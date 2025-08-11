@@ -1,0 +1,95 @@
+{
+  "name": "magnet-search-pro",
+  "version": "1.0.0",
+  "description": "专业的磁力搜索工具，支持用户系统、云端同步、智能缓存等功能",
+  "main": "backend/worker.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npx serve -s . -l 3000",
+    "dev:backend": "cd backend && wrangler dev",
+    "build": "echo 'No build process needed for vanilla JS'",
+    "deploy": "npm run deploy:backend && npm run deploy:frontend",
+    "deploy:backend": "cd backend && wrangler deploy",
+    "deploy:frontend": "cd frontend && wrangler pages deploy . --project-name=magnet-search",
+    "db:create": "cd backend && wrangler d1 create magnet-search-db",
+    "db:migrate": "cd backend && wrangler d1 execute magnet-search-db --file=schema.sql",
+    "db:migrate:dev": "cd backend && wrangler d1 execute magnet-search-db-dev --file=schema.sql",
+    "logs": "cd backend && wrangler tail",
+    "test": "echo 'Tests not implemented yet'",
+    "lint": "eslint frontend/js --fix",
+    "format": "prettier --write frontend/**/*.{html,css,js}",
+    "validate": "npm run lint && npm run format"
+  },
+  "keywords": [
+    "magnet",
+    "search",
+    "cloudflare",
+    "workers",
+    "d1",
+    "pages",
+    "javbus",
+    "javdb",
+    "torrent"
+  ],
+  "author": {
+    "name": "Your Name",
+    "email": "your.email@example.com",
+    "url": "https://github.com/yourusername"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/magnet-search-pro.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/magnet-search-pro/issues"
+  },
+  "homepage": "https://github.com/yourusername/magnet-search-pro#readme",
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "eslint": "^8.48.0",
+    "prettier": "^3.0.0",
+    "serve": "^14.2.0",
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "itty-router": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "eslintConfig": {
+    "env": {
+      "browser": true,
+      "es2021": true
+    },
+    "extends": "eslint:recommended",
+    "parserOptions": {
+      "ecmaVersion": "latest",
+      "sourceType": "module"
+    },
+    "rules": {
+      "no-unused-vars": "warn",
+      "no-console": "off",
+      "quotes": ["error", "single"],
+      "semi": ["error", "always"]
+    }
+  },
+  "prettier": {
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "tabWidth": 2,
+    "semi": true,
+    "printWidth": 100
+  },
+  "config": {
+    "frontend_port": 3000,
+    "backend_port": 8787
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "project_name": "磁力快搜 - 完整版",
+  "structure": {
+    "frontend/": {
+      "index.html": "主页面",
+      "login.html": "登录页面",
+      "dashboard.html": "用户面板",
+      "css/": {
+        "style.css": "主样式文件",
+        "login.css": "登录样式",
+        "dashboard.css": "面板样式"
+      },
+      "js/": {
+        "main.js": "主要逻辑",
+        "auth.js": "认证逻辑",
+        "api.js": "API调用",
+        "utils.js": "工具函数"
+      },
+      "images/": {
+        "favicon.ico": "网站图标",
+        "logo.png": "网站LOGO"
+      }
+    },
+    "backend/": {
+      "worker.js": "Cloudflare Worker主文件",
+      "schema.sql": "D1数据库结构",
+      "wrangler.toml": "Cloudflare配置文件"
+    },
+    "docs/": {
+      "README.md": "项目说明",
+      "DEPLOY.md": "部署指南"
+    }
+  },
+  "features": [
+    "用户注册/登录系统",
+    "JWT token认证",
+    "搜索记录云端同步",
+    "收藏夹云端同步",
+    "搜索结果缓存",
+    "用户个人面板",
+    "响应式设计",
+    "深色主题",
+    "搜索API代理",
+    "数据统计"
+  ]
+}
