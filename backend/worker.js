@@ -1,8 +1,78 @@
-// Cloudflare Worker 后端主文件
-import { Router } from 'itty-router';
+// Cloudflare Worker 后端主文件 - 直接部署版本
+// 支持直接上传到 Cloudflare Workers 控制台部署
 
-// 创建路由器
-const router = Router();
+// 简单的路由器实现（替代 itty-router）
+class SimpleRouter {
+    constructor() {
+        this.routes = [];
+    }
+
+    addRoute(method, path, handler) {
+        this.routes.push({ method, path, handler });
+    }
+
+    get(path, handler) {
+        this.addRoute('GET', path, handler);
+    }
+
+    post(path, handler) {
+        this.addRoute('POST', path, handler);
+    }
+
+    put(path, handler) {
+        this.addRoute('PUT', path, handler);
+    }
+
+    delete(path, handler) {
+        this.addRoute('DELETE', path, handler);
+    }
+
+    options(path, handler) {
+        this.addRoute('OPTIONS', path, handler);
+    }
+
+    all(path, handler) {
+        this.addRoute('*', path, handler);
+    }
+
+    async handle(request, env) {
+        const url = new URL(request.url);
+        const method = request.method;
+        const pathname = url.pathname;
+
+        // 查找匹配的路由
+        for (const route of this.routes) {
+            if (route.method === method || route.method === '*') {
+                if (this.matchPath(route.path, pathname)) {
+                    try {
+                        return await route.handler(request, env);
+                    } catch (error) {
+                        console.error('Route handler error:', error);
+                        return utils.errorResponse('Internal server error', 500);
+                    }
+                }
+            }
+        }
+
+        return utils.errorResponse('路由未找到', 404);
+    }
+
+    matchPath(routePath, requestPath) {
+        if (routePath === '*') return true;
+        if (routePath === requestPath) return true;
+        
+        // 支持通配符路径
+        if (routePath.endsWith('*')) {
+            const basePath = routePath.slice(0, -1);
+            return requestPath.startsWith(basePath);
+        }
+        
+        return false;
+    }
+}
+
+// 创建路由器实例
+const router = new SimpleRouter();
 
 // 数据库初始化SQL
 const DB_SCHEMA = `
@@ -191,6 +261,11 @@ const utils = {
     // 记录用户行为
     async logUserAction(env, userId, action, data, request) {
         try {
+            // 检查是否启用了行为记录
+            if (env.ENABLE_ACTION_LOGGING !== 'true') {
+                return;
+            }
+
             const actionId = this.generateId();
             const ip = this.getClientIP(request);
             const userAgent = request.headers.get('User-Agent') || '';
@@ -210,6 +285,27 @@ const utils = {
         } catch (error) {
             console.error('记录用户行为失败:', error);
         }
+    },
+
+    // 获取环境变量，如果不存在则返回默认值
+    getEnvVar(env, key, defaultValue = null) {
+        return env[key] !== undefined ? env[key] : defaultValue;
+    },
+
+    // 验证管理员权限
+    async verifyAdminAccess(request, env) {
+        const adminPassword = env.ADMIN_PASSWORD;
+        if (!adminPassword) {
+            return false;
+        }
+
+        const authHeader = request.headers.get('Authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return false;
+        }
+
+        const token = authHeader.substring(7);
+        return token === adminPassword;
     }
 };
 
@@ -221,7 +317,13 @@ async function authenticate(request, env) {
     }
 
     const token = authHeader.substring(7);
-    const payload = await utils.verifyJWT(token, env.JWT_SECRET);
+    const jwtSecret = env.JWT_SECRET;
+    if (!jwtSecret) {
+        console.error('JWT_SECRET 环境变量未设置');
+        return null;
+    }
+
+    const payload = await utils.verifyJWT(token, jwtSecret);
     
     if (!payload) {
         return null;
@@ -268,15 +370,24 @@ router.options('*', () => {
 
 // 健康检查
 router.get('/api/health', async (request, env) => {
+    const version = utils.getEnvVar(env, 'APP_VERSION', '1.0.0');
+    const environment = utils.getEnvVar(env, 'ENVIRONMENT', 'production');
+    
     return utils.successResponse({
         status: 'healthy',
         timestamp: Date.now(),
-        version: '1.0.0'
+        version,
+        environment
     });
 });
 
 // 初始化数据库
 router.post('/api/admin/init-db', async (request, env) => {
+    // 验证管理员权限
+    if (!await utils.verifyAdminAccess(request, env)) {
+        return utils.errorResponse('管理员权限验证失败', 403);
+    }
+
     try {
         // 执行数据库初始化
         const statements = DB_SCHEMA.split(';').filter(s => s.trim());
@@ -295,6 +406,12 @@ router.post('/api/admin/init-db', async (request, env) => {
 // 用户注册
 router.post('/api/auth/register', async (request, env) => {
     try {
+        // 检查是否允许注册
+        const allowRegistration = utils.getEnvVar(env, 'ALLOW_REGISTRATION', 'true') === 'true';
+        if (!allowRegistration) {
+            return utils.errorResponse('注册功能已关闭');
+        }
+
         const { username, email, password } = await request.json();
 
         // 输入验证
@@ -302,12 +419,16 @@ router.post('/api/auth/register', async (request, env) => {
             return utils.errorResponse('用户名、邮箱和密码都是必需的');
         }
 
-        if (username.length < 3 || username.length > 20) {
-            return utils.errorResponse('用户名长度应在3-20个字符之间');
+        const minUsernameLength = parseInt(utils.getEnvVar(env, 'MIN_USERNAME_LENGTH', '3'));
+        const maxUsernameLength = parseInt(utils.getEnvVar(env, 'MAX_USERNAME_LENGTH', '20'));
+        const minPasswordLength = parseInt(utils.getEnvVar(env, 'MIN_PASSWORD_LENGTH', '6'));
+
+        if (username.length < minUsernameLength || username.length > maxUsernameLength) {
+            return utils.errorResponse(`用户名长度应在${minUsernameLength}-${maxUsernameLength}个字符之间`);
         }
 
-        if (password.length < 6) {
-            return utils.errorResponse('密码至少需要6个字符');
+        if (password.length < minPasswordLength) {
+            return utils.errorResponse(`密码至少需要${minPasswordLength}个字符`);
         }
 
         // 检查用户名和邮箱是否已存在
@@ -367,15 +488,24 @@ router.post('/api/auth/login', async (request, env) => {
             return utils.errorResponse('用户名或密码错误');
         }
 
+        const jwtSecret = env.JWT_SECRET;
+        if (!jwtSecret) {
+            return utils.errorResponse('服务器配置错误', 500);
+        }
+
+        // 获取 token 过期时间（默认30天）
+        const tokenExpiryDays = parseInt(utils.getEnvVar(env, 'JWT_EXPIRY_DAYS', '30'));
+        const expirySeconds = tokenExpiryDays * 24 * 60 * 60;
+
         // 生成JWT token
         const payload = {
             userId: user.id,
             username: user.username,
             iat: Math.floor(Date.now() / 1000),
-            exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30天过期
+            exp: Math.floor(Date.now() / 1000) + expirySeconds
         };
 
-        const token = await utils.generateJWT(payload, env.JWT_SECRET);
+        const token = await utils.generateJWT(payload, jwtSecret);
         const tokenHash = await utils.hashPassword(token);
 
         // 清理过期会话
@@ -385,7 +515,7 @@ router.post('/api/auth/login', async (request, env) => {
 
         // 创建新会话
         const sessionId = utils.generateId();
-        const expiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30天
+        const expiresAt = Date.now() + (expirySeconds * 1000);
 
         await env.DB.prepare(`
             INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, last_activity)
@@ -432,15 +562,24 @@ router.post('/api/auth/refresh', async (request, env) => {
         return utils.errorResponse('认证失败', 401);
     }
 
+    const jwtSecret = env.JWT_SECRET;
+    if (!jwtSecret) {
+        return utils.errorResponse('服务器配置错误', 500);
+    }
+
+    // 获取 token 过期时间
+    const tokenExpiryDays = parseInt(utils.getEnvVar(env, 'JWT_EXPIRY_DAYS', '30'));
+    const expirySeconds = tokenExpiryDays * 24 * 60 * 60;
+
     // 生成新token
     const payload = {
         userId: user.id,
         username: user.username,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30天过期
+        exp: Math.floor(Date.now() / 1000) + expirySeconds
     };
 
-    const newToken = await utils.generateJWT(payload, env.JWT_SECRET);
+    const newToken = await utils.generateJWT(payload, jwtSecret);
     const tokenHash = await utils.hashPassword(newToken);
 
     // 更新会话
@@ -453,12 +592,7 @@ router.post('/api/auth/refresh', async (request, env) => {
         WHERE token_hash = ?
     `).bind(
         tokenHash,
-    await env.DB.prepare(`
-        UPDATE user_sessions SET token_hash = ?, expires_at = ?, last_activity = ?
-        WHERE token_hash = ?
-    `).bind(
-        tokenHash,
-        Date.now() + (30 * 24 * 60 * 60 * 1000),
+        Date.now() + (expirySeconds * 1000),
         Date.now(),
         oldTokenHash
     ).run();
@@ -500,6 +634,12 @@ router.post('/api/user/favorites', async (request, env) => {
 
         if (!Array.isArray(favorites)) {
             return utils.errorResponse('收藏夹数据格式错误');
+        }
+
+        // 检查收藏夹数量限制
+        const maxFavorites = parseInt(utils.getEnvVar(env, 'MAX_FAVORITES_PER_USER', '1000'));
+        if (favorites.length > maxFavorites) {
+            return utils.errorResponse(`收藏夹数量不能超过 ${maxFavorites} 个`);
         }
 
         // 清空现有收藏夹
@@ -583,6 +723,12 @@ router.post('/api/user/search-history', async (request, env) => {
             return utils.errorResponse('搜索历史数据格式错误');
         }
 
+        // 检查搜索历史数量限制
+        const maxHistoryItems = parseInt(utils.getEnvVar(env, 'MAX_HISTORY_PER_USER', '1000'));
+        if (history.length > maxHistoryItems) {
+            return utils.errorResponse(`搜索历史数量不能超过 ${maxHistoryItems} 个`);
+        }
+
         // 清空现有搜索历史
         await env.DB.prepare(`
             DELETE FROM user_search_history WHERE user_id = ?
@@ -623,9 +769,12 @@ router.get('/api/user/search-history', async (request, env) => {
     }
 
     try {
+        const url = new URL(request.url);
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
+
         const result = await env.DB.prepare(`
-            SELECT * FROM user_search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 50
-        `).bind(user.id).all();
+            SELECT * FROM user_search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?
+        `).bind(user.id, limit).all();
 
         const history = result.results.map(item => ({
             keyword: item.keyword,
@@ -653,17 +802,23 @@ router.post('/api/search/enhanced', async (request, env) => {
         const { keyword, basicResults } = await request.json();
 
         // 检查缓存
-        const cached = await env.DB.prepare(`
-            SELECT results FROM search_cache WHERE keyword = ? AND expires_at > ?
-        `).bind(keyword, Date.now()).first();
+        const cacheEnabled = utils.getEnvVar(env, 'ENABLE_SEARCH_CACHE', 'true') === 'true';
+        if (cacheEnabled) {
+            const cached = await env.DB.prepare(`
+                SELECT results FROM search_cache WHERE keyword = ? AND expires_at > ?
+            `).bind(keyword, Date.now()).first();
 
-        if (cached) {
-            return utils.successResponse({ results: JSON.parse(cached.results) });
+            if (cached) {
+                return utils.successResponse({ 
+                    results: JSON.parse(cached.results),
+                    cached: true
+                });
+            }
         }
 
         // TODO: 这里可以添加实际的搜索增强逻辑
         // 比如调用第三方API、爬虫等
-        let enhancedResults = basicResults;
+        let enhancedResults = basicResults || [];
 
         // 简单的结果增强示例：添加可用性检查
         for (let result of enhancedResults) {
@@ -672,18 +827,21 @@ router.post('/api/search/enhanced', async (request, env) => {
             // 这里可以添加实际的网站可用性检查
         }
 
-        // 缓存结果（1小时）
-        const cacheId = utils.generateId();
-        await env.DB.prepare(`
-            INSERT INTO search_cache (id, keyword, results, expires_at, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        `).bind(
-            cacheId,
-            keyword,
-            JSON.stringify(enhancedResults),
-            Date.now() + (60 * 60 * 1000), // 1小时
-            Date.now()
-        ).run();
+        // 缓存结果
+        if (cacheEnabled) {
+            const cacheTTL = parseInt(utils.getEnvVar(env, 'SEARCH_CACHE_TTL', '1800')); // 默认30分钟
+            const cacheId = utils.generateId();
+            await env.DB.prepare(`
+                INSERT OR REPLACE INTO search_cache (id, keyword, results, expires_at, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            `).bind(
+                cacheId,
+                keyword,
+                JSON.stringify(enhancedResults),
+                Date.now() + (cacheTTL * 1000),
+                Date.now()
+            ).run();
+        }
 
         // 记录搜索行为
         await utils.logUserAction(env, user.id, 'search_enhanced', { keyword, resultsCount: enhancedResults.length }, request);
@@ -801,13 +959,20 @@ router.post('/api/sites/status', async (request, env) => {
     try {
         const { urls } = await request.json();
         const results = [];
+        const timeoutMs = parseInt(utils.getEnvVar(env, 'SITE_CHECK_TIMEOUT', '5000'));
 
         for (const url of urls) {
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                
                 const response = await fetch(url, { 
-                    method: 'HEAD', 
-                    signal: AbortSignal.timeout(5000) 
+                    method: 'HEAD',
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
+                
                 results.push({
                     url,
                     status: response.status,
@@ -866,7 +1031,8 @@ router.get('/api/cache/search', async (request, env) => {
 
 router.post('/api/cache/search', async (request, env) => {
     try {
-        const { keyword, results, ttl = 1800 } = await request.json();
+        const { keyword, results, ttl } = await request.json();
+        const cacheTTL = ttl || parseInt(utils.getEnvVar(env, 'SEARCH_CACHE_TTL', '1800'));
 
         const cacheId = utils.generateId();
         await env.DB.prepare(`
@@ -876,7 +1042,7 @@ router.post('/api/cache/search', async (request, env) => {
             cacheId,
             keyword,
             JSON.stringify(results),
-            Date.now() + (ttl * 1000),
+            Date.now() + (cacheTTL * 1000),
             Date.now()
         ).run();
 
@@ -891,7 +1057,17 @@ router.post('/api/cache/search', async (request, env) => {
 // 统计API
 router.get('/api/stats', async (request, env) => {
     try {
-        // 获取总体统计（可以根据需要调整权限）
+        // 检查是否允许查看统计（可以根据需要调整权限）
+        const allowPublicStats = utils.getEnvVar(env, 'ALLOW_PUBLIC_STATS', 'false') === 'true';
+        
+        if (!allowPublicStats) {
+            // 验证管理员权限
+            if (!await utils.verifyAdminAccess(request, env)) {
+                return utils.errorResponse('权限不足', 403);
+            }
+        }
+
+        // 获取总体统计
         const userCount = await env.DB.prepare(`
             SELECT COUNT(*) as count FROM users
         `).first();
@@ -967,31 +1143,61 @@ router.post('/api/feedback', async (request, env) => {
 
 // 清理过期数据的定时任务端点
 router.post('/api/admin/cleanup', async (request, env) => {
+    // 验证管理员权限
+    if (!await utils.verifyAdminAccess(request, env)) {
+        return utils.errorResponse('管理员权限验证失败', 403);
+    }
+
     try {
         const now = Date.now();
         
         // 清理过期会话
-        await env.DB.prepare(`
-            DELETE FROM user_sessions WHERE expires_at < ?
-        `).bind(now).run();
+        const expiredSessions = await env.DB.prepare(`
+            DELETE FROM user_sessions WHERE expires_at < ? RETURNING COUNT(*) as count
+        `).bind(now).all();
 
         // 清理过期缓存
-        await env.DB.prepare(`
-            DELETE FROM search_cache WHERE expires_at < ?
-        `).bind(now).run();
+        const expiredCache = await env.DB.prepare(`
+            DELETE FROM search_cache WHERE expires_at < ? RETURNING COUNT(*) as count
+        `).bind(now).all();
 
-        // 清理旧的用户行为记录（保留30天）
-        const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
-        await env.DB.prepare(`
-            DELETE FROM user_actions WHERE created_at < ?
-        `).bind(thirtyDaysAgo).run();
+        // 清理旧的用户行为记录（保留指定天数）
+        const retentionDays = parseInt(utils.getEnvVar(env, 'ACTION_LOG_RETENTION_DAYS', '30'));
+        const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+        const cutoffTime = now - retentionMs;
+        
+        const oldActions = await env.DB.prepare(`
+            DELETE FROM user_actions WHERE created_at < ? RETURNING COUNT(*) as count
+        `).bind(cutoffTime).all();
 
-        return utils.successResponse({ message: '数据清理完成' });
+        return utils.successResponse({ 
+            message: '数据清理完成',
+            cleaned: {
+                sessions: expiredSessions.results?.[0]?.count || 0,
+                cache: expiredCache.results?.[0]?.count || 0,
+                actions: oldActions.results?.[0]?.count || 0
+            }
+        });
 
     } catch (error) {
         console.error('数据清理失败:', error);
         return utils.errorResponse('数据清理失败', 500);
     }
+});
+
+// 系统配置信息（不包含敏感信息）
+router.get('/api/config', async (request, env) => {
+    return utils.successResponse({
+        allowRegistration: utils.getEnvVar(env, 'ALLOW_REGISTRATION', 'true') === 'true',
+        minUsernameLength: parseInt(utils.getEnvVar(env, 'MIN_USERNAME_LENGTH', '3')),
+        maxUsernameLength: parseInt(utils.getEnvVar(env, 'MAX_USERNAME_LENGTH', '20')),
+        minPasswordLength: parseInt(utils.getEnvVar(env, 'MIN_PASSWORD_LENGTH', '6')),
+        maxFavoritesPerUser: parseInt(utils.getEnvVar(env, 'MAX_FAVORITES_PER_USER', '1000')),
+        maxHistoryPerUser: parseInt(utils.getEnvVar(env, 'MAX_HISTORY_PER_USER', '1000')),
+        searchCacheEnabled: utils.getEnvVar(env, 'ENABLE_SEARCH_CACHE', 'true') === 'true',
+        version: utils.getEnvVar(env, 'APP_VERSION', '1.0.0'),
+        environment: utils.getEnvVar(env, 'ENVIRONMENT', 'production')
+    });
 });
 
 // 默认路由 - 处理未匹配的路径
@@ -1001,6 +1207,17 @@ router.all('*', () => utils.errorResponse('API路径不存在', 404));
 export default {
     async fetch(request, env, ctx) {
         try {
+            // 验证必需的环境变量
+            if (!env.JWT_SECRET) {
+                console.error('JWT_SECRET 环境变量未设置');
+                return utils.errorResponse('服务器配置错误：缺少JWT密钥', 500);
+            }
+
+            if (!env.DB) {
+                console.error('DB 环境变量未设置');
+                return utils.errorResponse('服务器配置错误：数据库未配置', 500);
+            }
+
             return await router.handle(request, env);
         } catch (error) {
             console.error('Worker错误:', error);
