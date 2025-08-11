@@ -1,19 +1,81 @@
-// 主要应用逻辑
+// 主要应用逻辑 - 优化版本
+// 修复认证集成、错误处理、UI交互等问题
 class MagnetSearchApp {
     constructor() {
         this.currentUser = null;
         this.searchHistory = [];
         this.favorites = [];
         this.currentSearchResults = [];
+        this.isInitialized = false;
+        this.config = {};
         this.init();
     }
 
     // 初始化应用
-    init() {
-        this.bindEvents();
-        this.loadLocalData();
-        this.initTheme();
-        this.checkAuthStatus();
+    async init() {
+        try {
+            showLoading(true);
+            
+            // 加载系统配置
+            await this.loadConfig();
+            
+            // 绑定事件
+            this.bindEvents();
+            
+            // 加载本地数据
+            this.loadLocalData();
+            
+            // 初始化主题
+            this.initTheme();
+            
+            // 检查认证状态
+            await this.checkAuthStatus();
+            
+            // 测试API连接
+            await this.testAPIConnection();
+            
+            this.isInitialized = true;
+            console.log('✅ 应用初始化完成');
+            
+        } catch (error) {
+            console.error('❌ 应用初始化失败:', error);
+            showToast('应用初始化失败，请刷新页面重试', 'error', 5000);
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 加载系统配置
+    async loadConfig() {
+        try {
+            this.config = await API.getConfig();
+            console.log('📋 系统配置已加载:', this.config);
+        } catch (error) {
+            console.error('配置加载失败:', error);
+            // 使用默认配置
+            this.config = {
+                allowRegistration: true,
+                minUsernameLength: 3,
+                maxUsernameLength: 20,
+                minPasswordLength: 6,
+                maxFavoritesPerUser: 1000,
+                maxHistoryPerUser: 1000
+            };
+        }
+    }
+
+    // 测试API连接
+    async testAPIConnection() {
+        try {
+            const testResult = await APITester.testConnection();
+            if (!testResult.tests.every(t => t.status === 'success')) {
+                console.warn('⚠️ API连接测试存在问题');
+                showToast('API连接不稳定，部分功能可能受影响', 'warning', 5000);
+            }
+        } catch (error) {
+            console.error('API连接测试失败:', error);
+            showToast('无法连接到服务器，请检查网络连接', 'error', 5000);
+        }
     }
 
     // 绑定事件监听器
@@ -27,7 +89,9 @@ class MagnetSearchApp {
             searchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') this.performSearch();
             });
-            searchInput.addEventListener('input', (e) => this.handleSearchInput(e.target.value));
+            searchInput.addEventListener('input', debounce((e) => {
+                this.handleSearchInput(e.target.value);
+            }, 300));
         }
 
         // 主题切换
@@ -36,17 +100,27 @@ class MagnetSearchApp {
             themeToggle.addEventListener('click', () => this.toggleTheme());
         }
 
-        // 清除按钮
+        // 功能按钮
+        this.bindFunctionButtons();
+        
+        // 模态框相关
+        this.bindModalEvents();
+
+        // 全局键盘快捷键
+        this.bindKeyboardShortcuts();
+    }
+
+    // 绑定功能按钮
+    bindFunctionButtons() {
         const clearHistoryBtn = document.getElementById('clearHistoryBtn');
         const clearResultsBtn = document.getElementById('clearResultsBtn');
         const syncFavoritesBtn = document.getElementById('syncFavoritesBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
 
         if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', () => this.clearHistory());
         if (clearResultsBtn) clearResultsBtn.addEventListener('click', () => this.clearResults());
         if (syncFavoritesBtn) syncFavoritesBtn.addEventListener('click', () => this.syncFavorites());
-
-        // 模态框相关
-        this.bindModalEvents();
+        if (refreshBtn) refreshBtn.addEventListener('click', () => this.refreshData());
     }
 
     // 绑定模态框事件
@@ -73,16 +147,13 @@ class MagnetSearchApp {
         });
 
         // 点击模态框外部关闭
-        if (loginModal) {
-            loginModal.addEventListener('click', (e) => {
-                if (e.target === loginModal) this.closeModals();
-            });
-        }
-        if (registerModal) {
-            registerModal.addEventListener('click', (e) => {
-                if (e.target === registerModal) this.closeModals();
-            });
-        }
+        [loginModal, registerModal].forEach(modal => {
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) this.closeModals();
+                });
+            }
+        });
 
         // 表单提交
         const loginForm = document.getElementById('loginForm');
@@ -92,6 +163,26 @@ class MagnetSearchApp {
         if (registerForm) registerForm.addEventListener('submit', (e) => this.handleRegister(e));
     }
 
+    // 绑定键盘快捷键
+    bindKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + K 聚焦搜索框
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+            }
+
+            // Escape 关闭模态框
+            if (e.key === 'Escape') {
+                this.closeModals();
+            }
+        });
+    }
+
     // 执行搜索
     async performSearch() {
         const searchInput = document.getElementById('searchInput');
@@ -99,6 +190,13 @@ class MagnetSearchApp {
         
         if (!keyword) {
             showToast('请输入搜索关键词', 'error');
+            searchInput?.focus();
+            return;
+        }
+
+        // 验证搜索关键词
+        if (keyword.length > 100) {
+            showToast('搜索关键词过长', 'error');
             return;
         }
 
@@ -114,14 +212,24 @@ class MagnetSearchApp {
             // 显示搜索结果
             this.displaySearchResults(keyword, results);
 
-            // 如果用户已登录且开启自动同步，同步到云端
-            if (this.currentUser && document.getElementById('autoSync')?.checked) {
-                await this.syncSearchHistory();
+            // 记录搜索行为
+            if (typeof API !== 'undefined') {
+                API.recordAction('search', { keyword, resultCount: results.length }).catch(console.error);
+            }
+
+            // 如果用户已登录，记录搜索
+            if (this.currentUser) {
+                API.addSearchRecord(keyword, results).catch(console.error);
+                
+                // 自动同步（如果开启）
+                if (document.getElementById('autoSync')?.checked) {
+                    await this.syncSearchHistory();
+                }
             }
 
         } catch (error) {
             console.error('搜索失败:', error);
-            showToast('搜索失败，请稍后重试', 'error');
+            showToast(`搜索失败: ${error.message}`, 'error');
         } finally {
             showLoading(false);
         }
@@ -135,78 +243,98 @@ class MagnetSearchApp {
         if (cacheResults) {
             const cached = this.getCachedResults(keyword);
             if (cached) {
-                showToast('使用缓存结果', 'success');
+                showToast('使用缓存结果', 'info');
                 return cached;
             }
         }
 
         // 构建搜索源
-        const sources = [
-            {
-                name: 'JavBus',
-                url: `https://www.javbus.com/search/${encodeURIComponent(keyword)}`,
-                icon: '🎬',
-                description: '番号+磁力一体站，信息完善'
-            },
-            {
-                name: 'JavDB',
-                url: `https://javdb.com/search?q=${encodeURIComponent(keyword)}&f=all`,
-                icon: '📚',
-                description: '极简风格番号资料站，轻量快速'
-            },
-            {
-                name: 'JavLibrary',
-                url: `https://www.javlibrary.com/cn/vl_searchbyid.php?keyword=${encodeURIComponent(keyword)}`,
-                icon: '📖',
-                description: '评论活跃，女优搜索详尽'
-            },
-            {
-                name: 'AV01',
-                url: `https://av01.tv/search?keyword=${encodeURIComponent(keyword)}`,
-                icon: '🎥',
-                description: '快速预览站点，封面大图清晰'
-            },
-            {
-                name: 'MissAV',
-                url: `https://missav.com/search/${encodeURIComponent(keyword)}`,
-                icon: '💫',
-                description: '中文界面，封面高清，信息丰富'
-            },
-            {
-                name: 'btsow',
-                url: `https://btsow.com/search/${encodeURIComponent(keyword)}`,
-                icon: '🧲',
-                description: '中文磁力搜索引擎，番号资源丰富'
-            }
-        ];
+        const sources = this.buildSearchSources(keyword);
 
-        const results = sources.map((source, index) => ({
-            id: `result_${keyword}_${index}`,
-            title: source.name,
-            subtitle: source.description,
-            url: source.url,
-            icon: source.icon,
-            keyword: keyword,
-            timestamp: Date.now()
-        }));
-
-        // 缓存结果
-        if (cacheResults) {
-            this.cacheResults(keyword, results);
-        }
-
-        // 如果用户已登录，发送到后端进行高级处理
+        // 如果用户已登录，尝试使用增强搜索
         if (this.currentUser) {
             try {
-                const enhancedResults = await API.searchEnhanced(keyword, results);
-                return enhancedResults || results;
+                const enhancedResults = await API.searchEnhanced(keyword, sources);
+                if (enhancedResults) {
+                    // 缓存结果
+                    if (cacheResults) {
+                        this.cacheResults(keyword, enhancedResults);
+                    }
+                    return enhancedResults;
+                }
             } catch (error) {
-                console.error('增强搜索失败:', error);
-                return results;
+                console.warn('增强搜索失败，使用基础搜索:', error);
             }
         }
 
-        return results;
+        // 缓存基础搜索结果
+        if (cacheResults) {
+            this.cacheResults(keyword, sources);
+        }
+
+        return sources;
+    }
+
+    // 构建搜索源
+    buildSearchSources(keyword) {
+        const encodedKeyword = encodeURIComponent(keyword);
+        
+        return [
+            {
+                id: `result_${keyword}_javbus`,
+                title: 'JavBus',
+                subtitle: '番号+磁力一体站，信息完善',
+                url: `https://www.javbus.com/search/${encodedKeyword}`,
+                icon: '🎬',
+                keyword: keyword,
+                timestamp: Date.now()
+            },
+            {
+                id: `result_${keyword}_javdb`,
+                title: 'JavDB',
+                subtitle: '极简风格番号资料站，轻量快速',
+                url: `https://javdb.com/search?q=${encodedKeyword}&f=all`,
+                icon: '📚',
+                keyword: keyword,
+                timestamp: Date.now()
+            },
+            {
+                id: `result_${keyword}_javlibrary`,
+                title: 'JavLibrary',
+                subtitle: '评论活跃，女优搜索详尽',
+                url: `https://www.javlibrary.com/cn/vl_searchbyid.php?keyword=${encodedKeyword}`,
+                icon: '📖',
+                keyword: keyword,
+                timestamp: Date.now()
+            },
+            {
+                id: `result_${keyword}_av01`,
+                title: 'AV01',
+                subtitle: '快速预览站点，封面大图清晰',
+                url: `https://av01.tv/search?keyword=${encodedKeyword}`,
+                icon: '🎥',
+                keyword: keyword,
+                timestamp: Date.now()
+            },
+            {
+                id: `result_${keyword}_missav`,
+                title: 'MissAV',
+                subtitle: '中文界面，封面高清，信息丰富',
+                url: `https://missav.com/search/${encodedKeyword}`,
+                icon: '💫',
+                keyword: keyword,
+                timestamp: Date.now()
+            },
+            {
+                id: `result_${keyword}_btsow`,
+                title: 'btsow',
+                subtitle: '中文磁力搜索引擎，番号资源丰富',
+                url: `https://btsow.com/search/${encodedKeyword}`,
+                icon: '🧲',
+                keyword: keyword,
+                timestamp: Date.now()
+            }
+        ];
     }
 
     // 显示搜索结果
@@ -228,6 +356,11 @@ class MagnetSearchApp {
         }
 
         this.currentSearchResults = results;
+        
+        // 滚动到结果区域
+        setTimeout(() => {
+            resultsSection?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
     }
 
     // 创建搜索结果HTML
@@ -239,64 +372,131 @@ class MagnetSearchApp {
                 <div class="result-image">
                     <span style="font-size: 2rem;">${result.icon}</span>
                 </div>
-                <div class="result-title">${result.title}</div>
-                <div class="result-subtitle">${result.subtitle}</div>
+                <div class="result-content">
+                    <div class="result-title">${this.escapeHtml(result.title)}</div>
+                    <div class="result-subtitle">${this.escapeHtml(result.subtitle)}</div>
+                    <div class="result-url">${this.escapeHtml(result.url)}</div>
+                </div>
                 <div class="result-actions">
-                    <button class="action-btn visit-btn" onclick="app.openResult('${result.url}')">
+                    <button class="action-btn visit-btn" onclick="app.openResult('${this.escapeHtml(result.url)}')">
                         访问
                     </button>
                     <button class="action-btn favorite-btn ${isFavorited ? 'favorited' : ''}" 
                             onclick="app.toggleFavorite('${result.id}')">
                         ${isFavorited ? '已收藏' : '收藏'}
                     </button>
+                    <button class="action-btn copy-btn" onclick="app.copyToClipboard('${this.escapeHtml(result.url)}')">
+                        复制
+                    </button>
                 </div>
             </div>
         `;
     }
 
+    // HTML转义
+    escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
     // 绑定结果事件
     bindResultEvents() {
-        // 已在HTML中使用onclick处理
+        // 已在HTML中使用onclick处理，无需额外绑定
     }
 
     // 打开搜索结果
     openResult(url) {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        try {
+            // 记录访问行为
+            if (typeof API !== 'undefined') {
+                API.recordAction('visit_site', { url }).catch(console.error);
+            }
+            
+            window.open(url, '_blank', 'noopener,noreferrer');
+            showToast('已在新标签页打开', 'success');
+        } catch (error) {
+            console.error('打开链接失败:', error);
+            showToast('无法打开链接', 'error');
+        }
+    }
+
+    // 复制到剪贴板
+    async copyToClipboard(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast('已复制到剪贴板', 'success');
+            
+            // 记录复制行为
+            if (typeof API !== 'undefined') {
+                API.recordAction('copy_url', { url: text }).catch(console.error);
+            }
+        } catch (error) {
+            // 降级到旧方法
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast('已复制到剪贴板', 'success');
+            } catch (err) {
+                showToast('复制失败', 'error');
+            }
+            document.body.removeChild(textArea);
+        }
     }
 
     // 切换收藏状态
-    toggleFavorite(resultId) {
+    async toggleFavorite(resultId) {
         const result = this.currentSearchResults.find(r => r.id === resultId);
         if (!result) return;
 
         const existingIndex = this.favorites.findIndex(fav => fav.url === result.url);
         
-        if (existingIndex >= 0) {
-            // 移除收藏
-            this.favorites.splice(existingIndex, 1);
-            showToast('已移除收藏', 'success');
-        } else {
-            // 添加收藏
-            const favorite = {
-                id: `fav_${Date.now()}`,
-                title: result.title,
-                subtitle: result.subtitle,
-                url: result.url,
-                icon: result.icon,
-                keyword: result.keyword,
-                addedAt: new Date().toISOString()
-            };
-            this.favorites.unshift(favorite);
-            showToast('已添加收藏', 'success');
-        }
+        try {
+            if (existingIndex >= 0) {
+                // 移除收藏
+                this.favorites.splice(existingIndex, 1);
+                showToast('已移除收藏', 'success');
+            } else {
+                // 检查收藏数量限制
+                const maxFavorites = this.config.maxFavoritesPerUser || 1000;
+                if (this.favorites.length >= maxFavorites) {
+                    showToast(`收藏数量已达上限 (${maxFavorites})`, 'error');
+                    return;
+                }
+                
+                // 添加收藏
+                const favorite = {
+                    id: `fav_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    title: result.title,
+                    subtitle: result.subtitle,
+                    url: result.url,
+                    icon: result.icon,
+                    keyword: result.keyword,
+                    addedAt: new Date().toISOString()
+                };
+                this.favorites.unshift(favorite);
+                showToast('已添加收藏', 'success');
+            }
 
-        this.saveFavorites();
-        this.renderFavorites();
-        this.updateFavoriteButtons();
+            this.saveFavorites();
+            this.renderFavorites();
+            this.updateFavoriteButtons();
 
-        // 如果用户已登录，同步到云端
-        if (this.currentUser) {
-            this.syncFavorites();
+            // 如果用户已登录，同步到云端
+            if (this.currentUser) {
+                await this.syncFavorites();
+            }
+        } catch (error) {
+            console.error('收藏操作失败:', error);
+            showToast('收藏操作失败', 'error');
         }
     }
 
@@ -329,8 +529,9 @@ class MagnetSearchApp {
         });
 
         // 限制历史记录数量
-        if (this.searchHistory.length > 50) {
-            this.searchHistory = this.searchHistory.slice(0, 50);
+        const maxHistory = this.config.maxHistoryPerUser || 1000;
+        if (this.searchHistory.length > maxHistory) {
+            this.searchHistory = this.searchHistory.slice(0, maxHistory);
         }
 
         this.saveHistory();
@@ -350,9 +551,9 @@ class MagnetSearchApp {
         if (historySection) historySection.style.display = 'block';
         
         if (historyList) {
-            historyList.innerHTML = this.searchHistory.map(item => 
-                `<span class="history-item" onclick="app.searchFromHistory('${item.keyword.replace(/'/g, "\\'")}')">
-                    ${item.keyword}
+            historyList.innerHTML = this.searchHistory.slice(0, 10).map(item => 
+                `<span class="history-item" onclick="app.searchFromHistory('${this.escapeHtml(item.keyword)}')">
+                    ${this.escapeHtml(item.keyword)}
                 </span>`
             ).join('');
         }
@@ -375,9 +576,10 @@ class MagnetSearchApp {
 
         if (this.favorites.length === 0) {
             favoritesContainer.innerHTML = `
-                <div style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                <div class="empty-state">
                     <span style="font-size: 3rem;">📌</span>
                     <p>暂无收藏，搜索后添加收藏吧！</p>
+                    ${this.currentUser ? '' : '<p><small>登录后可以同步收藏到云端</small></p>'}
                 </div>
             `;
             return;
@@ -385,14 +587,24 @@ class MagnetSearchApp {
 
         favoritesContainer.innerHTML = this.favorites.map(fav => `
             <div class="favorite-item" data-id="${fav.id}">
-                <div class="favorite-title">
-                    <span style="margin-right: 0.5rem;">${fav.icon}</span>
-                    ${fav.title}
+                <div class="favorite-content">
+                    <div class="favorite-title">
+                        <span class="favorite-icon">${fav.icon}</span>
+                        <span class="favorite-name">${this.escapeHtml(fav.title)}</span>
+                    </div>
+                    <div class="favorite-subtitle">${this.escapeHtml(fav.subtitle)}</div>
+                    <div class="favorite-url">${this.escapeHtml(fav.url)}</div>
+                    <div class="favorite-meta">
+                        <span>关键词: ${this.escapeHtml(fav.keyword)}</span>
+                        <span>添加时间: ${formatRelativeTime(fav.addedAt)}</span>
+                    </div>
                 </div>
-                <div class="favorite-url">${fav.url}</div>
                 <div class="favorite-actions">
-                    <button class="action-btn visit-btn" onclick="app.openResult('${fav.url}')">
+                    <button class="action-btn visit-btn" onclick="app.openResult('${this.escapeHtml(fav.url)}')">
                         访问
+                    </button>
+                    <button class="action-btn copy-btn" onclick="app.copyToClipboard('${this.escapeHtml(fav.url)}')">
+                        复制
                     </button>
                     <button class="action-btn remove-btn" onclick="app.removeFavorite('${fav.id}')">
                         删除
@@ -403,7 +615,9 @@ class MagnetSearchApp {
     }
 
     // 移除收藏
-    removeFavorite(favoriteId) {
+    async removeFavorite(favoriteId) {
+        if (!confirm('确定要移除这个收藏吗？')) return;
+        
         const index = this.favorites.findIndex(fav => fav.id === favoriteId);
         if (index >= 0) {
             this.favorites.splice(index, 1);
@@ -414,19 +628,19 @@ class MagnetSearchApp {
 
             // 同步到云端
             if (this.currentUser) {
-                this.syncFavorites();
+                await this.syncFavorites();
             }
         }
     }
 
     // 清除搜索历史
     clearHistory() {
-        if (confirm('确定要清除所有搜索历史吗？')) {
-            this.searchHistory = [];
-            this.saveHistory();
-            this.renderHistory();
-            showToast('搜索历史已清除', 'success');
-        }
+        if (!confirm('确定要清除所有搜索历史吗？')) return;
+        
+        this.searchHistory = [];
+        this.saveHistory();
+        this.renderHistory();
+        showToast('搜索历史已清除', 'success');
     }
 
     // 清除搜索结果
@@ -442,22 +656,43 @@ class MagnetSearchApp {
         if (clearResultsBtn) clearResultsBtn.style.display = 'none';
 
         this.currentSearchResults = [];
+        showToast('搜索结果已清除', 'success');
+    }
+
+    // 刷新数据
+    async refreshData() {
+        if (!this.currentUser) {
+            showToast('请先登录', 'error');
+            return;
+        }
+
+        try {
+            showLoading(true);
+            showToast('正在刷新数据...', 'info');
+            
+            await this.loadCloudData();
+            showToast('数据刷新成功', 'success');
+        } catch (error) {
+            console.error('刷新数据失败:', error);
+            showToast('数据刷新失败', 'error');
+        } finally {
+            showLoading(false);
+        }
     }
 
     // 缓存管理
     getCachedResults(keyword) {
         const cacheKey = `search_cache_${keyword}`;
-        const cached = localStorage.getItem(cacheKey);
+        const cached = StorageManager.getItem(cacheKey);
         
         if (cached) {
-            const data = JSON.parse(cached);
             const now = Date.now();
             const cacheTimeout = 30 * 60 * 1000; // 30分钟
             
-            if (now - data.timestamp < cacheTimeout) {
-                return data.results;
+            if (now - cached.timestamp < cacheTimeout) {
+                return cached.results;
             } else {
-                localStorage.removeItem(cacheKey);
+                StorageManager.removeItem(cacheKey);
             }
         }
         
@@ -472,66 +707,45 @@ class MagnetSearchApp {
             timestamp: Date.now()
         };
         
-        try {
-            localStorage.setItem(cacheKey, JSON.stringify(data));
-        } catch (error) {
-            console.error('缓存失败:', error);
-        }
+        StorageManager.setItem(cacheKey, data);
     }
 
     // 本地数据管理
     loadLocalData() {
-        // 加载搜索历史
-        const savedHistory = localStorage.getItem('search_history');
-        if (savedHistory) {
-            try {
-                this.searchHistory = JSON.parse(savedHistory);
-                this.renderHistory();
-            } catch (error) {
-                console.error('加载搜索历史失败:', error);
-                this.searchHistory = [];
-            }
-        }
+        try {
+            // 加载搜索历史
+            this.searchHistory = StorageManager.getItem('search_history', []);
+            this.renderHistory();
 
-        // 加载收藏夹
-        const savedFavorites = localStorage.getItem('favorites');
-        if (savedFavorites) {
-            try {
-                this.favorites = JSON.parse(savedFavorites);
-                this.renderFavorites();
-            } catch (error) {
-                console.error('加载收藏夹失败:', error);
-                this.favorites = [];
-            }
+            // 加载收藏夹
+            this.favorites = StorageManager.getItem('favorites', []);
+            this.renderFavorites();
+            
+            console.log(`📚 本地数据已加载: ${this.searchHistory.length}条历史, ${this.favorites.length}个收藏`);
+        } catch (error) {
+            console.error('加载本地数据失败:', error);
+            this.searchHistory = [];
+            this.favorites = [];
         }
     }
 
     saveHistory() {
-        try {
-            localStorage.setItem('search_history', JSON.stringify(this.searchHistory));
-        } catch (error) {
-            console.error('保存搜索历史失败:', error);
-        }
+        StorageManager.setItem('search_history', this.searchHistory);
     }
 
     saveFavorites() {
-        try {
-            localStorage.setItem('favorites', JSON.stringify(this.favorites));
-        } catch (error) {
-            console.error('保存收藏夹失败:', error);
-        }
+        StorageManager.setItem('favorites', this.favorites);
     }
 
     // 主题管理
     initTheme() {
-        const savedTheme = localStorage.getItem('theme') || 'light';
+        const savedTheme = StorageManager.getItem('theme', 'light');
         const themeToggle = document.getElementById('themeToggle');
         
-        if (savedTheme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            if (themeToggle) themeToggle.textContent = '☀️';
-        } else {
-            if (themeToggle) themeToggle.textContent = '🌙';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        if (themeToggle) {
+            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
         }
     }
 
@@ -541,7 +755,7 @@ class MagnetSearchApp {
         const themeToggle = document.getElementById('themeToggle');
         
         document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
+        StorageManager.setItem('theme', newTheme);
         
         if (themeToggle) {
             themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
@@ -563,7 +777,7 @@ class MagnetSearchApp {
             showToast('收藏夹同步成功', 'success');
         } catch (error) {
             console.error('收藏夹同步失败:', error);
-            showToast('收藏夹同步失败', 'error');
+            showToast(`收藏夹同步失败: ${error.message}`, 'error');
         } finally {
             showLoading(false);
         }
@@ -585,7 +799,14 @@ class MagnetSearchApp {
         const registerModal = document.getElementById('registerModal');
         
         if (registerModal) registerModal.style.display = 'none';
-        if (loginModal) loginModal.style.display = 'block';
+        if (loginModal) {
+            loginModal.style.display = 'block';
+            // 聚焦用户名输入框
+            setTimeout(() => {
+                const usernameInput = document.getElementById('loginUsername');
+                if (usernameInput) usernameInput.focus();
+            }, 100);
+        }
     }
 
     showRegisterModal() {
@@ -593,7 +814,14 @@ class MagnetSearchApp {
         const registerModal = document.getElementById('registerModal');
         
         if (loginModal) loginModal.style.display = 'none';
-        if (registerModal) registerModal.style.display = 'block';
+        if (registerModal) {
+            registerModal.style.display = 'block';
+            // 聚焦用户名输入框
+            setTimeout(() => {
+                const usernameInput = document.getElementById('regUsername');
+                if (usernameInput) usernameInput.focus();
+            }, 100);
+        }
     }
 
     closeModals() {
@@ -608,7 +836,7 @@ class MagnetSearchApp {
     async handleLogin(event) {
         event.preventDefault();
         
-        const username = document.getElementById('loginUsername')?.value;
+        const username = document.getElementById('loginUsername')?.value.trim();
         const password = document.getElementById('loginPassword')?.value;
 
         if (!username || !password) {
@@ -628,12 +856,15 @@ class MagnetSearchApp {
                 
                 // 登录后同步云端数据
                 await this.loadCloudData();
+                
+                // 清空登录表单
+                document.getElementById('loginForm').reset();
             } else {
                 showToast(result.message || '登录失败', 'error');
             }
         } catch (error) {
             console.error('登录失败:', error);
-            showToast('登录失败，请稍后重试', 'error');
+            showToast(`登录失败: ${error.message}`, 'error');
         } finally {
             showLoading(false);
         }
@@ -642,11 +873,12 @@ class MagnetSearchApp {
     async handleRegister(event) {
         event.preventDefault();
         
-        const username = document.getElementById('regUsername')?.value;
-        const email = document.getElementById('regEmail')?.value;
+        const username = document.getElementById('regUsername')?.value.trim();
+        const email = document.getElementById('regEmail')?.value.trim();
         const password = document.getElementById('regPassword')?.value;
         const confirmPassword = document.getElementById('regConfirmPassword')?.value;
 
+        // 客户端验证
         if (!username || !email || !password || !confirmPassword) {
             showToast('请填写所有字段', 'error');
             return;
@@ -657,8 +889,20 @@ class MagnetSearchApp {
             return;
         }
 
-        if (password.length < 6) {
-            showToast('密码长度至少6位', 'error');
+        // 使用配置中的验证规则
+        if (username.length < this.config.minUsernameLength || username.length > this.config.maxUsernameLength) {
+            showToast(`用户名长度应在${this.config.minUsernameLength}-${this.config.maxUsernameLength}个字符之间`, 'error');
+            return;
+        }
+
+        if (password.length < this.config.minPasswordLength) {
+            showToast(`密码长度至少${this.config.minPasswordLength}个字符`, 'error');
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            showToast('请输入有效的邮箱地址', 'error');
             return;
         }
 
@@ -669,12 +913,19 @@ class MagnetSearchApp {
             if (result.success) {
                 showToast('注册成功，请登录', 'success');
                 this.showLoginModal();
+                
+                // 清空注册表单
+                document.getElementById('registerForm').reset();
+                
+                // 预填用户名到登录表单
+                const loginUsername = document.getElementById('loginUsername');
+                if (loginUsername) loginUsername.value = username;
             } else {
                 showToast(result.message || '注册失败', 'error');
             }
         } catch (error) {
             console.error('注册失败:', error);
-            showToast('注册失败，请稍后重试', 'error');
+            showToast(`注册失败: ${error.message}`, 'error');
         } finally {
             showLoading(false);
         }
@@ -683,20 +934,22 @@ class MagnetSearchApp {
     // 检查认证状态
     async checkAuthStatus() {
         const token = localStorage.getItem('auth_token');
-        if (token) {
-            try {
-                const result = await API.verifyToken(token);
-                if (result.success) {
-                    this.currentUser = result.user;
-                    this.updateUserUI();
-                    await this.loadCloudData();
-                } else {
-                    localStorage.removeItem('auth_token');
-                }
-            } catch (error) {
-                console.error('验证token失败:', error);
+        if (!token) return;
+
+        try {
+            const result = await API.verifyToken(token);
+            if (result.success && result.user) {
+                this.currentUser = result.user;
+                this.updateUserUI();
+                await this.loadCloudData();
+                console.log('✅ 用户认证成功:', this.currentUser.username);
+            } else {
                 localStorage.removeItem('auth_token');
+                console.log('❌ Token验证失败，已清除');
             }
+        } catch (error) {
+            console.error('验证token失败:', error);
+            localStorage.removeItem('auth_token');
         }
     }
 
@@ -705,32 +958,38 @@ class MagnetSearchApp {
         const loginBtn = document.getElementById('loginBtn');
         const userInfo = document.getElementById('userInfo');
         const username = document.getElementById('username');
+        const syncFavoritesBtn = document.getElementById('syncFavoritesBtn');
 
         if (this.currentUser) {
             if (loginBtn) loginBtn.style.display = 'none';
             if (userInfo) userInfo.style.display = 'flex';
             if (username) username.textContent = this.currentUser.username;
+            if (syncFavoritesBtn) syncFavoritesBtn.style.display = 'inline-block';
             
             // 绑定退出登录事件
             const logoutBtn = document.getElementById('logoutBtn');
             if (logoutBtn) {
-                logoutBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.logout();
-                });
+                logoutBtn.onclick = () => this.logout();
             }
         } else {
             if (loginBtn) loginBtn.style.display = 'inline-block';
             if (userInfo) userInfo.style.display = 'none';
+            if (syncFavoritesBtn) syncFavoritesBtn.style.display = 'none';
         }
     }
 
     // 退出登录
-    logout() {
-        this.currentUser = null;
-        localStorage.removeItem('auth_token');
-        this.updateUserUI();
-        showToast('已退出登录', 'success');
+    async logout() {
+        try {
+            await API.logout();
+        } catch (error) {
+            console.error('退出登录请求失败:', error);
+        } finally {
+            this.currentUser = null;
+            localStorage.removeItem('auth_token');
+            this.updateUserUI();
+            showToast('已退出登录', 'success');
+        }
     }
 
     // 加载云端数据
@@ -741,29 +1000,47 @@ class MagnetSearchApp {
             // 加载云端收藏夹
             const cloudFavorites = await API.getFavorites();
             if (cloudFavorites && cloudFavorites.length > 0) {
+                // 合并本地和云端收藏，以云端为准
                 this.favorites = cloudFavorites;
                 this.saveFavorites();
                 this.renderFavorites();
+                console.log(`☁️ 云端收藏已加载: ${cloudFavorites.length}个`);
             }
 
             // 加载云端搜索历史
             const cloudHistory = await API.getSearchHistory();
             if (cloudHistory && cloudHistory.length > 0) {
-                this.searchHistory = cloudHistory;
+                // 合并本地和云端历史
+                const mergedHistory = [...cloudHistory];
+                
+                // 添加本地独有的历史记录
+                this.searchHistory.forEach(localItem => {
+                    if (!mergedHistory.some(cloudItem => cloudItem.keyword === localItem.keyword)) {
+                        mergedHistory.push(localItem);
+                    }
+                });
+                
+                // 排序并限制数量
+                this.searchHistory = mergedHistory
+                    .sort((a, b) => b.timestamp - a.timestamp)
+                    .slice(0, this.config.maxHistoryPerUser || 1000);
+                
                 this.saveHistory();
                 this.renderHistory();
+                console.log(`☁️ 云端历史已加载: ${cloudHistory.length}条`);
             }
         } catch (error) {
             console.error('加载云端数据失败:', error);
+            showToast('加载云端数据失败，使用本地数据', 'warning');
         }
     }
 
     // 搜索输入处理
     handleSearchInput(value) {
-        // 可以在这里添加搜索建议功能
         if (value.length > 0) {
-            // 显示相关的历史搜索
             this.showSearchSuggestions(value);
+        } else {
+            this.hideSearchSuggestions();
         }
     }
 
@@ -774,12 +1051,74 @@ class MagnetSearchApp {
             .slice(0, 5);
         
         // 这里可以实现搜索建议下拉框
-        // 暂时省略UI实现
+        // 暂时省略UI实现，可以在后续版本中添加
+    }
+
+    // 隐藏搜索建议
+    hideSearchSuggestions() {
+        // 隐藏搜索建议下拉框
+    }
+}
+
+// 全局工具函数
+function debounce(func, wait, immediate = false) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            timeout = null;
+            if (!immediate) func.apply(this, args);
+        };
+        const callNow = immediate && !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+        if (callNow) func.apply(this, args);
+    };
+}
+
+function formatRelativeTime(date) {
+    if (!date) return '';
+    
+    const now = new Date();
+    const target = new Date(date);
+    const diff = now - target;
+    
+    const minute = 60 * 1000;
+    const hour = minute * 60;
+    const day = hour * 24;
+    const week = day * 7;
+    
+    if (diff < minute) {
+        return '刚刚';
+    } else if (diff < hour) {
+        return `${Math.floor(diff / minute)}分钟前`;
+    } else if (diff < day) {
+        return `${Math.floor(diff / hour)}小时前`;
+    } else if (diff < week) {
+        return `${Math.floor(diff / day)}天前`;
+    } else {
+        return target.toLocaleDateString('zh-CN');
     }
 }
 
 // 初始化应用
 let app;
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 初始化Magnet Search应用...');
     app = new MagnetSearchApp();
+});
+
+// 全局错误处理
+window.addEventListener('error', (event) => {
+    console.error('全局错误:', event.error);
+    showToast('应用出现错误，请刷新页面重试', 'error');
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('未处理的Promise拒绝:', event.reason);
+    if (event.reason && event.reason.message && event.reason.message.includes('认证失败')) {
+        // 自动处理认证失败
+        if (app && app.currentUser) {
+            app.logout();
+        }
+    }
 });

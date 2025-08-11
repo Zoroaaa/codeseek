@@ -1,7 +1,7 @@
-// Cloudflare Worker 后端主文件 - 直接部署版本
-// 支持直接上传到 Cloudflare Workers 控制台部署
+// Cloudflare Worker 后端主文件 - 优化版本
+// 修复CORS、路由匹配等关键问题
 
-// 简单的路由器实现（替代 itty-router）
+// 简单的路由器实现
 class SimpleRouter {
     constructor() {
         this.routes = [];
@@ -11,29 +11,12 @@ class SimpleRouter {
         this.routes.push({ method, path, handler });
     }
 
-    get(path, handler) {
-        this.addRoute('GET', path, handler);
-    }
-
-    post(path, handler) {
-        this.addRoute('POST', path, handler);
-    }
-
-    put(path, handler) {
-        this.addRoute('PUT', path, handler);
-    }
-
-    delete(path, handler) {
-        this.addRoute('DELETE', path, handler);
-    }
-
-    options(path, handler) {
-        this.addRoute('OPTIONS', path, handler);
-    }
-
-    all(path, handler) {
-        this.addRoute('*', path, handler);
-    }
+    get(path, handler) { this.addRoute('GET', path, handler); }
+    post(path, handler) { this.addRoute('POST', path, handler); }
+    put(path, handler) { this.addRoute('PUT', path, handler); }
+    delete(path, handler) { this.addRoute('DELETE', path, handler); }
+    options(path, handler) { this.addRoute('OPTIONS', path, handler); }
+    all(path, handler) { this.addRoute('*', path, handler); }
 
     async handle(request, env) {
         const url = new URL(request.url);
@@ -177,8 +160,8 @@ const utils = {
     // 生成JWT Token
     async generateJWT(payload, secret) {
         const header = { alg: 'HS256', typ: 'JWT' };
-        const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '');
-        const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, '');
+        const encodedHeader = btoa(JSON.stringify(header)).replace(/[=]/g, '');
+        const encodedPayload = btoa(JSON.stringify(payload)).replace(/[=]/g, '');
         
         const data = `${encodedHeader}.${encodedPayload}`;
         const encoder = new TextEncoder();
@@ -191,7 +174,7 @@ const utils = {
         );
         
         const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
-        const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g, '');
+        const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/[=]/g, '');
         
         return `${data}.${encodedSignature}`;
     },
@@ -211,12 +194,16 @@ const utils = {
                 ['verify']
             );
             
-            const signature = Uint8Array.from(atob(encodedSignature), c => c.charCodeAt(0));
+            // 修复base64解码问题
+            const padding = '='.repeat((4 - encodedSignature.length % 4) % 4);
+            const signature = Uint8Array.from(atob(encodedSignature + padding), c => c.charCodeAt(0));
             const isValid = await crypto.subtle.verify('HMAC', key, signature, encoder.encode(data));
             
             if (!isValid) return null;
             
-            const payload = JSON.parse(atob(encodedPayload));
+            // 修复base64解码问题
+            const payloadPadding = '='.repeat((4 - encodedPayload.length % 4) % 4);
+            const payload = JSON.parse(atob(encodedPayload + payloadPadding));
             
             // 检查过期时间
             if (payload.exp && Date.now() > payload.exp * 1000) {
@@ -230,31 +217,43 @@ const utils = {
         }
     },
 
+    // 创建CORS响应头
+    getCorsHeaders(origin = '*') {
+        return {
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+            'Access-Control-Max-Age': '86400',
+            'Access-Control-Allow-Credentials': 'true'
+        };
+    },
+
     // 响应工具
-    jsonResponse(data, status = 200) {
+    jsonResponse(data, status = 200, corsOrigin = '*') {
+        const headers = {
+            'Content-Type': 'application/json; charset=UTF-8',
+            ...this.getCorsHeaders(corsOrigin)
+        };
+
         return new Response(JSON.stringify(data), {
             status,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            },
+            headers
         });
     },
 
-    errorResponse(message, status = 400) {
-        return this.jsonResponse({ success: false, message }, status);
+    errorResponse(message, status = 400, corsOrigin = '*') {
+        return this.jsonResponse({ success: false, message, error: true }, status, corsOrigin);
     },
 
-    successResponse(data = {}) {
-        return this.jsonResponse({ success: true, ...data });
+    successResponse(data = {}, corsOrigin = '*') {
+        return this.jsonResponse({ success: true, ...data }, 200, corsOrigin);
     },
 
     // 获取客户端IP
     getClientIP(request) {
         return request.headers.get('CF-Connecting-IP') || 
-               request.headers.get('X-Forwarded-For') || 
+               request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() || 
+               request.headers.get('X-Real-IP') ||
                'unknown';
     },
 
@@ -330,41 +329,44 @@ async function authenticate(request, env) {
     }
 
     // 验证会话是否存在且未过期
-    const session = await env.DB.prepare(`
-        SELECT u.* FROM users u
-        JOIN user_sessions s ON u.id = s.user_id
-        WHERE s.token_hash = ? AND s.expires_at > ?
-    `).bind(
-        await utils.hashPassword(token),
-        Date.now()
-    ).first();
+    try {
+        const session = await env.DB.prepare(`
+            SELECT u.* FROM users u
+            JOIN user_sessions s ON u.id = s.user_id
+            WHERE s.token_hash = ? AND s.expires_at > ?
+        `).bind(
+            await utils.hashPassword(token),
+            Date.now()
+        ).first();
 
-    if (!session) {
+        if (!session) {
+            return null;
+        }
+
+        // 更新最后活动时间
+        await env.DB.prepare(`
+            UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
+        `).bind(Date.now(), await utils.hashPassword(token)).run();
+
+        return {
+            id: session.id,
+            username: session.username,
+            email: session.email,
+            permissions: JSON.parse(session.permissions || '[]'),
+            settings: JSON.parse(session.settings || '{}')
+        };
+    } catch (error) {
+        console.error('认证查询失败:', error);
         return null;
     }
-
-    // 更新最后活动时间
-    await env.DB.prepare(`
-        UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
-    `).bind(Date.now(), await utils.hashPassword(token)).run();
-
-    return {
-        id: session.id,
-        username: session.username,
-        email: session.email,
-        permissions: JSON.parse(session.permissions || '[]'),
-        settings: JSON.parse(session.settings || '{}')
-    };
 }
 
-// CORS预检请求处理
-router.options('*', () => {
+// CORS预检请求处理 - 修复所有路径
+router.options('*', (request, env) => {
+    const origin = request.headers.get('Origin') || '*';
     return new Response(null, {
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        },
+        status: 204,
+        headers: utils.getCorsHeaders(origin)
     });
 });
 
@@ -399,7 +401,7 @@ router.post('/api/admin/init-db', async (request, env) => {
         return utils.successResponse({ message: '数据库初始化成功' });
     } catch (error) {
         console.error('数据库初始化失败:', error);
-        return utils.errorResponse('数据库初始化失败', 500);
+        return utils.errorResponse(`数据库初始化失败: ${error.message}`, 500);
     }
 });
 
@@ -412,7 +414,8 @@ router.post('/api/auth/register', async (request, env) => {
             return utils.errorResponse('注册功能已关闭');
         }
 
-        const { username, email, password } = await request.json();
+        const body = await request.json().catch(() => ({}));
+        const { username, email, password } = body;
 
         // 输入验证
         if (!username || !email || !password) {
@@ -467,7 +470,8 @@ router.post('/api/auth/register', async (request, env) => {
 // 用户登录
 router.post('/api/auth/login', async (request, env) => {
     try {
-        const { username, password } = await request.json();
+        const body = await request.json().catch(() => ({}));
+        const { username, password } = body;
 
         if (!username || !password) {
             return utils.errorResponse('用户名和密码都是必需的');
@@ -630,7 +634,8 @@ router.post('/api/user/favorites', async (request, env) => {
     }
 
     try {
-        const { favorites } = await request.json();
+        const body = await request.json().catch(() => ({}));
+        const { favorites } = body;
 
         if (!Array.isArray(favorites)) {
             return utils.errorResponse('收藏夹数据格式错误');
@@ -708,483 +713,6 @@ router.get('/api/user/favorites', async (request, env) => {
     }
 });
 
-// 同步搜索历史
-router.post('/api/user/search-history', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
-    try {
-        const { history } = await request.json();
-
-        if (!Array.isArray(history)) {
-            return utils.errorResponse('搜索历史数据格式错误');
-        }
-
-        // 检查搜索历史数量限制
-        const maxHistoryItems = parseInt(utils.getEnvVar(env, 'MAX_HISTORY_PER_USER', '1000'));
-        if (history.length > maxHistoryItems) {
-            return utils.errorResponse(`搜索历史数量不能超过 ${maxHistoryItems} 个`);
-        }
-
-        // 清空现有搜索历史
-        await env.DB.prepare(`
-            DELETE FROM user_search_history WHERE user_id = ?
-        `).bind(user.id).run();
-
-        // 插入新历史记录
-        for (const item of history) {
-            const historyId = utils.generateId();
-            await env.DB.prepare(`
-                INSERT INTO user_search_history (id, user_id, keyword, results_count, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            `).bind(
-                historyId,
-                user.id,
-                item.keyword || '',
-                item.count || 0,
-                item.timestamp || Date.now()
-            ).run();
-        }
-
-        // 记录同步行为
-        await utils.logUserAction(env, user.id, 'sync_search_history', { count: history.length }, request);
-
-        return utils.successResponse({ message: '搜索历史同步成功' });
-
-    } catch (error) {
-        console.error('同步搜索历史失败:', error);
-        return utils.errorResponse('同步搜索历史失败', 500);
-    }
-});
-
-// 获取搜索历史
-router.get('/api/user/search-history', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
-    try {
-        const url = new URL(request.url);
-        const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
-
-        const result = await env.DB.prepare(`
-            SELECT * FROM user_search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?
-        `).bind(user.id, limit).all();
-
-        const history = result.results.map(item => ({
-            keyword: item.keyword,
-            count: item.results_count,
-            timestamp: item.created_at
-        }));
-
-        return utils.successResponse({ history });
-
-    } catch (error) {
-        console.error('获取搜索历史失败:', error);
-        return utils.errorResponse('获取搜索历史失败', 500);
-    }
-});
-
-// 增强搜索API
-router.post('/api/search/enhanced', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
-    try {
-        const { keyword, basicResults } = await request.json();
-
-        // 检查缓存
-        const cacheEnabled = utils.getEnvVar(env, 'ENABLE_SEARCH_CACHE', 'true') === 'true';
-        if (cacheEnabled) {
-            const cached = await env.DB.prepare(`
-                SELECT results FROM search_cache WHERE keyword = ? AND expires_at > ?
-            `).bind(keyword, Date.now()).first();
-
-            if (cached) {
-                return utils.successResponse({ 
-                    results: JSON.parse(cached.results),
-                    cached: true
-                });
-            }
-        }
-
-        // TODO: 这里可以添加实际的搜索增强逻辑
-        // 比如调用第三方API、爬虫等
-        let enhancedResults = basicResults || [];
-
-        // 简单的结果增强示例：添加可用性检查
-        for (let result of enhancedResults) {
-            result.enhanced = true;
-            result.lastChecked = Date.now();
-            // 这里可以添加实际的网站可用性检查
-        }
-
-        // 缓存结果
-        if (cacheEnabled) {
-            const cacheTTL = parseInt(utils.getEnvVar(env, 'SEARCH_CACHE_TTL', '1800')); // 默认30分钟
-            const cacheId = utils.generateId();
-            await env.DB.prepare(`
-                INSERT OR REPLACE INTO search_cache (id, keyword, results, expires_at, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            `).bind(
-                cacheId,
-                keyword,
-                JSON.stringify(enhancedResults),
-                Date.now() + (cacheTTL * 1000),
-                Date.now()
-            ).run();
-        }
-
-        // 记录搜索行为
-        await utils.logUserAction(env, user.id, 'search_enhanced', { keyword, resultsCount: enhancedResults.length }, request);
-
-        return utils.successResponse({ results: enhancedResults });
-
-    } catch (error) {
-        console.error('增强搜索失败:', error);
-        return utils.errorResponse('增强搜索失败', 500);
-    }
-});
-
-// 获取搜索统计
-router.get('/api/search/stats', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
-    try {
-        // 获取用户搜索统计
-        const userStats = await env.DB.prepare(`
-            SELECT COUNT(*) as total_searches,
-                   COUNT(DISTINCT keyword) as unique_keywords
-            FROM user_search_history WHERE user_id = ?
-        `).bind(user.id).first();
-
-        // 获取热门搜索关键词（用户相关）
-        const popularKeywords = await env.DB.prepare(`
-            SELECT keyword, COUNT(*) as count
-            FROM user_search_history WHERE user_id = ?
-            GROUP BY keyword ORDER BY count DESC LIMIT 10
-        `).bind(user.id).all();
-
-        return utils.successResponse({
-            totalSearches: userStats.total_searches || 0,
-            uniqueKeywords: userStats.unique_keywords || 0,
-            popularKeywords: popularKeywords.results
-        });
-
-    } catch (error) {
-        console.error('获取搜索统计失败:', error);
-        return utils.errorResponse('获取搜索统计失败', 500);
-    }
-});
-
-// 记录搜索行为
-router.post('/api/search/record', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
-    try {
-        const { keyword, results, timestamp } = await request.json();
-
-        // 记录到搜索历史
-        const historyId = utils.generateId();
-        await env.DB.prepare(`
-            INSERT INTO user_search_history (id, user_id, keyword, results_count, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        `).bind(
-            historyId,
-            user.id,
-            keyword,
-            results ? results.length : 0,
-            timestamp || Date.now()
-        ).run();
-
-        return utils.successResponse({ message: '搜索记录已保存' });
-
-    } catch (error) {
-        console.error('记录搜索失败:', error);
-        return utils.errorResponse('记录搜索失败', 500);
-    }
-});
-
-// 用户设置
-router.get('/api/user/settings', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
-    return utils.successResponse({ settings: user.settings });
-});
-
-router.put('/api/user/settings', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
-    try {
-        const settings = await request.json();
-
-        await env.DB.prepare(`
-            UPDATE users SET settings = ?, updated_at = ? WHERE id = ?
-        `).bind(JSON.stringify(settings), Date.now(), user.id).run();
-
-        return utils.successResponse({ message: '设置已更新' });
-
-    } catch (error) {
-        console.error('更新设置失败:', error);
-        return utils.errorResponse('更新设置失败', 500);
-    }
-});
-
-// 站点状态检查
-router.post('/api/sites/status', async (request, env) => {
-    try {
-        const { urls } = await request.json();
-        const results = [];
-        const timeoutMs = parseInt(utils.getEnvVar(env, 'SITE_CHECK_TIMEOUT', '5000'));
-
-        for (const url of urls) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-                
-                const response = await fetch(url, { 
-                    method: 'HEAD',
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
-                
-                results.push({
-                    url,
-                    status: response.status,
-                    accessible: response.ok,
-                    responseTime: Date.now()
-                });
-            } catch (error) {
-                results.push({
-                    url,
-                    status: 0,
-                    accessible: false,
-                    error: error.message
-                });
-            }
-        }
-
-        return utils.successResponse({ results });
-
-    } catch (error) {
-        console.error('检查站点状态失败:', error);
-        return utils.errorResponse('检查站点状态失败', 500);
-    }
-});
-
-// 缓存管理
-router.get('/api/cache/search', async (request, env) => {
-    const url = new URL(request.url);
-    const keyword = url.searchParams.get('keyword');
-
-    if (!keyword) {
-        return utils.errorResponse('缺少关键词参数');
-    }
-
-    try {
-        const cached = await env.DB.prepare(`
-            SELECT results FROM search_cache WHERE keyword = ? AND expires_at > ?
-        `).bind(keyword, Date.now()).first();
-
-        if (cached) {
-            return utils.successResponse({ 
-                results: JSON.parse(cached.results),
-                cached: true 
-            });
-        } else {
-            return utils.successResponse({ 
-                results: null,
-                cached: false 
-            });
-        }
-
-    } catch (error) {
-        console.error('获取缓存失败:', error);
-        return utils.errorResponse('获取缓存失败', 500);
-    }
-});
-
-router.post('/api/cache/search', async (request, env) => {
-    try {
-        const { keyword, results, ttl } = await request.json();
-        const cacheTTL = ttl || parseInt(utils.getEnvVar(env, 'SEARCH_CACHE_TTL', '1800'));
-
-        const cacheId = utils.generateId();
-        await env.DB.prepare(`
-            INSERT OR REPLACE INTO search_cache (id, keyword, results, expires_at, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        `).bind(
-            cacheId,
-            keyword,
-            JSON.stringify(results),
-            Date.now() + (cacheTTL * 1000),
-            Date.now()
-        ).run();
-
-        return utils.successResponse({ message: '缓存已保存' });
-
-    } catch (error) {
-        console.error('保存缓存失败:', error);
-        return utils.errorResponse('保存缓存失败', 500);
-    }
-});
-
-// 统计API
-router.get('/api/stats', async (request, env) => {
-    try {
-        // 检查是否允许查看统计（可以根据需要调整权限）
-        const allowPublicStats = utils.getEnvVar(env, 'ALLOW_PUBLIC_STATS', 'false') === 'true';
-        
-        if (!allowPublicStats) {
-            // 验证管理员权限
-            if (!await utils.verifyAdminAccess(request, env)) {
-                return utils.errorResponse('权限不足', 403);
-            }
-        }
-
-        // 获取总体统计
-        const userCount = await env.DB.prepare(`
-            SELECT COUNT(*) as count FROM users
-        `).first();
-
-        const searchCount = await env.DB.prepare(`
-            SELECT COUNT(*) as count FROM user_search_history
-        `).first();
-
-        const favoriteCount = await env.DB.prepare(`
-            SELECT COUNT(*) as count FROM user_favorites
-        `).first();
-
-        return utils.successResponse({
-            totalUsers: userCount.count || 0,
-            totalSearches: searchCount.count || 0,
-            totalFavorites: favoriteCount.count || 0,
-            timestamp: Date.now()
-        });
-
-    } catch (error) {
-        console.error('获取统计数据失败:', error);
-        return utils.errorResponse('获取统计数据失败', 500);
-    }
-});
-
-// 记录用户行为
-router.post('/api/stats/action', async (request, env) => {
-    try {
-        const { action, data, timestamp } = await request.json();
-        
-        // 尝试获取用户信息（可选）
-        let userId = null;
-        try {
-            const user = await authenticate(request, env);
-            userId = user?.id;
-        } catch (error) {
-            // 忽略认证错误，允许匿名记录
-        }
-
-        await utils.logUserAction(env, userId, action, data, request);
-
-        return utils.successResponse({ message: '行为已记录' });
-
-    } catch (error) {
-        console.error('记录行为失败:', error);
-        return utils.errorResponse('记录行为失败', 500);
-    }
-});
-
-// 反馈API
-router.post('/api/feedback', async (request, env) => {
-    try {
-        const feedback = await request.json();
-        
-        // 获取用户信息（可选）
-        let userId = null;
-        try {
-            const user = await authenticate(request, env);
-            userId = user?.id;
-        } catch (error) {
-            // 允许匿名反馈
-        }
-
-        await utils.logUserAction(env, userId, 'feedback', feedback, request);
-
-        return utils.successResponse({ message: '反馈已提交，感谢您的建议！' });
-
-    } catch (error) {
-        console.error('提交反馈失败:', error);
-        return utils.errorResponse('提交反馈失败', 500);
-    }
-});
-
-// 清理过期数据的定时任务端点
-router.post('/api/admin/cleanup', async (request, env) => {
-    // 验证管理员权限
-    if (!await utils.verifyAdminAccess(request, env)) {
-        return utils.errorResponse('管理员权限验证失败', 403);
-    }
-
-    try {
-        const now = Date.now();
-        
-        // 清理过期会话
-        const expiredSessions = await env.DB.prepare(`
-            DELETE FROM user_sessions WHERE expires_at < ? RETURNING COUNT(*) as count
-        `).bind(now).all();
-
-        // 清理过期缓存
-        const expiredCache = await env.DB.prepare(`
-            DELETE FROM search_cache WHERE expires_at < ? RETURNING COUNT(*) as count
-        `).bind(now).all();
-
-        // 清理旧的用户行为记录（保留指定天数）
-        const retentionDays = parseInt(utils.getEnvVar(env, 'ACTION_LOG_RETENTION_DAYS', '30'));
-        const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
-        const cutoffTime = now - retentionMs;
-        
-        const oldActions = await env.DB.prepare(`
-            DELETE FROM user_actions WHERE created_at < ? RETURNING COUNT(*) as count
-        `).bind(cutoffTime).all();
-
-        return utils.successResponse({ 
-            message: '数据清理完成',
-            cleaned: {
-                sessions: expiredSessions.results?.[0]?.count || 0,
-                cache: expiredCache.results?.[0]?.count || 0,
-                actions: oldActions.results?.[0]?.count || 0
-            }
-        });
-
-    } catch (error) {
-        console.error('数据清理失败:', error);
-        return utils.errorResponse('数据清理失败', 500);
-    }
-});
-
 // 系统配置信息（不包含敏感信息）
 router.get('/api/config', async (request, env) => {
     return utils.successResponse({
@@ -1201,7 +729,10 @@ router.get('/api/config', async (request, env) => {
 });
 
 // 默认路由 - 处理未匹配的路径
-router.all('*', () => utils.errorResponse('API路径不存在', 404));
+router.all('*', (request) => {
+    const url = new URL(request.url);
+    return utils.errorResponse(`API路径不存在: ${url.pathname}`, 404);
+});
 
 // Worker主函数
 export default {
