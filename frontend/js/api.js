@@ -12,7 +12,7 @@ class APIService {
         if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
             return 'http://localhost:8787'; // 本地开发
         }
-        return 'https://your-worker.your-subdomain.workers.dev'; // 替换为你的Worker URL
+        return 'https://codeseek.zadi.workers.dev/'; // 替换为你的Worker URL
     }
 
     // 设置认证token
