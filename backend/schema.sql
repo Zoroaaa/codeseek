@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS users (
     permissions TEXT DEFAULT '["search","favorite","history","sync"]',
     settings TEXT DEFAULT '{}',
     is_active INTEGER DEFAULT 1,
-    last_login INTEGER
+    last_login INTEGER,
+    is_verified INTEGER DEFAULT 0, -- 新增邮箱验证状态
+    verification_token TEXT -- 新增验证令牌
 );
 
 -- 用户会话表
@@ -176,7 +178,8 @@ INSERT OR IGNORE INTO system_config (key, value, description, created_at, update
 ('cache_ttl', '3600', '搜索缓存TTL（秒）', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('session_ttl', '2592000', '会话TTL（秒，30天）', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('enable_registration', '1', '是否开放注册', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('maintenance_mode', '0', '维护模式', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+('maintenance_mode', '0', '维护模式', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('db_version', '1.1', '数据库版本', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000); -- 新增版本控制
 
 -- 初始化默认监控站点
 INSERT OR IGNORE INTO site_monitoring (id, url, name, last_checked, created_at) VALUES
@@ -190,28 +193,28 @@ INSERT OR IGNORE INTO site_monitoring (id, url, name, last_checked, created_at) 
 -- 创建触发器用于自动更新时间戳
 CREATE TRIGGER IF NOT EXISTS update_users_timestamp 
     AFTER UPDATE ON users
-    FOR EACH ROW
+    FOR EACH ROW WHEN NEW.updated_at <= OLD.updated_at
     BEGIN
         UPDATE users SET updated_at = strftime('%s', 'now') * 1000 WHERE id = NEW.id;
     END;
 
 CREATE TRIGGER IF NOT EXISTS update_favorites_timestamp 
     AFTER UPDATE ON user_favorites
-    FOR EACH ROW
+    FOR EACH ROW WHEN NEW.updated_at <= OLD.updated_at
     BEGIN
         UPDATE user_favorites SET updated_at = strftime('%s', 'now') * 1000 WHERE id = NEW.id;
     END;
 
 CREATE TRIGGER IF NOT EXISTS update_feedback_timestamp 
     AFTER UPDATE ON user_feedback
-    FOR EACH ROW
+    FOR EACH ROW WHEN NEW.updated_at <= OLD.updated_at
     BEGIN
         UPDATE user_feedback SET updated_at = strftime('%s', 'now') * 1000 WHERE id = NEW.id;
     END;
 
 CREATE TRIGGER IF NOT EXISTS update_config_timestamp 
     AFTER UPDATE ON system_config
-    FOR EACH ROW
+    FOR EACH ROW WHEN NEW.updated_at <= OLD.updated_at
     BEGIN
         UPDATE system_config SET updated_at = strftime('%s', 'now') * 1000 WHERE key = NEW.key;
     END;
