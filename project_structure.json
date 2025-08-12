@@ -24,12 +24,8 @@
     "backend/": {
       "worker.js": "Cloudflare Worker主文件",
       "schema.sql": "D1数据库结构",
-      "wrangler.toml": "Cloudflare配置文件"
     },
-    "docs/": {
-      "README.md": "项目说明",
-      "DEPLOY.md": "部署指南"
-    }
+
   },
   "features": [
     "用户注册/登录系统",

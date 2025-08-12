@@ -1,12 +1,19 @@
-// Cloudflare Worker 后端主文件 - 优化版本
-// 修复CORS、路由匹配等关键问题
+// Cloudflare Worker 后端主文件 - 完全优化版本
+// 修复CORS、路由匹配、认证、安全性等关键问题
 
-// 简单的路由器实现
-class SimpleRouter {
+// 简单但强大的路由器实现
+class Router {
     constructor() {
         this.routes = [];
+        this.middlewares = [];
     }
 
+    // 添加中间件
+    use(middleware) {
+        this.middlewares.push(middleware);
+    }
+
+    // 添加路由
     addRoute(method, path, handler) {
         this.routes.push({ method, path, handler });
     }
@@ -16,287 +23,79 @@ class SimpleRouter {
     put(path, handler) { this.addRoute('PUT', path, handler); }
     delete(path, handler) { this.addRoute('DELETE', path, handler); }
     options(path, handler) { this.addRoute('OPTIONS', path, handler); }
+    patch(path, handler) { this.addRoute('PATCH', path, handler); }
     all(path, handler) { this.addRoute('*', path, handler); }
 
-    async handle(request, env) {
+    // 处理请求
+    async handle(request, env, ctx) {
         const url = new URL(request.url);
         const method = request.method;
         const pathname = url.pathname;
 
-        // 查找匹配的路由
-        for (const route of this.routes) {
-            if (route.method === method || route.method === '*') {
-                if (this.matchPath(route.path, pathname)) {
-                    try {
-                        return await route.handler(request, env);
-                    } catch (error) {
-                        console.error('Route handler error:', error);
-                        return utils.errorResponse('Internal server error', 500);
+        try {
+            // 执行中间件
+            for (const middleware of this.middlewares) {
+                const result = await middleware(request, env, ctx);
+                if (result) return result;
+            }
+
+            // 查找匹配的路由
+            for (const route of this.routes) {
+                if (route.method === method || route.method === '*') {
+                    const match = this.matchPath(route.path, pathname);
+                    if (match) {
+                        // 将路径参数添加到请求对象
+                        request.params = match.params;
+                        return await route.handler(request, env, ctx);
                     }
                 }
             }
-        }
 
-        return utils.errorResponse('路由未找到', 404);
+            return Utils.errorResponse('路由未找到', 404);
+        } catch (error) {
+            console.error('路由处理错误:', error);
+            return Utils.errorResponse('服务器内部错误', 500);
+        }
     }
 
+    // 路径匹配（支持参数）
     matchPath(routePath, requestPath) {
-        if (routePath === '*') return true;
-        if (routePath === requestPath) return true;
+        if (routePath === '*') return { params: {} };
         
-        // 支持通配符路径
+        // 简单路径匹配
+        if (routePath === requestPath) return { params: {} };
+        
+        // 通配符匹配
         if (routePath.endsWith('*')) {
             const basePath = routePath.slice(0, -1);
-            return requestPath.startsWith(basePath);
+            if (requestPath.startsWith(basePath)) {
+                return { params: {} };
+            }
         }
         
-        return false;
+        // 参数匹配
+        const routeParts = routePath.split('/');
+        const requestParts = requestPath.split('/');
+        
+        if (routeParts.length !== requestParts.length) return null;
+        
+        const params = {};
+        for (let i = 0; i < routeParts.length; i++) {
+            if (routeParts[i].startsWith(':')) {
+                const paramName = routeParts[i].slice(1);
+                params[paramName] = requestParts[i];
+            } else if (routeParts[i] !== requestParts[i]) {
+                return null;
+            }
+        }
+        
+        return { params };
     }
 }
 
-// 创建路由器实例
-const router = new SimpleRouter();
-
-// 数据库初始化SQL
-const DB_SCHEMA = `
--- 用户表
-CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    permissions TEXT DEFAULT '["search","favorite","history","sync"]',
-    settings TEXT DEFAULT '{}',
-    is_active INTEGER DEFAULT 1,
-    last_login INTEGER,
-    is_verified INTEGER DEFAULT 0, -- 新增邮箱验证状态
-    verification_token TEXT -- 新增验证令牌
-);
-
--- 用户会话表
-CREATE TABLE IF NOT EXISTS user_sessions (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    token_hash TEXT NOT NULL,
-    expires_at INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    last_activity INTEGER NOT NULL,
-    ip_address TEXT,
-    user_agent TEXT,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-);
-
--- 用户收藏表
-CREATE TABLE IF NOT EXISTS user_favorites (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    title TEXT NOT NULL,
-    subtitle TEXT,
-    url TEXT NOT NULL,
-    icon TEXT,
-    keyword TEXT,
-    tags TEXT DEFAULT '[]',
-    notes TEXT,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-);
-
--- 用户搜索历史表
-CREATE TABLE IF NOT EXISTS user_search_history (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    keyword TEXT NOT NULL,
-    results_count INTEGER DEFAULT 0,
-    search_type TEXT DEFAULT 'basic',
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-);
-
--- 搜索缓存表
-CREATE TABLE IF NOT EXISTS search_cache (
-    id TEXT PRIMARY KEY,
-    keyword TEXT NOT NULL,
-    keyword_hash TEXT NOT NULL,
-    results TEXT NOT NULL,
-    metadata TEXT DEFAULT '{}',
-    expires_at INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    access_count INTEGER DEFAULT 0
-);
-
--- 用户行为记录表
-CREATE TABLE IF NOT EXISTS user_actions (
-    id TEXT PRIMARY KEY,
-    user_id TEXT,
-    session_id TEXT,
-    action TEXT NOT NULL,
-    resource_type TEXT,
-    resource_id TEXT,
-    data TEXT,
-    ip_address TEXT,
-    user_agent TEXT,
-    created_at INTEGER NOT NULL
-);
-
--- 系统配置表
-CREATE TABLE IF NOT EXISTS system_config (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    description TEXT,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-);
-
--- 站点状态监控表
-CREATE TABLE IF NOT EXISTS site_monitoring (
-    id TEXT PRIMARY KEY,
-    url TEXT NOT NULL,
-    name TEXT NOT NULL,
-    status INTEGER DEFAULT 0,
-    response_time INTEGER,
-    last_checked INTEGER NOT NULL,
-    error_message TEXT,
-    check_count INTEGER DEFAULT 0,
-    success_count INTEGER DEFAULT 0
-);
-
--- 用户反馈表
-CREATE TABLE IF NOT EXISTS user_feedback (
-    id TEXT PRIMARY KEY,
-    user_id TEXT,
-    type TEXT NOT NULL, -- 'bug', 'feature', 'general'
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    status TEXT DEFAULT 'open', -- 'open', 'closed', 'resolved'
-    priority INTEGER DEFAULT 0, -- 0-low, 1-medium, 2-high
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
-);
-
--- 通知表
-CREATE TABLE IF NOT EXISTS notifications (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    type TEXT NOT NULL,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    data TEXT DEFAULT '{}',
-    is_read INTEGER DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-);
-
--- 创建索引
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
-
-CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
-CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions(expires_at);
-
-CREATE INDEX IF NOT EXISTS idx_favorites_user ON user_favorites(user_id);
-CREATE INDEX IF NOT EXISTS idx_favorites_created ON user_favorites(created_at);
-CREATE INDEX IF NOT EXISTS idx_favorites_keyword ON user_favorites(keyword);
-
-CREATE INDEX IF NOT EXISTS idx_history_user ON user_search_history(user_id);
-CREATE INDEX IF NOT EXISTS idx_history_keyword ON user_search_history(keyword);
-CREATE INDEX IF NOT EXISTS idx_history_created ON user_search_history(created_at);
-
-CREATE INDEX IF NOT EXISTS idx_cache_keyword ON search_cache(keyword);
-CREATE INDEX IF NOT EXISTS idx_cache_hash ON search_cache(keyword_hash);
-CREATE INDEX IF NOT EXISTS idx_cache_expires ON search_cache(expires_at);
-
-CREATE INDEX IF NOT EXISTS idx_actions_user ON user_actions(user_id);
-CREATE INDEX IF NOT EXISTS idx_actions_created ON user_actions(created_at);
-CREATE INDEX IF NOT EXISTS idx_actions_action ON user_actions(action);
-
-CREATE INDEX IF NOT EXISTS idx_monitoring_url ON site_monitoring(url);
-CREATE INDEX IF NOT EXISTS idx_monitoring_checked ON site_monitoring(last_checked);
-
-CREATE INDEX IF NOT EXISTS idx_feedback_user ON user_feedback(user_id);
-CREATE INDEX IF NOT EXISTS idx_feedback_status ON user_feedback(status);
-CREATE INDEX IF NOT EXISTS idx_feedback_type ON user_feedback(type);
-
-CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
-CREATE INDEX IF NOT EXISTS idx_notifications_expires ON notifications(expires_at);
-
--- 初始化系统配置
-INSERT OR IGNORE INTO system_config (key, value, description, created_at, updated_at) VALUES
-('site_name', '磁力快搜', '网站名称', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('site_description', '专业的磁力搜索工具', '网站描述', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('max_search_history', '100', '最大搜索历史记录数', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('max_favorites', '500', '最大收藏数量', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('cache_ttl', '3600', '搜索缓存TTL（秒）', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('session_ttl', '2592000', '会话TTL（秒，30天）', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('enable_registration', '1', '是否开放注册', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('maintenance_mode', '0', '维护模式', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('db_version', '1.1', '数据库版本', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000); -- 新增版本控制
-
--- 初始化默认监控站点
-INSERT OR IGNORE INTO site_monitoring (id, url, name, last_checked, created_at) VALUES
-('javbus', 'https://www.javbus.com', 'JavBus', 0, strftime('%s', 'now') * 1000),
-('javdb', 'https://javdb.com', 'JavDB', 0, strftime('%s', 'now') * 1000),
-('javlibrary', 'https://www.javlibrary.com', 'JavLibrary', 0, strftime('%s', 'now') * 1000),
-('av01', 'https://av01.tv', 'AV01', 0, strftime('%s', 'now') * 1000),
-('missav', 'https://missav.com', 'MissAV', 0, strftime('%s', 'now') * 1000),
-('jable', 'https://jable.tv', 'Jable', 0, strftime('%s', 'now') * 1000);
-
--- 创建触发器用于自动更新时间戳
-CREATE TRIGGER IF NOT EXISTS update_users_timestamp 
-    AFTER UPDATE ON users
-    FOR EACH ROW WHEN NEW.updated_at <= OLD.updated_at
-    BEGIN
-        UPDATE users SET updated_at = strftime('%s', 'now') * 1000 WHERE id = NEW.id;
-    END;
-
-CREATE TRIGGER IF NOT EXISTS update_favorites_timestamp 
-    AFTER UPDATE ON user_favorites
-    FOR EACH ROW WHEN NEW.updated_at <= OLD.updated_at
-    BEGIN
-        UPDATE user_favorites SET updated_at = strftime('%s', 'now') * 1000 WHERE id = NEW.id;
-    END;
-
-CREATE TRIGGER IF NOT EXISTS update_feedback_timestamp 
-    AFTER UPDATE ON user_feedback
-    FOR EACH ROW WHEN NEW.updated_at <= OLD.updated_at
-    BEGIN
-        UPDATE user_feedback SET updated_at = strftime('%s', 'now') * 1000 WHERE id = NEW.id;
-    END;
-
-CREATE TRIGGER IF NOT EXISTS update_config_timestamp 
-    AFTER UPDATE ON system_config
-    FOR EACH ROW WHEN NEW.updated_at <= OLD.updated_at
-    BEGIN
-        UPDATE system_config SET updated_at = strftime('%s', 'now') * 1000 WHERE key = NEW.key;
-    END;
-
--- 数据清理视图（用于定期清理）
-CREATE VIEW IF NOT EXISTS expired_sessions AS
-SELECT id FROM user_sessions WHERE expires_at < strftime('%s', 'now') * 1000;
-
-CREATE VIEW IF NOT EXISTS expired_cache AS
-SELECT id FROM search_cache WHERE expires_at < strftime('%s', 'now') * 1000;
-
-CREATE VIEW IF NOT EXISTS old_actions AS
-SELECT id FROM user_actions WHERE created_at < (strftime('%s', 'now') - 2592000) * 1000; -- 30天前
-
-CREATE VIEW IF NOT EXISTS expired_notifications AS
-SELECT id FROM notifications WHERE expires_at IS NOT NULL AND expires_at < strftime('%s', 'now') * 1000;
-
-
--- 完整SQL内容与文档1保持一致...
-`;
-
-// 工具函数
-const utils = {
-    // 生成UUID
+// 工具函数集合
+const Utils = {
+    // 生成唯一ID
     generateId() {
         return crypto.randomUUID();
     },
@@ -305,29 +104,106 @@ const utils = {
     generateRandomString(length = 32) {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
         let result = '';
+        const values = crypto.getRandomValues(new Uint8Array(length));
         for (let i = 0; i < length; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
+            result += chars[values[i] % chars.length];
         }
         return result;
     },
 
     // 哈希密码
-    async hashPassword(password) {
+    async hashPassword(password, salt = null) {
+        if (!salt) {
+            salt = this.generateRandomString(16);
+        }
         const encoder = new TextEncoder();
-        const data = encoder.encode(password);
+        const data = encoder.encode(password + salt);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return `${hashHex}:${salt}`;
+    },
+
+    // 验证密码
+    async verifyPassword(password, hashedPassword) {
+        try {
+            const [hash, salt] = hashedPassword.split(':');
+            if (!salt) {
+                // 旧格式，直接哈希比较
+                const simpleHash = await this.simpleHash(password);
+                return simpleHash === hashedPassword;
+            }
+            const newHash = await this.hashPassword(password, salt);
+            return newHash === hashedPassword;
+        } catch (error) {
+            console.error('密码验证失败:', error);
+            return false;
+        }
+    },
+
+    // 简单哈希（向后兼容）
+    async simpleHash(text) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text);
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
         return Array.from(new Uint8Array(hashBuffer))
             .map(b => b.toString(16).padStart(2, '0'))
             .join('');
     },
 
-    // 生成JWT Token
-    async generateJWT(payload, secret) {
+    // JWT Token处理
+    async generateJWT(payload, secret, expirySeconds = 2592000) {
         const header = { alg: 'HS256', typ: 'JWT' };
-        const encodedHeader = btoa(JSON.stringify(header)).replace(/[=]/g, '');
-        const encodedPayload = btoa(JSON.stringify(payload)).replace(/[=]/g, '');
+        const now = Math.floor(Date.now() / 1000);
+        
+        const jwtPayload = {
+            ...payload,
+            iat: now,
+            exp: now + expirySeconds,
+            jti: this.generateId()
+        };
+
+        const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
+        const encodedPayload = this.base64UrlEncode(JSON.stringify(jwtPayload));
         
         const data = `${encodedHeader}.${encodedPayload}`;
+        const signature = await this.signJWT(data, secret);
+        
+        return `${data}.${signature}`;
+    },
+
+    async verifyJWT(token, secret) {
+        try {
+            const [encodedHeader, encodedPayload, encodedSignature] = token.split('.');
+            if (!encodedHeader || !encodedPayload || !encodedSignature) {
+                return null;
+            }
+
+            // 验证签名
+            const data = `${encodedHeader}.${encodedPayload}`;
+            const expectedSignature = await this.signJWT(data, secret);
+            
+            if (expectedSignature !== encodedSignature) {
+                return null;
+            }
+
+            // 解析载荷
+            const payload = JSON.parse(this.base64UrlDecode(encodedPayload));
+            
+            // 检查过期时间
+            const now = Math.floor(Date.now() / 1000);
+            if (payload.exp && now > payload.exp) {
+                return null;
+            }
+
+            return payload;
+        } catch (error) {
+            console.error('JWT验证失败:', error);
+            return null;
+        }
+    },
+
+    async signJWT(data, secret) {
         const encoder = new TextEncoder();
         const key = await crypto.subtle.importKey(
             'raw',
@@ -338,109 +214,108 @@ const utils = {
         );
         
         const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
-        const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/[=]/g, '');
-        
-        return `${data}.${encodedSignature}`;
+        return this.base64UrlEncode(new Uint8Array(signature));
     },
 
-    // 验证JWT Token (修复base64解码问题)
-    async verifyJWT(token, secret) {
-        try {
-            const [encodedHeader, encodedPayload, encodedSignature] = token.split('.');
-            const data = `${encodedHeader}.${encodedPayload}`;
-            
-            const encoder = new TextEncoder();
-            const key = await crypto.subtle.importKey(
-                'raw',
-                encoder.encode(secret),
-                { name: 'HMAC', hash: 'SHA-256' },
-                false,
-                ['verify']
-            );
-            
-            // 修复base64解码问题
-            const signature = Uint8Array.from(atob(encodedSignature.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-            const isValid = await crypto.subtle.verify('HMAC', key, signature, encoder.encode(data));
-            
-            if (!isValid) return null;
-            
-            // 修复base64解码问题
-            const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
-            
-            // 检查过期时间
-            if (payload.exp && Date.now() > payload.exp * 1000) {
-                return null;
-            }
-            
-            return payload;
-        } catch (error) {
-            console.error('JWT验证失败:', error);
-            return null;
-        }
+    base64UrlEncode(data) {
+        let str = typeof data === 'string' ? data : String.fromCharCode(...data);
+        return btoa(str).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/[=]/g, '');
     },
 
-    // 创建CORS响应头 (支持环境变量配置)
-    getCorsHeaders(env, origin = '*') {
-        const allowedOrigins = env.ALLOWED_ORIGINS ? env.ALLOWED_ORIGINS.split(',') : [];
-        const validOrigin = allowedOrigins.includes(origin) ? origin : '*';
-        
+    base64UrlDecode(str) {
+        str = str.replace(/[-]/g, '+').replace(/[_]/g, '/');
+        while (str.length % 4) str += '=';
+        return atob(str);
+    },
+
+    // CORS处理
+    getCorsHeaders(origin = '*') {
         return {
-            'Access-Control-Allow-Origin': validOrigin,
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
             'Access-Control-Max-Age': '86400',
-            'Access-Control-Allow-Credentials': validOrigin !== '*' ? 'true' : undefined
+            'Access-Control-Allow-Credentials': 'true'
         };
     },
 
     // 响应工具
-    jsonResponse(data, status = 200, env, request) {
-        const origin = request.headers.get('Origin') || '*';
+    jsonResponse(data, status = 200, corsOrigin = '*') {
         const headers = {
             'Content-Type': 'application/json; charset=UTF-8',
-            ...this.getCorsHeaders(env, origin)
+            ...this.getCorsHeaders(corsOrigin)
         };
 
-        return new Response(JSON.stringify(data), {
-            status,
-            headers
-        });
+        return new Response(JSON.stringify(data), { status, headers });
     },
 
-    errorResponse(message, status = 400, env, request) {
+    errorResponse(message, status = 400, corsOrigin = '*') {
         return this.jsonResponse({ 
             success: false, 
-            message, 
-            error: true 
-        }, status, env, request);
+            error: true, 
+            message,
+            timestamp: Date.now()
+        }, status, corsOrigin);
     },
 
-    successResponse(data = {}, env, request) {
+    successResponse(data = {}, corsOrigin = '*') {
         return this.jsonResponse({ 
             success: true, 
+            timestamp: Date.now(),
             ...data 
-        }, 200, env, request);
+        }, 200, corsOrigin);
     },
 
-    // 获取客户端IP
-    getClientIP(request) {
-        return request.headers.get('CF-Connecting-IP') || 
-               request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() || 
-               request.headers.get('X-Real-IP') ||
-               'unknown';
+    // 获取客户端信息
+    getClientInfo(request) {
+        return {
+            ip: request.headers.get('CF-Connecting-IP') || 
+                request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() || 
+                request.headers.get('X-Real-IP') || 'unknown',
+            userAgent: request.headers.get('User-Agent') || '',
+            country: request.cf?.country || 'unknown',
+            city: request.cf?.city || 'unknown'
+        };
+    },
+
+    // 速率限制
+    async checkRateLimit(env, identifier, limit = 100, window = 60) {
+        const key = `rate_limit:${identifier}`;
+        const now = Math.floor(Date.now() / 1000);
+        const windowStart = now - window;
+        
+        try {
+            // 使用KV存储进行速率限制
+            const data = await env.KV?.get(key);
+            let requests = data ? JSON.parse(data) : [];
+            
+            // 清理过期请求
+            requests = requests.filter(timestamp => timestamp > windowStart);
+            
+            if (requests.length >= limit) {
+                return false;
+            }
+            
+            // 添加当前请求
+            requests.push(now);
+            await env.KV?.put(key, JSON.stringify(requests), { expirationTtl: window * 2 });
+            
+            return true;
+        } catch (error) {
+            console.error('速率限制检查失败:', error);
+            return true; // 出错时允许请求
+        }
     },
 
     // 记录用户行为
-    async logUserAction(env, userId, action, data, request) {
+    async logUserAction(env, userId, action, data = {}, request = null) {
         try {
-            // 检查是否启用了行为记录
-            if (env.ENABLE_ACTION_LOGGING !== 'true') {
+            if (!env.ENABLE_ACTION_LOGGING || env.ENABLE_ACTION_LOGGING !== 'true') {
                 return;
             }
 
+            const clientInfo = request ? this.getClientInfo(request) : {};
             const actionId = this.generateId();
-            const ip = this.getClientIP(request);
-            const userAgent = request.headers.get('User-Agent') || '';
             
             await env.DB.prepare(`
                 INSERT INTO user_actions (id, user_id, action, data, ip_address, user_agent, created_at)
@@ -449,9 +324,9 @@ const utils = {
                 actionId,
                 userId,
                 action,
-                JSON.stringify(data),
-                ip,
-                userAgent,
+                JSON.stringify({ ...data, ...clientInfo }),
+                clientInfo.ip,
+                clientInfo.userAgent,
                 Date.now()
             ).run();
         } catch (error) {
@@ -459,7 +334,7 @@ const utils = {
         }
     },
 
-    // 获取环境变量，如果不存在则返回默认值
+    // 获取环境变量
     getEnvVar(env, key, defaultValue = null) {
         return env[key] !== undefined ? env[key] : defaultValue;
     },
@@ -478,147 +353,334 @@ const utils = {
 
         const token = authHeader.substring(7);
         return token === adminPassword;
+    },
+
+    // 验证请求数据
+    validateInput(data, rules) {
+        const errors = [];
+        
+        for (const [field, rule] of Object.entries(rules)) {
+            const value = data[field];
+            
+            if (rule.required && (!value || (typeof value === 'string' && !value.trim()))) {
+                errors.push(`${field}是必填字段`);
+                continue;
+            }
+            
+            if (value && rule.minLength && value.length < rule.minLength) {
+                errors.push(`${field}最少需要${rule.minLength}个字符`);
+            }
+            
+            if (value && rule.maxLength && value.length > rule.maxLength) {
+                errors.push(`${field}最多允许${rule.maxLength}个字符`);
+            }
+            
+            if (value && rule.pattern && !rule.pattern.test(value)) {
+                errors.push(`${field}格式不正确`);
+            }
+            
+            if (value && rule.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                errors.push(`${field}邮箱格式不正确`);
+            }
+        }
+        
+        return { isValid: errors.length === 0, errors };
     }
 };
 
 // 认证中间件
-async function authenticate(request, env) {
+async function authMiddleware(request, env, ctx) {
+    // 跳过不需要认证的路径
+    const url = new URL(request.url);
+    const publicPaths = [
+        '/api/health',
+        '/api/config',
+        '/api/auth/register',
+        '/api/auth/login',
+        '/api/admin/init-db'
+    ];
+    
+    if (publicPaths.some(path => url.pathname.startsWith(path))) {
+        return null;
+    }
+
+    // OPTIONS请求不需要认证
+    if (request.method === 'OPTIONS') {
+        return null;
+    }
+
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return null;
+        return Utils.errorResponse('需要认证令牌', 401);
     }
 
     const token = authHeader.substring(7);
     const jwtSecret = env.JWT_SECRET;
-    if (!jwtSecret) {
-        console.error('JWT_SECRET 环境变量未设置');
-        return null;
-    }
-
-    const payload = await utils.verifyJWT(token, jwtSecret);
     
-    if (!payload) {
-        return null;
+    if (!jwtSecret) {
+        console.error('JWT_SECRET环境变量未设置');
+        return Utils.errorResponse('服务器配置错误', 500);
     }
 
-    // 验证会话是否存在且未过期
     try {
+        const payload = await Utils.verifyJWT(token, jwtSecret);
+        if (!payload) {
+            return Utils.errorResponse('无效的认证令牌', 401);
+        }
+
+        // 验证会话
+        const tokenHash = await Utils.simpleHash(token);
         const session = await env.DB.prepare(`
             SELECT u.* FROM users u
             JOIN user_sessions s ON u.id = s.user_id
-            WHERE s.token_hash = ? AND s.expires_at > ?
-        `).bind(
-            await utils.hashPassword(token),
-            Date.now()
-        ).first();
+            WHERE s.token_hash = ? AND s.expires_at > ? AND s.is_active = 1
+        `).bind(tokenHash, Date.now()).first();
 
         if (!session) {
-            return null;
+            return Utils.errorResponse('会话已过期', 401);
         }
 
-        // 更新最后活动时间
+        // 更新会话活动时间
         await env.DB.prepare(`
             UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
-        `).bind(Date.now(), await utils.hashPassword(token)).run();
+        `).bind(Date.now(), tokenHash).run();
 
-        return {
+        // 将用户信息附加到请求
+        request.user = {
             id: session.id,
             username: session.username,
             email: session.email,
             permissions: JSON.parse(session.permissions || '[]'),
             settings: JSON.parse(session.settings || '{}')
         };
+
+        return null; // 继续处理请求
     } catch (error) {
-        console.error('认证查询失败:', error);
-        return null;
+        console.error('认证中间件错误:', error);
+        return Utils.errorResponse('认证失败', 401);
     }
 }
 
-// CORS预检请求处理 - 修复所有路径
+// 速率限制中间件
+async function rateLimitMiddleware(request, env, ctx) {
+    const clientInfo = Utils.getClientInfo(request);
+    const limit = parseInt(Utils.getEnvVar(env, 'API_RATE_LIMIT', '100'));
+    
+    const allowed = await Utils.checkRateLimit(env, clientInfo.ip, limit, 60);
+    if (!allowed) {
+        return Utils.errorResponse('请求过于频繁，请稍后再试', 429);
+    }
+    
+    return null;
+}
+
+// 创建路由器实例
+const router = new Router();
+
+// 添加中间件
+router.use(rateLimitMiddleware);
+router.use(authMiddleware);
+
+// 数据库初始化SQL
+const DB_SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    permissions TEXT DEFAULT '["search","favorite","history","sync"]',
+    settings TEXT DEFAULT '{}',
+    is_active INTEGER DEFAULT 1,
+    last_login INTEGER,
+    login_count INTEGER DEFAULT 0,
+    failed_login_attempts INTEGER DEFAULT 0,
+    locked_until INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_activity INTEGER NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    is_active INTEGER DEFAULT 1,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS user_favorites (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    subtitle TEXT,
+    url TEXT NOT NULL,
+    icon TEXT,
+    keyword TEXT,
+    tags TEXT DEFAULT '[]',
+    notes TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS user_search_history (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    keyword TEXT NOT NULL,
+    results_count INTEGER DEFAULT 0,
+    search_type TEXT DEFAULT 'basic',
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS search_cache (
+    id TEXT PRIMARY KEY,
+    keyword TEXT NOT NULL,
+    keyword_hash TEXT NOT NULL,
+    results TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    access_count INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS user_actions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    action TEXT NOT NULL,
+    data TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON user_favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_history_user ON user_search_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_cache_keyword ON search_cache(keyword_hash);
+CREATE INDEX IF NOT EXISTS idx_actions_user ON user_actions(user_id);
+`;
+
+// CORS预检请求处理
 router.options('*', (request, env) => {
     const origin = request.headers.get('Origin') || '*';
     return new Response(null, {
         status: 204,
-        headers: utils.getCorsHeaders(env, origin)
+        headers: Utils.getCorsHeaders(origin)
     });
 });
 
 // 健康检查
 router.get('/api/health', async (request, env) => {
-    const version = utils.getEnvVar(env, 'APP_VERSION', '1.0.0');
-    const environment = utils.getEnvVar(env, 'ENVIRONMENT', 'production');
+    const dbStatus = await env.DB.prepare('SELECT 1').first().then(() => 'ok').catch(() => 'error');
     
-    return utils.successResponse({
+    return Utils.successResponse({
         status: 'healthy',
-        timestamp: Date.now(),
-        version,
-        environment
-    }, env, request);
+        version: Utils.getEnvVar(env, 'APP_VERSION', '1.0.0'),
+        environment: Utils.getEnvVar(env, 'ENVIRONMENT', 'production'),
+        database: dbStatus,
+        timestamp: Date.now()
+    });
+});
+
+// 获取系统配置
+router.get('/api/config', async (request, env) => {
+    try {
+        const configs = await env.DB.prepare(`
+            SELECT key, value, config_type FROM system_config WHERE is_public = 1
+        `).all();
+
+        const config = {};
+        configs.results.forEach(item => {
+            let value = item.value;
+            if (item.config_type === 'integer') {
+                value = parseInt(value);
+            } else if (item.config_type === 'boolean') {
+                value = value === '1' || value === 'true';
+            }
+            config[item.key] = value;
+        });
+
+        return Utils.successResponse(config);
+    } catch (error) {
+        console.error('获取配置失败:', error);
+        // 返回默认配置
+        return Utils.successResponse({
+            site_name: '磁力快搜',
+            site_description: '专业的磁力搜索工具',
+            enable_registration: true,
+            min_username_length: 3,
+            max_username_length: 20,
+            min_password_length: 6,
+            max_favorites: 500,
+            max_search_history: 100
+        });
+    }
 });
 
 // 初始化数据库
 router.post('/api/admin/init-db', async (request, env) => {
-    // 验证管理员权限
-    if (!await utils.verifyAdminAccess(request, env)) {
-        return utils.errorResponse('管理员权限验证失败', 403, env, request);
+    if (!await Utils.verifyAdminAccess(request, env)) {
+        return Utils.errorResponse('管理员权限验证失败', 403);
     }
 
     try {
-        // 执行数据库初始化
         const statements = DB_SCHEMA.split(';').filter(s => s.trim());
         for (const statement of statements) {
             if (statement.trim()) {
                 await env.DB.exec(statement);
             }
         }
-        return utils.successResponse({ message: '数据库初始化成功' }, env, request);
+        
+        console.log('数据库初始化成功');
+        return Utils.successResponse({ message: '数据库初始化成功' });
     } catch (error) {
         console.error('数据库初始化失败:', error);
-        return utils.errorResponse(`数据库初始化失败: ${error.message}`, 500, env, request);
+        return Utils.errorResponse(`数据库初始化失败: ${error.message}`, 500);
     }
 });
 
 // 用户注册
 router.post('/api/auth/register', async (request, env) => {
     try {
-        // 检查是否允许注册
-        const allowRegistration = utils.getEnvVar(env, 'ALLOW_REGISTRATION', 'true') === 'true';
+        const allowRegistration = Utils.getEnvVar(env, 'ALLOW_REGISTRATION', 'true') === 'true';
         if (!allowRegistration) {
-            return utils.errorResponse('注册功能已关闭', 403, env, request);
+            return Utils.errorResponse('注册功能已关闭');
         }
 
         const body = await request.json().catch(() => ({}));
+        
+        // 验证输入
+        const validation = Utils.validateInput(body, {
+            username: { required: true, minLength: 3, maxLength: 20, pattern: /^[a-zA-Z0-9_\u4e00-\u9fa5]+$/ },
+            email: { required: true, type: 'email' },
+            password: { required: true, minLength: 6, maxLength: 50 }
+        });
+
+        if (!validation.isValid) {
+            return Utils.errorResponse(validation.errors.join(', '));
+        }
+
         const { username, email, password } = body;
 
-        // 输入验证
-        if (!username || !email || !password) {
-            return utils.errorResponse('用户名、邮箱和密码都是必需的', 400, env, request);
-        }
-
-        const minUsernameLength = parseInt(utils.getEnvVar(env, 'MIN_USERNAME_LENGTH', '3'));
-        const maxUsernameLength = parseInt(utils.getEnvVar(env, 'MAX_USERNAME_LENGTH', '20'));
-        const minPasswordLength = parseInt(utils.getEnvVar(env, 'MIN_PASSWORD_LENGTH', '6'));
-
-        if (username.length < minUsernameLength || username.length > maxUsernameLength) {
-            return utils.errorResponse(`用户名长度应在${minUsernameLength}-${maxUsernameLength}个字符之间`, 400, env, request);
-        }
-
-        if (password.length < minPasswordLength) {
-            return utils.errorResponse(`密码至少需要${minPasswordLength}个字符`, 400, env, request);
-        }
-
-        // 检查用户名和邮箱是否已存在
+        // 检查用户是否已存在
         const existingUser = await env.DB.prepare(`
             SELECT id FROM users WHERE username = ? OR email = ?
         `).bind(username, email).first();
 
         if (existingUser) {
-            return utils.errorResponse('用户名或邮箱已存在', 409, env, request);
+            return Utils.errorResponse('用户名或邮箱已存在');
         }
 
-        // 创建新用户
-        const userId = utils.generateId();
-        const passwordHash = await utils.hashPassword(password);
+        // 创建用户
+        const userId = Utils.generateId();
+        const passwordHash = await Utils.hashPassword(password);
         const now = Date.now();
 
         await env.DB.prepare(`
@@ -626,17 +688,16 @@ router.post('/api/auth/register', async (request, env) => {
             VALUES (?, ?, ?, ?, ?, ?)
         `).bind(userId, username, email, passwordHash, now, now).run();
 
-        // 记录注册行为
-        await utils.logUserAction(env, userId, 'register', { username, email }, request);
+        await Utils.logUserAction(env, userId, 'register', { username, email }, request);
 
-        return utils.successResponse({ 
+        return Utils.successResponse({ 
             message: '注册成功',
             user: { id: userId, username, email }
-        }, env, request);
+        });
 
     } catch (error) {
         console.error('注册失败:', error);
-        return utils.errorResponse('注册失败，请稍后重试', 500, env, request);
+        return Utils.errorResponse('注册失败，请稍后重试', 500);
     }
 });
 
@@ -644,65 +705,94 @@ router.post('/api/auth/register', async (request, env) => {
 router.post('/api/auth/login', async (request, env) => {
     try {
         const body = await request.json().catch(() => ({}));
-        const { username, password } = body;
+        
+        const validation = Utils.validateInput(body, {
+            username: { required: true },
+            password: { required: true }
+        });
 
-        if (!username || !password) {
-            return utils.errorResponse('用户名和密码都是必需的', 400, env, request);
+        if (!validation.isValid) {
+            return Utils.errorResponse(validation.errors.join(', '));
         }
+
+        const { username, password } = body;
 
         // 查找用户
         const user = await env.DB.prepare(`
-            SELECT * FROM users WHERE username = ? OR email = ?
+            SELECT * FROM users WHERE (username = ? OR email = ?) AND is_active = 1
         `).bind(username, username).first();
 
         if (!user) {
-            return utils.errorResponse('用户名或密码错误', 401, env, request);
+            return Utils.errorResponse('用户名或密码错误');
+        }
+
+        // 检查账号是否被锁定
+        const now = Date.now();
+        if (user.locked_until && now < user.locked_until) {
+            const remainingMinutes = Math.ceil((user.locked_until - now) / 60000);
+            return Utils.errorResponse(`账号已锁定，${remainingMinutes}分钟后重试`);
         }
 
         // 验证密码
-        const passwordHash = await utils.hashPassword(password);
-        if (passwordHash !== user.password_hash) {
-            return utils.errorResponse('用户名或密码错误', 401, env, request);
+        const isValidPassword = await Utils.verifyPassword(password, user.password_hash);
+        if (!isValidPassword) {
+            // 增加失败尝试次数
+            const failedAttempts = (user.failed_login_attempts || 0) + 1;
+            const maxAttempts = parseInt(Utils.getEnvVar(env, 'MAX_LOGIN_ATTEMPTS', '5'));
+            
+            let lockUntil = null;
+            if (failedAttempts >= maxAttempts) {
+                const lockDuration = parseInt(Utils.getEnvVar(env, 'LOCK_DURATION', '1800')) * 1000;
+                lockUntil = now + lockDuration;
+            }
+
+            await env.DB.prepare(`
+                UPDATE users SET failed_login_attempts = ?, locked_until = ? WHERE id = ?
+            `).bind(failedAttempts, lockUntil, user.id).run();
+
+            return Utils.errorResponse('用户名或密码错误');
         }
 
         const jwtSecret = env.JWT_SECRET;
         if (!jwtSecret) {
-            return utils.errorResponse('服务器配置错误', 500, env, request);
+            return Utils.errorResponse('服务器配置错误', 500);
         }
 
-        // 获取 token 过期时间（默认30天）
-        const tokenExpiryDays = parseInt(utils.getEnvVar(env, 'JWT_EXPIRY_DAYS', '30'));
+        // 生成JWT令牌
+        const tokenExpiryDays = parseInt(Utils.getEnvVar(env, 'JWT_EXPIRY_DAYS', '30'));
         const expirySeconds = tokenExpiryDays * 24 * 60 * 60;
 
-        // 生成JWT token
         const payload = {
             userId: user.id,
-            username: user.username,
-            iat: Math.floor(Date.now() / 1000),
-            exp: Math.floor(Date.now() / 1000) + expirySeconds
+            username: user.username
         };
 
-        const token = await utils.generateJWT(payload, jwtSecret);
-        const tokenHash = await utils.hashPassword(token);
+        const token = await Utils.generateJWT(payload, jwtSecret, expirySeconds);
+        const tokenHash = await Utils.simpleHash(token);
 
         // 清理过期会话
         await env.DB.prepare(`
             DELETE FROM user_sessions WHERE user_id = ? AND expires_at < ?
-        `).bind(user.id, Date.now()).run();
+        `).bind(user.id, now).run();
 
-        // 创建新会话
-        const sessionId = utils.generateId();
-        const expiresAt = Date.now() + (expirySeconds * 1000);
+        // 创建会话
+        const sessionId = Utils.generateId();
+        const expiresAt = now + (expirySeconds * 1000);
+        const clientInfo = Utils.getClientInfo(request);
 
         await env.DB.prepare(`
-            INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, last_activity)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `).bind(sessionId, user.id, tokenHash, expiresAt, Date.now(), Date.now()).run();
+            INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, last_activity, ip_address, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(sessionId, user.id, tokenHash, expiresAt, now, now, clientInfo.ip, clientInfo.userAgent).run();
 
-        // 记录登录行为
-        await utils.logUserAction(env, user.id, 'login', { username }, request);
+        // 重置失败尝试次数并更新最后登录时间
+        await env.DB.prepare(`
+            UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login = ?, login_count = login_count + 1 WHERE id = ?
+        `).bind(now, user.id).run();
 
-        return utils.successResponse({
+        await Utils.logUserAction(env, user.id, 'login', { username }, request);
+
+        return Utils.successResponse({
             message: '登录成功',
             token,
             user: {
@@ -712,128 +802,100 @@ router.post('/api/auth/login', async (request, env) => {
                 permissions: JSON.parse(user.permissions || '[]'),
                 settings: JSON.parse(user.settings || '{}')
             }
-        }, env, request);
+        });
 
     } catch (error) {
         console.error('登录失败:', error);
-        return utils.errorResponse('登录失败，请稍后重试', 500, env, request);
+        return Utils.errorResponse('登录失败，请稍后重试', 500);
     }
 });
 
-// 验证token
+// 验证令牌
 router.get('/api/auth/verify', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401, env, request);
-    }
-
-    return utils.successResponse({ user }, env, request);
+    return Utils.successResponse({ user: request.user });
 });
 
-// 刷新token
+// 刷新令牌
 router.post('/api/auth/refresh', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401, env, request);
+    try {
+        const jwtSecret = env.JWT_SECRET;
+        const tokenExpiryDays = parseInt(Utils.getEnvVar(env, 'JWT_EXPIRY_DAYS', '30'));
+        const expirySeconds = tokenExpiryDays * 24 * 60 * 60;
+
+        const payload = {
+            userId: request.user.id,
+            username: request.user.username
+        };
+
+        const newToken = await Utils.generateJWT(payload, jwtSecret, expirySeconds);
+        const newTokenHash = await Utils.simpleHash(newToken);
+
+        // 获取当前令牌
+        const authHeader = request.headers.get('Authorization');
+        const oldToken = authHeader.substring(7);
+        const oldTokenHash = await Utils.simpleHash(oldToken);
+
+        // 更新会话
+        const now = Date.now();
+        await env.DB.prepare(`
+            UPDATE user_sessions SET token_hash = ?, expires_at = ?, last_activity = ?
+            WHERE token_hash = ?
+        `).bind(newTokenHash, now + (expirySeconds * 1000), now, oldTokenHash).run();
+
+        return Utils.successResponse({ token: newToken });
+    } catch (error) {
+        console.error('刷新令牌失败:', error);
+        return Utils.errorResponse('刷新令牌失败', 500);
     }
-
-    const jwtSecret = env.JWT_SECRET;
-    if (!jwtSecret) {
-        return utils.errorResponse('服务器配置错误', 500, env, request);
-    }
-
-    // 获取 token 过期时间
-    const tokenExpiryDays = parseInt(utils.getEnvVar(env, 'JWT_EXPIRY_DAYS', '30'));
-    const expirySeconds = tokenExpiryDays * 24 * 60 * 60;
-
-    // 生成新token
-    const payload = {
-        userId: user.id,
-        username: user.username,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + expirySeconds
-    };
-
-    const newToken = await utils.generateJWT(payload, jwtSecret);
-    const tokenHash = await utils.hashPassword(newToken);
-
-    // 更新会话
-    const authHeader = request.headers.get('Authorization');
-    const oldToken = authHeader.substring(7);
-    const oldTokenHash = await utils.hashPassword(oldToken);
-
-    await env.DB.prepare(`
-        UPDATE user_sessions SET token_hash = ?, expires_at = ?, last_activity = ?
-        WHERE token_hash = ?
-    `).bind(
-        tokenHash,
-        Date.now() + (expirySeconds * 1000),
-        Date.now(),
-        oldTokenHash
-    ).run();
-
-    return utils.successResponse({ token: newToken }, env, request);
 });
 
 // 退出登录
 router.post('/api/auth/logout', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (user) {
-        // 删除会话
+    try {
         const authHeader = request.headers.get('Authorization');
         const token = authHeader.substring(7);
-        const tokenHash = await utils.hashPassword(token);
+        const tokenHash = await Utils.simpleHash(token);
 
         await env.DB.prepare(`
-            DELETE FROM user_sessions WHERE token_hash = ?
+            UPDATE user_sessions SET is_active = 0 WHERE token_hash = ?
         `).bind(tokenHash).run();
 
-        // 记录退出行为
-        await utils.logUserAction(env, user.id, 'logout', {}, request);
-    }
+        await Utils.logUserAction(env, request.user.id, 'logout', {}, request);
 
-    return utils.successResponse({ message: '退出成功' }, env, request);
+        return Utils.successResponse({ message: '退出成功' });
+    } catch (error) {
+        console.error('退出登录失败:', error);
+        return Utils.errorResponse('退出登录失败', 500);
+    }
 });
 
 // 同步收藏夹
 router.post('/api/user/favorites', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401, env, request);
-    }
-
     try {
         const body = await request.json().catch(() => ({}));
         const { favorites } = body;
 
         if (!Array.isArray(favorites)) {
-            return utils.errorResponse('收藏夹数据格式错误', 400, env, request);
+            return Utils.errorResponse('收藏夹数据格式错误');
         }
 
-        // 检查收藏夹数量限制
-        const maxFavorites = parseInt(utils.getEnvVar(env, 'MAX_FAVORITES_PER_USER', '1000'));
+        const maxFavorites = parseInt(Utils.getEnvVar(env, 'MAX_FAVORITES_PER_USER', '1000'));
         if (favorites.length > maxFavorites) {
-            return utils.errorResponse(`收藏夹数量不能超过 ${maxFavorites} 个`, 400, env, request);
+            return Utils.errorResponse(`收藏夹数量不能超过 ${maxFavorites} 个`);
         }
 
         // 清空现有收藏夹
-        await env.DB.prepare(`
-            DELETE FROM user_favorites WHERE user_id = ?
-        `).bind(user.id).run();
+        await env.DB.prepare(`DELETE FROM user_favorites WHERE user_id = ?`).bind(request.user.id).run();
 
-        // 插入新收藏
+        // 批量插入新收藏
         for (const favorite of favorites) {
-            const favoriteId = favorite.id || utils.generateId();
+            const favoriteId = favorite.id || Utils.generateId();
             await env.DB.prepare(`
                 INSERT INTO user_favorites (id, user_id, title, subtitle, url, icon, keyword, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).bind(
                 favoriteId,
-                user.id,
+                request.user.id,
                 favorite.title || '',
                 favorite.subtitle || '',
                 favorite.url || '',
@@ -844,35 +906,22 @@ router.post('/api/user/favorites', async (request, env) => {
             ).run();
         }
 
-        // 记录同步行为
-        await utils.logUserAction(env, user.id, 'sync_favorites', { count: favorites.length }, request);
+        await Utils.logUserAction(env, request.user.id, 'sync_favorites', { count: favorites.length }, request);
 
-        return utils.successResponse({ message: '收藏夹同步成功' }, env, request);
+        return Utils.successResponse({ message: '收藏夹同步成功' });
 
     } catch (error) {
         console.error('同步收藏夹失败:', error);
-        return utils.errorResponse('同步收藏夹失败', 500, env, request);
+        return Utils.errorResponse('同步收藏夹失败', 500);
     }
-});
-//处理dashboard页面
-router.get('/dashboard', async (request, env) => {
-    return new Response(getDashboardHTML(), {
-        headers: { 'Content-Type': 'text/html' }
-    });
 });
 
 // 获取收藏夹
 router.get('/api/user/favorites', async (request, env) => {
-    const user = await authenticate(request, env);
-    
-    if (!user) {
-        return utils.errorResponse('认证失败', 401, env, request);
-    }
-
     try {
         const result = await env.DB.prepare(`
             SELECT * FROM user_favorites WHERE user_id = ? ORDER BY created_at DESC
-        `).bind(user.id).all();
+        `).bind(request.user.id).all();
 
         const favorites = result.results.map(fav => ({
             id: fav.id,
@@ -884,207 +933,87 @@ router.get('/api/user/favorites', async (request, env) => {
             addedAt: new Date(fav.created_at).toISOString()
         }));
 
-        return utils.successResponse({ favorites }, env, request);
+        return Utils.successResponse({ favorites });
 
     } catch (error) {
         console.error('获取收藏夹失败:', error);
-        return utils.errorResponse('获取收藏夹失败', 500, env, request);
+        return Utils.errorResponse('获取收藏夹失败', 500);
     }
 });
 
-// 系统配置信息（不包含敏感信息）
-router.get('/api/config', async (request, env) => {
-    return utils.successResponse({
-        allowRegistration: utils.getEnvVar(env, 'ALLOW_REGISTRATION', 'true') === 'true',
-        minUsernameLength: parseInt(utils.getEnvVar(env, 'MIN_USERNAME_LENGTH', '3')),
-        maxUsernameLength: parseInt(utils.getEnvVar(env, 'MAX_USERNAME_LENGTH', '20')),
-        minPasswordLength: parseInt(utils.getEnvVar(env, 'MIN_PASSWORD_LENGTH', '6')),
-        maxFavoritesPerUser: parseInt(utils.getEnvVar(env, 'MAX_FAVORITES_PER_USER', '1000')),
-        maxHistoryPerUser: parseInt(utils.getEnvVar(env, 'MAX_HISTORY_PER_USER', '1000')),
-        searchCacheEnabled: utils.getEnvVar(env, 'ENABLE_SEARCH_CACHE', 'true') === 'true',
-        version: utils.getEnvVar(env, 'APP_VERSION', '1.0.0'),
-        environment: utils.getEnvVar(env, 'ENVIRONMENT', 'production')
-    }, env, request);
-});
-
-// 默认路由 - 处理未匹配的路径
-router.all('*', (request, env) => {
-    const url = new URL(request.url);
-    return utils.errorResponse(`API路径不存在: ${url.pathname}`, 404, env, request);
-});
-
-// 路由配置 (续)
-
-// 获取搜索结果
-router.get('/api/search', async (request, env) => {
-    // 限流中间件
-    const ip = utils.getClientIP(request);
-    const rateKey = `rate:${ip}`;
-    const rateCount = await env.DB.prepare(`
-        SELECT COUNT(*) as count FROM user_actions 
-        WHERE ip_address = ? AND created_at > ?
-    `).bind(ip, Date.now() - 60000).first().then(r => r.count);
-    
-    if (rateCount > 20) {
-        return utils.errorResponse('请求过于频繁，请稍后再试', 429, env, request);
-    }
-
-    const url = new URL(request.url);
-    const keyword = url.searchParams.get('q');
-    
-    if (!keyword || keyword.length < 2) {
-        return utils.errorResponse('搜索关键词至少需要2个字符', 400, env, request);
-    }
-
+// 添加搜索记录
+router.post('/api/search/record', async (request, env) => {
     try {
-        // 检查缓存
-        const cacheKey = utils.generateId(keyword);
-        const cachedResult = await env.DB.prepare(`
-            SELECT results FROM search_cache 
-            WHERE keyword_hash = ? AND expires_at > ?
-        `).bind(cacheKey, Date.now()).first();
-        
-        if (cachedResult) {
-            // 记录缓存命中
-            await env.DB.prepare(`
-                UPDATE search_cache SET access_count = access_count + 1 
-                WHERE keyword_hash = ?
-            `).bind(cacheKey).run();
-            
-            return utils.successResponse({
-                cached: true,
-                results: JSON.parse(cachedResult.results)
-            }, env, request);
+        const body = await request.json().catch(() => ({}));
+        const { keyword, results, timestamp } = body;
+
+        if (!keyword) {
+            return Utils.errorResponse('关键词不能为空');
         }
-        
-        // 实际搜索逻辑 (伪代码)
-        const results = await this.performWebSearch(keyword);
-        
-        // 缓存结果 (15分钟)
+
+        const recordId = Utils.generateId();
         await env.DB.prepare(`
-            INSERT INTO search_cache (id, keyword, keyword_hash, results, expires_at, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `).bind(
-            utils.generateId(),
-            keyword,
-            cacheKey,
-            JSON.stringify(results),
-            Date.now() + 900000, // 15分钟
-            Date.now()
-        ).run();
-        
-        return utils.successResponse({
-            cached: false,
-            results
-        }, env, request);
-        
+            INSERT INTO user_search_history (id, user_id, keyword, results_count, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        `).bind(recordId, request.user.id, keyword, results.length || 0, timestamp || Date.now()).run();
+
+        return Utils.successResponse({ message: '搜索记录已保存' });
+
     } catch (error) {
-        console.error('搜索失败:', error);
-        return utils.errorResponse('搜索失败，请稍后重试', 500, env, request);
+        console.error('保存搜索记录失败:', error);
+        return Utils.errorResponse('保存搜索记录失败', 500);
     }
 });
 
-// 监控状态
-router.get('/api/monitoring', async (request, env) => {
+// 获取搜索历史
+router.get('/api/user/search-history', async (request, env) => {
     try {
-        const results = await env.DB.prepare(`
-            SELECT * FROM site_monitoring 
-            ORDER BY last_checked DESC 
-            LIMIT 20
-        `).all();
-        
-        const sites = results.results.map(site => ({
-            id: site.id,
-            name: site.name,
-            url: site.url,
-            status: site.status,
-            lastChecked: new Date(site.last_checked).toISOString(),
-            responseTime: site.response_time,
-            successRate: site.check_count > 0 
-                ? Math.round((site.success_count / site.check_count) * 100) 
-                : 0
+        const result = await env.DB.prepare(`
+            SELECT * FROM user_search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 100
+        `).bind(request.user.id).all();
+
+        const history = result.results.map(item => ({
+            keyword: item.keyword,
+            resultsCount: item.results_count,
+            timestamp: item.created_at
         }));
-        
-        return utils.successResponse({ sites }, env, request);
-        
+
+        return Utils.successResponse({ history });
+
     } catch (error) {
-        console.error('获取监控数据失败:', error);
-        return utils.errorResponse('获取监控数据失败', 500, env, request);
+        console.error('获取搜索历史失败:', error);
+        return Utils.errorResponse('获取搜索历史失败', 500);
     }
 });
 
-// 数据清理任务
-router.post('/api/admin/cleanup', async (request, env) => {
-    // 验证管理员权限
-    if (!await utils.verifyAdminAccess(request, env)) {
-        return utils.errorResponse('管理员权限验证失败', 403, env, request);
-    }
-    
+// 用户统计
+router.get('/api/user/stats', async (request, env) => {
     try {
-        // 清理过期会话
-        await env.DB.exec(`
-            DELETE FROM user_sessions WHERE expires_at < ${Date.now()}
-        `);
-        
-        // 清理过期缓存
-        await env.DB.exec(`
-            DELETE FROM search_cache WHERE expires_at < ${Date.now()}
-        `);
-        
-        // 清理旧的行为记录（30天前）
-        await env.DB.exec(`
-            DELETE FROM user_actions WHERE created_at < ${Date.now() - 2592000000}
-        `);
-        
-        // 清理过期通知
-        await env.DB.exec(`
-            DELETE FROM notifications WHERE expires_at IS NOT NULL AND expires_at < ${Date.now()}
-        `);
-        
-        return utils.successResponse({ message: '清理任务完成' }, env, request);
-        
+        const [favCount, historyCount, loginCount] = await Promise.all([
+            env.DB.prepare(`SELECT COUNT(*) as count FROM user_favorites WHERE user_id = ?`).bind(request.user.id).first(),
+            env.DB.prepare(`SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?`).bind(request.user.id).first(),
+            env.DB.prepare(`SELECT login_count, created_at FROM users WHERE id = ?`).bind(request.user.id).first()
+        ]);
+
+        const activeDays = Math.floor((Date.now() - loginCount.created_at) / (24 * 60 * 60 * 1000)) + 1;
+
+        return Utils.successResponse({
+            totalFavorites: favCount.count,
+            totalSearches: historyCount.count,
+            totalLogins: loginCount.login_count,
+            activeDays
+        });
+
     } catch (error) {
-        console.error('数据清理失败:', error);
-        return utils.errorResponse('数据清理失败', 500, env, request);
+        console.error('获取用户统计失败:', error);
+        return Utils.errorResponse('获取用户统计失败', 500);
     }
 });
 
-// 模拟搜索函数
-async function performWebSearch(keyword) {
-    // 实际项目中这里会调用爬虫或搜索API
-    // 以下是模拟结果
-    
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve([
-                {
-                    id: utils.generateId(),
-                    title: `"${keyword}" 的搜索结果 1`,
-                    size: '1.2 GB',
-                    date: new Date().toISOString(),
-                    seeds: 25,
-                    peers: 10,
-                    source: 'source1.com',
-                    magnetLink: `magnet:?xt=urn:btih:${utils.generateRandomString(40)}`
-                },
-                {
-                    id: utils.generateId(),
-                    title: `高清资源 ${keyword} 完整版`,
-                    size: '4.7 GB',
-                    date: new Date().toISOString(),
-                    seeds: 120,
-                    peers: 45,
-                    source: 'source2.com',
-                    magnetLink: `magnet:?xt=urn:btih:${utils.generateRandomString(40)}`
-                }
-            ]);
-        }, 500);
-    });
-}
-
-// 错误处理中间件（全局）
-router.all('*', (request, env) => {
-    return utils.errorResponse('API路径不存在', 404, env, request);
+// 默认路由处理
+router.all('*', (request) => {
+    const url = new URL(request.url);
+    return Utils.errorResponse(`API路径不存在: ${url.pathname}`, 404);
 });
 
 // Worker主函数
@@ -1092,21 +1021,18 @@ export default {
     async fetch(request, env, ctx) {
         try {
             // 验证必需的环境变量
-            if (!env.JWT_SECRET) {
-                console.error('JWT_SECRET 环境变量未设置');
-                return utils.errorResponse('服务器配置错误：缺少JWT密钥', 500, env, request);
+            const requiredVars = ['JWT_SECRET', 'DB'];
+            const missingVars = requiredVars.filter(varName => !env[varName]);
+            
+            if (missingVars.length > 0) {
+                console.error('缺少必需的环境变量:', missingVars);
+                return Utils.errorResponse(`服务器配置错误：缺少环境变量 ${missingVars.join(', ')}`, 500);
             }
 
-            if (!env.DB) {
-                console.error('DB 环境变量未设置');
-                return utils.errorResponse('服务器配置错误：数据库未配置', 500, env, request);
-            }
-
-            return await router.handle(request, env);
+            return await router.handle(request, env, ctx);
         } catch (error) {
             console.error('Worker错误:', error);
-            return utils.errorResponse('服务器内部错误', 500, env, request);
+            return Utils.errorResponse('服务器内部错误', 500);
         }
     }
 };
-
