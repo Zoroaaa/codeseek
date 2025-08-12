@@ -1,0 +1,28 @@
+{
+  "name": "magnet-search",
+  "version": "1.0.0",
+  "description": "专业的磁力搜索工具，支持云端同步",
+  "keywords": ["magnet", "search", "cloudflare", "torrent"],
+  "author": "Your Name",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler dev worker.js",
+    "deploy": "bash deploy.sh",
+    "deploy:worker": "wrangler publish worker.js",
+    "deploy:db": "wrangler d1 execute magnet-search-db --file=schema.sql",
+    "serve": "python -m http.server 8080",
+    "lint": "echo 'Linting...'",
+    "test": "echo 'Testing...'"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/magnet-search.git"
+  },
+  "homepage": "https://your-site.pages.dev",
+  "bugs": {
+    "url": "https://github.com/yourusername/magnet-search/issues"
+  }
+}

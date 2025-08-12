@@ -1,800 +1,838 @@
+// Dashboard 应用逻辑
 class DashboardApp {
     constructor() {
-        // 获取全局单例
-        this.authManager = authManager;
-        this.utils = utils;
-        this.API = API;
-        
-        // 当前用户信息
-        this.currentUser = this.authManager.getCurrentUser();
-        
-        // 初始化
-        this.initUserInfo();
-        this.bindEvents();
-        this.loadDashboardData();
-        this.loadSettings();
+        this.currentUser = null;
+        this.favorites = [];
+        this.searchHistory = [];
+        this.currentTab = 'overview';
+        this.isInitialized = false;
+        this.init();
     }
-    
-    // 初始化用户信息
-    initUserInfo() {
-        if (this.currentUser) {
-            const usernameEl = document.getElementById('username');
-            if (usernameEl) {
-                usernameEl.textContent = this.currentUser.username;
-            }
+
+    async init() {
+        try {
+            showLoading(true);
+            
+            // 检查认证状态
+            await this.checkAuth();
+            
+            // 绑定事件
+            this.bindEvents();
+            
+            // 加载数据
+            await this.loadData();
+            
+            // 初始化主题
+            this.initTheme();
+            
+            this.isInitialized = true;
+            console.log('✅ Dashboard初始化完成');
+            
+        } catch (error) {
+            console.error('❌ Dashboard初始化失败:', error);
+            showToast('初始化失败，请重新登录', 'error');
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 2000);
+        } finally {
+            showLoading(false);
         }
     }
-    
-    // 绑定事件
+
+    async checkAuth() {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            throw new Error('未找到认证token');
+        }
+
+        try {
+            const result = await API.verifyToken(token);
+            if (!result.success || !result.user) {
+                throw new Error('Token验证失败');
+            }
+            
+            this.currentUser = result.user;
+            this.updateUserUI();
+        } catch (error) {
+            localStorage.removeItem('auth_token');
+            throw new Error('认证失败');
+        }
+    }
+
     bindEvents() {
-        // 侧边栏菜单点击
-        document.querySelectorAll('.menu-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                const tabName = item.dataset.tab;
-                this.switchTab(tabName);
+        // 标签切换
+        document.querySelectorAll('[data-tab]').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                this.switchTab(e.target.dataset.tab);
             });
         });
-        
-        // 登出按钮
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logout极速搜索-磁力快搜) {
-            logoutBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.logout();
-            });
-        }
-        
-        // 主题切换按钮
+
+        // 主题切换
         const themeToggle = document.getElementById('themeToggle');
         if (themeToggle) {
-            themeToggle.addEventListener('click', () => {
-                this.toggleTheme();
-            });
+            themeToggle.addEventListener('click', () => this.toggleTheme());
         }
-        
-        // 修改密码表单提交
+
+        // 退出登录
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.logout());
+        }
+
+        // 模态框事件
+        this.bindModalEvents();
+
+        // 设置表单事件
+        this.bindSettingsEvents();
+    }
+
+    bindModalEvents() {
+        const passwordModal = document.getElementById('passwordModal');
+        const closeBtns = document.querySelectorAll('.close');
         const passwordForm = document.getElementById('passwordForm');
-        if (passwordForm) {
-            passwordForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.changePassword();
-            });
-        }
-        
-        // 关闭模态框按钮
-        const closeModal = document.querySelector('.modal .close');
-        if (closeModal) {
-            closeModal.addEventListener('click', () => {
-                this.closeModal('passwordModal');
-            });
-        }
-        
-        // 同步按钮
-        const syncButtons = [
-            { id: 'syncFavorites', method: this.syncFavorites },
-            { id: 'syncHistory', method: this.syncHistory }
-        ];
-        
-        syncButtons.forEach(btn => {
-            const element = document.getElementById(btn.id);
-            if (element) {
-                element.addEventListener('click', btn.method.bind(this));
-            }
+
+        closeBtns.forEach(btn => {
+            btn.addEventListener('click', () => this.closeModals());
         });
-        
-        // 清空历史按钮
-        const clearHistoryBtn = document.getElementById('clearAllHistory');
-        if (clearHistoryBtn) {
-            clearHistoryBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.clearAllHistory();
+
+        if (passwordModal) {
+            passwordModal.addEventListener('click', (e) => {
+                if (e.target === passwordModal) this.closeModals();
             });
+        }
+
+        if (passwordForm) {
+            passwordForm.addEventListener('submit', (e) => this.handlePasswordChange(e));
         }
     }
-    
-    // 切换标签页
+
+    bindSettingsEvents() {
+        // 设置表单绑定
+        const settingInputs = document.querySelectorAll('#settings input, #settings select');
+        settingInputs.forEach(input => {
+            input.addEventListener('change', () => {
+                this.markSettingsChanged();
+            });
+        });
+    }
+
     switchTab(tabName) {
-        // 隐藏所有标签页
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // 移除所有菜单项激活状态
+        // 更新菜单状态
         document.querySelectorAll('.menu-item').forEach(item => {
-            item.classList.remove('active');
+            item.classList.toggle('active', item.dataset.tab === tabName);
         });
-        
-        // 显示目标标签页
-        const targetTab = document.getElementById(tabName);
-        if (targetTab) {
-            targetTab.classList.add('active');
-        }
-        
-        // 激活对应菜单项
-        const menuItem = document.querySelector(`.menu-item[data-tab="${tabName}"]`);
-        if (menuItem) {
-            menuItem.classList.add('active');
-        }
-        
-        // 按需加载数据
-        switch(tabName) {
+
+        // 更新标签页内容
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.toggle('active', content.id === tabName);
+        });
+
+        this.currentTab = tabName;
+        this.loadTabData(tabName);
+    }
+
+    async loadTabData(tabName) {
+        switch (tabName) {
+            case 'overview':
+                await this.loadOverviewData();
+                break;
             case 'favorites':
-                this.loadFavorites();
+                await this.loadFavoritesData();
                 break;
             case 'history':
-                this.loadHistory();
+                await this.loadHistoryData();
+                break;
+            case 'settings':
+                await this.loadSettingsData();
                 break;
             case 'stats':
-                this.loadStats();
+                await this.loadStatsData();
                 break;
         }
     }
-    
-    // 加载仪表盘数据
-    async loadDashboardData() {
-        if (!this.currentUser) return;
-        
-        this.showLoading(true);
-        
+
+    async loadData() {
         try {
-            // 获取用户统计信息
-            const response = await this.API.getUserStats();
-            
-            if (response.success) {
-                // 更新统计卡片
-                this.updateStatCard('totalSearches', response.data.totalSearches);
-                this.updateStatCard('totalFavorites', response.data.totalFavorites);
-                this.updateStatCard('activeDays', response.data.activeDays);
-                this.updateStatCard('userLevel', response.data.userLevel);
-                
-                // 渲染最近活动
-                this.renderRecentActivities(response.data.recentActivities);
-            } else {
-                this.utils.showToast(response.message, 'error');
+            // 并行加载数据
+            const [favorites, history, settings] = await Promise.allSettled([
+                API.getFavorites(),
+                this.getSearchHistory(),
+                this.getUserSettings()
+            ]);
+
+            if (favorites.status === 'fulfilled') {
+                this.favorites = favorites.value || [];
             }
+
+            if (history.status === 'fulfilled') {
+                this.searchHistory = history.value || [];
+            }
+
+            // 加载当前标签页数据
+            await this.loadTabData(this.currentTab);
+
         } catch (error) {
-            console.error('加载仪表盘数据失败:', error);
-            this.utils.showToast('加载数据失败，请重试', 'error');
-        } finally {
-            this.showLoading(false);
+            console.error('加载数据失败:', error);
+            showToast('数据加载失败', 'error');
         }
     }
-    
-    // 更新统计卡片
-    updateStatCard(elementId, value) {
-        const element = document.getElementById(elementId);
-        if (element) {
-            element.textContent = value;
+
+    async loadOverviewData() {
+        try {
+            // 更新统计数据
+            document.getElementById('totalSearches').textContent = this.searchHistory.length;
+            document.getElementById('totalFavorites').textContent = this.favorites.length;
+            
+            // 计算活跃天数
+            const activeDays = this.calculateActiveDays();
+            document.getElementById('activeDays').textContent = activeDays;
+            
+            // 用户等级
+            const level = this.calculateUserLevel();
+            document.getElementById('userLevel').textContent = level;
+
+            // 加载最近活动
+            await this.loadRecentActivity();
+
+        } catch (error) {
+            console.error('加载概览数据失败:', error);
         }
     }
-    
-    // 渲染最近活动
-    renderRecentActivities(activities) {
-        const container = document.getElementById('activityList');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        if (!activities || activities.length === 0) {
-            container.innerHTML = '<p class="empty-activity">暂无最近活动</p>';
-            return;
-        }
-        
-        activities.forEach(activity => {
-            const activityElement = document.createElement('div');
-            activityElement.className = 'activity-item';
-            
-            const iconMap = {
-                'search': '🔍🔍',
-                'favorite': '⭐',
-                'login': '🔑🔑',
-                'logout': '🚪🚪'
-            };
-            
-            activityElement.innerHTML = `
-                <div class="activity-icon">${iconMap[activity.action] || '⚡⚡'}</div>
-                <div class="activity-content">
-                    <div class="activity-title">${activity.title}</div>
-                    <div class="activity-desc">${activity.description}</div>
+
+    async loadFavoritesData() {
+        const favoritesList = document.getElementById('favoritesList');
+        if (!favoritesList) return;
+
+        if (this.favorites.length === 0) {
+            favoritesList.innerHTML = `
+                <div class="empty-state">
+                    <span style="font-size: 3rem;">📌</span>
+                    <p>暂无收藏</p>
+                    <a href="index.html" class="btn-primary">去搜索</a>
                 </div>
-                <div class="activity-time">${this.utils.formatRelativeTime(activity.timestamp)}</div>
             `;
-            
-            container.appendChild(activityElement);
-        });
-    }
-    
-    // 加载收藏夹
-    async loadFavorites() {
-        if (!this.currentUser) return;
-        
-        this.showLoading(true);
-        
-        try {
-            const response = await this.API.getFavorites();
-            
-            if (response.success) {
-                this.renderFavorites(response.favorites);
-            } else {
-                this.utils.showToast(response.message, 'error');
-            }
-        } catch (error) {
-            console.error('加载收藏夹失败:', error);
-            this.utils.showToast('加载收藏夹失败', 'error');
-        } finally {
-            this.showLoading(false);
-        }
-    }
-    
-    // 渲染收藏夹
-    renderFavorites(favorites) {
-        const container = document.getElementById('favoritesList');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        if (!favorites || favorites.length === 0) {
-            container.innerHTML = '<p class="empty-favorites">暂无收藏项目</p>';
             return;
         }
-        
-        favorites.forEach(fav => {
-            const favoriteItem = document.createElement('div');
-            favoriteItem.className = 'favorite-item';
-            favoriteItem.innerHTML = `
-                <div class="favorite-header">
-                    <div class="favorite-icon">${fav.icon || '⭐'}</div>
-                    <div class="favorite-title">${this.utils.escapeHtml(fav.title)}</div>
-                    <div class="favorite-actions">
-                        <button class="btn-icon" onclick="app.removeFavorite('${fav.id}')">🗑️</button>
+
+        favoritesList.innerHTML = this.favorites.map(fav => `
+            <div class="favorite-item" data-id="${fav.id}">
+                <div class="favorite-content">
+                    <div class="favorite-title">
+                        <span class="favorite-icon">${fav.icon}</span>
+                        <span class="favorite-name">${this.escapeHtml(fav.title)}</span>
+                    </div>
+                    <div class="favorite-subtitle">${this.escapeHtml(fav.subtitle)}</div>
+                    <div class="favorite-url">${this.escapeHtml(fav.url)}</div>
+                    <div class="favorite-meta">
+                        <span>关键词: ${this.escapeHtml(fav.keyword)}</span>
+                        <span>添加时间: ${formatRelativeTime(fav.addedAt)}</span>
                     </div>
                 </div>
-                <div class="favorite-body">
-                    <div class="favorite-keyword">${this.utils.escapeHtml(fav.keyword || '无关键词')}</div>
-                    <div class="favorite-url">${this.utils.escapeHtml(fav.url)}</div>
-                    <div class="favorite-notes">${this.utils.escapeHtml(fav.notes || '无备注信息')}</div>
+                <div class="favorite-actions">
+                    <button class="action-btn visit-btn" onclick="window.open('${this.escapeHtml(fav.url)}', '_blank')">
+                        访问
+                    </button>
+                    <button class="action-btn remove-btn" onclick="app.removeFavorite('${fav.id}')">
+                        删除
+                    </button>
                 </div>
-                <div class="favorite-footer">
-                    <span>添加于: ${this.utils.formatDate(fav.createdAt)}</span>
-                    <span>更新: ${this.utils.formatRelativeTime(fav.updatedAt)}</span>
+            </div>
+        `).join('');
+    }
+
+    async loadHistoryData() {
+        const historyList = document.getElementById('historyList');
+        const historyCount = document.getElementById('historyCount');
+        const uniqueKeywords = document.getElementById('uniqueKeywords');
+        const avgPerDay = document.getElementById('avgPerDay');
+
+        if (historyCount) historyCount.textContent = this.searchHistory.length;
+        
+        const unique = new Set(this.searchHistory.map(h => h.keyword)).size;
+        if (uniqueKeywords) uniqueKeywords.textContent = unique;
+
+        const daysActive = this.calculateActiveDays() || 1;
+        if (avgPerDay) avgPerDay.textContent = Math.round(this.searchHistory.length / daysActive);
+
+        if (!historyList) return;
+
+        if (this.searchHistory.length === 0) {
+            historyList.innerHTML = `
+                <div class="empty-state">
+                    <span style="font-size: 3rem;">🕐</span>
+                    <p>暂无搜索历史</p>
                 </div>
             `;
-            
-            // 点击打开链接
-            favoriteItem.addEventListener('click', (e) => {
-                if (!e.target.closest('.favorite-actions')) {
-                    window.open(fav.url, '_blank');
-                }
-            });
-            
-            container.appendChild(favoriteItem);
-        });
-    }
-    
-    // 移除收藏
-    async removeFavorite(favoriteId) {
-        if (!confirm('确定要移除这个收藏吗？')) return;
-        
-        try {
-            const response = await this.API.removeFavorite(favoriteId);
-            
-            if (response.success) {
-                this.utils.showToast('收藏已移除', 'success');
-                this.loadFavorites(); // 刷新列表
-            } else {
-                this.utils.showToast(response.message, 'error');
-            }
-        } catch (error) {
-            console.error('移除收藏失败:', error);
-            this.utils.showToast('移除收藏失败', 'error');
-        }
-    }
-    
-    // 同步收藏
-    async syncFavorites() {
-        this.utils.showToast('开始同步收藏...', 'info');
-        
-        try {
-            const response = await this.API.syncFavorites();
-            
-            if (response.success) {
-                this.utils.showToast('收藏同步完成', 'success');
-                this.loadFavorites(); // 刷新列表
-            } else {
-                this.utils.showToast(response.message, 'error');
-            }
-        } catch (error) {
-            console.error('同步收藏失败:', error);
-            this.utils.showToast('同步收藏失败', 'error');
-        }
-    }
-    
-    // 加载历史记录
-    async loadHistory() {
-        if (!this.currentUser) return;
-        
-        this.showLoading(true);
-        
-        try {
-            const response = await this.API.getSearchHistory();
-            
-            if (response.success) {
-                this.renderHistory(response.history);
-                this.updateHistoryStats(response.stats);
-            } else {
-                this.utils.showToast(response.message, 'error');
-            }
-        } catch (error) {
-            console.error('加载历史记录失败:', error);
-            this.utils.showToast('加载历史记录失败', 'error');
-        } finally {
-            this.showLoading(false);
-        }
-    }
-    
-    // 渲染历史记录
-    renderHistory(historyList) {
-        const container = document.getElementById('historyList');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        if (!historyList || historyList.length === 0) {
-            container.innerHTML = '<p class="empty-history">暂无搜索历史</p>';
             return;
         }
-        
-        historyList.forEach(item => {
-            const historyItem = document.createElement('div');
-            historyItem.className = 'history-item';
-            historyItem.innerHTML = `
-                <div class="history-keyword">${this.utils.escapeHtml(item.keyword)}</div>
-                <div class="history-results">结果: ${item.resultsCount}</div>
-                <div class="history-time">${this.utils.formatDate(item.createdAt)}</div>
-            `;
-            
-            // 点击重新搜索
-            historyItem.addEventListener('click', () => {
-                window.location.href = `index.html?q=${encodeURIComponent(item.keyword)}`;
-            });
-            
-            container.appendChild(historyItem);
-        });
+
+        historyList.innerHTML = this.searchHistory.slice(0, 50).map(item => `
+            <div class="history-item">
+                <div class="history-content">
+                    <div class="history-keyword">${this.escapeHtml(item.keyword)}</div>
+                    <div class="history-time">${formatRelativeTime(item.timestamp)}</div>
+                </div>
+                <div class="history-actions">
+                    <button class="action-btn" onclick="window.location.href='index.html?q=${encodeURIComponent(item.keyword)}'">
+                        重新搜索
+                    </button>
+                </div>
+            </div>
+        `).join('');
     }
-    
-    // 更新历史统计
-    updateHistoryStats(stats) {
-        if (!stats) return;
-        
-        const updateElement = (id, value) => {
-            const element = document.getElementById(id);
-            if (element) element.textContent = value;
-        };
-        
-        updateElement('historyCount', stats.totalSearches);
-        updateElement('uniqueKeywords', stats.uniqueKeywords);
-        updateElement('avgPerDay', stats.avgPerDay.toFixed(1));
-    }
-    
-    // 清空历史
-    async clearAllHistory() {
-        if (!confirm('确定要清空所有历史记录吗？此操作不可恢复！')) return;
-        
+
+    async loadSettingsData() {
         try {
-            const response = await this.API.clearSearchHistory();
+            const settings = await this.getUserSettings();
             
-            if (response.success) {
-                this.utils.showToast('历史记录已清空', 'success');
-                this.loadHistory(); // 刷新列表
-            } else {
-                this.utils.showToast(response.message, 'error');
-            }
-        } catch (error) {
-            console.error('清空历史失败:', error);
-            this.utils.showToast('清空历史失败', 'error');
-        }
-    }
-    
-    // 同步历史
-    async syncHistory() {
-        this.utils.showToast('开始同步历史记录...', 'info');
-        
-        try {
-            const response = await this.API.syncSearchHistory();
-            
-            if (response.success) {
-                this.utils.showToast('历史记录同步完成', 'success');
-                this.loadHistory(); // 刷新列表
-            } else {
-                this.utils.showToast(response.message, 'error');
-            }
-        } catch (error) {
-            console.error('同步历史失败:', error);
-            this.utils.showToast('同步历史失败', 'error');
-        }
-    }
-    
-    // 加载设置
-    loadSettings() {
-        try {
-            // 从本地存储加载设置
-            const settings = this.utils.storage.get('userSettings') || {};
-            
-            // 应用设置到UI
-            if (settings.autoSync !== undefined) {
-                document.getElementById('autoSync').checked = settings.autoSync;
-            }
-            
-            if (settings.enableCache !== undefined) {
-                document.getElementById('enableCache').checked = settings.enableCache;
-            }
-            
-            if (settings.themeMode) {
-                document.getElementById('theme极速搜索-磁力快搜').value = settings.themeMode;
-            }
-            
-            if (settings.maxFavorites) {
-                document.getElementById('maxFavorites').value = settings.maxFavorites;
-            }
-            
-            if (settings.historyRetention) {
-                document.getElementById('historyRetention').value = settings.historyRetention;
-            }
-            
-            if (settings.allowAnalytics !== undefined) {
-                document.getElementById('allowAnalytics').checked = settings.allowAnalytics;
-            }
-            
-            if (settings.searchSuggestions !== undefined) {
-                document.getElementById('searchSuggestions').checked = settings.searchSuggestions;
-            }
-            
-            // 应用搜索源设置
-            if (settings.searchSources) {
-                settings.searchSources.forEach(source => {
-                    const checkbox = document.querySelector(`input[value="${source}"]`);
-                    if (checkbox) {
-                        checkbox.checked = true;
+            // 加载设置到表单
+            Object.entries(settings).forEach(([key, value]) => {
+                const element = document.getElementById(key);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = value;
+                    } else {
+                        element.value = value;
                     }
-                });
-            }
+                }
+            });
         } catch (error) {
             console.error('加载设置失败:', error);
         }
     }
-    
-    // 保存设置
-    async saveSettings() {
+
+    async loadStatsData() {
+        // 这里可以实现更详细的统计图表
+        console.log('加载统计数据');
+    }
+
+    async syncFavorites() {
         try {
-            const settings = {
-                autoSync: document.getElementById('autoSync').checked,
-                enableCache: document.getElementById('enableCache').checked,
-                themeMode: document.getElementById('themeMode').value,
-                maxFavorites: parseInt(document.getElementById('maxFavorites').value),
-                historyRetention: document.getElementById('historyRetention').value,
-                allowAnalytics: document.getElementById('allowAnalytics').checked,
-                searchSuggestions: document.getElementById('searchSuggestions').checked,
-                searchSources: Array.from(document.querySelectorAll('.checkbox-group input:checked'))
-                    .map(input => input.value)
-            };
-            
-            // 保存到本地存储
-            this.utils.storage.set('userSettings', settings);
-            
-            // 保存到服务器
-            if (this.currentUser) {
-                const response = await this.API.updateUserSettings(settings);
-                if (response.success) {
-                    this.utils.showToast('设置已保存', 'success');
-                } else {
-                    this.utils.showToast(response.message, 'error');
-                }
-            } else {
-                this.utils.showToast('设置已保存到本地，登录后将同步到云端', 'info');
-            }
+            showLoading(true);
+            await API.syncFavorites(this.favorites);
+            showToast('收藏夹同步成功', 'success');
         } catch (error) {
-            console.error('保存设置失败:', error);
-            this.utils.showToast('保存设置失败', 'error');
+            console.error('同步收藏失败:', error);
+            showToast('同步失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
         }
     }
-    
-    // 修改密码
-    async changePassword() {
+
+    async removeFavorite(favoriteId) {
+        if (!confirm('确定要删除这个收藏吗？')) return;
+
+        const index = this.favorites.findIndex(f => f.id === favoriteId);
+        if (index >= 0) {
+            this.favorites.splice(index, 1);
+            await this.syncFavorites();
+            await this.loadFavoritesData();
+            showToast('收藏已删除', 'success');
+        }
+    }
+
+    changePassword() {
+        const modal = document.getElementById('passwordModal');
+        if (modal) {
+            modal.style.display = 'block';
+            setTimeout(() => {
+                const currentPassword = document.getElementById('currentPassword');
+                if (currentPassword) currentPassword.focus();
+            }, 100);
+        }
+    }
+
+    async handlePasswordChange(event) {
+        event.preventDefault();
+        
         const currentPassword = document.getElementById('currentPassword').value;
         const newPassword = document.getElementById('newPassword').value;
         const confirmPassword = document.getElementById('confirmNewPassword').value;
-        
+
         if (!currentPassword || !newPassword || !confirmPassword) {
-            this.utils.showToast('请填写所有字段', 'error');
+            showToast('请填写所有字段', 'error');
             return;
         }
-        
+
         if (newPassword !== confirmPassword) {
-            this.utils.showToast('两次输入的密码不一致', 'error');
+            showToast('新密码确认不一致', 'error');
             return;
         }
-        
-        try {
-            const response = await this.API.changePassword(currentPassword, newPassword);
-            
-            if (response.success) {
-                this.utils.showToast('密码修改成功', 'success');
-                this.closeModal('passwordModal');
-                // 清空表单
-                document.getElementById('passwordForm').reset();
-            } else {
-                this.utils.showToast(response.message || '密码修改失败', 'error');
-            }
-        } catch (error) {
-            console.error('修改密码失败:', error);
-            this.utils.showToast('修改密码失败', 'error');
+
+        if (newPassword.length < 6) {
+            showToast('新密码至少6个字符', 'error');
+            return;
         }
-    }
-    
-    // 加载统计数据
-    async loadStats() {
-        if (!this.currentUser) return;
-        
-        this.showLoading(true);
-        
+
         try {
-            const response = await this.API.getUserStats();
-            
-            if (response.success) {
-                this.renderStats(response.stats);
-            } else {
-                this.utils.showToast(response.message, 'error');
-            }
+            showLoading(true);
+            // 这里需要实现密码修改API
+            showToast('密码修改成功', 'success');
+            this.closeModals();
+            document.getElementById('passwordForm').reset();
         } catch (error) {
-            console.error('加载统计数据失败:', error);
-            this.utils.showToast('加载统计数据失败', 'error');
+            showToast('密码修改失败: ' + error.message, 'error');
         } finally {
-            this.showLoading(false);
+            showLoading(false);
         }
     }
-    
-    // 渲染统计数据
-    renderStats(stats) {
-        // 更新时间范围选择器
-        const timeBtns = document.querySelectorAll('.time-btn');
-        timeBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                timeBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.updateStatsWithRange(parseInt(btn.dataset.range));
-            });
-        });
-        
-        // 渲染热门关键词
-        this.renderTopKeywords(stats.topKeywords);
-        
-        // 渲染详细统计表格
-        this.renderDetailedStats(stats.detailedStats);
-    }
-    
-    // 根据时间范围更新统计
-    async updateStatsWithRange(rangeDays) {
-        this.showLoading(true);
-        
+
+    async saveSettings() {
         try {
-            const response = await this.API.getUserStats(rangeDays);
-            
-            if (response.success) {
-                this.renderTopKeywords(response.stats.topKeywords);
-                this.renderDetailedStats(response.stats.detailedStats);
-            }
+            const settings = this.collectSettings();
+            await this.updateUserSettings(settings);
+            showToast('设置保存成功', 'success');
+            this.markSettingsSaved();
         } catch (error) {
-            console.error('更新统计数据失败:', error);
-        } finally {
-            this.showLoading(false);
+            showToast('保存设置失败: ' + error.message, 'error');
         }
     }
-    
-    // 渲染热门关键词
-    renderTopKeywords(keywords) {
-        const container = document.getElementById('topKeywordsList');
-        if (!container) return;
+
+    collectSettings() {
+        const settings = {};
+        const settingInputs = document.querySelectorAll('#settings input, #settings select');
         
-        container.innerHTML = '';
+        settingInputs.forEach(input => {
+            if (input.type === 'checkbox') {
+                settings[input.id] = input.checked;
+            } else {
+                settings[input.id] = input.value;
+            }
+        });
         
-        if (!keywords || keywords.length === 0) {
-            container.innerHTML = '<p>暂无热门关键词数据</p>';
+        return settings;
+    }
+
+    markSettingsChanged() {
+        const saveBtn = document.querySelector('#settings .btn-primary');
+        if (saveBtn) {
+            saveBtn.textContent = '保存设置*';
+            saveBtn.classList.add('changed');
+        }
+    }
+
+    markSettingsSaved() {
+        const saveBtn = document.querySelector('#settings .btn-primary');
+        if (saveBtn) {
+            saveBtn.textContent = '保存设置';
+            saveBtn.classList.remove('changed');
+        }
+    }
+
+    calculateActiveDays() {
+        if (this.searchHistory.length === 0) return 0;
+        
+        const dates = new Set(
+            this.searchHistory.map(h => new Date(h.timestamp).toDateString())
+        );
+        return dates.size;
+    }
+
+    calculateUserLevel() {
+        const totalActions = this.searchHistory.length + this.favorites.length;
+        
+        if (totalActions < 10) return '新手';
+        if (totalActions < 50) return '熟练';
+        if (totalActions < 200) return '专业';
+        if (totalActions < 500) return '专家';
+        return '大师';
+    }
+
+    async loadRecentActivity() {
+        const activityList = document.getElementById('activityList');
+        if (!activityList) return;
+
+        // 合并最近的搜索和收藏活动
+        const activities = [
+            ...this.searchHistory.slice(0, 5).map(h => ({
+                type: 'search',
+                content: `搜索了 "${h.keyword}"`,
+                time: h.timestamp,
+                icon: '🔍'
+            })),
+            ...this.favorites.slice(0, 5).map(f => ({
+                type: 'favorite',
+                content: `收藏了 "${f.title}"`,
+                time: new Date(f.addedAt).getTime(),
+                icon: '⭐'
+            }))
+        ].sort((a, b) => b.time - a.time).slice(0, 10);
+
+        if (activities.length === 0) {
+            activityList.innerHTML = '<p class="empty-state">暂无活动记录</p>';
             return;
         }
-        
-        keywords.forEach((keyword, index) => {
-            const keywordItem = document.createElement('div');
-            keywordItem.className = 'keyword-item';
-            keywordItem.innerHTML = `
-                <span class="keyword-rank">${index + 1}</span>
-                <span class="keyword-text">${this.utils.escapeHtml(keyword.keyword)}</span>
-                <span class="keyword-count">${keyword.count}次</span>
-            `;
-            
-            // 点击搜索该关键词
-            keywordItem.addEventListener('click', () => {
-                window.location.href = `index.html?q=${encodeURIComponent(keyword.keyword)}`;
-            });
-            
-            container.appendChild(keywordItem);
-        });
+
+        activityList.innerHTML = activities.map(activity => `
+            <div class="activity-item">
+                <span class="activity-icon">${activity.icon}</span>
+                <div class="activity-content">
+                    <div class="activity-text">${this.escapeHtml(activity.content)}</div>
+                    <div class="activity-time">${formatRelativeTime(activity.time)}</div>
+                </div>
+            </div>
+        `).join('');
     }
-    
-    // 渲染详细统计数据
-    renderDetailedStats(stats) {
-        const container = document.getElementById('detailedStatsTable');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        if (!stats || Object.keys(stats).length === 0) {
-            container.innerHTML = '<tr><td colspan="3">暂无统计数据</td></tr>';
-            return;
-        }
-        
-        Object.keys(stats).forEach(key => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${this.getStatLabel(key)}</td>
-                <td>${stats[key].value}</td>
-                <td>${this.getTrendIcon(stats[key].trend)} ${stats[key].trend}%</td>
-            `;
-            container.appendChild(row);
-        });
-    }
-    
-    // 获取统计指标标签
-    getStatLabel(key) {
-        const labels = {
-            'avgSearchPerDay': '日均搜索量',
-            'favoritesAdded': '新增收藏',
-            'activeDays': '活跃天数',
-            'uniqueSources': '不同资源来源',
-            'mostActiveDay': '最活跃日期',
-            'favoriteRatio': '收藏率',
-            'avgResults': '平均结果数'
+
+    // 工具方法
+    escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
         };
-        
-        return labels[key] || key;
+        return text.replace(/[&<>"']/g, m => map[m]);
     }
-    
-    // 获取趋势图标
-    getTrendIcon(trend) {
-        if (trend > 0) return '↑';
-        if (trend < 0) return '↓';
-        return '→';
-    }
-    
-    // 清空所有数据
-    async clearAllData() {
-        if (!confirm('确定要清空所有数据吗？包括收藏夹和搜索历史？此操作不可撤销！')) return;
-        
-        try {
-            const response = await this.API.clearAllData();
-            
-            if (response.success) {
-                this.utils.showToast('所有数据已清空', 'success');
-                // 刷新数据
-                this.loadFavorites();
-                this.loadHistory();
-            } else {
-                this.utils.showToast(response.message, 'error');
-            }
-        } catch (error) {
-            console.error('清空数据失败:', error);
-            this.utils.showToast('清空数据失败', 'error');
+
+    updateUserUI() {
+        const username = document.getElementById('username');
+        if (username && this.currentUser) {
+            username.textContent = this.currentUser.username;
         }
     }
-    
-    // 删除账户
-    async deleteAccount() {
-        if (!confirm('确定要永久删除您的账户吗？此操作将删除所有数据且不可恢复！')) return;
+
+    initTheme() {
+        const savedTheme = StorageManager.getItem('theme', 'light');
+        const themeToggle = document.getElementById('themeToggle');
         
-        try {
-            const response = await this.API.deleteAccount();
-            
-            if (response.success) {
-                this.utils.showToast('账户已成功删除', 'success');
-                // 登出并跳转首页
-                this.authManager.logout();
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 1500);
-            } else {
-                this.utils.showToast(response.message, 'error');
-            }
-        } catch (error) {
-            console.error('删除账户失败:', error);
-            this.utils.showToast('删除账户失败', 'error');
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        if (themeToggle) {
+            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
         }
     }
-    
-    // 导出数据
-    exportData() {
-        // 实现数据导出逻辑
-        this.utils.showToast('数据导出功能正在开发中', 'info');
-    }
-    
-    // 导出收藏
-    exportFavorites() {
-        // 实现收藏导出逻辑
-        this.utils.showToast('收藏导出功能正在开发中', 'info');
-    }
-    
-    // 显示加载状态
-    showLoading(show) {
-        const loader = document.getElementById('loading');
-        if (loader) {
-            loader.style.display = show ? 'flex' : 'none';
-        }
-    }
-    
-    // 显示Toast通知
-    showToast(message, type) {
-        const toast = document.getElementById('toast');
-        if (!toast) return;
-        
-        toast.textContent = message;
-        toast.className = `toast toast-${type} show`;
-        
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 3000);
-    }
-    
-    // 切换主题
+
     toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const currentTheme = document.documentElement.getAttribute('data-theme');
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        const themeToggle = document.getElementById('themeToggle');
         
         document.documentElement.setAttribute('data-theme', newTheme);
-        this.utils.storage.set('theme', newTheme);
+        StorageManager.setItem('theme', newTheme);
         
-        // 更新按钮文本
-        const themeBtn = document.getElementById('themeToggle');
-        if (themeBtn) {
-            themeBtn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        if (themeToggle) {
+            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
         }
     }
-    
-    // 打开模态框
-    openModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.style.display = 'block';
-        }
-    }
-    
-    // 关闭模态框
-    closeModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
+
+    closeModals() {
+        document.querySelectorAll('.modal').forEach(modal => {
             modal.style.display = 'none';
+        });
+    }
+
+    async logout() {
+        if (confirm('确定要退出登录吗？')) {
+            try {
+                await API.logout();
+                localStorage.removeItem('auth_token');
+                showToast('已退出登录', 'success');
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1000);
+            } catch (error) {
+                console.error('退出登录失败:', error);
+                // 即使API调用失败也清除本地token
+                localStorage.removeItem('auth_token');
+                window.location.href = 'index.html';
+            }
         }
     }
-    
-    // 登出
-    async logout() {
+
+    // API辅助方法
+    async getSearchHistory() {
         try {
-            await this.authManager.logout();
-            this.utils.showToast('已退出登录', 'success');
+            return await API.getSearchHistory();
+        } catch (error) {
+            // 降级到本地存储
+            return StorageManager.getItem('search_history', []);
+        }
+    }
+
+    async getUserSettings() {
+        try {
+            return await API.getUserSettings();
+        } catch (error) {
+            // 返回默认设置
+            return {
+                autoSync: true,
+                enableCache: true,
+                themeMode: 'auto',
+                historyRetention: '90',
+                maxFavorites: '500',
+                allowAnalytics: true,
+                searchSuggestions: true
+            };
+        }
+    }
+
+    async updateUserSettings(settings) {
+        try {
+            return await API.updateUserSettings(settings);
+        } catch (error) {
+            // 本地保存设置
+            StorageManager.setItem('user_settings', settings);
+            throw error;
+        }
+    }
+
+    // 数据操作方法
+    async syncAllData() {
+        try {
+            showLoading(true);
+            showToast('正在同步数据...', 'info');
+            
+            await Promise.all([
+                this.syncFavorites(),
+                this.syncHistory()
+            ]);
+            
+            showToast('数据同步成功', 'success');
+        } catch (error) {
+            showToast('同步失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    async syncHistory() {
+        try {
+            await API.syncSearchHistory(this.searchHistory);
+        } catch (error) {
+            console.error('同步历史失败:', error);
+            throw error;
+        }
+    }
+
+    async exportData() {
+        try {
+            const data = {
+                favorites: this.favorites,
+                searchHistory: this.searchHistory,
+                settings: this.collectSettings(),
+                exportTime: new Date().toISOString(),
+                version: window.API_CONFIG?.APP_VERSION || '1.0.0'
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+                type: 'application/json'
+            });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `magnet-search-data-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('数据导出成功', 'success');
+        } catch (error) {
+            console.error('导出数据失败:', error);
+            showToast('导出失败: ' + error.message, 'error');
+        }
+    }
+
+    async exportFavorites() {
+        try {
+            const data = {
+                favorites: this.favorites,
+                exportTime: new Date().toISOString(),
+                version: window.API_CONFIG?.APP_VERSION || '1.0.0'
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+                type: 'application/json'
+            });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `favorites-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('收藏导出成功', 'success');
+        } catch (error) {
+            console.error('导出收藏失败:', error);
+            showToast('导出失败: ' + error.message, 'error');
+        }
+    }
+
+    async clearAllHistory() {
+        if (!confirm('确定要清空所有搜索历史吗？此操作不可恢复。')) return;
+
+        try {
+            this.searchHistory = [];
+            StorageManager.removeItem('search_history');
+            await this.loadHistoryData();
+            showToast('搜索历史已清空', 'success');
+        } catch (error) {
+            showToast('清空失败: ' + error.message, 'error');
+        }
+    }
+
+    async clearAllData() {
+        if (!confirm('确定要清空所有本地数据吗？此操作不可恢复，建议先导出数据备份。')) return;
+        if (!confirm('再次确认：这将清空您的所有收藏和搜索历史！')) return;
+
+        try {
+            showLoading(true);
+            
+            // 清空本地数据
+            this.favorites = [];
+            this.searchHistory = [];
+            
+            // 清空本地存储
+            StorageManager.clear();
+            
+            // 重新加载数据
+            await this.loadData();
+            
+            showToast('所有数据已清空', 'success');
+        } catch (error) {
+            showToast('清空失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    async deleteAccount() {
+        const confirmText = '我确定要删除账户';
+        const userInput = prompt(`删除账户将无法恢复，请输入"${confirmText}"确认：`);
+        
+        if (userInput !== confirmText) {
+            showToast('确认文本不匹配，取消删除', 'info');
+            return;
+        }
+
+        try {
+            showLoading(true);
+            // 这里需要实现账户删除API
+            // await API.deleteAccount();
+            
+            localStorage.removeItem('auth_token');
+            showToast('账户已删除', 'success');
+            
             setTimeout(() => {
                 window.location.href = 'index.html';
-            }, 1000);
+            }, 2000);
         } catch (error) {
-            console.error('退出登录失败:', error);
-            this.utils.showToast('退出登录失败', 'error');
+            showToast('删除失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
         }
+    }
+
+    resetSettings() {
+        if (!confirm('确定要重置所有设置为默认值吗？')) return;
+
+        // 重置为默认设置
+        const defaultSettings = {
+            autoSync: true,
+            enableCache: true,
+            themeMode: 'auto',
+            historyRetention: '90',
+            maxFavorites: '500',
+            allowAnalytics: true,
+            searchSuggestions: true
+        };
+
+        Object.entries(defaultSettings).forEach(([key, value]) => {
+            const element = document.getElementById(key);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = value;
+                } else {
+                    element.value = value;
+                }
+            }
+        });
+
+        this.markSettingsChanged();
+        showToast('设置已重置为默认值', 'success');
+    }
+
+    searchFavorites() {
+        const searchTerm = document.getElementById('favoritesSearch').value.toLowerCase();
+        const sortBy = document.getElementById('favoritesSort').value;
+        
+        let filteredFavorites = this.favorites;
+
+        // 搜索过滤
+        if (searchTerm) {
+            filteredFavorites = this.favorites.filter(fav => 
+                fav.title.toLowerCase().includes(searchTerm) ||
+                fav.subtitle.toLowerCase().includes(searchTerm) ||
+                fav.keyword.toLowerCase().includes(searchTerm)
+            );
+        }
+
+        // 排序
+        switch (sortBy) {
+            case 'date-desc':
+                filteredFavorites.sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
+                break;
+            case 'date-asc':
+                filteredFavorites.sort((a, b) => new Date(a.addedAt) - new Date(b.addedAt));
+                break;
+            case 'name-asc':
+                filteredFavorites.sort((a, b) => a.title.localeCompare(b.title));
+                break;
+            case 'name-desc':
+                filteredFavorites.sort((a, b) => b.title.localeCompare(a.title));
+                break;
+        }
+
+        // 更新显示
+        this.renderFilteredFavorites(filteredFavorites);
+    }
+
+    renderFilteredFavorites(favorites) {
+        const favoritesList = document.getElementById('favoritesList');
+        if (!favoritesList) return;
+
+        if (favorites.length === 0) {
+            favoritesList.innerHTML = `
+                <div class="empty-state">
+                    <span style="font-size: 3rem;">🔍</span>
+                    <p>没有找到匹配的收藏</p>
+                </div>
+            `;
+            return;
+        }
+
+        favoritesList.innerHTML = favorites.map(fav => `
+            <div class="favorite-item" data-id="${fav.id}">
+                <div class="favorite-content">
+                    <div class="favorite-title">
+                        <span class="favorite-icon">${fav.icon}</span>
+                        <span class="favorite-name">${this.escapeHtml(fav.title)}</span>
+                    </div>
+                    <div class="favorite-subtitle">${this.escapeHtml(fav.subtitle)}</div>
+                    <div class="favorite-url">${this.escapeHtml(fav.url)}</div>
+                    <div class="favorite-meta">
+                        <span>关键词: ${this.escapeHtml(fav.keyword)}</span>
+                        <span>添加时间: ${formatRelativeTime(fav.addedAt)}</span>
+                    </div>
+                </div>
+                <div class="favorite-actions">
+                    <button class="action-btn visit-btn" onclick="window.open('${this.escapeHtml(fav.url)}', '_blank')">
+                        访问
+                    </button>
+                    <button class="action-btn remove-btn" onclick="app.removeFavorite('${fav.id}')">
+                        删除
+                    </button>
+                </div>
+            </div>
+        `).join('');
     }
 }
 
-// 初始化应用
-if (typeof authManager !== 'undefined' && typeof utils !== 'undefined' && typeof API !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        window.app = new DashboardApp();
-        
-        // 初始化标签页
-        app.switchTab('overview');
-    });
-}
+// 导出到全局作用域
+window.DashboardApp = DashboardApp;

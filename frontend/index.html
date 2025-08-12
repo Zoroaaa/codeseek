@@ -3,26 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>磁力快搜 - 专业版</title>
+    <title id="page-title">磁力快搜 - 专业版</title>
+    <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索">
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    
+    <!-- 预加载配置脚本 -->
+    <script>
+        // Cloudflare Pages 环境变量注入
+        // 这些变量将在构建时被 Cloudflare Pages 替换
+        window.CF_API_BASE_URL = typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined;
+        window.CF_APP_NAME = typeof process !== 'undefined' && process.env ? process.env.APP_NAME : undefined;
+        window.CF_APP_VERSION = typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : undefined;
+        window.CF_ENABLE_ANALYTICS = typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : undefined;
+        window.CF_ENABLE_DEBUG = typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : undefined;
+    </script>
+    <script src="js/config.js"></script>
 </head>
 <body>
     <!-- 导航栏 -->
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-brand">
-                <img src="images/logo.png" alt="Logo" class="logo">
-                <span class="brand-text">磁力快搜</span>
+                <img src="images/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
+                <span class="brand-text" id="brand-text">磁力快搜</span>
             </div>
             <div class="nav-menu">
-                <button id="themeToggle" class="theme-btn">🌙</button>
+                <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
                 <div id="userMenu" class="user-menu">
                     <button id="loginBtn" class="login-btn">登录</button>
                     <div id="userInfo" class="user-info" style="display:none;">
                         <span id="username" class="username"></span>
                         <div class="dropdown">
-                            <button class="dropdown-btn">▼</button>
+                            <button class="dropdown-btn" title="用户菜单">▼</button>
                             <div class="dropdown-content">
                                 <a href="dashboard.html">个人中心</a>
                                 <a href="#" id="logoutBtn">退出登录</a>
@@ -38,19 +51,26 @@
     <main class="main-content">
         <!-- Hero区域 -->
         <section class="hero">
-            <h1 class="hero-title">磁力快搜 - 专业版</h1>
+            <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
             <p class="hero-subtitle">智能搜索，云端同步，极致体验</p>
             
             <!-- 搜索框 -->
             <div class="search-container">
                 <div class="search-box">
-                    <input type="text" id="searchInput" class="search-input" placeholder="请输入番号或关键词" autocomplete="off">
-                    <button id="searchBtn" class="search-btn">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        class="search-input" 
+                        placeholder="请输入番号或关键词" 
+                        autocomplete="off"
+                        maxlength="100"
+                    >
+                    <button id="searchBtn" class="search-btn" title="搜索">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="8"></circle>
                             <path d="21 21l-4.35-4.35"></path>
                         </svg>
-                        搜索
+                        <span>搜索</span>
                     </button>
                 </div>
                 <div class="search-options">
@@ -63,6 +83,18 @@
                         <span>自动同步到云端</span>
                     </label>
                 </div>
+            </div>
+        </section>
+
+        <!-- 快速提示 -->
+        <section id="quickTips" class="quick-tips">
+            <div class="tips-content">
+                <h3>💡 搜索技巧</h3>
+                <ul>
+                    <li>输入完整番号获得最精确结果</li>
+                    <li>使用空格分隔多个关键词</li>
+                    <li>登录后可享受云端同步服务</li>
+                </ul>
             </div>
         </section>
 
@@ -79,7 +111,10 @@
         <section id="resultsSection" class="results-section" style="display:none;">
             <div class="section-header">
                 <h2>🔍 搜索结果</h2>
-                <button id="clearResultsBtn" class="clear-btn">清空结果</button>
+                <div class="section-actions">
+                    <button id="exportResultsBtn" class="action-btn" style="display:none;">导出结果</button>
+                    <button id="clearResultsBtn" class="clear-btn">清空结果</button>
+                </div>
             </div>
             <div id="searchInfo" class="search-info"></div>
             <div id="results" class="results-grid"></div>
@@ -89,31 +124,34 @@
         <section class="favorites-section">
             <div class="section-header">
                 <h2>⭐ 我的收藏</h2>
-                <button id="syncFavoritesBtn" class="sync-btn">同步收藏</button>
+                <div class="section-actions">
+                    <button id="syncFavoritesBtn" class="sync-btn" style="display:none;">同步收藏</button>
+                    <button id="importFavoritesBtn" class="action-btn" style="display:none;">导入收藏</button>
+                </div>
             </div>
             <div id="favorites" class="favorites-grid"></div>
         </section>
 
-        <!-- 资源站点导航 -->
+        <!-- 站点导航 -->
         <section class="sites-section">
             <h2>🌐 资源站点导航</h2>
             <div class="sites-grid">
                 <div class="site-category">
                     <h3>📚 番号资料站</h3>
                     <div class="site-list">
-                        <a href="https://www.javlibrary.com/cn" target="_blank" class="site-item">
+                        <a href="https://www.javlibrary.com/cn" target="_blank" class="site-item" rel="noopener noreferrer">
                             <div class="site-info">
                                 <strong>JavLibrary</strong>
                                 <span>评论活跃，女优搜索详尽</span>
                             </div>
                         </a>
-                        <a href="https://www.javbus.com" target="_blank" class="site-item">
+                        <a href="https://www.javbus.com" target="_blank" class="site-item" rel="noopener noreferrer">
                             <div class="site-info">
                                 <strong>JavBus</strong>
                                 <span>番号+磁力一体站，信息完善</span>
                             </div>
                         </a>
-                        <a href="https://javdb.com" target="_blank" class="site-item">
+                        <a href="https://javdb.com" target="_blank" class="site-item" rel="noopener noreferrer">
                             <div class="site-info">
                                 <strong>JavDB</strong>
                                 <span>极简风格番号资料站，轻量快速</span>
@@ -125,19 +163,19 @@
                 <div class="site-category">
                     <h3>🎥 在线播放平台</h3>
                     <div class="site-list">
-                        <a href="https://jable.tv" target="_blank" class="site-item">
+                        <a href="https://jable.tv" target="_blank" class="site-item" rel="noopener noreferrer">
                             <div class="site-info">
                                 <strong>Jable</strong>
                                 <span>播放速度快，进度可跟踪</span>
                             </div>
                         </a>
-                        <a href="https://www5.javmost.com/" target="_blank" class="site-item">
+                        <a href="https://www5.javmost.com/" target="_blank" class="site-item" rel="noopener noreferrer">
                             <div class="site-info">
                                 <strong>JavMost</strong>
                                 <span>简洁界面，中文支持</span>
                             </div>
                         </a>
-                        <a href="https://jav.guru" target="_blank" class="site-item">
+                        <a href="https://jav.guru" target="_blank" class="site-item" rel="noopener noreferrer">
                             <div class="site-info">
                                 <strong>JavGuru</strong>
                                 <span>播放+评论一体，有项目评分</span>
@@ -149,13 +187,13 @@
                 <div class="site-category">
                     <h3>💬 社区论坛</h3>
                     <div class="site-list">
-                        <a href="https://sehuatang.net" target="_blank" class="site-item">
+                        <a href="https://sehuatang.net" target="_blank" class="site-item" rel="noopener noreferrer">
                             <div class="site-info">
                                 <strong>色花堂</strong>
                                 <span>网盘资源丰富，需注册登陆</span>
                             </div>
                         </a>
-                        <a href="https://t66y.com" target="_blank" class="site-item">
+                        <a href="https://t66y.com" target="_blank" class="site-item" rel="noopener noreferrer">
                             <div class="site-info">
                                 <strong>草榴社区</strong>
                                 <span>老牌论坛，需代理访问</span>
@@ -168,16 +206,30 @@
     </main>
 
     <!-- 模态框 -->
-    <div id="loginModal" class="modal">
+    <div id="loginModal" class="modal" aria-labelledby="login-title" role="dialog">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>用户登录</h2>
-            <form id="loginForm">
+            <span class="close" aria-label="关闭">&times;</span>
+            <h2 id="login-title">用户登录</h2>
+            <form id="loginForm" novalidate>
                 <div class="form-group">
-                    <input type="text" id="loginUsername" placeholder="用户名" required>
+                    <input 
+                        type="text" 
+                        id="loginUsername" 
+                        placeholder="用户名或邮箱" 
+                        required 
+                        autocomplete="username"
+                        maxlength="50"
+                    >
                 </div>
                 <div class="form-group">
-                    <input type="password" id="loginPassword" placeholder="密码" required>
+                    <input 
+                        type="password" 
+                        id="loginPassword" 
+                        placeholder="密码" 
+                        required 
+                        autocomplete="current-password"
+                        maxlength="50"
+                    >
                 </div>
                 <button type="submit" class="submit-btn">登录</button>
                 <div class="form-links">
@@ -187,22 +239,49 @@
         </div>
     </div>
 
-    <div id="registerModal" class="modal">
+    <div id="registerModal" class="modal" aria-labelledby="register-title" role="dialog">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>用户注册</h2>
-            <form id="registerForm">
+            <span class="close" aria-label="关闭">&times;</span>
+            <h2 id="register-title">用户注册</h2>
+            <form id="registerForm" novalidate>
                 <div class="form-group">
-                    <input type="text" id="regUsername" placeholder="用户名" required>
+                    <input 
+                        type="text" 
+                        id="regUsername" 
+                        placeholder="用户名" 
+                        required 
+                        autocomplete="username"
+                        maxlength="20"
+                    >
                 </div>
                 <div class="form-group">
-                    <input type="email" id="regEmail" placeholder="邮箱" required>
+                    <input 
+                        type="email" 
+                        id="regEmail" 
+                        placeholder="邮箱" 
+                        required 
+                        autocomplete="email"
+                    >
                 </div>
                 <div class="form-group">
-                    <input type="password" id="regPassword" placeholder="密码" required>
+                    <input 
+                        type="password" 
+                        id="regPassword" 
+                        placeholder="密码" 
+                        required 
+                        autocomplete="new-password"
+                        maxlength="50"
+                    >
                 </div>
                 <div class="form-group">
-                    <input type="password" id="regConfirmPassword" placeholder="确认密码" required>
+                    <input 
+                        type="password" 
+                        id="regConfirmPassword" 
+                        placeholder="确认密码" 
+                        required 
+                        autocomplete="new-password"
+                        maxlength="50"
+                    >
                 </div>
                 <button type="submit" class="submit-btn">注册</button>
                 <div class="form-links">
@@ -213,11 +292,17 @@
     </div>
 
     <!-- Toast通知 -->
-    <div id="toast" class="toast"></div>
+    <div id="toast" class="toast" role="alert" aria-live="polite"></div>
 
     <!-- Loading -->
-    <div id="loading" class="loading" style="display:none;">
+    <div id="loading" class="loading" style="display:none;" aria-label="加载中">
         <div class="spinner"></div>
+    </div>
+
+    <!-- 连接状态指示器 -->
+    <div id="connectionStatus" class="connection-status" style="display:none;">
+        <span class="status-indicator"></span>
+        <span class="status-text">检查连接...</span>
     </div>
 
     <!-- 脚本文件 -->
@@ -225,9 +310,38 @@
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/main.js"></script>
-	<script>
-// 替换为你的实际Worker URL
-window.API_BASE_URL = 'https://codeseek.zadi.workers.dev';
+
+    <!-- 初始化脚本 -->
+    <script>
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 初始化应用...');
+            
+            // 更新页面标题和品牌名称
+            if (window.API_CONFIG) {
+                const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
+                document.getElementById('page-title').textContent = `${appName} - 专业版`;
+                document.getElementById('brand-text').textContent = appName;
+                document.getElementById('hero-title').textContent = `${appName} - 专业版`;
+            }
+            
+            // 创建应用实例
+            if (typeof MagnetSearchApp !== 'undefined') {
+                window.app = new MagnetSearchApp();
+            }
+        });
+
+        // 页面可见性变化处理
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && window.app) {
+                // 页面重新获得焦点时刷新状态
+                setTimeout(() => {
+                    if (window.app.isInitialized) {
+                        window.app.checkConnectionStatus();
+                    }
+                }, 100);
+            }
+        });
     </script>
 </body>
 </html>

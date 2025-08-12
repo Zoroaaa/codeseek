@@ -3,10 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>用户面板 - 磁力快搜</title>
+    <title id="page-title">用户面板 - 磁力快搜</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    
+    <!-- 环境配置 -->
+    <script>
+        // 环境变量配置
+        window.CF_API_BASE_URL = typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined;
+        window.CF_APP_NAME = typeof process !== 'undefined' && process.env ? process.env.APP_NAME : undefined;
+        window.CF_APP_VERSION = typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : undefined;
+        window.CF_ENABLE_ANALYTICS = typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : undefined;
+        window.CF_ENABLE_DEBUG = typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : undefined;
+    </script>
+    <script src="js/config.js"></script>
 </head>
 <body>
     <!-- 导航栏 -->
@@ -14,17 +25,17 @@
         <div class="nav-container">
             <div class="nav-brand">
                 <a href="index.html">
-                    <img src="images/logo.png" alt="Logo" class="logo">
-                    <span class="brand-text">磁力快搜</span>
+                    <img src="images/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
+                    <span class="brand-text" id="brand-text">磁力快搜</span>
                 </a>
             </div>
             <div class="nav-menu">
                 <a href="index.html" class="nav-link">首页</a>
-                <button id="themeToggle" class="theme-btn">🌙</button>
+                <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
                 <div id="userInfo" class="user-info">
                     <span id="username" class="username"></span>
                     <div class="dropdown">
-                        <button class="dropdown-btn">▼</button>
+                        <button class="dropdown-btn" title="用户菜单">▼</button>
                         <div class="dropdown-content">
                             <a href="#" class="dropdown-item active">个人中心</a>
                             <a href="#" id="logoutBtn" class="dropdown-item">退出登录</a>
@@ -35,8 +46,6 @@
         </div>
     </nav>
 
-    <!-- 主要内容 -->
-    <main class="dashboard-container">
     <!-- 主要内容 -->
     <main class="dashboard-container">
         <!-- 侧边栏 -->
@@ -152,7 +161,7 @@
                 <div class="favorites-controls">
                     <div class="search-box">
                         <input type="text" id="favoritesSearch" placeholder="搜索收藏..." autocomplete="off">
-                        <button onclick="app.searchFavorites()">🔍</button>
+                        <button onclick="app.searchFavorites()" title="搜索">🔍</button>
                     </div>
                     <div class="filter-options">
                         <select id="favoritesSort">
@@ -220,167 +229,168 @@
                 </div>
             </div>
 
-            <!-- 设置标签页 -->
-            <div id="settings" class="tab-content">
-                <div class="tab-header">
-                    <h1>用户设置</h1>
-                    <p>个性化您的使用体验</p>
-                </div>
-
-                <div class="settings-sections">
-                    <!-- 基本设置 -->
-                    <div class="settings-section">
-                        <h3>基本设置</h3>
-                        <div class="setting-item">
-                            <label>自动同步</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="autoSync" checked>
-                                <span class="setting-desc">搜索和收藏自动同步到云端</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>搜索缓存</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="enableCache" checked>
-                                <span class="setting-desc">启用搜索结果缓存，提升加载速度</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>主题模式</label>
-                            <div class="setting-control">
-                                <select id="themeMode">
-                                    <option value="auto">跟随系统</option>
-                                    <option value="light">浅色模式</option>
-                                    <option value="dark">深色模式</option>
-                                </select>
-                            </div>
-                        </div>
+                <!-- 设置标签页 -->
+                <div id="settings" class="tab-content">
+                    <div class="tab-header">
+                        <h1>用户设置</h1>
+                        <p>个性化您的使用体验</p>
                     </div>
 
-                    <!-- 搜索设置 -->
-                    <div class="settings-section">
-                        <h3>搜索设置</h3>
-                        <div class="setting-item">
-                            <label>默认搜索源</label>
-                            <div class="setting-control">
-                                <div class="checkbox-group">
-                                    <label><input type="checkbox" value="javbus" checked> JavBus</label>
-                                    <label><input type="checkbox" value="javdb" checked> JavDB</label>
-                                    <label><input type="checkbox" value="javlibrary" checked> JavLibrary</label>
-                                    <label><input type="checkbox" value="av01"> AV01</label>
-                                    <label><input type="checkbox" value="missav"> MissAV</label>
+                    <div class="settings-sections">
+                        <!-- 基本设置 -->
+                        <div class="settings-section">
+                            <h3>基本设置</h3>
+                            <div class="setting-item">
+                                <label>自动同步</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="autoSync" checked>
+                                    <span class="setting-desc">搜索和收藏自动同步到云端</span>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>搜索缓存</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="enableCache" checked>
+                                    <span class="setting-desc">启用搜索结果缓存，提升加载速度</span>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>主题模式</label>
+                                <div class="setting-control">
+                                    <select id="themeMode">
+                                        <option value="auto">跟随系统</option>
+                                        <option value="light">浅色模式</option>
+                                        <option value="dark">深色模式</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
-                        <div class="setting-item">
-                            <label>搜索历史保留</label>
-                            <div class="setting-control">
-                                <select id="historyRetention">
-                                    <option value="30">30天</option>
-                                    <option value="90" selected>90天</option>
-                                    <option value="365">1年</option>
-                                    <option value="-1">永久保留</option>
-                                </select>
+
+                        <!-- 搜索设置 -->
+                        <div class="settings-section">
+                            <h3>搜索设置</h3>
+                            <div class="setting-item">
+                                <label>默认搜索源</label>
+                                <div class="setting-control">
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" value="javbus" checked> JavBus</label>
+                                        <label><input type="checkbox" value="javdb" checked> JavDB</label>
+                                        <label><input type="checkbox" value="javlibrary" checked> JavLibrary</label>
+                                        <label><input type="checkbox" value="av01"> AV01</label>
+                                        <label><input type="checkbox" value="missav"> MissAV</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>搜索历史保留</label>
+                                <div class="setting-control">
+                                    <select id="historyRetention">
+                                        <option value="30">30天</option>
+                                        <option value="90" selected>90天</option>
+                                        <option value="365">1年</option>
+                                        <option value="-1">永久保留</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>最大收藏数量</label>
+                                <div class="setting-control">
+                                    <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
+                                    <span class="setting-desc">收藏夹最大容量限制</span>
+                                </div>
                             </div>
                         </div>
-                        <div class="setting-item">
-                            <label>最大收藏数量</label>
-                            <div class="setting-control">
-                                <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
-                                <span class="setting-desc">收藏夹最大容量限制</span>
+
+                        <!-- 隐私设置 -->
+                        <div class="settings-section">
+                            <h3>隐私设置</h3>
+                            <div class="setting-item">
+                                <label>行为统计</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="allowAnalytics" checked>
+                                    <span class="setting-desc">允许收集匿名使用统计，帮助改进产品</span>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>搜索建议</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="searchSuggestions" checked>
+                                    <span class="setting-desc">基于历史记录提供搜索建议</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- 隐私设置 -->
-                    <div class="settings-section">
-                        <h3>隐私设置</h3>
-                        <div class="setting-item">
-                            <label>行为统计</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="allowAnalytics" checked>
-                                <span class="setting-desc">允许收集匿名使用统计，帮助改进产品</span>
+                        <!-- 账户操作 -->
+                        <div class="settings-section">
+                            <h3>账户操作</h3>
+                            <div class="dangerous-actions">
+                                <button class="btn-warning" onclick="app.changePassword()">修改密码</button>
+                                <button class="btn-danger" onclick="app.clearAllData()">清空所有数据</button>
+                                <button class="btn-danger" onclick="app.deleteAccount()">删除账户</button>
                             </div>
                         </div>
-                        <div class="setting-item">
-                            <label>搜索建议</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="searchSuggestions" checked>
-                                <span class="setting-desc">基于历史记录提供搜索建议</span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- 账户操作 -->
-                    <div class="settings-section">
-                        <h3>账户操作</h3>
-                        <div class="dangerous-actions">
-                            <button class="btn-warning" onclick="app.changePassword()">修改密码</button>
-                            <button class="btn-danger" onclick="app.clearAllData()">清空所有数据</button>
-                            <button class="btn-danger" onclick="app.deleteAccount()">删除账户</button>
-                        </div>
-                    </div>
-
-                    <!-- 保存设置 -->
-                    <div class="settings-actions">
-                        <button class="btn-primary" onclick="app.saveSettings()">保存设置</button>
-                        <button class="btn-secondary" onclick="app.resetSettings()">重置默认</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 统计标签页 -->
-            <div id="stats" class="tab-content">
-                <div class="tab-header">
-                    <h1>使用统计</h1>
-                    <p>查看您的使用数据和趋势</p>
-                </div>
-
-                <!-- 时间范围选择 -->
-                <div class="stats-controls">
-                    <div class="time-range-selector">
-                        <button class="time-btn active" data-range="7">近7天</button>
-                        <button class="time-btn" data-range="30">近30天</button>
-                        <button class="time-btn" data-range="90">近90天</button>
-                        <button class="time-btn" data-range="365">近一年</button>
-                    </div>
-                </div>
-
-                <!-- 统计图表 -->
-                <div class="charts-container">
-                    <div class="chart-section">
-                        <h3>搜索活动趋势</h3>
-                        <div id="searchTrendChart" class="chart-placeholder">
-                            <p>搜索趋势图表区域</p>
-                        </div>
-                    </div>
-
-                    <div class="chart-section">
-                        <h3>热门搜索关键词</h3>
-                        <div id="topKeywordsChart" class="chart-placeholder">
-                            <div class="top-keywords-list" id="topKeywordsList">
-                                <!-- 热门关键词列表 -->
-                            </div>
+                        <!-- 保存设置 -->
+                        <div class="settings-actions">
+                            <button class="btn-primary" onclick="app.saveSettings()">保存设置</button>
+                            <button class="btn-secondary" onclick="app.resetSettings()">重置默认</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- 详细统计 -->
-                <div class="detailed-stats">
-                    <div class="stats-table">
-                        <h3>详细数据</h3>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>指标</th>
-                                    <th>数值</th>
-                                    <th>趋势</th>
-                                </tr>
-                            </thead>
-                            <tbody id="detailedStatsTable">
-                                <!-- 详细统计数据 -->
-                            </tbody>
-                        </table>
+                <!-- 统计标签页 -->
+                <div id="stats" class="tab-content">
+                    <div class="tab-header">
+                        <h1>使用统计</h1>
+                        <p>查看您的使用数据和趋势</p>
+                    </div>
+
+                    <!-- 时间范围选择 -->
+                    <div class="stats-controls">
+                        <div class="time-range-selector">
+                            <button class="time-btn active" data-range="7">近7天</button>
+                            <button class="time-btn" data-range="30">近30天</button>
+                            <button class="time-btn" data-range="90">近90天</button>
+                            <button class="time-btn" data-range="365">近一年</button>
+                        </div>
+                    </div>
+
+                    <!-- 统计图表 -->
+                    <div class="charts-container">
+                        <div class="chart-section">
+                            <h3>搜索活动趋势</h3>
+                            <div id="searchTrendChart" class="chart-placeholder">
+                                <p>搜索趋势图表区域</p>
+                            </div>
+                        </div>
+
+                        <div class="chart-section">
+                            <h3>热门搜索关键词</h3>
+                            <div id="topKeywordsChart" class="chart-placeholder">
+                                <div class="top-keywords-list" id="topKeywordsList">
+                                    <!-- 热门关键词列表 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 详细统计 -->
+                    <div class="detailed-stats">
+                        <div class="stats-table">
+                            <h3>详细数据</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>指标</th>
+                                        <th>数值</th>
+                                        <th>趋势</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detailedStatsTable">
+                                    <!-- 详细统计数据 -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -388,19 +398,19 @@
     </main>
 
     <!-- 模态框 -->
-    <div id="passwordModal" class="modal">
+    <div id="passwordModal" class="modal" aria-labelledby="password-title" role="dialog">
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>修改密码</h2>
-            <form id="passwordForm">
+            <span class="close" aria-label="关闭">&times;</span>
+            <h2 id="password-title">修改密码</h2>
+            <form id="passwordForm" novalidate>
                 <div class="form-group">
-                    <input type="password" id="currentPassword" placeholder="当前密码" required>
+                    <input type="password" id="currentPassword" placeholder="当前密码" required autocomplete="current-password">
                 </div>
                 <div class="form-group">
-                    <input type="password" id="newPassword" placeholder="新密码" required>
+                    <input type="password" id="newPassword" placeholder="新密码" required autocomplete="new-password">
                 </div>
                 <div class="form-group">
-                    <input type="password" id="confirmNewPassword" placeholder="确认新密码" required>
+                    <input type="password" id="confirmNewPassword" placeholder="确认新密码" required autocomplete="new-password">
                 </div>
                 <button type="submit" class="submit-btn">修改密码</button>
             </form>
@@ -408,10 +418,10 @@
     </div>
 
     <!-- Toast通知 -->
-    <div id="toast" class="toast"></div>
+    <div id="toast" class="toast" role="alert" aria-live="polite"></div>
 
     <!-- Loading -->
-    <div id="loading" class="loading" style="display:none;">
+    <div id="loading" class="loading" style="display:none;" aria-label="加载中">
         <div class="spinner"></div>
     </div>
 
@@ -424,6 +434,13 @@
     <script>
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', () => {
+            // 更新页面标题和品牌名称
+            if (window.API_CONFIG) {
+                const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
+                document.getElementById('page-title').textContent = `用户面板 - ${appName}`;
+                document.getElementById('brand-text').textContent = appName;
+            }
+            
             if (typeof DashboardApp !== 'undefined') {
                 window.app = new DashboardApp();
             }

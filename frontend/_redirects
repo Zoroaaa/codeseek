@@ -1,0 +1,2 @@
+/dashboard  /dashboard.html  200
+/api/*      http://codeseek.zadi.workers.dev/api/:splat  200
