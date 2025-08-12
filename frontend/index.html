@@ -312,36 +312,88 @@
     <script src="js/main.js"></script>
 
     <!-- 初始化脚本 -->
-    <script>
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('🚀 初始化应用...');
-            
-            // 更新页面标题和品牌名称
-            if (window.API_CONFIG) {
-                const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
-                document.getElementById('page-title').textContent = `${appName} - 专业版`;
-                document.getElementById('brand-text').textContent = appName;
-                document.getElementById('hero-title').textContent = `${appName} - 专业版`;
-            }
-            
-            // 创建应用实例
-            if (typeof MagnetSearchApp !== 'undefined') {
-                window.app = new MagnetSearchApp();
-            }
-        });
+<script>
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 DOM加载完成，开始初始化...');
+    
+    // 检查关键依赖
+    if (typeof showToast === 'undefined') {
+        console.error('❌ Utils.js 未加载');
+        return;
+    }
+    
+    if (typeof APIManager === 'undefined') {
+        console.error('❌ API.js 未加载');
+        return;
+    }
+    
+    if (typeof AuthManager === 'undefined') {
+        console.error('❌ Auth.js 未加载');
+        return;
+    }
+    
+    if (typeof MagnetSearchApp === 'undefined') {
+        console.error('❌ Main.js 未加载');
+        return;
+    }
+    
+    // 更新页面标题和品牌名称
+    if (window.API_CONFIG) {
+        const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
+        const titleElement = document.getElementById('page-title');
+        const brandElement = document.getElementById('brand-text');
+        const heroElement = document.getElementById('hero-title');
+        
+        if (titleElement) titleElement.textContent = `${appName} - 专业版`;
+        if (brandElement) brandElement.textContent = appName;
+        if (heroElement) heroElement.textContent = `${appName} - 专业版`;
+    }
+    
+    // 创建应用实例
+    try {
+        console.log('✅ 开始创建应用实例...');
+        window.app = new MagnetSearchApp();
+    } catch (error) {
+        console.error('❌ 应用创建失败:', error);
+        
+        // 应急处理 - 手动绑定基本功能
+        const searchBtn = document.getElementById('searchBtn');
+        const searchInput = document.getElementById('searchInput');
+        
+        if (searchBtn && searchInput) {
+            searchBtn.onclick = function() {
+                const keyword = searchInput.value.trim();
+                if (!keyword) {
+                    alert('请输入搜索关键词');
+                    return;
+                }
+                window.open(`https://www.javbus.com/search/${keyword}`, '_blank');
+            };
+        }
+        
+        const loginBtn = document.getElementById('loginBtn');
+        if (loginBtn) {
+            loginBtn.onclick = function() {
+                const modal = document.getElementById('loginModal');
+                if (modal) modal.style.display = 'block';
+            };
+        }
+        
+        showToast('应用初始化失败，使用基础功能', 'warning');
+    }
+});
 
-        // 页面可见性变化处理
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && window.app) {
-                // 页面重新获得焦点时刷新状态
-                setTimeout(() => {
-                    if (window.app.isInitialized) {
-                        window.app.checkConnectionStatus();
-                    }
-                }, 100);
+// 页面可见性变化处理
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && window.app && window.app.isInitialized) {
+        setTimeout(() => {
+            if (window.app.checkConnectionStatus) {
+                window.app.checkConnectionStatus();
             }
-        });
-    </script>
+        }, 100);
+    }
+});
+</script>
 </body>
 </html>

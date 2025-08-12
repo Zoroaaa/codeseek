@@ -84,6 +84,45 @@ class DashboardApp {
 
         // 设置表单事件
         this.bindSettingsEvents();
+        
+        // 密码修改按钮
+        const changePasswordBtn = document.getElementById('changePasswordBtn');
+        if (changePasswordBtn) {
+            changePasswordBtn.addEventListener('click', () => this.changePassword());
+        }
+
+        // 数据操作按钮
+        const syncAllDataBtn = document.getElementById('syncAllDataBtn');
+        const exportDataBtn = document.getElementById('exportDataBtn');
+        const exportFavoritesBtn = document.getElementById('exportFavoritesBtn');
+        const clearHistoryBtn = document.getElementById('clearAllHistoryBtn');
+        const clearAllDataBtn = document.getElementById('clearAllDataBtn');
+        const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+        const resetSettingsBtn = document.getElementById('resetSettingsBtn');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+
+        if (syncAllDataBtn) syncAllDataBtn.addEventListener('click', () => this.syncAllData());
+        if (exportDataBtn) exportDataBtn.addEventListener('click', () => this.exportData());
+        if (exportFavoritesBtn) exportFavoritesBtn.addEventListener('click', () => this.exportFavorites());
+        if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', () => this.clearAllHistory());
+        if (clearAllDataBtn) clearAllDataBtn.addEventListener('click', () => this.clearAllData());
+        if (deleteAccountBtn) deleteAccountBtn.addEventListener('click', () => this.deleteAccount());
+        if (resetSettingsBtn) resetSettingsBtn.addEventListener('click', () => this.resetSettings());
+        if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => this.saveSettings());
+
+        // 收藏夹搜索和排序
+        const favoritesSearchBtn = document.getElementById('favoritesSearchBtn');
+        const favoritesSearch = document.getElementById('favoritesSearch');
+        const favoritesSort = document.getElementById('favoritesSort');
+        
+        if (favoritesSearchBtn) favoritesSearchBtn.addEventListener('click', () => this.searchFavorites());
+        if (favoritesSearch) {
+            favoritesSearch.addEventListener('input', debounce(() => this.searchFavorites(), 300));
+            favoritesSearch.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.searchFavorites();
+            });
+        }
+        if (favoritesSort) favoritesSort.addEventListener('change', () => this.searchFavorites());
     }
 
     bindModalEvents() {
@@ -180,16 +219,21 @@ class DashboardApp {
     async loadOverviewData() {
         try {
             // 更新统计数据
-            document.getElementById('totalSearches').textContent = this.searchHistory.length;
-            document.getElementById('totalFavorites').textContent = this.favorites.length;
+            const totalSearchesEl = document.getElementById('totalSearches');
+            const totalFavoritesEl = document.getElementById('totalFavorites');
+            const activeDaysEl = document.getElementById('activeDays');
+            const userLevelEl = document.getElementById('userLevel');
+
+            if (totalSearchesEl) totalSearchesEl.textContent = this.searchHistory.length;
+            if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
             
             // 计算活跃天数
             const activeDays = this.calculateActiveDays();
-            document.getElementById('activeDays').textContent = activeDays;
+            if (activeDaysEl) activeDaysEl.textContent = activeDays;
             
             // 用户等级
             const level = this.calculateUserLevel();
-            document.getElementById('userLevel').textContent = level;
+            if (userLevelEl) userLevelEl.textContent = level;
 
             // 加载最近活动
             await this.loadRecentActivity();
@@ -367,9 +411,21 @@ class DashboardApp {
         try {
             showLoading(true);
             // 这里需要实现密码修改API
-            showToast('密码修改成功', 'success');
-            this.closeModals();
-            document.getElementById('passwordForm').reset();
+            const response = await API.request('/api/auth/change-password', {
+                method: 'POST',
+                body: JSON.stringify({
+                    currentPassword,
+                    newPassword
+                })
+            });
+            
+            if (response.success) {
+                showToast('密码修改成功', 'success');
+                this.closeModals();
+                document.getElementById('passwordForm').reset();
+            } else {
+                throw new Error(response.message || '密码修改失败');
+            }
         } catch (error) {
             showToast('密码修改失败: ' + error.message, 'error');
         } finally {
@@ -713,15 +769,20 @@ class DashboardApp {
 
         try {
             showLoading(true);
-            // 这里需要实现账户删除API
-            // await API.deleteAccount();
+            const response = await API.request('/api/auth/delete-account', {
+                method: 'POST'
+            });
             
-            localStorage.removeItem('auth_token');
-            showToast('账户已删除', 'success');
-            
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 2000);
+            if (response.success) {
+                localStorage.removeItem('auth_token');
+                showToast('账户已删除', 'success');
+                
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            } else {
+                throw new Error(response.message || '删除账户失败');
+            }
         } catch (error) {
             showToast('删除失败: ' + error.message, 'error');
         } finally {
@@ -759,8 +820,8 @@ class DashboardApp {
     }
 
     searchFavorites() {
-        const searchTerm = document.getElementById('favoritesSearch').value.toLowerCase();
-        const sortBy = document.getElementById('favoritesSort').value;
+        const searchTerm = document.getElementById('favoritesSearch')?.value.toLowerCase() || '';
+        const sortBy = document.getElementById('favoritesSort')?.value || 'date-desc';
         
         let filteredFavorites = this.favorites;
 

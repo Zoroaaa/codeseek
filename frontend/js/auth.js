@@ -156,15 +156,6 @@ class AuthManager {
         try {
             const response = await API.verifyToken(this.token);
             
-    // 验证token
-    async verifyToken() {
-        if (!this.token) {
-            return false;
-        }
-
-        try {
-            const response = await API.verifyToken(this.token);
-            
             if (response.success && response.user) {
                 this.currentUser = response.user;
                 StorageManager.setItem('current_user', response.user);

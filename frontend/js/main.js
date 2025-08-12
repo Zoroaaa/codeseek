@@ -1,4 +1,4 @@
-// 主要应用逻辑 - 优化版本
+// 主要应用逻辑 - 修复版本
 class MagnetSearchApp {
     constructor() {
         this.currentUser = null;
@@ -8,6 +8,13 @@ class MagnetSearchApp {
         this.isInitialized = false;
         this.config = {};
         this.connectionStatus = 'checking';
+        this.authManager = new AuthManager();
+        
+        // 确保API已初始化
+        if (window.API) {
+            window.API.init();
+        }
+        
         this.init();
     }
 
@@ -18,9 +25,6 @@ class MagnetSearchApp {
             
             // 显示连接状态
             this.showConnectionStatus();
-            
-            // 加载系统配置
-            await this.loadConfig();
             
             // 绑定事件
             this.bindEvents();
