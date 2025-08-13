@@ -499,6 +499,82 @@ router.post('/api/auth/logout', async (request, env) => {
     return utils.successResponse({ message: '退出成功' });
 });
 
+
+
+// 添加同步搜索历史接口
+router.post('/api/user/sync/search-history', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { searchHistory } = body;
+
+        if (!Array.isArray(searchHistory)) {
+            return utils.errorResponse('搜索历史数据格式错误');
+        }
+
+        const maxHistory = parseInt(env.MAX_HISTORY_PER_USER || '1000');
+        if (searchHistory.length > maxHistory) {
+            return utils.errorResponse(`搜索历史数量不能超过 ${maxHistory} 条`);
+        }
+
+        // 清除现有搜索历史
+        await env.DB.prepare(`DELETE FROM user_search_history WHERE user_id = ?`).bind(user.id).run();
+
+        // 批量插入新的搜索历史
+        for (const item of searchHistory) {
+            if (!item.keyword) continue; // 跳过无效记录
+            
+            const historyId = item.id || utils.generateId();
+            await env.DB.prepare(`
+                INSERT INTO user_search_history (id, user_id, query, source, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            `).bind(
+                historyId,
+                user.id,
+                item.keyword,
+                item.source || 'unknown',
+                item.timestamp || Date.now()
+            ).run();
+        }
+
+        return utils.successResponse({ message: '搜索历史同步成功' });
+
+    } catch (error) {
+        console.error('同步搜索历史失败:', error);
+        return utils.errorResponse('同步搜索历史失败', 500);
+    }
+});
+
+// 添加记录行为接口
+router.post('/api/actions/record', async (request, env) => {
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { action, data } = body;
+
+        if (!action) {
+            return utils.errorResponse('行为类型不能为空');
+        }
+
+        // 尝试获取用户信息（可选）
+        const user = await authenticate(request, env);
+        const userId = user ? user.id : null;
+
+        // 记录行为
+        await utils.logUserAction(env, userId, action, data || {}, request);
+
+        return utils.successResponse({ message: '行为记录成功' });
+
+    } catch (error) {
+        console.error('记录行为失败:', error);
+        // 行为记录失败不应该影响用户体验
+        return utils.successResponse({ message: '记录行为成功（静默失败）' });
+    }
+});
+
 router.post('/api/user/favorites', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) {
@@ -569,9 +645,6 @@ router.get('/api/user/favorites', async (request, env) => {
         return utils.errorResponse('获取收藏夹失败', 500);
     }
 });
-
-// 在您的 worker.js 中添加以下路由定义
-// 建议放在 router.get('/api/user/favorites') 之后
 
 // 保存搜索历史
 router.post('/api/user/search-history', async (request, env) => {
@@ -659,6 +732,7 @@ router.get('/api/user/search-history', async (request, env) => {
 
         const history = result.results.map(item => ({
             id: item.id,
+            keyword: item.query, // 注意这里映射字段名
             query: item.query,
             source: item.source,
             timestamp: item.created_at,
@@ -672,6 +746,7 @@ router.get('/api/user/search-history', async (request, env) => {
 
         return utils.successResponse({ 
             history,
+            searchHistory: history, // 添加这个字段以兼容前端
             total: countResult.total,
             limit,
             offset,
@@ -807,8 +882,6 @@ router.get('/api/config', async (request, env) => {
     });
 });
 
-// 在 worker.js 中添加以下 analytics 相关路由
-
 // 记录用户行为分析
 router.post('/api/analytics/record', async (request, env) => {
     try {
@@ -929,8 +1002,6 @@ router.get('/api/analytics/stats', async (request, env) => {
     }
 });
 
-// 添加更多 analytics 相关的路由以处理不同的请求格式
-
 // 调试接口 - 帮助查看前端发送的数据格式
 router.post('/api/debug/analytics', async (request, env) => {
     try {
@@ -999,7 +1070,88 @@ router.get('/api/system/status', async (request, env) => {
     }
 });
 
+// 修复用户Token验证接口（前端调用的verifyToken）
+router.post('/api/auth/verify-token', async (request, env) => {
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { token } = body;
 
+        if (!token) {
+            return utils.errorResponse('Token不能为空', 401);
+        }
+
+        const jwtSecret = env.JWT_SECRET;
+        if (!jwtSecret) {
+            return utils.errorResponse('服务器配置错误', 500);
+        }
+
+        const payload = await utils.verifyJWT(token, jwtSecret);
+        if (!payload) {
+            return utils.errorResponse('Token无效或已过期', 401);
+        }
+
+        try {
+            const tokenHash = await utils.hashPassword(token);
+            const session = await env.DB.prepare(`
+                SELECT u.* FROM users u
+                JOIN user_sessions s ON u.id = s.user_id
+                WHERE s.token_hash = ? AND s.expires_at > ?
+            `).bind(tokenHash, Date.now()).first();
+
+            if (!session) {
+                return utils.errorResponse('会话已过期', 401);
+            }
+
+            // 更新活动时间
+            await env.DB.prepare(`
+                UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
+            `).bind(Date.now(), tokenHash).run();
+
+            const user = {
+                id: session.id,
+                username: session.username,
+                email: session.email,
+                permissions: JSON.parse(session.permissions || '[]'),
+                settings: JSON.parse(session.settings || '{}')
+            };
+
+            return utils.successResponse({ 
+                user,
+                valid: true,
+                message: 'Token验证成功'
+            });
+
+        } catch (error) {
+            console.error('Token验证数据库查询失败:', error);
+            return utils.errorResponse('Token验证失败', 401);
+        }
+
+    } catch (error) {
+        console.error('Token验证失败:', error);
+        return utils.errorResponse('Token验证失败', 401);
+    }
+});
+
+// 添加健康检查的别名接口
+router.get('/api/health-check', async (request, env) => {
+    return utils.successResponse({
+        status: 'healthy',
+        timestamp: Date.now(),
+        version: env.APP_VERSION || '1.0.0'
+    });
+});
+
+// 同步收藏夹接口（别名）
+router.post('/api/user/sync/favorites', async (request, env) => {
+    // 重用现有的收藏夹同步逻辑
+    return await router.routes.get('POST:/api/user/favorites')(request, env);
+});
+
+// 获取搜索历史接口（别名，适配前端调用）
+router.get('/api/user/search-history/list', async (request, env) => {
+    // 重用现有的搜索历史获取逻辑
+    return await router.routes.get('GET:/api/user/search-history')(request, env);
+});
 
 // 默认处理器
 router.get('/*', (request) => {
@@ -1027,3 +1179,4 @@ export default {
         }
     }
 };
+

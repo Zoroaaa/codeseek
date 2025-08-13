@@ -11,48 +11,54 @@ class MagnetSearchApp {
         this.init();
     }
 
-    async init() {
-        try {
-            showLoading(true);
-            console.log('🚀 初始化磁力快搜应用...');
-            
-            // 显示连接状态
-            this.showConnectionStatus();
-            
-            // 加载系统配置
-            await this.loadConfig();
-            
-            // 绑定事件
-            this.bindEvents();
-            
-            // 加载本地数据
-            this.loadLocalData();
-            
-            // 初始化主题
-            this.initTheme();
-            
-            // 检查认证状态
-            await this.checkAuthStatus();
-            
-            // 测试API连接
-            await this.testConnection();
-            
-            // 处理URL参数（如搜索关键词）
-            this.handleURLParams();
-            
-            this.isInitialized = true;
-            this.hideConnectionStatus();
-            console.log('✅ 应用初始化完成');
-            
-        } catch (error) {
-            console.error('❌ 应用初始化失败:', error);
-            this.connectionStatus = 'error';
-            this.updateConnectionStatus('连接失败');
-            showToast('应用初始化失败，请刷新页面重试', 'error', 5000);
-        } finally {
-            showLoading(false);
+async init() {
+    try {
+        showLoading(true);
+        console.log('🚀 初始化磁力快搜应用...');
+        
+        // 显示连接状态
+        this.showConnectionStatus();
+        
+        // 加载系统配置
+        await this.loadConfig();
+        
+        // 绑定事件
+        this.bindEvents();
+        
+        // 加载本地数据
+        this.loadLocalData();
+        
+        // 初始化主题
+        this.initTheme();
+        
+        // 检查认证状态
+        await this.checkAuthStatus();
+        
+        // 若未认证，打开登录模态
+        if (!this.currentUser) {
+            document.getElementById('loginModal').style.display = 'block';
         }
+
+        // 测试API连接
+        await this.testConnection();
+        
+        // 处理URL参数（如搜索关键词）
+        this.handleURLParams();
+        
+        this.isInitialized = true;
+        this.hideConnectionStatus();
+        console.log('✅ 应用初始化完成');
+        
+    } catch (error) {
+        console.error('❌ 应用初始化失败:', error);
+        this.connectionStatus = 'error';
+        this.updateConnectionStatus('连接失败');
+        showToast('应用初始化失败，请刷新页面重试', 'error', 5000);
+    } finally {
+        showLoading(false);
     }
+}
+
 
     showConnectionStatus() {
         const status = document.getElementById('connectionStatus');
@@ -316,43 +322,29 @@ class MagnetSearchApp {
         }
     }
 
-    async searchKeyword(keyword) {
-        const cacheResults = document.getElementById('cacheResults')?.checked;
-        
-        // 检查缓存
-        if (cacheResults) {
-            const cached = this.getCachedResults(keyword);
-            if (cached) {
-                showToast('使用缓存结果', 'info', 2000);
-                return cached;
-            }
+async searchKeyword(keyword) {
+    const cacheResults = document.getElementById('cacheResults')?.checked;
+    
+    // 检查缓存
+    if (cacheResults) {
+        const cached = this.getCachedResults(keyword);
+        if (cached) {
+            showToast('使用缓存结果', 'info', 2000);
+            return cached;
         }
-
-        // 构建搜索源
-        const sources = this.buildSearchSources(keyword);
-
-        // 如果用户已登录，尝试使用增强搜索
-        if (this.currentUser) {
-            try {
-                const enhancedResults = await API.searchEnhanced(keyword, sources);
-                if (enhancedResults && enhancedResults.length > 0) {
-                    if (cacheResults) {
-                        this.cacheResults(keyword, enhancedResults);
-                    }
-                    return enhancedResults;
-                }
-            } catch (error) {
-                console.warn('增强搜索失败，使用基础搜索:', error);
-            }
-        }
-
-        // 缓存基础搜索结果
-        if (cacheResults) {
-            this.cacheResults(keyword, sources);
-        }
-
-        return sources;
     }
+
+    // 构建搜索源
+    const sources = this.buildSearchSources(keyword);
+
+    // 直接使用基础搜索，移除增强搜索逻辑
+    if (cacheResults) {
+        this.cacheResults(keyword, sources);
+    }
+
+    return sources;
+}
+
 
     buildSearchSources(keyword) {
         const encodedKeyword = encodeURIComponent(keyword);

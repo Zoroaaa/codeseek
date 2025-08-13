@@ -7,18 +7,16 @@
     <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索">
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
-    
-    <!-- 预加载配置脚本 -->
     <script>
-        // Cloudflare Pages 环境变量注入
-        // 这些变量将在构建时被 Cloudflare Pages 替换
-        window.CF_API_BASE_URL = typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined;
-        window.CF_APP_NAME = typeof process !== 'undefined' && process.env ? process.env.APP_NAME : undefined;
-        window.CF_APP_VERSION = typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : undefined;
-        window.CF_ENABLE_ANALYTICS = typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : undefined;
-        window.CF_ENABLE_DEBUG = typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : undefined;
+        // 检查用户是否已登录的函数
+        window.onload = function() {
+            const authToken = localStorage.getItem('auth_token');
+            if (!authToken) {
+                // 用户未登录，显示登录模态框
+                document.getElementById('loginModal').style.display = 'block';
+            }
+        };
     </script>
-    <script src="js/config.js"></script>
 </head>
 <body>
     <!-- 导航栏 -->
@@ -47,8 +45,8 @@
         </div>
     </nav>
 
-    <!-- 主要内容区域 -->
-    <main class="main-content">
+    <!-- 仅显示主内容区域如果用户已登录 -->
+    <main class="main-content" style="display:none;">
         <!-- Hero区域 -->
         <section class="hero">
             <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
@@ -87,7 +85,7 @@
         </section>
 
         <!-- 快速提示 -->
-        <section id="quickTips" class="quick-tips">
+        <section id="quickTips" class="quick-tips" style="display:none;">
             <div class="tips-content">
                 <h3>💡 搜索技巧</h3>
                 <ul>
@@ -205,7 +203,7 @@
         </section>
     </main>
 
-    <!-- 模态框 -->
+    <!-- 登录模态框 -->
     <div id="loginModal" class="modal" aria-labelledby="login-title" role="dialog">
         <div class="modal-content">
             <span class="close" aria-label="关闭">&times;</span>
@@ -239,6 +237,7 @@
         </div>
     </div>
 
+    <!-- 注册模态框 -->
     <div id="registerModal" class="modal" aria-labelledby="register-title" role="dialog">
         <div class="modal-content">
             <span class="close" aria-label="关闭">&times;</span>
@@ -311,13 +310,17 @@
     <script src="js/auth.js"></script>
     <script src="js/main.js"></script>
 
-    <!-- 初始化脚本 -->
     <script>
-        // 页面加载完成后初始化
+        // 页面加载完成后的初始行为
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🚀 初始化应用...');
-            
-            // 更新页面标题和品牌名称
+
+            const authToken = localStorage.getItem('auth_token');
+            if (authToken) {
+                document.querySelector('.main-content').style.display = 'block';
+            }
+
+            // 修改页面标题与品牌名称
             if (window.API_CONFIG) {
                 const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
                 document.getElementById('page-title').textContent = `${appName} - 专业版`;
@@ -331,10 +334,9 @@
             }
         });
 
-        // 页面可见性变化处理
+        // 处理页面可见性变化
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && window.app) {
-                // 页面重新获得焦点时刷新状态
                 setTimeout(() => {
                     if (window.app.isInitialized) {
                         window.app.checkConnectionStatus();

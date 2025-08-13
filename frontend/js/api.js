@@ -185,18 +185,6 @@ class APIService {
         });
     }
 
-    async searchEnhanced(keyword, basicSources) {
-        try {
-            const response = await this.request('/api/search/enhanced', {
-                method: 'POST',
-                body: JSON.stringify({ keyword, basicSources })
-            });
-            return response.results || basicSources;
-        } catch (error) {
-            console.error('增强搜索失败:', error);
-            return basicSources;
-        }
-    }
 
     async recordAction(action, data) {
         try {
