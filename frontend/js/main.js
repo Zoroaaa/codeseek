@@ -1,4 +1,4 @@
-// 主要应用逻辑 - 修复版本
+// 主要应用逻辑 - 优化版本
 class MagnetSearchApp {
     constructor() {
         this.currentUser = null;
@@ -8,13 +8,6 @@ class MagnetSearchApp {
         this.isInitialized = false;
         this.config = {};
         this.connectionStatus = 'checking';
-        this.authManager = new AuthManager();
-        
-        // 确保API已初始化
-        if (window.API) {
-            window.API.init();
-        }
-        
         this.init();
     }
 
@@ -25,6 +18,9 @@ class MagnetSearchApp {
             
             // 显示连接状态
             this.showConnectionStatus();
+            
+            // 加载系统配置
+            await this.loadConfig();
             
             // 绑定事件
             this.bindEvents();
@@ -498,18 +494,13 @@ class MagnetSearchApp {
         const urlObj = new URL(url);
         return `${urlObj.hostname}${urlObj.pathname.length > 20 ? urlObj.pathname.substr(0, 20) + '...' : urlObj.pathname}`;
     }
-	
-    // 绑定结果事件
-    bindResultEvents() {
-        // 已在HTML中使用onclick处理，无需额外绑定
-    }
 
     // 打开搜索结果
-    openResult(url) {
+    openResult(url, source) {
         try {
             // 记录访问行为
             if (typeof API !== 'undefined') {
-                API.recordAction('visit_site', { url }).catch(console.error);
+                API.recordAction('visit_site', { url, source }).catch(console.error);
             }
             
             window.open(url, '_blank', 'noopener,noreferrer');
@@ -604,7 +595,7 @@ class MagnetSearchApp {
             
             if (result) {
                 const isFavorited = this.favorites.some(fav => fav.url === result.url);
-                btn.textContent = isFavorited ? '已收藏' : '收藏';
+                btn.querySelector('span').textContent = isFavorited ? '已收藏' : '收藏';
                 btn.classList.toggle('favorited', isFavorited);
             }
         });
@@ -751,6 +742,84 @@ class MagnetSearchApp {
 
         this.currentSearchResults = [];
         showToast('搜索结果已清除', 'success');
+    }
+
+    // 导出搜索结果
+    async exportResults() {
+        if (this.currentSearchResults.length === 0) {
+            showToast('没有搜索结果可以导出', 'error');
+            return;
+        }
+
+        try {
+            const data = {
+                results: this.currentSearchResults,
+                exportTime: new Date().toISOString(),
+                version: window.API_CONFIG?.APP_VERSION || '1.0.0'
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+                type: 'application/json'
+            });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `search-results-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('搜索结果导出成功', 'success');
+        } catch (error) {
+            console.error('导出搜索结果失败:', error);
+            showToast('导出失败: ' + error.message, 'error');
+        }
+    }
+
+    // 导入收藏夹
+    async importFavorites() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                
+                if (data.favorites && Array.isArray(data.favorites)) {
+                    // 合并收藏，避免重复
+                    const existingUrls = new Set(this.favorites.map(fav => fav.url));
+                    const newFavorites = data.favorites.filter(fav => !existingUrls.has(fav.url));
+                    
+                    if (newFavorites.length > 0) {
+                        this.favorites.push(...newFavorites);
+                        this.saveFavorites();
+                        this.renderFavorites();
+                        showToast(`成功导入${newFavorites.length}个收藏`, 'success');
+                        
+                        // 同步到云端
+                        if (this.currentUser) {
+                            await this.syncFavorites();
+                        }
+                    } else {
+                        showToast('没有新的收藏需要导入', 'info');
+                    }
+                } else {
+                    throw new Error('文件格式不正确');
+                }
+            } catch (error) {
+                console.error('导入收藏失败:', error);
+                showToast('导入失败: ' + error.message, 'error');
+            }
+        };
+        
+        input.click();
     }
 
     // 刷新数据
@@ -1025,7 +1094,7 @@ class MagnetSearchApp {
         }
     }
 
-    // 继续其他方法...
+    // 检查认证状态
     async checkAuthStatus() {
         const token = localStorage.getItem('auth_token');
         if (!token) {
@@ -1064,8 +1133,6 @@ class MagnetSearchApp {
                 resultCount: results.length,
                 timestamp: Date.now() 
             }).catch(console.error);
-            
-            API.addSearchRecord(keyword, results).catch(console.error);
         }
     }
 
@@ -1174,6 +1241,19 @@ class MagnetSearchApp {
     hideSearchSuggestions() {
         // 隐藏搜索建议下拉框
     }
+
+    // 工具方法
+    escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
 }
 
 // 全局工具函数
@@ -1222,12 +1302,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 初始化Magnet Search应用...');
     app = new MagnetSearchApp();
 });
-
-    // 其他方法保持不变，但需要添加错误处理和用户体验优化...
-    
-    // 省略其他已有方法的重复代码，这些方法基本保持原有逻辑
-    // 主要是加强了错误处理、用户反馈和连接状态检查
-}
 
 // 全局错误处理
 window.addEventListener('error', (event) => {
