@@ -117,14 +117,37 @@ const utils = {
         return crypto.randomUUID();
     },
 
-    async hashPassword(password) {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(password);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        return Array.from(new Uint8Array(hashBuffer))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-    },
+// 在文档2中修改utils.hashPassword
+async hashPassword(password) {
+    const encoder = new TextEncoder();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iterations = 100000;
+    
+    const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(password),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveBits']
+    );
+    
+    const keyBuffer = await crypto.subtle.deriveBits(
+        {
+            name: 'PBKDF2',
+            salt: salt,
+            iterations: iterations,
+            hash: 'SHA-256'
+        },
+        keyMaterial,
+        256
+    );
+    
+    const keyArray = Array.from(new Uint8Array(keyBuffer));
+    const saltArray = Array.from(salt);
+    
+    // 格式: iterations:salt:hash
+    return `${iterations}:${saltArray.map(b => b.toString(16).padStart(2, '0')).join('')}:${keyArray.map(b => b.toString(16).padStart(2, '0')).join('')}`;
+},
 
     async generateJWT(payload, secret) {
         const header = { alg: 'HS256', typ: 'JWT' };
@@ -151,6 +174,16 @@ const utils = {
         try {
             const [encodedHeader, encodedPayload, encodedSignature] = token.split('.');
             if (!encodedHeader || !encodedPayload || !encodedSignature) return null;
+
+        // 添加算法验证
+        const headerPadding = '='.repeat((4 - encodedHeader.length % 4) % 4);
+        const header = JSON.parse(atob(encodedHeader + headerPadding));
+        
+        // 验证算法
+        if (header.alg !== 'HS256') {
+            console.error('不支持的算法:', header.alg);
+            return null;
+        }			
 
             const data = `${encodedHeader}.${encodedPayload}`;
             const encoder = new TextEncoder();
@@ -474,6 +507,50 @@ router.post('/api/auth/login', async (request, env) => {
     } catch (error) {
         console.error('登录失败:', error);
         return utils.errorResponse('登录失败，请稍后重试', 500);
+    }
+});
+
+// 在文档2中增加密码修改路由
+router.put('/api/auth/change-password', async (request, env) => {
+    try {
+        const user = await authenticate(request, env);
+        if (!user) return utils.errorResponse('认证失败', 401);
+        
+        const body = await request.json();
+        const { currentPassword, newPassword } = body;
+        
+        if (!currentPassword || !newPassword) {
+            return utils.errorResponse('当前密码和新密码不能为空');
+        }
+        
+        // 验证当前密码
+        const userRecord = await env.DB.prepare(
+            `SELECT password_hash FROM users WHERE id = ?`
+        ).bind(user.id).first();
+        
+        if (!userRecord) return utils.errorResponse('用户不存在', 404);
+        
+        const currentHash = await utils.hashPassword(currentPassword);
+        if (currentHash !== userRecord.password_hash) {
+            return utils.errorResponse('当前密码错误');
+        }
+        
+        // 更新密码
+        const newHash = await utils.hashPassword(newPassword);
+        await env.DB.prepare(
+            `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`
+        ).bind(newHash, Date.now(), user.id).run();
+        
+        // 使所有会话失效
+        await env.DB.prepare(
+            `DELETE FROM user_sessions WHERE user_id = ?`
+        ).bind(user.id).run();
+
+        return utils.successResponse({ message: '密码修改成功' });
+        
+    } catch (error) {
+        console.error('密码修改失败:', error);
+        return utils.errorResponse('密码修改失败', 500);
     }
 });
 
@@ -991,21 +1068,26 @@ router.delete('/api/user/search-history/:id', async (request, env) => {
 
 // 清空搜索历史
 router.delete('/api/user/search-history', async (request, env) => {
-    const user = await authenticate(request, env);
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
     try {
-        await env.DB.prepare(`
-            DELETE FROM user_search_history WHERE user_id = ?
-        `).bind(user.id).run();
-
-        return utils.successResponse({ message: '搜索历史已清空' });
-
+        const user = await authenticate(request, env);
+        if (!user) return utils.errorResponse('认证失败', 401);
+        
+        const result = await env.DB.prepare(
+            `DELETE FROM user_search_history WHERE user_id = ?`
+        ).bind(user.id).run();
+        
+        if (result.success) {
+            return utils.successResponse({ 
+                message: '搜索历史已清空',
+                deletedCount: result.changes
+            });
+        }
+        
+        return utils.errorResponse('清空历史失败', 500);
+        
     } catch (error) {
-        console.error('清空搜索历史失败:', error);
-        return utils.errorResponse('清空搜索历史失败', 500);
+        console.error('清空历史失败:', error);
+        return utils.errorResponse('清空历史失败: ' + error.message, 500);
     }
 });
 

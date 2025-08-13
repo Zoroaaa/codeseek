@@ -649,24 +649,36 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
         }
     }
 
-    // 数据操作方法
-    async syncAllData() {
-        try {
-            showLoading(true);
-            showToast('正在同步数据...', 'info');
-            
-            await Promise.all([
-                this.syncFavorites(),
-                this.syncHistory()
-            ]);
-            
-            showToast('数据同步成功', 'success');
-        } catch (error) {
-            showToast('同步失败: ' + error.message, 'error');
-        } finally {
-            showLoading(false);
-        }
+// 在文档10中修改syncAllData方法
+async syncAllData() {
+    const syncBtn = document.querySelector('.action-btn[onclick*="syncAllData"]');
+    if (syncBtn) {
+        syncBtn.innerHTML = '<span class="btn-icon">🔄</span><span>同步中...</span>';
+        syncBtn.disabled = true;
     }
+    
+    try {
+        showToast('数据同步开始...', 'info');
+        
+        await Promise.all([
+            this.syncFavorites(),
+            this.syncHistory()
+        ]);
+        
+        showToast('数据同步成功', 'success');
+        
+    } catch (error) {
+        console.error('同步失败:', error);
+        showToast(`同步失败: ${error.message}`, 'error');
+        
+    } finally {
+        if (syncBtn) {
+            syncBtn.innerHTML = '<span class="btn-icon">🔄</span><span>同步数据</span>';
+            syncBtn.disabled = false;
+        }
+        showLoading(false);
+    }
+}
 
     async syncHistory() {
         try {

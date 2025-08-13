@@ -111,6 +111,9 @@ CREATE INDEX IF NOT EXISTS idx_actions_action ON user_actions(action);
 
 CREATE INDEX IF NOT EXISTS idx_config_public ON system_config(is_public);
 
+CREATE INDEX IF NOT EXISTS idx_history_user_keyword ON user_search_history(user_id, query);
+CREATE INDEX IF NOT EXISTS idx_favorites_user_url ON user_favorites(user_id, url);
+
 -- 初始化系统配置
 INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_public, created_at, updated_at) VALUES
 ('site_name', '磁力快搜', '网站名称', 'string', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
