@@ -883,6 +883,92 @@ const NetworkUtils = {
     }
 };
 
+// 在utils.js中添加专门的导航函数
+function navigateToPage(url, options = {}) {
+    const { 
+        useReplace = false, 
+        retryOnError = true, 
+        maxRetries = 2,
+        timeout = 5000 
+    } = options;
+    
+    return new Promise((resolve, reject) => {
+        try {
+            // 清理URL，确保路径正确
+            const cleanUrl = url.startsWith('./') ? url : `./${url}`;
+            
+            // 检查是否需要添加.html后缀
+            if (!cleanUrl.includes('.html') && !cleanUrl.includes('?')) {
+                const urlParts = cleanUrl.split('?');
+                const path = urlParts[0];
+                const query = urlParts[1] ? '?' + urlParts[1] : '';
+                const finalUrl = path + '.html' + query;
+                
+                if (useReplace) {
+                    window.location.replace(finalUrl);
+                } else {
+                    window.location.href = finalUrl;
+                }
+            } else {
+                if (useReplace) {
+                    window.location.replace(cleanUrl);
+                } else {
+                    window.location.href = cleanUrl;
+                }
+            }
+            
+            // 设置超时检查
+            setTimeout(() => {
+                reject(new Error('导航超时'));
+            }, timeout);
+            
+        } catch (error) {
+            if (retryOnError && maxRetries > 0) {
+                console.warn('导航失败，重试中...', error);
+                setTimeout(() => {
+                    navigateToPage(url, { ...options, maxRetries: maxRetries - 1 })
+                        .then(resolve)
+                        .catch(reject);
+                }, 1000);
+            } else {
+                reject(error);
+            }
+        }
+    });
+}
+
+// 专门处理dashboard跳转的函数
+async function navigateToDashboard() {
+    try {
+        showLoading(true);
+        
+        // 检查认证状态
+        const authToken = localStorage.getItem('auth_token');
+        if (!authToken) {
+            throw new Error('未登录');
+        }
+        
+        // 使用replace避免308重定向问题
+        await navigateToPage('dashboard.html', { useReplace: true });
+        
+    } catch (error) {
+        console.error('跳转到dashboard失败:', error);
+        showToast('跳转失败: ' + error.message, 'error');
+        
+        // 如果是认证问题，显示登录模态框
+        if (error.message.includes('认证') || error.message.includes('未登录')) {
+            if (typeof app !== 'undefined' && app.showLoginModal) {
+                app.showLoginModal();
+            }
+        }
+    } finally {
+        showLoading(false);
+    }
+}
+
+
+
+
 // 初始化错误处理
 ErrorHandler.init();
 
@@ -896,3 +982,6 @@ window.PerformanceUtils = PerformanceUtils;
 window.CookieUtils = CookieUtils;
 window.ErrorHandler = ErrorHandler;
 window.NetworkUtils = NetworkUtils;
+// 导出到全局作用域
+window.navigateToPage = navigateToPage;
+window.navigateToDashboard = navigateToDashboard;

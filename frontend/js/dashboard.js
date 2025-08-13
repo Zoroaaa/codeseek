@@ -11,6 +11,14 @@ class DashboardApp {
 
     async init() {
         try {
+			
+			// 检查URL是否正确
+        if (!window.location.pathname.endsWith('.html')) {
+            console.log('URL格式不正确，重定向到正确路径');
+            window.location.replace('./dashboard.html' + window.location.search);
+            return;
+        }
+			
             showLoading(true);
             
             // 检查认证状态
@@ -29,14 +37,16 @@ class DashboardApp {
             console.log('✅ Dashboard初始化完成');
             
         } catch (error) {
-            console.error('❌ Dashboard初始化失败:', error);
-            showToast('初始化失败，请重新登录', 'error');
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 2000);
-        } finally {
-            showLoading(false);
-        }
+        console.error('❌ Dashboard初始化失败:', error);
+        showToast('初始化失败，请重新登录', 'error');
+        
+        // 使用replace避免重定向循环
+        setTimeout(() => {
+            window.location.replace('./index.html');
+        }, 2000);
+    } finally {
+        showLoading(false);
+    }
     }
 
     async checkAuth() {

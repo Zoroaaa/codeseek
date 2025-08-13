@@ -162,19 +162,32 @@
         }
     }
     
-	// 在config.js中添加
+// 在config.js中替换现有的handleRedirectIssues函数
 function handleRedirectIssues() {
+    // 避免在已经是.html文件时进行处理
+    if (window.location.pathname.endsWith('.html')) {
+        return;
+    }
+    
     // 检查当前页面是否有重定向问题
-    if (window.location.pathname.endsWith('/dashboard') || 
-        window.location.pathname.endsWith('/index')) {
-        // 如果URL不以.html结尾，添加.html
-        const newPath = window.location.pathname + '.html';
-        window.history.replaceState(null, '', newPath + window.location.search);
+    if (window.location.pathname.endsWith('/dashboard')) {
+        // 直接导航到正确的URL，避免使用replaceState
+        window.location.replace('./dashboard.html' + window.location.search);
+        return;
+    }
+    
+    if (window.location.pathname.endsWith('/index')) {
+        window.location.replace('./index.html' + window.location.search);
+        return;
     }
 }
 
-// 在页面加载时调用
-document.addEventListener('DOMContentLoaded', handleRedirectIssues);
+// 只在必要时调用，并添加防护
+document.addEventListener('DOMContentLoaded', () => {
+    // 添加延迟以避免与服务器重定向冲突
+    setTimeout(handleRedirectIssues, 100);
+});
+
 
 	
     /**

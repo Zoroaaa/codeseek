@@ -229,6 +229,15 @@ async init() {
                 if (e.target === modal) this.closeModals();
             });
         });
+		
+		// 在bindModalEvents方法中添加
+const dashboardLink = document.querySelector('a[href="./dashboard.html"]');
+if (dashboardLink) {
+    dashboardLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateToDashboard();
+    });
+}
 
         // 表单提交
         const loginForm = document.getElementById('loginForm');
