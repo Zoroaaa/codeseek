@@ -251,6 +251,8 @@ body {
   margin-top: 1rem;
 }
 
+
+
 .checkbox-label {
   display: flex;
   align-items: center;
@@ -617,6 +619,12 @@ section {
 
 .submit-btn:hover {
   background: var(--accent-hover);
+}
+
+/* === 添加按钮禁用样式在这里 === */
+.submit-btn.submitting {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .form-links {

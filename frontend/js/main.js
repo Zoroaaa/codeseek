@@ -1082,8 +1082,12 @@ async syncSearchHistory() {
     
     if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.classList.add('submitting');
-        submitBtn.textContent = '注册中...';
+// 正确代码
+submitBtn.classList.add('submitting');
+const span = document.createElement('span');
+span.textContent = '注册中...';
+submitBtn.innerHTML = '';
+submitBtn.appendChild(span);
     }
         
         const username = document.getElementById('regUsername')?.value.trim();
