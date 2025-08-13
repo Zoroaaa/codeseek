@@ -831,6 +831,7 @@ class MagnetSearchApp {
 
         try {
             showLoading(true);
+            
             showToast('正在刷新数据...', 'info');
             
             await this.loadCloudData();
@@ -1227,14 +1228,22 @@ class MagnetSearchApp {
         }
     }
 
-    // 显示搜索建议
+    // 显示搜索建议 - 修复错误的方法
     showSearchSuggestions(query) {
+        // 安全检查：确保搜索历史中的每个项目都有有效的keyword属性
         const suggestions = this.searchHistory
-            .filter(item => item.keyword.toLowerCase().includes(query.toLowerCase()))
+            .filter(item => {
+                // 修复：添加安全检查，确保item和item.keyword存在且为字符串
+                if (!item || !item.keyword || typeof item.keyword !== 'string') {
+                    return false;
+                }
+                return item.keyword.toLowerCase().includes((query || '').toLowerCase());
+            })
             .slice(0, 5);
         
         // 这里可以实现搜索建议下拉框
         // 暂时省略UI实现，可以在后续版本中添加
+        console.log('搜索建议:', suggestions);
     }
 
     // 隐藏搜索建议
