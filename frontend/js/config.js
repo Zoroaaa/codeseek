@@ -162,6 +162,21 @@
         }
     }
     
+	// 在config.js中添加
+function handleRedirectIssues() {
+    // 检查当前页面是否有重定向问题
+    if (window.location.pathname.endsWith('/dashboard') || 
+        window.location.pathname.endsWith('/index')) {
+        // 如果URL不以.html结尾，添加.html
+        const newPath = window.location.pathname + '.html';
+        window.history.replaceState(null, '', newPath + window.location.search);
+    }
+}
+
+// 在页面加载时调用
+document.addEventListener('DOMContentLoaded', handleRedirectIssues);
+
+	
     /**
      * 显示调试信息
      */

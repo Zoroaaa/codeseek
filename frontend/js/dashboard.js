@@ -317,7 +317,7 @@ class DashboardApp {
                     <div class="history-time">${formatRelativeTime(item.timestamp)}</div>
                 </div>
                 <div class="history-actions">
-                    <button class="action-btn" onclick="window.location.href='index.html?q=${encodeURIComponent(item.keyword)}'">
+                    <button class="action-btn" onclick="window.location.href='./index.html?q=${encodeURIComponent(item.keyword)}'">
                         重新搜索
                     </button>
                 </div>

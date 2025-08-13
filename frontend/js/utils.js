@@ -138,6 +138,24 @@ function throttle(func, limit) {
     };
 }
 
+// 在utils.js中添加
+function handleNavigationError(url, retryCount = 0) {
+    if (retryCount < 3) {
+        setTimeout(() => {
+            try {
+                window.location.href = url;
+            } catch (error) {
+                console.error('导航失败:', error);
+                handleNavigationError(url, retryCount + 1);
+            }
+        }, 1000 * (retryCount + 1));
+    } else {
+        showToast('页面跳转失败，请手动刷新页面', 'error');
+    }
+}
+
+
+
 /**
  * 深拷贝对象
  */
