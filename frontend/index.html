@@ -7,16 +7,17 @@
     <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索">
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    
+    <!-- 环境配置 -->
     <script>
-        // 检查用户是否已登录的函数
-        window.onload = function() {
-            const authToken = localStorage.getItem('auth_token');
-            if (!authToken) {
-                // 用户未登录，显示登录模态框
-                document.getElementById('loginModal').style.display = 'block';
-            }
-        };
+        // 环境变量配置
+        window.CF_API_BASE_URL = typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined;
+        window.CF_APP_NAME = typeof process !== 'undefined' && process.env ? process.env.APP_NAME : undefined;
+        window.CF_APP_VERSION = typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : undefined;
+        window.CF_ENABLE_ANALYTICS = typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : undefined;
+        window.CF_ENABLE_DEBUG = typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : undefined;
     </script>
+    <script src="js/config.js"></script>
 </head>
 <body>
     <!-- 导航栏 -->
@@ -45,8 +46,8 @@
         </div>
     </nav>
 
-    <!-- 仅显示主内容区域如果用户已登录 -->
-    <main class="main-content" style="display:none;">
+    <!-- 主内容区域 -->
+    <main class="main-content">
         <!-- Hero区域 -->
         <section class="hero">
             <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
@@ -55,21 +56,24 @@
             <!-- 搜索框 -->
             <div class="search-container">
                 <div class="search-box">
-                    <input 
-                        type="text" 
-                        id="searchInput" 
-                        class="search-input" 
-                        placeholder="请输入番号或关键词" 
-                        autocomplete="off"
-                        maxlength="100"
-                    >
-                    <button id="searchBtn" class="search-btn" title="搜索">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <path d="M21 21l-4.35-4.35"></path>
-                        </svg>
-                        <span>搜索</span>
-                    </button>
+                    <form id="searchForm">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            class="search-input" 
+                            placeholder="请输入番号或关键词" 
+                            autocomplete="off"
+                            maxlength="100"
+                        >
+                        <button type="submit" id="searchBtn" class="search-btn" title="搜索">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="M21 21l-4.35-4.35"></path>
+                            </svg>
+                            <span>搜索</span>
+                        </button>
+                    </form>
+                    <div id="searchSuggestions" class="search-suggestions" style="display: none;"></div>
                 </div>
                 <div class="search-options">
                     <label class="checkbox-label">
@@ -85,7 +89,7 @@
         </section>
 
         <!-- 快速提示 -->
-        <section id="quickTips" class="quick-tips" style="display:none;">
+        <section id="quickTips" class="quick-tips">
             <div class="tips-content">
                 <h3>💡 搜索技巧</h3>
                 <ul>
@@ -97,12 +101,14 @@
         </section>
 
         <!-- 搜索历史 -->
-        <section id="historySection" class="history-section" style="display:none;">
+        <section id="historySection" class="history-section">
             <div class="section-header">
                 <h2>🕐 搜索历史</h2>
                 <button id="clearHistoryBtn" class="clear-btn">清空历史</button>
             </div>
-            <div id="historyList" class="history-list"></div>
+            <div id="searchHistory" class="history-list">
+                <p class="empty-message">暂无搜索历史</p>
+            </div>
         </section>
 
         <!-- 搜索结果 -->
@@ -115,7 +121,7 @@
                 </div>
             </div>
             <div id="searchInfo" class="search-info"></div>
-            <div id="results" class="results-grid"></div>
+            <div id="searchResults" class="results-grid"></div>
         </section>
 
         <!-- 收藏夹 -->
@@ -127,7 +133,9 @@
                     <button id="importFavoritesBtn" class="action-btn" style="display:none;">导入收藏</button>
                 </div>
             </div>
-            <div id="favorites" class="favorites-grid"></div>
+            <div id="favorites" class="favorites-grid">
+                <p class="empty-message">暂无收藏</p>
+            </div>
         </section>
 
         <!-- 站点导航 -->
@@ -213,6 +221,7 @@
                     <input 
                         type="text" 
                         id="loginUsername" 
+                        name="username"
                         placeholder="用户名或邮箱" 
                         required 
                         autocomplete="username"
@@ -223,6 +232,7 @@
                     <input 
                         type="password" 
                         id="loginPassword" 
+                        name="password"
                         placeholder="密码" 
                         required 
                         autocomplete="current-password"
@@ -247,6 +257,7 @@
                     <input 
                         type="text" 
                         id="regUsername" 
+                        name="username"
                         placeholder="用户名" 
                         required 
                         autocomplete="username"
@@ -257,6 +268,7 @@
                     <input 
                         type="email" 
                         id="regEmail" 
+                        name="email"
                         placeholder="邮箱" 
                         required 
                         autocomplete="email"
@@ -266,6 +278,7 @@
                     <input 
                         type="password" 
                         id="regPassword" 
+                        name="password"
                         placeholder="密码" 
                         required 
                         autocomplete="new-password"
@@ -276,6 +289,7 @@
                     <input 
                         type="password" 
                         id="regConfirmPassword" 
+                        name="confirmPassword"
                         placeholder="确认密码" 
                         required 
                         autocomplete="new-password"
@@ -304,6 +318,9 @@
         <span class="status-text">检查连接...</span>
     </div>
 
+    <!-- 文件导入输入框（隐藏） -->
+    <input type="file" id="importFile" accept=".json" style="display: none;">
+
     <!-- 脚本文件 -->
     <script src="js/utils.js"></script>
     <script src="js/api.js"></script>
@@ -315,11 +332,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🚀 初始化应用...');
 
-            const authToken = localStorage.getItem('auth_token');
-            if (authToken) {
-                document.querySelector('.main-content').style.display = 'block';
-            }
-
             // 修改页面标题与品牌名称
             if (window.API_CONFIG) {
                 const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
@@ -328,22 +340,88 @@
                 document.getElementById('hero-title').textContent = `${appName} - 专业版`;
             }
             
-            // 创建应用实例
-            if (typeof MagnetSearchApp !== 'undefined') {
-                window.app = new MagnetSearchApp();
+            // 检查认证状态并显示内容
+            const authToken = localStorage.getItem('auth_token');
+            if (authToken) {
+                document.querySelector('.main-content').style.display = 'block';
+                
+                // 验证token有效性
+                if (window.authManager) {
+                    window.authManager.verifyToken(authToken).catch(() => {
+                        // Token无效，显示登录框
+                        document.getElementById('loginModal').style.display = 'flex';
+                    });
+                }
+            } else {
+                // 用户未登录，显示登录模态框
+                document.getElementById('loginModal').style.display = 'flex';
+            }
+
+            // 确保所有依赖已加载后创建应用实例
+            if (typeof authManager !== 'undefined' && typeof API !== 'undefined') {
+                if (typeof MagnetSearchApp !== 'undefined') {
+                    window.app = new MagnetSearchApp();
+                } else {
+                    console.error('MagnetSearchApp 未定义');
+                }
+            } else {
+                console.error('认证管理器或API未加载');
+            }
+
+            // 设置文件导入事件
+            const importFile = document.getElementById('importFile');
+            if (importFile) {
+                importFile.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file && window.app) {
+                        window.app.importUserData(file);
+                    }
+                });
             }
         });
+
+        // 全局函数：导航到dashboard
+        function navigateToDashboard() {
+            window.location.href = 'dashboard.html';
+        }
 
         // 处理页面可见性变化
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && window.app) {
                 setTimeout(() => {
                     if (window.app.isInitialized) {
-                        window.app.checkConnectionStatus();
+                        window.app.checkConnection();
                     }
                 }, 100);
+            }
+        });
+
+        // 全局错误处理
+        window.addEventListener('error', (event) => {
+            console.error('全局错误:', event.error);
+            if (window.API_CONFIG && window.API_CONFIG.ENABLE_DEBUG) {
+                if (window.showToast) {
+                    window.showToast('发生错误: ' + event.error.message, 'error');
+                }
+            }
+        });
+
+        // 网络状态处理
+        window.addEventListener('online', () => {
+            if (window.showToast) {
+                window.showToast('网络已连接', 'success');
+            }
+            if (window.app && window.app.checkConnection) {
+                window.app.checkConnection();
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            if (window.showToast) {
+                window.showToast('网络已断开', 'warning');
             }
         });
     </script>
 </body>
 </html>
+
