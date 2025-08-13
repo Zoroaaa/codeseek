@@ -423,27 +423,22 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
             return;
         }
 
-        try {
-            showLoading(true);
-            // 这里需要实现密码修改API
-            const response = await API.request('/api/auth/change-password', {
-                method: 'POST',
-                body: JSON.stringify({
-                    currentPassword,
-                    newPassword
-                })
-            });
-            
-            if (response.success) {
-                showToast('密码修改成功', 'success');
-                this.closeModals();
-                document.getElementById('passwordForm').reset();
-            } else {
-                throw new Error(response.message || '密码修改失败');
-            }
-        } catch (error) {
-            showToast('密码修改失败: ' + error.message, 'error');
-        } finally {
+    try {
+        showLoading(true);
+        
+        // 调用正确的API方法
+        const response = await API.changePassword(currentPassword, newPassword);
+        
+        if (response.success) {
+            showToast('密码修改成功', 'success');
+            this.closeModals();
+            document.getElementById('passwordForm').reset();
+        } else {
+            throw new Error(response.message || '密码修改失败');
+        }
+    } catch (error) {
+        showToast('密码修改失败: ' + error.message, 'error');
+    } finally {
             showLoading(false);
         }
     }

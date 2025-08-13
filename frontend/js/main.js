@@ -1047,6 +1047,15 @@ async syncSearchHistory() {
                 this.updateUserUI();
                 this.closeModals();
                 showToast(`欢迎回来，${result.user.username}！`, 'success');
+				
+				// 关键修复：显示主内容区域
+        document.querySelector('.main-content').style.display = 'block';
+        
+        // 关闭模态框
+        this.closeModals();
+        
+        // 特殊修复：检查是否有搜索查询
+        this.handleURLParams();
                 
                 // 登录后同步云端数据
                 await this.loadCloudData();
@@ -1066,6 +1075,16 @@ async syncSearchHistory() {
 
     async handleRegister(event) {
         event.preventDefault();
+		
+		    // 添加防止重复提交机制
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    if (submitBtn && submitBtn.classList.contains('submitting')) return;
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('submitting');
+        submitBtn.textContent = '注册中...';
+    }
         
         const username = document.getElementById('regUsername')?.value.trim();
         const email = document.getElementById('regEmail')?.value.trim();
@@ -1121,8 +1140,13 @@ async syncSearchHistory() {
             console.error('注册失败:', error);
             showToast(`注册失败: ${error.message}`, 'error');
         } finally {
-            showLoading(false);
+        // 重置按钮状态
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('submitting');
+            submitBtn.textContent = '注册';
         }
+    }
     }
 
     // 检查认证状态
@@ -1192,19 +1216,25 @@ async syncSearchHistory() {
         }
     }
 
-    // 退出登录
-    async logout() {
-        try {
-            await API.logout();
-        } catch (error) {
-            console.error('退出登录请求失败:', error);
-        } finally {
-            this.currentUser = null;
-            localStorage.removeItem('auth_token');
-            this.updateUserUI();
-            showToast('已退出登录', 'success');
-        }
+async logout() {
+    try {
+        await API.logout();
+    } catch (error) {
+        console.error('退出登录请求失败:', error);
+    } finally {
+        this.currentUser = null;
+        localStorage.removeItem('auth_token');
+        this.updateUserUI();
+        showToast('已退出登录', 'success');
+        
+        // 关键修复：显示登录模态框
+        this.showLoginModal();
+        
+        // 重置主界面状态
+        document.querySelector('.main-content').style.display = 'none';
+        this.hideSearchSuggestions();
     }
+}
 
 // 修复加载云端数据方法中的搜索历史部分
 async loadCloudData() {

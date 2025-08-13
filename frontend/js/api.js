@@ -145,6 +145,16 @@ class APIService {
             body: JSON.stringify({ favorites })
         });
     }
+	
+	async changePassword(currentPassword, newPassword) {
+    return await this.request('/api/auth/change-password', {
+        method: 'PUT',
+        body: JSON.stringify({ 
+            currentPassword, 
+            newPassword 
+        })
+    });
+}
 
     async getFavorites() {
         const response = await this.request('/api/user/favorites');
