@@ -23,7 +23,7 @@ class APIService {
         }
         
         // 生产环境默认值（需要在页面中配置）
-        return window.API_CONFIG?.PROD_URL || 'http://codeseek.zadi.workers.dev';
+        return window.API_CONFIG?.PROD_URL || 'https://codeseek.zadi.workers.dev';
     }
 
     setToken(token) {
