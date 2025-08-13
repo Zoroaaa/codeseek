@@ -603,8 +603,8 @@ async searchKeyword(keyword) {
     }
 
 // 修复添加搜索历史方法
-// 在文档11中修改addToHistory方法
 addToHistory(keyword) {
+    // 验证关键词
     if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
         console.warn('无效的搜索关键词，跳过添加到历史');
         return;
@@ -612,26 +612,20 @@ addToHistory(keyword) {
 
     const trimmedKeyword = keyword.trim();
     
-    // 查找现有记录
-    const existingIndex = this.searchHistory.findIndex(
-        item => item.keyword === trimmedKeyword
-    );
+    // 移除重复项
+    this.searchHistory = this.searchHistory.filter(item => {
+        return item && item.keyword && item.keyword !== trimmedKeyword;
+    });
     
-    if (existingIndex >= 0) {
-        // 更新现有记录
-        this.searchHistory[existingIndex].timestamp = Date.now();
-        this.searchHistory[existingIndex].count = 
-            (this.searchHistory[existingIndex].count || 1) + 1;
-    } else {
-        // 添加新记录
-        this.searchHistory.unshift({
-            id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            keyword: trimmedKeyword,
-            timestamp: Date.now(),
-            count: 1,
-            source: 'manual'
-        });
-    }
+    // 添加到开头
+    this.searchHistory.unshift({
+        id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        keyword: trimmedKeyword,
+        query: trimmedKeyword, // 兼容性
+        timestamp: Date.now(),
+        count: 1,
+        source: 'manual'
+    });
 
     // 限制历史记录数量
     const maxHistory = this.config.maxHistoryPerUser || 1000;
@@ -641,6 +635,13 @@ addToHistory(keyword) {
 
     this.saveHistory();
     this.renderHistory();
+
+    // 如果用户已登录，保存到云端
+    if (this.currentUser) {
+        API.saveSearchHistory(trimmedKeyword, 'manual').catch(error => {
+            console.error('保存搜索历史到云端失败:', error);
+        });
+    }
 }
 
     // 渲染搜索历史
@@ -1124,32 +1125,30 @@ async syncSearchHistory() {
         }
     }
 
-// 【修改】修复认证状态检查
-async checkAuthStatus() {
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
-        console.log('未找到认证token');
-        return;
-    }
-
-    try {
-        const result = await API.verifyToken(token);
-        if (result.success && result.user) {
-            this.currentUser = result.user;
-            this.updateUserUI();
-            await this.loadCloudData();
-            console.log('✅ 用户认证成功:', this.currentUser.username);
-        } else {
-            localStorage.removeItem('auth_token');
-            API.setToken(null);
-            console.log('Token验证失败，已清除');
+    // 检查认证状态
+    async checkAuthStatus() {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            console.log('未找到认证token');
+            return;
         }
-    } catch (error) {
-        console.error('验证token失败:', error);
-        localStorage.removeItem('auth_token');
-        API.setToken(null);
+
+        try {
+            const result = await API.verifyToken(token);
+            if (result.success && result.user) {
+                this.currentUser = result.user;
+                this.updateUserUI();
+                await this.loadCloudData();
+                console.log('✅ 用户认证成功:', this.currentUser.username);
+            } else {
+                localStorage.removeItem('auth_token');
+                console.log('Token验证失败，已清除');
+            }
+        } catch (error) {
+            console.error('验证token失败:', error);
+            localStorage.removeItem('auth_token');
+        }
     }
-}
 
     checkConnectionStatus() {
         if (this.isInitialized) {

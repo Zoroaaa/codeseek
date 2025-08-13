@@ -111,6 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_actions_action ON user_actions(action);
 
 CREATE INDEX IF NOT EXISTS idx_config_public ON system_config(is_public);
 
+-- 在文档1中增加索引
 CREATE INDEX IF NOT EXISTS idx_history_user_keyword ON user_search_history(user_id, query);
 CREATE INDEX IF NOT EXISTS idx_favorites_user_url ON user_favorites(user_id, url);
 
