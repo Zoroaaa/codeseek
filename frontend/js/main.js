@@ -1125,30 +1125,32 @@ async syncSearchHistory() {
         }
     }
 
-    // 检查认证状态
-    async checkAuthStatus() {
-        const token = localStorage.getItem('auth_token');
-        if (!token) {
-            console.log('未找到认证token');
-            return;
-        }
-
-        try {
-            const result = await API.verifyToken(token);
-            if (result.success && result.user) {
-                this.currentUser = result.user;
-                this.updateUserUI();
-                await this.loadCloudData();
-                console.log('✅ 用户认证成功:', this.currentUser.username);
-            } else {
-                localStorage.removeItem('auth_token');
-                console.log('Token验证失败，已清除');
-            }
-        } catch (error) {
-            console.error('验证token失败:', error);
-            localStorage.removeItem('auth_token');
-        }
+// 【修改】修复认证状态检查
+async checkAuthStatus() {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+        console.log('未找到认证token');
+        return;
     }
+
+    try {
+        const result = await API.verifyToken(token);
+        if (result.success && result.user) {
+            this.currentUser = result.user;
+            this.updateUserUI();
+            await this.loadCloudData();
+            console.log('✅ 用户认证成功:', this.currentUser.username);
+        } else {
+            localStorage.removeItem('auth_token');
+            API.setToken(null);
+            console.log('Token验证失败，已清除');
+        }
+    } catch (error) {
+        console.error('验证token失败:', error);
+        localStorage.removeItem('auth_token');
+        API.setToken(null);
+    }
+}
 
     checkConnectionStatus() {
         if (this.isInitialized) {

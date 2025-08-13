@@ -499,6 +499,147 @@ router.post('/api/auth/logout', async (request, env) => {
     return utils.successResponse({ message: '退出成功' });
 });
 
+// 【新增】用户设置相关接口
+router.get('/api/user/settings', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const userRecord = await env.DB.prepare(`
+            SELECT settings FROM users WHERE id = ?
+        `).bind(user.id).first();
+
+        const settings = userRecord ? JSON.parse(userRecord.settings || '{}') : {};
+
+        return utils.successResponse({ 
+            settings: {
+                theme: settings.theme || 'light',
+                autoSync: settings.autoSync !== false,
+                cacheResults: settings.cacheResults !== false,
+                maxHistoryPerUser: settings.maxHistoryPerUser || 1000,
+                maxFavoritesPerUser: settings.maxFavoritesPerUser || 1000,
+                ...settings
+            }
+        });
+
+    } catch (error) {
+        console.error('获取用户设置失败:', error);
+        return utils.errorResponse('获取用户设置失败', 500);
+    }
+});
+
+router.put('/api/user/settings', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { settings } = body;
+
+        if (!settings || typeof settings !== 'object') {
+            return utils.errorResponse('设置数据格式错误');
+        }
+
+        // 验证设置字段
+        const allowedSettings = ['theme', 'autoSync', 'cacheResults', 'maxHistoryPerUser', 'maxFavoritesPerUser'];
+        const filteredSettings = {};
+        
+        Object.keys(settings).forEach(key => {
+            if (allowedSettings.includes(key)) {
+                filteredSettings[key] = settings[key];
+            }
+        });
+
+        // 获取现有设置
+        const userRecord = await env.DB.prepare(`
+            SELECT settings FROM users WHERE id = ?
+        `).bind(user.id).first();
+
+        const currentSettings = userRecord ? JSON.parse(userRecord.settings || '{}') : {};
+        const updatedSettings = { ...currentSettings, ...filteredSettings };
+
+        // 更新用户设置
+        await env.DB.prepare(`
+            UPDATE users SET settings = ?, updated_at = ? WHERE id = ?
+        `).bind(JSON.stringify(updatedSettings), Date.now(), user.id).run();
+
+        return utils.successResponse({ 
+            message: '设置更新成功',
+            settings: updatedSettings
+        });
+
+    } catch (error) {
+        console.error('更新用户设置失败:', error);
+        return utils.errorResponse('更新用户设置失败', 500);
+    }
+});
+
+// 修复用户Token验证接口（前端调用的verifyToken）
+router.post('/api/auth/verify-token', async (request, env) => {
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { token } = body;
+
+        if (!token) {
+            return utils.errorResponse('Token不能为空', 401);
+        }
+
+        const jwtSecret = env.JWT_SECRET;
+        if (!jwtSecret) {
+            return utils.errorResponse('服务器配置错误', 500);
+        }
+
+        const payload = await utils.verifyJWT(token, jwtSecret);
+        if (!payload) {
+            return utils.errorResponse('Token无效或已过期', 401);
+        }
+
+        try {
+            const tokenHash = await utils.hashPassword(token);
+            const session = await env.DB.prepare(`
+                SELECT u.* FROM users u
+                JOIN user_sessions s ON u.id = s.user_id
+                WHERE s.token_hash = ? AND s.expires_at > ?
+            `).bind(tokenHash, Date.now()).first();
+
+            if (!session) {
+                return utils.errorResponse('会话已过期', 401);
+            }
+
+            // 更新活动时间
+            await env.DB.prepare(`
+                UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
+            `).bind(Date.now(), tokenHash).run();
+
+            const user = {
+                id: session.id,
+                username: session.username,
+                email: session.email,
+                permissions: JSON.parse(session.permissions || '[]'),
+                settings: JSON.parse(session.settings || '{}')
+            };
+
+            return utils.successResponse({ 
+                user,
+                valid: true,
+                message: 'Token验证成功'
+            });
+
+        } catch (error) {
+            console.error('Token验证数据库查询失败:', error);
+            return utils.errorResponse('Token验证失败', 401);
+        }
+
+    } catch (error) {
+        console.error('Token验证失败:', error);
+        return utils.errorResponse('Token验证失败', 401);
+    }
+});
+
 
 
 // 添加同步搜索历史接口

@@ -25,6 +25,8 @@ class APIService {
         // 生产环境默认值（需要在页面中配置）
         return window.API_CONFIG?.PROD_URL || 'https://codeseek.zadi.workers.dev';
     }
+	
+
 
     setToken(token) {
         this.token = token;
@@ -123,11 +125,31 @@ class APIService {
         return response;
     }
 
-    async verifyToken(token) {
-        return await this.request('/api/auth/verify', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+// 【修改】修复 verifyToken 方法
+async verifyToken(token) {
+    return await this.request('/api/auth/verify-token', {
+        method: 'POST',
+        body: JSON.stringify({ token })
+    });
+}
+
+// 【新增】添加获取和更新用户设置的方法
+async getUserSettings() {
+    try {
+        const response = await this.request('/api/user/settings');
+        return response.settings || {};
+    } catch (error) {
+        console.error('获取用户设置失败:', error);
+        return {};
     }
+}
+
+async updateUserSettings(settings) {
+    return await this.request('/api/user/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ settings })
+    });
+}
 
     async logout() {
         try {
