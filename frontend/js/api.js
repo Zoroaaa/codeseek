@@ -151,22 +151,72 @@ class APIService {
         return response.favorites || [];
     }
 
-    async syncSearchHistory(history) {
-        return await this.request('/api/user/search-history', {
+// 修复搜索历史同步方法
+async syncSearchHistory(history) {
+    try {
+        // 确保数据格式正确
+        const validHistory = history.filter(item => {
+            return item && (item.query || item.keyword) && 
+                   typeof (item.query || item.keyword) === 'string' && 
+                   (item.query || item.keyword).trim().length > 0;
+        }).map(item => ({
+            id: item.id || utils.generateId(),
+            query: item.query || item.keyword,
+            keyword: item.query || item.keyword, // 兼容性
+            source: item.source || 'unknown',
+            timestamp: item.timestamp || Date.now()
+        }));
+
+        return await this.request('/api/user/sync/search-history', {
             method: 'POST',
-            body: JSON.stringify({ history })
+            body: JSON.stringify({ 
+                searchHistory: validHistory,
+                history: validHistory // 兼容性
+            })
         });
+    } catch (error) {
+        console.error('同步搜索历史失败:', error);
+        throw error;
+    }
+}
+
+// 修复保存单条搜索历史
+async saveSearchHistory(query, source = 'unknown') {
+    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        throw new Error('搜索关键词不能为空');
     }
 
-    async getSearchHistory() {
-        try {
-            const response = await this.request('/api/user/search-history');
-            return response.history || [];
-        } catch (error) {
-            console.error('获取搜索历史失败:', error);
-            return [];
-        }
+    return await this.request('/api/user/search-history', {
+        method: 'POST',
+        body: JSON.stringify({ 
+            query: query.trim(), 
+            source: source,
+            timestamp: Date.now() 
+        })
+    });
+}
+
+
+// 修复获取搜索历史方法
+async getSearchHistory() {
+    try {
+        const response = await this.request('/api/user/search-history');
+        const history = response.history || response.searchHistory || [];
+        
+        // 确保返回的数据格式正确
+        return history.filter(item => {
+            return item && (item.query || item.keyword) && 
+                   typeof (item.query || item.keyword) === 'string';
+        }).map(item => ({
+            ...item,
+            keyword: item.keyword || item.query,
+            query: item.query || item.keyword
+        }));
+    } catch (error) {
+        console.error('获取搜索历史失败:', error);
+        return [];
     }
+}
 
     async getUserSettings() {
         try {

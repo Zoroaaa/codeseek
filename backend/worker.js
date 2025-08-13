@@ -646,7 +646,7 @@ router.get('/api/user/favorites', async (request, env) => {
     }
 });
 
-// 保存搜索历史
+// 保存搜索历史 - 修复版本
 router.post('/api/user/search-history', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) {
@@ -657,17 +657,16 @@ router.post('/api/user/search-history', async (request, env) => {
         const body = await request.json().catch(() => ({}));
         const { query, timestamp, source } = body;
 
-        // 输入验证
-        const errors = utils.validateInput({ query }, {
-            query: { 
-                required: true, 
-                minLength: 1, 
-                maxLength: 200 
-            }
-        });
+        // 修复：确保query字段存在且有效
+        if (!query || typeof query !== 'string' || query.trim().length === 0) {
+            return utils.errorResponse('搜索关键词不能为空');
+        }
 
-        if (errors.length > 0) {
-            return utils.errorResponse(errors[0]);
+        const trimmedQuery = query.trim();
+        
+        // 输入验证
+        if (trimmedQuery.length > 200) {
+            return utils.errorResponse('搜索关键词过长');
         }
 
         const maxHistory = parseInt(env.MAX_HISTORY_PER_USER || '1000');
@@ -682,10 +681,13 @@ router.post('/api/user/search-history', async (request, env) => {
             const deleteCount = countResult.count - maxHistory + 1;
             await env.DB.prepare(`
                 DELETE FROM user_search_history 
-                WHERE user_id = ? 
-                ORDER BY created_at ASC 
-                LIMIT ?
-            `).bind(user.id, deleteCount).run();
+                WHERE user_id = ? AND id IN (
+                    SELECT id FROM user_search_history 
+                    WHERE user_id = ? 
+                    ORDER BY created_at ASC 
+                    LIMIT ?
+                )
+            `).bind(user.id, user.id, deleteCount).run();
         }
 
         // 添加新的搜索历史
@@ -695,10 +697,10 @@ router.post('/api/user/search-history', async (request, env) => {
         await env.DB.prepare(`
             INSERT INTO user_search_history (id, user_id, query, source, created_at)
             VALUES (?, ?, ?, ?, ?)
-        `).bind(historyId, user.id, query, source || 'unknown', now).run();
+        `).bind(historyId, user.id, trimmedQuery, source || 'unknown', now).run();
 
         // 记录用户行为
-        await utils.logUserAction(env, user.id, 'search', { query, source }, request);
+        await utils.logUserAction(env, user.id, 'search', { query: trimmedQuery, source }, request);
 
         return utils.successResponse({ 
             message: '搜索历史保存成功',
@@ -707,9 +709,65 @@ router.post('/api/user/search-history', async (request, env) => {
 
     } catch (error) {
         console.error('保存搜索历史失败:', error);
-        return utils.errorResponse('保存搜索历史失败', 500);
+        return utils.errorResponse('保存搜索历史失败: ' + error.message, 500);
     }
 });
+
+// 修复同步搜索历史接口
+router.post('/api/user/sync/search-history', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { searchHistory, history } = body;
+        
+        // 兼容两种格式
+        const historyData = searchHistory || history || [];
+
+        if (!Array.isArray(historyData)) {
+            return utils.errorResponse('搜索历史数据格式错误');
+        }
+
+        const maxHistory = parseInt(env.MAX_HISTORY_PER_USER || '1000');
+        if (historyData.length > maxHistory) {
+            return utils.errorResponse(`搜索历史数量不能超过 ${maxHistory} 条`);
+        }
+
+        // 清除现有搜索历史
+        await env.DB.prepare(`DELETE FROM user_search_history WHERE user_id = ?`).bind(user.id).run();
+
+        // 批量插入新的搜索历史
+        for (const item of historyData) {
+            // 修复：确保每个item都有有效的查询字段
+            const query = item.query || item.keyword;
+            if (!query || typeof query !== 'string' || query.trim().length === 0) {
+                continue; // 跳过无效记录
+            }
+            
+            const historyId = item.id || utils.generateId();
+            await env.DB.prepare(`
+                INSERT INTO user_search_history (id, user_id, query, source, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            `).bind(
+                historyId,
+                user.id,
+                query.trim(),
+                item.source || 'unknown',
+                item.timestamp || Date.now()
+            ).run();
+        }
+
+        return utils.successResponse({ message: '搜索历史同步成功' });
+
+    } catch (error) {
+        console.error('同步搜索历史失败:', error);
+        return utils.errorResponse('同步搜索历史失败: ' + error.message, 500);
+    }
+});
+
 
 // 获取搜索历史
 router.get('/api/user/search-history', async (request, env) => {
