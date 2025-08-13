@@ -641,7 +641,6 @@ router.post('/api/auth/verify-token', async (request, env) => {
 });
 
 
-
 // 添加同步搜索历史接口
 router.post('/api/user/sync/search-history', async (request, env) => {
     const user = await authenticate(request, env);
@@ -1269,67 +1268,7 @@ router.get('/api/system/status', async (request, env) => {
     }
 });
 
-// 修复用户Token验证接口（前端调用的verifyToken）
-router.post('/api/auth/verify-token', async (request, env) => {
-    try {
-        const body = await request.json().catch(() => ({}));
-        const { token } = body;
 
-        if (!token) {
-            return utils.errorResponse('Token不能为空', 401);
-        }
-
-        const jwtSecret = env.JWT_SECRET;
-        if (!jwtSecret) {
-            return utils.errorResponse('服务器配置错误', 500);
-        }
-
-        const payload = await utils.verifyJWT(token, jwtSecret);
-        if (!payload) {
-            return utils.errorResponse('Token无效或已过期', 401);
-        }
-
-        try {
-            const tokenHash = await utils.hashPassword(token);
-            const session = await env.DB.prepare(`
-                SELECT u.* FROM users u
-                JOIN user_sessions s ON u.id = s.user_id
-                WHERE s.token_hash = ? AND s.expires_at > ?
-            `).bind(tokenHash, Date.now()).first();
-
-            if (!session) {
-                return utils.errorResponse('会话已过期', 401);
-            }
-
-            // 更新活动时间
-            await env.DB.prepare(`
-                UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
-            `).bind(Date.now(), tokenHash).run();
-
-            const user = {
-                id: session.id,
-                username: session.username,
-                email: session.email,
-                permissions: JSON.parse(session.permissions || '[]'),
-                settings: JSON.parse(session.settings || '{}')
-            };
-
-            return utils.successResponse({ 
-                user,
-                valid: true,
-                message: 'Token验证成功'
-            });
-
-        } catch (error) {
-            console.error('Token验证数据库查询失败:', error);
-            return utils.errorResponse('Token验证失败', 401);
-        }
-
-    } catch (error) {
-        console.error('Token验证失败:', error);
-        return utils.errorResponse('Token验证失败', 401);
-    }
-});
 
 // 添加健康检查的别名接口
 router.get('/api/health-check', async (request, env) => {
