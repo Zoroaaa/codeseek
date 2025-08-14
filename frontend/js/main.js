@@ -1068,16 +1068,16 @@ renderHistory() {
 // 导出结果
 async exportResults() {
     try {
-        if (!this.searchResults || this.searchResults.length === 0) {
+        if (!this.currentSearchResults || this.currentSearchResults.length === 0) {
             showToast('没有搜索结果可以导出', 'warning');
             return;
         }
 
         const exportData = {
             query: this.lastSearchQuery || '',
-            results: this.searchResults,
+            results: this.currentSearchResults,
             exportTime: new Date().toISOString(),
-            totalResults: this.searchResults.length,
+            totalResults: this.currentSearchResults.length,
             version: window.API_CONFIG?.APP_VERSION || '1.0.0'
         };
 
@@ -1230,25 +1230,21 @@ updateFunctionButtons() {
         StorageManager.setItem(cacheKey, data);
     }
 
-// 在数据加载后调用
 async loadLocalData() {
-        // 本地数据管理
-    loadLocalData() {
-        try {
-            // 加载搜索历史
-            this.searchHistory = StorageManager.getItem('search_history', []);
-            this.renderHistory();
+    try {
+        // 加载搜索历史
+        this.searchHistory = StorageManager.getItem('search_history', []);
+        this.renderHistory();
 
-            // 加载收藏夹
-            this.favorites = StorageManager.getItem('favorites', []);
-            this.renderFavorites();
-            
-            console.log(`📚 本地数据已加载: ${this.searchHistory.length}条历史, ${this.favorites.length}个收藏`);
-        } catch (error) {
-            console.error('加载本地数据失败:', error);
-            this.searchHistory = [];
-            this.favorites = [];
-        }
+        // 加载收藏夹
+        this.favorites = StorageManager.getItem('favorites', []);
+        this.renderFavorites();
+        
+        console.log(`📚 本地数据已加载: ${this.searchHistory.length}条历史, ${this.favorites.length}个收藏`);
+    } catch (error) {
+        console.error('加载本地数据失败:', error);
+        this.searchHistory = [];
+        this.favorites = [];
     }
     
     // 初始化搜索引擎
@@ -1752,9 +1748,12 @@ getSuggestionTypeText(type) {
 
 
     // 隐藏搜索建议
-    hideSearchSuggestions() {
-        // 隐藏搜索建议下拉框
+	hideSearchSuggestions() {
+    const suggestionsContainer = document.getElementById('searchSuggestions');
+    if (suggestionsContainer) {
+        suggestionsContainer.style.display = 'none';
     }
+}
 
     // 工具方法
     escapeHtml(text) {
