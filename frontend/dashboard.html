@@ -205,21 +205,38 @@
 </div>
                 </div>
 
-                <!-- 历史搜索和统计 -->
-                <div class="history-stats">
-                    <div class="stat-item">
-                        <span class="stat-value" id="historyCount">0</span>
-                        <span class="stat-desc">搜索记录</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="uniqueKeywords">0</span>
-                        <span class="stat-desc">不同关键词</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="avgPerDay">0</span>
-                        <span class="stat-desc">日均搜索</span>
-                    </div>
-                </div>
+
+<!-- 历史记录统计 -->
+<div class="history-stats">
+    <div class="stat-item">
+        <span class="stat-value" id="historyCount">0</span>
+        <span class="stat-desc">搜索记录</span>
+    </div>
+    <div class="stat-item">
+        <span class="stat-value" id="uniqueKeywords">0</span>
+        <span class="stat-desc">不同关键词</span>
+    </div>
+    <div class="stat-item">
+        <span class="stat-value" id="avgPerDay">0</span>
+        <span class="stat-desc">日均搜索</span>
+    </div>
+</div>
+
+<!-- 历史记录时间过滤按钮 -->
+<div class="history-time-filter">
+    <button class="time-filter-btn active" data-filter="all" onclick="app.filterHistory('all')">
+        <span>📅</span> 全部
+    </button>
+    <button class="time-filter-btn" data-filter="today" onclick="app.filterHistory('today')">
+        <span>📅</span> 今天
+    </button>
+    <button class="time-filter-btn" data-filter="week" onclick="app.filterHistory('week')">
+        <span>📅</span> 本周
+    </button>
+    <button class="time-filter-btn" data-filter="month" onclick="app.filterHistory('month')">
+        <span>📅</span> 本月
+    </button>
+</div>
 
 <!-- 热门关键词云 -->
 <div class="popular-keywords">
@@ -229,24 +246,31 @@
     </div>
 </div>
 
-                <!-- 热门关键词 -->
-                <div class="popular-keywords">
-                    <h3>热门搜索</h3>
-                    <div id="keywordCloud" class="keyword-cloud">
-                        <!-- 关键词云将通过JavaScript生成 -->
-                    </div>
-                </div>
+<!-- 历史记录搜索和排序控件 -->
+<div class="history-controls">
+    <div class="search-box">
+        <input type="text" id="historySearch" placeholder="搜索历史记录..." autocomplete="off">
+        <button onclick="app.searchHistory()" title="搜索历史" class="search-btn">
+            <span>🔍</span>
+        </button>
+        <button onclick="app.clearHistorySearch()" title="清除搜索" class="clear-search-btn">
+            <span>✕</span>
+        </button>
+    </div>
+    <div class="filter-options">
+        <select id="historySort" onchange="app.sortHistory(this.value)">
+            <option value="time-desc">按时间排序（新→旧）</option>
+            <option value="time-asc">按时间排序（旧→新）</option>
+            <option value="name-asc">按名称排序（A→Z）</option>
+            <option value="name-desc">按名称排序（Z→A）</option>
+            <option value="frequency-desc">按频率排序（高→低）</option>
+        </select>
+    </div>
+</div>
 
-                <!-- 历史记录列表 -->
-                <div class="history-controls">
-                    <input type="text" id="historySearch" placeholder="搜索历史记录..." autocomplete="off">
-                    <select id="historyTimeFilter">
-                        <option value="all">全部时间</option>
-                        <option value="today">今天</option>
-                        <option value="week">本周</option>
-                        <option value="month">本月</option>
-                    </select>
-                </div>
+
+
+
 
                 <div id="historyList" class="history-list">
                     <!-- 历史记录将通过JavaScript动态加载 -->

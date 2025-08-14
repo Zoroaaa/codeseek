@@ -1178,6 +1178,197 @@ if (!document.getElementById('toast-styles')) {
     document.head.appendChild(styleSheet);
 }
 
+// 性能监控类
+class PerformanceMonitor {
+    constructor() {
+        this.metrics = {};
+        this.startTimes = {};
+    }
+
+    start(name) {
+        this.startTimes[name] = performance.now();
+    }
+
+    end(name) {
+        if (this.startTimes[name]) {
+            const duration = performance.now() - this.startTimes[name];
+            this.metrics[name] = this.metrics[name] || [];
+            this.metrics[name].push(duration);
+            
+            // 保持最近50次记录
+            if (this.metrics[name].length > 50) {
+                this.metrics[name] = this.metrics[name].slice(-50);
+            }
+            
+            delete this.startTimes[name];
+            return duration;
+        }
+        return 0;
+    }
+
+    getMetrics(name) {
+        if (!this.metrics[name]) return null;
+        
+        const times = this.metrics[name];
+        const avg = times.reduce((a, b) => a + b, 0) / times.length;
+        const min = Math.min(...times);
+        const max = Math.max(...times);
+        
+        return { avg, min, max, count: times.length };
+    }
+
+    getAllMetrics() {
+        const result = {};
+        Object.keys(this.metrics).forEach(name => {
+            result[name] = this.getMetrics(name);
+        });
+        return result;
+    }
+
+    logMetrics() {
+        console.table(this.getAllMetrics());
+    }
+}
+
+// 错误边界处理
+class ErrorBoundary {
+    constructor() {
+        this.errorCount = 0;
+        this.lastError = null;
+        this.setupGlobalErrorHandler();
+    }
+
+    setupGlobalErrorHandler() {
+        window.addEventListener('error', (event) => {
+            this.handleError(event.error, 'Global Error', {
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno
+            });
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            this.handleError(event.reason, 'Unhandled Promise Rejection');
+        });
+    }
+
+    handleError(error, context = 'Unknown', metadata = {}) {
+        this.errorCount++;
+        this.lastError = {
+            error,
+            context,
+            metadata,
+            timestamp: Date.now(),
+            userAgent: navigator.userAgent,
+            url: window.location.href
+        };
+
+        console.error('Error captured by ErrorBoundary:', {
+            message: error?.message || error,
+            stack: error?.stack,
+            context,
+            metadata
+        });
+
+        // 发送错误报告（如果启用）
+        this.reportError();
+
+        // 显示用户友好的错误消息
+        this.showUserError(error, context);
+    }
+
+    async reportError() {
+        if (window.API_CONFIG?.ENABLE_ERROR_REPORTING && this.lastError) {
+            try {
+                // 可以发送到分析服务
+                const errorData = {
+                    message: this.lastError.error?.message || String(this.lastError.error),
+                    context: this.lastError.context,
+                    timestamp: this.lastError.timestamp,
+                    userAgent: this.lastError.userAgent,
+                    url: this.lastError.url,
+                    errorCount: this.errorCount
+                };
+
+                // 这里可以调用API发送错误报告
+                console.log('Error report:', errorData);
+            } catch (reportError) {
+                console.warn('Failed to report error:', reportError);
+            }
+        }
+    }
+
+    showUserError(error, context) {
+        const message = this.getUserFriendlyMessage(error, context);
+        showToast(message, 'error', 5000);
+    }
+
+    getUserFriendlyMessage(error, context) {
+        const errorMessage = error?.message || String(error);
+
+        // 网络错误
+        if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+            return '网络连接出现问题，请检查您的网络连接';
+        }
+
+        // API错误
+        if (context.includes('API') || errorMessage.includes('401')) {
+            return '服务连接失败，请稍后重试';
+        }
+
+        // 存储错误
+        if (errorMessage.includes('localStorage') || errorMessage.includes('storage')) {
+            return '本地存储出现问题，请清理浏览器缓存';
+        }
+
+        // 解析错误
+        if (errorMessage.includes('JSON') || errorMessage.includes('parse')) {
+            return '数据解析失败，请刷新页面重试';
+        }
+
+        // 权限错误
+        if (errorMessage.includes('permission') || errorMessage.includes('denied')) {
+            return '权限不足，请重新登录';
+        }
+
+        // 通用错误消息
+        return '出现了一些问题，我们正在努力解决';
+    }
+
+    getErrorStats() {
+        return {
+            errorCount: this.errorCount,
+            lastError: this.lastError,
+            isHealthy: this.errorCount < 5
+        };
+    }
+
+    reset() {
+        this.errorCount = 0;
+        this.lastError = null;
+    }
+}
+
+// 创建全局实例
+window.performanceMonitor = new PerformanceMonitor();
+window.errorBoundary = new ErrorBoundary();
+
+// 导出增强的工具函数
+window.measurePerformance = (name, fn) => {
+    return async (...args) => {
+        window.performanceMonitor.start(name);
+        try {
+            const result = await fn(...args);
+            const duration = window.performanceMonitor.end(name);
+            console.log(`${name} completed in ${duration.toFixed(2)}ms`);
+            return result;
+        } catch (error) {
+            window.performanceMonitor.end(name);
+            window.errorBoundary.handleError(error, name);
+            throw error;
+        }
+    };
+};
 
 
 // 初始化错误处理
