@@ -7,7 +7,13 @@ class MagnetSearchApp {
         this.currentSearchResults = [];
         this.isInitialized = false;
         this.config = {};
-        this.connectionStatus = 'checking';
+        this.connectionStatus = 'checking';	
+		 // 添加防重复调用标记
+        this.isLoggingIn = false;
+        this.isLoggingOut = false;
+        this.isSearching = false;
+        this.pendingOperations = new Set();
+		
         this.init();
 		this.searchEngine = new SearchSuggestionEngine(this);
     }
@@ -405,7 +411,7 @@ bindUserMenuEvents() {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            this.handleLogout();
+            this.logout(); // ✅ 修复：使用正确的方法名
         });
     }
 }
@@ -549,60 +555,97 @@ initializeSearchEngine() {
 }
 
 
+// 修复3：通用的防重复提交装饰器
+function preventDuplicateCall(target, propertyName, descriptor) {
+    const originalMethod = descriptor.value;
+    const pendingCallsMap = new Map();
 
-
-
-    async performSearch() {
-        const searchInput = document.getElementById('searchInput');
-        const keyword = searchInput?.value.trim();
+    descriptor.value = async function(...args) {
+        const key = `${propertyName}_${JSON.stringify(args)}`;
         
-        if (!keyword) {
-            showToast('请输入搜索关键词', 'error');
-            searchInput?.focus();
-            return;
+        if (pendingCallsMap.has(key)) {
+            console.log(`防止重复调用: ${propertyName}`);
+            return pendingCallsMap.get(key);
         }
 
-        // 验证关键词
-        if (keyword.length > 100) {
-            showToast('搜索关键词过长', 'error');
-            return;
-        }
-
-        if (keyword.length < 2) {
-            showToast('搜索关键词至少2个字符', 'error');
-            return;
-        }
+        const promise = originalMethod.apply(this, args);
+        pendingCallsMap.set(key, promise);
 
         try {
-            showLoading(true);
-            
-            // 隐藏提示区域
-            this.hideQuickTips();
-
-            // 添加到搜索历史
-            this.addToHistory(keyword);
-
-            // 执行搜索
-            const results = await this.searchKeyword(keyword);
-            
-            // 显示搜索结果
-            this.displaySearchResults(keyword, results);
-
-            // 记录搜索行为
-            this.recordSearchAction(keyword, results);
-
-            // 自动同步（如果用户已登录且开启）
-            if (this.currentUser && document.getElementById('autoSync')?.checked) {
-                this.syncSearchHistory().catch(console.error);
-            }
-
-        } catch (error) {
-            console.error('搜索失败:', error);
-            showToast(`搜索失败: ${error.message}`, 'error');
+            return await promise;
         } finally {
-            showLoading(false);
+            pendingCallsMap.delete(key);
         }
+    };
+
+    return descriptor;
+}
+
+
+async performSearch() {
+    // 防止搜索重复调用
+    if (this.isSearching) {
+        console.log('搜索正在进行中，跳过重复请求');
+        return;
     }
+    
+    this.isSearching = true;
+    
+    const searchInput = document.getElementById('searchInput');
+    const keyword = searchInput?.value.trim();
+    
+    if (!keyword) {
+        showToast('请输入搜索关键词', 'error');
+        searchInput?.focus();
+        this.isSearching = false;
+        return;
+    }
+
+    // 验证关键词
+    if (keyword.length > 100) {
+        showToast('搜索关键词过长', 'error');
+        this.isSearching = false;
+        return;
+    }
+
+    if (keyword.length < 2) {
+        showToast('搜索关键词至少2个字符', 'error');
+        this.isSearching = false;
+        return;
+    }
+
+    try {
+        showLoading(true);
+        
+        // 隐藏提示区域
+        this.hideQuickTips();
+
+        // 添加到搜索历史
+        this.addToHistory(keyword);
+
+        // 执行搜索
+        const results = await this.searchKeyword(keyword);
+        
+        // 显示搜索结果
+        this.displaySearchResults(keyword, results);
+
+        // 记录搜索行为
+        this.recordSearchAction(keyword, results);
+
+        // 自动同步（如果用户已登录且开启）
+        if (this.currentUser && document.getElementById('autoSync')?.checked) {
+            this.syncSearchHistory().catch(console.error);
+        }
+
+    } catch (error) {
+        console.error('搜索失败:', error);
+        showToast(`搜索失败: ${error.message}`, 'error');
+    } finally {
+        showLoading(false);
+        this.isSearching = false;
+    }
+}
+
 
     hideQuickTips() {
         const quickTips = document.getElementById('quickTips');
@@ -819,52 +862,67 @@ async searchKeyword(keyword) {
     }
 
     // 切换收藏状态
-    async toggleFavorite(resultId) {
+async toggleFavorite(resultId) {
+    // 防止重复调用
+    const key = `favorite_${resultId}`;
+    if (this.pendingOperations?.has(key)) {
+        console.log('收藏操作正在进行中，跳过重复请求');
+        return;
+    }
+    
+    if (!this.pendingOperations) {
+        this.pendingOperations = new Set();
+    }
+    
+    this.pendingOperations.add(key);
+
+    try {
         const result = this.currentSearchResults.find(r => r.id === resultId);
         if (!result) return;
 
         const existingIndex = this.favorites.findIndex(fav => fav.url === result.url);
         
-        try {
-            if (existingIndex >= 0) {
-                // 移除收藏
-                this.favorites.splice(existingIndex, 1);
-                showToast('已移除收藏', 'success');
-            } else {
-                // 检查收藏数量限制
-                const maxFavorites = this.config.maxFavoritesPerUser || 1000;
-                if (this.favorites.length >= maxFavorites) {
-                    showToast(`收藏数量已达上限 (${maxFavorites})`, 'error');
-                    return;
-                }
-                
-                // 添加收藏
-                const favorite = {
-                    id: `fav_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    title: result.title,
-                    subtitle: result.subtitle,
-                    url: result.url,
-                    icon: result.icon,
-                    keyword: result.keyword,
-                    addedAt: new Date().toISOString()
-                };
-                this.favorites.unshift(favorite);
-                showToast('已添加收藏', 'success');
+        if (existingIndex >= 0) {
+            // 移除收藏
+            this.favorites.splice(existingIndex, 1);
+            showToast('已移除收藏', 'success');
+        } else {
+            // 检查收藏数量限制
+            const maxFavorites = this.config.maxFavoritesPerUser || 1000;
+            if (this.favorites.length >= maxFavorites) {
+                showToast(`收藏数量已达上限 (${maxFavorites})`, 'error');
+                return;
             }
-
-            this.saveFavorites();
-            this.renderFavorites();
-            this.updateFavoriteButtons();
-
-            // 如果用户已登录，同步到云端
-            if (this.currentUser) {
-                await this.syncFavorites();
-            }
-        } catch (error) {
-            console.error('收藏操作失败:', error);
-            showToast('收藏操作失败', 'error');
+            
+            // 添加收藏
+            const favorite = {
+                id: `fav_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                title: result.title,
+                subtitle: result.subtitle,
+                url: result.url,
+                icon: result.icon,
+                keyword: result.keyword,
+                addedAt: new Date().toISOString()
+            };
+            this.favorites.unshift(favorite);
+            showToast('已添加收藏', 'success');
         }
+
+        this.saveFavorites();
+        this.renderFavorites();
+        this.updateFavoriteButtons();
+
+        // 如果用户已登录，同步到云端
+        if (this.currentUser) {
+            await this.syncFavorites();
+        }
+    } catch (error) {
+        console.error('收藏操作失败:', error);
+        showToast('收藏操作失败', 'error');
+    } finally {
+        this.pendingOperations.delete(key);
     }
+}
 
     // 更新收藏按钮状态
     updateFavoriteButtons() {
@@ -1403,15 +1461,18 @@ showRegisterModal() {
 
     // 认证处理
 async handleLogin(event) {
-    // 关键修复：添加事件参数检查
     if (event) {
         event.preventDefault();
     }
     
     // 防止重复提交
+    if (this.isLoggingIn) {
+        console.log('登录正在进行中，跳过重复请求');
+        return;
+    }
+    
     const submitBtn = event?.target?.querySelector('button[type="submit"]') || 
                      document.querySelector('#loginForm button[type="submit"]');
-    if (submitBtn && submitBtn.disabled) return;
     
     const username = document.getElementById('loginUsername')?.value.trim();
     const password = document.getElementById('loginPassword')?.value;
@@ -1420,6 +1481,8 @@ async handleLogin(event) {
         showToast('请填写用户名和密码', 'error');
         return;
     }
+
+    this.isLoggingIn = true;
 
     try {
         // 禁用提交按钮
@@ -1470,6 +1533,7 @@ async handleLogin(event) {
         showToast(`登录失败: ${error.message}`, 'error');
     } finally {
         showLoading(false);
+        this.isLoggingIn = false;
         
         // 恢复提交按钮状态
         if (submitBtn) {
@@ -1478,6 +1542,7 @@ async handleLogin(event) {
         }
     }
 }
+
 
 async handleRegister(event) {
     // 关键修复：添加事件参数检查
@@ -1638,6 +1703,14 @@ resetRegisterButton(submitBtn) {
     }
 
 async logout() {
+    // 防止重复调用
+    if (this.isLoggingOut) {
+        console.log('正在登出中，跳过重复请求');
+        return;
+    }
+    
+    this.isLoggingOut = true;
+    
     try {
         await API.logout();
     } catch (error) {
@@ -1654,6 +1727,9 @@ async logout() {
         // 重置主界面状态
         document.querySelector('.main-content').style.display = 'none';
         this.hideSearchSuggestions();
+        
+        // 重置标记
+        this.isLoggingOut = false;
     }
 }
 
@@ -2009,3 +2085,4 @@ window.addEventListener('unhandledrejection', (event) => {
 
 // 导出到全局作用域
 window.MagnetSearchApp = MagnetSearchApp;
+
