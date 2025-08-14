@@ -1348,11 +1348,35 @@ class ErrorBoundary {
 // 防止重复调用的装饰器函数
 function preventDuplicateCall(func, delay = 1000) {
     let lastCallTime = 0;
+    let isExecuting = false;
+    
     return function(...args) {
         const now = Date.now();
-        if (now - lastCallTime > delay) {
-            lastCallTime = now;
-            return func.apply(this, args);
+        
+        // 防止重复调用
+        if (isExecuting || (now - lastCallTime < delay)) {
+            console.log('防止重复调用');
+            return Promise.resolve();
+        }
+        
+        lastCallTime = now;
+        isExecuting = true;
+        
+        try {
+            const result = func.apply(this, args);
+            
+            // 如果是Promise，等待完成
+            if (result && typeof result.then === 'function') {
+                return result.finally(() => {
+                    isExecuting = false;
+                });
+            } else {
+                isExecuting = false;
+                return result;
+            }
+        } catch (error) {
+            isExecuting = false;
+            throw error;
         }
     };
 }
