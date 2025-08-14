@@ -35,72 +35,123 @@ class APIService {
         }
     }
 
-    async request(endpoint, options = {}) {
-        const url = `${this.baseURL}${endpoint}`;
-        const headers = {
-            'Content-Type': 'application/json',
-            ...options.headers
-        };
+// 修改request方法添加重试逻辑
+async request(url, options = {}) {
+    const maxRetries = options.maxRetries || 3;
+    const retryDelay = options.retryDelay || 1000;
+    let lastError;
 
-        if (this.token) {
-            headers['Authorization'] = `Bearer ${this.token}`;
-        }
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            window.performanceMonitor.start(`api-${url}`);
+            
+            const response = await fetch(this.getFullUrl(url), {
+                headers: this.getHeaders(),
+                ...options
+            });
 
-        const config = {
-            method: 'GET',
-            credentials: 'omit', // 不发送cookies，避免CORS问题
-            ...options,
-            headers
-        };
+            window.performanceMonitor.end(`api-${url}`);
 
-        let lastError;
-        for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-            try {
-                const response = await fetch(url, config);
-                
-                if (response.ok) {
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        return await response.json();
-                    }
-                    return await response.text();
-                }
-                
-                if (response.status === 401) {
-                    this.setToken(null);
-                    throw new Error('认证失败，请重新登录');
-                }
-                
-                const errorText = await response.text().catch(() => '');
-                let errorMessage = `HTTP ${response.status}`;
+            // 检查响应状态
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => 'Unknown error');
+                let errorMessage;
                 
                 try {
                     const errorData = JSON.parse(errorText);
-                    errorMessage = errorData.message || errorMessage;
-                } catch (e) {
-                    if (errorText) errorMessage += `: ${errorText}`;
+                    errorMessage = errorData.error || errorData.message || 'Request failed';
+                } catch {
+                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
                 }
-                
-                throw new Error(errorMessage);
-                
-            } catch (error) {
-                lastError = error;
-                
-                if (error.name === 'TypeError' && attempt < this.maxRetries - 1) {
-                    await this.delay(this.retryDelay * (attempt + 1));
+
+                // 某些错误不应该重试
+                if (response.status === 401 || response.status === 403 || response.status === 404) {
+                    throw new Error(errorMessage);
+                }
+
+                // 服务器错误可以重试
+                if (response.status >= 500 && attempt < maxRetries) {
+                    console.warn(`API请求失败 (尝试 ${attempt}/${maxRetries}):`, errorMessage);
+                    await this.delay(retryDelay * attempt);
                     continue;
                 }
-                break;
+
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            
+            // 重置连接状态
+            this.consecutiveFailures = 0;
+            
+            return data;
+
+        } catch (error) {
+            lastError = error;
+            window.performanceMonitor.end(`api-${url}`);
+            
+            this.consecutiveFailures = (this.consecutiveFailures || 0) + 1;
+
+            if (attempt < maxRetries) {
+                console.warn(`API请求失败 (尝试 ${attempt}/${maxRetries}):`, error.message);
+                await this.delay(retryDelay * attempt);
+            } else {
+                // 更新连接状态
+                this.updateConnectionStatus('error');
+                window.errorBoundary.handleError(error, `API Request: ${url}`);
+                throw error;
             }
         }
-        
-        console.error(`API请求失败 (${endpoint}):`, lastError);
-        throw lastError;
     }
 
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
+    throw lastError;
+}
+
+// 延迟函数
+delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 连接状态管理
+updateConnectionStatus(status) {
+    this.connectionStatus = status;
+    
+    // 触发状态更新事件
+    window.dispatchEvent(new CustomEvent('connectionStatusChanged', {
+        detail: { status, failures: this.consecutiveFailures }
+    }));
+}
+
+// 智能重试配置
+getRetryConfig(operation) {
+    const configs = {
+        search: { maxRetries: 2, retryDelay: 500 },
+        sync: { maxRetries: 3, retryDelay: 1000 },
+        auth: { maxRetries: 1, retryDelay: 0 },
+        upload: { maxRetries: 2, retryDelay: 2000 }
+    };
+    
+    return configs[operation] || { maxRetries: 3, retryDelay: 1000 };
+}
+
+// 使用智能重试的包装方法
+async searchWithRetry(query, options = {}) {
+    const retryConfig = this.getRetryConfig('search');
+    return await this.request('/api/search', {
+        method: 'POST',
+        body: JSON.stringify({ query, ...options }),
+        ...retryConfig
+    });
+}
+
+async syncWithRetry(data) {
+    const retryConfig = this.getRetryConfig('sync');
+    return await this.request('/api/user/sync', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        ...retryConfig
+    });
+}
 
     // API方法
     async register(username, email, password) {
@@ -123,11 +174,31 @@ class APIService {
         return response;
     }
 
-    async verifyToken(token) {
+// 统一的token验证方法
+async verifyToken(token) {
+    if (!token) {
+        // 如果没有传入token，使用当前实例的token
+        token = this.token;
+    }
+    
+    if (!token) {
+        throw new Error('Token不能为空');
+    }
+
+    // 优先使用POST方式验证（支持body传token）
+    try {
+        return await this.request('/api/auth/verify', {
+            method: 'POST',
+            body: JSON.stringify({ token })
+        });
+    } catch (error) {
+        // 如果POST失败，尝试GET方式（使用Authorization头）
         return await this.request('/api/auth/verify', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
     }
+}
+
 
     async logout() {
         try {
@@ -164,24 +235,26 @@ class APIService {
 // 修复搜索历史同步方法
 async syncSearchHistory(history) {
     try {
-        // 确保数据格式正确
+        // 统一数据格式，只使用query字段
         const validHistory = history.filter(item => {
-            return item && (item.query || item.keyword) && 
-                   typeof (item.query || item.keyword) === 'string' && 
-                   (item.query || item.keyword).trim().length > 0;
-        }).map(item => ({
-            id: item.id || utils.generateId(),
-            query: item.query || item.keyword,
-            keyword: item.query || item.keyword, // 兼容性
-            source: item.source || 'unknown',
-            timestamp: item.timestamp || Date.now()
-        }));
+            const query = item.query || item.keyword;
+            return item && query && 
+                   typeof query === 'string' && 
+                   query.trim().length > 0;
+        }).map(item => {
+            const query = item.query || item.keyword;
+            return {
+                id: item.id || this.generateId(),
+                query: query.trim(),                    // 统一使用query字段
+                source: item.source || 'unknown',
+                timestamp: item.timestamp || Date.now()
+            };
+        });
 
         return await this.request('/api/user/sync/search-history', {
             method: 'POST',
             body: JSON.stringify({ 
-                searchHistory: validHistory,
-                history: validHistory // 兼容性
+                searchHistory: validHistory
             })
         });
     } catch (error) {
@@ -191,7 +264,7 @@ async syncSearchHistory(history) {
 }
 
 // 修复保存单条搜索历史
-async saveSearchHistory(query, source = 'unknown') {
+async saveSearchHistory(query, source = 'manual') {
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
         throw new Error('搜索关键词不能为空');
     }
@@ -213,19 +286,27 @@ async getSearchHistory() {
         const response = await this.request('/api/user/search-history');
         const history = response.history || response.searchHistory || [];
         
-        // 确保返回的数据格式正确
+        // 确保返回的数据格式正确，统一使用query字段
         return history.filter(item => {
-            return item && (item.query || item.keyword) && 
-                   typeof (item.query || item.keyword) === 'string';
+            const query = item.query || item.keyword;
+            return item && query && typeof query === 'string';
         }).map(item => ({
-            ...item,
-            keyword: item.keyword || item.query,
-            query: item.query || item.keyword
+            id: item.id,
+            query: item.query || item.keyword,      // 统一字段
+            keyword: item.query || item.keyword,    // 保持兼容性
+            source: item.source,
+            timestamp: item.timestamp,
+            createdAt: item.createdAt
         }));
     } catch (error) {
         console.error('获取搜索历史失败:', error);
         return [];
     }
+}
+
+// 添加工具方法
+generateId() {
+    return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
     async getUserSettings() {

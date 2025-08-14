@@ -626,13 +626,89 @@ router.put('/api/auth/change-password', async (request, env) => {
     }
 });
 
+// 统一的token验证接口
 router.get('/api/auth/verify', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) {
         return utils.errorResponse('认证失败', 401);
     }
-    return utils.successResponse({ user });
+    return utils.successResponse({ 
+        user,
+        valid: true,
+        message: 'Token验证成功'
+    });
 });
+
+// 兼容旧的POST验证接口（用于前端token验证）
+router.post('/api/auth/verify', async (request, env) => {
+    try {
+        const body = await request.json().catch(() => ({}));
+        let token = body.token;
+        
+        // 如果body中没有token，尝试从Authorization头获取
+        if (!token) {
+            const authHeader = request.headers.get('Authorization');
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                token = authHeader.substring(7);
+            }
+        }
+
+        if (!token) {
+            return utils.errorResponse('Token不能为空', 401);
+        }
+
+        const jwtSecret = env.JWT_SECRET;
+        if (!jwtSecret) {
+            return utils.errorResponse('服务器配置错误', 500);
+        }
+
+        const payload = await utils.verifyJWT(token, jwtSecret);
+        if (!payload) {
+            return utils.errorResponse('Token无效或已过期', 401);
+        }
+
+        try {
+            const tokenHash = await utils.hashPassword(token);
+            const session = await env.DB.prepare(`
+                SELECT u.* FROM users u
+                JOIN user_sessions s ON u.id = s.user_id
+                WHERE s.token_hash = ? AND s.expires_at > ?
+            `).bind(tokenHash, Date.now()).first();
+
+            if (!session) {
+                return utils.errorResponse('会话已过期', 401);
+            }
+
+            // 更新活动时间
+            await env.DB.prepare(`
+                UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
+            `).bind(Date.now(), tokenHash).run();
+
+            const user = {
+                id: session.id,
+                username: session.username,
+                email: session.email,
+                permissions: JSON.parse(session.permissions || '[]'),
+                settings: JSON.parse(session.settings || '{}')
+            };
+
+            return utils.successResponse({ 
+                user,
+                valid: true,
+                message: 'Token验证成功'
+            });
+
+        } catch (error) {
+            console.error('Token验证数据库查询失败:', error);
+            return utils.errorResponse('Token验证失败', 401);
+        }
+
+    } catch (error) {
+        console.error('Token验证失败:', error);
+        return utils.errorResponse('Token验证失败', 401);
+    }
+});
+
 
 router.post('/api/auth/logout', async (request, env) => {
     const user = await authenticate(request, env);
@@ -724,68 +800,6 @@ router.put('/api/user/settings', async (request, env) => {
     } catch (error) {
         console.error('更新用户设置失败:', error);
         return utils.errorResponse('更新用户设置失败', 500);
-    }
-});
-
-// 修复用户Token验证接口（前端调用的verifyToken）
-router.post('/api/auth/verify-token', async (request, env) => {
-    try {
-        const body = await request.json().catch(() => ({}));
-        const { token } = body;
-
-        if (!token) {
-            return utils.errorResponse('Token不能为空', 401);
-        }
-
-        const jwtSecret = env.JWT_SECRET;
-        if (!jwtSecret) {
-            return utils.errorResponse('服务器配置错误', 500);
-        }
-
-        const payload = await utils.verifyJWT(token, jwtSecret);
-        if (!payload) {
-            return utils.errorResponse('Token无效或已过期', 401);
-        }
-
-        try {
-            const tokenHash = await utils.hashPassword(token);
-            const session = await env.DB.prepare(`
-                SELECT u.* FROM users u
-                JOIN user_sessions s ON u.id = s.user_id
-                WHERE s.token_hash = ? AND s.expires_at > ?
-            `).bind(tokenHash, Date.now()).first();
-
-            if (!session) {
-                return utils.errorResponse('会话已过期', 401);
-            }
-
-            // 更新活动时间
-            await env.DB.prepare(`
-                UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
-            `).bind(Date.now(), tokenHash).run();
-
-            const user = {
-                id: session.id,
-                username: session.username,
-                email: session.email,
-                permissions: JSON.parse(session.permissions || '[]'),
-                settings: JSON.parse(session.settings || '{}')
-            };
-
-            return utils.successResponse({ 
-                user,
-                valid: true,
-                message: 'Token验证成功'
-            });
-
-        } catch (error) {
-            console.error('Token验证数据库查询失败:', error);
-            return utils.errorResponse('Token验证失败', 401);
-        }
-
-    } catch (error) {
-        console.error('Token验证失败:', error);
-        return utils.errorResponse('Token验证失败', 401);
     }
 });
 
@@ -944,28 +958,27 @@ router.post('/api/user/search-history', async (request, env) => {
 
     try {
         const body = await request.json().catch(() => ({}));
-        const { query, timestamp, source } = body;
+        const { query, keyword, timestamp, source } = body;
 
-        // 修复：确保query字段存在且有效
-        if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        // 统一使用query字段，兼容keyword字段
+        const searchQuery = query || keyword;
+        
+        if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim().length === 0) {
             return utils.errorResponse('搜索关键词不能为空');
         }
 
-        const trimmedQuery = query.trim();
+        const trimmedQuery = searchQuery.trim();
         
-        // 输入验证
         if (trimmedQuery.length > 200) {
             return utils.errorResponse('搜索关键词过长');
         }
 
         const maxHistory = parseInt(env.MAX_HISTORY_PER_USER || '1000');
         
-        // 检查当前历史记录数量
         const countResult = await env.DB.prepare(`
             SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?
         `).bind(user.id).first();
 
-        // 如果超过限制，删除最旧的记录
         if (countResult.count >= maxHistory) {
             const deleteCount = countResult.count - maxHistory + 1;
             await env.DB.prepare(`
@@ -979,16 +992,14 @@ router.post('/api/user/search-history', async (request, env) => {
             `).bind(user.id, user.id, deleteCount).run();
         }
 
-        // 添加新的搜索历史
         const historyId = utils.generateId();
         const now = timestamp || Date.now();
 
         await env.DB.prepare(`
             INSERT INTO user_search_history (id, user_id, query, source, created_at)
             VALUES (?, ?, ?, ?, ?)
-        `).bind(historyId, user.id, trimmedQuery, source || 'unknown', now).run();
+        `).bind(historyId, user.id, trimmedQuery, source || 'manual', now).run();
 
-        // 记录用户行为
         await utils.logUserAction(env, user.id, 'search', { query: trimmedQuery, source }, request);
 
         return utils.successResponse({ 

@@ -885,32 +885,37 @@ const NetworkUtils = {
 
 // 在utils.js中，替换 navigateToPage 和 navigateToDashboard
 
+// 简化的环境检测
 function isDevEnv() {
-    const h = window.location.hostname;
-    return h === 'localhost' || h === '127.0.0.1' || window.location.port !== '';
+    return window.location.hostname === 'localhost' || 
+           window.location.hostname === '127.0.0.1' || 
+           window.location.port !== '' ||
+           window.location.search.includes('dev=1');
 }
 
+// 简化的页面导航函数
 function navigateToPage(url, options = {}) {
-    const { useReplace = false, retryOnError = true, maxRetries = 2, timeout = 5000 } = options;
+    const { useReplace = false, timeout = 5000 } = options;
     const isDev = isDevEnv();
 
     return new Promise((resolve, reject) => {
         try {
-            // 统一前缀
-            let target = url.startsWith('./') || url.startsWith('/') ? url : `./${url}`;
-
-            // 开发环境：确保有 .html 后缀；生产环境：确保没有 .html 后缀
-            if (isDev) {
-                if (!/\.html(\?|$)/i.test(target)) {
-                    const [path, query = ''] = target.split('?');
-                    target = path.replace(/\/$/, '') + '.html' + (query ? '?' + query : '');
-                }
-            } else {
-                // 去掉 .html（让 Cloudflare Pages 的 clean URLs 工作）
-                target = target.replace(/\.html(\?|$)/i, (_, q) => q || '');
+            let target = url;
+            
+            // 确保URL格式正确
+            if (!target.startsWith('./') && !target.startsWith('/') && !target.startsWith('http')) {
+                target = `./${target}`;
             }
 
-            // 进行跳转
+            // 开发环境：确保有.html后缀
+            if (isDev && !target.includes('.') && !target.startsWith('http')) {
+                const [path, query = ''] = target.split('?');
+                target = path.replace(/\/$/, '') + '.html' + (query ? '?' + query : '');
+            }
+
+            console.log(`导航到: ${target}`);
+
+            // 执行导航
             if (useReplace) {
                 window.location.replace(target);
             } else {
@@ -918,39 +923,36 @@ function navigateToPage(url, options = {}) {
             }
 
             // 超时保护
-            const t = setTimeout(() => reject(new Error('导航超时')), timeout);
-            // 注意：页面跳转后这段一般不会执行到 resolve
+            setTimeout(() => {
+                reject(new Error('导航超时'));
+            }, timeout);
+
         } catch (error) {
-            if (retryOnError && maxRetries > 0) {
-                console.warn('导航失败，重试中...', error);
-                setTimeout(() => {
-                    navigateToPage(url, { ...options, maxRetries: maxRetries - 1 })
-                        .then(resolve)
-                        .catch(reject);
-                }, 1000);
-            } else {
-                reject(error);
-            }
+            console.error('导航失败:', error);
+            reject(error);
         }
     });
 }
 
+// 简化的Dashboard导航
 async function navigateToDashboard() {
     try {
         showLoading(true);
 
+        // 检查认证状态
         const authToken = localStorage.getItem('auth_token');
         if (!authToken) {
             throw new Error('未登录');
         }
 
-        // 生产环境跳 /dashboard（无 .html），开发环境会在 navigateToPage 内自动补 .html
+        // 直接导航，不做复杂的URL处理
         await navigateToPage('dashboard', { useReplace: true });
 
     } catch (error) {
-        console.error('跳转到dashboard失败:', error);
+        console.error('跳转到Dashboard失败:', error);
         showToast('跳转失败: ' + error.message, 'error');
 
+        // 如果认证失败，显示登录模态框
         if (error.message.includes('认证') || error.message.includes('未登录')) {
             if (typeof app !== 'undefined' && app.showLoginModal) {
                 app.showLoginModal();
@@ -961,6 +963,220 @@ async function navigateToDashboard() {
     }
 }
 
+// 增强的Toast通知系统
+class ToastManager {
+    constructor() {
+        this.container = this.createContainer();
+        this.toasts = [];
+    }
+
+    createContainer() {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+        }
+        return container;
+    }
+
+    show(message, type = 'info', duration = 3000) {
+        const toast = this.createToast(message, type, duration);
+        this.container.appendChild(toast);
+        this.toasts.push(toast);
+
+        // 触发显示动画
+        setTimeout(() => toast.classList.add('show'), 10);
+
+        // 自动隐藏
+        if (duration > 0) {
+            setTimeout(() => this.hide(toast), duration);
+        }
+
+        return toast;
+    }
+
+    createToast(message, type, duration) {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        
+        const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️'
+        };
+
+        toast.innerHTML = `
+            <div class="toast-content">
+                <span class="toast-icon">${icons[type] || icons.info}</span>
+                <span class="toast-message">${message}</span>
+                <button class="toast-close" onclick="window.toastManager.hide(this.parentElement.parentElement)">×</button>
+            </div>
+            ${duration > 0 ? `<div class="toast-progress" style="animation-duration: ${duration}ms;"></div>` : ''}
+        `;
+
+        return toast;
+    }
+
+    hide(toast) {
+        if (!toast || !toast.parentElement) return;
+
+        toast.classList.add('hiding');
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.parentElement.removeChild(toast);
+            }
+            const index = this.toasts.indexOf(toast);
+            if (index > -1) {
+                this.toasts.splice(index, 1);
+            }
+        }, 300);
+    }
+
+    clear() {
+        this.toasts.forEach(toast => this.hide(toast));
+    }
+}
+
+// 创建全局Toast管理器
+window.toastManager = new ToastManager();
+
+// 重新定义showToast函数
+function showToast(message, type = 'info', duration = 3000) {
+    return window.toastManager.show(message, type, duration);
+}
+
+// 添加对应的CSS样式
+const toastStyles = `
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    pointer-events: none;
+}
+
+.toast {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-lg);
+    min-width: 300px;
+    max-width: 500px;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+    position: relative;
+    overflow: hidden;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.hiding {
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.toast-success {
+    border-left: 4px solid #10b981;
+}
+
+.toast-error {
+    border-left: 4px solid #ef4444;
+}
+
+.toast-warning {
+    border-left: 4px solid #f59e0b;
+}
+
+.toast-info {
+    border-left: 4px solid #3b82f6;
+}
+
+.toast-content {
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.toast-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.toast-message {
+    flex: 1;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.25rem;
+    padding: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.toast-close:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-hover));
+    animation: toast-progress linear forwards;
+}
+
+@keyframes toast-progress {
+    from { width: 100%; }
+    to { width: 0%; }
+}
+
+@media (max-width: 640px) {
+    .toast-container {
+        left: 1rem;
+        right: 1rem;
+        top: 20px;
+    }
+    
+    .toast {
+        min-width: auto;
+        max-width: none;
+    }
+}
+`;
+
+// 注入Toast样式
+if (!document.getElementById('toast-styles')) {
+    const styleSheet = document.createElement('style');
+    styleSheet.id = 'toast-styles';
+    styleSheet.textContent = toastStyles;
+    document.head.appendChild(styleSheet);
+}
 
 
 
@@ -980,3 +1196,4 @@ window.NetworkUtils = NetworkUtils;
 // 导出到全局作用域
 window.navigateToPage = navigateToPage;
 window.navigateToDashboard = navigateToDashboard;
+

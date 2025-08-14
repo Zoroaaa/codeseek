@@ -115,28 +115,37 @@
                     </div>
                 </div>
 
-                <!-- 快速操作 -->
-                <div class="quick-actions">
-                    <h2>快速操作</h2>
-                    <div class="action-buttons">
-                        <button class="action-btn" onclick="window.location.href='index.html'">
-                            <span class="btn-icon">🔍</span>
-                            <span>开始搜索</span>
-                        </button>
-                        <button class="action-btn" onclick="app.switchTab('favorites')">
-                            <span class="btn-icon">⭐</span>
-                            <span>查看收藏</span>
-                        </button>
-                        <button class="action-btn" onclick="app.syncAllData()">
-                            <span class="btn-icon">🔄</span>
-                            <span>同步数据</span>
-                        </button>
-                        <button class="action-btn" onclick="app.exportData()">
-                            <span class="btn-icon">📤</span>
-                            <span>导出数据</span>
-                        </button>
-                    </div>
-                </div>
+<!-- 快速操作 -->
+<div class="quick-actions">
+    <h2>快速操作</h2>
+    <div class="action-buttons">
+        <button class="action-btn" onclick="window.location.href='index.html'">
+            <span class="btn-icon">🔍</span>
+            <span>开始搜索</span>
+        </button>
+        <button class="action-btn" onclick="app.switchTab('favorites')">
+            <span class="btn-icon">⭐</span>
+            <span>查看收藏</span>
+        </button>
+        <button id="syncAllDataBtn" class="action-btn" onclick="app.syncAllData()">
+            <span class="btn-icon">🔄</span>
+            <span>同步所有数据</span>
+        </button>
+        <button id="exportDataBtn" class="action-btn" onclick="app.exportData()">
+            <span class="btn-icon">📤</span>
+            <span>导出数据</span>
+        </button>
+        <button class="action-btn" onclick="app.exportFavorites()">
+            <span class="btn-icon">📋</span>
+            <span>导出收藏</span>
+        </button>
+        <button class="action-btn" onclick="app.refreshData()">
+            <span class="btn-icon">🔄</span>
+            <span>刷新数据</span>
+        </button>
+    </div>
+</div>
+
 
                 <!-- 最近活动 -->
                 <div class="recent-activity">
@@ -183,10 +192,17 @@
             <div id="history" class="tab-content">
                 <div class="tab-header">
                     <h1>搜索历史</h1>
-                    <div class="header-actions">
-                        <button class="btn-primary" onclick="app.syncHistory()">同步历史</button>
-                        <button class="btn-danger" onclick="app.clearAllHistory()">清空历史</button>
-                    </div>
+<div class="header-actions">
+    <button class="btn-secondary" onclick="app.exportHistory()">
+        <span>📤</span> 导出历史
+    </button>
+    <button class="btn-primary" onclick="app.syncHistory()">
+        <span>🔄</span> 同步历史
+    </button>
+    <button class="btn-danger" onclick="app.clearAllHistory()">
+        <span>🗑️</span> 清空历史
+    </button>
+</div>
                 </div>
 
                 <!-- 历史搜索和统计 -->
@@ -204,6 +220,14 @@
                         <span class="stat-desc">日均搜索</span>
                     </div>
                 </div>
+
+<!-- 热门关键词云 -->
+<div class="popular-keywords">
+    <h3>🔥 热门搜索关键词</h3>
+    <div id="keywordCloud" class="keyword-cloud">
+        <!-- 关键词标签将通过JavaScript生成 -->
+    </div>
+</div>
 
                 <!-- 热门关键词 -->
                 <div class="popular-keywords">
@@ -320,15 +344,34 @@
                             </div>
                         </div>
 
-                        <!-- 账户操作 -->
-                        <div class="settings-section">
-                            <h3>账户操作</h3>
-                            <div class="dangerous-actions">
-                                <button class="btn-warning" onclick="app.changePassword()">修改密码</button>
-                                <button class="btn-danger" onclick="app.clearAllData()">清空所有数据</button>
-                                <button class="btn-danger" onclick="app.deleteAccount()">删除账户</button>
-                            </div>
-                        </div>
+<!-- 账户操作 -->
+<div class="settings-section">
+    <h3>账户操作</h3>
+    <div class="setting-item">
+        <label>密码管理</label>
+        <div class="setting-control">
+            <button id="changePasswordBtn" class="btn-warning" onclick="app.changePassword()">
+                <span>🔑</span> 修改密码
+            </button>
+            <span class="setting-desc">更改您的登录密码</span>
+        </div>
+    </div>
+    <div class="setting-item">
+        <label>数据管理</label>
+        <div class="setting-control">
+            <div class="dangerous-actions">
+                <button class="btn-warning" onclick="app.clearAllData()">
+                    <span>🗑️</span> 清空所有数据
+                </button>
+                <button class="btn-danger" onclick="app.deleteAccount()">
+                    <span>⚠️</span> 删除账户
+                </button>
+            </div>
+            <span class="setting-desc">危险操作，请谨慎使用</span>
+        </div>
+    </div>
+</div>
+
 
                         <!-- 保存设置 -->
                         <div class="settings-actions">

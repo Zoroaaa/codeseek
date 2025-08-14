@@ -52,36 +52,40 @@
             <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
             <p class="hero-subtitle">智能搜索，云端同步，极致体验</p>
             
-            <!-- 搜索框 -->
-            <div class="search-container">
-                <div class="search-box">
-                    <input 
-                        type="text" 
-                        id="searchInput" 
-                        class="search-input" 
-                        placeholder="请输入番号或关键词" 
-                        autocomplete="off"
-                        maxlength="100"
-                    >
-                    <button id="searchBtn" class="search-btn" title="搜索">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <path d="M21 21l-4.35-4.35"></path>
-                        </svg>
-                        <span>搜索</span>
-                    </button>
-                </div>
-                <div class="search-options">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="cacheResults" checked>
-                        <span>缓存搜索结果</span>
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="autoSync" checked>
-                        <span>自动同步到云端</span>
-                    </label>
-                </div>
-            </div>
+<!-- 搜索框 -->
+<div class="search-container">
+    <div class="search-box-wrapper">
+        <div class="search-box">
+            <input 
+                type="text" 
+                id="searchInput" 
+                class="search-input" 
+                placeholder="请输入番号或关键词" 
+                autocomplete="off"
+                maxlength="100"
+            >
+            <button id="searchBtn" class="search-btn" title="搜索">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="M21 21l-4.35-4.35"></path>
+                </svg>
+                <span>搜索</span>
+            </button>
+        </div>
+        <!-- 搜索建议容器 -->
+        <div id="searchSuggestions" class="search-suggestions" style="display:none;"></div>
+    </div>
+    <div class="search-options">
+        <label class="checkbox-label">
+            <input type="checkbox" id="cacheResults" checked>
+            <span>缓存搜索结果</span>
+        </label>
+        <label class="checkbox-label">
+            <input type="checkbox" id="autoSync" checked>
+            <span>自动同步到云端</span>
+        </label>
+    </div>
+</div>
         </section>
 
         <!-- 快速提示 -->
@@ -105,30 +109,43 @@
             <div id="historyList" class="history-list"></div>
         </section>
 
-        <!-- 搜索结果 -->
-        <section id="resultsSection" class="results-section" style="display:none;">
-            <div class="section-header">
-                <h2>🔍 搜索结果</h2>
-                <div class="section-actions">
-                    <button id="exportResultsBtn" class="action-btn" style="display:none;">导出结果</button>
-                    <button id="clearResultsBtn" class="clear-btn">清空结果</button>
-                </div>
-            </div>
-            <div id="searchInfo" class="search-info"></div>
-            <div id="results" class="results-grid"></div>
-        </section>
+<!-- 搜索结果 -->
+<section id="resultsSection" class="results-section" style="display:none;">
+    <div class="section-header">
+        <h2>🔍 搜索结果</h2>
+        <div class="section-actions">
+            <button id="exportResultsBtn" class="action-btn" style="display:none;" title="导出搜索结果">
+                <span>📤</span> 导出结果
+            </button>
+            <button id="clearResultsBtn" class="clear-btn" title="清空搜索结果">
+                <span>🗑️</span> 清空结果
+            </button>
+        </div>
+    </div>
+    <div id="searchInfo" class="search-info"></div>
+    <div id="results" class="results-grid"></div>
+</section>
 
-        <!-- 收藏夹 -->
-        <section class="favorites-section">
-            <div class="section-header">
-                <h2>⭐ 我的收藏</h2>
-                <div class="section-actions">
-                    <button id="syncFavoritesBtn" class="sync-btn" style="display:none;">同步收藏</button>
-                    <button id="importFavoritesBtn" class="action-btn" style="display:none;">导入收藏</button>
-                </div>
-            </div>
-            <div id="favorites" class="favorites-grid"></div>
-        </section>
+
+<!-- 收藏夹 -->
+<section class="favorites-section">
+    <div class="section-header">
+        <h2>⭐ 我的收藏</h2>
+        <div class="section-actions">
+            <button id="syncFavoritesBtn" class="sync-btn" style="display:none;" title="同步收藏到云端">
+                <span>🔄</span> 同步收藏
+            </button>
+            <button id="importFavoritesBtn" class="action-btn" style="display:none;" title="导入收藏文件">
+                <span>📁</span> 导入收藏
+            </button>
+            <button id="exportFavoritesBtn" class="action-btn" style="display:none;" title="导出收藏文件">
+                <span>📤</span> 导出收藏
+            </button>
+        </div>
+    </div>
+    <div id="favorites" class="favorites-grid"></div>
+</section>
+
 
         <!-- 站点导航 -->
         <section class="sites-section">

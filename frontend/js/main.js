@@ -9,6 +9,7 @@ class MagnetSearchApp {
         this.config = {};
         this.connectionStatus = 'checking';
         this.init();
+		this.searchEngine = new SearchSuggestionEngine(this);
     }
 
 async init() {
@@ -34,9 +35,15 @@ async init() {
         // 检查认证状态
         await this.checkAuthStatus();
         
-        // 若未认证，打开登录模态
+        // 若未认证，显示登录模态框
         if (!this.currentUser) {
             document.getElementById('loginModal').style.display = 'block';
+        } else {
+            // 显示主内容
+            const mainContent = document.querySelector('.main-content');
+            if (mainContent) {
+                mainContent.style.display = 'block';
+            }
         }
 
         // 测试API连接
@@ -58,6 +65,7 @@ async init() {
         showLoading(false);
     }
 }
+
 
 
     showConnectionStatus() {
@@ -142,135 +150,391 @@ async init() {
         }
     }
 
-    bindEvents() {
-        // 搜索相关
-        const searchBtn = document.getElementById('searchBtn');
-        const searchInput = document.getElementById('searchInput');
-        
-        if (searchBtn) searchBtn.addEventListener('click', () => this.performSearch());
-        if (searchInput) {
-            searchInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') this.performSearch();
-            });
-            
-            // 搜索建议
-            searchInput.addEventListener('input', debounce((e) => {
-                this.handleSearchInput(e.target.value);
-            }, 300));
-            
-            // 焦点处理
-            searchInput.addEventListener('focus', () => {
-                this.showSearchSuggestions();
-            });
-            
-            searchInput.addEventListener('blur', () => {
-                // 延迟隐藏以允许点击建议
-                setTimeout(() => this.hideSearchSuggestions(), 200);
-            });
-        }
+bindEvents() {
+    console.log('🔗 绑定事件监听器...');
 
-        // 主题切换
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
+    // 搜索相关事件
+    this.bindSearchEvents();
+    
+    // 主题切换事件
+    this.bindThemeEvents();
+    
+    // 功能按钮事件
+    this.bindFunctionButtons();
+    
+    // 模态框事件
+    this.bindModalEvents();
+    
+    // 用户菜单事件
+    this.bindUserMenuEvents();
+    
+    // 全局键盘快捷键
+    this.bindKeyboardShortcuts();
+    
+    // 收藏夹控件事件
+    this.bindFavoritesControls();
+    
+    // 搜索建议容器初始化
+    this.initializeSearchSuggestions();
+    
+    // 连接状态监听
+    this.bindConnectionStatusEvents();
 
-        // 功能按钮
-        this.bindFunctionButtons();
-        
-        // 模态框相关
-        this.bindModalEvents();
+    console.log('✅ 事件绑定完成');
+}
 
-        // 全局键盘快捷键
-        this.bindKeyboardShortcuts();
-
-        // 收藏夹搜索和排序
-        this.bindFavoritesControls();
-    }
-
-    bindFunctionButtons() {
-        const buttons = {
-            clearHistoryBtn: () => this.clearHistory(),
-            clearResultsBtn: () => this.clearResults(),
-            syncFavoritesBtn: () => this.syncFavorites(),
-            exportResultsBtn: () => this.exportResults(),
-            importFavoritesBtn: () => this.importFavorites()
-        };
-
-        Object.entries(buttons).forEach(([id, handler]) => {
-            const btn = document.getElementById(id);
-            if (btn) btn.addEventListener('click', handler);
+// 搜索相关事件绑定
+bindSearchEvents() {
+    const searchBtn = document.getElementById('searchBtn');
+    const searchInput = document.getElementById('searchInput');
+    
+    if (searchBtn) {
+        searchBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.performSearch();
         });
     }
-
-    bindModalEvents() {
-        const loginBtn = document.getElementById('loginBtn');
-        const closeBtns = document.querySelectorAll('.close');
-        const showRegister = document.getElementById('showRegister');
-        const showLogin = document.getElementById('showLogin');
-
-        if (loginBtn) loginBtn.addEventListener('click', () => this.showLoginModal());
-        if (showRegister) showRegister.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.showRegisterModal();
+    
+    if (searchInput) {
+        // 搜索输入事件
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.performSearch();
+            }
         });
-        if (showLogin) showLogin.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.showLoginModal();
+        
+        // 搜索建议 - 防抖处理
+        searchInput.addEventListener('input', debounce((e) => {
+            this.handleSearchInput(e.target.value);
+        }, 300));
+        
+        // 焦点事件
+        searchInput.addEventListener('focus', (e) => {
+            if (e.target.value.trim().length >= 2) {
+                this.showSearchSuggestions(e.target.value);
+            }
         });
+        
+        searchInput.addEventListener('blur', (e) => {
+            // 延迟隐藏以允许点击建议
+            setTimeout(() => {
+                if (!this.isInteractingWithSuggestions) {
+                    this.hideSearchSuggestions();
+                }
+            }, 200);
+        });
+    }
+}
 
-        closeBtns.forEach(btn => {
-            btn.addEventListener('click', () => this.closeModals());
+// 主题切换事件
+bindThemeEvents() {
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            this.toggleTheme();
         });
+    }
+}
 
-        // 点击模态框外部关闭
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) this.closeModals();
-            });
-        });
-		
-		// 在bindModalEvents方法中添加
-const dashboardLink = document.querySelector('a[href="./dashboard.html"]');
-if (dashboardLink) {
-    dashboardLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        navigateToDashboard();
+// 功能按钮事件绑定
+bindFunctionButtons() {
+    const buttonConfigs = {
+        // 历史记录相关
+        clearHistoryBtn: {
+            handler: () => this.clearHistory(),
+            confirm: '确定要清空所有搜索历史吗？'
+        },
+        
+        // 搜索结果相关
+        clearResultsBtn: {
+            handler: () => this.clearResults(),
+            confirm: '确定要清空当前搜索结果吗？'
+        },
+        exportResultsBtn: {
+            handler: () => this.exportResults(),
+            condition: () => this.searchResults && this.searchResults.length > 0
+        },
+        
+        // 收藏夹相关
+        syncFavoritesBtn: {
+            handler: () => this.syncFavorites(),
+            condition: () => this.currentUser !== null
+        },
+        importFavoritesBtn: {
+            handler: () => this.importFavorites(),
+            condition: () => this.currentUser !== null
+        },
+        exportFavoritesBtn: {
+            handler: () => this.exportFavorites(),
+            condition: () => this.favorites && this.favorites.length > 0
+        }
+    };
+
+    Object.entries(buttonConfigs).forEach(([id, config]) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            // 移除现有监听器防止重复绑定
+            btn.removeEventListener('click', btn._boundHandler);
+            
+            // 创建新的处理器
+            const handler = async (e) => {
+                e.preventDefault();
+                
+                // 检查条件
+                if (config.condition && !config.condition()) {
+                    return;
+                }
+                
+                // 确认对话框
+                if (config.confirm && !confirm(config.confirm)) {
+                    return;
+                }
+                
+                try {
+                    await config.handler();
+                } catch (error) {
+                    console.error(`按钮处理失败 (${id}):`, error);
+                    showToast('操作失败: ' + error.message, 'error');
+                }
+            };
+            
+            // 保存引用并绑定
+            btn._boundHandler = handler;
+            btn.addEventListener('click', handler);
+            
+            // 更新按钮可见性
+            this.updateButtonVisibility(btn, config);
+        }
     });
 }
 
-        // 表单提交
-        const loginForm = document.getElementById('loginForm');
-        const registerForm = document.getElementById('registerForm');
-
-        if (loginForm) loginForm.addEventListener('submit', (e) => this.handleLogin(e));
-        if (registerForm) registerForm.addEventListener('submit', (e) => this.handleRegister(e));
+// 更新按钮可见性
+updateButtonVisibility(button, config) {
+    if (config.condition) {
+        const shouldShow = config.condition();
+        button.style.display = shouldShow ? 'block' : 'none';
     }
+}
 
-    bindKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + K 聚焦搜索框
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                e.preventDefault();
-                const searchInput = document.getElementById('searchInput');
-                if (searchInput) {
-                    searchInput.focus();
-                    searchInput.select();
-                }
-            }
-
-            // Escape 关闭模态框
-            if (e.key === 'Escape') {
-                this.closeModals();
-                this.hideSearchSuggestions();
-            }
+// 模态框事件绑定
+bindModalEvents() {
+    // 登录模态框
+    const loginModal = document.getElementById('loginModal');
+    const registerModal = document.getElementById('registerModal');
+    const loginBtn = document.getElementById('loginBtn');
+    const showRegisterLink = document.getElementById('showRegister');
+    const showLoginLink = document.getElementById('showLogin');
+    
+    if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+            this.showLoginModal();
         });
     }
-
-    bindFavoritesControls() {
-        // 这里可以添加收藏夹的搜索和排序控件绑定
-        // 目前在首页主要是显示，详细控制在dashboard页面
+    
+    if (showRegisterLink) {
+        showRegisterLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showRegisterModal();
+        });
     }
+    
+    if (showLoginLink) {
+        showLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showLoginModal();
+        });
+    }
+    
+    // 关闭按钮事件
+    document.querySelectorAll('.modal .close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', () => {
+            this.closeAllModals();
+        });
+    });
+    
+    // 点击模态框外部关闭
+    [loginModal, registerModal].forEach(modal => {
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeAllModals();
+                }
+            });
+        }
+    });
+    
+    // 表单提交事件
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleLogin();
+        });
+    }
+    
+    if (registerForm) {
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleRegister();
+        });
+    }
+}
+
+// 用户菜单事件
+bindUserMenuEvents() {
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.handleLogout();
+        });
+    }
+}
+
+// 键盘快捷键事件
+bindKeyboardShortcuts() {
+    let selectedSuggestionIndex = -1;
+    
+    document.addEventListener('keydown', (e) => {
+        const suggestionsContainer = document.getElementById('searchSuggestions');
+        const searchInput = document.getElementById('searchInput');
+        
+        // 处理搜索建议的键盘导航
+        if (suggestionsContainer && suggestionsContainer.style.display === 'block') {
+            const suggestions = suggestionsContainer.querySelectorAll('.suggestion-item');
+            
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, suggestions.length - 1);
+                    this.updateSuggestionSelection(suggestions, selectedSuggestionIndex);
+                    break;
+                    
+                case 'ArrowUp':
+                    e.preventDefault();
+                    selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1);
+                    this.updateSuggestionSelection(suggestions, selectedSuggestionIndex);
+                    break;
+                    
+                case 'Enter':
+                    if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
+                        e.preventDefault();
+                        suggestions[selectedSuggestionIndex].click();
+                        return;
+                    }
+                    break;
+                    
+                case 'Escape':
+                    this.hideSearchSuggestions();
+                    selectedSuggestionIndex = -1;
+                    if (searchInput) searchInput.focus();
+                    return;
+            }
+        }
+
+        // 全局快捷键
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+
+        // ESC 关闭模态框和建议
+        if (e.key === 'Escape') {
+            this.hideSearchSuggestions();
+            this.closeAllModals();
+            selectedSuggestionIndex = -1;
+        }
+    });
+
+    // 重置选择索引当建议隐藏时
+    const originalHideSearchSuggestions = this.hideSearchSuggestions.bind(this);
+    this.hideSearchSuggestions = () => {
+        selectedSuggestionIndex = -1;
+        originalHideSearchSuggestions();
+    };
+}
+
+// 收藏夹控件事件
+bindFavoritesControls() {
+    // 这里可以添加收藏夹相关的特殊控件事件
+    // 例如：收藏夹排序、过滤等
+}
+
+// 初始化搜索建议容器
+initializeSearchSuggestions() {
+    const searchContainer = document.querySelector('.search-container .search-box-wrapper');
+    if (searchContainer) {
+        const existingSuggestions = document.getElementById('searchSuggestions');
+        if (!existingSuggestions) {
+            const suggestionsContainer = document.createElement('div');
+            suggestionsContainer.id = 'searchSuggestions';
+            suggestionsContainer.className = 'search-suggestions';
+            suggestionsContainer.style.display = 'none';
+            
+            // 添加鼠标事件防止搜索框失焦时立即隐藏
+            suggestionsContainer.addEventListener('mouseenter', () => {
+                this.isInteractingWithSuggestions = true;
+            });
+            
+            suggestionsContainer.addEventListener('mouseleave', () => {
+                this.isInteractingWithSuggestions = false;
+            });
+            
+            searchContainer.appendChild(suggestionsContainer);
+        }
+    }
+}
+
+// 连接状态事件监听
+bindConnectionStatusEvents() {
+    // 监听连接状态变化
+    window.addEventListener('connectionStatusChanged', (event) => {
+        this.updateConnectionIndicator(event.detail);
+    });
+    
+    // 监听网络状态变化
+    window.addEventListener('online', () => {
+        this.connectionStatus = 'connected';
+        this.updateConnectionStatus('已连接');
+        showToast('网络连接已恢复', 'success');
+    });
+    
+    window.addEventListener('offline', () => {
+        this.connectionStatus = 'offline';
+        this.updateConnectionStatus('网络断开');
+        showToast('网络连接已断开', 'warning');
+    });
+}
+
+
+
+// 更新建议选择状态
+updateSuggestionSelection(suggestions, selectedIndex) {
+    suggestions.forEach((suggestion, index) => {
+        suggestion.classList.remove('keyboard-selected');
+        if (index === selectedIndex) {
+            suggestion.classList.add('keyboard-selected');
+            suggestion.scrollIntoView({ block: 'nearest' });
+        }
+    });
+}
+
+// 增强搜索历史初始化
+initializeSearchEngine() {
+    if (this.searchEngine) {
+        this.searchEngine.initializePopularKeywords();
+    }
+}
+
+
+
+
 
     async performSearch() {
         const searchInput = document.getElementById('searchInput');
@@ -610,32 +874,33 @@ addToHistory(keyword) {
         return;
     }
     
-    const trimmedKeyword = keyword.trim();
+    let trimmedKeyword = keyword.trim();
     if (trimmedKeyword.length === 0) {
         console.warn('搜索关键词为空，跳过添加');
         return;
     }
     
+    // 修复：使用let声明，允许重新赋值
     if (trimmedKeyword.length > 100) {
         console.warn('搜索关键词过长，截断处理');
         trimmedKeyword = trimmedKeyword.substring(0, 100);
     }
     
     try {
-        // 安全的数组过滤：确保每个item都有有效的keyword属性
+        // 安全的数组过滤：确保每个item都有有效的query属性
         this.searchHistory = this.searchHistory.filter(item => {
             return item && 
                    typeof item === 'object' && 
-                   item.keyword && 
-                   typeof item.keyword === 'string' && 
-                   item.keyword !== trimmedKeyword;
+                   item.query && 
+                   typeof item.query === 'string' && 
+                   item.query !== trimmedKeyword;
         });
         
-        // 创建新的历史记录项
+        // 创建新的历史记录项（统一使用query字段）
         const historyItem = {
             id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            keyword: trimmedKeyword,
-            query: trimmedKeyword, // 兼容性字段
+            query: trimmedKeyword,       // 主字段
+            keyword: trimmedKeyword,     // 兼容字段
             timestamp: Date.now(),
             count: 1,
             source: 'manual'
@@ -670,26 +935,35 @@ addToHistory(keyword) {
     }
 }
 
-    // 渲染搜索历史
-    renderHistory() {
-        const historySection = document.getElementById('historySection');
-        const historyList = document.getElementById('historyList');
 
-        if (this.searchHistory.length === 0) {
-            if (historySection) historySection.style.display = 'none';
-            return;
-        }
+// 修复渲染搜索历史
+renderHistory() {
+    const historySection = document.getElementById('historySection');
+    const historyList = document.getElementById('historyList');
 
-        if (historySection) historySection.style.display = 'block';
-        
-        if (historyList) {
-            historyList.innerHTML = this.searchHistory.slice(0, 10).map(item => 
-                `<span class="history-item" onclick="app.searchFromHistory('${this.escapeHtml(item.keyword)}')">
-                    ${this.escapeHtml(item.keyword)}
-                </span>`
-            ).join('');
-        }
+    // 过滤有效的搜索历史
+    const validHistory = this.searchHistory.filter(item => {
+        return item && item.query && 
+               typeof item.query === 'string' && 
+               item.query.trim().length > 0;
+    });
+
+    if (validHistory.length === 0) {
+        if (historySection) historySection.style.display = 'none';
+        return;
     }
+
+    if (historySection) historySection.style.display = 'block';
+    
+    if (historyList) {
+        historyList.innerHTML = validHistory.slice(0, 10).map(item => 
+            `<span class="history-item" onclick="app.searchFromHistory('${this.escapeHtml(item.query)}')">
+                ${this.escapeHtml(item.query)}
+            </span>`
+        ).join('');
+    }
+}
+
 
     // 从历史记录搜索
     searchFromHistory(keyword) {
@@ -791,39 +1065,74 @@ addToHistory(keyword) {
         showToast('搜索结果已清除', 'success');
     }
 
-    // 导出搜索结果
-    async exportResults() {
-        if (this.currentSearchResults.length === 0) {
-            showToast('没有搜索结果可以导出', 'error');
+// 导出结果
+async exportResults() {
+    try {
+        if (!this.searchResults || this.searchResults.length === 0) {
+            showToast('没有搜索结果可以导出', 'warning');
             return;
         }
 
-        try {
-            const data = {
-                results: this.currentSearchResults,
-                exportTime: new Date().toISOString(),
-                version: window.API_CONFIG?.APP_VERSION || '1.0.0'
-            };
+        const exportData = {
+            query: this.lastSearchQuery || '',
+            results: this.searchResults,
+            exportTime: new Date().toISOString(),
+            totalResults: this.searchResults.length,
+            version: window.API_CONFIG?.APP_VERSION || '1.0.0'
+        };
 
-            const blob = new Blob([JSON.stringify(data, null, 2)], {
-                type: 'application/json'
-            });
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json'
+        });
 
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `search-results-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `search-results-${this.lastSearchQuery || 'query'}-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
 
-            showToast('搜索结果导出成功', 'success');
-        } catch (error) {
-            console.error('导出搜索结果失败:', error);
-            showToast('导出失败: ' + error.message, 'error');
-        }
+        showToast('搜索结果导出成功', 'success');
+
+    } catch (error) {
+        console.error('导出搜索结果失败:', error);
+        showToast('导出失败: ' + error.message, 'error');
     }
+}
+
+// 更新所有功能按钮状态
+updateFunctionButtons() {
+    // 更新导出结果按钮
+    const exportResultsBtn = document.getElementById('exportResultsBtn');
+    if (exportResultsBtn) {
+        const hasResults = this.searchResults && this.searchResults.length > 0;
+        exportResultsBtn.style.display = hasResults ? 'inline-block' : 'none';
+    }
+    
+    // 更新同步相关按钮
+    const syncButtons = ['syncFavoritesBtn', 'importFavoritesBtn'];
+    syncButtons.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            btn.style.display = this.currentUser ? 'inline-block' : 'none';
+        }
+    });
+    
+    // 更新导出收藏按钮
+    const exportFavoritesBtn = document.getElementById('exportFavoritesBtn');
+    if (exportFavoritesBtn) {
+        const hasFavorites = this.favorites && this.favorites.length > 0;
+        exportFavoritesBtn.style.display = hasFavorites ? 'inline-block' : 'none';
+    }
+}
+
+// 在相关数据更新时调用按钮状态更新
+// 例如在 performSearch 方法最后调用
+// 在 loadFavorites 方法最后调用
+// 在 updateUserStatus 方法中调用
+
 
     // 导入收藏夹
     async importFavorites() {
@@ -921,7 +1230,9 @@ addToHistory(keyword) {
         StorageManager.setItem(cacheKey, data);
     }
 
-    // 本地数据管理
+// 在数据加载后调用
+async loadLocalData() {
+        // 本地数据管理
     loadLocalData() {
         try {
             // 加载搜索历史
@@ -939,6 +1250,13 @@ addToHistory(keyword) {
             this.favorites = [];
         }
     }
+    
+    // 初始化搜索引擎
+    this.initializeSearchEngine();
+}
+
+
+
 
     saveHistory() {
         StorageManager.setItem('search_history', this.searchHistory);
@@ -1013,36 +1331,55 @@ async syncSearchHistory() {
     }
 }
 
-    // 模态框管理
-    showLoginModal() {
-        const loginModal = document.getElementById('loginModal');
-        const registerModal = document.getElementById('registerModal');
+// 更新连接指示器
+updateConnectionIndicator(detail) {
+    const indicator = document.getElementById('connectionStatus');
+    if (indicator) {
+        const statusIndicator = indicator.querySelector('.status-indicator');
+        const statusText = indicator.querySelector('.status-text');
         
-        if (registerModal) registerModal.style.display = 'none';
-        if (loginModal) {
-            loginModal.style.display = 'block';
-            // 聚焦用户名输入框
-            setTimeout(() => {
-                const usernameInput = document.getElementById('loginUsername');
-                if (usernameInput) usernameInput.focus();
-            }, 100);
+        if (statusIndicator && statusText) {
+            statusIndicator.className = `status-indicator ${detail.status}`;
+            
+            const statusTexts = {
+                connected: '已连接',
+                warning: `连接不稳定 (${detail.failures} 次失败)`,
+                error: '连接失败',
+                checking: '检查连接...'
+            };
+            
+            statusText.textContent = statusTexts[detail.status] || '未知状态';
         }
     }
+}
 
-    showRegisterModal() {
-        const loginModal = document.getElementById('loginModal');
-        const registerModal = document.getElementById('registerModal');
-        
-        if (loginModal) loginModal.style.display = 'none';
-        if (registerModal) {
-            registerModal.style.display = 'block';
-            // 聚焦用户名输入框
-            setTimeout(() => {
-                const usernameInput = document.getElementById('regUsername');
-                if (usernameInput) usernameInput.focus();
-            }, 100);
+
+
+// 显示登录模态框
+showLoginModal() {
+    this.closeAllModals();
+    const loginModal = document.getElementById('loginModal');
+    if (loginModal) {
+        loginModal.style.display = 'block';
+        const usernameInput = document.getElementById('loginUsername');
+        if (usernameInput) {
+            setTimeout(() => usernameInput.focus(), 100);
         }
     }
+}
+
+// 显示注册模态框
+showRegisterModal() {
+    this.closeAllModals();
+    const registerModal = document.getElementById('registerModal');
+    if (registerModal) {
+        registerModal.style.display = 'block';
+        const usernameInput = document.getElementById('regUsername');
+        if (usernameInput) {
+            setTimeout(() => usernameInput.focus(), 100);
+        }
+    }
+}
 
     closeModals() {
         const loginModal = document.getElementById('loginModal');
@@ -1310,25 +1647,34 @@ async loadCloudData() {
         // 加载云端搜索历史
         const cloudHistory = await API.getSearchHistory();
         if (cloudHistory && cloudHistory.length > 0) {
-            // 过滤有效的历史记录
+            // 过滤有效的历史记录，统一使用query字段
             const validCloudHistory = cloudHistory.filter(item => {
-                return item && (item.keyword || item.query) && 
-                       typeof (item.keyword || item.query) === 'string' &&
-                       (item.keyword || item.query).trim().length > 0;
+                const query = item.query || item.keyword;
+                return item && query && 
+                       typeof query === 'string' &&
+                       query.trim().length > 0;
             }).map(item => ({
-                ...item,
-                keyword: item.keyword || item.query,
-                query: item.query || item.keyword
+                id: item.id,
+                query: item.query || item.keyword,      // 统一使用query
+                keyword: item.query || item.keyword,    // 保持兼容
+                timestamp: item.timestamp,
+                source: item.source || 'unknown'
             }));
 
-            // 合并本地和云端历史
+            // 合并本地和云端历史，去重
             const mergedHistory = [...validCloudHistory];
             
             // 添加本地独有的历史记录
             this.searchHistory.forEach(localItem => {
-                if (localItem && localItem.keyword && 
-                    !mergedHistory.some(cloudItem => cloudItem.keyword === localItem.keyword)) {
-                    mergedHistory.push(localItem);
+                if (localItem && localItem.query && 
+                    !mergedHistory.some(cloudItem => cloudItem.query === localItem.query)) {
+                    mergedHistory.push({
+                        id: localItem.id,
+                        query: localItem.query,
+                        keyword: localItem.query,
+                        timestamp: localItem.timestamp,
+                        source: localItem.source || 'local'
+                    });
                 }
             });
             
@@ -1347,32 +1693,63 @@ async loadCloudData() {
     }
 }
 
-    // 搜索输入处理
-    handleSearchInput(value) {
-        if (value.length > 0) {
-            this.showSearchSuggestions(value);
-        } else {
-            this.hideSearchSuggestions();
-        }
+
+// 处理搜索输入
+handleSearchInput(value) {
+    if (!value || value.length < 2) {
+        this.hideSearchSuggestions();
+        return;
     }
+    this.showSearchSuggestions(value);
+}
+
+// 关闭所有模态框
+closeAllModals() {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        modal.style.display = 'none';
+    });
+}
 
 // 修复搜索建议显示方法
 showSearchSuggestions(query) {
     if (!query || typeof query !== 'string') return;
     
-    // 安全检查：确保搜索历史中的每个项目都有有效的keyword属性
-    const suggestions = this.searchHistory
-        .filter(item => {
-            if (!item || !item.keyword || typeof item.keyword !== 'string') {
-                return false;
-            }
-            return item.keyword.toLowerCase().includes(query.toLowerCase());
-        })
-        .slice(0, 5);
+    const suggestionsContainer = document.getElementById('searchSuggestions');
+    if (!suggestionsContainer) return;
     
-    console.log('搜索建议:', suggestions);
-    // 这里可以实现搜索建议UI
+    const suggestions = this.searchEngine.generateSuggestions(query);
+    
+    if (suggestions.length > 0) {
+        const typeIcons = {
+            history: '🕐',
+            popular: '🔥',
+            code: '🎯'
+        };
+
+        suggestionsContainer.innerHTML = suggestions.map(suggestion => 
+            `<div class="suggestion-item suggestion-${suggestion.type}" 
+                  onclick="app.searchFromHistory('${this.escapeHtml(suggestion.text)}')">
+                <span class="suggestion-icon">${typeIcons[suggestion.type] || '🔍'}</span>
+                <span class="suggestion-text">${this.escapeHtml(suggestion.text)}</span>
+                <span class="suggestion-type">${this.getSuggestionTypeText(suggestion.type)}</span>
+            </div>`
+        ).join('');
+        suggestionsContainer.style.display = 'block';
+    } else {
+        suggestionsContainer.style.display = 'none';
+    }
 }
+
+getSuggestionTypeText(type) {
+    const typeTexts = {
+        history: '历史',
+        popular: '热门',
+        code: '番号'
+    };
+    return typeTexts[type] || '';
+}
+
 
     // 隐藏搜索建议
     hideSearchSuggestions() {
@@ -1430,6 +1807,149 @@ function formatRelativeTime(date) {
         return `${Math.floor(diff / day)}天前`;
     } else {
         return target.toLocaleDateString('zh-CN');
+    }
+}
+
+// 智能搜索建议类
+class SearchSuggestionEngine {
+    constructor(app) {
+        this.app = app;
+        this.cache = new Map();
+        this.popularKeywords = [];
+        this.userPreferences = new Set();
+    }
+
+    // 初始化热门关键词
+    initializePopularKeywords() {
+        // 从历史记录中提取热门关键词
+        const keywordCount = {};
+        (this.app.searchHistory || []).forEach(item => {
+            const keyword = item.query || item.keyword;
+            if (keyword) {
+                keywordCount[keyword] = (keywordCount[keyword] || 0) + 1;
+            }
+        });
+
+        this.popularKeywords = Object.entries(keywordCount)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 50)
+            .map(([keyword]) => keyword);
+    }
+
+    // 生成搜索建议
+    generateSuggestions(query) {
+        if (!query || query.length < 2) return [];
+
+        const cacheKey = query.toLowerCase();
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
+        const suggestions = new Set();
+        const queryLower = query.toLowerCase();
+
+        // 1. 历史记录匹配
+        (this.app.searchHistory || []).forEach(item => {
+            const keyword = item.query || item.keyword;
+            if (keyword && keyword.toLowerCase().includes(queryLower) && keyword !== query) {
+                suggestions.add({
+                    text: keyword,
+                    type: 'history',
+                    score: 10 + (item.count || 1)
+                });
+            }
+        });
+
+        // 2. 热门关键词匹配
+        this.popularKeywords.forEach(keyword => {
+            if (keyword.toLowerCase().includes(queryLower) && keyword !== query) {
+                suggestions.add({
+                    text: keyword,
+                    type: 'popular',
+                    score: 5
+                });
+            }
+        });
+
+        // 3. 番号模式匹配
+        const codePatterns = this.generateCodeSuggestions(query);
+        codePatterns.forEach(pattern => {
+            suggestions.add({
+                text: pattern,
+                type: 'code',
+                score: 8
+            });
+        });
+
+        // 排序并限制数量
+        const sortedSuggestions = Array.from(suggestions)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 8);
+
+        // 缓存结果
+        this.cache.set(cacheKey, sortedSuggestions);
+        
+        // 限制缓存大小
+        if (this.cache.size > 100) {
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey);
+        }
+
+        return sortedSuggestions;
+    }
+
+    // 生成番号建议
+    generateCodeSuggestions(query) {
+        const suggestions = [];
+        const upperQuery = query.toUpperCase();
+
+        // 常见番号前缀
+        const commonPrefixes = [
+            'SSIS', 'SSNI', 'CAWD', 'MIDV', 'MIAE', 'MIAA', 'MIRD',
+            'IPX', 'IPZ', 'ABP', 'ABAV', 'SHKD', 'ADN', 'JUL', 'JUY',
+            'PRED', 'PPPD', 'EBOD', 'MEYD', 'GVG', 'VAGU', 'HBAD',
+            'SW', 'HUNT', 'SCPX', 'CLUB', 'DVDES', 'SDDE', 'FSET'
+        ];
+
+        // 如果输入看起来像番号前缀
+        if (/^[A-Z]{2,5}$/i.test(query)) {
+            commonPrefixes.forEach(prefix => {
+                if (prefix.startsWith(upperQuery)) {
+                    for (let i = 1; i <= 5; i++) {
+                        const num = String(i).padStart(3, '0');
+                        suggestions.push(`${prefix}-${num}`);
+                    }
+                }
+            });
+        }
+
+        // 如果输入包含数字，尝试补全
+        if (/^[A-Z]+\d+$/i.test(query)) {
+            const match = upperQuery.match(/^([A-Z]+)(\d+)$/);
+            if (match) {
+                const [, prefix, num] = match;
+                const paddedNum = num.padStart(3, '0');
+                suggestions.push(`${prefix}-${paddedNum}`);
+            }
+        }
+
+        return suggestions.slice(0, 3);
+    }
+
+    // 清理缓存
+    clearCache() {
+        this.cache.clear();
+    }
+
+    // 更新用户偏好
+    updateUserPreferences(keyword) {
+        this.userPreferences.add(keyword.toLowerCase());
+        
+        // 限制偏好数量
+        if (this.userPreferences.size > 200) {
+            const array = Array.from(this.userPreferences);
+            this.userPreferences = new Set(array.slice(-150));
+        }
     }
 }
 
