@@ -88,25 +88,6 @@ CREATE TABLE IF NOT EXISTS system_config (
     updated_at INTEGER NOT NULL
 );
 
--- 添加分析事件表
-CREATE TABLE IF NOT EXISTS analytics_events (
-    id TEXT PRIMARY KEY,
-    user_id TEXT,
-    session_id TEXT,
-    event_type TEXT NOT NULL,
-    event_data TEXT DEFAULT '{}',
-    ip_address TEXT,
-    user_agent TEXT,
-    referer TEXT,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
-);
-
--- 创建相关索引
-CREATE INDEX IF NOT EXISTS idx_analytics_user_created ON analytics_events(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);
-CREATE INDEX IF NOT EXISTS idx_analytics_session ON analytics_events(session_id);
-
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -165,6 +146,3 @@ CREATE TRIGGER IF NOT EXISTS cleanup_expired_sessions
     BEGIN
         DELETE FROM user_sessions WHERE expires_at < strftime('%s', 'now') * 1000;
     END;
-	
-	
-

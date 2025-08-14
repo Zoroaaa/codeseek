@@ -9,39 +9,50 @@ class DashboardApp {
         this.init();
     }
 
-async init() {
-    try {
-        showLoading(true);
-        console.log('🚀 初始化Dashboard应用...');
-        
-        // 检查认证状态
-        await this.checkAuth();
-        
-        // 绑定事件
-        this.bindEvents();
-        
-        // 加载数据
-        await this.loadData();
-        
-        // 初始化主题
-        this.initTheme();
-        
-        this.isInitialized = true;
-        console.log('✅ Dashboard初始化完成');
-        
-    } catch (error) {
+    async init() {
+        try {
+			
+// 仅开发环境进行 .html 纠正，生产环境不处理
+const isDev = (window.location.hostname === 'localhost' ||
+               window.location.hostname === '127.0.0.1' ||
+               window.location.port !== '' ||
+               window.location.search.includes('dev=1'));
+
+if (isDev && !window.location.pathname.endsWith('.html')) {
+    console.log('开发环境修正URL到 .html 以便文件直开');
+    window.location.replace('./dashboard.html' + window.location.search);
+    return;
+}
+			
+            showLoading(true);
+            
+            // 检查认证状态
+            await this.checkAuth();
+            
+            // 绑定事件
+            this.bindEvents();
+            
+            // 加载数据
+            await this.loadData();
+            
+            // 初始化主题
+            this.initTheme();
+            
+            this.isInitialized = true;
+            console.log('✅ Dashboard初始化完成');
+            
+        } catch (error) {
         console.error('❌ Dashboard初始化失败:', error);
         showToast('初始化失败，请重新登录', 'error');
         
-        // 导航回首页
+        // 使用replace避免重定向循环
         setTimeout(() => {
-            navigateToPage('index');
+            window.location.replace('./index.html');
         }, 2000);
     } finally {
         showLoading(false);
     }
-}
-
+    }
 
     async checkAuth() {
         const token = localStorage.getItem('auth_token');
@@ -173,319 +184,6 @@ async init() {
         this.currentTab = tabName;
         this.loadTabData(tabName);
     }
-
-// 在DashboardApp类中添加缺少的方法
-
-// 同步所有数据
-async syncAllData() {
-    try {
-        showLoading(true);
-        
-        let syncResults = {
-            favorites: false,
-            history: false,
-            settings: false
-        };
-
-        // 同步收藏夹
-        try {
-            await this.syncFavorites();
-            syncResults.favorites = true;
-        } catch (error) {
-            console.error('同步收藏失败:', error);
-        }
-
-        // 同步历史记录
-        try {
-            await this.syncHistory();
-            syncResults.history = true;
-        } catch (error) {
-            console.error('同步历史失败:', error);
-        }
-
-        // 同步设置
-        try {
-            await this.syncSettings();
-            syncResults.settings = true;
-        } catch (error) {
-            console.error('同步设置失败:', error);
-        }
-
-        const successCount = Object.values(syncResults).filter(Boolean).length;
-        const totalCount = Object.keys(syncResults).length;
-
-        if (successCount === totalCount) {
-            showToast('所有数据同步成功', 'success');
-        } else if (successCount > 0) {
-            showToast(`部分数据同步成功 (${successCount}/${totalCount})`, 'warning');
-        } else {
-            showToast('数据同步失败', 'error');
-        }
-
-        // 刷新统计数据
-        await this.updateStats();
-
-    } catch (error) {
-        console.error('同步数据失败:', error);
-        showToast('同步数据失败: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// 导出数据
-async exportData() {
-    try {
-        showLoading(true);
-
-        // 收集所有数据
-        const userData = {
-            user: {
-                username: this.currentUser?.username,
-                email: this.currentUser?.email,
-                exportTime: new Date().toISOString()
-            },
-            favorites: this.favorites || [],
-            searchHistory: this.searchHistory || [],
-            settings: this.settings || {},
-            stats: await this.getStatsData(),
-            version: window.API_CONFIG?.APP_VERSION || '1.0.0',
-            type: 'complete_user_data'
-        };
-
-        const blob = new Blob([JSON.stringify(userData, null, 2)], {
-            type: 'application/json'
-        });
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.currentUser?.username || 'user'}-data-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        showToast('数据导出成功', 'success');
-
-        // 记录操作
-        API.recordAction('export_data', {
-            favoritesCount: this.favorites?.length || 0,
-            historyCount: this.searchHistory?.length || 0
-        }).catch(() => {});
-
-    } catch (error) {
-        console.error('导出数据失败:', error);
-        showToast('导出数据失败: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// 历史记录过滤
-filterHistory(filter) {
-    const buttons = document.querySelectorAll('.time-filter-btn');
-    buttons.forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.dataset.filter === filter) {
-            btn.classList.add('active');
-        }
-    });
-
-    let filteredHistory = [...(this.searchHistory || [])];
-    const now = Date.now();
-
-    switch (filter) {
-        case 'today':
-            const todayStart = new Date().setHours(0, 0, 0, 0);
-            filteredHistory = filteredHistory.filter(item => 
-                item.timestamp && item.timestamp >= todayStart
-            );
-            break;
-        case 'week':
-            const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
-            filteredHistory = filteredHistory.filter(item => 
-                item.timestamp && item.timestamp >= weekAgo
-            );
-            break;
-        case 'month':
-            const monthAgo = now - (30 * 24 * 60 * 60 * 1000);
-            filteredHistory = filteredHistory.filter(item => 
-                item.timestamp && item.timestamp >= monthAgo
-            );
-            break;
-        case 'all':
-        default:
-            // 显示全部
-            break;
-    }
-
-    this.renderHistory(filteredHistory);
-    this.updateHistoryStats(filteredHistory);
-}
-
-// 搜索历史记录
-searchHistory() {
-    const searchInput = document.getElementById('historySearch');
-    if (!searchInput) return;
-
-    const query = searchInput.value.trim().toLowerCase();
-    let filteredHistory = [...(this.searchHistory || [])];
-
-    if (query) {
-        filteredHistory = filteredHistory.filter(item => {
-            const itemQuery = (item.query || item.keyword || '').toLowerCase();
-            return itemQuery.includes(query);
-        });
-    }
-
-    this.renderHistory(filteredHistory);
-}
-
-// 生成关键词云
-generateKeywordCloud() {
-    const keywordCloud = document.getElementById('keywordCloud');
-    if (!keywordCloud || !this.searchHistory) return;
-
-    // 统计关键词频率
-    const keywordCount = {};
-    this.searchHistory.forEach(item => {
-        const keyword = item.query || item.keyword;
-        if (keyword && typeof keyword === 'string') {
-            keywordCount[keyword] = (keywordCount[keyword] || 0) + 1;
-        }
-    });
-
-    // 排序并取前20个
-    const sortedKeywords = Object.entries(keywordCount)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 20);
-
-    if (sortedKeywords.length === 0) {
-        keywordCloud.innerHTML = '<p style="text-align: center; color: var(--text-muted);">暂无搜索记录</p>';
-        return;
-    }
-
-    const maxCount = sortedKeywords[0][1];
-
-    keywordCloud.innerHTML = sortedKeywords.map(([keyword, count]) => {
-        const popularity = count / maxCount;
-        const isPopular = popularity > 0.5;
-        
-        return `<span class="keyword-tag ${isPopular ? 'popular' : ''}" 
-                     style="font-size: ${0.8 + popularity * 0.4}rem"
-                     onclick="app.searchFromKeyword('${this.escapeHtml(keyword)}')"
-                     title="搜索了 ${count} 次">
-                    ${this.escapeHtml(keyword)}
-                </span>`;
-    }).join('');
-}
-
-// 从关键词搜索
-searchFromKeyword(keyword) {
-    // 跳转到主页面并执行搜索
-    const searchUrl = `index.html?search=${encodeURIComponent(keyword)}`;
-    window.open(searchUrl, '_blank');
-}
-
-// 导出历史记录
-async exportHistory() {
-    try {
-        if (!this.searchHistory || this.searchHistory.length === 0) {
-            showToast('没有历史记录可以导出', 'warning');
-            return;
-        }
-
-        const data = {
-            searchHistory: this.searchHistory,
-            exportTime: new Date().toISOString(),
-            version: window.API_CONFIG?.APP_VERSION || '1.0.0',
-            type: 'search_history',
-            stats: {
-                totalSearches: this.searchHistory.length,
-                uniqueKeywords: new Set(this.searchHistory.map(item => item.query || item.keyword)).size,
-                dateRange: {
-                    oldest: Math.min(...this.searchHistory.map(item => item.timestamp || 0)),
-                    newest: Math.max(...this.searchHistory.map(item => item.timestamp || 0))
-                }
-            }
-        };
-
-        const blob = new Blob([JSON.stringify(data, null, 2)], {
-            type: 'application/json'
-        });
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `search-history-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        showToast('历史记录导出成功', 'success');
-
-    } catch (error) {
-        console.error('导出历史记录失败:', error);
-        showToast('导出历史记录失败: ' + error.message, 'error');
-    }
-}
-
-// 更新历史统计
-updateHistoryStats(history = this.searchHistory) {
-    if (!history) return;
-
-    const historyCount = document.getElementById('historyCount');
-    const uniqueKeywords = document.getElementById('uniqueKeywords');
-    const avgPerDay = document.getElementById('avgPerDay');
-
-    if (historyCount) historyCount.textContent = history.length;
-
-    if (uniqueKeywords) {
-        const unique = new Set(history.map(item => item.query || item.keyword)).size;
-        uniqueKeywords.textContent = unique;
-    }
-
-    if (avgPerDay && history.length > 0) {
-        const timestamps = history.map(item => item.timestamp || 0).filter(t => t > 0);
-        if (timestamps.length > 0) {
-            const oldest = Math.min(...timestamps);
-            const newest = Math.max(...timestamps);
-            const daysDiff = Math.max(1, Math.ceil((newest - oldest) / (24 * 60 * 60 * 1000)));
-            const avg = (history.length / daysDiff).toFixed(1);
-            avgPerDay.textContent = avg;
-        }
-    }
-}
-
-// 获取统计数据
-async getStatsData() {
-    return {
-        totalSearches: this.searchHistory?.length || 0,
-        totalFavorites: this.favorites?.length || 0,
-        uniqueKeywords: new Set((this.searchHistory || []).map(item => item.query || item.keyword)).size,
-        activeDays: await this.calculateActiveDays(),
-        lastLoginTime: Date.now(),
-        accountCreatedTime: this.currentUser?.createdAt || Date.now()
-    };
-}
-
-// 计算活跃天数
-async calculateActiveDays() {
-    if (!this.searchHistory || this.searchHistory.length === 0) return 0;
-
-    const dates = new Set();
-    this.searchHistory.forEach(item => {
-        if (item.timestamp) {
-            const date = new Date(item.timestamp).toDateString();
-            dates.add(date);
-        }
-    });
-
-    return dates.size;
-}
-
 
     async loadTabData(tabName) {
         switch (tabName) {
