@@ -9,41 +9,60 @@ class DashboardApp {
         this.init();
     }
 
-    async init() {
-        try {
-			
-// 仅开发环境进行 .html 纠正，生产环境不处理
-const isDev = (window.location.hostname === 'localhost' ||
-               window.location.hostname === '127.0.0.1' ||
-               window.location.port !== '' ||
-               window.location.search.includes('dev=1'));
+async init() {
+    try {
+        showLoading(true);
+        
+        // 防止重定向死循环的安全检查
+        const redirectCount = sessionStorage.getItem('dashboard_redirect_count') || 0;
+        if (redirectCount > 2) {
+            console.error('检测到重定向循环，停止重定向');
+            sessionStorage.removeItem('dashboard_redirect_count');
+            showToast('页面加载异常，请手动刷新', 'error');
+            return;
+        }
 
-if (isDev && !window.location.pathname.endsWith('.html')) {
-    console.log('开发环境修正URL到 .html 以便文件直开');
-    window.location.replace('./dashboard.html' + window.location.search);
-    return;
-}
-			
-            showLoading(true);
+        // 仅开发环境进行 .html 纠正，生产环境不处理
+        const isDev = (window.location.hostname === 'localhost' ||
+                       window.location.hostname === '127.0.0.1' ||
+                       window.location.port !== '' ||
+                       window.location.search.includes('dev=1'));
+
+        if (isDev && !window.location.pathname.endsWith('.html')) {
+            console.log('开发环境修正URL到 .html 以便文件直接访问');
             
-            // 检查认证状态
-            await this.checkAuth();
+            // 增加重定向计数
+            sessionStorage.setItem('dashboard_redirect_count', parseInt(redirectCount) + 1);
             
-            // 绑定事件
-            this.bindEvents();
-            
-            // 加载数据
-            await this.loadData();
-            
-            // 初始化主题
-            this.initTheme();
-            
-            this.isInitialized = true;
-            console.log('✅ Dashboard初始化完成');
-            
-        } catch (error) {
+            // 使用replace避免历史记录问题
+            window.location.replace('./dashboard.html' + window.location.search);
+            return;
+        }
+        
+        // 清除重定向计数
+        sessionStorage.removeItem('dashboard_redirect_count');
+        
+        // 检查认证状态
+        await this.checkAuth();
+        
+        // 绑定事件
+        this.bindEvents();
+        
+        // 加载数据
+        await this.loadData();
+        
+        // 初始化主题
+        this.initTheme();
+        
+        this.isInitialized = true;
+        console.log('✅ Dashboard初始化完成');
+        
+    } catch (error) {
         console.error('❌ Dashboard初始化失败:', error);
         showToast('初始化失败，请重新登录', 'error');
+        
+        // 清除可能的无效状态
+        sessionStorage.removeItem('dashboard_redirect_count');
         
         // 使用replace避免重定向循环
         setTimeout(() => {
@@ -52,7 +71,7 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
     } finally {
         showLoading(false);
     }
-    }
+}
 
     async checkAuth() {
         const token = localStorage.getItem('auth_token');

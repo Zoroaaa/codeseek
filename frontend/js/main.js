@@ -604,43 +604,69 @@ async searchKeyword(keyword) {
 
 // 修复添加搜索历史方法
 addToHistory(keyword) {
-    // 验证关键词
-    if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
-        console.warn('无效的搜索关键词，跳过添加到历史');
+    // 严格的输入验证
+    if (!keyword || typeof keyword !== 'string') {
+        console.warn('无效的搜索关键词类型:', typeof keyword);
         return;
     }
-
+    
     const trimmedKeyword = keyword.trim();
-    
-    // 移除重复项
-    this.searchHistory = this.searchHistory.filter(item => {
-        return item && item.keyword && item.keyword !== trimmedKeyword;
-    });
-    
-    // 添加到开头
-    this.searchHistory.unshift({
-        id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        keyword: trimmedKeyword,
-        query: trimmedKeyword, // 兼容性
-        timestamp: Date.now(),
-        count: 1,
-        source: 'manual'
-    });
-
-    // 限制历史记录数量
-    const maxHistory = this.config.maxHistoryPerUser || 1000;
-    if (this.searchHistory.length > maxHistory) {
-        this.searchHistory = this.searchHistory.slice(0, maxHistory);
+    if (trimmedKeyword.length === 0) {
+        console.warn('搜索关键词为空，跳过添加');
+        return;
     }
-
-    this.saveHistory();
-    this.renderHistory();
-
-    // 如果用户已登录，保存到云端
-    if (this.currentUser) {
-        API.saveSearchHistory(trimmedKeyword, 'manual').catch(error => {
-            console.error('保存搜索历史到云端失败:', error);
+    
+    if (trimmedKeyword.length > 100) {
+        console.warn('搜索关键词过长，截断处理');
+        trimmedKeyword = trimmedKeyword.substring(0, 100);
+    }
+    
+    try {
+        // 安全的数组过滤：确保每个item都有有效的keyword属性
+        this.searchHistory = this.searchHistory.filter(item => {
+            return item && 
+                   typeof item === 'object' && 
+                   item.keyword && 
+                   typeof item.keyword === 'string' && 
+                   item.keyword !== trimmedKeyword;
         });
+        
+        // 创建新的历史记录项
+        const historyItem = {
+            id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            keyword: trimmedKeyword,
+            query: trimmedKeyword, // 兼容性字段
+            timestamp: Date.now(),
+            count: 1,
+            source: 'manual'
+        };
+        
+        // 添加到开头
+        this.searchHistory.unshift(historyItem);
+
+        // 限制历史记录数量
+        const maxHistory = this.config.maxHistoryPerUser || 1000;
+        if (this.searchHistory.length > maxHistory) {
+            this.searchHistory = this.searchHistory.slice(0, maxHistory);
+        }
+
+        // 保存到本地存储
+        this.saveHistory();
+        
+        // 更新UI显示
+        this.renderHistory();
+
+        // 如果用户已登录，保存到云端（异步，不阻塞UI）
+        if (this.currentUser) {
+            API.saveSearchHistory(trimmedKeyword, 'manual').catch(error => {
+                console.error('保存搜索历史到云端失败:', error);
+                // 不显示错误提示，避免干扰用户体验
+            });
+        }
+        
+    } catch (error) {
+        console.error('添加搜索历史失败:', error);
+        // 确保不影响搜索功能
     }
 }
 
@@ -1027,51 +1053,78 @@ async syncSearchHistory() {
     }
 
     // 认证处理
-    async handleLogin(event) {
-        event.preventDefault();
-        
-        const username = document.getElementById('loginUsername')?.value.trim();
-        const password = document.getElementById('loginPassword')?.value;
+async handleLogin(event) {
+    event.preventDefault();
+    
+    // 防止重复提交
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    if (submitBtn && submitBtn.disabled) return;
+    
+    const username = document.getElementById('loginUsername')?.value.trim();
+    const password = document.getElementById('loginPassword')?.value;
 
-        if (!username || !password) {
-            showToast('请填写用户名和密码', 'error');
-            return;
+    if (!username || !password) {
+        showToast('请填写用户名和密码', 'error');
+        return;
+    }
+
+    try {
+        // 禁用提交按钮
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = '登录中...';
         }
-
-        try {
-            showLoading(true);
-            const result = await API.login(username, password);
+        
+        showLoading(true);
+        const result = await API.login(username, password);
+        
+        if (result.success) {
+            this.currentUser = result.user;
             
-            if (result.success) {
-                this.currentUser = result.user;
-                this.updateUserUI();
-                this.closeModals();
-                showToast(`欢迎回来，${result.user.username}！`, 'success');
-				
-				// 关键修复：显示主内容区域
-        document.querySelector('.main-content').style.display = 'block';
-        
-        // 关闭模态框
-        this.closeModals();
-        
-        // 特殊修复：检查是否有搜索查询
-        this.handleURLParams();
-                
-                // 登录后同步云端数据
-                await this.loadCloudData();
-                
-                // 清空登录表单
-                document.getElementById('loginForm').reset();
-            } else {
-                showToast(result.message || '登录失败', 'error');
+            // 立即更新UI状态
+            this.updateUserUI();
+            
+            // 显示主内容区域
+            const mainContent = document.querySelector('.main-content');
+            if (mainContent) {
+                mainContent.style.display = 'block';
             }
-        } catch (error) {
-            console.error('登录失败:', error);
-            showToast(`登录失败: ${error.message}`, 'error');
-        } finally {
-            showLoading(false);
+            
+            // 关闭模态框
+            this.closeModals();
+            
+            // 显示欢迎消息
+            showToast(`欢迎回来，${result.user.username}！`, 'success');
+            
+            // 异步加载云端数据（不阻塞UI）
+            this.loadCloudData().catch(error => {
+                console.error('加载云端数据失败:', error);
+                showToast('云端数据加载失败，使用本地数据', 'warning', 3000);
+            });
+            
+            // 处理URL参数（如搜索查询）
+            this.handleURLParams();
+            
+            // 清空登录表单
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) loginForm.reset();
+            
+        } else {
+            throw new Error(result.message || '登录失败');
+        }
+    } catch (error) {
+        console.error('登录失败:', error);
+        showToast(`登录失败: ${error.message}`, 'error');
+    } finally {
+        showLoading(false);
+        
+        // 恢复提交按钮状态
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '登录';
         }
     }
+}
 
     async handleRegister(event) {
         event.preventDefault();

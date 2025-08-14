@@ -38,42 +38,50 @@ async handle(request, env) {
         return await this.executeHandler(this.routes.get(exactKey), request, env);
     }
 
-    // 查找模式匹配的路由（包括参数路由）
-    const matchedRoutes = [];
-    for (const [routeKey, handler] of this.routes) {
-        const [routeMethod, routePath] = routeKey.split(':');
-        if ((routeMethod === method || routeMethod === '*') && this.matchPath(routePath, pathname)) {
-            // 优先级：参数路由 > 通配符路由
+// 查找模式匹配的路由（包括参数路由）
+const matchedRoutes = [];
+for (const [routeKey, handler] of this.routes) {
+    const [routeMethod, routePath] = routeKey.split(':');
+    if ((routeMethod === method || routeMethod === '*') && this.matchPath(routePath, pathname)) {
+        // 提取路径参数
+        const params = this.extractPathParams(routePath, pathname);
+        if (params !== null) { // 只有成功提取参数才添加到匹配列表
             const priority = routePath.includes(':') ? 1 : (routePath.includes('*') ? 0 : 2);
-            matchedRoutes.push({ handler, priority, routePath });
+            matchedRoutes.push({ handler, priority, routePath, params });
         }
     }
+}
 
-    // 按优先级排序并执行第一个匹配的处理器
-    if (matchedRoutes.length > 0) {
-        matchedRoutes.sort((a, b) => b.priority - a.priority);
-        return await this.executeHandler(matchedRoutes[0].handler, request, env);
-    }
+// 按优先级排序并执行第一个匹配的处理器
+if (matchedRoutes.length > 0) {
+    matchedRoutes.sort((a, b) => b.priority - a.priority);
+    const matched = matchedRoutes[0];
+    return await this.executeHandler(matched.handler, request, env, matched.params);
+}
 
     return utils.errorResponse(`API路径不存在: ${pathname}`, 404);
 }
 
-    async executeHandler(handler, request, env) {
-        try {
-            const result = await handler(request, env);
-            // 确保所有响应都有CORS头
-            if (result instanceof Response) {
-                const corsHeaders = utils.getCorsHeaders(request.headers.get('Origin') || '*');
-                Object.entries(corsHeaders).forEach(([key, value]) => {
-                    result.headers.set(key, value);
-                });
-            }
-            return result;
-        } catch (error) {
-            console.error('路由处理器错误:', error);
-            return utils.errorResponse('内部服务器错误', 500);
+// 修改executeHandler方法以传递参数
+async executeHandler(handler, request, env, params = {}) {
+    try {
+        // 将参数添加到request对象中
+        request.params = params;
+        
+        const result = await handler(request, env);
+        // 确保所有响应都有CORS头
+        if (result instanceof Response) {
+            const corsHeaders = utils.getCorsHeaders(request.headers.get('Origin') || '*');
+            Object.entries(corsHeaders).forEach(([key, value]) => {
+                result.headers.set(key, value);
+            });
         }
+        return result;
+    } catch (error) {
+        console.error('路由处理器错误:', error);
+        return utils.errorResponse('内部服务器错误', 500);
     }
+}
 
 // 替换您的 Router 类中的 matchPath 方法
 matchPath(routePath, requestPath) {
@@ -109,6 +117,42 @@ matchPath(routePath, requestPath) {
     
     return false;
 }
+
+// 在Router类的matchPath方法之后添加这个方法
+extractPathParams(routePath, requestPath) {
+    const params = {};
+    
+    if (!routePath.includes(':')) {
+        return params;
+    }
+    
+    const routeParts = routePath.split('/');
+    const requestParts = requestPath.split('/');
+    
+    if (routeParts.length !== requestParts.length) {
+        return null; // 长度不匹配，无效
+    }
+    
+    for (let i = 0; i < routeParts.length; i++) {
+        const routePart = routeParts[i];
+        const requestPart = requestParts[i];
+        
+        if (routePart.startsWith(':')) {
+            const paramName = routePart.slice(1);
+            // 参数验证：确保不为空且符合基本格式
+            if (!requestPart || requestPart.length === 0) {
+                return null;
+            }
+            // 基本的参数清理
+            params[paramName] = decodeURIComponent(requestPart).trim();
+        } else if (routePart !== requestPart) {
+            return null; // 固定部分不匹配
+        }
+    }
+    
+    return params;
+}
+
 }
 
 // 工具函数
@@ -147,40 +191,101 @@ const utils = {
         return `${data}.${encodedSignature}`;
     },
 
-    async verifyJWT(token, secret) {
+async verifyJWT(token, secret) {
+    try {
+        // 安全验证：检查token格式
+        if (!token || typeof token !== 'string') return null;
+        
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+        
+        const [encodedHeader, encodedPayload, encodedSignature] = parts;
+        
+        // 验证header
+        let header;
         try {
-            const [encodedHeader, encodedPayload, encodedSignature] = token.split('.');
-            if (!encodedHeader || !encodedPayload || !encodedSignature) return null;
-
-            const data = `${encodedHeader}.${encodedPayload}`;
-            const encoder = new TextEncoder();
-            const key = await crypto.subtle.importKey(
+            const headerPadding = '='.repeat((4 - encodedHeader.length % 4) % 4);
+            header = JSON.parse(atob(encodedHeader + headerPadding));
+        } catch (error) {
+            console.error('Header解析失败:', error);
+            return null;
+        }
+        
+        // 验证header格式和算法
+        if (!header || header.alg !== 'HS256' || header.typ !== 'JWT') {
+            console.error('无效的JWT header');
+            return null;
+        }
+        
+        // 验证payload
+        let payload;
+        try {
+            const payloadPadding = '='.repeat((4 - encodedPayload.length % 4) % 4);
+            payload = JSON.parse(atob(encodedPayload + payloadPadding));
+        } catch (error) {
+            console.error('Payload解析失败:', error);
+            return null;
+        }
+        
+        // 时间验证（在签名验证之前，减少计算开销）
+        const now = Math.floor(Date.now() / 1000);
+        
+        if (payload.exp && now >= payload.exp) {
+            console.error('Token已过期');
+            return null;
+        }
+        
+        if (payload.nbf && now < payload.nbf) {
+            console.error('Token还未生效');
+            return null;
+        }
+        
+        if (payload.iat && now < payload.iat - 300) { // 允许5分钟时钟偏差
+            console.error('Token签发时间无效');
+            return null;
+        }
+        
+        // 验证签名
+        const data = `${encodedHeader}.${encodedPayload}`;
+        const encoder = new TextEncoder();
+        
+        let key;
+        try {
+            key = await crypto.subtle.importKey(
                 'raw',
                 encoder.encode(secret),
                 { name: 'HMAC', hash: 'SHA-256' },
                 false,
                 ['verify']
             );
-            
-            const padding = '='.repeat((4 - encodedSignature.length % 4) % 4);
-            const signature = Uint8Array.from(atob(encodedSignature + padding), c => c.charCodeAt(0));
-            const isValid = await crypto.subtle.verify('HMAC', key, signature, encoder.encode(data));
-            
-            if (!isValid) return null;
-            
-            const payloadPadding = '='.repeat((4 - encodedPayload.length % 4) % 4);
-            const payload = JSON.parse(atob(encodedPayload + payloadPadding));
-            
-            if (payload.exp && Date.now() > payload.exp * 1000) {
-                return null;
-            }
-            
-            return payload;
         } catch (error) {
-            console.error('JWT验证失败:', error);
+            console.error('密钥导入失败:', error);
             return null;
         }
-    },
+        
+        let signature;
+        try {
+            const signaturePadding = '='.repeat((4 - encodedSignature.length % 4) % 4);
+            signature = Uint8Array.from(atob(encodedSignature + signaturePadding), c => c.charCodeAt(0));
+        } catch (error) {
+            console.error('签名解码失败:', error);
+            return null;
+        }
+        
+        const isValid = await crypto.subtle.verify('HMAC', key, signature, encoder.encode(data));
+        
+        if (!isValid) {
+            console.error('JWT签名验证失败');
+            return null;
+        }
+        
+        return payload;
+        
+    } catch (error) {
+        console.error('JWT验证过程出错:', error);
+        return null;
+    }
+},
 
     getCorsHeaders(origin = '*') {
         // 更严格的CORS配置
@@ -1009,27 +1114,50 @@ router.delete('/api/user/search-history/:id', async (request, env) => {
     }
 
     try {
-        const url = new URL(request.url);
-        const historyId = url.pathname.split('/').pop();
+        // 从路径参数中获取ID（需要前面的路由参数修复）
+        const historyId = request.params?.id || request.url.split('/').pop();
 
-        if (!historyId || historyId === 'search-history') {
-            return utils.errorResponse('历史记录ID无效');
+        // 安全验证：检查ID格式
+        if (!historyId || historyId === 'search-history' || !/^[a-zA-Z0-9_-]+$/.test(historyId)) {
+            return utils.errorResponse('历史记录ID无效', 400);
         }
 
+        // 验证ID长度（防止过长的恶意输入）
+        if (historyId.length > 50) {
+            return utils.errorResponse('历史记录ID格式错误', 400);
+        }
+
+        // 先检查记录是否存在且属于当前用户
+        const existingRecord = await env.DB.prepare(`
+            SELECT id FROM user_search_history 
+            WHERE id = ? AND user_id = ?
+        `).bind(historyId, user.id).first();
+
+        if (!existingRecord) {
+            return utils.errorResponse('历史记录不存在或无权删除', 404);
+        }
+
+        // 执行删除操作
         const result = await env.DB.prepare(`
             DELETE FROM user_search_history 
             WHERE id = ? AND user_id = ?
         `).bind(historyId, user.id).run();
 
         if (result.changes === 0) {
-            return utils.errorResponse('历史记录不存在或无权删除', 404);
+            return utils.errorResponse('删除操作失败', 500);
         }
 
-        return utils.successResponse({ message: '删除成功' });
+        // 记录操作日志
+        await utils.logUserAction(env, user.id, 'delete_history', { historyId }, request);
+
+        return utils.successResponse({ 
+            message: '删除成功',
+            deletedId: historyId
+        });
 
     } catch (error) {
         console.error('删除搜索历史失败:', error);
-        return utils.errorResponse('删除搜索历史失败', 500);
+        return utils.errorResponse('删除搜索历史失败: ' + error.message, 500);
     }
 });
 
