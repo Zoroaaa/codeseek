@@ -138,7 +138,9 @@ function throttle(func, limit) {
     };
 }
 
-// 在utils.js中添加
+/**
+ * 导航错误处理函数
+ */
 function handleNavigationError(url, retryCount = 0) {
     if (retryCount < 3) {
         setTimeout(() => {
@@ -153,8 +155,6 @@ function handleNavigationError(url, retryCount = 0) {
         showToast('页面跳转失败，请手动刷新页面', 'error');
     }
 }
-
-
 
 /**
  * 深拷贝对象
@@ -883,9 +883,7 @@ const NetworkUtils = {
     }
 };
 
-// 在utils.js中，替换 navigateToPage 和 navigateToDashboard
-
-// 简化的环境检测
+// 环境检测
 function isDevEnv() {
     return window.location.hostname === 'localhost' || 
            window.location.hostname === '127.0.0.1' || 
@@ -893,7 +891,7 @@ function isDevEnv() {
            window.location.search.includes('dev=1');
 }
 
-// 简化的页面导航函数
+// 页面导航函数
 function navigateToPage(url, options = {}) {
     const { useReplace = false, timeout = 5000 } = options;
     const isDev = isDevEnv();
@@ -934,7 +932,7 @@ function navigateToPage(url, options = {}) {
     });
 }
 
-// 简化的Dashboard导航
+// Dashboard导航
 async function navigateToDashboard() {
     try {
         showLoading(true);
@@ -945,7 +943,7 @@ async function navigateToDashboard() {
             throw new Error('未登录');
         }
 
-        // 直接导航，不做复杂的URL处理
+        // 直接导航
         await navigateToPage('dashboard', { useReplace: true });
 
     } catch (error) {
@@ -1048,7 +1046,7 @@ function showToast(message, type = 'info', duration = 3000) {
     return window.toastManager.show(message, type, duration);
 }
 
-// 添加对应的CSS样式
+// Toast样式
 const toastStyles = `
 .toast-container {
     position: fixed;
@@ -1062,10 +1060,10 @@ const toastStyles = `
 }
 
 .toast {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    background: var(--bg-primary, #ffffff);
+    border: 1px solid var(--border-color, #e5e7eb);
     border-radius: 0.75rem;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     min-width: 300px;
     max-width: 500px;
     opacity: 0;
@@ -1116,7 +1114,7 @@ const toastStyles = `
 
 .toast-message {
     flex: 1;
-    color: var(--text-primary);
+    color: var(--text-primary, #111827);
     font-size: 0.95rem;
     line-height: 1.4;
 }
@@ -1124,7 +1122,7 @@ const toastStyles = `
 .toast-close {
     background: none;
     border: none;
-    color: var(--text-muted);
+    color: var(--text-muted, #6b7280);
     cursor: pointer;
     font-size: 1.25rem;
     padding: 0;
@@ -1138,8 +1136,8 @@ const toastStyles = `
 }
 
 .toast-close:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+    background: var(--bg-tertiary, #f3f4f6);
+    color: var(--text-primary, #111827);
 }
 
 .toast-progress {
@@ -1147,7 +1145,7 @@ const toastStyles = `
     bottom: 0;
     left: 0;
     height: 3px;
-    background: linear-gradient(90deg, var(--accent-primary), var(--accent-hover));
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
     animation: toast-progress linear forwards;
 }
 
@@ -1270,7 +1268,7 @@ class ErrorBoundary {
             metadata
         });
 
-        // 发送错误报告（如果启用）
+        // 发送错误报告
         this.reportError();
 
         // 显示用户友好的错误消息
@@ -1280,7 +1278,6 @@ class ErrorBoundary {
     async reportError() {
         if (window.API_CONFIG?.ENABLE_ERROR_REPORTING && this.lastError) {
             try {
-                // 可以发送到分析服务
                 const errorData = {
                     message: this.lastError.error?.message || String(this.lastError.error),
                     context: this.lastError.context,
@@ -1290,7 +1287,6 @@ class ErrorBoundary {
                     errorCount: this.errorCount
                 };
 
-                // 这里可以调用API发送错误报告
                 console.log('Error report:', errorData);
             } catch (reportError) {
                 console.warn('Failed to report error:', reportError);
@@ -1349,11 +1345,23 @@ class ErrorBoundary {
     }
 }
 
+// 防止重复调用的装饰器函数
+function preventDuplicateCall(func, delay = 1000) {
+    let lastCallTime = 0;
+    return function(...args) {
+        const now = Date.now();
+        if (now - lastCallTime > delay) {
+            lastCallTime = now;
+            return func.apply(this, args);
+        }
+    };
+}
+
 // 创建全局实例
 window.performanceMonitor = new PerformanceMonitor();
 window.errorBoundary = new ErrorBoundary();
 
-// 导出增强的工具函数
+// 性能测量装饰器
 window.measurePerformance = (name, fn) => {
     return async (...args) => {
         window.performanceMonitor.start(name);
@@ -1370,7 +1378,6 @@ window.measurePerformance = (name, fn) => {
     };
 };
 
-
 // 初始化错误处理
 ErrorHandler.init();
 
@@ -1384,7 +1391,6 @@ window.PerformanceUtils = PerformanceUtils;
 window.CookieUtils = CookieUtils;
 window.ErrorHandler = ErrorHandler;
 window.NetworkUtils = NetworkUtils;
-// 导出到全局作用域
 window.navigateToPage = navigateToPage;
 window.navigateToDashboard = navigateToDashboard;
-
+window.preventDuplicateCall = preventDuplicateCall;
