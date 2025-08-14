@@ -189,20 +189,30 @@ bindSearchEvents() {
     const searchInput = document.getElementById('searchInput');
     
     if (searchBtn) {
-        searchBtn.addEventListener('click', (e) => {
+        // 移除旧监听器
+        searchBtn.removeEventListener('click', this._searchBtnHandler);
+        
+        // 创建新的处理器并保存引用
+        this._searchBtnHandler = (e) => {
             e.preventDefault();
             this.performSearch();
-        });
+        };
+        
+        searchBtn.addEventListener('click', this._searchBtnHandler);
     }
     
     if (searchInput) {
         // 搜索输入事件
-        searchInput.addEventListener('keypress', (e) => {
+        searchInput.removeEventListener('keypress', this._searchInputHandler);
+        
+        this._searchInputHandler = (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 this.performSearch();
             }
-        });
+        };
+        
+        searchInput.addEventListener('keypress', this._searchInputHandler);
         
         // 搜索建议 - 防抖处理
         searchInput.addEventListener('input', debounce((e) => {
@@ -327,7 +337,8 @@ bindModalEvents() {
     const showLoginLink = document.getElementById('showLogin');
     
     if (loginBtn) {
-        loginBtn.addEventListener('click', () => {
+        loginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             this.showLoginModal();
         });
     }
@@ -348,7 +359,8 @@ bindModalEvents() {
     
     // 关闭按钮事件
     document.querySelectorAll('.modal .close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
+        closeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             this.closeAllModals();
         });
     });
@@ -364,21 +376,25 @@ bindModalEvents() {
         }
     });
     
-    // 表单提交事件
+    // 表单提交事件 - 关键修复
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
     
     if (loginForm) {
+        // 移除旧的事件监听器
+        loginForm.removeEventListener('submit', this.handleLogin);
+        // 绑定新的事件监听器，确保正确的 this 上下文
         loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleLogin();
+            this.handleLogin(e);
         });
     }
     
     if (registerForm) {
+        // 移除旧的事件监听器
+        registerForm.removeEventListener('submit', this.handleRegister);
+        // 绑定新的事件监听器，确保正确的 this 上下文
         registerForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleRegister();
+            this.handleRegister(e);
         });
     }
 }
@@ -1387,10 +1403,14 @@ showRegisterModal() {
 
     // 认证处理
 async handleLogin(event) {
-    event.preventDefault();
+    // 关键修复：添加事件参数检查
+    if (event) {
+        event.preventDefault();
+    }
     
     // 防止重复提交
-    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const submitBtn = event?.target?.querySelector('button[type="submit"]') || 
+                     document.querySelector('#loginForm button[type="submit"]');
     if (submitBtn && submitBtn.disabled) return;
     
     const username = document.getElementById('loginUsername')?.value.trim();
@@ -1424,7 +1444,7 @@ async handleLogin(event) {
             }
             
             // 关闭模态框
-            this.closeModals();
+            this.closeAllModals();
             
             // 显示欢迎消息
             showToast(`欢迎回来，${result.user.username}！`, 'success');
@@ -1459,85 +1479,96 @@ async handleLogin(event) {
     }
 }
 
-    async handleRegister(event) {
+async handleRegister(event) {
+    // 关键修复：添加事件参数检查
+    if (event) {
         event.preventDefault();
-		
-		    // 添加防止重复提交机制
-    const submitBtn = event.target.querySelector('button[type="submit"]');
+    }
+    
+    // 添加防止重复提交机制
+    const submitBtn = event?.target?.querySelector('button[type="submit"]') || 
+                     document.querySelector('#registerForm button[type="submit"]');
     if (submitBtn && submitBtn.classList.contains('submitting')) return;
     
     if (submitBtn) {
         submitBtn.disabled = true;
-// 正确代码
-submitBtn.classList.add('submitting');
-const span = document.createElement('span');
-span.textContent = '注册中...';
-submitBtn.innerHTML = '';
-submitBtn.appendChild(span);
+        submitBtn.classList.add('submitting');
+        submitBtn.textContent = '注册中...';
     }
         
-        const username = document.getElementById('regUsername')?.value.trim();
-        const email = document.getElementById('regEmail')?.value.trim();
-        const password = document.getElementById('regPassword')?.value;
-        const confirmPassword = document.getElementById('regConfirmPassword')?.value;
+    const username = document.getElementById('regUsername')?.value.trim();
+    const email = document.getElementById('regEmail')?.value.trim();
+    const password = document.getElementById('regPassword')?.value;
+    const confirmPassword = document.getElementById('regConfirmPassword')?.value;
 
-        // 客户端验证
-        if (!username || !email || !password || !confirmPassword) {
-            showToast('请填写所有字段', 'error');
-            return;
-        }
+    // 客户端验证
+    if (!username || !email || !password || !confirmPassword) {
+        showToast('请填写所有字段', 'error');
+        this.resetRegisterButton(submitBtn);
+        return;
+    }
 
-        if (password !== confirmPassword) {
-            showToast('两次输入的密码不一致', 'error');
-            return;
-        }
+    if (password !== confirmPassword) {
+        showToast('两次输入的密码不一致', 'error');
+        this.resetRegisterButton(submitBtn);
+        return;
+    }
 
-        // 使用配置中的验证规则
-        if (username.length < this.config.minUsernameLength || username.length > this.config.maxUsernameLength) {
-            showToast(`用户名长度应在${this.config.minUsernameLength}-${this.config.maxUsernameLength}个字符之间`, 'error');
-            return;
-        }
+    // 使用配置中的验证规则
+    if (username.length < this.config.minUsernameLength || username.length > this.config.maxUsernameLength) {
+        showToast(`用户名长度应在${this.config.minUsernameLength}-${this.config.maxUsernameLength}个字符之间`, 'error');
+        this.resetRegisterButton(submitBtn);
+        return;
+    }
 
-        if (password.length < this.config.minPasswordLength) {
-            showToast(`密码长度至少${this.config.minPasswordLength}个字符`, 'error');
-            return;
-        }
+    if (password.length < this.config.minPasswordLength) {
+        showToast(`密码长度至少${this.config.minPasswordLength}个字符`, 'error');
+        this.resetRegisterButton(submitBtn);
+        return;
+    }
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            showToast('请输入有效的邮箱地址', 'error');
-            return;
-        }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showToast('请输入有效的邮箱地址', 'error');
+        this.resetRegisterButton(submitBtn);
+        return;
+    }
 
-        try {
-            showLoading(true);
-            const result = await API.register(username, email, password);
+    try {
+        showLoading(true);
+        const result = await API.register(username, email, password);
+        
+        if (result.success) {
+            showToast('注册成功，请登录', 'success');
+            this.showLoginModal();
             
-            if (result.success) {
-                showToast('注册成功，请登录', 'success');
-                this.showLoginModal();
-                
-                // 清空注册表单
-                document.getElementById('registerForm').reset();
-                
-                // 预填用户名到登录表单
-                const loginUsername = document.getElementById('loginUsername');
-                if (loginUsername) loginUsername.value = username;
-            } else {
-                showToast(result.message || '注册失败', 'error');
-            }
-        } catch (error) {
-            console.error('注册失败:', error);
-            showToast(`注册失败: ${error.message}`, 'error');
-        } finally {
-        // 重置按钮状态
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('submitting');
-            submitBtn.textContent = '注册';
+            // 清空注册表单
+            const registerForm = document.getElementById('registerForm');
+            if (registerForm) registerForm.reset();
+            
+            // 预填用户名到登录表单
+            const loginUsername = document.getElementById('loginUsername');
+            if (loginUsername) loginUsername.value = username;
+        } else {
+            showToast(result.message || '注册失败', 'error');
         }
+    } catch (error) {
+        console.error('注册失败:', error);
+        showToast(`注册失败: ${error.message}`, 'error');
+    } finally {
+        showLoading(false);
+        this.resetRegisterButton(submitBtn);
     }
+}
+
+// 新增：重置注册按钮状态的辅助方法
+resetRegisterButton(submitBtn) {
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('submitting');
+        submitBtn.textContent = '注册';
     }
+}
 
     // 检查认证状态
     async checkAuthStatus() {
