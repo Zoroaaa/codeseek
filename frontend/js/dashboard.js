@@ -572,7 +572,6 @@ initTheme() {
         const themeToggle = document.getElementById('themeToggle');
         
         document.documentElement.setAttribute('data-theme', newTheme);
-        StorageManager.setItem('theme', newTheme);
         
         if (themeToggle) {
             themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
@@ -630,7 +629,6 @@ async getSearchHistory() {
             return await API.updateUserSettings(settings);
         } catch (error) {
             // 本地保存设置
-            StorageManager.setItem('user_settings', settings);
             throw error;
         }
     }
@@ -749,8 +747,7 @@ async clearAllHistory() {
             this.favorites = [];
             this.searchHistory = [];
             
-            // 清空本地存储
-            StorageManager.clear();
+
             
             // 重新加载数据
             await this.loadData();

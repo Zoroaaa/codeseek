@@ -16,7 +16,7 @@ class AuthManager {
     // 从本地存储加载认证信息
     loadStoredAuth() {
         const token = localStorage.getItem('auth_token');
-        const user = StorageManager.getItem('current_user');
+
         
         if (token && user) {
             this.setAuth(user, token);
@@ -30,7 +30,7 @@ class AuthManager {
         
         // 存储到本地
         localStorage.setItem('auth_token', token);
-        StorageManager.setItem('current_user', user);
+
         
         // 设置API token
         if (typeof API !== 'undefined') {
@@ -53,7 +53,7 @@ class AuthManager {
         
         // 清除本地存储
         localStorage.removeItem('auth_token');
-        StorageManager.removeItem('current_user');
+
         
         // 清除API token
         if (typeof API !== 'undefined') {
@@ -158,7 +158,7 @@ class AuthManager {
             
             if (response.success && response.user) {
                 this.currentUser = response.user;
-                StorageManager.setItem('current_user', response.user);
+
                 return true;
             } else {
                 this.clearAuth();
@@ -439,7 +439,7 @@ const SessionManager = {
             sessionId: generateId(16)
         };
         
-        StorageManager.setItem(this.SESSION_KEY, session);
+
         this.startActivityTracking();
         return session;
     },
@@ -452,13 +452,13 @@ const SessionManager = {
             this.recordSessionStats(session);
         }
         
-        StorageManager.removeItem(this.SESSION_KEY);
+
         this.stopActivityTracking();
     },
 
     // 获取当前会话
     getSession() {
-        return StorageManager.getItem(this.SESSION_KEY);
+
     },
 
     // 更新活动时间
@@ -466,7 +466,7 @@ const SessionManager = {
         const session = this.getSession();
         if (session) {
             session.lastActivity = Date.now();
-            StorageManager.setItem(this.SESSION_KEY, session);
+
         }
     },
 

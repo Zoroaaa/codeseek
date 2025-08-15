@@ -825,11 +825,9 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
     loadLocalData() {
         try {
             // 加载搜索历史
-            this.searchHistory = StorageManager.getItem('search_history', []);
             this.renderHistory();
 
             // 加载收藏夹
-            this.favorites = StorageManager.getItem('favorites', []);
             this.renderFavorites();
             
             console.log(`📚 本地数据已加载: ${this.searchHistory.length}条历史, ${this.favorites.length}个收藏`);
@@ -844,7 +842,6 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
 
     // 主题管理
     initTheme() {
-        const savedTheme = StorageManager.getItem('theme', 'light');
         const themeToggle = document.getElementById('themeToggle');
         
         document.documentElement.setAttribute('data-theme', savedTheme);
@@ -860,7 +857,6 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
         const themeToggle = document.getElementById('themeToggle');
         
         document.documentElement.setAttribute('data-theme', newTheme);
-        StorageManager.setItem('theme', newTheme);
         
         if (themeToggle) {
             themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
