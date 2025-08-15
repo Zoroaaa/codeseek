@@ -206,14 +206,6 @@ function generateId(length = 10) {
  * 存储管理器
  */
 const StorageManager = {
-    // 存储配额检查
-    getQuotaUsage() {
-        if ('storage' in navigator && 'estimate' in navigator.storage) {
-            return navigator.storage.estimate();
-        }
-        return Promise.resolve({ usage: 0, quota: 0 });
-    },
-
     // 安全的localStorage操作
     setItem(key, value) {
         try {
@@ -221,17 +213,6 @@ const StorageManager = {
             localStorage.setItem(key, serialized);
             return true;
         } catch (error) {
-            if (error.name === 'QuotaExceededError') {
-                console.warn('存储空间不足，尝试清理缓存');
-                this.clearCache();
-                try {
-                    localStorage.setItem(key, JSON.stringify(value));
-                    return true;
-                } catch (retryError) {
-                    console.error('存储失败:', retryError);
-                    return false;
-                }
-            }
             console.error('存储数据失败:', error);
             return false;
         }
@@ -265,25 +246,6 @@ const StorageManager = {
             console.error('清空存储失败:', error);
             return false;
         }
-    },
-
-    // 清理缓存数据
-    clearCache() {
-        const cacheKeys = Object.keys(localStorage).filter(key => 
-            key.startsWith('search_cache_') || 
-            key.startsWith('temp_') ||
-            key.includes('cache')
-        );
-        
-        cacheKeys.forEach(key => {
-            try {
-                localStorage.removeItem(key);
-            } catch (error) {
-                console.error(`清理缓存失败 ${key}:`, error);
-            }
-        });
-        
-        console.log(`已清理${cacheKeys.length}个缓存项`);
     },
 
     // 获取存储使用情况

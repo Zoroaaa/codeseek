@@ -177,6 +177,8 @@ async deleteAccount() {
     }
 }
 
+
+
 // 清空搜索历史方法
 async clearAllSearchHistory() {
     if (!this.token) {
@@ -238,35 +240,36 @@ async getSearchStats() {
         }
     }
 
-// 修复 syncFavorites 方法
-async syncFavorites(favorites) {
+// 在APIService中优化syncFavorites方法
+async syncFavorites(favorites, operation = 'sync') {
     if (!this.token) {
         throw new Error('用户未登录');
     }
     
-    if (!Array.isArray(favorites)) {
-        throw new Error('收藏数据格式错误');
-    }
+    const endpoint = '/api/user/favorites';
     
-    // 验证收藏数据结构
-    const validFavorites = favorites.filter(fav => {
-        return fav && fav.title && fav.url && 
-               typeof fav.title === 'string' && 
-               typeof fav.url === 'string';
-    });
-    
-    if (validFavorites.length !== favorites.length) {
-        console.warn('过滤了无效的收藏数据');
-    }
-    
-    try {
-        return await this.request('/api/user/favorites', {
-            method: 'POST',
-            body: JSON.stringify({ favorites: validFavorites })
-        });
-    } catch (error) {
-        console.error('同步收藏失败:', error);
-        throw error;
+    switch (operation) {
+        case 'add':
+            return this.request(endpoint, {
+                method: 'POST',
+                body: JSON.stringify(favorites)
+            });
+            
+        case 'delete':
+            return this.request(`${endpoint}/${favorites.id}`, {
+                method: 'DELETE'
+            });
+            
+        case 'clear':
+            return this.request(endpoint, {
+                method: 'DELETE'
+            });
+            
+        default: // sync
+            return this.request(endpoint, {
+                method: 'PUT',
+                body: JSON.stringify({ favorites })
+            });
     }
 }
 	
@@ -286,31 +289,27 @@ async syncFavorites(favorites) {
     }
 
 // 修复搜索历史同步方法
-async syncSearchHistory(history) {
-    try {
-        // 确保数据格式正确
-        const validHistory = history.filter(item => {
-            return item && (item.query || item.keyword) && 
-                   typeof (item.query || item.keyword) === 'string' && 
-                   (item.query || item.keyword).trim().length > 0;
-        }).map(item => ({
-            id: item.id || generateId(),
-            query: item.query || item.keyword,
-            keyword: item.query || item.keyword, // 兼容性
-            source: item.source || 'unknown',
-            timestamp: item.timestamp || Date.now()
-        }));
-
-        return await this.request('/api/user/sync/search-history', {
-            method: 'POST',
-            body: JSON.stringify({ 
-                searchHistory: validHistory,
-                history: validHistory // 兼容性
-            })
-        });
-    } catch (error) {
-        console.error('同步搜索历史失败:', error);
-        throw error;
+// 优化syncSearchHistory方法
+async syncSearchHistory(history, operation = 'sync') {
+    const endpoint = '/api/user/search-history';
+    
+    switch (operation) {
+        case 'add':
+            return this.request(endpoint, {
+                method: 'POST',
+                body: JSON.stringify(history)
+            });
+            
+        case 'clear':
+            return this.request(endpoint, {
+                method: 'DELETE'
+            });
+            
+        default: // sync
+            return this.request(endpoint, {
+                method: 'PUT',
+                body: JSON.stringify({ history })
+            });
     }
 }
 
