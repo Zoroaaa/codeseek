@@ -205,88 +205,56 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
         }
     }
 
-    async loadData() {
-        try {
-            // 并行加载数据
-            const [favorites, history, settings] = await Promise.allSettled([
-                API.getFavorites(),
-                this.getSearchHistory(),
-                this.getUserSettings()
-            ]);
+async loadData() {
+    try {
+        showLoading(true);
+        const [favorites, history, settings] = await Promise.all([
+            API.getFavorites(),
+            API.getSearchHistory(),
+            this.getUserSettings()
+        ]);
 
-            if (favorites.status === 'fulfilled') {
-                this.favorites = favorites.value || [];
-            }
-
-            if (history.status === 'fulfilled') {
-                this.searchHistory = history.value || [];
-            }
-
-            // 加载当前标签页数据
-            await this.loadTabData(this.currentTab);
-
-        } catch (error) {
-            console.error('加载数据失败:', error);
-            showToast('数据加载失败', 'error');
-        }
+        this.favorites = favorites;
+        this.searchHistory = history;
+        await this.loadTabData(this.currentTab);
+    } catch (error) {
+        console.error('加载数据失败:', error);
+        showToast('无法加载数据，请检查网络连接', 'error');
+    } finally {
+        showLoading(false);
     }
+}
 
 // 修复后代码
 async loadOverviewData() {
     try {
-        // 获取真实的统计数据
-        const [searchStats, favorites] = await Promise.allSettled([
-            API.getSearchStats(),
-            Promise.resolve(this.favorites)
-        ]);
+        showLoading(true);
+        const searchStats = await API.getSearchStats();
         
-        // 处理搜索统计
-        const stats = searchStats.status === 'fulfilled' ? searchStats.value : {
-            total: this.searchHistory.length,
-            today: 0,
-            thisWeek: 0,
-            topQueries: []
-        };
-        
-        // 更新UI
         const totalSearchesEl = document.getElementById('totalSearches');
         const totalFavoritesEl = document.getElementById('totalFavorites');
         const activeDaysEl = document.getElementById('activeDays');
         const userLevelEl = document.getElementById('userLevel');
 
-        if (totalSearchesEl) totalSearchesEl.textContent = stats.total || 0;
+        if (totalSearchesEl) totalSearchesEl.textContent = searchStats.total || 0;
         if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
         
-        // 计算活跃天数
         const activeDays = this.calculateActiveDays();
         if (activeDaysEl) activeDaysEl.textContent = activeDays;
         
-        // 用户等级
         const level = this.calculateUserLevel();
         if (userLevelEl) userLevelEl.textContent = level;
 
-        // 加载最近活动
         await this.loadRecentActivity();
-
     } catch (error) {
         console.error('加载概览数据失败:', error);
-        // 降级到本地数据
-        this.loadOverviewDataFromLocal();
+        showToast('无法加载概览数据，请检查网络连接', 'error');
+    } finally {
+        showLoading(false);
     }
 }
 
-// 添加降级方法
-loadOverviewDataFromLocal() {
-    const totalSearchesEl = document.getElementById('totalSearches');
-    const totalFavoritesEl = document.getElementById('totalFavorites');
-    const activeDaysEl = document.getElementById('activeDays');
-    const userLevelEl = document.getElementById('userLevel');
 
-    if (totalSearchesEl) totalSearchesEl.textContent = this.searchHistory.length;
-    if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
-    if (activeDaysEl) activeDaysEl.textContent = this.calculateActiveDays();
-    if (userLevelEl) userLevelEl.textContent = this.calculateUserLevel();
-}
 
     async loadFavoritesData() {
         const favoritesList = document.getElementById('favoritesList');
@@ -589,15 +557,14 @@ showToast('保存设置失败: ' + e.message, 'error');
         }
     }
 
-    initTheme() {
-        const savedTheme = StorageManager.getItem('theme', 'light');
-        const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        if (themeToggle) {
-            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-        }
+initTheme() {
+    const defaultTheme = 'light'; // 直接使用默认主题
+    const themeToggle = document.getElementById('themeToggle');
+    document.documentElement.setAttribute('data-theme', defaultTheme);
+    if (themeToggle) {
+        themeToggle.textContent = defaultTheme === 'dark' ? '☀️' : '🌙';
     }
+}
 
     toggleTheme() {
         const currentTheme = document.documentElement.getAttribute('data-theme');
@@ -637,14 +604,9 @@ showToast('保存设置失败: ' + e.message, 'error');
     }
 
     // API辅助方法
-    async getSearchHistory() {
-        try {
-            return await API.getSearchHistory();
-        } catch (error) {
-            // 降级到本地存储
-            return StorageManager.getItem('search_history', []);
-        }
-    }
+async getSearchHistory() {
+    return await API.getSearchHistory();
+}
 
     async getUserSettings() {
         try {
@@ -762,20 +724,11 @@ showToast('保存设置失败: ' + e.message, 'error');
 // 修复后代码
 async clearAllHistory() {
     if (!confirm('确定要清空所有搜索历史吗？此操作不可恢复。')) return;
-
     try {
         showLoading(true);
-        
-        // 使用API类的封装方法
         await API.clearAllSearchHistory();
-        
-        // 清空本地数据
         this.searchHistory = [];
-        StorageManager.removeItem('search_history');
-        
-        // 重新加载数据
         await this.loadHistoryData();
-        
         showToast('搜索历史已清空', 'success');
     } catch (error) {
         console.error('清空搜索历史失败:', error);

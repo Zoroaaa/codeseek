@@ -280,10 +280,13 @@ async syncFavorites(favorites) {
     });
 }
 
-    async getFavorites() {
-        const response = await this.request('/api/user/favorites');
-        return response.favorites || [];
+async getFavorites() {
+    const response = await this.request('/api/user/favorites');
+    if (!response.favorites) {
+        throw new Error('无法获取收藏夹数据');
     }
+    return response.favorites;
+}
 
 // 修复搜索历史同步方法
 async syncSearchHistory(history) {
@@ -336,8 +339,6 @@ async getSearchHistory() {
     try {
         const response = await this.request('/api/user/search-history');
         const history = response.history || response.searchHistory || [];
-        
-        // 确保返回的数据格式正确
         return history.filter(item => {
             return item && (item.query || item.keyword) && 
                    typeof (item.query || item.keyword) === 'string';
@@ -348,7 +349,7 @@ async getSearchHistory() {
         }));
     } catch (error) {
         console.error('获取搜索历史失败:', error);
-        return [];
+        throw new Error('无法获取搜索历史，请检查网络连接');
     }
 }
 
