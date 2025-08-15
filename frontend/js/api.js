@@ -177,14 +177,14 @@ async deleteAccount() {
     }
 }
 
-// 修复清空搜索历史方法（添加必需的query参数）
+// 清空搜索历史方法
 async clearAllSearchHistory() {
     if (!this.token) {
         throw new Error('用户未登录');
     }
     
     try {
-        return await this.request('/api/user/search-history?operation=clear', {
+        return await this.request('/api/user/search-history', {
             method: 'DELETE'
         });
     } catch (error) {
@@ -288,14 +288,15 @@ async syncFavorites(favorites) {
 // 修复搜索历史同步方法
 async syncSearchHistory(history) {
     try {
-        // 确保数据格式正确，统一使用query字段
+        // 确保数据格式正确
         const validHistory = history.filter(item => {
             return item && (item.query || item.keyword) && 
                    typeof (item.query || item.keyword) === 'string' && 
                    (item.query || item.keyword).trim().length > 0;
         }).map(item => ({
-            id: item.id || this.generateId(),
-            query: item.query || item.keyword, // 统一使用query
+            id: item.id || generateId(),
+            query: item.query || item.keyword,
+            keyword: item.query || item.keyword, // 兼容性
             source: item.source || 'unknown',
             timestamp: item.timestamp || Date.now()
         }));
@@ -304,7 +305,7 @@ async syncSearchHistory(history) {
             method: 'POST',
             body: JSON.stringify({ 
                 searchHistory: validHistory,
-                history: validHistory // 保持兼容性
+                history: validHistory // 兼容性
             })
         });
     } catch (error) {
@@ -322,7 +323,7 @@ async saveSearchHistory(query, source = 'unknown') {
     return await this.request('/api/user/search-history', {
         method: 'POST',
         body: JSON.stringify({ 
-            query: query.trim(), // 使用query字段
+            query: query.trim(), 
             source: source,
             timestamp: Date.now() 
         })
@@ -336,24 +337,19 @@ async getSearchHistory() {
         const response = await this.request('/api/user/search-history');
         const history = response.history || response.searchHistory || [];
         
-        // 确保返回的数据格式正确，统一使用query字段
+        // 确保返回的数据格式正确
         return history.filter(item => {
-            return item && item.query && 
-                   typeof item.query === 'string';
+            return item && (item.query || item.keyword) && 
+                   typeof (item.query || item.keyword) === 'string';
         }).map(item => ({
             ...item,
-            query: item.query, // 主字段
-            keyword: item.query // 兼容性字段
+            keyword: item.keyword || item.query,
+            query: item.query || item.keyword
         }));
     } catch (error) {
         console.error('获取搜索历史失败:', error);
         return [];
     }
-}
-
-// 添加ID生成辅助方法
-generateId() {
-    return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
     async getUserSettings() {

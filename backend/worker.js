@@ -5,13 +5,6 @@
 class Router {
     constructor() {
         this.routes = new Map();
-		this.middleware = [];
-    }
-	
-	    // 添加中间件支持
-    use(middleware) {
-        this.middleware.push(middleware);
-        return this;
     }
 
     addRoute(method, path, handler) {
@@ -27,136 +20,56 @@ class Router {
 
 // 同时更新 handle 方法以支持参数路由优先匹配
 // 在 Router 类中优化 handle 方法
-    async handle(request, env) {
-        const url = new URL(request.url);
-        const method = request.method;
-        const pathname = url.pathname;
+async handle(request, env) {
+    const url = new URL(request.url);
+    const method = request.method;
+    const pathname = url.pathname;
 
-        try {
-            // 处理CORS预检请求
-            if (method === 'OPTIONS') {
-                return new Response(null, {
-                    status: 204,
-                    headers: utils.getCorsHeaders(request.headers.get('Origin') || '*')
-                });
+    // 处理CORS预检请求
+    if (method === 'OPTIONS') {
+        return new Response(null, {
+            status: 204,
+            headers: utils.getCorsHeaders(request.headers.get('Origin') || '*')
+        });
+    }
+
+    // 1. 首先查找精确匹配的路由
+    const exactKey = `${method}:${pathname}`;
+    if (this.routes.has(exactKey)) {
+        return await this.executeHandler(this.routes.get(exactKey), request, env);
+    }
+
+    // 2. 查找参数路由（如 /api/user/search-history/:id）
+    const paramRoutes = [];
+    const staticRoutes = [];
+    
+    for (const [routeKey, handler] of this.routes) {
+        const [routeMethod, routePath] = routeKey.split(':');
+        
+        if (routeMethod !== method && routeMethod !== '*') continue;
+        
+        if (this.matchPath(routePath, pathname)) {
+            if (routePath.includes(':')) {
+                paramRoutes.push({ handler, routePath, specificity: this.calculateSpecificity(routePath) });
+            } else if (routePath.includes('*')) {
+                staticRoutes.push({ handler, routePath, specificity: 0 });
             }
-
-            // 执行中间件
-            for (const middleware of this.middleware) {
-                const result = await middleware(request, env);
-                if (result instanceof Response) {
-                    return result;
-                }
-            }
-
-            // 路由匹配 - 改进算法
-            const matchResult = this.findBestMatch(method, pathname);
-            
-            if (matchResult) {
-                // 注入路由参数到request对象
-                request.params = matchResult.params;
-                request.query = this.parseQueryString(url.searchParams);
-                
-                return await this.executeHandler(matchResult.handler, request, env);
-            }
-
-            return utils.standardErrorResponse(
-                `API路径不存在: ${pathname}`, 
-                404, 
-                'ROUTE_NOT_FOUND'
-            );
-
-        } catch (error) {
-            console.error('路由处理错误:', error);
-            return utils.standardErrorResponse(
-                '服务器内部错误', 
-                500, 
-                'INTERNAL_ERROR'
-            );
         }
     }
-	
-	    // 改进的路由匹配算法
-    findBestMatch(method, pathname) {
-        const routes = Array.from(this.routes.entries())
-            .filter(([key]) => {
-                const [routeMethod] = key.split(':');
-                return routeMethod === method || routeMethod === '*';
-            })
-            .map(([key, handler]) => {
-                const [, routePath] = key.split(':');
-                const match = this.matchPathWithParams(routePath, pathname);
-                return match ? { ...match, handler, routePath } : null;
-            })
-            .filter(Boolean)
-            .sort((a, b) => b.score - a.score); // 按匹配度排序
 
-        return routes[0] || null;
+    // 3. 按特异性排序参数路由（越具体的路由优先级越高）
+    if (paramRoutes.length > 0) {
+        paramRoutes.sort((a, b) => b.specificity - a.specificity);
+        return await this.executeHandler(paramRoutes[0].handler, request, env);
     }
-	
-	    // 带参数的路径匹配
-    matchPathWithParams(routePath, requestPath) {
-        // 精确匹配
-        if (routePath === requestPath) {
-            return { params: {}, score: 1000 };
-        }
 
-        // 通配符匹配
-        if (routePath.endsWith('/*')) {
-            const basePath = routePath.slice(0, -2);
-            if (requestPath.startsWith(basePath)) {
-                return { 
-                    params: { wildcard: requestPath.slice(basePath.length) }, 
-                    score: 100 
-                };
-            }
-        }
-
-        // 参数匹配
-        if (routePath.includes(':')) {
-            const routeParts = routePath.split('/');
-            const requestParts = requestPath.split('/');
-
-            if (routeParts.length !== requestParts.length) {
-                return null;
-            }
-
-            const params = {};
-            let score = 500;
-
-            for (let i = 0; i < routeParts.length; i++) {
-                const routePart = routeParts[i];
-                const requestPart = requestParts[i];
-
-                if (routePart.startsWith(':')) {
-                    // 参数部分
-                    const paramName = routePart.slice(1);
-                    params[paramName] = decodeURIComponent(requestPart);
-                    score -= 10; // 参数匹配降低分数
-                } else if (routePart !== requestPart) {
-                    return null; // 静态部分不匹配
-                } else {
-                    score += 10; // 静态部分匹配增加分数
-                }
-            }
-
-            return { params, score };
-        }
-
-        return null;
+    // 4. 处理通配符路由
+    if (staticRoutes.length > 0) {
+        return await this.executeHandler(staticRoutes[0].handler, request, env);
     }
-	
-	    // 解析查询字符串
-    parseQueryString(searchParams) {
-        const query = {};
-        for (const [key, value] of searchParams.entries()) {
-            query[key] = value;
-        }
-        return query;
-    }
-	
-	
 
+    return utils.errorResponse(`API路径不存在: ${pathname}`, 404);
+}
 
 // 计算路由特异性（越具体的路由分数越高）
 calculateSpecificity(routePath) {
@@ -389,70 +302,41 @@ const utils = {
         return errors;
     },
 	
-    // 标准化成功响应
-    standardSuccessResponse(data = {}, message = '操作成功', meta = {}) {
+	    // 统一成功响应格式
+    successResponse(data = {}, origin = '*') {
         const response = {
             success: true,
-            code: 'SUCCESS',
-            message,
-            data,
-            meta: {
-                timestamp: Date.now(),
-                version: process.env.APP_VERSION || '1.0.0',
-                ...meta
-            }
+            timestamp: Date.now(),
+            ...data
         };
         
-        return this.jsonResponse(response, 200);
+        return this.jsonResponse(response, 200, origin);
     },
 
-    // 标准化错误响应
-    standardErrorResponse(message, status = 400, errorCode = null, details = null) {
+    // 统一错误响应格式
+    errorResponse(message, status = 400, origin = '*', errorCode = null) {
         const response = {
             success: false,
             error: true,
-            code: errorCode || this.getErrorCode(status),
             message,
-            details,
-            meta: {
-                timestamp: Date.now(),
-                version: process.env.APP_VERSION || '1.0.0'
-            }
+            code: errorCode,
+            timestamp: Date.now()
         };
         
-        return this.jsonResponse(response, status);
-    },
-	
-	    // 获取错误代码
-    getErrorCode(status) {
-        const errorCodes = {
-            400: 'BAD_REQUEST',
-            401: 'UNAUTHORIZED',
-            403: 'FORBIDDEN',
-            404: 'NOT_FOUND',
-            409: 'CONFLICT',
-            422: 'VALIDATION_ERROR',
-            429: 'RATE_LIMIT_EXCEEDED',
-            500: 'INTERNAL_ERROR',
-            502: 'BAD_GATEWAY',
-            503: 'SERVICE_UNAVAILABLE'
-        };
-        
-        return errorCodes[status] || 'UNKNOWN_ERROR';
+        return this.jsonResponse(response, status, origin);
     },
 
-    // 分页响应标准化
-    standardPaginatedResponse(data, pagination, message = '获取成功') {
-        return this.standardSuccessResponse(data, message, {
+    // 分页响应格式
+    paginatedResponse(data, pagination, origin = '*') {
+        return this.successResponse({
+            data,
             pagination: {
                 total: pagination.total || 0,
                 limit: pagination.limit || 50,
                 offset: pagination.offset || 0,
-                hasMore: pagination.hasMore || false,
-                page: Math.floor((pagination.offset || 0) / (pagination.limit || 50)) + 1,
-                totalPages: Math.ceil((pagination.total || 0) / (pagination.limit || 50))
+                hasMore: pagination.hasMore || false
             }
-        });
+        }, origin);
     },
 
     // 验证必需参数
@@ -489,34 +373,16 @@ async function authenticate(request, env) {
     }
 
     const token = authHeader.substring(7);
-    
-    // 验证token格式
-    if (!token || token.length < 10) {
-        console.warn('Invalid token format');
-        return null;
-    }
-
     const jwtSecret = env.JWT_SECRET;
     if (!jwtSecret) {
         console.error('JWT_SECRET 环境变量未设置');
         return null;
     }
 
+    const payload = await utils.verifyJWT(token, jwtSecret);
+    if (!payload) return null;
+
     try {
-        // 验证JWT
-        const payload = await utils.verifyJWT(token, jwtSecret);
-        if (!payload) {
-            console.warn('JWT验证失败');
-            return null;
-        }
-
-        // 检查token过期
-        if (payload.exp && Date.now() > payload.exp * 1000) {
-            console.warn('Token已过期');
-            return null;
-        }
-
-        // 查询数据库验证会话
         const tokenHash = await utils.hashPassword(token);
         const session = await env.DB.prepare(`
             SELECT u.* FROM users u
@@ -524,16 +390,7 @@ async function authenticate(request, env) {
             WHERE s.token_hash = ? AND s.expires_at > ?
         `).bind(tokenHash, Date.now()).first();
 
-        if (!session) {
-            console.warn('会话不存在或已过期');
-            return null;
-        }
-
-        // 检查用户状态
-        if (!session.is_active) {
-            console.warn('用户账户已禁用');
-            return null;
-        }
+        if (!session) return null;
 
         // 更新活动时间
         await env.DB.prepare(`
@@ -545,10 +402,8 @@ async function authenticate(request, env) {
             username: session.username,
             email: session.email,
             permissions: JSON.parse(session.permissions || '[]'),
-            settings: JSON.parse(session.settings || '{}'),
-            isActive: session.is_active
+            settings: JSON.parse(session.settings || '{}')
         };
-        
     } catch (error) {
         console.error('认证查询失败:', error);
         return null;
@@ -583,30 +438,41 @@ const router = new Router();
 
 // API路由定义
 router.get('/api/health', async (request, env) => {
-    const healthData = {
+    return utils.successResponse({
         status: 'healthy',
         timestamp: Date.now(),
-        version: env.APP_VERSION || '1.0.0',
-        environment: env.ENVIRONMENT || 'production'
-    };
-    
-    return utils.standardSuccessResponse(healthData, '服务健康检查正常');
+        version: env.APP_VERSION || '1.0.0'
+    });
 });
 
 router.post('/api/auth/register', async (request, env) => {
     try {
-        const body = await utils.safeJsonParse(request, {});
+        const body = await request.json().catch(() => ({}));
         const { username, email, password } = body;
 
         // 输入验证
-        const validation = validateRegistrationInput({ username, email, password }, env);
-        if (!validation.valid) {
-            return utils.standardErrorResponse(
-                validation.message, 
-                400, 
-                'VALIDATION_ERROR',
-                validation.details
-            );
+        const errors = utils.validateInput({ username, email, password }, {
+            username: { 
+                required: true, 
+                minLength: 3, 
+                maxLength: 20,
+                pattern: /^[a-zA-Z0-9_]+$/,
+                message: '用户名只能包含字母、数字和下划线'
+            },
+            email: { 
+                required: true,
+                pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                message: '邮箱格式不正确'
+            },
+            password: { 
+                required: true, 
+                minLength: 6,
+                maxLength: 50
+            }
+        });
+
+        if (errors.length > 0) {
+            return utils.errorResponse(errors[0]);
         }
 
         // 检查用户是否已存在
@@ -615,11 +481,7 @@ router.post('/api/auth/register', async (request, env) => {
         `).bind(username, email).first();
 
         if (existingUser) {
-            return utils.standardErrorResponse(
-                '用户名或邮箱已存在', 
-                409, 
-                'USER_EXISTS'
-            );
+            return utils.errorResponse('用户名或邮箱已存在');
         }
 
         // 创建用户
@@ -632,76 +494,16 @@ router.post('/api/auth/register', async (request, env) => {
             VALUES (?, ?, ?, ?, ?, ?)
         `).bind(userId, username, email, passwordHash, now, now).run();
 
-        return utils.standardSuccessResponse(
-            { 
-                user: { 
-                    id: userId, 
-                    username, 
-                    email,
-                    createdAt: new Date(now).toISOString()
-                }
-            }, 
-            '注册成功'
-        );
+        return utils.successResponse({ 
+            message: '注册成功',
+            user: { id: userId, username, email }
+        });
 
     } catch (error) {
         console.error('注册失败:', error);
-        return utils.standardErrorResponse(
-            '注册失败，请稍后重试', 
-            500, 
-            'REGISTRATION_ERROR'
-        );
+        return utils.errorResponse('注册失败，请稍后重试', 500);
     }
 });
-
-// 输入验证函数
-function validateRegistrationInput({ username, email, password }, env) {
-    const errors = [];
-    
-    // 用户名验证
-    if (!username || typeof username !== 'string') {
-        errors.push('用户名不能为空');
-    } else {
-        const minLength = parseInt(env.MIN_USERNAME_LENGTH || '3');
-        const maxLength = parseInt(env.MAX_USERNAME_LENGTH || '20');
-        
-        if (username.length < minLength) {
-            errors.push(`用户名至少${minLength}个字符`);
-        }
-        if (username.length > maxLength) {
-            errors.push(`用户名最多${maxLength}个字符`);
-        }
-        if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(username)) {
-            errors.push('用户名只能包含字母、数字、下划线或中文');
-        }
-    }
-    
-    // 邮箱验证
-    if (!email || typeof email !== 'string') {
-        errors.push('邮箱不能为空');
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        errors.push('邮箱格式不正确');
-    }
-    
-    // 密码验证
-    if (!password || typeof password !== 'string') {
-        errors.push('密码不能为空');
-    } else {
-        const minLength = parseInt(env.MIN_PASSWORD_LENGTH || '6');
-        if (password.length < minLength) {
-            errors.push(`密码至少${minLength}个字符`);
-        }
-        if (password.length > 50) {
-            errors.push('密码最多50个字符');
-        }
-    }
-    
-    return {
-        valid: errors.length === 0,
-        message: errors[0] || '',
-        details: errors
-    };
-}
 
 // 优化登录接口响应
 router.post('/api/auth/login', async (request, env) => {
@@ -931,27 +733,27 @@ router.put('/api/user/settings', async (request, env) => {
     }
 });
 
-// 增强Token验证接口
+// 修复用户Token验证接口（前端调用的verifyToken）
 router.post('/api/auth/verify-token', async (request, env) => {
     try {
-        const body = await utils.safeJsonParse(request, {});
+        const body = await request.json().catch(() => ({}));
         const { token } = body;
 
         // 参数验证
-        if (!token || typeof token !== 'string' || token.trim().length === 0) {
-            return utils.errorResponse('Token参数无效', 400, request.headers.get('Origin'), 'INVALID_TOKEN');
+        if (!token || typeof token !== 'string') {
+            return utils.errorResponse('Token参数无效', 400);
         }
 
         const jwtSecret = env.JWT_SECRET;
         if (!jwtSecret) {
             console.error('JWT_SECRET 环境变量未设置');
-            return utils.errorResponse('服务器配置错误', 500, request.headers.get('Origin'), 'SERVER_CONFIG_ERROR');
+            return utils.errorResponse('服务器配置错误', 500);
         }
 
         // 验证JWT格式和有效性
         const payload = await utils.verifyJWT(token, jwtSecret);
         if (!payload) {
-            return utils.errorResponse('Token无效或已过期', 401, request.headers.get('Origin'), 'TOKEN_INVALID');
+            return utils.errorResponse('Token无效或已过期', 401);
         }
 
         // 查询数据库验证会话
@@ -959,11 +761,11 @@ router.post('/api/auth/verify-token', async (request, env) => {
         const session = await env.DB.prepare(`
             SELECT u.* FROM users u
             JOIN user_sessions s ON u.id = s.user_id
-            WHERE s.token_hash = ? AND s.expires_at > ? AND u.is_active = 1
+            WHERE s.token_hash = ? AND s.expires_at > ?
         `).bind(tokenHash, Date.now()).first();
 
         if (!session) {
-            return utils.errorResponse('会话已过期或用户已禁用', 401, request.headers.get('Origin'), 'SESSION_EXPIRED');
+            return utils.errorResponse('会话已过期或不存在', 401);
         }
 
         // 更新最后活动时间
@@ -977,21 +779,18 @@ router.post('/api/auth/verify-token', async (request, env) => {
             username: session.username,
             email: session.email,
             permissions: JSON.parse(session.permissions || '[]'),
-            settings: JSON.parse(session.settings || '{}'),
-            lastLogin: session.last_login,
-            loginCount: session.login_count
+            settings: JSON.parse(session.settings || '{}')
         };
 
         return utils.successResponse({ 
             valid: true,
             user,
-            message: 'Token验证成功',
-            expiresAt: payload.exp * 1000
-        }, request.headers.get('Origin'));
+            message: 'Token验证成功'
+        });
 
     } catch (error) {
         console.error('Token验证失败:', error);
-        return utils.errorResponse('Token验证失败', 401, request.headers.get('Origin'), 'VERIFICATION_ERROR');
+        return utils.errorResponse('Token验证失败', 401);
     }
 });
 
@@ -1303,7 +1102,7 @@ router.post('/api/user/sync/search-history', async (request, env) => {
 
         // 批量插入新的搜索历史
         for (const item of historyData) {
-            // 确保每个item都有有效的查询字段，优先使用query
+            // 修复：确保每个item都有有效的查询字段
             const query = item.query || item.keyword;
             if (!query || typeof query !== 'string' || query.trim().length === 0) {
                 continue; // 跳过无效记录
@@ -1352,8 +1151,8 @@ router.get('/api/user/search-history', async (request, env) => {
 
         const history = result.results.map(item => ({
             id: item.id,
-            query: item.query,              // 主字段
-            keyword: item.query,            // 兼容性字段
+            keyword: item.query, // 注意这里映射字段名
+            query: item.query,
             source: item.source,
             timestamp: item.created_at,
             createdAt: new Date(item.created_at).toISOString()
@@ -1366,7 +1165,7 @@ router.get('/api/user/search-history', async (request, env) => {
 
         return utils.successResponse({ 
             history,
-            searchHistory: history, // 兼容性字段
+            searchHistory: history, // 添加这个字段以兼容前端
             total: countResult.total,
             limit,
             offset,
@@ -1378,7 +1177,6 @@ router.get('/api/user/search-history', async (request, env) => {
         return utils.errorResponse('获取搜索历史失败', 500);
     }
 });
-
 
 // 删除搜索历史记录
 // 删除单条搜索历史（参数路由，优先级高）

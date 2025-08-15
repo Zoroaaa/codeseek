@@ -9,7 +9,6 @@ class MagnetSearchApp {
         this.config = {};
         this.connectionStatus = 'checking';
         this.init();
-		this.submissionStates = new Map(); // 添加提交状态管理
     }
 
 async init() {
@@ -613,16 +612,16 @@ addToHistory(keyword) {
 
     const trimmedKeyword = keyword.trim();
     
-    // 移除重复项（基于query字段）
+    // 移除重复项
     this.searchHistory = this.searchHistory.filter(item => {
-        return item && item.query && item.query !== trimmedKeyword;
+        return item && item.keyword && item.keyword !== trimmedKeyword;
     });
     
-    // 添加到开头（统一使用query字段）
+    // 添加到开头
     this.searchHistory.unshift({
-        id: this.generateId(),
-        query: trimmedKeyword,        // 主字段
-        keyword: trimmedKeyword,      // 兼容性字段
+        id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        keyword: trimmedKeyword,
+        query: trimmedKeyword, // 兼容性
         timestamp: Date.now(),
         count: 1,
         source: 'manual'
@@ -642,27 +641,6 @@ addToHistory(keyword) {
         API.saveSearchHistory(trimmedKeyword, 'manual').catch(error => {
             console.error('保存搜索历史到云端失败:', error);
         });
-    }
-}
-
-// 修复渲染搜索历史
-renderHistory() {
-    const historySection = document.getElementById('historySection');
-    const historyList = document.getElementById('historyList');
-
-    if (this.searchHistory.length === 0) {
-        if (historySection) historySection.style.display = 'none';
-        return;
-    }
-
-    if (historySection) historySection.style.display = 'block';
-    
-    if (historyList) {
-        historyList.innerHTML = this.searchHistory.slice(0, 10).map(item => 
-            `<span class="history-item" onclick="app.searchFromHistory('${this.escapeHtml(item.query)}')">
-                ${this.escapeHtml(item.query)}
-            </span>`
-        ).join('');
     }
 }
 
@@ -688,13 +666,13 @@ renderHistory() {
     }
 
     // 从历史记录搜索
-searchFromHistory(query) {
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.value = query;
-        this.performSearch();
+    searchFromHistory(keyword) {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.value = keyword;
+            this.performSearch();
+        }
     }
-}
 
     // 渲染收藏夹
     renderFavorites() {
@@ -762,19 +740,17 @@ searchFromHistory(query) {
     }
 
     // 清除搜索历史
-clearHistory() {
-    if (!confirm('确定要清除所有搜索历史吗？')) return;
-    
-    this.searchHistory = [];
-    this.saveHistory();
-    this.renderHistory();
-    showToast('搜索历史已清除', 'success');
-    
-    // 如果用户已登录，清除云端历史
-    if (this.currentUser) {
-        API.clearAllSearchHistory().catch(console.error);
-    }
+    clearHistory() {
+        if (!confirm('确定要清除所有搜索历史吗？')) return;
+        
+        this.searchHistory = [];
+        this.saveHistory();
+        this.renderHistory();
+        showToast('搜索历史已清除', 'success');
+		if (this.currentUser) {
+API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.error);
 }
+    }
 
     // 清除搜索结果
     clearResults() {
@@ -1000,11 +976,11 @@ async syncSearchHistory() {
     if (!this.currentUser) return;
 
     try {
-        // 过滤有效的搜索历史，确保query字段存在
+        // 过滤有效的搜索历史
         const validHistory = this.searchHistory.filter(item => {
-            return item && item.query && 
-                   typeof item.query === 'string' && 
-                   item.query.trim().length > 0;
+            return item && item.keyword && 
+                   typeof item.keyword === 'string' && 
+                   item.keyword.trim().length > 0;
         });
 
         await API.syncSearchHistory(validHistory);
@@ -1012,11 +988,6 @@ async syncSearchHistory() {
     } catch (error) {
         console.error('搜索历史同步失败:', error);
     }
-}
-
-// 添加ID生成辅助方法
-generateId() {
-    return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
     // 模态框管理
@@ -1058,32 +1029,19 @@ generateId() {
         if (registerModal) registerModal.style.display = 'none';
     }
 
-    // 修复登录处理方法（同样添加防重复提交）
+    // 认证处理
     async handleLogin(event) {
         event.preventDefault();
         
-        const formId = 'loginForm';
-        const submitBtn = event.target.querySelector('button[type="submit"]');
-        
-        // 防止重复提交
-        if (this.submissionStates.get(formId)) {
-            console.warn('登录请求正在处理中，请稍候');
+        const username = document.getElementById('loginUsername')?.value.trim();
+        const password = document.getElementById('loginPassword')?.value;
+
+        if (!username || !password) {
+            showToast('请填写用户名和密码', 'error');
             return;
         }
 
         try {
-            // 设置提交状态
-            this.submissionStates.set(formId, true);
-            this.setSubmitButtonState(submitBtn, true, '登录中...');
-            
-            const username = document.getElementById('loginUsername')?.value.trim();
-            const password = document.getElementById('loginPassword')?.value;
-
-            if (!username || !password) {
-                showToast('请填写用户名和密码', 'error');
-                return;
-            }
-
             showLoading(true);
             const result = await API.login(username, password);
             
@@ -1092,173 +1050,110 @@ generateId() {
                 this.updateUserUI();
                 this.closeModals();
                 showToast(`欢迎回来，${result.user.username}！`, 'success');
-                
-                // 显示主内容区域
-                const mainContent = document.querySelector('.main-content');
-                if (mainContent) mainContent.style.display = 'block';
-                
-                // 处理URL参数
-                this.handleURLParams();
+				
+				// 关键修复：显示主内容区域
+        document.querySelector('.main-content').style.display = 'block';
+        
+        // 关闭模态框
+        this.closeModals();
+        
+        // 特殊修复：检查是否有搜索查询
+        this.handleURLParams();
                 
                 // 登录后同步云端数据
                 await this.loadCloudData();
                 
                 // 清空登录表单
-                event.target.reset();
+                document.getElementById('loginForm').reset();
             } else {
-                throw new Error(result.message || '登录失败');
+                showToast(result.message || '登录失败', 'error');
             }
         } catch (error) {
             console.error('登录失败:', error);
             showToast(`登录失败: ${error.message}`, 'error');
         } finally {
-            // 重置提交状态
-            this.submissionStates.delete(formId);
-            this.setSubmitButtonState(submitBtn, false, '登录');
             showLoading(false);
         }
     }
-}
 
-    // 修复注册处理方法
     async handleRegister(event) {
         event.preventDefault();
+		
+		    // 添加防止重复提交机制
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    if (submitBtn && submitBtn.classList.contains('submitting')) return;
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+// 正确代码
+submitBtn.classList.add('submitting');
+const span = document.createElement('span');
+span.textContent = '注册中...';
+submitBtn.innerHTML = '';
+submitBtn.appendChild(span);
+    }
         
-        const formId = 'registerForm';
-        const submitBtn = event.target.querySelector('button[type="submit"]');
-        
-        // 防止重复提交
-        if (this.submissionStates.get(formId)) {
-            console.warn('注册请求正在处理中，请稍候');
+        const username = document.getElementById('regUsername')?.value.trim();
+        const email = document.getElementById('regEmail')?.value.trim();
+        const password = document.getElementById('regPassword')?.value;
+        const confirmPassword = document.getElementById('regConfirmPassword')?.value;
+
+        // 客户端验证
+        if (!username || !email || !password || !confirmPassword) {
+            showToast('请填写所有字段', 'error');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            showToast('两次输入的密码不一致', 'error');
+            return;
+        }
+
+        // 使用配置中的验证规则
+        if (username.length < this.config.minUsernameLength || username.length > this.config.maxUsernameLength) {
+            showToast(`用户名长度应在${this.config.minUsernameLength}-${this.config.maxUsernameLength}个字符之间`, 'error');
+            return;
+        }
+
+        if (password.length < this.config.minPasswordLength) {
+            showToast(`密码长度至少${this.config.minPasswordLength}个字符`, 'error');
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            showToast('请输入有效的邮箱地址', 'error');
             return;
         }
 
         try {
-            // 设置提交状态
-            this.submissionStates.set(formId, true);
-            this.setSubmitButtonState(submitBtn, true, '注册中...');
-            
-            // 获取表单数据
-            const formData = this.getRegisterFormData(event.target);
-            const validation = this.validateRegisterForm(formData);
-            
-            if (!validation.valid) {
-                showToast(validation.message, 'error');
-                return;
-            }
-
-            // 发送注册请求
             showLoading(true);
-            const result = await API.register(formData.username, formData.email, formData.password);
+            const result = await API.register(username, email, password);
             
             if (result.success) {
                 showToast('注册成功，请登录', 'success');
                 this.showLoginModal();
                 
                 // 清空注册表单
-                event.target.reset();
+                document.getElementById('registerForm').reset();
                 
                 // 预填用户名到登录表单
                 const loginUsername = document.getElementById('loginUsername');
-                if (loginUsername) loginUsername.value = formData.username;
-                
-                // 记录注册成功行为
-                if (typeof API !== 'undefined') {
-                    API.recordAction('register_success', { 
-                        username: formData.username 
-                    }).catch(console.error);
-                }
+                if (loginUsername) loginUsername.value = username;
             } else {
-                throw new Error(result.message || '注册失败');
+                showToast(result.message || '注册失败', 'error');
             }
-            
         } catch (error) {
             console.error('注册失败:', error);
             showToast(`注册失败: ${error.message}`, 'error');
-            
-            // 记录注册失败行为
-            if (typeof API !== 'undefined') {
-                API.recordAction('register_failed', { 
-                    error: error.message 
-                }).catch(console.error);
-            }
         } finally {
-            // 重置提交状态
-            this.submissionStates.delete(formId);
-            this.setSubmitButtonState(submitBtn, false, '注册');
-            showLoading(false);
+        // 重置按钮状态
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('submitting');
+            submitBtn.textContent = '注册';
         }
     }
-	
-	    // 新增：获取注册表单数据
-    getRegisterFormData(form) {
-        return {
-            username: form.querySelector('#regUsername')?.value.trim() || '',
-            email: form.querySelector('#regEmail')?.value.trim() || '',
-            password: form.querySelector('#regPassword')?.value || '',
-            confirmPassword: form.querySelector('#regConfirmPassword')?.value || ''
-        };
-    }
-
-    // 新增：验证注册表单
-    validateRegisterForm(data) {
-        const { username, email, password, confirmPassword } = data;
-
-        if (!username || !email || !password || !confirmPassword) {
-            return { valid: false, message: '请填写所有字段' };
-        }
-
-        if (password !== confirmPassword) {
-            return { valid: false, message: '两次输入的密码不一致' };
-        }
-
-        // 使用配置中的验证规则
-        const config = this.config || {};
-        const minUsernameLength = config.minUsernameLength || 3;
-        const maxUsernameLength = config.maxUsernameLength || 20;
-        const minPasswordLength = config.minPasswordLength || 6;
-
-        if (username.length < minUsernameLength || username.length > maxUsernameLength) {
-            return { 
-                valid: false, 
-                message: `用户名长度应在${minUsernameLength}-${maxUsernameLength}个字符之间` 
-            };
-        }
-
-        if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(username)) {
-            return { 
-                valid: false, 
-                message: '用户名只能包含字母、数字、下划线或中文' 
-            };
-        }
-
-        if (password.length < minPasswordLength) {
-            return { 
-                valid: false, 
-                message: `密码长度至少${minPasswordLength}个字符` 
-            };
-        }
-
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return { valid: false, message: '请输入有效的邮箱地址' };
-        }
-
-        return { valid: true };
-    }
-
-    // 新增：设置提交按钮状态
-    setSubmitButtonState(button, isSubmitting, text) {
-        if (!button) return;
-        
-        button.disabled = isSubmitting;
-        button.textContent = text;
-        
-        if (isSubmitting) {
-            button.classList.add('submitting');
-        } else {
-            button.classList.remove('submitting');
-        }
     }
 
     // 检查认证状态
@@ -1361,31 +1256,31 @@ async loadCloudData() {
             this.renderFavorites();
         }
 
-        // 加载云端搜索历史 - 统一使用query字段
+        // 加载云端搜索历史 - 统一数据格式
         const cloudHistory = await API.getSearchHistory();
         if (cloudHistory && cloudHistory.length > 0) {
-            // 统一字段名处理 - 主要使用query字段
+            // 统一字段名处理
             const normalizedHistory = cloudHistory.map(item => ({
-                id: item.id || this.generateId(),
-                query: item.query,           // 主字段
-                keyword: item.query,         // 兼容性字段  
+                id: item.id || `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                keyword: item.keyword || item.query, // 统一使用 keyword
+                query: item.query || item.keyword,   // 保持 query 兼容性
                 source: item.source || 'unknown',
                 timestamp: item.timestamp || item.createdAt || Date.now(),
                 count: item.count || 1
             })).filter(item => {
                 // 过滤无效数据
-                return item.query && typeof item.query === 'string' && item.query.trim().length > 0;
+                return item.keyword && typeof item.keyword === 'string' && item.keyword.trim().length > 0;
             });
 
-            // 合并本地和云端历史，基于query字段去重
+            // 合并本地和云端历史，去重
             const mergedHistory = [...normalizedHistory];
             this.searchHistory.forEach(localItem => {
-                if (localItem && localItem.query && 
-                    !mergedHistory.some(cloudItem => cloudItem.query === localItem.query)) {
+                if (localItem && localItem.keyword && 
+                    !mergedHistory.some(cloudItem => cloudItem.keyword === localItem.keyword)) {
                     mergedHistory.push({
                         ...localItem,
-                        query: localItem.query,
-                        keyword: localItem.query
+                        keyword: localItem.keyword || localItem.query,
+                        query: localItem.query || localItem.keyword
                     });
                 }
             });
@@ -1415,19 +1310,24 @@ async loadCloudData() {
     }
 
 // 修复搜索建议显示方法
-showSearchSuggestions(searchQuery) {
-    if (!searchQuery || typeof searchQuery !== 'string') return;
+showSearchSuggestions(query) {
+    if (!query || typeof query !== 'string') return;
     
     const suggestions = this.searchHistory
         .filter(item => {
-            if (!item || !item.query || typeof item.query !== 'string') {
+            if (!item) return false;
+            
+            // 统一字段名处理 - 兼容 keyword 和 query
+            const searchTerm = item.keyword || item.query;
+            if (!searchTerm || typeof searchTerm !== 'string') {
                 return false;
             }
             
-            return item.query.toLowerCase().includes(searchQuery.toLowerCase());
+            return searchTerm.toLowerCase().includes(query.toLowerCase());
         })
         .slice(0, 5);
     
+    // 实现搜索建议UI显示
     this.renderSearchSuggestions(suggestions);
 }
 
@@ -1435,6 +1335,7 @@ showSearchSuggestions(searchQuery) {
 renderSearchSuggestions(suggestions) {
     let suggestionsContainer = document.getElementById('searchSuggestions');
     
+    // 如果容器不存在，创建一个
     if (!suggestionsContainer) {
         suggestionsContainer = document.createElement('div');
         suggestionsContainer.id = 'searchSuggestions';
@@ -1452,10 +1353,11 @@ renderSearchSuggestions(suggestions) {
     }
     
     suggestionsContainer.innerHTML = suggestions.map(item => {
+        const displayText = item.keyword || item.query;
         return `
-            <div class="suggestion-item" onclick="app.searchFromHistory('${this.escapeHtml(item.query)}')">
+            <div class="suggestion-item" onclick="app.searchFromHistory('${this.escapeHtml(displayText)}')">
                 <span class="suggestion-icon">🕐</span>
-                <span class="suggestion-text">${this.escapeHtml(item.query)}</span>
+                <span class="suggestion-text">${this.escapeHtml(displayText)}</span>
             </div>
         `;
     }).join('');

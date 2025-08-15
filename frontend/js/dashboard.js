@@ -6,18 +6,24 @@ class DashboardApp {
         this.searchHistory = [];
         this.currentTab = 'overview';
         this.isInitialized = false;
-		this.redirectAttempts = 0; // 添加重定向计数器
-        this.maxRedirectAttempts = 3; // 最大重定向次数
         this.init();
     }
 
     async init() {
         try {
-            // 安全的URL处理 - 防止重定向循环
-            if (!this.handleURLRedirection()) {
-                return; // 如果正在重定向，停止初始化
-            }
-            
+			
+// 仅开发环境进行 .html 纠正，生产环境不处理
+const isDev = (window.location.hostname === 'localhost' ||
+               window.location.hostname === '127.0.0.1' ||
+               window.location.port !== '' ||
+               window.location.search.includes('dev=1'));
+
+if (isDev && !window.location.pathname.endsWith('.html')) {
+    console.log('开发环境修正URL到 .html 以便文件直开');
+    window.location.replace('./dashboard.html' + window.location.search);
+    return;
+}
+			
             showLoading(true);
             
             // 检查认证状态
@@ -36,75 +42,18 @@ class DashboardApp {
             console.log('✅ Dashboard初始化完成');
             
         } catch (error) {
-            console.error('❌ Dashboard初始化失败:', error);
-            this.handleInitializationError(error);
-        } finally {
-            showLoading(false);
-        }
-    }
-	
-	    // 新增：安全的URL重定向处理
-    handleURLRedirection() {
-        // 检查重定向次数，防止无限循环
-        const redirectCount = sessionStorage.getItem('dashboard_redirect_count') || '0';
-        this.redirectAttempts = parseInt(redirectCount);
+        console.error('❌ Dashboard初始化失败:', error);
+        showToast('初始化失败，请重新登录', 'error');
         
-        if (this.redirectAttempts >= this.maxRedirectAttempts) {
-            console.warn('⚠️ 达到最大重定向次数，停止重定向');
-            sessionStorage.removeItem('dashboard_redirect_count');
-            showToast('页面加载异常，请手动刷新', 'warning');
-            return true; // 继续初始化
-        }
-
-        // 仅在开发环境进行URL纠正
-        const isDev = this.isDevEnvironment();
-        
-        if (isDev && this.needsHTMLExtension()) {
-            this.redirectAttempts++;
-            sessionStorage.setItem('dashboard_redirect_count', this.redirectAttempts.toString());
-            
-            console.log(`🔄 开发环境URL纠正 (${this.redirectAttempts}/${this.maxRedirectAttempts})`);
-            
-            // 使用replace避免历史记录堆积
-            const newURL = './dashboard.html' + window.location.search + window.location.hash;
-            window.location.replace(newURL);
-            return false; // 停止当前初始化
-        }
-        
-        // 成功处理，清除计数器
-        sessionStorage.removeItem('dashboard_redirect_count');
-        return true; // 继续初始化
+        // 使用replace避免重定向循环
+        setTimeout(() => {
+            window.location.replace('./index.html');
+        }, 2000);
+    } finally {
+        showLoading(false);
+    }
     }
 
-    // 新增：检测开发环境
-    isDevEnvironment() {
-        return window.location.hostname === 'localhost' ||
-               window.location.hostname === '127.0.0.1' ||
-               window.location.port !== '' ||
-               window.location.search.includes('dev=1');
-    }
-
-    // 新增：检查是否需要HTML扩展名
-    needsHTMLExtension() {
-        const path = window.location.pathname;
-        return path.endsWith('/dashboard') || 
-               (path.includes('dashboard') && !path.endsWith('.html'));
-    }
-
-    // 新增：初始化错误处理
-    handleInitializationError(error) {
-        if (error.message.includes('认证')) {
-            showToast('认证失败，请重新登录', 'error');
-            setTimeout(() => {
-                window.location.replace('./index.html');
-            }, 2000);
-        } else {
-            showToast('初始化失败，请刷新页面重试', 'error');
-        }
-    }
-
-
-    // 修复认证检查方法
     async checkAuth() {
         const token = localStorage.getItem('auth_token');
         if (!token) {
@@ -112,24 +61,16 @@ class DashboardApp {
         }
 
         try {
-            // 添加超时控制
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('认证请求超时')), 10000);
-            });
-
-            const authPromise = API.verifyToken(token);
-            const result = await Promise.race([authPromise, timeoutPromise]);
-            
+            const result = await API.verifyToken(token);
             if (!result.success || !result.user) {
                 throw new Error('Token验证失败');
             }
             
             this.currentUser = result.user;
             this.updateUserUI();
-            
         } catch (error) {
             localStorage.removeItem('auth_token');
-            throw new Error(`认证失败: ${error.message}`);
+            throw new Error('认证失败');
         }
     }
 
@@ -388,48 +329,46 @@ loadOverviewDataFromLocal() {
         `).join('');
     }
 
-// 修复加载历史数据方法
-async loadHistoryData() {
-    const historyList = document.getElementById('historyList');
-    const historyCount = document.getElementById('historyCount');
-    const uniqueKeywords = document.getElementById('uniqueKeywords');
-    const avgPerDay = document.getElementById('avgPerDay');
+    async loadHistoryData() {
+        const historyList = document.getElementById('historyList');
+        const historyCount = document.getElementById('historyCount');
+        const uniqueKeywords = document.getElementById('uniqueKeywords');
+        const avgPerDay = document.getElementById('avgPerDay');
 
-    if (historyCount) historyCount.textContent = this.searchHistory.length;
-    
-    // 基于query字段计算唯一关键词数量
-    const unique = new Set(this.searchHistory.map(h => h.query)).size;
-    if (uniqueKeywords) uniqueKeywords.textContent = unique;
+        if (historyCount) historyCount.textContent = this.searchHistory.length;
+        
+        const unique = new Set(this.searchHistory.map(h => h.keyword)).size;
+        if (uniqueKeywords) uniqueKeywords.textContent = unique;
 
-    const daysActive = this.calculateActiveDays() || 1;
-    if (avgPerDay) avgPerDay.textContent = Math.round(this.searchHistory.length / daysActive);
+        const daysActive = this.calculateActiveDays() || 1;
+        if (avgPerDay) avgPerDay.textContent = Math.round(this.searchHistory.length / daysActive);
 
-    if (!historyList) return;
+        if (!historyList) return;
 
-    if (this.searchHistory.length === 0) {
-        historyList.innerHTML = `
-            <div class="empty-state">
-                <span style="font-size: 3rem;">🕐</span>
-                <p>暂无搜索历史</p>
+        if (this.searchHistory.length === 0) {
+            historyList.innerHTML = `
+                <div class="empty-state">
+                    <span style="font-size: 3rem;">🕐</span>
+                    <p>暂无搜索历史</p>
+                </div>
+            `;
+            return;
+        }
+
+        historyList.innerHTML = this.searchHistory.slice(0, 50).map(item => `
+            <div class="history-item">
+                <div class="history-content">
+                    <div class="history-keyword">${this.escapeHtml(item.keyword)}</div>
+                    <div class="history-time">${formatRelativeTime(item.timestamp)}</div>
+                </div>
+                <div class="history-actions">
+                    <button class="action-btn" onclick="window.location.href='./index.html?q=${encodeURIComponent(item.keyword)}'">
+                        重新搜索
+                    </button>
+                </div>
             </div>
-        `;
-        return;
+        `).join('');
     }
-
-    historyList.innerHTML = this.searchHistory.slice(0, 50).map(item => `
-        <div class="history-item">
-            <div class="history-content">
-                <div class="history-keyword">${this.escapeHtml(item.query)}</div>
-                <div class="history-time">${formatRelativeTime(item.timestamp)}</div>
-            </div>
-            <div class="history-actions">
-                <button class="action-btn" onclick="window.location.href='./index.html?q=${encodeURIComponent(item.query)}'">
-                    重新搜索
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
 
 //设置项映射（示例）
 async loadSettingsData() {
@@ -697,26 +636,15 @@ showToast('保存设置失败: ' + e.message, 'error');
         }
     }
 
-// 修复获取搜索历史方法
-async getSearchHistory() {
-    try {
-        const history = await API.getSearchHistory();
-        // 确保数据格式正确，统一使用query字段
-        return history.map(item => ({
-            ...item,
-            query: item.query,
-            keyword: item.query // 保持兼容性
-        }));
-    } catch (error) {
-        // 降级到本地存储
-        const localHistory = StorageManager.getItem('search_history', []);
-        return localHistory.map(item => ({
-            ...item,
-            query: item.query || item.keyword,
-            keyword: item.query || item.keyword
-        }));
+    // API辅助方法
+    async getSearchHistory() {
+        try {
+            return await API.getSearchHistory();
+        } catch (error) {
+            // 降级到本地存储
+            return StorageManager.getItem('search_history', []);
+        }
     }
-}
 
     async getUserSettings() {
         try {
