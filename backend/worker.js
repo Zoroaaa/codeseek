@@ -502,23 +502,18 @@ router.put('/api/auth/change-password', async (request, env) => {
             return utils.errorResponse('当前密码错误');
         }
         
-    // 密码修改成功后
-    await env.DB.prepare(
-        `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`
-    ).bind(newHash, Date.now(), user.id).run();
-    
-    // 新增：使该用户所有会话失效（除当前会话）
-    const authHeader = request.headers.get('Authorization');
-    const currentToken = authHeader.substring(7);
-    const currentTokenHash = await utils.hashPassword(currentToken);
-    
-    await env.DB.prepare(
-        `DELETE FROM user_sessions WHERE user_id = ? AND token_hash != ?`
-    ).bind(user.id, currentTokenHash).run();
+        // 更新密码
+        const newHash = await utils.hashPassword(newPassword);
+        await env.DB.prepare(
+            `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`
+        ).bind(newHash, Date.now(), user.id).run();
+        
+        // 使所有会话失效
+        await env.DB.prepare(
+            `DELETE FROM user_sessions WHERE user_id = ?`
+        ).bind(user.id).run();
 
-    return utils.successResponse({ 
-        message: '密码修改成功，其他设备会话已失效'
-    });
+        return utils.successResponse({ message: '密码修改成功' });
         
     } catch (error) {
         console.error('密码修改失败:', error);
@@ -589,6 +584,10 @@ router.put('/api/user/settings', async (request, env) => {
         const body = await request.json().catch(() => ({}));
         const { settings } = body;
 
+        if (!settings || typeof settings !== 'object') {
+            return utils.errorResponse('设置数据格式错误');
+        }
+
         // 验证设置字段
         const allowedSettings = ['theme', 'autoSync', 'cacheResults', 'maxHistoryPerUser', 'maxFavoritesPerUser'];
         const filteredSettings = {};
@@ -605,14 +604,6 @@ router.put('/api/user/settings', async (request, env) => {
         `).bind(user.id).first();
 
         const currentSettings = userRecord ? JSON.parse(userRecord.settings || '{}') : {};
-        
-        // 新增：应用主题设置
-        if (filteredSettings.theme) {
-            filteredSettings.theme = ['light', 'dark', 'auto'].includes(filteredSettings.theme) 
-                ? filteredSettings.theme 
-                : 'auto';
-        }
-        
         const updatedSettings = { ...currentSettings, ...filteredSettings };
 
         // 更新用户设置
@@ -620,8 +611,8 @@ router.put('/api/user/settings', async (request, env) => {
             UPDATE users SET settings = ?, updated_at = ? WHERE id = ?
         `).bind(JSON.stringify(updatedSettings), Date.now(), user.id).run();
 
-        // 新增：返回应用后的设置
         return utils.successResponse({ 
+            message: '设置更新成功',
             settings: updatedSettings
         });
 

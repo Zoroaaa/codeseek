@@ -926,27 +926,16 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
     }
 
     // 主题管理
-initTheme() {
-    // 优先使用用户设置的主题
-    if (this.currentUser && this.currentUser.settings?.theme) {
-        const theme = this.currentUser.settings.theme;
-        document.documentElement.setAttribute('data-theme', theme);
-        this.updateThemeIcon(theme);
-    } else {
-        // 降级到本地存储
+    initTheme() {
         const savedTheme = StorageManager.getItem('theme', 'light');
+        const themeToggle = document.getElementById('themeToggle');
+        
         document.documentElement.setAttribute('data-theme', savedTheme);
-        this.updateThemeIcon(savedTheme);
+        
+        if (themeToggle) {
+            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        }
     }
-}
-
-// 修复主题图标更新方法
-updateThemeIcon(theme) {
-    const themeToggle = document.getElementById('themeToggle');
-    if (themeToggle) {
-        themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙'; // 移除重复的emoji
-    }
-}
 
     toggleTheme() {
         const currentTheme = document.documentElement.getAttribute('data-theme');

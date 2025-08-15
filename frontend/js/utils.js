@@ -306,22 +306,6 @@ const StorageManager = {
             itemCount
         };
     }
-	
-	    // 新增：同步主题设置
-    syncThemeSetting(theme) {
-        // 更新本地存储
-        this.setItem('theme', theme);
-        
-        // 更新DOM
-        document.documentElement.setAttribute('data-theme', theme);
-        
-        // 更新主题图标
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
-        }
-    }
-	
 };
 
 /**
@@ -977,13 +961,6 @@ async function navigateToDashboard() {
     }
 }
 
- //DOM 查询简化函数
-function byId(id) {
-    return document.getElementById(id);
-}
-
-
-
 
 
 
@@ -1003,5 +980,3 @@ window.NetworkUtils = NetworkUtils;
 // 导出到全局作用域
 window.navigateToPage = navigateToPage;
 window.navigateToDashboard = navigateToDashboard;
-// 导出到全局作用域
-window.byId = byId;

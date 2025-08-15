@@ -186,21 +186,6 @@ function handleRedirectIssues() {
     }
 }
 
-// 新增：同步主题设置
-syncThemeSetting(theme) {
-    // 更新本地存储
-    this.setItem('theme', theme);
-    
-    // 更新DOM
-    document.documentElement.setAttribute('data-theme', theme);
-    
-    // 更新主题图标
-    const themeToggle = document.getElementById('themeToggle');
-    if (themeToggle) {
-        themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙'; // 修复重复emoji
-    }
-}
-
 // 只在必要时调用，并添加防护
 document.addEventListener('DOMContentLoaded', () => {
     // 添加延迟以避免与服务器重定向冲突

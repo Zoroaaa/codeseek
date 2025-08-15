@@ -106,8 +106,7 @@ CREATE TABLE IF NOT EXISTS analytics_events (
 CREATE INDEX IF NOT EXISTS idx_analytics_user_created ON analytics_events(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_analytics_session ON analytics_events(session_id);
--- 确保 analytics_events 表有足够数据支持统计
-CREATE INDEX IF NOT EXISTS idx_analytics_date ON analytics_events(DATE(created_at / 1000, 'unixepoch'));
+
 
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
