@@ -647,7 +647,7 @@ initTheme() {
 updateThemeIcon(theme) {
     const themeToggle = document.getElementById('themeToggle');
     if (themeToggle) {
-        themeToggle.textContent = theme === 'dark' ? '☀☀️' : '🌙🌙';
+        themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
     }
 }
 

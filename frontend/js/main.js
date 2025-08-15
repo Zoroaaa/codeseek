@@ -940,11 +940,11 @@ initTheme() {
     }
 }
 
-// 新增相同的方法：更新主题图标
+// 修复主题图标更新方法
 updateThemeIcon(theme) {
     const themeToggle = document.getElementById('themeToggle');
     if (themeToggle) {
-        themeToggle.textContent = theme === 'dark' ? '☀☀️' : '🌙🌙';
+        themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙'; // 移除重复的emoji
     }
 }
 
