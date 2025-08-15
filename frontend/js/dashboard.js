@@ -231,32 +231,62 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
         }
     }
 
-    async loadOverviewData() {
-        try {
-            // 更新统计数据
-            const totalSearchesEl = document.getElementById('totalSearches');
-            const totalFavoritesEl = document.getElementById('totalFavorites');
-            const activeDaysEl = document.getElementById('activeDays');
-            const userLevelEl = document.getElementById('userLevel');
+// 修复后代码
+async loadOverviewData() {
+    try {
+        // 获取真实的统计数据
+        const [searchStats, favorites] = await Promise.allSettled([
+            API.getSearchStats(),
+            Promise.resolve(this.favorites)
+        ]);
+        
+        // 处理搜索统计
+        const stats = searchStats.status === 'fulfilled' ? searchStats.value : {
+            total: this.searchHistory.length,
+            today: 0,
+            thisWeek: 0,
+            topQueries: []
+        };
+        
+        // 更新UI
+        const totalSearchesEl = document.getElementById('totalSearches');
+        const totalFavoritesEl = document.getElementById('totalFavorites');
+        const activeDaysEl = document.getElementById('activeDays');
+        const userLevelEl = document.getElementById('userLevel');
 
-            if (totalSearchesEl) totalSearchesEl.textContent = this.searchHistory.length;
-            if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
-            
-            // 计算活跃天数
-            const activeDays = this.calculateActiveDays();
-            if (activeDaysEl) activeDaysEl.textContent = activeDays;
-            
-            // 用户等级
-            const level = this.calculateUserLevel();
-            if (userLevelEl) userLevelEl.textContent = level;
+        if (totalSearchesEl) totalSearchesEl.textContent = stats.total || 0;
+        if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
+        
+        // 计算活跃天数
+        const activeDays = this.calculateActiveDays();
+        if (activeDaysEl) activeDaysEl.textContent = activeDays;
+        
+        // 用户等级
+        const level = this.calculateUserLevel();
+        if (userLevelEl) userLevelEl.textContent = level;
 
-            // 加载最近活动
-            await this.loadRecentActivity();
+        // 加载最近活动
+        await this.loadRecentActivity();
 
-        } catch (error) {
-            console.error('加载概览数据失败:', error);
-        }
+    } catch (error) {
+        console.error('加载概览数据失败:', error);
+        // 降级到本地数据
+        this.loadOverviewDataFromLocal();
     }
+}
+
+// 添加降级方法
+loadOverviewDataFromLocal() {
+    const totalSearchesEl = document.getElementById('totalSearches');
+    const totalFavoritesEl = document.getElementById('totalFavorites');
+    const activeDaysEl = document.getElementById('activeDays');
+    const userLevelEl = document.getElementById('userLevel');
+
+    if (totalSearchesEl) totalSearchesEl.textContent = this.searchHistory.length;
+    if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
+    if (activeDaysEl) activeDaysEl.textContent = this.calculateActiveDays();
+    if (userLevelEl) userLevelEl.textContent = this.calculateUserLevel();
+}
 
     async loadFavoritesData() {
         const favoritesList = document.getElementById('favoritesList');
@@ -729,19 +759,31 @@ showToast('保存设置失败: ' + e.message, 'error');
         }
     }
 
-    async clearAllHistory() {
-        if (!confirm('确定要清空所有搜索历史吗？此操作不可恢复。')) return;
+// 修复后代码
+async clearAllHistory() {
+    if (!confirm('确定要清空所有搜索历史吗？此操作不可恢复。')) return;
 
-        try {
-            this.searchHistory = [];
-            StorageManager.removeItem('search_history');
-            await this.loadHistoryData();
-			await API.request('/api/user/search-history', { method: 'DELETE' });
-            showToast('搜索历史已清空', 'success');
-        } catch (error) {
-            showToast('清空失败: ' + error.message, 'error');
-        }
+    try {
+        showLoading(true);
+        
+        // 使用API类的封装方法
+        await API.clearAllSearchHistory();
+        
+        // 清空本地数据
+        this.searchHistory = [];
+        StorageManager.removeItem('search_history');
+        
+        // 重新加载数据
+        await this.loadHistoryData();
+        
+        showToast('搜索历史已清空', 'success');
+    } catch (error) {
+        console.error('清空搜索历史失败:', error);
+        showToast('清空失败: ' + error.message, 'error');
+    } finally {
+        showLoading(false);
     }
+}
 
     async clearAllData() {
         if (!confirm('确定要清空所有本地数据吗？此操作不可恢复，建议先导出数据备份。')) return;
@@ -768,37 +810,38 @@ showToast('保存设置失败: ' + e.message, 'error');
         }
     }
 
-    async deleteAccount() {
-        const confirmText = '我确定要删除账户';
-        const userInput = prompt(`删除账户将无法恢复，请输入"${confirmText}"确认：`);
-        
-        if (userInput !== confirmText) {
-            showToast('确认文本不匹配，取消删除', 'info');
-            return;
-        }
-
-        try {
-            showLoading(true);
-            const response = await API.request('/api/auth/delete-account', {
-                method: 'POST'
-            });
-            
-            if (response.success) {
-                localStorage.removeItem('auth_token');
-                showToast('账户已删除', 'success');
-                
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-            } else {
-                throw new Error(response.message || '删除账户失败');
-            }
-        } catch (error) {
-            showToast('删除失败: ' + error.message, 'error');
-        } finally {
-            showLoading(false);
-        }
+// 修复后代码
+async deleteAccount() {
+    const confirmText = '我确定要删除账户';
+    const userInput = prompt(`删除账户将无法恢复，请输入"${confirmText}"确认：`);
+    
+    if (userInput !== confirmText) {
+        showToast('确认文本不匹配，取消删除', 'info');
+        return;
     }
+
+    try {
+        showLoading(true);
+        
+        // 使用API类的封装方法
+        const response = await API.deleteAccount();
+        
+        if (response.success) {
+            showToast('账户已删除', 'success');
+            
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 2000);
+        } else {
+            throw new Error(response.message || '删除账户失败');
+        }
+    } catch (error) {
+        console.error('删除账户失败:', error);
+        showToast('删除失败: ' + error.message, 'error');
+    } finally {
+        showLoading(false);
+    }
+}
 
     resetSettings() {
         if (!confirm('确定要重置所有设置为默认值吗？')) return;

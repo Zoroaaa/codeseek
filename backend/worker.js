@@ -19,6 +19,7 @@ class Router {
     options(path, handler) { this.addRoute('OPTIONS', path, handler); }
 
 // 同时更新 handle 方法以支持参数路由优先匹配
+// 在 Router 类中优化 handle 方法
 async handle(request, env) {
     const url = new URL(request.url);
     const method = request.method;
@@ -32,30 +33,59 @@ async handle(request, env) {
         });
     }
 
-    // 查找精确匹配的路由
+    // 1. 首先查找精确匹配的路由
     const exactKey = `${method}:${pathname}`;
     if (this.routes.has(exactKey)) {
         return await this.executeHandler(this.routes.get(exactKey), request, env);
     }
 
-    // 查找模式匹配的路由（包括参数路由）
-    const matchedRoutes = [];
+    // 2. 查找参数路由（如 /api/user/search-history/:id）
+    const paramRoutes = [];
+    const staticRoutes = [];
+    
     for (const [routeKey, handler] of this.routes) {
         const [routeMethod, routePath] = routeKey.split(':');
-        if ((routeMethod === method || routeMethod === '*') && this.matchPath(routePath, pathname)) {
-            // 优先级：参数路由 > 通配符路由
-            const priority = routePath.includes(':') ? 1 : (routePath.includes('*') ? 0 : 2);
-            matchedRoutes.push({ handler, priority, routePath });
+        
+        if (routeMethod !== method && routeMethod !== '*') continue;
+        
+        if (this.matchPath(routePath, pathname)) {
+            if (routePath.includes(':')) {
+                paramRoutes.push({ handler, routePath, specificity: this.calculateSpecificity(routePath) });
+            } else if (routePath.includes('*')) {
+                staticRoutes.push({ handler, routePath, specificity: 0 });
+            }
         }
     }
 
-    // 按优先级排序并执行第一个匹配的处理器
-    if (matchedRoutes.length > 0) {
-        matchedRoutes.sort((a, b) => b.priority - a.priority);
-        return await this.executeHandler(matchedRoutes[0].handler, request, env);
+    // 3. 按特异性排序参数路由（越具体的路由优先级越高）
+    if (paramRoutes.length > 0) {
+        paramRoutes.sort((a, b) => b.specificity - a.specificity);
+        return await this.executeHandler(paramRoutes[0].handler, request, env);
+    }
+
+    // 4. 处理通配符路由
+    if (staticRoutes.length > 0) {
+        return await this.executeHandler(staticRoutes[0].handler, request, env);
     }
 
     return utils.errorResponse(`API路径不存在: ${pathname}`, 404);
+}
+
+// 计算路由特异性（越具体的路由分数越高）
+calculateSpecificity(routePath) {
+    const parts = routePath.split('/');
+    let score = 0;
+    
+    for (const part of parts) {
+        if (part === '') continue;
+        if (part.startsWith(':')) {
+            score += 1; // 参数部分得分较低
+        } else {
+            score += 10; // 静态部分得分较高
+        }
+    }
+    
+    return score;
 }
 
     async executeHandler(handler, request, env) {
@@ -277,8 +307,101 @@ const utils = {
             }
         }
         return errors;
+    },
+	
+	    // 统一成功响应格式
+    successResponse(data = {}, origin = '*') {
+        const response = {
+            success: true,
+            timestamp: Date.now(),
+            ...data
+        };
+        
+        return this.jsonResponse(response, 200, origin);
+    },
+
+    // 统一错误响应格式
+    errorResponse(message, status = 400, origin = '*', errorCode = null) {
+        const response = {
+            success: false,
+            error: true,
+            message,
+            code: errorCode,
+            timestamp: Date.now()
+        };
+        
+        return this.jsonResponse(response, status, origin);
+    },
+
+    // 分页响应格式
+    paginatedResponse(data, pagination, origin = '*') {
+        return this.successResponse({
+            data,
+            pagination: {
+                total: pagination.total || 0,
+                limit: pagination.limit || 50,
+                offset: pagination.offset || 0,
+                hasMore: pagination.hasMore || false
+            }
+        }, origin);
+    },
+
+    // 验证必需参数
+    validateRequiredParams(body, requiredFields) {
+        const missing = [];
+        for (const field of requiredFields) {
+            if (!body[field] || 
+                (typeof body[field] === 'string' && body[field].trim() === '')) {
+                missing.push(field);
+            }
+        }
+        return missing;
+    },
+
+    // 安全的JSON解析
+    async safeJsonParse(request, fallback = {}) {
+        try {
+            return await request.json();
+        } catch (error) {
+            console.warn('JSON解析失败:', error);
+            return fallback;
+        }
     }
 };
+
+// 添加错误处理装饰器函数
+function withErrorHandling(handler) {
+    return async (request, env) => {
+        try {
+            return await handler(request, env);
+        } catch (error) {
+            console.error('接口处理错误:', error);
+            
+            // 根据错误类型返回不同的响应
+            if (error.message.includes('认证')) {
+                return utils.errorResponse('认证失败', 401);
+            } else if (error.message.includes('权限')) {
+                return utils.errorResponse('权限不足', 403);
+            } else if (error.message.includes('不存在')) {
+                return utils.errorResponse('资源不存在', 404);
+            } else if (error.message.includes('格式') || error.message.includes('验证')) {
+                return utils.errorResponse(error.message, 400);
+            } else {
+                return utils.errorResponse('服务器内部错误', 500);
+            }
+        }
+    };
+}
+
+// 应用错误处理到关键接口
+router.post('/api/auth/login', withErrorHandling(async (request, env) => {
+    // 登录逻辑...
+}));
+
+router.post('/api/user/favorites', withErrorHandling(async (request, env) => {
+    // 收藏同步逻辑...
+}));
+
 
 // 认证中间件
 async function authenticate(request, env) {
@@ -397,38 +520,41 @@ router.post('/api/auth/register', async (request, env) => {
     }
 });
 
+// 优化登录接口响应
 router.post('/api/auth/login', async (request, env) => {
     try {
         const body = await request.json().catch(() => ({}));
         const { username, password } = body;
 
+        // 输入验证
         const errors = utils.validateInput({ username, password }, {
-            username: { required: true },
-            password: { required: true }
+            username: { required: true, maxLength: 50 },
+            password: { required: true, maxLength: 50 }
         });
 
         if (errors.length > 0) {
-            return utils.errorResponse(errors[0]);
+            return utils.errorResponse(errors[0], 400);
         }
 
-        // 查找用户
+        // 查找用户（支持用户名或邮箱）
         const user = await env.DB.prepare(`
             SELECT * FROM users WHERE username = ? OR email = ?
         `).bind(username, username).first();
 
         if (!user) {
-            return utils.errorResponse('用户名或密码错误');
+            return utils.errorResponse('用户名或密码错误', 401);
         }
 
         // 验证密码
         const passwordHash = await utils.hashPassword(password);
         if (passwordHash !== user.password_hash) {
-            return utils.errorResponse('用户名或密码错误');
+            return utils.errorResponse('用户名或密码错误', 401);
         }
 
         // 生成JWT
         const jwtSecret = env.JWT_SECRET;
         if (!jwtSecret) {
+            console.error('JWT_SECRET 环境变量未设置');
             return utils.errorResponse('服务器配置错误', 500);
         }
 
@@ -459,6 +585,12 @@ router.post('/api/auth/login', async (request, env) => {
             VALUES (?, ?, ?, ?, ?, ?)
         `).bind(sessionId, user.id, tokenHash, expiresAt, Date.now(), Date.now()).run();
 
+        // 记录登录行为
+        await utils.logUserAction(env, user.id, 'login', { 
+            loginMethod: 'password',
+            sessionId 
+        }, request);
+
         return utils.successResponse({
             message: '登录成功',
             token,
@@ -476,6 +608,7 @@ router.post('/api/auth/login', async (request, env) => {
         return utils.errorResponse('登录失败，请稍后重试', 500);
     }
 });
+
 
 // 在文档2中增加密码修改路由
 router.put('/api/auth/change-password', async (request, env) => {
@@ -521,13 +654,6 @@ router.put('/api/auth/change-password', async (request, env) => {
     }
 });
 
-router.get('/api/auth/verify', async (request, env) => {
-    const user = await authenticate(request, env);
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-    return utils.successResponse({ user });
-});
 
 router.post('/api/auth/logout', async (request, env) => {
     const user = await authenticate(request, env);
@@ -628,55 +754,54 @@ router.post('/api/auth/verify-token', async (request, env) => {
         const body = await request.json().catch(() => ({}));
         const { token } = body;
 
-        if (!token) {
-            return utils.errorResponse('Token不能为空', 401);
+        // 参数验证
+        if (!token || typeof token !== 'string') {
+            return utils.errorResponse('Token参数无效', 400);
         }
 
         const jwtSecret = env.JWT_SECRET;
         if (!jwtSecret) {
+            console.error('JWT_SECRET 环境变量未设置');
             return utils.errorResponse('服务器配置错误', 500);
         }
 
+        // 验证JWT格式和有效性
         const payload = await utils.verifyJWT(token, jwtSecret);
         if (!payload) {
             return utils.errorResponse('Token无效或已过期', 401);
         }
 
-        try {
-            const tokenHash = await utils.hashPassword(token);
-            const session = await env.DB.prepare(`
-                SELECT u.* FROM users u
-                JOIN user_sessions s ON u.id = s.user_id
-                WHERE s.token_hash = ? AND s.expires_at > ?
-            `).bind(tokenHash, Date.now()).first();
+        // 查询数据库验证会话
+        const tokenHash = await utils.hashPassword(token);
+        const session = await env.DB.prepare(`
+            SELECT u.* FROM users u
+            JOIN user_sessions s ON u.id = s.user_id
+            WHERE s.token_hash = ? AND s.expires_at > ?
+        `).bind(tokenHash, Date.now()).first();
 
-            if (!session) {
-                return utils.errorResponse('会话已过期', 401);
-            }
-
-            // 更新活动时间
-            await env.DB.prepare(`
-                UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
-            `).bind(Date.now(), tokenHash).run();
-
-            const user = {
-                id: session.id,
-                username: session.username,
-                email: session.email,
-                permissions: JSON.parse(session.permissions || '[]'),
-                settings: JSON.parse(session.settings || '{}')
-            };
-
-            return utils.successResponse({ 
-                user,
-                valid: true,
-                message: 'Token验证成功'
-            });
-
-        } catch (error) {
-            console.error('Token验证数据库查询失败:', error);
-            return utils.errorResponse('Token验证失败', 401);
+        if (!session) {
+            return utils.errorResponse('会话已过期或不存在', 401);
         }
+
+        // 更新最后活动时间
+        await env.DB.prepare(`
+            UPDATE user_sessions SET last_activity = ? WHERE token_hash = ?
+        `).bind(Date.now(), tokenHash).run();
+
+        // 构建用户信息
+        const user = {
+            id: session.id,
+            username: session.username,
+            email: session.email,
+            permissions: JSON.parse(session.permissions || '[]'),
+            settings: JSON.parse(session.settings || '{}')
+        };
+
+        return utils.successResponse({ 
+            valid: true,
+            user,
+            message: 'Token验证成功'
+        });
 
     } catch (error) {
         console.error('Token验证失败:', error);
@@ -690,27 +815,141 @@ router.post('/api/auth/verify-token', async (request, env) => {
 router.post('/api/actions/record', async (request, env) => {
     try {
         const body = await request.json().catch(() => ({}));
-        const { action, data } = body;
+        const { action, data, timestamp, sessionId } = body;
 
-        if (!action) {
-            return utils.errorResponse('行为类型不能为空');
+        // 参数验证和清理
+        let actionType = 'unknown';
+        if (action && typeof action === 'string' && action.trim()) {
+            actionType = action.trim();
+        } else if (action && typeof action === 'object' && action.type) {
+            actionType = String(action.type).trim();
         }
 
-        // 尝试获取用户信息（可选）
+        // 验证action类型
+        const allowedActions = [
+            'search', 'login', 'logout', 'register', 'visit_site', 'copy_url',
+            'favorite_add', 'favorite_remove', 'settings_update', 'export_data',
+            'sync_data', 'page_view', 'session_start', 'session_end'
+        ];
+
+        if (!allowedActions.includes(actionType)) {
+            actionType = 'custom'; // 允许自定义行为类型
+        }
+
+        // 获取用户信息（可选）
         const user = await authenticate(request, env);
         const userId = user ? user.id : null;
 
-        // 记录行为
-        await utils.logUserAction(env, userId, action, data || {}, request);
+        // 获取客户端信息
+        const clientIP = utils.getClientIP(request);
+        const userAgent = request.headers.get('User-Agent') || '';
+        const referer = request.headers.get('Referer') || '';
 
-        return utils.successResponse({ message: '行为记录成功' });
+        // 记录到用户行为表
+        if (userId && env.ENABLE_ACTION_LOGGING === 'true') {
+            await utils.logUserAction(env, userId, actionType, data || {}, request);
+        }
+
+        // 如果启用分析功能，也记录到分析表
+        if (env.ENABLE_ANALYTICS === 'true') {
+            const recordId = utils.generateId();
+            const recordTimestamp = timestamp || Date.now();
+
+            await env.DB.prepare(`
+                INSERT INTO analytics_events (
+                    id, user_id, session_id, event_type, event_data, 
+                    ip_address, user_agent, referer, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+                recordId,
+                userId,
+                sessionId || utils.generateId(),
+                actionType,
+                JSON.stringify(data || {}),
+                clientIP,
+                userAgent,
+                referer,
+                recordTimestamp
+            ).run();
+        }
+
+        return utils.successResponse({ 
+            recorded: true,
+            actionType,
+            userId: userId || null,
+            timestamp: Date.now()
+        });
 
     } catch (error) {
         console.error('记录行为失败:', error);
         // 行为记录失败不应该影响用户体验
-        return utils.successResponse({ message: '记录行为成功（静默失败）' });
+        return utils.successResponse({ 
+            recorded: false, 
+            error: 'silent_failure',
+            message: '行为记录失败但不影响功能'
+        });
     }
 });
+
+// 用户行为统计查询接口
+router.get('/api/user/analytics', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const url = new URL(request.url);
+        const days = Math.min(parseInt(url.searchParams.get('days') || '30'), 90);
+        const startTime = Date.now() - (days * 24 * 60 * 60 * 1000);
+
+        // 查询用户行为统计
+        const actionStats = await env.DB.prepare(`
+            SELECT action, COUNT(*) as count
+            FROM user_actions 
+            WHERE user_id = ? AND created_at >= ?
+            GROUP BY action
+            ORDER BY count DESC
+        `).bind(user.id, startTime).all();
+
+        // 查询每日活动统计
+        const dailyStats = await env.DB.prepare(`
+            SELECT 
+                DATE(created_at / 1000, 'unixepoch') as date,
+                COUNT(*) as actions
+            FROM user_actions 
+            WHERE user_id = ? AND created_at >= ?
+            GROUP BY DATE(created_at / 1000, 'unixepoch')
+            ORDER BY date DESC
+        `).bind(user.id, startTime).all();
+
+        // 获取搜索统计
+        const searchStats = await env.DB.prepare(`
+            SELECT COUNT(*) as total FROM user_search_history WHERE user_id = ?
+        `).bind(user.id).first();
+
+        // 获取收藏统计
+        const favoriteStats = await env.DB.prepare(`
+            SELECT COUNT(*) as total FROM user_favorites WHERE user_id = ?
+        `).bind(user.id).first();
+
+        return utils.successResponse({
+            period: `${days}天`,
+            actions: {
+                total: actionStats.results.reduce((sum, item) => sum + item.count, 0),
+                byType: actionStats.results
+            },
+            daily: dailyStats.results,
+            searches: searchStats.total || 0,
+            favorites: favoriteStats.total || 0
+        });
+
+    } catch (error) {
+        console.error('获取用户统计失败:', error);
+        return utils.errorResponse('获取统计数据失败', 500);
+    }
+});
+
 
 router.post('/api/user/favorites', async (request, env) => {
     const user = await authenticate(request, env);
@@ -955,6 +1194,7 @@ router.get('/api/user/search-history', async (request, env) => {
 });
 
 // 删除搜索历史记录
+// 删除单条搜索历史（参数路由，优先级高）
 router.delete('/api/user/search-history/:id', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) {
@@ -963,10 +1203,12 @@ router.delete('/api/user/search-history/:id', async (request, env) => {
 
     try {
         const url = new URL(request.url);
-        const historyId = url.pathname.split('/').pop();
+        const pathParts = url.pathname.split('/');
+        const historyId = pathParts[pathParts.length - 1];
 
-        if (!historyId || historyId === 'search-history') {
-            return utils.errorResponse('历史记录ID无效');
+        // 验证ID格式
+        if (!historyId || historyId === 'search-history' || historyId.length < 10) {
+            return utils.errorResponse('历史记录ID格式无效', 400);
         }
 
         const result = await env.DB.prepare(`
@@ -978,7 +1220,16 @@ router.delete('/api/user/search-history/:id', async (request, env) => {
             return utils.errorResponse('历史记录不存在或无权删除', 404);
         }
 
-        return utils.successResponse({ message: '删除成功' });
+        // 记录删除行为
+        await utils.logUserAction(env, user.id, 'history_delete', { 
+            historyId,
+            deletedCount: 1 
+        }, request);
+
+        return utils.successResponse({ 
+            message: '删除成功',
+            deletedId: historyId
+        });
 
     } catch (error) {
         console.error('删除搜索历史失败:', error);
@@ -987,6 +1238,7 @@ router.delete('/api/user/search-history/:id', async (request, env) => {
 });
 
 // 清空搜索历史
+// 清空所有搜索历史（精确路由）
 router.delete('/api/user/search-history', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) {
@@ -994,11 +1246,35 @@ router.delete('/api/user/search-history', async (request, env) => {
     }
 
     try {
+        // 检查是否是清空操作（通过query参数区分）
+        const url = new URL(request.url);
+        const operation = url.searchParams.get('operation');
+        
+        if (operation !== 'clear') {
+            return utils.errorResponse('请指定operation=clear参数以确认清空操作', 400);
+        }
+
+        // 获取删除前的数量统计
+        const countResult = await env.DB.prepare(`
+            SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?
+        `).bind(user.id).first();
+
+        const deletedCount = countResult.count || 0;
+
+        // 执行清空操作
         await env.DB.prepare(`
             DELETE FROM user_search_history WHERE user_id = ?
         `).bind(user.id).run();
 
-        return utils.successResponse({ message: '搜索历史已清空' });
+        // 记录清空行为
+        await utils.logUserAction(env, user.id, 'history_clear', { 
+            deletedCount 
+        }, request);
+
+        return utils.successResponse({ 
+            message: '搜索历史已清空',
+            deletedCount
+        });
 
     } catch (error) {
         console.error('清空搜索历史失败:', error);
@@ -1090,190 +1366,47 @@ router.get('/api/config', async (request, env) => {
     });
 });
 
-// 记录用户行为分析
-router.post('/api/analytics/record', async (request, env) => {
-    try {
-        const body = await request.json().catch(() => ({}));
-        const { event, data, timestamp, sessionId } = body;
-
-        // 更宽松的验证 - 允许各种格式的事件类型
-        let eventType = 'unknown';
-        if (event) {
-            if (typeof event === 'string' && event.trim()) {
-                eventType = event.trim();
-            } else if (typeof event === 'object' && event.type) {
-                eventType = String(event.type);
-            } else {
-                eventType = String(event);
-            }
-        }
-
-        // 如果事件类型仍然无效，使用默认值而不是返回错误
-        if (!eventType || eventType === 'undefined' || eventType === 'null') {
-            eventType = 'page_interaction';
-        }
-
-        // 获取客户端信息
-        const clientIP = utils.getClientIP(request);
-        const userAgent = request.headers.get('User-Agent') || '';
-        const referer = request.headers.get('Referer') || '';
-        
-        // 尝试获取用户信息（可选，未登录用户也能记录）
-        const user = await authenticate(request, env);
-        const userId = user ? user.id : null;
-
-        // 创建分析记录
-        const recordId = utils.generateId();
-        const recordTimestamp = timestamp || Date.now();
-
-        // 如果启用了分析功能才记录
-        if (env.ENABLE_ANALYTICS === 'true') {
-            await env.DB.prepare(`
-                INSERT INTO analytics_events (
-                    id, user_id, session_id, event_type, event_data, 
-                    ip_address, user_agent, referer, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).bind(
-                recordId,
-                userId,
-                sessionId || utils.generateId(),
-                eventType,
-                JSON.stringify(data || {}),
-                clientIP,
-                userAgent,
-                referer,
-                recordTimestamp
-            ).run();
-        }
-
-        return utils.successResponse({ 
-            recorded: true,
-            recordId: env.ENABLE_ANALYTICS === 'true' ? recordId : null
-        });
-
-    } catch (error) {
-        console.error('记录分析数据失败:', error);
-        // 分析记录失败不应该影响用户体验，返回成功
-        return utils.successResponse({ recorded: false, error: 'silent' });
-    }
-});
-
-// 获取用户分析统计（需要认证）
-router.get('/api/analytics/stats', async (request, env) => {
-    const user = await authenticate(request, env);
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
-    try {
-        if (env.ENABLE_ANALYTICS !== 'true') {
-            return utils.successResponse({ 
-                message: '分析功能未启用',
-                stats: {}
-            });
-        }
-
-        const url = new URL(request.url);
-        const days = Math.min(parseInt(url.searchParams.get('days') || '30'), 90);
-        const startTime = Date.now() - (days * 24 * 60 * 60 * 1000);
-
-        // 获取事件统计
-        const eventStats = await env.DB.prepare(`
-            SELECT event_type, COUNT(*) as count
-            FROM analytics_events 
-            WHERE user_id = ? AND created_at >= ?
-            GROUP BY event_type
-            ORDER BY count DESC
-        `).bind(user.id, startTime).all();
-
-        // 获取每日活动统计
-        const dailyStats = await env.DB.prepare(`
-            SELECT 
-                DATE(created_at / 1000, 'unixepoch') as date,
-                COUNT(*) as events
-            FROM analytics_events 
-            WHERE user_id = ? AND created_at >= ?
-            GROUP BY DATE(created_at / 1000, 'unixepoch')
-            ORDER BY date DESC
-        `).bind(user.id, startTime).all();
-
-        return utils.successResponse({
-            eventStats: eventStats.results,
-            dailyStats: dailyStats.results,
-            period: `${days}天`,
-            totalEvents: eventStats.results.reduce((sum, item) => sum + item.count, 0)
-        });
-
-    } catch (error) {
-        console.error('获取分析统计失败:', error);
-        return utils.errorResponse('获取统计数据失败', 500);
-    }
-});
-
-// 调试接口 - 帮助查看前端发送的数据格式
-router.post('/api/debug/analytics', async (request, env) => {
-    try {
-        const body = await request.json().catch(() => null);
-        const textBody = await request.clone().text().catch(() => '');
-        
-        return utils.successResponse({
-            headers: Object.fromEntries(request.headers.entries()),
-            jsonBody: body,
-            textBody: textBody,
-            url: request.url,
-            method: request.method
-        });
-    } catch (error) {
-        return utils.errorResponse('调试失败: ' + error.message);
-    }
-});
-
-// 简化的分析记录接口 - 接受任何格式
-router.post('/api/track', async (request, env) => {
-    try {
-        const body = await request.json().catch(() => ({}));
-        
-        // 获取客户端信息
-        const clientIP = utils.getClientIP(request);
-        const userAgent = request.headers.get('User-Agent') || '';
-        
-        // 尝试获取用户信息（可选）
-        const user = await authenticate(request, env);
-        const userId = user ? user.id : null;
-
-        // 简单记录到日志（如果不想存储到数据库）
-        console.log('Analytics Track:', {
-            user: userId,
-            ip: clientIP,
-            data: body,
-            timestamp: Date.now()
-        });
-
-        return utils.successResponse({ tracked: true });
-    } catch (error) {
-        console.error('Track error:', error);
-        return utils.successResponse({ tracked: false });
-    }
-});
 
 // 健康检查接口增强
 router.get('/api/system/status', async (request, env) => {
     try {
         // 检查数据库连接
-        const dbCheck = await env.DB.prepare('SELECT 1').first();
+        const dbCheck = await env.DB.prepare('SELECT 1 as test').first();
+        
+        // 检查关键环境变量
+        const envCheck = {
+            hasJwtSecret: !!env.JWT_SECRET,
+            hasDatabase: !!env.DB,
+            analyticsEnabled: env.ENABLE_ANALYTICS === 'true',
+            actionLoggingEnabled: env.ENABLE_ACTION_LOGGING === 'true'
+        };
+        
+        // 检查数据库表是否存在（可选）
+        let tablesCheck = 'unknown';
+        try {
+            await env.DB.prepare('SELECT COUNT(*) FROM users LIMIT 1').first();
+            tablesCheck = 'ok';
+        } catch (e) {
+            tablesCheck = 'missing_tables';
+        }
         
         return utils.successResponse({
             status: 'healthy',
-            timestamp: Date.now(),
             version: env.APP_VERSION || '1.0.0',
-            database: dbCheck ? 'connected' : 'disconnected',
+            database: {
+                connected: !!dbCheck,
+                tables: tablesCheck
+            },
+            environment: envCheck,
             features: {
                 registration: (env.ALLOW_REGISTRATION || 'true') === 'true',
-                analytics: (env.ENABLE_ANALYTICS || 'false') === 'true',
-                actionLogging: (env.ENABLE_ACTION_LOGGING || 'false') === 'true'
-            }
+                analytics: env.ENABLE_ANALYTICS === 'true',
+                actionLogging: env.ENABLE_ACTION_LOGGING === 'true'
+            },
+            timestamp: Date.now()
         });
     } catch (error) {
+        console.error('系统状态检查失败:', error);
         return utils.errorResponse('系统状态检查失败', 500);
     }
 });

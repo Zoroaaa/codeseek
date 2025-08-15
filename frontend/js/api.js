@@ -35,68 +35,83 @@ class APIService {
         }
     }
 
-    async request(endpoint, options = {}) {
-        const url = `${this.baseURL}${endpoint}`;
-        const headers = {
-            'Content-Type': 'application/json',
-            ...options.headers
-        };
+async request(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers
+    };
 
-        if (this.token) {
-            headers['Authorization'] = `Bearer ${this.token}`;
-        }
-
-        const config = {
-            method: 'GET',
-            credentials: 'omit', // 不发送cookies，避免CORS问题
-            ...options,
-            headers
-        };
-
-        let lastError;
-        for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-            try {
-                const response = await fetch(url, config);
-                
-                if (response.ok) {
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        return await response.json();
-                    }
-                    return await response.text();
-                }
-                
-                if (response.status === 401) {
-                    this.setToken(null);
-                    throw new Error('认证失败，请重新登录');
-                }
-                
-                const errorText = await response.text().catch(() => '');
-                let errorMessage = `HTTP ${response.status}`;
-                
-                try {
-                    const errorData = JSON.parse(errorText);
-                    errorMessage = errorData.message || errorMessage;
-                } catch (e) {
-                    if (errorText) errorMessage += `: ${errorText}`;
-                }
-                
-                throw new Error(errorMessage);
-                
-            } catch (error) {
-                lastError = error;
-                
-                if (error.name === 'TypeError' && attempt < this.maxRetries - 1) {
-                    await this.delay(this.retryDelay * (attempt + 1));
-                    continue;
-                }
-                break;
-            }
-        }
-        
-        console.error(`API请求失败 (${endpoint}):`, lastError);
-        throw lastError;
+    if (this.token) {
+        headers['Authorization'] = `Bearer ${this.token}`;
     }
+
+    const config = {
+        method: 'GET',
+        credentials: 'omit',
+        ...options,
+        headers
+    };
+
+    let lastError;
+    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+        try {
+            // 网络状态检查
+            if (!navigator.onLine) {
+                throw new Error('网络连接不可用');
+            }
+            
+            const response = await fetch(url, config);
+            
+            if (response.ok) {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return await response.json();
+                }
+                return await response.text();
+            }
+            
+            // 401错误特殊处理
+            if (response.status === 401) {
+                this.setToken(null);
+                throw new Error('认证失败，请重新登录');
+            }
+            
+            // 5xx错误可以重试
+            if (response.status >= 500 && attempt < this.maxRetries - 1) {
+                await this.delay(this.retryDelay * (attempt + 1));
+                continue;
+            }
+            
+            const errorText = await response.text().catch(() => '');
+            let errorMessage = `HTTP ${response.status}`;
+            
+            try {
+                const errorData = JSON.parse(errorText);
+                errorMessage = errorData.message || errorMessage;
+            } catch (e) {
+                if (errorText) errorMessage += `: ${errorText}`;
+            }
+            
+            throw new Error(errorMessage);
+            
+        } catch (error) {
+            lastError = error;
+            
+            // 网络错误可以重试
+            if ((error.name === 'TypeError' || error.message.includes('fetch')) && 
+                attempt < this.maxRetries - 1) {
+                await this.delay(this.retryDelay * (attempt + 1));
+                continue;
+            }
+            break;
+        }
+    }
+    
+    console.error(`API请求失败 (${endpoint}):`, lastError);
+    throw lastError;
+}
+
 
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -123,11 +138,95 @@ class APIService {
         return response;
     }
 
-    async verifyToken(token) {
-        return await this.request('/api/auth/verify-token', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+// 修正为POST调用，匹配后端接口
+async verifyToken(token) {
+    if (!token) {
+        throw new Error('Token不能为空');
     }
+    
+    try {
+        return await this.request('/api/auth/verify-token', {
+            method: 'POST',
+            body: JSON.stringify({ token })
+        });
+    } catch (error) {
+        console.error('Token验证失败:', error);
+        throw error;
+    }
+}
+
+// 删除账户方法
+async deleteAccount() {
+    if (!this.token) {
+        throw new Error('用户未登录');
+    }
+    
+    try {
+        const response = await this.request('/api/auth/delete-account', {
+            method: 'POST'
+        });
+        
+        if (response.success) {
+            this.setToken(null); // 清除本地token
+        }
+        
+        return response;
+    } catch (error) {
+        console.error('删除账户失败:', error);
+        throw error;
+    }
+}
+
+// 清空搜索历史方法
+async clearAllSearchHistory() {
+    if (!this.token) {
+        throw new Error('用户未登录');
+    }
+    
+    try {
+        return await this.request('/api/user/search-history', {
+            method: 'DELETE'
+        });
+    } catch (error) {
+        console.error('清空搜索历史失败:', error);
+        throw error;
+    }
+}
+
+// 删除单条搜索历史方法
+async deleteSearchHistory(historyId) {
+    if (!this.token) {
+        throw new Error('用户未登录');
+    }
+    
+    if (!historyId) {
+        throw new Error('历史记录ID不能为空');
+    }
+    
+    try {
+        return await this.request(`/api/user/search-history/${historyId}`, {
+            method: 'DELETE'
+        });
+    } catch (error) {
+        console.error('删除搜索历史失败:', error);
+        throw error;
+    }
+}
+
+// 获取搜索统计方法
+async getSearchStats() {
+    if (!this.token) {
+        return { total: 0, today: 0, thisWeek: 0, topQueries: [] };
+    }
+    
+    try {
+        return await this.request('/api/user/search-stats');
+    } catch (error) {
+        console.error('获取搜索统计失败:', error);
+        return { total: 0, today: 0, thisWeek: 0, topQueries: [] };
+    }
+}
+
 
     async logout() {
         try {
@@ -139,12 +238,37 @@ class APIService {
         }
     }
 
-    async syncFavorites(favorites) {
+// 修复 syncFavorites 方法
+async syncFavorites(favorites) {
+    if (!this.token) {
+        throw new Error('用户未登录');
+    }
+    
+    if (!Array.isArray(favorites)) {
+        throw new Error('收藏数据格式错误');
+    }
+    
+    // 验证收藏数据结构
+    const validFavorites = favorites.filter(fav => {
+        return fav && fav.title && fav.url && 
+               typeof fav.title === 'string' && 
+               typeof fav.url === 'string';
+    });
+    
+    if (validFavorites.length !== favorites.length) {
+        console.warn('过滤了无效的收藏数据');
+    }
+    
+    try {
         return await this.request('/api/user/favorites', {
             method: 'POST',
-            body: JSON.stringify({ favorites })
+            body: JSON.stringify({ favorites: validFavorites })
         });
+    } catch (error) {
+        console.error('同步收藏失败:', error);
+        throw error;
     }
+}
 	
 	async changePassword(currentPassword, newPassword) {
     return await this.request('/api/auth/change-password', {
@@ -238,12 +362,39 @@ async getSearchHistory() {
         }
     }
 
-    async updateUserSettings(settings) {
+// 修复 updateUserSettings 方法
+async updateUserSettings(settings) {
+    if (!this.token) {
+        throw new Error('用户未登录');
+    }
+    
+    if (!settings || typeof settings !== 'object') {
+        throw new Error('设置数据格式错误');
+    }
+    
+    // 验证设置字段
+    const allowedSettings = [
+        'theme', 'autoSync', 'cacheResults', 
+        'maxHistoryPerUser', 'maxFavoritesPerUser'
+    ];
+    
+    const validSettings = {};
+    Object.keys(settings).forEach(key => {
+        if (allowedSettings.includes(key)) {
+            validSettings[key] = settings[key];
+        }
+    });
+    
+    try {
         return await this.request('/api/user/settings', {
             method: 'PUT',
-            body: JSON.stringify({ settings })
+            body: JSON.stringify({ settings: validSettings })
         });
+    } catch (error) {
+        console.error('更新用户设置失败:', error);
+        throw error;
     }
+}
 
 
     async recordAction(action, data) {

@@ -1254,31 +1254,34 @@ async loadCloudData() {
             this.favorites = cloudFavorites;
             this.saveFavorites();
             this.renderFavorites();
-            console.log(`☁️ 云端收藏已加载: ${cloudFavorites.length}个`);
         }
 
-        // 加载云端搜索历史
+        // 加载云端搜索历史 - 统一数据格式
         const cloudHistory = await API.getSearchHistory();
         if (cloudHistory && cloudHistory.length > 0) {
-            // 过滤有效的历史记录
-            const validCloudHistory = cloudHistory.filter(item => {
-                return item && (item.keyword || item.query) && 
-                       typeof (item.keyword || item.query) === 'string' &&
-                       (item.keyword || item.query).trim().length > 0;
-            }).map(item => ({
-                ...item,
-                keyword: item.keyword || item.query,
-                query: item.query || item.keyword
-            }));
+            // 统一字段名处理
+            const normalizedHistory = cloudHistory.map(item => ({
+                id: item.id || `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                keyword: item.keyword || item.query, // 统一使用 keyword
+                query: item.query || item.keyword,   // 保持 query 兼容性
+                source: item.source || 'unknown',
+                timestamp: item.timestamp || item.createdAt || Date.now(),
+                count: item.count || 1
+            })).filter(item => {
+                // 过滤无效数据
+                return item.keyword && typeof item.keyword === 'string' && item.keyword.trim().length > 0;
+            });
 
-            // 合并本地和云端历史
-            const mergedHistory = [...validCloudHistory];
-            
-            // 添加本地独有的历史记录
+            // 合并本地和云端历史，去重
+            const mergedHistory = [...normalizedHistory];
             this.searchHistory.forEach(localItem => {
                 if (localItem && localItem.keyword && 
                     !mergedHistory.some(cloudItem => cloudItem.keyword === localItem.keyword)) {
-                    mergedHistory.push(localItem);
+                    mergedHistory.push({
+                        ...localItem,
+                        keyword: localItem.keyword || localItem.query,
+                        query: localItem.query || localItem.keyword
+                    });
                 }
             });
             
@@ -1289,13 +1292,13 @@ async loadCloudData() {
             
             this.saveHistory();
             this.renderHistory();
-            console.log(`☁️ 云端历史已加载: ${validCloudHistory.length}条`);
         }
     } catch (error) {
         console.error('加载云端数据失败:', error);
         showToast('加载云端数据失败，使用本地数据', 'warning');
     }
 }
+
 
     // 搜索输入处理
     handleSearchInput(value) {
@@ -1310,18 +1313,56 @@ async loadCloudData() {
 showSearchSuggestions(query) {
     if (!query || typeof query !== 'string') return;
     
-    // 安全检查：确保搜索历史中的每个项目都有有效的keyword属性
     const suggestions = this.searchHistory
         .filter(item => {
-            if (!item || !item.keyword || typeof item.keyword !== 'string') {
+            if (!item) return false;
+            
+            // 统一字段名处理 - 兼容 keyword 和 query
+            const searchTerm = item.keyword || item.query;
+            if (!searchTerm || typeof searchTerm !== 'string') {
                 return false;
             }
-            return item.keyword.toLowerCase().includes(query.toLowerCase());
+            
+            return searchTerm.toLowerCase().includes(query.toLowerCase());
         })
         .slice(0, 5);
     
-    console.log('搜索建议:', suggestions);
-    // 这里可以实现搜索建议UI
+    // 实现搜索建议UI显示
+    this.renderSearchSuggestions(suggestions);
+}
+
+// 新增搜索建议渲染方法
+renderSearchSuggestions(suggestions) {
+    let suggestionsContainer = document.getElementById('searchSuggestions');
+    
+    // 如果容器不存在，创建一个
+    if (!suggestionsContainer) {
+        suggestionsContainer = document.createElement('div');
+        suggestionsContainer.id = 'searchSuggestions';
+        suggestionsContainer.className = 'search-suggestions';
+        
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput && searchInput.parentNode) {
+            searchInput.parentNode.appendChild(suggestionsContainer);
+        }
+    }
+    
+    if (suggestions.length === 0) {
+        suggestionsContainer.style.display = 'none';
+        return;
+    }
+    
+    suggestionsContainer.innerHTML = suggestions.map(item => {
+        const displayText = item.keyword || item.query;
+        return `
+            <div class="suggestion-item" onclick="app.searchFromHistory('${this.escapeHtml(displayText)}')">
+                <span class="suggestion-icon">🕐</span>
+                <span class="suggestion-text">${this.escapeHtml(displayText)}</span>
+            </div>
+        `;
+    }).join('');
+    
+    suggestionsContainer.style.display = 'block';
 }
 
     // 隐藏搜索建议

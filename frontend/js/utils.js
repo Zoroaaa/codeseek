@@ -880,7 +880,37 @@ const NetworkUtils = {
             };
         }
         return null;
+    },
+	// 添加API连接测试
+    async testAPIConnection(baseURL) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const response = await fetch(`${baseURL}/api/health`, {
+                method: 'GET',
+                signal: controller.signal,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+                const data = await response.json();
+                return { connected: true, data };
+            } else {
+                return { connected: false, status: response.status };
+            }
+        } catch (error) {
+            return { 
+                connected: false, 
+                error: error.name === 'AbortError' ? 'timeout' : error.message 
+            };
+        }
     }
+	
 };
 
 // 在utils.js中，替换 navigateToPage 和 navigateToDashboard
