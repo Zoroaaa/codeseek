@@ -74,27 +74,6 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
         }
     }
 
-    // 新增删除单条历史记录方法
-    async deleteHistoryItem(historyId) {
-        if (!confirm('确定要删除这条搜索记录吗？')) return;
-        
-        try {
-            const result = await API.request(`/api/user/search-history/${historyId}`, {
-                method: 'DELETE'
-            });
-            
-            if (result.success) {
-                // 从本地数据中移除
-                this.searchHistory = this.searchHistory.filter(item => item.id !== historyId);
-                this.saveHistory();
-                await this.loadHistoryData();
-                showToast('历史记录已删除', 'success');
-            }
-        } catch (error) {
-            showToast('删除失败: ' + error.message, 'error');
-        }
-    }
-
     bindEvents() {
         // 标签切换
         document.querySelectorAll('[data-tab]').forEach(tab => {
@@ -346,23 +325,19 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
             return;
         }
 
-    historyList.innerHTML = this.searchHistory.slice(0, 50).map(item => `
-        <div class="history-item">
-            <div class="history-content">
-                <div class="history-keyword">${this.escapeHtml(item.keyword)}</div>
-                <div class="history-time">${formatRelativeTime(item.timestamp)}</div>
+        historyList.innerHTML = this.searchHistory.slice(0, 50).map(item => `
+            <div class="history-item">
+                <div class="history-content">
+                    <div class="history-keyword">${this.escapeHtml(item.keyword)}</div>
+                    <div class="history-time">${formatRelativeTime(item.timestamp)}</div>
+                </div>
+                <div class="history-actions">
+                    <button class="action-btn" onclick="window.location.href='./index.html?q=${encodeURIComponent(item.keyword)}'">
+                        重新搜索
+                    </button>
+                </div>
             </div>
-            <div class="history-actions">
-                <button class="action-btn" onclick="window.location.href='./index.html?q=${encodeURIComponent(item.keyword)}'">
-                    重新搜索
-                </button>
-                <!-- 新增删除按钮 -->
-                <button class="action-btn danger-btn" onclick="app.deleteHistoryItem('${item.id}')">
-                    删除
-                </button>
-            </div>
-        </div>
-    `).join('');
+        `).join('');
     }
 
 //设置项映射（示例）
@@ -377,43 +352,10 @@ byId('maxFavorites').value = s.maxFavoritesPerUser ?? 500;
 } catch (e) { console.error(e); }
 }
 
-// 在文档6的loadStatsData方法中添加图表渲染
-async loadStatsData() {
-    try {
-        const response = await API.request('/api/analytics/stats');
-        
-        // 渲染搜索趋势图表
-        const trendCtx = document.getElementById('searchTrendChart').getContext('2d');
-        new Chart(trendCtx, {
-            type: 'line',
-            data: {
-                labels: response.dailyStats.map(d => d.date),
-                datasets: [{
-                    label: '每日搜索量',
-                    data: response.dailyStats.map(d => d.events),
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)'
-                }]
-            }
-        });
-        
-        // 渲染热门关键词图表
-        const keywordsCtx = document.getElementById('topKeywordsChart').getContext('2d');
-        new Chart(keywordsCtx, {
-            type: 'bar',
-            data: {
-                labels: response.topQueries.map(k => k.query),
-                datasets: [{
-                    label: '搜索次数',
-                    data: response.topQueries.map(k => k.count),
-                    backgroundColor: '#10b981'
-                }]
-            }
-        });
-    } catch (error) {
-        console.error('加载统计数据失败:', error);
+    async loadStatsData() {
+        // 这里可以实现更详细的统计图表
+        console.log('加载统计数据');
     }
-}
 
     async syncFavorites() {
         try {
@@ -807,10 +749,6 @@ showToast('保存设置失败: ' + e.message, 'error');
 
         try {
             showLoading(true);
-			
-			        // 新增API调用清空云端数据
-            await API.request('/api/user/search-history', { method: 'DELETE' });
-            await API.request('/api/user/favorites', { method: 'DELETE' });
             
             // 清空本地数据
             this.favorites = [];
