@@ -502,18 +502,23 @@ router.put('/api/auth/change-password', async (request, env) => {
             return utils.errorResponse('当前密码错误');
         }
         
-        // 更新密码
-        const newHash = await utils.hashPassword(newPassword);
-        await env.DB.prepare(
-            `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`
-        ).bind(newHash, Date.now(), user.id).run();
-        
-        // 使所有会话失效
-        await env.DB.prepare(
-            `DELETE FROM user_sessions WHERE user_id = ?`
-        ).bind(user.id).run();
+    // 密码修改成功后
+    await env.DB.prepare(
+        `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`
+    ).bind(newHash, Date.now(), user.id).run();
+    
+    // 新增：使该用户所有会话失效（除当前会话）
+    const authHeader = request.headers.get('Authorization');
+    const currentToken = authHeader.substring(7);
+    const currentTokenHash = await utils.hashPassword(currentToken);
+    
+    await env.DB.prepare(
+        `DELETE FROM user_sessions WHERE user_id = ? AND token_hash != ?`
+    ).bind(user.id, currentTokenHash).run();
 
-        return utils.successResponse({ message: '密码修改成功' });
+    return utils.successResponse({ 
+        message: '密码修改成功，其他设备会话已失效'
+    });
         
     } catch (error) {
         console.error('密码修改失败:', error);
