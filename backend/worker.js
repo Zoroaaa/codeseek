@@ -244,13 +244,6 @@ const utils = {
         return response;
     },
 
-    errorResponse(message, status = 400, origin = '*') {
-        return this.jsonResponse({ success: false, message, error: true }, status, origin);
-    },
-
-    successResponse(data = {}, origin = '*') {
-        return this.jsonResponse({ success: true, ...data }, 200, origin);
-    },
 
     getClientIP(request) {
         return request.headers.get('CF-Connecting-IP') || 
@@ -369,38 +362,7 @@ const utils = {
     }
 };
 
-// 添加错误处理装饰器函数
-function withErrorHandling(handler) {
-    return async (request, env) => {
-        try {
-            return await handler(request, env);
-        } catch (error) {
-            console.error('接口处理错误:', error);
-            
-            // 根据错误类型返回不同的响应
-            if (error.message.includes('认证')) {
-                return utils.errorResponse('认证失败', 401);
-            } else if (error.message.includes('权限')) {
-                return utils.errorResponse('权限不足', 403);
-            } else if (error.message.includes('不存在')) {
-                return utils.errorResponse('资源不存在', 404);
-            } else if (error.message.includes('格式') || error.message.includes('验证')) {
-                return utils.errorResponse(error.message, 400);
-            } else {
-                return utils.errorResponse('服务器内部错误', 500);
-            }
-        }
-    };
-}
 
-// 应用错误处理到关键接口
-router.post('/api/auth/login', withErrorHandling(async (request, env) => {
-    // 登录逻辑...
-}));
-
-router.post('/api/user/favorites', withErrorHandling(async (request, env) => {
-    // 收藏同步逻辑...
-}));
 
 
 // 认证中间件
@@ -446,6 +408,29 @@ async function authenticate(request, env) {
         console.error('认证查询失败:', error);
         return null;
     }
+}
+
+// 错误处理装饰器函数
+function withErrorHandling(handler) {
+    return async (request, env) => {
+        try {
+            return await handler(request, env);
+        } catch (error) {
+            console.error('接口处理错误:', error);
+            
+            if (error.message.includes('认证')) {
+                return utils.errorResponse('认证失败', 401);
+            } else if (error.message.includes('权限')) {
+                return utils.errorResponse('权限不足', 403);
+            } else if (error.message.includes('不存在')) {
+                return utils.errorResponse('资源不存在', 404);
+            } else if (error.message.includes('格式') || error.message.includes('验证')) {
+                return utils.errorResponse(error.message, 400);
+            } else {
+                return utils.errorResponse('服务器内部错误', 500);
+            }
+        }
+    };
 }
 
 // 创建路由实例
