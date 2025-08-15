@@ -205,31 +205,33 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
         }
     }
 
-// 加载数据
-async loadData() {
-    try {
-        showLoading(true);
-        await this.checkAuth();
-        
-        // 直接从云端加载
-        const [favorites, history] = await Promise.all([
-            API.syncFavorites([], 'get'),
-            API.syncSearchHistory([], 'get')
-        ]);
-        
-        this.favorites = favorites || [];
-        this.searchHistory = history || [];
-        
-        await this.loadTabData(this.currentTab);
-    } catch (error) {
-        console.error('加载数据失败:', error);
-        showToast('数据加载失败', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
+    async loadData() {
+        try {
+            // 并行加载数据
+            const [favorites, history, settings] = await Promise.allSettled([
+                API.getFavorites(),
+                this.getSearchHistory(),
+                this.getUserSettings()
+            ]);
 
-// 加载概览数据
+            if (favorites.status === 'fulfilled') {
+                this.favorites = favorites.value || [];
+            }
+
+            if (history.status === 'fulfilled') {
+                this.searchHistory = history.value || [];
+            }
+
+            // 加载当前标签页数据
+            await this.loadTabData(this.currentTab);
+
+        } catch (error) {
+            console.error('加载数据失败:', error);
+            showToast('数据加载失败', 'error');
+        }
+    }
+
+// 修复后代码
 async loadOverviewData() {
     try {
         // 获取真实的统计数据
@@ -398,26 +400,17 @@ byId('maxFavorites').value = s.maxFavoritesPerUser ?? 500;
         }
     }
 
-// 移除收藏
-async removeFavorite(favoriteId) {
-    if (!confirm('确定要删除这个收藏吗？')) return;
+    async removeFavorite(favoriteId) {
+        if (!confirm('确定要删除这个收藏吗？')) return;
 
-    try {
-        showLoading(true);
-        // 调用API删除
-        await API.syncFavorites({ id: favoriteId }, 'delete');
-        
-        // 重新加载收藏数据
-        this.favorites = await API.syncFavorites([], 'get');
-        await this.loadFavoritesData();
-        showToast('收藏已删除', 'success');
-    } catch (error) {
-        console.error('删除收藏失败:', error);
-        showToast('删除失败: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
+        const index = this.favorites.findIndex(f => f.id === favoriteId);
+        if (index >= 0) {
+            this.favorites.splice(index, 1);
+            await this.syncFavorites();
+            await this.loadFavoritesData();
+            showToast('收藏已删除', 'success');
+        }
     }
-}
 
     changePassword() {
         const modal = document.getElementById('passwordModal');
@@ -680,22 +673,24 @@ showToast('保存设置失败: ' + e.message, 'error');
         }
     }
 
-// 同步所有数据
-async syncAllData() {
-    try {
-        showLoading(true);
-        showToast('正在同步数据...', 'info');
-        
-        // 由于我们已经是实时操作云端，所以这里只需要重新加载数据
-        await this.loadData();
-        
-        showToast('数据同步成功', 'success');
-    } catch (error) {
-        showToast('同步失败: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
+    // 数据操作方法
+    async syncAllData() {
+        try {
+            showLoading(true);
+            showToast('正在同步数据...', 'info');
+            
+            await Promise.all([
+                this.syncFavorites(),
+                this.syncHistory()
+            ]);
+            
+            showToast('数据同步成功', 'success');
+        } catch (error) {
+            showToast('同步失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
     }
-}
 
     async syncHistory() {
         try {
@@ -764,18 +759,23 @@ async syncAllData() {
         }
     }
 
-// 清空搜索历史
+// 修复后代码
 async clearAllHistory() {
     if (!confirm('确定要清空所有搜索历史吗？此操作不可恢复。')) return;
 
     try {
         showLoading(true);
-        // 调用API清空
-        await API.syncSearchHistory(null, 'clear');
         
-        // 清空本地状态并重新加载
+        // 使用API类的封装方法
+        await API.clearAllSearchHistory();
+        
+        // 清空本地数据
         this.searchHistory = [];
+        StorageManager.removeItem('search_history');
+        
+        // 重新加载数据
         await this.loadHistoryData();
+        
         showToast('搜索历史已清空', 'success');
     } catch (error) {
         console.error('清空搜索历史失败:', error);
@@ -784,7 +784,6 @@ async clearAllHistory() {
         showLoading(false);
     }
 }
-
 
     async clearAllData() {
         if (!confirm('确定要清空所有本地数据吗？此操作不可恢复，建议先导出数据备份。')) return;
