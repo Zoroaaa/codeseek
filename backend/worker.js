@@ -1279,28 +1279,6 @@ router.get('/api/system/status', async (request, env) => {
 });
 
 
-
-// 添加健康检查的别名接口
-router.get('/api/health-check', async (request, env) => {
-    return utils.successResponse({
-        status: 'healthy',
-        timestamp: Date.now(),
-        version: env.APP_VERSION || '1.0.0'
-    });
-});
-
-// 同步收藏夹接口（别名）
-router.post('/api/user/sync/favorites', async (request, env) => {
-    // 重用现有的收藏夹同步逻辑
-    return await router.routes.get('POST:/api/user/favorites')(request, env);
-});
-
-// 获取搜索历史接口（别名，适配前端调用）
-router.get('/api/user/search-history/list', async (request, env) => {
-    // 重用现有的搜索历史获取逻辑
-    return await router.routes.get('GET:/api/user/search-history')(request, env);
-});
-
 // 默认处理器
 router.get('/*', (request) => {
     const url = new URL(request.url);

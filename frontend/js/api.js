@@ -124,7 +124,7 @@ class APIService {
     }
 
     async verifyToken(token) {
-        return await this.request('/api/auth/verify', {
+        return await this.request('/api/auth/verify-token', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
     }
