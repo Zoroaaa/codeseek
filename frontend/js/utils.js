@@ -306,6 +306,21 @@ const StorageManager = {
             itemCount
         };
     }
+	
+	    // 新增：同步主题设置
+    syncThemeSetting(theme) {
+        // 更新本地存储
+        this.setItem('theme', theme);
+        
+        // 更新DOM
+        document.documentElement.setAttribute('data-theme', theme);
+        
+        // 更新主题图标
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.textContent = theme === 'dark' ? '☀☀️' : '🌙🌙';
+        }
+    }
 };
 
 /**

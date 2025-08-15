@@ -180,8 +180,7 @@ async syncSearchHistory(history) {
         return await this.request('/api/user/sync/search-history', {
             method: 'POST',
             body: JSON.stringify({ 
-                searchHistory: validHistory,
-                history: validHistory // 兼容性
+                history: validHistory // 统一使用history字段名
             })
         });
     } catch (error) {

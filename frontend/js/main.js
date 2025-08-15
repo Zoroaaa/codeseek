@@ -926,16 +926,27 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
     }
 
     // 主题管理
-    initTheme() {
+initTheme() {
+    // 优先使用用户设置的主题
+    if (this.currentUser && this.currentUser.settings?.theme) {
+        const theme = this.currentUser.settings.theme;
+        document.documentElement.setAttribute('data-theme', theme);
+        this.updateThemeIcon(theme);
+    } else {
+        // 降级到本地存储
         const savedTheme = StorageManager.getItem('theme', 'light');
-        const themeToggle = document.getElementById('themeToggle');
-        
         document.documentElement.setAttribute('data-theme', savedTheme);
-        
-        if (themeToggle) {
-            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-        }
+        this.updateThemeIcon(savedTheme);
     }
+}
+
+// 新增相同的方法：更新主题图标
+updateThemeIcon(theme) {
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        themeToggle.textContent = theme === 'dark' ? '☀☀️' : '🌙🌙';
+    }
+}
 
     toggleTheme() {
         const currentTheme = document.documentElement.getAttribute('data-theme');

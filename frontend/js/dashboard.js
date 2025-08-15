@@ -325,37 +325,86 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
             return;
         }
 
-        historyList.innerHTML = this.searchHistory.slice(0, 50).map(item => `
-            <div class="history-item">
-                <div class="history-content">
-                    <div class="history-keyword">${this.escapeHtml(item.keyword)}</div>
-                    <div class="history-time">${formatRelativeTime(item.timestamp)}</div>
-                </div>
-                <div class="history-actions">
-                    <button class="action-btn" onclick="window.location.href='./index.html?q=${encodeURIComponent(item.keyword)}'">
-                        重新搜索
-                    </button>
-                </div>
+    historyList.innerHTML = this.searchHistory.slice(0, 50).map(item => `
+        <div class="history-item">
+            <div class="history-content">
+                <div class="history-keyword">${this.escapeHtml(item.keyword)}</div>
+                <div class="history-time">${formatRelativeTime(item.timestamp)}</div>
             </div>
-        `).join('');
+            <div class="history-actions">
+                <button class="action-btn" onclick="window.location.href='./index.html?q=${encodeURIComponent(item.keyword)}'">
+                    重新搜索
+                </button>
+                <!-- 新增删除按钮 -->
+                <button class="action-btn danger-btn" onclick="app.deleteHistoryItem('${item.id}')">
+                    删除
+                </button>
+            </div>
+        </div>
+    `).join('');
     }
 
-//设置项映射（示例）
+//设置项映射
 async loadSettingsData() {
-try {
-const s = await this.getUserSettings();
-byId('autoSync').checked = s.autoSync !== false;
-byId('enableCache').checked = s.cacheResults !== false;
-byId('themeMode').value = s.theme || 'auto';
-byId('maxFavorites').value = s.maxFavoritesPerUser ?? 500;
-// historyRetention 与 maxHistoryPerUser 的映射策略根据你的产品规则设定
-} catch (e) { console.error(e); }
+    try {
+        const settings = await this.getUserSettings();
+        
+        // 确保主题设置正确应用
+        if (settings.theme) {
+            document.documentElement.setAttribute('data-theme', settings.theme);
+            this.updateThemeIcon(settings.theme);
+        }
+        
+        // 更新UI控件
+        byId('autoSync').checked = settings.autoSync !== false;
+        byId('enableCache').checked = settings.cacheResults !== false;
+        byId('themeMode').value = settings.theme || 'auto';
+        byId('maxFavorites').value = settings.maxFavoritesPerUser ?? 500;
+        
+    } catch (e) { 
+        console.error(e);
+        // 应用默认主题
+        document.documentElement.setAttribute('data-theme', 'light');
+        this.updateThemeIcon('light');
+    }
 }
 
-    async loadStatsData() {
-        // 这里可以实现更详细的统计图表
-        console.log('加载统计数据');
+async loadStatsData() {
+    try {
+        const response = await API.request('/api/analytics/stats');
+        
+        // 渲染搜索趋势图表
+        const trendCtx = document.getElementById('searchTrendChart').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: response.dailyStats.map(d => d.date),
+                datasets: [{
+                    label: '每日搜索量',
+                    data: response.dailyStats.map(d => d.events),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)'
+                }]
+            }
+        });
+        
+        // 渲染热门关键词图表
+        const keywordsCtx = document.getElementById('topKeywordsChart').getContext('2d');
+        new Chart(keywordsCtx, {
+            type: 'bar',
+            data: {
+                labels: response.topQueries.map(k => k.query),
+                datasets: [{
+                    label: '搜索次数',
+                    data: response.topQueries.map(k => k.count),
+                    backgroundColor: '#10b981'
+                }]
+            }
+        });
+    } catch (error) {
+        console.error('加载统计数据失败:', error);
     }
+}
 
     async syncFavorites() {
         try {
@@ -379,6 +428,27 @@ byId('maxFavorites').value = s.maxFavoritesPerUser ?? 500;
             await this.syncFavorites();
             await this.loadFavoritesData();
             showToast('收藏已删除', 'success');
+        }
+    }
+	
+	    // 新增删除单条历史记录方法
+    async deleteHistoryItem(historyId) {
+        if (!confirm('确定要删除这条搜索记录吗？')) return;
+        
+        try {
+            const result = await API.request(`/api/user/search-history/${historyId}`, {
+                method: 'DELETE'
+            });
+            
+            if (result.success) {
+                // 从本地数据中移除
+                this.searchHistory = this.searchHistory.filter(item => item.id !== historyId);
+                this.saveHistory();
+                await this.loadHistoryData();
+                showToast('历史记录已删除', 'success');
+            }
+        } catch (error) {
+            showToast('删除失败: ' + error.message, 'error');
         }
     }
 
@@ -559,28 +629,65 @@ showToast('保存设置失败: ' + e.message, 'error');
         }
     }
 
-    initTheme() {
+initTheme() {
+    // 优先使用用户设置的主题
+    if (this.currentUser && this.currentUser.settings?.theme) {
+        const theme = this.currentUser.settings.theme;
+        document.documentElement.setAttribute('data-theme', theme);
+        this.updateThemeIcon(theme);
+    } else {
+        // 降级到本地存储
         const savedTheme = StorageManager.getItem('theme', 'light');
-        const themeToggle = document.getElementById('themeToggle');
-        
         document.documentElement.setAttribute('data-theme', savedTheme);
-        if (themeToggle) {
-            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-        }
+        this.updateThemeIcon(savedTheme);
     }
+}
 
-    toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', newTheme);
-        StorageManager.setItem('theme', newTheme);
-        
-        if (themeToggle) {
-            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-        }
+// 新增方法：更新主题图标
+updateThemeIcon(theme) {
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        themeToggle.textContent = theme === 'dark' ? '☀☀️' : '🌙🌙';
     }
+}
+
+toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    // 更新UI
+    document.documentElement.setAttribute('data-theme', newTheme);
+    this.updateThemeIcon(newTheme);
+    
+    // 保存到本地存储
+    StorageManager.setItem('theme', newTheme);
+    
+    // 如果用户已登录，同步到云端
+    if (this.currentUser) {
+        this.saveThemeToCloud(newTheme);
+    }
+    
+    showToast(`已切换到${newTheme === 'dark' ? '深色' : '浅色'}主题`, 'success');
+}
+
+// 新增方法：保存主题到云端
+async saveThemeToCloud(theme) {
+    try {
+        // 获取当前设置
+        const settings = await this.getUserSettings();
+        
+        // 更新主题设置
+        const updatedSettings = {
+            ...settings,
+            theme: theme
+        };
+        
+        // 保存到云端
+        await this.updateUserSettings(updatedSettings);
+    } catch (error) {
+        console.error('主题设置同步失败:', error);
+    }
+}
 
     closeModals() {
         document.querySelectorAll('.modal').forEach(modal => {
@@ -749,6 +856,10 @@ showToast('保存设置失败: ' + e.message, 'error');
 
         try {
             showLoading(true);
+			
+			// 新增API调用清空云端数据
+            await API.request('/api/user/search-history', { method: 'DELETE' });
+            await API.request('/api/user/favorites', { method: 'DELETE' });
             
             // 清空本地数据
             this.favorites = [];
