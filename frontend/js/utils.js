@@ -859,7 +859,7 @@ const NetworkUtils = {
     async testConnection(url = window.API_CONFIG?.BASE_URL + '/api/health') {
         try {
             const response = await fetch(url, { 
-                method: 'HEAD',
+                method: 'GET',
                 mode: 'no-cors'
             });
             return true;

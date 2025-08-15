@@ -685,53 +685,6 @@ router.post('/api/auth/verify-token', async (request, env) => {
 });
 
 
-// 添加同步搜索历史接口
-router.post('/api/user/sync/search-history', async (request, env) => {
-    const user = await authenticate(request, env);
-    if (!user) {
-        return utils.errorResponse('认证失败', 401);
-    }
-
-    try {
-        const body = await request.json().catch(() => ({}));
-        const { searchHistory } = body;
-
-        if (!Array.isArray(searchHistory)) {
-            return utils.errorResponse('搜索历史数据格式错误');
-        }
-
-        const maxHistory = parseInt(env.MAX_HISTORY_PER_USER || '1000');
-        if (searchHistory.length > maxHistory) {
-            return utils.errorResponse(`搜索历史数量不能超过 ${maxHistory} 条`);
-        }
-
-        // 清除现有搜索历史
-        await env.DB.prepare(`DELETE FROM user_search_history WHERE user_id = ?`).bind(user.id).run();
-
-        // 批量插入新的搜索历史
-        for (const item of searchHistory) {
-            if (!item.keyword) continue; // 跳过无效记录
-            
-            const historyId = item.id || utils.generateId();
-            await env.DB.prepare(`
-                INSERT INTO user_search_history (id, user_id, query, source, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            `).bind(
-                historyId,
-                user.id,
-                item.keyword,
-                item.source || 'unknown',
-                item.timestamp || Date.now()
-            ).run();
-        }
-
-        return utils.successResponse({ message: '搜索历史同步成功' });
-
-    } catch (error) {
-        console.error('同步搜索历史失败:', error);
-        return utils.errorResponse('同步搜索历史失败', 500);
-    }
-});
 
 // 添加记录行为接口
 router.post('/api/actions/record', async (request, env) => {
@@ -1110,6 +1063,19 @@ router.get('/api/user/search-stats', async (request, env) => {
         console.error('获取搜索统计失败:', error);
         return utils.errorResponse('获取搜索统计失败', 500);
     }
+});
+
+//删除账户
+router.post('/api/auth/delete-account', async (request, env) => {
+     const user = await authenticate(request, env);
+     if (!user) return utils.errorResponse('认证失败', 401);
+    try {
+     await env.DB.prepare(DELETE FROM users WHERE id = ?).bind(user.id).run();
+     return utils.successResponse({ message: '账户已删除' });
+      } catch (e) {
+       console.error('删除账户失败:', e);
+       return utils.errorResponse('删除账户失败', 500);
+}
 });
 
 router.get('/api/config', async (request, env) => {

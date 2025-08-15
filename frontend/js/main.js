@@ -747,6 +747,9 @@ addToHistory(keyword) {
         this.saveHistory();
         this.renderHistory();
         showToast('搜索历史已清除', 'success');
+		if (this.currentUser) {
+API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.error);
+}
     }
 
     // 清除搜索结果

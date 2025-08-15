@@ -170,7 +170,7 @@ async syncSearchHistory(history) {
                    typeof (item.query || item.keyword) === 'string' && 
                    (item.query || item.keyword).trim().length > 0;
         }).map(item => ({
-            id: item.id || utils.generateId(),
+            id: item.id || generateId(),
             query: item.query || item.keyword,
             keyword: item.query || item.keyword, // 兼容性
             source: item.source || 'unknown',
@@ -247,14 +247,12 @@ async getSearchHistory() {
 
 
     async recordAction(action, data) {
-        try {
-            return await this.request('/api/analytics/record', {
-                method: 'POST',
-                body: JSON.stringify({ action, data, timestamp: Date.now() })
-            });
-        } catch (error) {
-            console.error('记录行为失败:', error);
-        }
+       try {
+       return await this.request('/api/actions/record', {
+       method: 'POST',
+       body: JSON.stringify({ action, data })
+       });
+    } catch (e) { console.error('记录行为失败:', e); }
     }
 
     async getConfig() {

@@ -77,8 +77,8 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
     bindEvents() {
         // 标签切换
         document.querySelectorAll('[data-tab]').forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
+            tab.addEventListener('click', () => {
+                this.switchTab(tab.dataset.tab);
             });
         });
 
@@ -340,25 +340,17 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
         `).join('');
     }
 
-    async loadSettingsData() {
-        try {
-            const settings = await this.getUserSettings();
-            
-            // 加载设置到表单
-            Object.entries(settings).forEach(([key, value]) => {
-                const element = document.getElementById(key);
-                if (element) {
-                    if (element.type === 'checkbox') {
-                        element.checked = value;
-                    } else {
-                        element.value = value;
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('加载设置失败:', error);
-        }
-    }
+//设置项映射（示例）
+async loadSettingsData() {
+try {
+const s = await this.getUserSettings();
+byId('autoSync').checked = s.autoSync !== false;
+byId('enableCache').checked = s.cacheResults !== false;
+byId('themeMode').value = s.theme || 'auto';
+byId('maxFavorites').value = s.maxFavoritesPerUser ?? 500;
+// historyRetention 与 maxHistoryPerUser 的映射策略根据你的产品规则设定
+} catch (e) { console.error(e); }
+}
 
     async loadStatsData() {
         // 这里可以实现更详细的统计图表
@@ -443,16 +435,23 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
         }
     }
 
-    async saveSettings() {
-        try {
-            const settings = this.collectSettings();
-            await this.updateUserSettings(settings);
-            showToast('设置保存成功', 'success');
-            this.markSettingsSaved();
-        } catch (error) {
-            showToast('保存设置失败: ' + error.message, 'error');
-        }
-    }
+async saveSettings() {
+try {
+const ui = this.collectSettings();
+const payload = {
+theme: ui.themeMode,
+autoSync: !!ui.autoSync,
+cacheResults: !!ui.enableCache,
+maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
+maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10)
+};
+await this.updateUserSettings(payload);
+showToast('设置保存成功', 'success');
+this.markSettingsSaved();
+} catch (e) {
+showToast('保存设置失败: ' + e.message, 'error');
+}
+}
 
     collectSettings() {
         const settings = {};
@@ -737,6 +736,7 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
             this.searchHistory = [];
             StorageManager.removeItem('search_history');
             await this.loadHistoryData();
+			await API.request('/api/user/search-history', { method: 'DELETE' });
             showToast('搜索历史已清空', 'success');
         } catch (error) {
             showToast('清空失败: ' + error.message, 'error');
