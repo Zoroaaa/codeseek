@@ -184,9 +184,17 @@ async clearAllSearchHistory() {
     }
     
     try {
+        // 方案1: 通过请求体传递参数
         return await this.request('/api/user/search-history', {
-            method: 'DELETE'
+            method: 'DELETE',
+            body: JSON.stringify({ operation: 'clear' })
         });
+        
+        // 方案2: 如果后端期望查询参数，使用下面这种方式
+        // return await this.request('/api/user/search-history?operation=clear', {
+        //     method: 'DELETE'
+        // });
+        
     } catch (error) {
         console.error('清空搜索历史失败:', error);
         throw error;
