@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">用户面板 - 磁力快搜</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    
+    <!-- 环境配置 -->
+    <script>
+        // 环境变量配置
+        window.CF_API_BASE_URL = typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined;
+        window.CF_APP_NAME = typeof process !== 'undefined' && process.env ? process.env.APP_NAME : undefined;
+        window.CF_APP_VERSION = typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : undefined;
+        window.CF_ENABLE_ANALYTICS = typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : undefined;
+        window.CF_ENABLE_DEBUG = typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : undefined;
+    </script>
+    <script src="js/config.js"></script>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <a href="./index.html">
+                    <img src="images/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
+                    <span class="brand-text" id="brand-text">磁力快搜</span>
+                </a>
+            </div>
+            <div class="nav-menu">
+                <a href="./index.html" class="nav-link">首页</a>
+                <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
+                <div id="userInfo" class="user-info">
+                    <span id="username" class="username"></span>
+                    <div class="dropdown">
+                        <button class="dropdown-btn" title="用户菜单">▼</button>
+                        <div class="dropdown-content">
+                            <a href="#" class="dropdown-item active">个人中心</a>
+                            <a href="#" id="logoutBtn" class="dropdown-item">退出登录</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <main class="dashboard-container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-menu">
+                <div class="menu-item active" data-tab="overview">
+                    <span class="menu-icon">📊</span>
+                    <span class="menu-text">概览</span>
+                </div>
+                <div class="menu-item" data-tab="favorites">
+                    <span class="menu-icon">⭐</span>
+                    <span class="menu-text">我的收藏</span>
+                </div>
+                <div class="menu-item" data-tab="history">
+                    <span class="menu-icon">🕐</span>
+                    <span class="menu-text">搜索历史</span>
+                </div>
+                <div class="menu-item" data-tab="settings">
+                    <span class="menu-icon">⚙️</span>
+                    <span class="menu-text">设置</span>
+                </div>
+                <div class="menu-item" data-tab="stats">
+                    <span class="menu-icon">📈</span>
+                    <span class="menu-text">统计</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容区域 -->
+        <div class="main-content">
+            <!-- 概览标签页 -->
+            <div id="overview" class="tab-content active">
+                <div class="tab-header">
+                    <h1>用户概览</h1>
+                    <p>欢迎回来，管理您的搜索和收藏</p>
+                </div>
+
+                <!-- 统计卡片 -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🔍</div>
+                        <div class="stat-info">
+                            <div class="stat-number" id="totalSearches">0</div>
+                            <div class="stat-label">总搜索次数</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-info">
+                            <div class="stat-number" id="totalFavorites">0</div>
+                            <div class="stat-label">收藏数量</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📅</div>
+                        <div class="stat-info">
+                            <div class="stat-number" id="activeDays">0</div>
+                            <div class="stat-label">活跃天数</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🏆</div>
+                        <div class="stat-info">
+                            <div class="stat-number" id="userLevel">新手</div>
+                            <div class="stat-label">用户等级</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 快速操作 -->
+                <div class="quick-actions">
+                    <h2>快速操作</h2>
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="window.location.href='index.html'">
+                            <span class="btn-icon">🔍</span>
+                            <span>开始搜索</span>
+                        </button>
+                        <button class="action-btn" onclick="app.switchTab('favorites')">
+                            <span class="btn-icon">⭐</span>
+                            <span>查看收藏</span>
+                        </button>
+                        <button class="action-btn" onclick="app.syncAllData()">
+                            <span class="btn-icon">🔄</span>
+                            <span>同步数据</span>
+                        </button>
+                        <button class="action-btn" onclick="app.exportData()">
+                            <span class="btn-icon">📤</span>
+                            <span>导出数据</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 最近活动 -->
+                <div class="recent-activity">
+                    <h2>最近活动</h2>
+                    <div id="activityList" class="activity-list">
+                        <!-- 活动列表将通过JavaScript动态加载 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 收藏标签页 -->
+            <div id="favorites" class="tab-content">
+                <div class="tab-header">
+                    <h1>我的收藏</h1>
+                    <div class="header-actions">
+                        <button class="btn-primary" onclick="app.syncFavorites()">同步收藏</button>
+                        <button class="btn-secondary" onclick="app.exportFavorites()">导出收藏</button>
+                    </div>
+                </div>
+
+                <!-- 收藏搜索和过滤 -->
+                <div class="favorites-controls">
+                    <div class="search-box">
+                        <input type="text" id="favoritesSearch" placeholder="搜索收藏..." autocomplete="off">
+                        <button onclick="app.searchFavorites()" title="搜索">🔍</button>
+                    </div>
+                    <div class="filter-options">
+                        <select id="favoritesSort">
+                            <option value="date-desc">按日期排序（新→旧）</option>
+                            <option value="date-asc">按日期排序（旧→新）</option>
+                            <option value="name-asc">按名称排序（A→Z）</option>
+                            <option value="name-desc">按名称排序（Z→A）</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 收藏列表 -->
+                <div id="favoritesList" class="favorites-list">
+                    <!-- 收藏项将通过JavaScript动态加载 -->
+                </div>
+            </div>
+
+            <!-- 搜索历史标签页 -->
+            <div id="history" class="tab-content">
+                <div class="tab-header">
+                    <h1>搜索历史</h1>
+                    <div class="header-actions">
+                        <button class="btn-primary" onclick="app.syncHistory()">同步历史</button>
+                        <button class="btn-danger" onclick="app.clearAllHistory()">清空历史</button>
+                    </div>
+                </div>
+
+                <!-- 历史搜索和统计 -->
+                <div class="history-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="historyCount">0</span>
+                        <span class="stat-desc">搜索记录</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="uniqueKeywords">0</span>
+                        <span class="stat-desc">不同关键词</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="avgPerDay">0</span>
+                        <span class="stat-desc">日均搜索</span>
+                    </div>
+                </div>
+
+                <!-- 热门关键词 -->
+                <div class="popular-keywords">
+                    <h3>热门搜索</h3>
+                    <div id="keywordCloud" class="keyword-cloud">
+                        <!-- 关键词云将通过JavaScript生成 -->
+                    </div>
+                </div>
+
+                <!-- 历史记录列表 -->
+                <div class="history-controls">
+                    <input type="text" id="historySearch" placeholder="搜索历史记录..." autocomplete="off">
+                    <select id="historyTimeFilter">
+                        <option value="all">全部时间</option>
+                        <option value="today">今天</option>
+                        <option value="week">本周</option>
+                        <option value="month">本月</option>
+                    </select>
+                </div>
+
+                <div id="historyList" class="history-list">
+                    <!-- 历史记录将通过JavaScript动态加载 -->
+                </div>
+            </div>
+
+                <!-- 设置标签页 -->
+                <div id="settings" class="tab-content">
+                    <div class="tab-header">
+                        <h1>用户设置</h1>
+                        <p>个性化您的使用体验</p>
+                    </div>
+
+                    <div class="settings-sections">
+                        <!-- 基本设置 -->
+                        <div class="settings-section">
+                            <h3>基本设置</h3>
+                            <div class="setting-item">
+                                <label>自动同步</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="autoSync" checked>
+                                    <span class="setting-desc">搜索和收藏自动同步到云端</span>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>搜索缓存</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="enableCache" checked>
+                                    <span class="setting-desc">启用搜索结果缓存，提升加载速度</span>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>主题模式</label>
+                                <div class="setting-control">
+                                    <select id="themeMode">
+                                        <option value="auto">跟随系统</option>
+                                        <option value="light">浅色模式</option>
+                                        <option value="dark">深色模式</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 搜索设置 -->
+                        <div class="settings-section">
+                            <h3>搜索设置</h3>
+                            <div class="setting-item">
+                                <label>默认搜索源</label>
+                                <div class="setting-control">
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" value="javbus" checked> JavBus</label>
+                                        <label><input type="checkbox" value="javdb" checked> JavDB</label>
+                                        <label><input type="checkbox" value="javlibrary" checked> JavLibrary</label>
+                                        <label><input type="checkbox" value="av01"> AV01</label>
+                                        <label><input type="checkbox" value="missav"> MissAV</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>搜索历史保留</label>
+                                <div class="setting-control">
+                                    <select id="historyRetention">
+                                        <option value="30">30天</option>
+                                        <option value="90" selected>90天</option>
+                                        <option value="365">1年</option>
+                                        <option value="-1">永久保留</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>最大收藏数量</label>
+                                <div class="setting-control">
+                                    <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
+                                    <span class="setting-desc">收藏夹最大容量限制</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 隐私设置 -->
+                        <div class="settings-section">
+                            <h3>隐私设置</h3>
+                            <div class="setting-item">
+                                <label>行为统计</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="allowAnalytics" checked>
+                                    <span class="setting-desc">允许收集匿名使用统计，帮助改进产品</span>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>搜索建议</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="searchSuggestions" checked>
+                                    <span class="setting-desc">基于历史记录提供搜索建议</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 账户操作 -->
+                        <div class="settings-section">
+                            <h3>账户操作</h3>
+                            <div class="dangerous-actions">
+                                <button class="btn-warning" onclick="app.changePassword()">修改密码</button>
+                                <button class="btn-danger" onclick="app.clearAllData()">清空所有数据</button>
+                                <button class="btn-danger" onclick="app.deleteAccount()">删除账户</button>
+                            </div>
+                        </div>
+
+                        <!-- 保存设置 -->
+                        <div class="settings-actions">
+                            <button class="btn-primary" onclick="app.saveSettings()">保存设置</button>
+                            <button class="btn-secondary" onclick="app.resetSettings()">重置默认</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 统计标签页 -->
+                <div id="stats" class="tab-content">
+                    <div class="tab-header">
+                        <h1>使用统计</h1>
+                        <p>查看您的使用数据和趋势</p>
+                    </div>
+
+                    <!-- 时间范围选择 -->
+                    <div class="stats-controls">
+                        <div class="time-range-selector">
+                            <button class="time-btn active" data-range="7">近7天</button>
+                            <button class="time-btn" data-range="30">近30天</button>
+                            <button class="time-btn" data-range="90">近90天</button>
+                            <button class="time-btn" data-range="365">近一年</button>
+                        </div>
+                    </div>
+
+                    <!-- 统计图表 -->
+                    <div class="charts-container">
+                        <div class="chart-section">
+                            <h3>搜索活动趋势</h3>
+                            <div id="searchTrendChart" class="chart-placeholder">
+                                <p>搜索趋势图表区域</p>
+                            </div>
+                        </div>
+
+                        <div class="chart-section">
+                            <h3>热门搜索关键词</h3>
+                            <div id="topKeywordsChart" class="chart-placeholder">
+                                <div class="top-keywords-list" id="topKeywordsList">
+                                    <!-- 热门关键词列表 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 详细统计 -->
+                    <div class="detailed-stats">
+                        <div class="stats-table">
+                            <h3>详细数据</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>指标</th>
+                                        <th>数值</th>
+                                        <th>趋势</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detailedStatsTable">
+                                    <!-- 详细统计数据 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 模态框 -->
+    <div id="passwordModal" class="modal" aria-labelledby="password-title" role="dialog">
+        <div class="modal-content">
+            <span class="close" aria-label="关闭">&times;</span>
+            <h2 id="password-title">修改密码</h2>
+            <form id="passwordForm" novalidate>
+                <div class="form-group">
+                    <input type="password" id="currentPassword" placeholder="当前密码" required autocomplete="current-password">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="newPassword" placeholder="新密码" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="confirmNewPassword" placeholder="确认新密码" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="submit-btn">修改密码</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast通知 -->
+    <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+    <!-- Loading -->
+    <div id="loading" class="loading" style="display:none;" aria-label="加载中">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- 脚本文件 -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/dashboard.js"></script>
+
+    <script>
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 更新页面标题和品牌名称
+            if (window.API_CONFIG) {
+                const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
+                document.getElementById('page-title').textContent = `用户面板 - ${appName}`;
+                document.getElementById('brand-text').textContent = appName;
+            }
+            
+            if (typeof DashboardApp !== 'undefined') {
+                window.app = new DashboardApp();
+            }
+        });
+    </script>
+</body>
+</html>
