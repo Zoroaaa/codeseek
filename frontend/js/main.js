@@ -1010,29 +1010,13 @@ async searchKeyword(keyword) {
     // 主题管理
     // 移除本地存储相关方法，保留主题设置
     initTheme() {
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        
-        if (themeToggle) {
-            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-        }
+		window.themeManager.applyTheme();
+
     }
 
     toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme); // 主题设置仍使用本地存储
-        
-        if (themeToggle) {
-            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-        }
-        
-        showToast(`已切换到${newTheme === 'dark' ? '深色' : '浅色'}主题`, 'success');
+		window.themeManager.toggleTheme();
+
     }
 
     // 云端同步
@@ -1518,21 +1502,12 @@ function formatRelativeTime(date) {
 }
 
 // 初始化应用
-/* let app;
+let app;
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 初始化Magnet Search应用（纯云端模式）...');
     app = new MagnetSearchApp();
-}); */
-
-let app;
-document.addEventListener('DOMContentLoaded', () => {
-    if (!app) {
-        console.log('🚀 初始化Magnet Search应用（纯云端模式）...');
-        app = new MagnetSearchApp();
-    } else {
-        console.log('应用已初始化，跳过重复初始化');
-    }
 });
+
 
 // 全局错误处理
 window.addEventListener('error', (event) => {

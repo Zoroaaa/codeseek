@@ -467,26 +467,13 @@ class DashboardApp {
 
     // 保留主题管理（仅此项使用本地存储）
     initTheme() {
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        if (themeToggle) {
-            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-        }
+		window.themeManager.toggleTheme();
+
     }
 
     toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme); // 主题设置保留本地存储
-        
-        if (themeToggle) {
-            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-        }
+		window.themeManager.toggleTheme();
+
     }
 
     // 修改退出登录
