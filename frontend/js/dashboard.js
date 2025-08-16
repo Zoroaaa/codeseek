@@ -7,13 +7,6 @@ class DashboardApp {
         this.currentTab = 'overview';
         this.isInitialized = false;
         this.init();
-		    // 添加移动端菜单切换
-    this.mobileMenuToggle = document.getElementById('mobileMenuToggle');
-    if (this.mobileMenuToggle) {
-      this.mobileMenuToggle.addEventListener('click', () => {
-        document.querySelector('.sidebar').classList.toggle('active');
-      });
-    }
     }
 
     async init() {
@@ -623,27 +616,25 @@ class DashboardApp {
         this.loadTabData(tabName);
     }
 
-  async loadTabData(tabName) {
-    // 使用统一加载方法
-    const loaderMap = {
-      overview: this.loadOverviewData.bind(this),
-      favorites: this.loadFavoritesData.bind(this),
-      history: this.loadHistoryData.bind(this),
-      settings: this.loadSettingsData.bind(this),
-      stats: this.loadStatsData.bind(this)
-    };
-    
-    if (loaderMap[tabName]) {
-      try {
-        showLoading(true);
-        await loaderMap[tabName]();
-      } catch (error) {
-        showToast(`加载${tabName}数据失败: ${error.message}`, 'error');
-      } finally {
-        showLoading(false);
-      }
+    async loadTabData(tabName) {
+        switch (tabName) {
+            case 'overview':
+                await this.loadOverviewData();
+                break;
+            case 'favorites':
+                await this.loadFavoritesData();
+                break;
+            case 'history':
+                await this.loadHistoryData();
+                break;
+            case 'settings':
+                await this.loadSettingsData();
+                break;
+            case 'stats':
+                await this.loadStatsData();
+                break;
+        }
     }
-  }
 
     loadOverviewDataFromLocal() {
         const totalSearchesEl = document.getElementById('totalSearches');
@@ -1007,29 +998,7 @@ class DashboardApp {
             </div>
         `).join('');
     }
-	
-  async loadInitialData() {
-    const batch = new APIBatch();
-    
-    const requests = [
-      { endpoint: '/api/user/favorites', options: { method: 'GET' } },
-      { endpoint: '/api/user/search-history', options: { method: 'GET' } },
-      { endpoint: '/api/user/stats', options: { method: 'GET' } }
-    ];
-    
-    return Promise.all(requests.map(req => {
-      return new Promise((resolve, reject) => {
-        batch.addRequest({
-          endpoint: req.endpoint,
-          options: req.options,
-          resolve,
-          reject
-        });
-      });
-    }));
-  }
 }
-
 
 // 导出到全局作用域
 window.DashboardApp = DashboardApp;

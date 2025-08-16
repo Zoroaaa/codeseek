@@ -401,32 +401,18 @@ const FormValidator = {
     },
 
     // 验证密码
-// 在auth.js中改进密码策略
-class AuthManager {
-  validatePassword(password) {
-    // 增强密码策略
-    const MIN_LENGTH = 8;
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasLowerCase = /[a-z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    
-    if (password.length < MIN_LENGTH) {
-      return { valid: false, message: `密码至少需要${MIN_LENGTH}个字符` };
-    }
-    
-    const strength = [hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar]
-      .filter(Boolean).length;
-    
-    if (strength < 3) {
-      return {
-        valid: false,
-        message: '密码需包含大小写字母、数字和特殊字符'
-      };
-    }
-    
-    return { valid: true };
-},
+    validatePassword(password) {
+        if (!password) return { valid: false, message: '密码不能为空' };
+        if (password.length < 6) return { valid: false, message: '密码至少6个字符' };
+        if (password.length > 50) return { valid: false, message: '密码最多50个字符' };
+        
+        const strength = PasswordStrengthChecker.checkStrength(password);
+        if (strength.score < 2) {
+            return { valid: false, message: '密码强度太弱，' + strength.feedback.join('，') };
+        }
+        
+        return { valid: true };
+    },
 
     // 验证搜索关键词
     validateSearchKeyword(keyword) {

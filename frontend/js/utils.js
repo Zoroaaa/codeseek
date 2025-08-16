@@ -1187,35 +1187,6 @@ function navigateToPage(url, options = {}) {
     });
 }
 
-// 在utils.js中添加高级缓存管理
-const CachingManager = {
-  caches: {},
-  
-  set(key, data, ttl = 300) {
-    this.caches[key] = {
-      data,
-      expires: Date.now() + ttl * 1000
-    };
-  },
-  
-  get(key) {
-    const item = this.caches[key];
-    if (item && item.expires > Date.now()) {
-      return item.data;
-    }
-    delete this.caches[key];
-    return null;
-  },
-  
-  clear(pattern) {
-    Object.keys(this.caches).forEach(key => {
-      if (key.includes(pattern)) {
-        delete this.caches[key];
-      }
-    });
-  }
-};
-
 // Dashboard导航函数
 async function navigateToDashboard() {
     try {

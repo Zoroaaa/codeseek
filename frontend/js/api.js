@@ -36,19 +36,11 @@ class APIService {
     }
 
 async request(endpoint, options = {}) {
-	
     const url = `${this.baseURL}${endpoint}`;
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers
     };
-	
-		    // 添加请求签名
-    const timestamp = Date.now();
-    const signature = await this.generateRequestSignature(endpoint, options, timestamp);
-        // 添加到已存在的 headers 对象
-    headers['X-Request-Timestamp'] = timestamp;
-    headers['X-Request-Signature'] = signature;
 
     if (this.token) {
         headers['Authorization'] = `Bearer ${this.token}`;
@@ -120,22 +112,6 @@ async request(endpoint, options = {}) {
     throw lastError;
 }
 
-  async generateRequestSignature(endpoint, options, timestamp) {
-    // 简化的签名生成逻辑
-    const payload = JSON.stringify(options.body || {});
-    const stringToSign = `${endpoint}|${options.method}|${timestamp}|${payload}`;
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw', encoder.encode(this.token),
-      { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-    );
-    const signature = await crypto.subtle.sign(
-      'HMAC', key, encoder.encode(stringToSign)
-    );
-    return btoa(String.fromCharCode(...new Uint8Array(signature)));
-  }
-
-
 
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -161,7 +137,6 @@ async request(endpoint, options = {}) {
         
         return response;
     }
-	
 
 // 修正为POST调用，匹配后端接口
 async verifyToken(token) {
@@ -292,26 +267,15 @@ async syncFavorites(favorites) {
         console.warn('过滤了无效的收藏数据');
     }
     
-    // 添加重试机制
-    const MAX_RETRIES = 3;
-    let retries = 0;
-    
-    while (retries < MAX_RETRIES) {
-      try {
+    try {
         return await this.request('/api/user/favorites', {
-          method: 'POST',
-          body: JSON.stringify({ favorites })
+            method: 'POST',
+            body: JSON.stringify({ favorites: validFavorites })
         });
-      } catch (error) {
-        if (error.status === 429 || error.message.includes('timeout')) {
-          retries++;
-          await this.delay(1000 * retries); // 指数退避
-        } else {
-          throw error;
-        }
-      }
+    } catch (error) {
+        console.error('同步收藏失败:', error);
+        throw error;
     }
-    throw new Error('同步失败，请检查网络连接');
 }
 	
 	async changePassword(currentPassword, newPassword) {
@@ -467,41 +431,6 @@ async updateUserSettings(settings) {
             return { status: 'error', message: error.message };
         }
     }
-}
-
-// 在api.js中添加请求批处理
-class APIBatch {
-  constructor() {
-    this.queue = [];
-    this.batchTimer = null;
-  }
-  
-  addRequest(request) {
-    this.queue.push(request);
-    if (!this.batchTimer) {
-      this.batchTimer = setTimeout(() => this.processBatch(), 50);
-    }
-  }
-  
-  async processBatch() {
-    const batchRequests = [...this.queue];
-    this.queue = [];
-    this.batchTimer = null;
-    
-    try {
-      const responses = await Promise.all(batchRequests.map(req => 
-        API.request(req.endpoint, req.options)
-      ));
-      
-      batchRequests.forEach((req, index) => {
-        req.resolve(responses[index]);
-      });
-    } catch (error) {
-      batchRequests.forEach(req => {
-        req.reject(error);
-      });
-    }
-  }
 }
 
 // 创建全局API实例
