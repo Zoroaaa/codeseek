@@ -885,7 +885,6 @@ async searchKeyword(keyword) {
                     
                     if (newFavorites.length > 0) {
                         this.favorites.push(...newFavorites);
-                        this.saveFavorites();
                         this.renderFavorites();
                         showToast(`成功导入${newFavorites.length}个收藏`, 'success');
                         
@@ -1349,7 +1348,6 @@ async loadCloudData() {
         const cloudFavorites = await API.getFavorites();
         if (cloudFavorites && cloudFavorites.length > 0) {
             this.favorites = cloudFavorites;
-            this.saveFavorites();
             this.renderFavorites();
         }
 
@@ -1387,7 +1385,6 @@ async loadCloudData() {
                 .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
                 .slice(0, this.config.maxHistoryPerUser || 1000);
             
-            this.saveHistory();
             this.renderHistory();
         }
     } catch (error) {
