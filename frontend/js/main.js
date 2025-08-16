@@ -332,7 +332,26 @@ if (dashboardLink) {
     }
 
 async searchKeyword(keyword) {
-    return this.buildSearchSources(keyword);
+    const cacheResults = document.getElementById('cacheResults')?.checked;
+    
+    // 检查缓存
+    if (cacheResults) {
+        const cached = this.getCachedResults(keyword);
+        if (cached) {
+            showToast('使用缓存结果', 'info', 2000);
+            return cached;
+        }
+    }
+
+    // 构建搜索源
+    const sources = this.buildSearchSources(keyword);
+
+    // 直接使用基础搜索，移除增强搜索逻辑
+    if (cacheResults) {
+        this.cacheResults(keyword, sources);
+    }
+
+    return sources;
 }
 
 
@@ -553,6 +572,7 @@ async searchKeyword(keyword) {
                 showToast('已添加收藏', 'success');
             }
 
+            this.saveFavorites();
             this.renderFavorites();
             this.updateFavoriteButtons();
 
@@ -583,18 +603,44 @@ async searchKeyword(keyword) {
     }
 
 // 修复添加搜索历史方法
-async addToHistory(keyword) {
-    try {
-        if (this.currentUser) {
-            await API.saveSearchHistory(keyword, 'user');
-            this.searchHistory = await API.getSearchHistory();
-            this.renderHistory();
-        } else {
-            showToast('请登录以保存搜索历史', 'info');
-        }
-    } catch (error) {
-        console.error('保存搜索历史失败:', error);
-        showToast('保存搜索历史失败', 'error');
+addToHistory(keyword) {
+    // 验证关键词
+    if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
+        console.warn('无效的搜索关键词，跳过添加到历史');
+        return;
+    }
+
+    const trimmedKeyword = keyword.trim();
+    
+    // 移除重复项
+    this.searchHistory = this.searchHistory.filter(item => {
+        return item && item.keyword && item.keyword !== trimmedKeyword;
+    });
+    
+    // 添加到开头
+    this.searchHistory.unshift({
+        id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        keyword: trimmedKeyword,
+        query: trimmedKeyword, // 兼容性
+        timestamp: Date.now(),
+        count: 1,
+        source: 'manual'
+    });
+
+    // 限制历史记录数量
+    const maxHistory = this.config.maxHistoryPerUser || 1000;
+    if (this.searchHistory.length > maxHistory) {
+        this.searchHistory = this.searchHistory.slice(0, maxHistory);
+    }
+
+    this.saveHistory();
+    this.renderHistory();
+
+    // 如果用户已登录，保存到云端
+    if (this.currentUser) {
+        API.saveSearchHistory(trimmedKeyword, 'manual').catch(error => {
+            console.error('保存搜索历史到云端失败:', error);
+        });
     }
 }
 
@@ -681,6 +727,7 @@ async addToHistory(keyword) {
         const index = this.favorites.findIndex(fav => fav.id === favoriteId);
         if (index >= 0) {
             this.favorites.splice(index, 1);
+            this.saveFavorites();
             this.renderFavorites();
             this.updateFavoriteButtons();
             showToast('已移除收藏', 'success');
@@ -697,6 +744,7 @@ async addToHistory(keyword) {
         if (!confirm('确定要清除所有搜索历史吗？')) return;
         
         this.searchHistory = [];
+        this.saveHistory();
         this.renderHistory();
         showToast('搜索历史已清除', 'success');
 		if (this.currentUser) {
@@ -775,6 +823,7 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
                     
                     if (newFavorites.length > 0) {
                         this.favorites.push(...newFavorites);
+                        this.saveFavorites();
                         this.renderFavorites();
                         showToast(`成功导入${newFavorites.length}个收藏`, 'success');
                         
@@ -819,15 +868,45 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
         }
     }
 
+    // 缓存管理
+    getCachedResults(keyword) {
+        const cacheKey = `search_cache_${keyword}`;
+        const cached = StorageManager.getItem(cacheKey);
+        
+        if (cached) {
+            const now = Date.now();
+            const cacheTimeout = 30 * 60 * 1000; // 30分钟
+            
+            if (now - cached.timestamp < cacheTimeout) {
+                return cached.results;
+            } else {
+                StorageManager.removeItem(cacheKey);
+            }
+        }
+        
+        return null;
+    }
 
+    cacheResults(keyword, results) {
+        const cacheKey = `search_cache_${keyword}`;
+        const data = {
+            keyword,
+            results,
+            timestamp: Date.now()
+        };
+        
+        StorageManager.setItem(cacheKey, data);
+    }
 
     // 本地数据管理
     loadLocalData() {
         try {
             // 加载搜索历史
+            this.searchHistory = StorageManager.getItem('search_history', []);
             this.renderHistory();
 
             // 加载收藏夹
+            this.favorites = StorageManager.getItem('favorites', []);
             this.renderFavorites();
             
             console.log(`📚 本地数据已加载: ${this.searchHistory.length}条历史, ${this.favorites.length}个收藏`);
@@ -838,10 +917,17 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
         }
     }
 
+    saveHistory() {
+        StorageManager.setItem('search_history', this.searchHistory);
+    }
 
+    saveFavorites() {
+        StorageManager.setItem('favorites', this.favorites);
+    }
 
     // 主题管理
     initTheme() {
+        const savedTheme = StorageManager.getItem('theme', 'light');
         const themeToggle = document.getElementById('themeToggle');
         
         document.documentElement.setAttribute('data-theme', savedTheme);
@@ -857,6 +943,7 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
         const themeToggle = document.getElementById('themeToggle');
         
         document.documentElement.setAttribute('data-theme', newTheme);
+        StorageManager.setItem('theme', newTheme);
         
         if (themeToggle) {
             themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
@@ -1159,34 +1246,56 @@ async logout() {
 // 修复加载云端数据方法中的搜索历史部分
 async loadCloudData() {
     if (!this.currentUser) return;
+
     try {
-        showLoading(true);
-        const [cloudFavorites, cloudHistory] = await Promise.all([
-            API.getFavorites(),
-            API.getSearchHistory()
-        ]);
-        
-        this.favorites = cloudFavorites;
-        this.renderFavorites();
-        
-        this.searchHistory = cloudHistory.map(item => ({
-            id: item.id || `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            keyword: item.keyword || item.query,
-            query: item.query || item.keyword,
-            source: item.source || 'unknown',
-            timestamp: item.timestamp || item.createdAt || Date.now(),
-            count: item.count || 1
-        })).filter(item => {
-            return item.keyword && typeof item.keyword === 'string' && item.keyword.trim().length > 0;
-        }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-         .slice(0, this.config.maxHistoryPerUser || 1000);
-        
-        this.renderHistory();
+        // 加载云端收藏夹
+        const cloudFavorites = await API.getFavorites();
+        if (cloudFavorites && cloudFavorites.length > 0) {
+            this.favorites = cloudFavorites;
+            this.saveFavorites();
+            this.renderFavorites();
+        }
+
+        // 加载云端搜索历史 - 统一数据格式
+        const cloudHistory = await API.getSearchHistory();
+        if (cloudHistory && cloudHistory.length > 0) {
+            // 统一字段名处理
+            const normalizedHistory = cloudHistory.map(item => ({
+                id: item.id || `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                keyword: item.keyword || item.query, // 统一使用 keyword
+                query: item.query || item.keyword,   // 保持 query 兼容性
+                source: item.source || 'unknown',
+                timestamp: item.timestamp || item.createdAt || Date.now(),
+                count: item.count || 1
+            })).filter(item => {
+                // 过滤无效数据
+                return item.keyword && typeof item.keyword === 'string' && item.keyword.trim().length > 0;
+            });
+
+            // 合并本地和云端历史，去重
+            const mergedHistory = [...normalizedHistory];
+            this.searchHistory.forEach(localItem => {
+                if (localItem && localItem.keyword && 
+                    !mergedHistory.some(cloudItem => cloudItem.keyword === localItem.keyword)) {
+                    mergedHistory.push({
+                        ...localItem,
+                        keyword: localItem.keyword || localItem.query,
+                        query: localItem.query || localItem.keyword
+                    });
+                }
+            });
+            
+            // 排序并限制数量
+            this.searchHistory = mergedHistory
+                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+                .slice(0, this.config.maxHistoryPerUser || 1000);
+            
+            this.saveHistory();
+            this.renderHistory();
+        }
     } catch (error) {
         console.error('加载云端数据失败:', error);
-        showToast('无法加载云端数据，请检查网络连接', 'error');
-    } finally {
-        showLoading(false);
+        showToast('加载云端数据失败，使用本地数据', 'warning');
     }
 }
 

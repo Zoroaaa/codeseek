@@ -202,6 +202,111 @@ function generateId(length = 10) {
     return result;
 }
 
+/**
+ * 存储管理器
+ */
+const StorageManager = {
+    // 存储配额检查
+    getQuotaUsage() {
+        if ('storage' in navigator && 'estimate' in navigator.storage) {
+            return navigator.storage.estimate();
+        }
+        return Promise.resolve({ usage: 0, quota: 0 });
+    },
+
+    // 安全的localStorage操作
+    setItem(key, value) {
+        try {
+            const serialized = JSON.stringify(value);
+            localStorage.setItem(key, serialized);
+            return true;
+        } catch (error) {
+            if (error.name === 'QuotaExceededError') {
+                console.warn('存储空间不足，尝试清理缓存');
+                this.clearCache();
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                    return true;
+                } catch (retryError) {
+                    console.error('存储失败:', retryError);
+                    return false;
+                }
+            }
+            console.error('存储数据失败:', error);
+            return false;
+        }
+    },
+
+    getItem(key, defaultValue = null) {
+        try {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : defaultValue;
+        } catch (error) {
+            console.error('读取数据失败:', error);
+            return defaultValue;
+        }
+    },
+
+    removeItem(key) {
+        try {
+            localStorage.removeItem(key);
+            return true;
+        } catch (error) {
+            console.error('删除数据失败:', error);
+            return false;
+        }
+    },
+
+    clear() {
+        try {
+            localStorage.clear();
+            return true;
+        } catch (error) {
+            console.error('清空存储失败:', error);
+            return false;
+        }
+    },
+
+    // 清理缓存数据
+    clearCache() {
+        const cacheKeys = Object.keys(localStorage).filter(key => 
+            key.startsWith('search_cache_') || 
+            key.startsWith('temp_') ||
+            key.includes('cache')
+        );
+        
+        cacheKeys.forEach(key => {
+            try {
+                localStorage.removeItem(key);
+            } catch (error) {
+                console.error(`清理缓存失败 ${key}:`, error);
+            }
+        });
+        
+        console.log(`已清理${cacheKeys.length}个缓存项`);
+    },
+
+    // 获取存储使用情况
+    getStorageUsage() {
+        let total = 0;
+        const itemCount = localStorage.length;
+        
+        for (let i = 0; i < itemCount; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                const value = localStorage.getItem(key);
+                total += key.length + (value ? value.length : 0);
+            }
+        }
+        
+        return {
+            used: total,
+            usedKB: (total / 1024).toFixed(2),
+            usedMB: (total / (1024 * 1024)).toFixed(2),
+            itemCount
+        };
+    }
+};
 
 /**
  * URL工具
@@ -687,6 +792,32 @@ const ErrorHandler = {
         this.storeError(errorInfo);
     },
 
+    // 存储错误到本地
+    storeError(errorInfo) {
+        try {
+            const errors = StorageManager.getItem('app_errors', []);
+            errors.push(errorInfo);
+            
+            // 只保留最近50个错误
+            if (errors.length > 50) {
+                errors.splice(0, errors.length - 50);
+            }
+            
+            StorageManager.setItem('app_errors', errors);
+        } catch (error) {
+            console.error('存储错误信息失败:', error);
+        }
+    },
+
+    // 获取存储的错误
+    getStoredErrors() {
+        return StorageManager.getItem('app_errors', []);
+    },
+
+    // 清除存储的错误
+    clearStoredErrors() {
+        StorageManager.removeItem('app_errors');
+    },
 
     // 安全执行函数
     safeExecute(func, fallback = null, context = 'function') {
@@ -867,6 +998,7 @@ async function navigateToDashboard() {
 ErrorHandler.init();
 
 // 导出到全局作用域
+window.StorageManager = StorageManager;
 window.URLUtils = URLUtils;
 window.StringUtils = StringUtils;
 window.ArrayUtils = ArrayUtils;
