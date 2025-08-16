@@ -11,53 +11,55 @@ class MagnetSearchApp {
         this.init();
     }
 
-async init() {
-    try {
-        showLoading(true);
-        console.log('🚀 初始化磁力快搜应用...');
-        
-        // 显示连接状态
-        this.showConnectionStatus();
-        
-        // 加载系统配置
-        await this.loadConfig();
-        
-        // 绑定事件
-        this.bindEvents();
-        
-        // 加载本地数据
-        this.loadLocalData();
-        
-        // 初始化主题
-        this.initTheme();
-        
-        // 检查认证状态
-        await this.checkAuthStatus();
-        
-        // 若未认证，打开登录模态
-        if (!this.currentUser) {
-            document.getElementById('loginModal').style.display = 'block';
-        }
+    async init() {
+        try {
+            showLoading(true);
+            console.log('🚀 初始化磁力快搜应用...');
+            
+            // 显示连接状态
+            this.showConnectionStatus();
+            
+            // 加载系统配置
+            await this.loadConfig();
+            
+            // 绑定事件
+            this.bindEvents();
+            
+            // 初始化主题（仅从localStorage读取主题设置）
+            this.initTheme();
+            
+            // 检查认证状态
+            await this.checkAuthStatus();
+            
+            // 若未认证，打开登录模态
+            if (!this.currentUser) {
+                document.getElementById('loginModal').style.display = 'block';
+                document.querySelector('.main-content').style.display = 'none';
+            } else {
+                document.querySelector('.main-content').style.display = 'block';
+                // 已登录用户直接加载云端数据
+                await this.loadCloudData();
+            }
 
-        // 测试API连接
-        await this.testConnection();
-        
-        // 处理URL参数（如搜索关键词）
-        this.handleURLParams();
-        
-        this.isInitialized = true;
-        this.hideConnectionStatus();
-        console.log('✅ 应用初始化完成');
-        
-    } catch (error) {
-        console.error('❌ 应用初始化失败:', error);
-        this.connectionStatus = 'error';
-        this.updateConnectionStatus('连接失败');
-        showToast('应用初始化失败，请刷新页面重试', 'error', 5000);
-    } finally {
-        showLoading(false);
+            // 测试API连接
+            await this.testConnection();
+            
+            // 处理URL参数（如搜索关键词）
+            this.handleURLParams();
+            
+            this.isInitialized = true;
+            this.hideConnectionStatus();
+            console.log('✅ 应用初始化完成');
+            
+        } catch (error) {
+            console.error('❌ 应用初始化失败:', error);
+            this.connectionStatus = 'error';
+            this.updateConnectionStatus('连接失败');
+            showToast('应用初始化失败，请刷新页面重试', 'error', 5000);
+        } finally {
+            showLoading(false);
+        }
     }
-}
 
 
     showConnectionStatus() {
@@ -539,26 +541,42 @@ async searchKeyword(keyword) {
     }
 
     // 切换收藏状态
+    // 修改收藏操作 - 直接与API交互
     async toggleFavorite(resultId) {
+        if (!this.currentUser) {
+            showToast('请先登录后再收藏', 'error');
+            return;
+        }
+
         const result = this.currentSearchResults.find(r => r.id === resultId);
         if (!result) return;
 
         const existingIndex = this.favorites.findIndex(fav => fav.url === result.url);
         
         try {
+            showLoading(true);
+
             if (existingIndex >= 0) {
-                // 移除收藏
+                // 移除收藏 - 从云端删除
+                const favoriteToRemove = this.favorites[existingIndex];
+                
+                // 先从本地移除以立即更新UI
                 this.favorites.splice(existingIndex, 1);
+                this.renderFavorites();
+                this.updateFavoriteButtons();
+                
+                // 重新同步到云端
+                await API.syncFavorites(this.favorites);
                 showToast('已移除收藏', 'success');
+                
             } else {
-                // 检查收藏数量限制
+                // 添加收藏
                 const maxFavorites = this.config.maxFavoritesPerUser || 1000;
                 if (this.favorites.length >= maxFavorites) {
                     showToast(`收藏数量已达上限 (${maxFavorites})`, 'error');
                     return;
                 }
                 
-                // 添加收藏
                 const favorite = {
                     id: `fav_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     title: result.title,
@@ -568,21 +586,25 @@ async searchKeyword(keyword) {
                     keyword: result.keyword,
                     addedAt: new Date().toISOString()
                 };
+                
+                // 先添加到本地以立即更新UI
                 this.favorites.unshift(favorite);
+                this.renderFavorites();
+                this.updateFavoriteButtons();
+                
+                // 同步到云端
+                await API.syncFavorites(this.favorites);
                 showToast('已添加收藏', 'success');
             }
 
-            this.saveFavorites();
-            this.renderFavorites();
-            this.updateFavoriteButtons();
-
-            // 如果用户已登录，同步到云端
-            if (this.currentUser) {
-                await this.syncFavorites();
-            }
         } catch (error) {
             console.error('收藏操作失败:', error);
-            showToast('收藏操作失败', 'error');
+            showToast('收藏操作失败: ' + error.message, 'error');
+            
+            // 操作失败，重新从云端加载数据以恢复状态
+            await this.loadCloudData();
+        } finally {
+            showLoading(false);
         }
     }
 
@@ -603,46 +625,52 @@ async searchKeyword(keyword) {
     }
 
 // 修复添加搜索历史方法
-addToHistory(keyword) {
-    // 验证关键词
-    if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
-        console.warn('无效的搜索关键词，跳过添加到历史');
-        return;
+    // 修改添加搜索历史 - 直接调用API
+    async addToHistory(keyword) {
+        if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
+            console.warn('无效的搜索关键词，跳过添加到历史');
+            return;
+        }
+
+        if (!this.currentUser) {
+            console.log('用户未登录，无法保存搜索历史');
+            return;
+        }
+
+        const trimmedKeyword = keyword.trim();
+        
+        try {
+            // 直接调用API保存
+            await API.saveSearchHistory(trimmedKeyword, 'manual');
+            
+            // 本地添加以立即更新UI（避免重复查询）
+            this.searchHistory = this.searchHistory.filter(item => 
+                item && item.keyword && item.keyword !== trimmedKeyword
+            );
+            
+            this.searchHistory.unshift({
+                id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                keyword: trimmedKeyword,
+                query: trimmedKeyword,
+                timestamp: Date.now(),
+                count: 1,
+                source: 'manual'
+            });
+
+            // 限制数量
+            const maxHistory = this.config.maxHistoryPerUser || 1000;
+            if (this.searchHistory.length > maxHistory) {
+                this.searchHistory = this.searchHistory.slice(0, maxHistory);
+            }
+
+            this.renderHistory();
+            
+        } catch (error) {
+            console.error('保存搜索历史失败:', error);
+            // 云端保存失败，仍然可以在当前会话中显示
+            showToast('保存搜索历史失败', 'warning');
+        }
     }
-
-    const trimmedKeyword = keyword.trim();
-    
-    // 移除重复项
-    this.searchHistory = this.searchHistory.filter(item => {
-        return item && item.keyword && item.keyword !== trimmedKeyword;
-    });
-    
-    // 添加到开头
-    this.searchHistory.unshift({
-        id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        keyword: trimmedKeyword,
-        query: trimmedKeyword, // 兼容性
-        timestamp: Date.now(),
-        count: 1,
-        source: 'manual'
-    });
-
-    // 限制历史记录数量
-    const maxHistory = this.config.maxHistoryPerUser || 1000;
-    if (this.searchHistory.length > maxHistory) {
-        this.searchHistory = this.searchHistory.slice(0, maxHistory);
-    }
-
-    this.saveHistory();
-    this.renderHistory();
-
-    // 如果用户已登录，保存到云端
-    if (this.currentUser) {
-        API.saveSearchHistory(trimmedKeyword, 'manual').catch(error => {
-            console.error('保存搜索历史到云端失败:', error);
-        });
-    }
-}
 
     // 渲染搜索历史
     renderHistory() {
@@ -721,35 +749,69 @@ addToHistory(keyword) {
     }
 
     // 移除收藏
+    // 修改移除收藏 - 直接与API交互
     async removeFavorite(favoriteId) {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
         if (!confirm('确定要移除这个收藏吗？')) return;
         
         const index = this.favorites.findIndex(fav => fav.id === favoriteId);
         if (index >= 0) {
-            this.favorites.splice(index, 1);
-            this.saveFavorites();
-            this.renderFavorites();
-            this.updateFavoriteButtons();
-            showToast('已移除收藏', 'success');
-
-            // 同步到云端
-            if (this.currentUser) {
-                await this.syncFavorites();
+            try {
+                showLoading(true);
+                
+                // 先从本地移除
+                this.favorites.splice(index, 1);
+                this.renderFavorites();
+                this.updateFavoriteButtons();
+                
+                // 同步到云端
+                await API.syncFavorites(this.favorites);
+                showToast('已移除收藏', 'success');
+                
+            } catch (error) {
+                console.error('移除收藏失败:', error);
+                showToast('移除收藏失败: ' + error.message, 'error');
+                
+                // 重新加载云端数据以恢复状态
+                await this.loadCloudData();
+            } finally {
+                showLoading(false);
             }
         }
     }
 
     // 清除搜索历史
-    clearHistory() {
+    // 修改清除历史 - 直接调用API
+    async clearHistory() {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
         if (!confirm('确定要清除所有搜索历史吗？')) return;
         
-        this.searchHistory = [];
-        this.saveHistory();
-        this.renderHistory();
-        showToast('搜索历史已清除', 'success');
-		if (this.currentUser) {
-API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.error);
-}
+        try {
+            showLoading(true);
+            
+            // 调用API清除
+            await API.clearAllSearchHistory();
+            
+            // 清空本地数据并更新UI
+            this.searchHistory = [];
+            this.renderHistory();
+            
+            showToast('搜索历史已清除', 'success');
+            
+        } catch (error) {
+            console.error('清除搜索历史失败:', error);
+            showToast('清除失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
     }
 
     // 清除搜索结果
@@ -870,64 +932,86 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
 
     // 缓存管理
     getCachedResults(keyword) {
-        const cacheKey = `search_cache_${keyword}`;
-        const cached = StorageManager.getItem(cacheKey);
-        
-        if (cached) {
-            const now = Date.now();
-            const cacheTimeout = 30 * 60 * 1000; // 30分钟
-            
-            if (now - cached.timestamp < cacheTimeout) {
-                return cached.results;
-            } else {
-                StorageManager.removeItem(cacheKey);
-            }
-        }
-        
+        // 禁用本地缓存，始终进行新搜索
         return null;
     }
 
     cacheResults(keyword, results) {
-        const cacheKey = `search_cache_${keyword}`;
-        const data = {
-            keyword,
-            results,
-            timestamp: Date.now()
-        };
-        
-        StorageManager.setItem(cacheKey, data);
+        // 禁用本地缓存
+        return;
     }
 
-    // 本地数据管理
-    loadLocalData() {
-        try {
-            // 加载搜索历史
-            this.searchHistory = StorageManager.getItem('search_history', []);
-            this.renderHistory();
-
-            // 加载收藏夹
-            this.favorites = StorageManager.getItem('favorites', []);
-            this.renderFavorites();
-            
-            console.log(`📚 本地数据已加载: ${this.searchHistory.length}条历史, ${this.favorites.length}个收藏`);
-        } catch (error) {
-            console.error('加载本地数据失败:', error);
+    // 移除 loadLocalData 方法，替换为纯云端加载
+    async loadCloudData() {
+        if (!this.currentUser) {
+            console.log('用户未登录，无法加载云端数据');
             this.searchHistory = [];
             this.favorites = [];
+            this.renderHistory();
+            this.renderFavorites();
+            return;
+        }
+
+        try {
+            showLoading(true);
+            console.log('📡 加载云端数据...');
+            
+            // 并行加载收藏夹和搜索历史
+            const [favoritesResult, historyResult] = await Promise.allSettled([
+                API.getFavorites(),
+                API.getSearchHistory()
+            ]);
+
+            // 处理收藏夹数据
+            if (favoritesResult.status === 'fulfilled') {
+                this.favorites = favoritesResult.value || [];
+            } else {
+                console.error('加载收藏夹失败:', favoritesResult.reason);
+                this.favorites = [];
+            }
+
+            // 处理搜索历史数据
+            if (historyResult.status === 'fulfilled') {
+                const cloudHistory = historyResult.value || [];
+                this.searchHistory = cloudHistory.map(item => ({
+                    id: item.id || `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    keyword: item.keyword || item.query,
+                    query: item.query || item.keyword,
+                    source: item.source || 'unknown',
+                    timestamp: item.timestamp || item.createdAt || Date.now(),
+                    count: item.count || 1
+                })).filter(item => {
+                    return item.keyword && typeof item.keyword === 'string' && item.keyword.trim().length > 0;
+                });
+            } else {
+                console.error('加载搜索历史失败:', historyResult.reason);
+                this.searchHistory = [];
+            }
+            
+            // 渲染界面
+            this.renderHistory();
+            this.renderFavorites();
+            
+            console.log(`✅ 云端数据加载完成: ${this.searchHistory.length}条历史, ${this.favorites.length}个收藏`);
+            
+        } catch (error) {
+            console.error('加载云端数据失败:', error);
+            showToast('加载数据失败，请重试', 'error');
+            this.searchHistory = [];
+            this.favorites = [];
+            this.renderHistory();
+            this.renderFavorites();
+        } finally {
+            showLoading(false);
         }
     }
 
-    saveHistory() {
-        StorageManager.setItem('search_history', this.searchHistory);
-    }
 
-    saveFavorites() {
-        StorageManager.setItem('favorites', this.favorites);
-    }
 
     // 主题管理
+    // 移除本地存储相关方法，保留主题设置
     initTheme() {
-        const savedTheme = StorageManager.getItem('theme', 'light');
+        const savedTheme = localStorage.getItem('theme') || 'light';
         const themeToggle = document.getElementById('themeToggle');
         
         document.documentElement.setAttribute('data-theme', savedTheme);
@@ -943,7 +1027,7 @@ API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.erro
         const themeToggle = document.getElementById('themeToggle');
         
         document.documentElement.setAttribute('data-theme', newTheme);
-        StorageManager.setItem('theme', newTheme);
+        localStorage.setItem('theme', newTheme); // 主题设置仍使用本地存储
         
         if (themeToggle) {
             themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
@@ -1030,6 +1114,7 @@ async syncSearchHistory() {
     }
 
     // 认证处理
+   // 修改登录成功后的处理
     async handleLogin(event) {
         event.preventDefault();
         
@@ -1048,20 +1133,20 @@ async syncSearchHistory() {
             if (result.success) {
                 this.currentUser = result.user;
                 this.updateUserUI();
-                this.closeModals();
-                showToast(`欢迎回来，${result.user.username}！`, 'success');
-				
-				// 关键修复：显示主内容区域
-        document.querySelector('.main-content').style.display = 'block';
-        
-        // 关闭模态框
-        this.closeModals();
-        
-        // 特殊修复：检查是否有搜索查询
-        this.handleURLParams();
                 
-                // 登录后同步云端数据
+                // 显示主内容区域
+                document.querySelector('.main-content').style.display = 'block';
+                
+                // 关闭模态框
+                this.closeModals();
+                
+                showToast(`欢迎回来，${result.user.username}！`, 'success');
+                
+                // 登录后立即加载云端数据
                 await this.loadCloudData();
+                
+                // 处理URL参数（如搜索查询）
+                this.handleURLParams();
                 
                 // 清空登录表单
                 document.getElementById('loginForm').reset();
@@ -1223,25 +1308,37 @@ submitBtn.appendChild(span);
         }
     }
 
-async logout() {
-    try {
-        await API.logout();
-    } catch (error) {
-        console.error('退出登录请求失败:', error);
-    } finally {
-        this.currentUser = null;
-        localStorage.removeItem('auth_token');
-        this.updateUserUI();
-        showToast('已退出登录', 'success');
-        
-        // 关键修复：显示登录模态框
-        this.showLoginModal();
-        
-        // 重置主界面状态
-        document.querySelector('.main-content').style.display = 'none';
-        this.hideSearchSuggestions();
+    // 修改退出登录处理
+    async logout() {
+        try {
+            await API.logout();
+        } catch (error) {
+            console.error('退出登录请求失败:', error);
+        } finally {
+            this.currentUser = null;
+            localStorage.removeItem('auth_token');
+            
+            // 清空所有数据
+            this.searchHistory = [];
+            this.favorites = [];
+            this.currentSearchResults = [];
+            
+            // 更新UI
+            this.updateUserUI();
+            this.renderHistory();
+            this.renderFavorites();
+            this.clearResults();
+            
+            showToast('已退出登录', 'success');
+            
+            // 显示登录模态框
+            this.showLoginModal();
+            
+            // 隐藏主界面
+            document.querySelector('.main-content').style.display = 'none';
+            this.hideSearchSuggestions();
+        }
     }
-}
 
 // 修复加载云端数据方法中的搜索历史部分
 async loadCloudData() {
@@ -1310,26 +1407,25 @@ async loadCloudData() {
     }
 
 // 修复搜索建议显示方法
-showSearchSuggestions(query) {
-    if (!query || typeof query !== 'string') return;
-    
-    const suggestions = this.searchHistory
-        .filter(item => {
-            if (!item) return false;
-            
-            // 统一字段名处理 - 兼容 keyword 和 query
-            const searchTerm = item.keyword || item.query;
-            if (!searchTerm || typeof searchTerm !== 'string') {
-                return false;
-            }
-            
-            return searchTerm.toLowerCase().includes(query.toLowerCase());
-        })
-        .slice(0, 5);
-    
-    // 实现搜索建议UI显示
-    this.renderSearchSuggestions(suggestions);
-}
+    // 修改搜索建议显示 - 基于云端数据
+    showSearchSuggestions(query) {
+        if (!query || typeof query !== 'string') return;
+        
+        const suggestions = this.searchHistory
+            .filter(item => {
+                if (!item) return false;
+                
+                const searchTerm = item.keyword || item.query;
+                if (!searchTerm || typeof searchTerm !== 'string') {
+                    return false;
+                }
+                
+                return searchTerm.toLowerCase().includes(query.toLowerCase());
+            })
+            .slice(0, 5);
+        
+        this.renderSearchSuggestions(suggestions);
+    }
 
 // 新增搜索建议渲染方法
 renderSearchSuggestions(suggestions) {
@@ -1384,7 +1480,7 @@ renderSearchSuggestions(suggestions) {
     }
 }
 
-// 全局工具函数
+// 修改工具函数和初始化代码保持不变
 function debounce(func, wait, immediate = false) {
     let timeout;
     return function executedFunction(...args) {
@@ -1427,7 +1523,7 @@ function formatRelativeTime(date) {
 // 初始化应用
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 初始化Magnet Search应用...');
+    console.log('🚀 初始化Magnet Search应用（纯云端模式）...');
     app = new MagnetSearchApp();
 });
 

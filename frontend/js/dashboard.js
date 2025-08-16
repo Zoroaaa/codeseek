@@ -1,4 +1,4 @@
-// Dashboard 应用逻辑
+// Dashboard 应用逻辑 - 纯云端存储版本
 class DashboardApp {
     constructor() {
         this.currentUser = null;
@@ -11,19 +11,17 @@ class DashboardApp {
 
     async init() {
         try {
-			
-// 仅开发环境进行 .html 纠正，生产环境不处理
-const isDev = (window.location.hostname === 'localhost' ||
-               window.location.hostname === '127.0.0.1' ||
-               window.location.port !== '' ||
-               window.location.search.includes('dev=1'));
+            const isDev = (window.location.hostname === 'localhost' ||
+                           window.location.hostname === '127.0.0.1' ||
+                           window.location.port !== '' ||
+                           window.location.search.includes('dev=1'));
 
-if (isDev && !window.location.pathname.endsWith('.html')) {
-    console.log('开发环境修正URL到 .html 以便文件直开');
-    window.location.replace('./dashboard.html' + window.location.search);
-    return;
-}
-			
+            if (isDev && !window.location.pathname.endsWith('.html')) {
+                console.log('开发环境修正URL到 .html 以便文件直开');
+                window.location.replace('./dashboard.html' + window.location.search);
+                return;
+            }
+            
             showLoading(true);
             
             // 检查认证状态
@@ -32,8 +30,8 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
             // 绑定事件
             this.bindEvents();
             
-            // 加载数据
-            await this.loadData();
+            // 加载云端数据
+            await this.loadCloudData();
             
             // 初始化主题
             this.initTheme();
@@ -42,16 +40,15 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
             console.log('✅ Dashboard初始化完成');
             
         } catch (error) {
-        console.error('❌ Dashboard初始化失败:', error);
-        showToast('初始化失败，请重新登录', 'error');
-        
-        // 使用replace避免重定向循环
-        setTimeout(() => {
-            window.location.replace('./index.html');
-        }, 2000);
-    } finally {
-        showLoading(false);
-    }
+            console.error('❌ Dashboard初始化失败:', error);
+            showToast('初始化失败，请重新登录', 'error');
+            
+            setTimeout(() => {
+                window.location.replace('./index.html');
+            }, 2000);
+        } finally {
+            showLoading(false);
+        }
     }
 
     async checkAuth() {
@@ -74,6 +71,443 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
         }
     }
 
+    // 纯云端数据加载
+    async loadCloudData() {
+        if (!this.currentUser) {
+            console.log('用户未登录，无法加载数据');
+            return;
+        }
+
+        try {
+            // 并行加载数据
+            const [favoritesResult, historyResult] = await Promise.allSettled([
+                API.getFavorites(),
+                API.getSearchHistory()
+            ]);
+
+            // 处理收藏夹
+            if (favoritesResult.status === 'fulfilled') {
+                this.favorites = favoritesResult.value || [];
+            } else {
+                console.error('加载收藏夹失败:', favoritesResult.reason);
+                this.favorites = [];
+            }
+
+            // 处理搜索历史
+            if (historyResult.status === 'fulfilled') {
+                const cloudHistory = historyResult.value || [];
+                this.searchHistory = cloudHistory.map(item => ({
+                    id: item.id || `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    keyword: item.keyword || item.query,
+                    query: item.query || item.keyword,
+                    source: item.source || 'unknown',
+                    timestamp: item.timestamp || item.createdAt || Date.now(),
+                    count: item.count || 1
+                })).filter(item => {
+                    return item.keyword && typeof item.keyword === 'string' && item.keyword.trim().length > 0;
+                });
+            } else {
+                console.error('加载搜索历史失败:', historyResult.reason);
+                this.searchHistory = [];
+            }
+
+            // 加载当前标签页数据
+            await this.loadTabData(this.currentTab);
+
+        } catch (error) {
+            console.error('加载云端数据失败:', error);
+            showToast('数据加载失败', 'error');
+            this.favorites = [];
+            this.searchHistory = [];
+        }
+    }
+
+    // 修改概览数据加载
+    async loadOverviewData() {
+        try {
+            const [searchStats] = await Promise.allSettled([
+                API.getSearchStats()
+            ]);
+            
+            const stats = searchStats.status === 'fulfilled' ? searchStats.value : {
+                total: this.searchHistory.length,
+                today: 0,
+                thisWeek: 0,
+                topQueries: []
+            };
+            
+            // 更新UI
+            const totalSearchesEl = document.getElementById('totalSearches');
+            const totalFavoritesEl = document.getElementById('totalFavorites');
+            const activeDaysEl = document.getElementById('activeDays');
+            const userLevelEl = document.getElementById('userLevel');
+
+            if (totalSearchesEl) totalSearchesEl.textContent = stats.total || 0;
+            if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
+            
+            const activeDays = this.calculateActiveDays();
+            if (activeDaysEl) activeDaysEl.textContent = activeDays;
+            
+            const level = this.calculateUserLevel();
+            if (userLevelEl) userLevelEl.textContent = level;
+
+            await this.loadRecentActivity();
+
+        } catch (error) {
+            console.error('加载概览数据失败:', error);
+            this.loadOverviewDataFromLocal();
+        }
+    }
+
+    // 修改设置加载 - 从API获取
+    async loadSettingsData() {
+        try {
+            const settings = await API.getUserSettings();
+            
+            const autoSyncEl = document.getElementById('autoSync');
+            const enableCacheEl = document.getElementById('enableCache');
+            const themeModeEl = document.getElementById('themeMode');
+            const maxFavoritesEl = document.getElementById('maxFavorites');
+
+            if (autoSyncEl) autoSyncEl.checked = settings.autoSync !== false;
+            if (enableCacheEl) enableCacheEl.checked = settings.cacheResults !== false;
+            if (themeModeEl) themeModeEl.value = settings.theme || 'auto';
+            if (maxFavoritesEl) maxFavoritesEl.value = settings.maxFavoritesPerUser ?? 500;
+
+        } catch (error) {
+            console.error('加载设置失败:', error);
+            showToast('加载设置失败', 'error');
+        }
+    }
+
+    // 修改同步收藏 - 直接与API交互
+    async syncFavorites() {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
+        try {
+            showLoading(true);
+            await API.syncFavorites(this.favorites);
+            showToast('收藏夹同步成功', 'success');
+        } catch (error) {
+            console.error('同步收藏失败:', error);
+            showToast('同步失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 修改移除收藏
+    async removeFavorite(favoriteId) {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
+        if (!confirm('确定要删除这个收藏吗？')) return;
+
+        const index = this.favorites.findIndex(f => f.id === favoriteId);
+        if (index >= 0) {
+            try {
+                showLoading(true);
+                
+                // 从数组中移除
+                this.favorites.splice(index, 1);
+                
+                // 同步到云端
+                await API.syncFavorites(this.favorites);
+                
+                // 重新加载数据以确保一致性
+                await this.loadFavoritesData();
+                showToast('收藏已删除', 'success');
+                
+            } catch (error) {
+                console.error('删除收藏失败:', error);
+                showToast('删除失败: ' + error.message, 'error');
+                
+                // 重新加载云端数据以恢复状态
+                await this.loadCloudData();
+            } finally {
+                showLoading(false);
+            }
+        }
+    }
+
+    // 修改清空搜索历史
+    async clearAllHistory() {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
+        if (!confirm('确定要清空所有搜索历史吗？此操作不可恢复。')) return;
+
+        try {
+            showLoading(true);
+            
+            // 使用API清空
+            await API.clearAllSearchHistory();
+            
+            // 清空本地数据
+            this.searchHistory = [];
+            
+            // 重新加载数据
+            await this.loadHistoryData();
+            
+            showToast('搜索历史已清空', 'success');
+        } catch (error) {
+            console.error('清空搜索历史失败:', error);
+            showToast('清空失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 修改清空所有数据
+    async clearAllData() {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
+        if (!confirm('确定要清空所有数据吗？此操作不可恢复，建议先导出数据备份。')) return;
+        if (!confirm('再次确认：这将清空您的所有收藏和搜索历史！')) return;
+
+        try {
+            showLoading(true);
+            
+            // 清空云端数据
+            await Promise.all([
+                API.clearAllSearchHistory(),
+                API.syncFavorites([]) // 传空数组清空收藏
+            ]);
+            
+            // 清空本地数据
+            this.favorites = [];
+            this.searchHistory = [];
+            
+            // 重新加载数据
+            await this.loadCloudData();
+            
+            showToast('所有数据已清空', 'success');
+        } catch (error) {
+            console.error('清空数据失败:', error);
+            showToast('清空失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 修改保存设置
+    async saveSettings() {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
+        try {
+            showLoading(true);
+            const ui = this.collectSettings();
+            const payload = {
+                theme: ui.themeMode,
+                autoSync: !!ui.autoSync,
+                cacheResults: !!ui.enableCache,
+                maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
+                maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10)
+            };
+            
+            await API.updateUserSettings(payload);
+            showToast('设置保存成功', 'success');
+            this.markSettingsSaved();
+        } catch (error) {
+            console.error('保存设置失败:', error);
+            showToast('保存设置失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 修改数据同步
+    async syncAllData() {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
+        try {
+            showLoading(true);
+            showToast('正在同步数据...', 'info');
+            
+            // 同步收藏夹到云端
+            await API.syncFavorites(this.favorites);
+            
+            // 重新从云端加载数据以确保一致性
+            await this.loadCloudData();
+            
+            showToast('数据同步成功', 'success');
+        } catch (error) {
+            console.error('数据同步失败:', error);
+            showToast('同步失败: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 修改数据导出
+    async exportData() {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
+        try {
+            // 从云端重新获取最新数据
+            const [favorites, history, settings] = await Promise.all([
+                API.getFavorites(),
+                API.getSearchHistory(),
+                API.getUserSettings()
+            ]);
+
+            const data = {
+                favorites: favorites || this.favorites,
+                searchHistory: history || this.searchHistory,
+                settings: settings || this.collectSettings(),
+                exportTime: new Date().toISOString(),
+                version: window.API_CONFIG?.APP_VERSION || '1.0.0'
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+                type: 'application/json'
+            });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `magnet-search-data-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('数据导出成功', 'success');
+        } catch (error) {
+            console.error('导出数据失败:', error);
+            showToast('导出失败: ' + error.message, 'error');
+        }
+    }
+
+    // 修改收藏夹导出
+    async exportFavorites() {
+        if (!this.currentUser) {
+            showToast('用户未登录', 'error');
+            return;
+        }
+
+        try {
+            // 从云端获取最新收藏数据
+            const favorites = await API.getFavorites();
+            
+            const data = {
+                favorites: favorites || this.favorites,
+                exportTime: new Date().toISOString(),
+                version: window.API_CONFIG?.APP_VERSION || '1.0.0'
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+                type: 'application/json'
+            });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `favorites-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('收藏导出成功', 'success');
+        } catch (error) {
+            console.error('导出收藏失败:', error);
+            showToast('导出失败: ' + error.message, 'error');
+        }
+    }
+
+    // 修改重置设置
+    resetSettings() {
+        if (!confirm('确定要重置所有设置为默认值吗？')) return;
+
+        // 重置为默认设置
+        const defaultSettings = {
+            autoSync: true,
+            enableCache: true,
+            themeMode: 'auto',
+            historyRetention: '90',
+            maxFavorites: '500',
+            allowAnalytics: true,
+            searchSuggestions: true
+        };
+
+        Object.entries(defaultSettings).forEach(([key, value]) => {
+            const element = document.getElementById(key);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = value;
+                } else {
+                    element.value = value;
+                }
+            }
+        });
+
+        this.markSettingsChanged();
+        showToast('设置已重置为默认值，请点击保存', 'success');
+    }
+
+    // 保留主题管理（仅此项使用本地存储）
+    initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        const themeToggle = document.getElementById('themeToggle');
+        
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        if (themeToggle) {
+            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        }
+    }
+
+    toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        const themeToggle = document.getElementById('themeToggle');
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme); // 主题设置保留本地存储
+        
+        if (themeToggle) {
+            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        }
+    }
+
+    // 修改退出登录
+    async logout() {
+        if (confirm('确定要退出登录吗？')) {
+            try {
+                await API.logout();
+                localStorage.removeItem('auth_token');
+                showToast('已退出登录', 'success');
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1000);
+            } catch (error) {
+                console.error('退出登录失败:', error);
+                localStorage.removeItem('auth_token');
+                window.location.href = 'index.html';
+            }
+        }
+    }
+
+    // 以下方法保持不变，但移除任何本地存储引用
     bindEvents() {
         // 标签切换
         document.querySelectorAll('[data-tab]').forEach(tab => {
@@ -161,7 +595,6 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
     }
 
     bindSettingsEvents() {
-        // 设置表单绑定
         const settingInputs = document.querySelectorAll('#settings input, #settings select');
         settingInputs.forEach(input => {
             input.addEventListener('change', () => {
@@ -171,12 +604,10 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
     }
 
     switchTab(tabName) {
-        // 更新菜单状态
         document.querySelectorAll('.menu-item').forEach(item => {
             item.classList.toggle('active', item.dataset.tab === tabName);
         });
 
-        // 更新标签页内容
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === tabName);
         });
@@ -205,88 +636,17 @@ if (isDev && !window.location.pathname.endsWith('.html')) {
         }
     }
 
-    async loadData() {
-        try {
-            // 并行加载数据
-            const [favorites, history, settings] = await Promise.allSettled([
-                API.getFavorites(),
-                this.getSearchHistory(),
-                this.getUserSettings()
-            ]);
-
-            if (favorites.status === 'fulfilled') {
-                this.favorites = favorites.value || [];
-            }
-
-            if (history.status === 'fulfilled') {
-                this.searchHistory = history.value || [];
-            }
-
-            // 加载当前标签页数据
-            await this.loadTabData(this.currentTab);
-
-        } catch (error) {
-            console.error('加载数据失败:', error);
-            showToast('数据加载失败', 'error');
-        }
-    }
-
-// 修复后代码
-async loadOverviewData() {
-    try {
-        // 获取真实的统计数据
-        const [searchStats, favorites] = await Promise.allSettled([
-            API.getSearchStats(),
-            Promise.resolve(this.favorites)
-        ]);
-        
-        // 处理搜索统计
-        const stats = searchStats.status === 'fulfilled' ? searchStats.value : {
-            total: this.searchHistory.length,
-            today: 0,
-            thisWeek: 0,
-            topQueries: []
-        };
-        
-        // 更新UI
+    loadOverviewDataFromLocal() {
         const totalSearchesEl = document.getElementById('totalSearches');
         const totalFavoritesEl = document.getElementById('totalFavorites');
         const activeDaysEl = document.getElementById('activeDays');
         const userLevelEl = document.getElementById('userLevel');
 
-        if (totalSearchesEl) totalSearchesEl.textContent = stats.total || 0;
+        if (totalSearchesEl) totalSearchesEl.textContent = this.searchHistory.length;
         if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
-        
-        // 计算活跃天数
-        const activeDays = this.calculateActiveDays();
-        if (activeDaysEl) activeDaysEl.textContent = activeDays;
-        
-        // 用户等级
-        const level = this.calculateUserLevel();
-        if (userLevelEl) userLevelEl.textContent = level;
-
-        // 加载最近活动
-        await this.loadRecentActivity();
-
-    } catch (error) {
-        console.error('加载概览数据失败:', error);
-        // 降级到本地数据
-        this.loadOverviewDataFromLocal();
+        if (activeDaysEl) activeDaysEl.textContent = this.calculateActiveDays();
+        if (userLevelEl) userLevelEl.textContent = this.calculateUserLevel();
     }
-}
-
-// 添加降级方法
-loadOverviewDataFromLocal() {
-    const totalSearchesEl = document.getElementById('totalSearches');
-    const totalFavoritesEl = document.getElementById('totalFavorites');
-    const activeDaysEl = document.getElementById('activeDays');
-    const userLevelEl = document.getElementById('userLevel');
-
-    if (totalSearchesEl) totalSearchesEl.textContent = this.searchHistory.length;
-    if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
-    if (activeDaysEl) activeDaysEl.textContent = this.calculateActiveDays();
-    if (userLevelEl) userLevelEl.textContent = this.calculateUserLevel();
-}
 
     async loadFavoritesData() {
         const favoritesList = document.getElementById('favoritesList');
@@ -370,46 +730,8 @@ loadOverviewDataFromLocal() {
         `).join('');
     }
 
-//设置项映射（示例）
-async loadSettingsData() {
-try {
-const s = await this.getUserSettings();
-byId('autoSync').checked = s.autoSync !== false;
-byId('enableCache').checked = s.cacheResults !== false;
-byId('themeMode').value = s.theme || 'auto';
-byId('maxFavorites').value = s.maxFavoritesPerUser ?? 500;
-// historyRetention 与 maxHistoryPerUser 的映射策略根据你的产品规则设定
-} catch (e) { console.error(e); }
-}
-
     async loadStatsData() {
-        // 这里可以实现更详细的统计图表
         console.log('加载统计数据');
-    }
-
-    async syncFavorites() {
-        try {
-            showLoading(true);
-            await API.syncFavorites(this.favorites);
-            showToast('收藏夹同步成功', 'success');
-        } catch (error) {
-            console.error('同步收藏失败:', error);
-            showToast('同步失败: ' + error.message, 'error');
-        } finally {
-            showLoading(false);
-        }
-    }
-
-    async removeFavorite(favoriteId) {
-        if (!confirm('确定要删除这个收藏吗？')) return;
-
-        const index = this.favorites.findIndex(f => f.id === favoriteId);
-        if (index >= 0) {
-            this.favorites.splice(index, 1);
-            await this.syncFavorites();
-            await this.loadFavoritesData();
-            showToast('收藏已删除', 'success');
-        }
     }
 
     changePassword() {
@@ -445,43 +767,24 @@ byId('maxFavorites').value = s.maxFavoritesPerUser ?? 500;
             return;
         }
 
-    try {
-        showLoading(true);
-        
-        // 调用正确的API方法
-        const response = await API.changePassword(currentPassword, newPassword);
-        
-        if (response.success) {
-            showToast('密码修改成功', 'success');
-            this.closeModals();
-            document.getElementById('passwordForm').reset();
-        } else {
-            throw new Error(response.message || '密码修改失败');
-        }
-    } catch (error) {
-        showToast('密码修改失败: ' + error.message, 'error');
-    } finally {
+        try {
+            showLoading(true);
+            
+            const response = await API.changePassword(currentPassword, newPassword);
+            
+            if (response.success) {
+                showToast('密码修改成功', 'success');
+                this.closeModals();
+                document.getElementById('passwordForm').reset();
+            } else {
+                throw new Error(response.message || '密码修改失败');
+            }
+        } catch (error) {
+            showToast('密码修改失败: ' + error.message, 'error');
+        } finally {
             showLoading(false);
         }
     }
-
-async saveSettings() {
-try {
-const ui = this.collectSettings();
-const payload = {
-theme: ui.themeMode,
-autoSync: !!ui.autoSync,
-cacheResults: !!ui.enableCache,
-maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
-maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10)
-};
-await this.updateUserSettings(payload);
-showToast('设置保存成功', 'success');
-this.markSettingsSaved();
-} catch (e) {
-showToast('保存设置失败: ' + e.message, 'error');
-}
-}
 
     collectSettings() {
         const settings = {};
@@ -537,7 +840,6 @@ showToast('保存设置失败: ' + e.message, 'error');
         const activityList = document.getElementById('activityList');
         if (!activityList) return;
 
-        // 合并最近的搜索和收藏活动
         const activities = [
             ...this.searchHistory.slice(0, 5).map(h => ({
                 type: 'search',
@@ -569,7 +871,6 @@ showToast('保存设置失败: ' + e.message, 'error');
         `).join('');
     }
 
-    // 工具方法
     escapeHtml(text) {
         if (!text) return '';
         const map = {
@@ -589,287 +890,41 @@ showToast('保存设置失败: ' + e.message, 'error');
         }
     }
 
-    initTheme() {
-        const savedTheme = StorageManager.getItem('theme', 'light');
-        const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        if (themeToggle) {
-            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-        }
-    }
-
-    toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', newTheme);
-        StorageManager.setItem('theme', newTheme);
-        
-        if (themeToggle) {
-            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-        }
-    }
-
     closeModals() {
         document.querySelectorAll('.modal').forEach(modal => {
             modal.style.display = 'none';
         });
     }
 
-    async logout() {
-        if (confirm('确定要退出登录吗？')) {
-            try {
-                await API.logout();
-                localStorage.removeItem('auth_token');
-                showToast('已退出登录', 'success');
+    async deleteAccount() {
+        const confirmText = '我确定要删除账户';
+        const userInput = prompt(`删除账户将无法恢复，请输入"${confirmText}"确认：`);
+        
+        if (userInput !== confirmText) {
+            showToast('确认文本不匹配，取消删除', 'info');
+            return;
+        }
+
+        try {
+            showLoading(true);
+            
+            const response = await API.deleteAccount();
+            
+            if (response.success) {
+                showToast('账户已删除', 'success');
+                
                 setTimeout(() => {
                     window.location.href = 'index.html';
-                }, 1000);
-            } catch (error) {
-                console.error('退出登录失败:', error);
-                // 即使API调用失败也清除本地token
-                localStorage.removeItem('auth_token');
-                window.location.href = 'index.html';
+                }, 2000);
+            } else {
+                throw new Error(response.message || '删除账户失败');
             }
-        }
-    }
-
-    // API辅助方法
-    async getSearchHistory() {
-        try {
-            return await API.getSearchHistory();
         } catch (error) {
-            // 降级到本地存储
-            return StorageManager.getItem('search_history', []);
-        }
-    }
-
-    async getUserSettings() {
-        try {
-            return await API.getUserSettings();
-        } catch (error) {
-            // 返回默认设置
-            return {
-                autoSync: true,
-                enableCache: true,
-                themeMode: 'auto',
-                historyRetention: '90',
-                maxFavorites: '500',
-                allowAnalytics: true,
-                searchSuggestions: true
-            };
-        }
-    }
-
-    async updateUserSettings(settings) {
-        try {
-            return await API.updateUserSettings(settings);
-        } catch (error) {
-            // 本地保存设置
-            StorageManager.setItem('user_settings', settings);
-            throw error;
-        }
-    }
-
-    // 数据操作方法
-    async syncAllData() {
-        try {
-            showLoading(true);
-            showToast('正在同步数据...', 'info');
-            
-            await Promise.all([
-                this.syncFavorites(),
-                this.syncHistory()
-            ]);
-            
-            showToast('数据同步成功', 'success');
-        } catch (error) {
-            showToast('同步失败: ' + error.message, 'error');
+            console.error('删除账户失败:', error);
+            showToast('删除失败: ' + error.message, 'error');
         } finally {
             showLoading(false);
         }
-    }
-
-    async syncHistory() {
-        try {
-            await API.syncSearchHistory(this.searchHistory);
-        } catch (error) {
-            console.error('同步历史失败:', error);
-            throw error;
-        }
-    }
-
-    async exportData() {
-        try {
-            const data = {
-                favorites: this.favorites,
-                searchHistory: this.searchHistory,
-                settings: this.collectSettings(),
-                exportTime: new Date().toISOString(),
-                version: window.API_CONFIG?.APP_VERSION || '1.0.0'
-            };
-
-            const blob = new Blob([JSON.stringify(data, null, 2)], {
-                type: 'application/json'
-            });
-
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `magnet-search-data-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            showToast('数据导出成功', 'success');
-        } catch (error) {
-            console.error('导出数据失败:', error);
-            showToast('导出失败: ' + error.message, 'error');
-        }
-    }
-
-    async exportFavorites() {
-        try {
-            const data = {
-                favorites: this.favorites,
-                exportTime: new Date().toISOString(),
-                version: window.API_CONFIG?.APP_VERSION || '1.0.0'
-            };
-
-            const blob = new Blob([JSON.stringify(data, null, 2)], {
-                type: 'application/json'
-            });
-
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `favorites-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            showToast('收藏导出成功', 'success');
-        } catch (error) {
-            console.error('导出收藏失败:', error);
-            showToast('导出失败: ' + error.message, 'error');
-        }
-    }
-
-// 修复后代码
-async clearAllHistory() {
-    if (!confirm('确定要清空所有搜索历史吗？此操作不可恢复。')) return;
-
-    try {
-        showLoading(true);
-        
-        // 使用API类的封装方法
-        await API.clearAllSearchHistory();
-        
-        // 清空本地数据
-        this.searchHistory = [];
-        StorageManager.removeItem('search_history');
-        
-        // 重新加载数据
-        await this.loadHistoryData();
-        
-        showToast('搜索历史已清空', 'success');
-    } catch (error) {
-        console.error('清空搜索历史失败:', error);
-        showToast('清空失败: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-    async clearAllData() {
-        if (!confirm('确定要清空所有本地数据吗？此操作不可恢复，建议先导出数据备份。')) return;
-        if (!confirm('再次确认：这将清空您的所有收藏和搜索历史！')) return;
-
-        try {
-            showLoading(true);
-            
-            // 清空本地数据
-            this.favorites = [];
-            this.searchHistory = [];
-            
-            // 清空本地存储
-            StorageManager.clear();
-            
-            // 重新加载数据
-            await this.loadData();
-            
-            showToast('所有数据已清空', 'success');
-        } catch (error) {
-            showToast('清空失败: ' + error.message, 'error');
-        } finally {
-            showLoading(false);
-        }
-    }
-
-// 修复后代码
-async deleteAccount() {
-    const confirmText = '我确定要删除账户';
-    const userInput = prompt(`删除账户将无法恢复，请输入"${confirmText}"确认：`);
-    
-    if (userInput !== confirmText) {
-        showToast('确认文本不匹配，取消删除', 'info');
-        return;
-    }
-
-    try {
-        showLoading(true);
-        
-        // 使用API类的封装方法
-        const response = await API.deleteAccount();
-        
-        if (response.success) {
-            showToast('账户已删除', 'success');
-            
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 2000);
-        } else {
-            throw new Error(response.message || '删除账户失败');
-        }
-    } catch (error) {
-        console.error('删除账户失败:', error);
-        showToast('删除失败: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-    resetSettings() {
-        if (!confirm('确定要重置所有设置为默认值吗？')) return;
-
-        // 重置为默认设置
-        const defaultSettings = {
-            autoSync: true,
-            enableCache: true,
-            themeMode: 'auto',
-            historyRetention: '90',
-            maxFavorites: '500',
-            allowAnalytics: true,
-            searchSuggestions: true
-        };
-
-        Object.entries(defaultSettings).forEach(([key, value]) => {
-            const element = document.getElementById(key);
-            if (element) {
-                if (element.type === 'checkbox') {
-                    element.checked = value;
-                } else {
-                    element.value = value;
-                }
-            }
-        });
-
-        this.markSettingsChanged();
-        showToast('设置已重置为默认值', 'success');
     }
 
     searchFavorites() {
@@ -878,7 +933,6 @@ async deleteAccount() {
         
         let filteredFavorites = this.favorites;
 
-        // 搜索过滤
         if (searchTerm) {
             filteredFavorites = this.favorites.filter(fav => 
                 fav.title.toLowerCase().includes(searchTerm) ||
@@ -887,7 +941,6 @@ async deleteAccount() {
             );
         }
 
-        // 排序
         switch (sortBy) {
             case 'date-desc':
                 filteredFavorites.sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
@@ -903,7 +956,6 @@ async deleteAccount() {
                 break;
         }
 
-        // 更新显示
         this.renderFilteredFavorites(filteredFavorites);
     }
 
