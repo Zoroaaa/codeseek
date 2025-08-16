@@ -199,6 +199,7 @@ async clearAllSearchHistory() {
         console.error('清空搜索历史失败:', error);
         throw error;
     }
+}
 
 // 删除单条搜索历史方法
 async deleteSearchHistory(historyId) {
