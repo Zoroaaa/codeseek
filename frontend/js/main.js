@@ -1518,10 +1518,20 @@ function formatRelativeTime(date) {
 }
 
 // 初始化应用
-let app;
+/* let app;
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 初始化Magnet Search应用（纯云端模式）...');
     app = new MagnetSearchApp();
+}); */
+
+let app;
+document.addEventListener('DOMContentLoaded', () => {
+    if (!app) {
+        console.log('🚀 初始化Magnet Search应用（纯云端模式）...');
+        app = new MagnetSearchApp();
+    } else {
+        console.log('应用已初始化，跳过重复初始化');
+    }
 });
 
 // 全局错误处理
