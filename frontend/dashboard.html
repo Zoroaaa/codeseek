@@ -1,382 +1,393 @@
-<div class="menu-item" data-tab="settings">
-                    <span class="menu-icon">??</span>
-                    <span class="menu-text">ÉèÖÃ</span>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">ç”¨æˆ·é¢æ¿ - ç£åŠ›å¿«æœ</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    
+    <!-- ç¯å¢ƒé…ç½® -->
+    <script>
+        // ç¯å¢ƒå˜é‡é…ç½®
+        window.CF_API_BASE_URL = typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined;
+        window.CF_APP_NAME = typeof process !== 'undefined' && process.env ? process.env.APP_NAME : undefined;
+        window.CF_APP_VERSION = typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : undefined;
+        window.CF_ENABLE_ANALYTICS = typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : undefined;
+        window.CF_ENABLE_DEBUG = typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : undefined;
+    </script>
+    <script src="js/config.js"></script>
+</head>
+<body>
+    <!-- å¯¼èˆªæ  -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <a href="./index.html">
+                    <img src="images/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
+                    <span class="brand-text" id="brand-text">ç£åŠ›å¿«æœ</span>
+                </a>
+            </div>
+            <div class="nav-menu">
+                <a href="./index.html" class="nav-link">é¦–é¡µ</a>
+                <button id="themeToggle" class="theme-btn" title="åˆ‡æ¢ä¸»é¢˜">ğŸŒ™</button>
+                <div id="userInfo" class="user-info">
+                    <span id="username" class="username"></span>
+                    <div class="dropdown">
+                        <button class="dropdown-btn" title="ç”¨æˆ·èœå•">â–¼</button>
+                        <div class="dropdown-content">
+                            <a href="#" class="dropdown-item active">ä¸ªäººä¸­å¿ƒ</a>
+                            <a href="#" id="logoutBtn" class="dropdown-item">é€€å‡ºç™»å½•</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ä¸»è¦å†…å®¹ -->
+    <main class="dashboard-container">
+        <!-- ä¾§è¾¹æ  -->
+        <aside class="sidebar">
+            <div class="sidebar-menu">
+                <div class="menu-item active" data-tab="overview">
+                    <span class="menu-icon">ğŸ“Š</span>
+                    <span class="menu-text">æ¦‚è§ˆ</span>
+                </div>
+                <div class="menu-item" data-tab="favorites">
+                    <span class="menu-icon">â­</span>
+                    <span class="menu-text">æˆ‘çš„æ”¶è—</span>
+                </div>
+                <div class="menu-item" data-tab="history">
+                    <span class="menu-icon">ğŸ•</span>
+                    <span class="menu-text">æœç´¢å†å²</span>
+                </div>
+                <div class="menu-item" data-tab="settings">
+                    <span class="menu-icon">âš™ï¸</span>
+                    <span class="menu-text">è®¾ç½®</span>
                 </div>
                 <div class="menu-item" data-tab="stats">
-                    <span class="menu-icon">??</span>
-                    <span class="menu-text">Í³¼Æ</span>
+                    <span class="menu-icon">ğŸ“ˆ</span>
+                    <span class="menu-text">ç»Ÿè®¡</span>
                 </div>
             </div>
         </aside>
 
-        <!-- Ö÷ÄÚÈİÇøÓò -->
+        <!-- ä¸»å†…å®¹åŒºåŸŸ -->
         <div class="main-content">
-            <!-- ¸ÅÀÀ±êÇ©Ò³ -->
+            <!-- æ¦‚è§ˆæ ‡ç­¾é¡µ -->
             <div id="overview" class="tab-content active">
                 <div class="tab-header">
-                    <h1>ÓÃ»§¸ÅÀÀ</h1>
-                    <p>»¶Ó­»ØÀ´£¬¹ÜÀíÄúµÄËÑË÷ºÍÊÕ²Ø</p>
+                    <h1>ç”¨æˆ·æ¦‚è§ˆ</h1>
+                    <p>æ¬¢è¿å›æ¥ï¼Œç®¡ç†æ‚¨çš„æœç´¢å’Œæ”¶è—</p>
                 </div>
 
-                <!-- Í³¼Æ¿¨Æ¬ -->
+                <!-- ç»Ÿè®¡å¡ç‰‡ -->
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-icon">??</div>
+                        <div class="stat-icon">ğŸ”</div>
                         <div class="stat-info">
                             <div class="stat-number" id="totalSearches">0</div>
-                            <div class="stat-label">×ÜËÑË÷´ÎÊı</div>
+                            <div class="stat-label">æ€»æœç´¢æ¬¡æ•°</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">?</div>
+                        <div class="stat-icon">â­</div>
                         <div class="stat-info">
                             <div class="stat-number" id="totalFavorites">0</div>
-                            <div class="stat-label">ÊÕ²ØÊıÁ¿</div>
+                            <div class="stat-label">æ”¶è—æ•°é‡</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">??</div>
+                        <div class="stat-icon">ğŸ“…</div>
                         <div class="stat-info">
                             <div class="stat-number" id="activeDays">0</div>
-                            <div class="stat-label">»îÔ¾ÌìÊı</div>
+                            <div class="stat-label">æ´»è·ƒå¤©æ•°</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">??</div>
+                        <div class="stat-icon">ğŸ†</div>
                         <div class="stat-info">
-                            <div class="stat-number" id="userLevel">ĞÂÊÖ</div>
-                            <div class="stat-label">ÓÃ»§µÈ¼¶</div>
+                            <div class="stat-number" id="userLevel">æ–°æ‰‹</div>
+                            <div class="stat-label">ç”¨æˆ·ç­‰çº§</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ¿ìËÙ²Ù×÷ -->
+                <!-- å¿«é€Ÿæ“ä½œ -->
                 <div class="quick-actions">
-                    <h2>¿ìËÙ²Ù×÷</h2>
+                    <h2>å¿«é€Ÿæ“ä½œ</h2>
                     <div class="action-buttons">
                         <button class="action-btn" onclick="window.location.href='index.html'">
-                            <span class="btn-icon">??</span>
-                            <span>¿ªÊ¼ËÑË÷</span>
+                            <span class="btn-icon">ğŸ”</span>
+                            <span>å¼€å§‹æœç´¢</span>
                         </button>
-                        <button class="action-btn" onclick="switchTab('favorites')">
-                            <span class="btn-icon">?</span>
-                            <span>²é¿´ÊÕ²Ø</span>
+                        <button class="action-btn" onclick="app.switchTab('favorites')">
+                            <span class="btn-icon">â­</span>
+                            <span>æŸ¥çœ‹æ”¶è—</span>
                         </button>
-                        <button class="action-btn" onclick="syncAllData()">
-                            <span class="btn-icon">??</span>
-                            <span>Í¬²½Êı¾İ</span>
+                        <button class="action-btn" onclick="app.syncAllData()">
+                            <span class="btn-icon">ğŸ”„</span>
+                            <span>åŒæ­¥æ•°æ®</span>
                         </button>
-                        <button class="action-btn" onclick="exportData()">
-                            <span class="btn-icon">??</span>
-                            <span>µ¼³öÊı¾İ</span>
+                        <button class="action-btn" onclick="app.exportData()">
+                            <span class="btn-icon">ğŸ“¤</span>
+                            <span>å¯¼å‡ºæ•°æ®</span>
                         </button>
                     </div>
                 </div>
 
-                <!-- ×î½ü»î¶¯ -->
-                <div class="content-section">
-                    <h2 class="section-title">?? ×î½ü»î¶¯</h2>
+                <!-- æœ€è¿‘æ´»åŠ¨ -->
+                <div class="recent-activity">
+                    <h2>æœ€è¿‘æ´»åŠ¨</h2>
                     <div id="activityList" class="activity-list">
-                        <!-- »î¶¯ÁĞ±í½«Í¨¹ıJavaScript¶¯Ì¬¼ÓÔØ -->
-                        <div class="empty-state">
-                            <span class="emoji">??</span>
-                            <h3>ÔİÎŞ»î¶¯¼ÇÂ¼</h3>
-                            <p>¿ªÊ¼Ê¹ÓÃÓ¦ÓÃºó£¬ÄúµÄ»î¶¯¼ÇÂ¼½«ÔÚÕâÀïÏÔÊ¾</p>
-                        </div>
+                        <!-- æ´»åŠ¨åˆ—è¡¨å°†é€šè¿‡JavaScriptåŠ¨æ€åŠ è½½ -->
                     </div>
                 </div>
             </div>
 
-            <!-- ÊÕ²Ø±êÇ©Ò³ -->
+            <!-- æ”¶è—æ ‡ç­¾é¡µ -->
             <div id="favorites" class="tab-content">
                 <div class="tab-header">
-                    <h1>ÎÒµÄÊÕ²Ø</h1>
+                    <h1>æˆ‘çš„æ”¶è—</h1>
                     <div class="header-actions">
-                        <button class="btn btn-primary" onclick="syncFavorites()">?? Í¬²½ÊÕ²Ø</button>
-                        <button class="btn btn-secondary" onclick="exportFavorites()">?? µ¼³öÊÕ²Ø</button>
+                        <button class="btn-primary" onclick="app.syncFavorites()">åŒæ­¥æ”¶è—</button>
+                        <button class="btn-secondary" onclick="app.exportFavorites()">å¯¼å‡ºæ”¶è—</button>
                     </div>
                 </div>
 
-                <!-- ÊÕ²ØËÑË÷ºÍ¹ıÂË -->
+                <!-- æ”¶è—æœç´¢å’Œè¿‡æ»¤ -->
                 <div class="favorites-controls">
                     <div class="search-box">
-                        <input type="text" id="favoritesSearch" placeholder="ËÑË÷ÊÕ²Ø..." autocomplete="off">
-                        <button onclick="searchFavorites()" title="ËÑË÷">??</button>
+                        <input type="text" id="favoritesSearch" placeholder="æœç´¢æ”¶è—..." autocomplete="off">
+                        <button onclick="app.searchFavorites()" title="æœç´¢">ğŸ”</button>
                     </div>
                     <div class="filter-options">
                         <select id="favoritesSort">
-                            <option value="date-desc">°´ÈÕÆÚÅÅĞò£¨ĞÂ¡ú¾É£©</option>
-                            <option value="date-asc">°´ÈÕÆÚÅÅĞò£¨¾É¡úĞÂ£©</option>
-                            <option value="name-asc">°´Ãû³ÆÅÅĞò£¨A¡úZ£©</option>
-                            <option value="name-desc">°´Ãû³ÆÅÅĞò£¨Z¡úA£©</option>
+                            <option value="date-desc">æŒ‰æ—¥æœŸæ’åºï¼ˆæ–°â†’æ—§ï¼‰</option>
+                            <option value="date-asc">æŒ‰æ—¥æœŸæ’åºï¼ˆæ—§â†’æ–°ï¼‰</option>
+                            <option value="name-asc">æŒ‰åç§°æ’åºï¼ˆAâ†’Zï¼‰</option>
+                            <option value="name-desc">æŒ‰åç§°æ’åºï¼ˆZâ†’Aï¼‰</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- ÊÕ²ØÁĞ±í -->
-                <div class="content-section">
-                    <div id="favoritesList" class="favorites-list">
-                        <!-- ÊÕ²ØÏî½«Í¨¹ıJavaScript¶¯Ì¬¼ÓÔØ -->
-                        <div class="empty-state">
-                            <span class="emoji">?</span>
-                            <h3>ÔİÎŞÊÕ²Ø</h3>
-                            <p>¿ªÊ¼ËÑË÷²¢ÊÕ²ØÄúÏ²»¶µÄÄÚÈİ°É</p>
-                        </div>
-                    </div>
+                <!-- æ”¶è—åˆ—è¡¨ -->
+                <div id="favoritesList" class="favorites-list">
+                    <!-- æ”¶è—é¡¹å°†é€šè¿‡JavaScriptåŠ¨æ€åŠ è½½ -->
                 </div>
             </div>
 
-            <!-- ËÑË÷ÀúÊ·±êÇ©Ò³ -->
+            <!-- æœç´¢å†å²æ ‡ç­¾é¡µ -->
             <div id="history" class="tab-content">
                 <div class="tab-header">
-                    <h1>ËÑË÷ÀúÊ·</h1>
+                    <h1>æœç´¢å†å²</h1>
                     <div class="header-actions">
-                        <button class="btn btn-primary" onclick="syncHistory()">?? Í¬²½ÀúÊ·</button>
-                        <button class="btn btn-danger" onclick="clearAllHistory()">??? Çå¿ÕÀúÊ·</button>
+                        <button class="btn-primary" onclick="app.syncHistory()">åŒæ­¥å†å²</button>
+                        <button class="btn-danger" onclick="app.clearAllHistory()">æ¸…ç©ºå†å²</button>
                     </div>
                 </div>
 
-                <!-- ÀúÊ·ËÑË÷ºÍÍ³¼Æ -->
-                <div class="content-section">
-                    <div class="history-stats">
-                        <div class="stat-item">
-                            <span class="stat-value" id="historyCount">0</span>
-                            <span class="stat-desc">ËÑË÷¼ÇÂ¼</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="uniqueKeywords">0</span>
-                            <span class="stat-desc">²»Í¬¹Ø¼ü´Ê</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="avgPerDay">0</span>
-                            <span class="stat-desc">ÈÕ¾ùËÑË÷</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="topKeyword">-</span>
-                            <span class="stat-desc">ÈÈÃÅ¹Ø¼ü´Ê</span>
-                        </div>
+                <!-- å†å²æœç´¢å’Œç»Ÿè®¡ -->
+                <div class="history-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="historyCount">0</span>
+                        <span class="stat-desc">æœç´¢è®°å½•</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="uniqueKeywords">0</span>
+                        <span class="stat-desc">ä¸åŒå…³é”®è¯</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="avgPerDay">0</span>
+                        <span class="stat-desc">æ—¥å‡æœç´¢</span>
                     </div>
                 </div>
 
-                <!-- ÀúÊ·¼ÇÂ¼ÁĞ±í -->
-                <div class="content-section">
-                    <div class="history-controls">
-                        <input type="text" id="historySearch" placeholder="ËÑË÷ÀúÊ·¼ÇÂ¼..." autocomplete="off">
-                        <select id="historyTimeFilter">
-                            <option value="all">È«²¿Ê±¼ä</option>
-                            <option value="today">½ñÌì</option>
-                            <option value="week">±¾ÖÜ</option>
-                            <option value="month">±¾ÔÂ</option>
-                        </select>
+                <!-- çƒ­é—¨å…³é”®è¯ -->
+                <div class="popular-keywords">
+                    <h3>çƒ­é—¨æœç´¢</h3>
+                    <div id="keywordCloud" class="keyword-cloud">
+                        <!-- å…³é”®è¯äº‘å°†é€šè¿‡JavaScriptç”Ÿæˆ -->
                     </div>
+                </div>
 
-                    <div id="historyList" class="history-list">
-                        <!-- ÀúÊ·¼ÇÂ¼½«Í¨¹ıJavaScript¶¯Ì¬¼ÓÔØ -->
-                        <div class="empty-state">
-                            <span class="emoji">??</span>
-                            <h3>ÔİÎŞËÑË÷ÀúÊ·</h3>
-                            <p>¿ªÊ¼ËÑË÷ºó£¬ÄúµÄËÑË÷ÀúÊ·½«ÔÚÕâÀïÏÔÊ¾</p>
-                        </div>
-                    </div>
+                <!-- å†å²è®°å½•åˆ—è¡¨ -->
+                <div class="history-controls">
+                    <input type="text" id="historySearch" placeholder="æœç´¢å†å²è®°å½•..." autocomplete="off">
+                    <select id="historyTimeFilter">
+                        <option value="all">å…¨éƒ¨æ—¶é—´</option>
+                        <option value="today">ä»Šå¤©</option>
+                        <option value="week">æœ¬å‘¨</option>
+                        <option value="month">æœ¬æœˆ</option>
+                    </select>
+                </div>
+
+                <div id="historyList" class="history-list">
+                    <!-- å†å²è®°å½•å°†é€šè¿‡JavaScriptåŠ¨æ€åŠ è½½ -->
                 </div>
             </div>
 
-            <!-- ÉèÖÃ±êÇ©Ò³ -->
-            <div id="settings" class="tab-content">
-                <div class="tab-header">
-                    <h1>ÓÃ»§ÉèÖÃ</h1>
-                    <p>¸öĞÔ»¯ÄúµÄÊ¹ÓÃÌåÑé</p>
-                </div>
-
-                <div class="settings-sections">
-                    <!-- »ù±¾ÉèÖÃ -->
-                    <div class="settings-section">
-                        <h3>?? »ù±¾ÉèÖÃ</h3>
-                        <div class="setting-item">
-                            <label>×Ô¶¯Í¬²½</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="autoSync" checked>
-                                <span class="setting-desc">ËÑË÷ºÍÊÕ²Ø×Ô¶¯Í¬²½µ½ÔÆ¶Ë</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>ËÑË÷»º´æ</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="enableCache" checked>
-                                <span class="setting-desc">ÆôÓÃËÑË÷½á¹û»º´æ£¬ÌáÉı¼ÓÔØËÙ¶È</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>Ö÷ÌâÄ£Ê½</label>
-                            <div class="setting-control">
-                                <select id="themeMode">
-                                    <option value="auto">¸úËæÏµÍ³</option>
-                                    <option value="light">Ç³É«Ä£Ê½</option>
-                                    <option value="dark">ÉîÉ«Ä£Ê½</option>
-                                </select>
-                                <span class="setting-desc">Ñ¡ÔñÄúÏ²»¶µÄ½çÃæÖ÷Ìâ</span>
-                            </div>
-                        </div>
+                <!-- è®¾ç½®æ ‡ç­¾é¡µ -->
+                <div id="settings" class="tab-content">
+                    <div class="tab-header">
+                        <h1>ç”¨æˆ·è®¾ç½®</h1>
+                        <p>ä¸ªæ€§åŒ–æ‚¨çš„ä½¿ç”¨ä½“éªŒ</p>
                     </div>
 
-                    <!-- ËÑË÷ÉèÖÃ -->
-                    <div class="settings-section">
-                        <h3>?? ËÑË÷ÉèÖÃ</h3>
-                        <div class="setting-item">
-                            <label>Ä¬ÈÏËÑË÷Ô´</label>
-                            <div class="setting-control">
-                                <div class="checkbox-group">
-                                    <label><input type="checkbox" value="javbus" checked> JavBus</label>
-                                    <label><input type="checkbox" value="javdb" checked> JavDB</label>
-                                    <label><input type="checkbox" value="javlibrary" checked> JavLibrary</label>
-                                    <label><input type="checkbox" value="av01"> AV01</label>
-                                    <label><input type="checkbox" value="missav"> MissAV</label>
+                    <div class="settings-sections">
+                        <!-- åŸºæœ¬è®¾ç½® -->
+                        <div class="settings-section">
+                            <h3>åŸºæœ¬è®¾ç½®</h3>
+                            <div class="setting-item">
+                                <label>è‡ªåŠ¨åŒæ­¥</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="autoSync" checked>
+                                    <span class="setting-desc">æœç´¢å’Œæ”¶è—è‡ªåŠ¨åŒæ­¥åˆ°äº‘ç«¯</span>
                                 </div>
-                                <span class="setting-desc">Ñ¡ÔñÄ¬ÈÏÊ¹ÓÃµÄËÑË÷Ô´</span>
+                            </div>
+                            <div class="setting-item">
+                                <label>æœç´¢ç¼“å­˜</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="enableCache" checked>
+                                    <span class="setting-desc">å¯ç”¨æœç´¢ç»“æœç¼“å­˜ï¼Œæå‡åŠ è½½é€Ÿåº¦</span>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>ä¸»é¢˜æ¨¡å¼</label>
+                                <div class="setting-control">
+                                    <select id="themeMode">
+                                        <option value="auto">è·Ÿéšç³»ç»Ÿ</option>
+                                        <option value="light">æµ…è‰²æ¨¡å¼</option>
+                                        <option value="dark">æ·±è‰²æ¨¡å¼</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
-                        <div class="setting-item">
-                            <label>ËÑË÷ÀúÊ·±£Áô</label>
-                            <div class="setting-control">
-                                <select id="historyRetention">
-                                    <option value="30">30Ìì</option>
-                                    <option value="90" selected>90Ìì</option>
-                                    <option value="365">1Äê</option>
-                                    <option value="-1">ÓÀ¾Ã±£Áô</option>
-                                </select>
-                                <span class="setting-desc">ËÑË÷ÀúÊ·×Ô¶¯ÇåÀíÊ±¼ä</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>×î´óÊÕ²ØÊıÁ¿</label>
-                            <div class="setting-control">
-                                <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
-                                <span class="setting-desc">ÊÕ²Ø¼Ğ×î´óÈİÁ¿ÏŞÖÆ</span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- ÒşË½ÉèÖÃ -->
-                    <div class="settings-section">
-                        <h3>?? ÒşË½ÉèÖÃ</h3>
-                        <div class="setting-item">
-                            <label>ĞĞÎªÍ³¼Æ</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="allowAnalytics" checked>
-                                <span class="setting-desc">ÔÊĞíÊÕ¼¯ÄäÃûÊ¹ÓÃÍ³¼Æ£¬°ïÖú¸Ä½ø²úÆ·</span>
+                        <!-- æœç´¢è®¾ç½® -->
+                        <div class="settings-section">
+                            <h3>æœç´¢è®¾ç½®</h3>
+                            <div class="setting-item">
+                                <label>é»˜è®¤æœç´¢æº</label>
+                                <div class="setting-control">
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" value="javbus" checked> JavBus</label>
+                                        <label><input type="checkbox" value="javdb" checked> JavDB</label>
+                                        <label><input type="checkbox" value="javlibrary" checked> JavLibrary</label>
+                                        <label><input type="checkbox" value="av01"> AV01</label>
+                                        <label><input type="checkbox" value="missav"> MissAV</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>æœç´¢å†å²ä¿ç•™</label>
+                                <div class="setting-control">
+                                    <select id="historyRetention">
+                                        <option value="30">30å¤©</option>
+                                        <option value="90" selected>90å¤©</option>
+                                        <option value="365">1å¹´</option>
+                                        <option value="-1">æ°¸ä¹…ä¿ç•™</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>æœ€å¤§æ”¶è—æ•°é‡</label>
+                                <div class="setting-control">
+                                    <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
+                                    <span class="setting-desc">æ”¶è—å¤¹æœ€å¤§å®¹é‡é™åˆ¶</span>
+                                </div>
                             </div>
                         </div>
-                        <div class="setting-item">
-                            <label>ËÑË÷½¨Òé</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="searchSuggestions" checked>
-                                <span class="setting-desc">»ùÓÚÀúÊ·¼ÇÂ¼Ìá¹©ËÑË÷½¨Òé</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>Êı¾İ¼ÓÃÜ</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="encryptData" checked>
-                                <span class="setting-desc">¶Ô±¾µØ´æ´¢µÄÊı¾İ½øĞĞ¼ÓÃÜ</span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- ÕË»§²Ù×÷ -->
-                    <div class="settings-section">
-                        <h3>?? ÕË»§²Ù×÷</h3>
-                        <div class="dangerous-actions">
-                            <button class="btn btn-warning" onclick="changePassword()">?? ĞŞ¸ÄÃÜÂë</button>
-                            <button class="btn btn-danger" onclick="clearAllData()">??? Çå¿ÕËùÓĞÊı¾İ</button>
-                            <button class="btn btn-danger" onclick="deleteAccount()">? É¾³ıÕË»§</button>
+                        <!-- éšç§è®¾ç½® -->
+                        <div class="settings-section">
+                            <h3>éšç§è®¾ç½®</h3>
+                            <div class="setting-item">
+                                <label>è¡Œä¸ºç»Ÿè®¡</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="allowAnalytics" checked>
+                                    <span class="setting-desc">å…è®¸æ”¶é›†åŒ¿åä½¿ç”¨ç»Ÿè®¡ï¼Œå¸®åŠ©æ”¹è¿›äº§å“</span>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label>æœç´¢å»ºè®®</label>
+                                <div class="setting-control">
+                                    <input type="checkbox" id="searchSuggestions" checked>
+                                    <span class="setting-desc">åŸºäºå†å²è®°å½•æä¾›æœç´¢å»ºè®®</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- ±£´æÉèÖÃ -->
-                    <div class="settings-actions">
-                        <button class="btn btn-primary" onclick="saveSettings()">?? ±£´æÉèÖÃ</button>
-                        <button class="btn btn-secondary" onclick="resetSettings()">?? ÖØÖÃÄ¬ÈÏ</button>
+                        <!-- è´¦æˆ·æ“ä½œ -->
+                        <div class="settings-section">
+                            <h3>è´¦æˆ·æ“ä½œ</h3>
+                            <div class="dangerous-actions">
+                                <button class="btn-warning" onclick="app.changePassword()">ä¿®æ”¹å¯†ç </button>
+                                <button class="btn-danger" onclick="app.clearAllData()">æ¸…ç©ºæ‰€æœ‰æ•°æ®</button>
+                                <button class="btn-danger" onclick="app.deleteAccount()">åˆ é™¤è´¦æˆ·</button>
+                            </div>
+                        </div>
+
+                        <!-- ä¿å­˜è®¾ç½® -->
+                        <div class="settings-actions">
+                            <button class="btn-primary" onclick="app.saveSettings()">ä¿å­˜è®¾ç½®</button>
+                            <button class="btn-secondary" onclick="app.resetSettings()">é‡ç½®é»˜è®¤</button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Í³¼Æ±êÇ©Ò³ -->
-            <div id="stats" class="tab-content">
-                <div class="tab-header">
-                    <h1>Ê¹ÓÃÍ³¼Æ</h1>
-                    <p>²é¿´ÄúµÄÊ¹ÓÃÊı¾İºÍÇ÷ÊÆ</p>
-                </div>
-
-                <!-- Ê±¼ä·¶Î§Ñ¡Ôñ -->
-                <div class="stats-controls">
-                    <div class="time-range-selector">
-                        <button class="time-btn active" data-range="7">½ü7Ìì</button>
-                        <button class="time-btn" data-range="30">½ü30Ìì</button>
-                        <button class="time-btn" data-range="90">½ü90Ìì</button>
-                        <button class="time-btn" data-range="365">½üÒ»Äê</button>
+                <!-- ç»Ÿè®¡æ ‡ç­¾é¡µ -->
+                <div id="stats" class="tab-content">
+                    <div class="tab-header">
+                        <h1>ä½¿ç”¨ç»Ÿè®¡</h1>
+                        <p>æŸ¥çœ‹æ‚¨çš„ä½¿ç”¨æ•°æ®å’Œè¶‹åŠ¿</p>
                     </div>
-                </div>
 
-                <!-- Í³¼ÆÍ¼±í -->
-                <div class="charts-container">
-                    <div class="chart-section">
-                        <h3>?? ËÑË÷»î¶¯Ç÷ÊÆ</h3>
-                        <div id="searchTrendChart" class="chart-placeholder">
-                            <p>?? ËÑË÷Ç÷ÊÆÍ¼±íÇøÓò</p>
+                    <!-- æ—¶é—´èŒƒå›´é€‰æ‹© -->
+                    <div class="stats-controls">
+                        <div class="time-range-selector">
+                            <button class="time-btn active" data-range="7">è¿‘7å¤©</button>
+                            <button class="time-btn" data-range="30">è¿‘30å¤©</button>
+                            <button class="time-btn" data-range="90">è¿‘90å¤©</button>
+                            <button class="time-btn" data-range="365">è¿‘ä¸€å¹´</button>
                         </div>
                     </div>
 
-                    <div class="chart-section">
-                        <h3>?? ÈÈÃÅËÑË÷¹Ø¼ü´Ê</h3>
-                        <div id="topKeywordsChart" class="chart-placeholder">
-                            <div class="top-keywords-list" id="topKeywordsList">
-                                <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
-                                    ÔİÎŞÊı¾İ
+                    <!-- ç»Ÿè®¡å›¾è¡¨ -->
+                    <div class="charts-container">
+                        <div class="chart-section">
+                            <h3>æœç´¢æ´»åŠ¨è¶‹åŠ¿</h3>
+                            <div id="searchTrendChart" class="chart-placeholder">
+                                <p>æœç´¢è¶‹åŠ¿å›¾è¡¨åŒºåŸŸ</p>
+                            </div>
+                        </div>
+
+                        <div class="chart-section">
+                            <h3>çƒ­é—¨æœç´¢å…³é”®è¯</h3>
+                            <div id="topKeywordsChart" class="chart-placeholder">
+                                <div class="top-keywords-list" id="topKeywordsList">
+                                    <!-- çƒ­é—¨å…³é”®è¯åˆ—è¡¨ -->
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- ÏêÏ¸Í³¼Æ -->
-                <div class="content-section">
+                    <!-- è¯¦ç»†ç»Ÿè®¡ -->
                     <div class="detailed-stats">
-                        <h3 class="section-title">?? ÏêÏ¸Êı¾İ</h3>
                         <div class="stats-table">
+                            <h3>è¯¦ç»†æ•°æ®</h3>
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>Ö¸±ê</th>
-                                        <th>ÊıÖµ</th>
-                                        <th>Ç÷ÊÆ</th>
-                                        <th>ËµÃ÷</th>
+                                        <th>æŒ‡æ ‡</th>
+                                        <th>æ•°å€¼</th>
+                                        <th>è¶‹åŠ¿</th>
                                     </tr>
                                 </thead>
                                 <tbody id="detailedStatsTable">
-                                    <tr>
-                                        <td>×ÜËÑË÷´ÎÊı</td>
-                                        <td id="totalSearchesStat">-</td>
-                                        <td>??</td>
-                                        <td>ÀÛ¼ÆËÑË÷´ÎÊı</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Æ½¾ùÃ¿ÈÕËÑË÷</td>
-                                        <td id="avgDailySearches">-</td>
-                                        <td>??</td>
-                                        <td>Ã¿ÌìÆ½¾ùËÑË÷´ÎÊı</td>
-                                    </tr>
-                                    <tr>
-                                        <td>ÊÕ²Ø×ª»¯ÂÊ</td>
-                                        <td id="favoriteConversionRate">-</td>
-                                        <td>?</td>
-                                        <td>ËÑË÷µ½ÊÕ²ØµÄ×ª»¯ÂÊ</td>
-                                    </tr>
-                                    <tr>
-                                        <td>»îÔ¾Ê±¶Î</td>
-                                        <td id="mostActiveHour">-</td>
-                                        <td>??</td>
-                                        <td>×î³£Ê¹ÓÃµÄÊ±¼ä¶Î</td>
-                                    </tr>
+                                    <!-- è¯¦ç»†ç»Ÿè®¡æ•°æ® -->
                                 </tbody>
                             </table>
                         </div>
@@ -386,2274 +397,54 @@
         </div>
     </main>
 
-    <!-- ĞŞ¸ÄÃÜÂëÄ£Ì¬¿ò -->
-    <div id="passwordModal" class="modal" aria-labelledby="password-title" role="dialog" aria-modal="true">
+    <!-- æ¨¡æ€æ¡† -->
+    <div id="passwordModal" class="modal" aria-labelledby="password-title" role="dialog">
         <div class="modal-content">
-            <span class="close" aria-label="¹Ø±Õ">&times;</span>
-            <h2 id="password-title">?? ĞŞ¸ÄÃÜÂë</h2>
+            <span class="close" aria-label="å…³é—­">&times;</span>
+            <h2 id="password-title">ä¿®æ”¹å¯†ç </h2>
             <form id="passwordForm" novalidate>
                 <div class="form-group">
-                    <input type="password" id="currentPassword" placeholder="µ±Ç°ÃÜÂë" required autocomplete="current-password">
+                    <input type="password" id="currentPassword" placeholder="å½“å‰å¯†ç " required autocomplete="current-password">
                 </div>
                 <div class="form-group">
-                    <input type="password" id="newPassword" placeholder="ĞÂÃÜÂë" required autocomplete="new-password">
+                    <input type="password" id="newPassword" placeholder="æ–°å¯†ç " required autocomplete="new-password">
                 </div>
                 <div class="form-group">
-                    <input type="password" id="confirmNewPassword" placeholder="È·ÈÏĞÂÃÜÂë" required autocomplete="new-password">
+                    <input type="password" id="confirmNewPassword" placeholder="ç¡®è®¤æ–°å¯†ç " required autocomplete="new-password">
                 </div>
-                <button type="submit" class="submit-btn">ĞŞ¸ÄÃÜÂë</button>
+                <button type="submit" class="submit-btn">ä¿®æ”¹å¯†ç </button>
             </form>
         </div>
     </div>
 
-    <!-- ToastÍ¨Öª -->
-    <div id="toast" class="toast" role="alert" aria-live="polite">
-        <span class="toast-message"></span>
-    </div>
+    <!-- Toasté€šçŸ¥ -->
+    <div id="toast" class="toast" role="alert" aria-live="polite"></div>
 
     <!-- Loading -->
-    <div id="loading" class="loading" style="display:none;" aria-label="¼ÓÔØÖĞ">
+    <div id="loading" class="loading" style="display:none;" aria-label="åŠ è½½ä¸­">
         <div class="spinner"></div>
-        <div class="loading-text">¼ÓÔØÖĞ...</div>
     </div>
 
-    <!-- JavaScript -->
+    <!-- è„šæœ¬æ–‡ä»¶ -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/dashboard.js"></script>
+
     <script>
-        // È«¾Ö¹¤¾ßº¯Êı
-        const Utils = {
-            showToast(message, type = 'info', duration = 3000) {
-                const toast = document.getElementById('toast');
-                const toastMessage = toast.querySelector('.toast-message');
-                
-                toastMessage.textContent = message;
-                toast.className = `toast ${type}`;
-                toast.classList.add('show');
-                
-                setTimeout(() => {
-                    toast.classList.remove('show');
-                }, duration);
-            },
-
-            showLoading(text = '¼ÓÔØÖĞ...') {
-                const loading = document.getElementById('loading');
-                const loadingText = loading.querySelector('.loading-text');
-                loadingText.textContent = text;
-                loading.style.display = 'flex';
-            },
-
-            hideLoading() {
-                document.getElementById('loading').style.display = 'none';
-            },
-
-            formatDate(date) {
-                return new Intl.DateTimeFormat('zh-CN', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }).format(new Date(date));
-            },
-
-            generateId() {
-                return Date.now().toString(36) + Math.random().toString(36).substr(2);
-            },
-
-            storage: {
-                get(key, defaultValue = null) {
-                    try {
-                        const item = localStorage.getItem(key);
-                        return item ? JSON.parse(item) : defaultValue;
-                    } catch (e) {
-                        console.error('Storage get error:', e);
-                        return defaultValue;
-                    }
-                },
-
-                set(key, value) {
-                    try {
-                        localStorage.setItem(key, JSON.stringify(value));
-                        return true;
-                    } catch (e) {
-                        console.error('Storage set error:', e);
-                        return false;
-                    }
-                },
-
-                remove(key) {
-                    try {
-                        localStorage.removeItem(key);
-                        return true;
-                    } catch (e) {
-                        console.error('Storage remove error:', e);
-                        return false;
-                    }
-                }
-            }
-        };
-
-        // Ö÷Ìâ¹ÜÀí
-        class ThemeManager {
-            constructor() {
-                this.currentTheme = 'light';
-                this.init();
-            }
-
-            init() {
-                this.loadTheme();
-                this.bindEvents();
-            }
-
-            loadTheme() {
-                const savedTheme = Utils.storage.get('theme', 'auto');
-                this.applyTheme(savedTheme);
-            }
-
-            applyTheme(theme) {
-                if (theme === 'auto') {
-                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    theme = prefersDark ? 'dark' : 'light';
-                }
-
-                document.documentElement.setAttribute('data-theme', theme);
-                this.currentTheme = theme;
-                this.updateThemeIcon();
-                Utils.storage.set('theme', theme);
-            }
-
-            updateThemeIcon() {
-                const themeIcon = document.getElementById('themeIcon');
-                if (themeIcon) {
-                    themeIcon.textContent = this.currentTheme === 'dark' ? '??' : '??';
-                }
-            }
-
-            toggle() {
-                const newTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
-                this.applyTheme(newTheme);
-                
-                document.body.style.transition = 'background-color 0.3s ease';
-                setTimeout(() => {
-                    document.body.style.transition = '';
-                }, 300);
-            }
-
-            bindEvents() {
-                const themeToggle = document.getElementById('themeToggle');
-                if (themeToggle) {
-                    themeToggle.addEventListener('click', () => this.toggle());
-                }
-            }
-        }
-
-        // DashboardÓ¦ÓÃÖ÷Àà
-        class DashboardApp {
-            constructor() {
-                this.currentTab = 'overview';
-                this.mockData = this.generateMockData();
-                this.init();
-            }
-
-            init() {
-                this.bindEvents();
-                this.loadStatistics();
-                this.loadFavorites();
-                this.loadHistory();
-                this.updateActivity();
-                this.initSettings();
-                
-                // ³õÊ¼»¯Ö÷Ìâ¹ÜÀíÆ÷
-                this.themeManager = new ThemeManager();
-            }
-
-            generateMockData() {
-                return {
-                    searches: Utils.storage.get('searchHistory', []),
-                    favorites: Utils.storage.get('favorites', []),
-                    stats: {
-                        totalSearches: Math.floor(Math.random() * 500) + 50,
-                        totalFavorites: Math.floor(Math.random() * 50) + 5,
-                        activeDays: Math.floor(Math.random() * 30) + 1,
-                        userLevel: '»îÔ¾ÓÃ»§'
-                    },
-                    activities: [
-                        { type: 'search', content: 'ËÑË÷ÁË "MIAA-123"', time: new Date(Date.now() - 1000 * 60 * 30) },
-                        { type: 'favorite', content: 'ÊÕ²ØÁËĞÂÄÚÈİ', time: new Date(Date.now() - 1000 * 60 * 60 * 2) },
-                        { type: 'login', content: 'µÇÂ¼ÏµÍ³', time: new Date(Date.now() - 1000 * 60 * 60 * 4) }
-                    ]
-                };
-            }
-
-            bindEvents() {
-                // ±êÇ©Ò³ÇĞ»»
-                document.querySelectorAll('.menu-item').forEach(item => {
-                    item.addEventListener('click', (e) => {
-                        const tab = e.currentTarget.dataset.tab;
-                        if (tab) {
-                            this.switchTab(tab);
-                        }
-                    });
-                });
-
-                // Ê±¼ä·¶Î§Ñ¡Ôñ
-                document.querySelectorAll('.time-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
-                        e.currentTarget.classList.add('active');
-                        this.updateStats(e.currentTarget.dataset.range);
-                    });
-                });
-
-                // Ä£Ì¬¿òÏà¹Ø
-                document.querySelectorAll('.close').forEach(btn => {
-                    btn.addEventListener('click', () => this.hideModals());
-                });
-
-                window.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('modal')) {
-                        this.hideModals();
-                    }
-                });
-
-                // µÇ³ö°´Å¥
-                const logoutBtn = document.getElementById('logoutBtn');
-                if (logoutBtn) {
-                    logoutBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        this.logout();
-                    });
-                }
-            }
-
-            switchTab(tabName) {
-                // ÒÆ³ıËùÓĞactive×´Ì¬
-                document.querySelectorAll('.tab-content').forEach(tab => {
-                    tab.classList.remove('active');
-                });
-                document.querySelectorAll('.menu-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-
-                // Ìí¼ÓĞÂµÄactive×´Ì¬
-                const targetTab = document.getElementById(tabName);
-                const targetMenuItem = document.querySelector(`[data-tab="${tabName}"]`);
-                
-                if (targetTab) {
-                    targetTab.classList.add('active');
-                }
-                if (targetMenuItem) {
-                    targetMenuItem.classList.add('active');
-                }
-
-                this.currentTab = tabName;
-
-                // ¸ù¾İ²»Í¬±êÇ©Ò³¼ÓÔØÊı¾İ
-                switch (tabName) {
-                    case 'favorites':
-                        this.loadFavorites();
-                        break;
-                    case 'history':
-                        this.loadHistory();
-                        break;
-                    case 'stats':
-                        this.loadStatistics();
-                        break;
-                }
-            }
-
-            loadStatistics() {
-                const stats = this.mockData.stats;
-                
-                // ¸üĞÂÍ³¼Æ¿¨Æ¬
-                document.getElementById('totalSearches').textContent = stats.totalSearches;
-                document.getElementById('totalFavorites').textContent = stats.totalFavorites;
-                document.getElementById('activeDays').textContent = stats.activeDays;
-                document.getElementById('userLevel').textContent = stats.userLevel;
-
-                // ¸üĞÂÏêÏ¸Í³¼Æ±í¸ñ
-                document.getElementById('totalSearchesStat').textContent = stats.totalSearches;
-                document.getElementById('avgDailySearches').textContent = Math.round(stats.totalSearches / Math.max(stats.activeDays, 1));
-                document.getElementById('favoriteConversionRate').textContent = `${Math.round((stats.totalFavorites / stats.totalSearches) * 100)}%`;
-                document.getElementById('mostActiveHour').textContent = '14:00-18:00';
-            }
-
-            loadFavorites() {
-                const favoritesList = document.getElementById('favoritesList');
-                const favorites = this.mockData.favorites;
-
-                if (!favoritesList) return;
-
-                if (favorites.length === 0) {
-                    favoritesList.innerHTML = `
-                        <div class="empty-state">
-                            <span class="emoji">?</span>
-                            <h3>ÔİÎŞÊÕ²Ø</h3>
-                            <p>¿ªÊ¼ËÑË÷²¢ÊÕ²ØÄúÏ²»¶µÄÄÚÈİ°É</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                favoritesList.innerHTML = '';
-                favorites.slice(0, 10).forEach((favorite, index) => {
-                    const favoriteElement = this.createFavoriteElement(favorite, index);
-                    favoritesList.appendChild(favoriteElement);
-                });
-            }
-
-            createFavoriteElement(favorite, index) {
-                const div = document.createElement('div');
-                div.className = 'favorite-item';
-                div.style.animation = `slideInUp 0.6s ease ${index * 0.1}s forwards`;
-                
-                div.innerHTML = `
-                    <div class="favorite-content">
-                        <div class="favorite-title">
-                            <span class="favorite-icon">??</span>
-                            <span class="favorite-name">${favorite.title || `ÊÕ²ØÏîÄ¿ ${index + 1}`}</span>
-                        </div>
-                        <div class="favorite-subtitle">${favorite.subtitle || '¾«²ÊÄÚÈİ£¬ÖµµÃÊÕ²Ø'}</div>
-                        <div class="favorite-url">${favorite.url || 'https://example.com/item/' + (index + 1)}</div>
-                        <div class="favorite-meta">
-                            <span>ÊÕ²ØÊ±¼ä£º${Utils.formatDate(favorite.favoriteTime || new Date())}</span>
-                            <span>ÀàĞÍ£ºÊÓÆµ</span>
-                        </div>
-                    </div>
-                    <div class="favorite-actions">
-                        <button class="btn btn-primary" onclick="window.open('${favorite.url || '#'}', '_blank')">
-                            ?? ·ÃÎÊ
-                        </button>
-                        <button class="btn btn-danger" onclick="dashboardApp.removeFavorite('${favorite.id || Utils.generateId()}')">
-                            ??? ÒÆ³ı
-                        </button>
-                    </div>
-                `;
-
-                return div;
-            }
-
-            loadHistory() {
-                const historyList = document.getElementById('historyList');
-                const searches = this.mockData.searches;
-
-                // ¸üĞÂÀúÊ·Í³¼Æ
-                const historyCount = searches.length;
-                const uniqueKeywords = new Set(searches.map(s => s.query)).size;
-                const avgPerDay = Math.round(historyCount / Math.max(this.mockData.stats.activeDays, 1) * 10) / 10;
-                const topKeyword = this.getTopKeyword(searches);
-
-                document.getElementById('historyCount').textContent = historyCount;
-                document.getElementById('uniqueKeywords').textContent = uniqueKeywords;
-                document.getElementById('avgPerDay').textContent = avgPerDay;
-                document.getElementById('topKeyword').textContent = topKeyword;
-
-                if (!historyList) return;
-
-                if (searches.length === 0) {
-                    historyList.innerHTML = `
-                        <div class="empty-state">
-                            <span class="emoji">??</span>
-                            <h3>ÔİÎŞËÑË÷ÀúÊ·</h3>
-                            <p>¿ªÊ¼ËÑË÷ºó£¬ÄúµÄËÑË÷ÀúÊ·½«ÔÚÕâÀïÏÔÊ¾</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                historyList.innerHTML = '';
-                searches.slice(0, 20).forEach((search, index) => {
-                    const historyElement = this.createHistoryElement(search, index);
-                    historyList.appendChild(historyElement);
-                });
-            }
-
-            createHistoryElement(search, index) {
-                const div = document.createElement('div');
-                div.className = 'history-item';
-                div.style.animation = `slideInUp 0.4s ease ${index * 0.05}s forwards`;
-                
-                div.innerHTML = `
-                    <div class="history-content">
-                        <div class="history-keyword">${search.query}</div>
-                        <div class="history-time">${Utils.formatDate(search.timestamp)}</div>
-                    </div>
-                    <div class="history-actions">
-                        <button class="btn btn-primary" onclick="window.open('index.html?q=${encodeURIComponent(search.query)}', '_blank')">
-                            ?? ÖØĞÂËÑË÷
-                        </button>
-                    </div>
-                `;
-
-                return div;
-            }
-
-            getTopKeyword(searches) {
-                if (searches.length === 0) return '-';
-                
-                const keywordCount = {};
-                searches.forEach(search => {
-                    keywordCount[search.query] = (keywordCount[search.query] || 0) + 1;
-                });
-
-                const sortedKeywords = Object.entries(keywordCount)
-                    .sort((a, b) => b[1] - a[1]);
-
-                return sortedKeywords.length > 0 ? sortedKeywords[0][0] : '-';
-            }
-
-            updateActivity() {
-                const activityList = document.getElementById('activityList');
-                if (!activityList) return;
-
-                const activities = this.mockData.activities;
-
-                if (activities.length === 0) {
-                    activityList.innerHTML = `
-                        <div class="empty-state">
-                            <span class="emoji">??</span>
-                            <h3>ÔİÎŞ»î¶¯¼ÇÂ¼</h3>
-                            <p>¿ªÊ¼Ê¹ÓÃÓ¦ÓÃºó£¬ÄúµÄ»î¶¯¼ÇÂ¼½«ÔÚÕâÀïÏÔÊ¾</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                activityList.innerHTML = activities.map((activity, index) => `
-                    <div class="activity-item" style="animation: slideInUp 0.5s ease ${index * 0.1}s forwards;">
-                        <div class="activity-icon">${this.getActivityIcon(activity.type)}</div>
-                        <div class="activity-content">
-                            <div class="activity-text">${activity.content}</div>
-                            <div class="activity-time">${Utils.formatDate(activity.time)}</div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            getActivityIcon(type) {
-                const icons = {
-                    search: '??',
-                    favorite: '?',
-                    login: '??',
-                    setting: '??'
-                };
-                return icons[type] || '??';
-            }
-
-            initSettings() {
-                // ¼ÓÔØ±£´æµÄÉèÖÃ
-                const settings = Utils.storage.get('user_settings', {});
-                
-                // Ó¦ÓÃÉèÖÃµ½UI
-                Object.entries(settings).forEach(([key, value]) => {
-                    const element = document.getElementById(key);
-                    if (element) {
-                        if (element.type === 'checkbox') {
-                            element.checked = value;
-                        } else {
-                            element.value = value;
-                        }
-                    }
-                });
-            }
-
-            removeFavorite(id) {
-                if (confirm('È·¶¨ÒªÒÆ³ıÕâ¸öÊÕ²ØÂğ£¿')) {
-                    // Ä£ÄâÒÆ³ı²Ù×÷
-                    Utils.showToast('ÊÕ²ØÒÑÒÆ³ı', 'success');
-                    this.loadFavorites();
-                }
-            }
-
-            updateStats(range) {
-                Utils.showLoading('¸üĞÂÍ³¼ÆÊı¾İ...');
-                
-                setTimeout(() => {
-                    // Ä£ÄâÊı¾İ¸üĞÂ
-                    Utils.hideLoading();
-                    Utils.showToast(`ÒÑ¸üĞÂ½ü${range}ÌìµÄÍ³¼ÆÊı¾İ`, 'success');
-                }, 1000);
-            }
-
-            hideModals() {
-                document.querySelectorAll('.modal').forEach(modal => {
-                    modal.style.display = 'none';
-                });
-            }
-
-            logout() {
-                if (confirm('È·¶¨ÒªÍË³öµÇÂ¼Âğ£¿')) {
-                    Utils.storage.remove('auth_token');
-                    Utils.storage.remove('user_data');
-                    Utils.showToast('ÒÑÍË³öµÇÂ¼', 'info');
-                    setTimeout(() => {
-                        window.location.href = 'index.html';
-                    }, 1000);
-                }
-            }
-        }
-
-        // È«¾Öº¯Êı
-        function switchTab(tabName) {
-            if (window.dashboardApp) {
-                window.dashboardApp.switchTab(tabName);
-            }
-        }
-
-        function syncAllData() {
-            Utils.showLoading('ÕıÔÚÍ¬²½Êı¾İ...');
-            setTimeout(() => {
-                Utils.hideLoading();
-                Utils.showToast('Êı¾İÍ¬²½³É¹¦', 'success');
-            }, 2000);
-        }
-
-        function exportData() {
-            const data = {
-                favorites: Utils.storage.get('favorites', []),
-                searchHistory: Utils.storage.get('searchHistory', []),
-                settings: Utils.storage.get('user_settings', {}),
-                exportTime: new Date().toISOString()
-            };
-
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `magnetSearch-backup-${new Date().getTime()}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            Utils.showToast('Êı¾İµ¼³ö³É¹¦', 'success');
-        }
-
-        function syncFavorites() {
-            Utils.showLoading('ÕıÔÚÍ¬²½ÊÕ²Ø...');
-            setTimeout(() => {
-                Utils.hideLoading();
-                Utils.showToast('ÊÕ²ØÍ¬²½³É¹¦', 'success');
-            }, 1500);
-        }
-
-        function exportFavorites() {
-            const favorites = Utils.storage.get('favorites', []);
-            if (favorites.length === 0) {
-                Utils.showToast('ÔİÎŞÊÕ²ØÊı¾İ', 'warning');
-                return;
-            }
-
-            const blob = new Blob([JSON.stringify(favorites, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `favorites-${new Date().getTime()}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            Utils.showToast('ÊÕ²Øµ¼³ö³É¹¦', 'success');
-        }
-
-        function searchFavorites() {
-            const query = document.getElementById('favoritesSearch').value.trim();
-            if (query) {
-                Utils.showToast(`ËÑË÷ÊÕ²Ø: "${query}"`, 'info');
-                // ÕâÀïÓ¦¸ÃÊµÏÖÊµ¼ÊµÄËÑË÷Âß¼­
-            }
-        }
-
-        function syncHistory() {
-            Utils.showLoading('ÕıÔÚÍ¬²½ÀúÊ·...');
-            setTimeout(() => {
-                Utils.hideLoading();
-                Utils.showToast('ÀúÊ·Í¬²½³É¹¦', 'success');
-            }, 1500);
-        }
-
-        function clearAllHistory() {
-            if (confirm('È·¶¨ÒªÇå¿ÕËùÓĞËÑË÷ÀúÊ·Âğ£¿´Ë²Ù×÷²»¿É³·Ïú£¡')) {
-                Utils.storage.remove('searchHistory');
-                Utils.showToast('ËÑË÷ÀúÊ·ÒÑÇå¿Õ', 'success');
-                if (window.dashboardApp) {
-                    window.dashboardApp.loadHistory();
-                }
-            }
-        }
-
-        function changePassword() {
-            const modal = document.getElementById('passwordModal');
-            if (modal) {
-                modal.style.display = 'block';
-            }
-        }
-
-        function saveSettings() {
-            const settings = {};
-            
-            // ÊÕ¼¯ËùÓĞÉèÖÃ
-            document.querySelectorAll('#settings input, #settings select').forEach(input => {
-                if (input.id) {
-                    if (input.type === 'checkbox') {
-                        settings[input.id] = input.checked;
-                    } else {
-                        settings[input.id] = input.value;
-                    }
-                }
-            });
-
-            Utils.storage.set('user_settings', settings);
-            Utils.showToast('ÉèÖÃÒÑ±£´æ', 'success');
-            
-            // Ó¦ÓÃÖ÷ÌâÉèÖÃ
-            const themeMode = settings.themeMode;
-            if (themeMode && window.dashboardApp && window.dashboardApp.themeManager) {
-                window.dashboardApp.themeManager.applyTheme(themeMode);
-            }
-        }
-
-        function resetSettings() {
-            if (confirm('È·¶¨ÒªÖØÖÃËùÓĞÉèÖÃÎªÄ¬ÈÏÖµÂğ£¿')) {
-                Utils.storage.remove('user_settings');
-                Utils.showToast('ÉèÖÃÒÑÖØÖÃ', 'success');
-                setTimeout(() => {
-                    location.reload();
-                }, 1000);
-            }
-        }
-
-        function clearAllData() {
-            if (confirm('¾¯¸æ£º´Ë²Ù×÷½«Çå¿ÕËùÓĞ±¾µØÊı¾İ£¬°üÀ¨ÊÕ²Ø¡¢ÀúÊ·¼ÇÂ¼ºÍÉèÖÃ¡£È·¶¨Òª¼ÌĞøÂğ£¿')) {
-                if (confirm('ÕâÊÇ×îºóÈ·ÈÏ£¬Çå¿ÕºóÊı¾İÎŞ·¨»Ö¸´£¡')) {
-                    ['favorites', 'searchHistory', 'user_settings'].forEach(key => {
-                        Utils.storage.remove(key);
-                    });
-                    Utils.showToast('ËùÓĞÊı¾İÒÑÇå¿Õ', 'success');
-                    setTimeout(() => {
-                        location.reload();
-                    }, 1500);
-                }
-            }
-        }
-
-        function deleteAccount() {
-            if (confirm('¾¯¸æ£ºÉ¾³ıÕË»§½«ÓÀ¾ÃÉ¾³ıËùÓĞÊı¾İ£¬´Ë²Ù×÷²»¿É³·Ïú£¡')) {
-                if (confirm('ÇëÔÙ´ÎÈ·ÈÏÉ¾³ıÕË»§²Ù×÷£º')) {
-                    Utils.showLoading('ÕıÔÚÉ¾³ıÕË»§...');
-                    setTimeout(() => {
-                        Utils.storage.clear();
-                        Utils.hideLoading();
-                        Utils.showToast('ÕË»§ÒÑÉ¾³ı', 'info');
-                        setTimeout(() => {
-                            window.location.href = 'index.html';
-                        }, 2000);
-                    }, 3000);
-                }
-            }
-        }
-
-        // Ò³Ãæ¼ÓÔØÍê³Éºó³õÊ¼»¯
+        // é¡µé¢åŠ è½½å®Œæˆååˆå§‹åŒ–
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('?? Dashboard³õÊ¼»¯...');
-
-            // ¼ì²éµÇÂ¼×´Ì¬
-            const authToken = Utils.storage.get('auth_token');
-            if (!authToken) {
-                Utils.showToast('ÇëÏÈµÇÂ¼', 'warning');
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-                return;
+            // æ›´æ–°é¡µé¢æ ‡é¢˜å’Œå“ç‰Œåç§°
+            if (window.API_CONFIG) {
+                const appName = window.API_CONFIG.APP_NAME || 'ç£åŠ›å¿«æœ';
+                document.getElementById('page-title').textContent = `ç”¨æˆ·é¢æ¿ - ${appName}`;
+                document.getElementById('brand-text').textContent = appName;
             }
-
-            // ¸üĞÂÒ³Ãæ±êÌâºÍÆ·ÅÆÃû³Æ
-            const appName = '´ÅÁ¦¿ìËÑ';
-            document.getElementById('page-title').textContent = `ÓÃ»§Ãæ°å - ${appName}`;
-            document.getElementById('brand-text').textContent = appName;
-
-            // ´´½¨DashboardÓ¦ÓÃÊµÀı
-            window.dashboardApp = new DashboardApp();
-
-            // ĞŞ¸ÄÃÜÂë±íµ¥´¦Àí
-            const passwordForm = document.getElementById('passwordForm');
-            if (passwordForm) {
-                passwordForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    const currentPassword = document.getElementById('currentPassword').value;
-                    const newPassword = document.getElementById('newPassword').value;
-                    const confirmPassword = document.getElementById('confirmNewPassword').value;
-
-                    if (!currentPassword || !newPassword || !confirmPassword) {
-                        Utils.showToast('ÇëÌîĞ´ÍêÕûĞÅÏ¢', 'warning');
-                        return;
-                    }
-
-                    if (newPassword.length < 8) {
-                        Utils.showToast('ĞÂÃÜÂë³¤¶ÈÖÁÉÙ8¸ö×Ö·û', 'warning');
-                        return;
-                    }
-
-                    if (newPassword !== confirmPassword) {
-                        Utils.showToast('Á½´ÎÊäÈëµÄÃÜÂë²»Ò»ÖÂ', 'warning');
-                        return;
-                    }
-
-                    Utils.showLoading('ÕıÔÚĞŞ¸ÄÃÜÂë...');
-                    
-                    // Ä£ÄâAPIµ÷ÓÃ
-                    setTimeout(() => {
-                        Utils.hideLoading();
-                        Utils.showToast('ÃÜÂëĞŞ¸Ä³É¹¦', 'success');
-                        
-                        // ¹Ø±ÕÄ£Ì¬¿ò²¢ÖØÖÃ±íµ¥
-                        window.dashboardApp.hideModals();
-                        passwordForm.reset();
-                    }, 2000);
-                });
-            }
-
-            console.log('? Dashboard³õÊ¼»¯Íê³É');
-        });
-
-        // Ò³ÃæĞ¶ÔØÊ±µÄÇåÀí¹¤×÷
-        window.addEventListener('beforeunload', () => {
-            // ±£´æµ±Ç°×´Ì¬
-            if (window.dashboardApp) {
-                const currentState = {
-                    currentTab: window.dashboardApp.currentTab,
-                    lastVisit: new Date().toISOString()
-                };
-                Utils.storage.set('dashboard_state', currentState);
-            }
-        });
-
-        // Ò³Ãæ¿É¼ûĞÔ±ä»¯´¦Àí
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && window.dashboardApp) {
-                // Ò³ÃæÖØĞÂ¿É¼ûÊ±£¬Ë¢ĞÂÊı¾İ
-                window.dashboardApp.loadStatistics();
-                window.dashboardApp.updateActivity();
+            
+            if (typeof DashboardApp !== 'undefined') {
+                window.app = new DashboardApp();
             }
         });
     </script>
 </body>
-</html><!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">ÓÃ»§Ãæ°å - ´ÅÁ¦¿ìËÑ</title>
-    <meta name="description" content="´ÅÁ¦¿ìËÑÓÃ»§Ãæ°å£¬¹ÜÀíÊÕ²Ø£¬²é¿´ËÑË÷ÀúÊ·£¬¸öĞÔ»¯ÉèÖÃ">
-    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <style>
-        /* ¼Ì³ĞÖ÷ÑùÊ½µÄCSS±äÁ¿ */
-        :root {
-            --primary: #6366f1;
-            --primary-dark: #4338ca;
-            --primary-light: #e0e7ff;
-            --secondary: #f3f4f6;
-            --accent: #10b981;
-            --accent-hover: #059669;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --success: #22c55e;
-            
-            --bg-primary: #ffffff;
-            --bg-secondary: #f8fafc;
-            --bg-tertiary: #f1f5f9;
-            --bg-card: rgba(255, 255, 255, 0.9);
-            --bg-glass: rgba(255, 255, 255, 0.1);
-            
-            --text-primary: #0f172a;
-            --text-secondary: #64748b;
-            --text-muted: #94a3b8;
-            
-            --border: #e2e8f0;
-            --border-light: #f1f5f9;
-            
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            
-            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            
-            --radius-sm: 0.375rem;
-            --radius-md: 0.5rem;
-            --radius-lg: 0.75rem;
-            --radius-xl: 1rem;
-            --radius-2xl: 1.5rem;
-            
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            --transition-fast: all 0.15s ease-out;
-            --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            
-            --sidebar-width: 280px;
-        }
-
-        [data-theme="dark"] {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --bg-tertiary: #334155;
-            --bg-card: rgba(30, 41, 59, 0.9);
-            --bg-glass: rgba(255, 255, 255, 0.05);
-            
-            --text-primary: #f8fafc;
-            --text-secondary: #cbd5e1;
-            --text-muted: #94a3b8;
-            
-            --border: #374151;
-            --border-light: #4b5563;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: var(--text-primary);
-            line-height: 1.6;
-            transition: var(--transition);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        /* µ¼º½À¸ */
-        .navbar {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: var(--shadow-sm);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            transition: var(--transition);
-        }
-
-        .nav-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 2rem;
-            height: 70px;
-        }
-
-        .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-            text-decoration: none;
-            transition: var(--transition);
-        }
-
-        .logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--gradient-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 1.2rem;
-        }
-
-        .nav-menu {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .nav-link {
-            color: var(--text-primary);
-            text-decoration: none;
-            font-weight: 500;
-            padding: 0.5rem 1rem;
-            border-radius: var(--radius-md);
-            transition: var(--transition);
-        }
-
-        .nav-link:hover {
-            background: var(--primary-light);
-            color: var(--primary);
-        }
-
-        .theme-btn {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            font-size: 1.25rem;
-            cursor: pointer;
-            padding: 0.75rem;
-            border-radius: 50%;
-            transition: var(--transition-bounce);
-            color: var(--text-primary);
-        }
-
-        .theme-btn:hover {
-            background: var(--primary);
-            color: white;
-            transform: scale(1.1) rotate(15deg);
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            position: relative;
-        }
-
-        .username {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .dropdown {
-            position: relative;
-        }
-
-        .dropdown-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 0.5rem;
-            color: var(--text-secondary);
-            border-radius: var(--radius-sm);
-            transition: var(--transition);
-        }
-
-        .dropdown-content {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-xl);
-            min-width: 180px;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(-10px);
-            transition: var(--transition);
-        }
-
-        .dropdown:hover .dropdown-content {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        .dropdown-content a {
-            display: block;
-            padding: 0.75rem 1rem;
-            color: var(--text-primary);
-            text-decoration: none;
-            transition: var(--transition);
-            border-radius: var(--radius-md);
-            margin: 0.25rem;
-        }
-
-        .dropdown-content a:hover,
-        .dropdown-content a.active {
-            background: var(--primary-light);
-            color: var(--primary);
-            transform: translateX(4px);
-        }
-
-        /* DashboardÈİÆ÷ */
-        .dashboard-container {
-            display: flex;
-            min-height: calc(100vh - 70px);
-            max-width: 1400px;
-            margin: 0 auto;
-            gap: 2rem;
-            padding: 2rem;
-        }
-
-        /* ²à±ßÀ¸ */
-        .sidebar {
-            width: var(--sidebar-width);
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border-radius: var(--radius-2xl);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: var(--shadow-md);
-            padding: 1.5rem 0;
-            height: fit-content;
-            position: sticky;
-            top: 90px;
-            transition: var(--transition);
-        }
-
-        .sidebar:hover {
-            box-shadow: var(--shadow-lg);
-        }
-
-        .sidebar-menu {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            padding: 0 1rem;
-        }
-
-        .menu-item {
-            display: flex;
-            align-items: center;
-            padding: 1rem 1.5rem;
-            cursor: pointer;
-            transition: var(--transition-bounce);
-            border-radius: var(--radius-lg);
-            color: var(--text-secondary);
-            font-weight: 500;
-            margin: 0.25rem 0;
-        }
-
-        .menu-item:hover {
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--primary);
-            transform: translateX(4px) scale(1.02);
-        }
-
-        .menu-item.active {
-            background: var(--gradient-primary);
-            color: white;
-            box-shadow: var(--shadow-md);
-        }
-
-        .menu-icon {
-            font-size: 1.5rem;
-            margin-right: 1rem;
-            width: 2rem;
-            text-align: center;
-        }
-
-        .menu-text {
-            font-size: 1rem;
-        }
-
-        /* Ö÷ÄÚÈİÇø */
-        .main-content {
-            flex: 1;
-            min-width: 0;
-        }
-
-        /* ±êÇ©Ò³ÄÚÈİ */
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.5s ease;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .tab-header {
-            margin-bottom: 2rem;
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border-radius: var(--radius-2xl);
-            padding: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: var(--shadow-md);
-        }
-
-        .tab-header h1 {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin-bottom: 0.75rem;
-            background: var(--gradient-primary);
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .tab-header p {
-            color: var(--text-secondary);
-            font-size: 1.2rem;
-            font-weight: 400;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        /* Í³¼Æ¿¨Æ¬ */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border-radius: var(--radius-xl);
-            padding: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-            transition: var(--transition-bounce);
-            box-shadow: var(--shadow-sm);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: var(--gradient-primary);
-        }
-
-        .stat-card:hover {
-            transform: translateY(-4px) scale(1.02);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .stat-icon {
-            font-size: 3rem;
-            padding: 1rem;
-            background: var(--gradient-accent);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: var(--shadow-md);
-        }
-
-        .stat-info {
-            flex: 1;
-        }
-
-        .stat-number {
-            font-size: 2.5rem;
-            font-weight: 800;
-            color: var(--primary);
-            line-height: 1;
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 1rem;
-            font-weight: 500;
-        }
-
-        /* ¿ìËÙ²Ù×÷ */
-        .quick-actions {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border-radius: var(--radius-2xl);
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: var(--shadow-md);
-        }
-
-        .quick-actions h2 {
-            margin-bottom: 1.5rem;
-            color: var(--text-primary);
-            font-size: 1.75rem;
-            font-weight: 700;
-        }
-
-        .action-buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .action-btn {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1.5rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-xl);
-            cursor: pointer;
-            transition: var(--transition-bounce);
-            color: var(--text-primary);
-            text-decoration: none;
-            font-weight: 600;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .action-btn:hover {
-            background: var(--gradient-primary);
-            color: white;
-            transform: translateY(-2px) scale(1.02);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .btn-icon {
-            font-size: 1.75rem;
-        }
-
-        /* °´Å¥ÑùÊ½ */
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: var(--radius-lg);
-            cursor: pointer;
-            font-weight: 600;
-            transition: var(--transition-bounce);
-            border: none;
-            font-size: 0.95rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .btn-primary {
-            background: var(--gradient-primary);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-warning {
-            background: var(--warning);
-            color: white;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        /* ÄÚÈİÇøÓò */
-        .content-section {
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            border-radius: var(--radius-2xl);
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: var(--shadow-md);
-            transition: var(--transition);
-        }
-
-        .content-section:hover {
-            box-shadow: var(--shadow-lg);
-        }
-
-        .section-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        /* ÊÕ²Ø¼Ğ¿Ø¼ş */
-        .favorites-controls {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .search-box {
-            flex: 1;
-            min-width: 250px;
-            display: flex;
-            gap: 0.5rem;
-            position: relative;
-        }
-
-        .search-box input {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
-            border-radius: var(--radius-lg);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 0.95rem;
-            transition: var(--transition);
-        }
-
-        .search-box input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        .search-box button {
-            padding: 0.75rem 1rem;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: var(--radius-lg);
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .filter-options select {
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
-            border-radius: var(--radius-lg);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 0.95rem;
-        }
-
-        /* ÁĞ±íÑùÊ½ */
-        .favorites-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .favorite-item {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-xl);
-            padding: 1.5rem;
-            transition: var(--transition);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .favorite-item:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-            border-color: var(--primary);
-        }
-
-        .favorite-content {
-            margin-bottom: 1.5rem;
-        }
-
-        .favorite-title {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .favorite-icon {
-            font-size: 1.5rem;
-        }
-
-        .favorite-name {
-            font-weight: 700;
-            color: var(--text-primary);
-            font-size: 1.1rem;
-        }
-
-        .favorite-subtitle {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
-            margin-bottom: 0.75rem;
-            line-height: 1.5;
-        }
-
-        .favorite-url {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-            word-break: break-all;
-            padding: 0.75rem;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-md);
-            border-left: 3px solid var(--primary);
-            font-family: 'Courier New', monospace;
-        }
-
-        .favorite-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-top: 1rem;
-        }
-
-        .favorite-actions {
-            display: flex;
-            gap: 0.75rem;
-        }
-
-        .favorite-actions .btn {
-            flex: 1;
-            padding: 0.5rem;
-            font-size: 0.85rem;
-            justify-content: center;
-        }
-
-        /* ÀúÊ·¼ÇÂ¼ */
-        .history-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 2rem;
-            margin-bottom: 2rem;
-            text-align: center;
-        }
-
-        .stat-item {
-            padding: 1rem;
-            background: var(--bg-secondary);
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--border);
-            transition: var(--transition);
-        }
-
-        .stat-item:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .stat-value {
-            display: block;
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-desc {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
-        .history-controls {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .history-controls input,
-        .history-controls select {
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
-            border-radius: var(--radius-lg);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 0.95rem;
-        }
-
-        .history-controls input {
-            flex: 1;
-            min-width: 200px;
-        }
-
-        .history-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .history-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 1.5rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            transition: var(--transition);
-        }
-
-        .history-item:hover {
-            transform: translateX(4px);
-            border-color: var(--primary);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .history-content {
-            flex: 1;
-        }
-
-        .history-keyword {
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: 1rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .history-time {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-        }
-
-        .history-actions .btn {
-            padding: 0.5rem 1rem;
-            font-size: 0.85rem;
-        }
-
-        /* ÉèÖÃÒ³Ãæ */
-        .settings-sections {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-        }
-
-        .settings-section {
-            background: var(--bg-secondary);
-            border-radius: var(--radius-xl);
-            padding: 2rem;
-            border: 1px solid var(--border);
-            transition: var(--transition);
-        }
-
-        .settings-section:hover {
-            box-shadow: var(--shadow-md);
-        }
-
-        .settings-section h3 {
-            margin-bottom: 1.5rem;
-            color: var(--text-primary);
-            font-size: 1.25rem;
-            font-weight: 700;
-            padding-bottom: 0.75rem;
-            border-bottom: 3px solid var(--primary);
-        }
-
-        .setting-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            padding: 1.5rem 0;
-            border-bottom: 1px solid var(--border);
-            gap: 2rem;
-        }
-
-        .setting-item:last-child {
-            border-bottom: none;
-        }
-
-        .setting-item label {
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: 1rem;
-            flex-shrink: 0;
-            min-width: 120px;
-        }
-
-        .setting-control {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.75rem;
-        }
-
-        .setting-desc {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            text-align: right;
-            max-width: 300px;
-            line-height: 1.5;
-        }
-
-        .checkbox-group {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 1rem;
-        }
-
-        .checkbox-group label {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-            font-weight: 500;
-            padding: 0.5rem;
-            border-radius: var(--radius-md);
-            transition: var(--transition);
-        }
-
-        .checkbox-group label:hover {
-            background: var(--bg-tertiary);
-        }
-
-        .dangerous-actions {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            justify-content: center;
-            padding: 2rem 0;
-        }
-
-        .settings-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            padding: 2rem 0;
-            flex-wrap: wrap;
-        }
-
-        /* Í³¼ÆÒ³Ãæ */
-        .stats-controls {
-            margin-bottom: 2rem;
-            display: flex;
-            justify-content: center;
-        }
-
-        .time-range-selector {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            background: var(--bg-secondary);
-            padding: 0.5rem;
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--border);
-        }
-
-        .time-btn {
-            padding: 0.75rem 1.25rem;
-            background: transparent;
-            border: none;
-            border-radius: var(--radius-md);
-            cursor: pointer;
-            transition: var(--transition);
-            color: var(--text-primary);
-            font-weight: 600;
-        }
-
-        .time-btn:hover {
-            background: var(--bg-tertiary);
-        }
-
-        .time-btn.active {
-            background: var(--gradient-primary);
-            color: white;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .charts-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .chart-section {
-            background: var(--bg-secondary);
-            border-radius: var(--radius-xl);
-            padding: 2rem;
-            border: 1px solid var(--border);
-            transition: var(--transition);
-        }
-
-        .chart-section:hover {
-            box-shadow: var(--shadow-md);
-        }
-
-        .chart-section h3 {
-            margin-bottom: 1.5rem;
-            color: var(--text-primary);
-            font-size: 1.25rem;
-            font-weight: 700;
-        }
-
-        .chart-placeholder {
-            height: 300px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-lg);
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-            font-weight: 500;
-        }
-
-        .detailed-stats {
-            background: var(--bg-secondary);
-            border-radius: var(--radius-xl);
-            padding: 2rem;
-            border: 1px solid var(--border);
-        }
-
-        .stats-table table {
-            width: 100%;
-            border-collapse: collapse;
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-        }
-
-        .stats-table th,
-        .stats-table td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .stats-table th {
-            font-weight: 700;
-            color: var(--text-primary);
-            background: var(--bg-tertiary);
-            font-size: 0.95rem;
-        }
-
-        .stats-table td {
-            color: var(--text-secondary);
-        }
-
-        /* Ä£Ì¬¿ò */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            z-index: 2000;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .modal-content {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            padding: 2.5rem;
-            border-radius: var(--radius-2xl);
-            width: 90%;
-            max-width: 500px;
-            box-shadow: var(--shadow-xl);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .modal-content h2 {
-            text-align: center;
-            margin-bottom: 2rem;
-            color: var(--text-primary);
-            font-size: 1.75rem;
-            font-weight: 700;
-        }
-
-        .close {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--text-muted);
-            transition: var(--transition);
-            padding: 0.5rem;
-            border-radius: 50%;
-            background: var(--bg-secondary);
-        }
-
-        .close:hover {
-            color: var(--danger);
-            background: rgba(239, 68, 68, 0.1);
-            transform: scale(1.1);
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 1rem 1.25rem;
-            border: 2px solid var(--border);
-            border-radius: var(--radius-lg);
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            font-size: 1rem;
-            transition: var(--transition);
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 1rem;
-            background: var(--gradient-primary);
-            color: white;
-            border: none;
-            border-radius: var(--radius-lg);
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 700;
-            transition: var(--transition-bounce);
-            box-shadow: var(--shadow-md);
-        }
-
-        .submit-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .submit-btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-
-        /* ToastÍ¨Öª */
-        .toast {
-            position: fixed;
-            top: 30px;
-            right: 30px;
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            color: var(--text-primary);
-            padding: 1.25rem 1.75rem;
-            border-radius: var(--radius-lg);
-            z-index: 2001;
-            transform: translateX(400px);
-            transition: var(--transition-bounce);
-            box-shadow: var(--shadow-xl);
-            border: 1px solid var(--border);
-            min-width: 300px;
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast.error {
-            background: var(--danger);
-            color: white;
-        }
-
-        .toast.success {
-            background: var(--success);
-            color: white;
-        }
-
-        .toast.warning {
-            background: var(--warning);
-            color: white;
-        }
-
-        /* Loading¶¯»­ */
-        .loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 2002;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        .loading-text {
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        /* ¿Õ×´Ì¬ */
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: var(--text-secondary);
-        }
-
-        .empty-state .emoji {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            display: block;
-        }
-
-        .empty-state h3 {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-            font-weight: 700;
-        }
-
-        .empty-state p {
-            font-size: 1.1rem;
-            line-height: 1.6;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-
-        /* ¶¯»­ */
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes slideIn {
-            from { 
-                transform: translate(-50%, -60%); 
-                opacity: 0; 
-                scale: 0.9;
-            }
-            to { 
-                transform: translate(-50%, -50%); 
-                opacity: 1; 
-                scale: 1;
-            }
-        }
-
-        @keyframes slideInUp {
-            from {
-                transform: translateY(30px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        /* ÏìÓ¦Ê½Éè¼Æ */
-        @media (max-width: 1024px) {
-            .dashboard-container {
-                flex-direction: column;
-                padding: 1rem;
-                gap: 1rem;
-            }
-            
-            .sidebar {
-                width: 100%;
-                position: static;
-                order: 2;
-            }
-            
-            .sidebar-menu {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 0.5rem;
-                padding: 0 1rem;
-                overflow-x: auto;
-            }
-            
-            .menu-item {
-                flex-direction: column;
-                text-align: center;
-                padding: 1rem 0.5rem;
-                min-height: 80px;
-                justify-content: center;
-            }
-
-            .menu-item:hover {
-                transform: translateY(-2px) scale(1.02);
-            }
-            
-            .menu-icon {
-                margin-right: 0;
-                margin-bottom: 0.5rem;
-                font-size: 1.25rem;
-            }
-            
-            .menu-text {
-                font-size: 0.85rem;
-            }
-            
-            .main-content {
-                order: 1;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            }
-            
-            .action-buttons {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .nav-container {
-                padding: 0 1rem;
-            }
-            
-            .nav-brand .brand-text {
-                font-size: 1.25rem;
-            }
-            
-            .dashboard-container {
-                padding: 0.5rem;
-            }
-            
-            .tab-header {
-                padding: 1.5rem;
-            }
-            
-            .tab-header h1 {
-                font-size: 2rem;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .stat-card {
-                flex-direction: column;
-                text-align: center;
-                padding: 1.5rem;
-            }
-            
-            .favorites-controls,
-            .history-controls {
-                flex-direction: column;
-            }
-            
-            .header-actions,
-            .dangerous-actions,
-            .settings-actions {
-                flex-direction: column;
-            }
-            
-            .charts-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .setting-item {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 1rem;
-            }
-            
-            .setting-control {
-                align-items: stretch;
-            }
-            
-            .setting-desc {
-                text-align: left;
-                max-width: none;
-            }
-
-            .modal-content {
-                width: 95%;
-                padding: 2rem;
-                margin: 1rem;
-            }
-
-            .sidebar-menu {
-                grid-template-columns: repeat(3, 1fr);
-                padding: 0.5rem;
-            }
-
-            .menu-item {
-                min-height: 70px;
-                padding: 0.75rem 0.5rem;
-            }
-
-            .menu-text {
-                font-size: 0.8rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .tab-header h1 {
-                font-size: 1.75rem;
-            }
-            
-            .nav-container {
-                height: 60px;
-            }
-            
-            .nav-menu {
-                gap: 1rem;
-            }
-            
-            .content-section {
-                padding: 1.5rem;
-            }
-            
-            .stat-card {
-                padding: 1rem;
-            }
-            
-            .stat-icon {
-                font-size: 2.5rem;
-                padding: 0.75rem;
-            }
-            
-            .stat-number {
-                font-size: 2rem;
-            }
-            
-            .favorites-list {
-                grid-template-columns: 1fr;
-            }
-            
-            .history-stats {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 1rem;
-            }
-            
-            .time-range-selector {
-                flex-direction: column;
-                width: 100%;
-            }
-
-            .sidebar-menu {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        /* ´òÓ¡ÑùÊ½ */
-        @media print {
-            .sidebar,
-            .navbar,
-            .modal,
-            .toast,
-            .loading {
-                display: none !important;
-            }
-            
-            body {
-                background: white !important;
-                color: black !important;
-            }
-            
-            .dashboard-container {
-                flex-direction: column;
-                padding: 0;
-            }
-            
-            .main-content {
-                padding: 0;
-            }
-            
-            .content-section {
-                background: white !important;
-                border: 1px solid black !important;
-                box-shadow: none !important;
-                page-break-inside: avoid;
-            }
-        }
-
-        /* ¸ß¶Ô±È¶ÈÖ§³Ö */
-        @media (prefers-contrast: high) {
-            :root {
-                --border: #000000;
-                --text-secondary: #000000;
-            }
-            
-            [data-theme="dark"] {
-                --border: #ffffff;
-                --text-secondary: #ffffff;
-            }
-        }
-
-        /* ¼õÉÙ¶¯»­Ö§³Ö */
-        @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- µ¼º½À¸ -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="nav-brand">
-                <div class="logo">M</div>
-                <span class="brand-text" id="brand-text">´ÅÁ¦¿ìËÑ</span>
-            </div>
-            <div class="nav-menu">
-                <a href="./index.html" class="nav-link">?? Ê×Ò³</a>
-                <button id="themeToggle" class="theme-btn" title="ÇĞ»»Ö÷Ìâ" aria-label="ÇĞ»»Ö÷Ìâ">
-                    <span id="themeIcon">??</span>
-                </button>
-                <div id="userInfo" class="user-info">
-                    <span id="username" class="username">DemoÓÃ»§</span>
-                    <div class="dropdown">
-                        <button class="dropdown-btn" title="ÓÃ»§²Ëµ¥" aria-label="ÓÃ»§²Ëµ¥">¨‹</button>
-                        <div class="dropdown-content" role="menu">
-                            <a href="#" class="dropdown-item active" role="menuitem">?? ¸öÈËÖĞĞÄ</a>
-                            <a href="#" id="logoutBtn" class="dropdown-item" role="menuitem">?? ÍË³öµÇÂ¼</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Ö÷ÒªÄÚÈİ -->
-    <main class="dashboard-container">
-        <!-- ²à±ßÀ¸ -->
-        <aside class="sidebar">
-            <div class="sidebar-menu">
-                <div class="menu-item active" data-tab="overview">
-                    <span class="menu-icon">??</span>
-                    <span class="menu-text">¸ÅÀÀ</span>
-                </div>
-                <div class="menu-item" data-tab="favorites">
-                    <span class="menu-icon">?</span>
-                    <span class="menu-text">ÎÒµÄÊÕ²Ø</span>
-                </div>
-                <div class="menu-item" data-tab="history">
-                    <span class="menu-icon">??</span>
-                    <span class="menu-text">ËÑË÷ÀúÊ·</span>
-                </div>
-                <div class="menu-item" data-tab="settings">
-                    <span class="menu-icon">??</span>
+</html>
