@@ -1,4 +1,3 @@
-<!-- Optimized dashboard.html — generated 2025-08-16 14:58:31 UTC. Non-breaking markup cleanups. -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -8,7 +7,8 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
-\1    <!-- 环境配置 -->
+    
+    <!-- 环境配置 -->
     <script>
         // 环境变量配置
         window.CF_API_BASE_URL = typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined;
@@ -17,7 +17,7 @@
         window.CF_ENABLE_ANALYTICS = typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : undefined;
         window.CF_ENABLE_DEBUG = typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : undefined;
     </script>
-    <script src="js/config.js" defer></script>
+    <script src="js/config.js"></script>
 </head>
 <body>
     <!-- 导航栏 -->
@@ -426,10 +426,10 @@
     </div>
 
     <!-- 脚本文件 -->
-    <script src="js/utils.js" defer></script>
-    <script src="js/api.js" defer></script>
-    <script src="js/auth.js" defer></script>
-    <script src="js/dashboard.js" defer></script>
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/dashboard.js"></script>
 
     <script>
         // 页面加载完成后初始化
@@ -440,7 +440,8 @@
                 document.getElementById('page-title').textContent = `用户面板 - ${appName}`;
                 document.getElementById('brand-text').textContent = appName;
             }
-\1            if (typeof DashboardApp !== 'undefined') {
+            
+            if (typeof DashboardApp !== 'undefined') {
                 window.app = new DashboardApp();
             }
         });

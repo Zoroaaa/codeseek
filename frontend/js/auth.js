@@ -1,6 +1,3 @@
-/** Optimized auth.js — generated 2025-08-16 14:58:31 UTC. Behavior preserved; style normalized. */
-'use strict';
-
 // 认证模块
 class AuthManager {
     constructor() {
@@ -20,7 +17,8 @@ class AuthManager {
     loadStoredAuth() {
         const token = localStorage.getItem('auth_token');
         const user = StorageManager.getItem('current_user');
-\1        if (token && user) {
+        
+        if (token && user) {
             this.setAuth(user, token);
         }
     }
@@ -29,34 +27,43 @@ class AuthManager {
     setAuth(user, token) {
         this.currentUser = user;
         this.token = token;
-\1        // 存储到本地
+        
+        // 存储到本地
         localStorage.setItem('auth_token', token);
         StorageManager.setItem('current_user', user);
-\1        // 设置API token
+        
+        // 设置API token
         if (typeof API !== 'undefined') {
             API.setToken(token);
         }
-\1        // 启动token刷新定时器
+        
+        // 启动token刷新定时器
         this.startTokenRefresh();
-\1        // 触发认证状态变化事件
+        
+        // 触发认证状态变化事件
         this.dispatchAuthEvent('login', user);
     }
 
     // 清除认证信息
     clearAuth() {
         const previousUser = this.currentUser;
-\1        this.currentUser = null;
+        
+        this.currentUser = null;
         this.token = null;
-\1        // 清除本地存储
+        
+        // 清除本地存储
         localStorage.removeItem('auth_token');
         StorageManager.removeItem('current_user');
-\1        // 清除API token
+        
+        // 清除API token
         if (typeof API !== 'undefined') {
             API.setToken(null);
         }
-\1        // 停止token刷新
+        
+        // 停止token刷新
         this.stopTokenRefresh();
-\1        // 触发认证状态变化事件
+        
+        // 触发认证状态变化事件
         this.dispatchAuthEvent('logout', previousUser);
     }
 
@@ -79,8 +86,10 @@ class AuthManager {
     async login(username, password) {
         try {
             showLoading(true);
-\1            const response = await API.login(username, password);
-\1            if (response.success && response.user && response.token) {
+            
+            const response = await API.login(username, password);
+            
+            if (response.success && response.user && response.token) {
                 this.setAuth(response.user, response.token);
                 showToast(`欢迎回来，${response.user.username}！`, 'success');
                 return { success: true, user: response.user };
@@ -100,13 +109,16 @@ class AuthManager {
     async register(username, email, password) {
         try {
             showLoading(true);
-\1            // 客户端验证
+            
+            // 客户端验证
             const validation = this.validateRegistration(username, email, password);
             if (!validation.valid) {
                 throw new Error(validation.message);
             }
-\1            const response = await API.register(username, email, password);
-\1            if (response.success) {
+            
+            const response = await API.register(username, email, password);
+            
+            if (response.success) {
                 showToast('注册成功！请登录您的账户', 'success');
                 return { success: true };
             } else {
@@ -143,7 +155,8 @@ class AuthManager {
 
         try {
             const response = await API.verifyToken(this.token);
-\1            if (response.success && response.user) {
+            
+            if (response.success && response.user) {
                 this.currentUser = response.user;
                 StorageManager.setItem('current_user', response.user);
                 return true;
@@ -211,7 +224,8 @@ class AuthManager {
             const response = await API.request('/api/auth/refresh', {
                 method: 'POST'
             });
-\1            if (response.success && response.token) {
+            
+            if (response.success && response.token) {
                 this.token = response.token;
                 localStorage.setItem('auth_token', response.token);
                 API.setToken(response.token);
@@ -274,46 +288,55 @@ const PasswordStrengthChecker = {
     // 检查密码强度
     checkStrength(password) {
         if (!password) return { score: 0, feedback: [] };
-\1        let score = 0;
+        
+        let score = 0;
         const feedback = [];
-\1        // 长度检查
+        
+        // 长度检查
         if (password.length >= 8) {
             score += 1;
         } else {
             feedback.push('密码至少8个字符');
         }
-\1        // 包含小写字母
+        
+        // 包含小写字母
         if (/[a-z]/.test(password)) {
             score += 1;
         } else {
             feedback.push('需要包含小写字母');
         }
-\1        // 包含大写字母
+        
+        // 包含大写字母
         if (/[A-Z]/.test(password)) {
             score += 1;
         } else {
             feedback.push('需要包含大写字母');
         }
-\1        // 包含数字
+        
+        // 包含数字
         if (/\d/.test(password)) {
             score += 1;
         } else {
             feedback.push('需要包含数字');
         }
-\1        // 包含特殊字符
+        
+        // 包含特殊字符
         if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
             score += 1;
         } else {
             feedback.push('建议包含特殊字符');
         }
-\1        // 避免常见模式
+        
+        // 避免常见模式
         if (!/(.)\1{2,}/.test(password)) {
             score += 1;
         } else {
             feedback.push('避免重复字符');
         }
-\1        const strength = ['很弱', '弱', '一般', '强', '很强'][Math.min(Math.floor(score / 1.2), 4)];
-\1        return {
+        
+        const strength = ['很弱', '弱', '一般', '强', '很强'][Math.min(Math.floor(score / 1.2), 4)];
+        
+        return {
             score,
             strength,
             feedback,
@@ -327,18 +350,22 @@ const PasswordStrengthChecker = {
         const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
         const numbers = '0123456789';
         const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-\1        const allChars = lowercase + uppercase + numbers + symbols;
+        
+        const allChars = lowercase + uppercase + numbers + symbols;
         let password = '';
-\1        // 确保每种类型至少有一个字符
+        
+        // 确保每种类型至少有一个字符
         password += this.getRandomChar(lowercase);
         password += this.getRandomChar(uppercase);
         password += this.getRandomChar(numbers);
         password += this.getRandomChar(symbols);
-\1        // 填充剩余长度
+        
+        // 填充剩余长度
         for (let i = 4; i < length; i++) {
             password += this.getRandomChar(allChars);
         }
-\1        // 打乱字符顺序
+        
+        // 打乱字符顺序
         return password.split('').sort(() => Math.random() - 0.5).join('');
     },
 
@@ -378,11 +405,13 @@ const FormValidator = {
         if (!password) return { valid: false, message: '密码不能为空' };
         if (password.length < 6) return { valid: false, message: '密码至少6个字符' };
         if (password.length > 50) return { valid: false, message: '密码最多50个字符' };
-\1        const strength = PasswordStrengthChecker.checkStrength(password);
+        
+        const strength = PasswordStrengthChecker.checkStrength(password);
         if (strength.score < 2) {
             return { valid: false, message: '密码强度太弱，' + strength.feedback.join('，') };
         }
-\1        return { valid: true };
+        
+        return { valid: true };
     },
 
     // 验证搜索关键词
@@ -400,7 +429,8 @@ const FormValidator = {
 const SessionManager = {
     // 会话存储键名
     SESSION_KEY: 'user_session',
-\1    // 开始会话
+    
+    // 开始会话
     startSession(user) {
         const session = {
             user,
@@ -408,7 +438,8 @@ const SessionManager = {
             lastActivity: Date.now(),
             sessionId: generateId(16)
         };
-\1        StorageManager.setItem(this.SESSION_KEY, session);
+        
+        StorageManager.setItem(this.SESSION_KEY, session);
         this.startActivityTracking();
         return session;
     },
@@ -420,7 +451,8 @@ const SessionManager = {
             // 记录会话统计
             this.recordSessionStats(session);
         }
-\1        StorageManager.removeItem(this.SESSION_KEY);
+        
+        StorageManager.removeItem(this.SESSION_KEY);
         this.stopActivityTracking();
     },
 
@@ -443,10 +475,12 @@ const SessionManager = {
         // 监听用户活动
         const events = ['click', 'keypress', 'scroll', 'mousemove'];
         const updateActivity = debounce(() => this.updateActivity(), 30000);
-\1        events.forEach(event => {
+        
+        events.forEach(event => {
             document.addEventListener(event, updateActivity);
         });
-\1        // 定期检查会话超时
+        
+        // 定期检查会话超时
         this.activityTimer = setInterval(() => {
             this.checkSessionTimeout();
         }, 60000);
@@ -464,9 +498,11 @@ const SessionManager = {
     checkSessionTimeout() {
         const session = this.getSession();
         if (!session) return;
-\1        const now = Date.now();
+        
+        const now = Date.now();
         const timeout = 2 * 60 * 60 * 1000; // 2小时超时
-\1        if (now - session.lastActivity > timeout) {
+        
+        if (now - session.lastActivity > timeout) {
             showToast('会话已超时，请重新登录', 'error');
             if (typeof auth !== 'undefined') {
                 auth.clearAuth();
@@ -482,7 +518,8 @@ const SessionManager = {
             duration: Date.now() - session.startTime,
             endTime: Date.now()
         };
-\1        // 发送到后端统计
+        
+        // 发送到后端统计
         if (typeof API !== 'undefined') {
             API.recordAction('session_end', stats).catch(console.error);
         }
@@ -506,14 +543,17 @@ const PermissionManager = {
     // 检查用户权限
     hasPermission(user, permission) {
         if (!user || !user.permissions) return false;
-\1        return user.permissions.includes(permission) ||\1               user.permissions.includes(this.PERMISSIONS.ADMIN);
+        
+        return user.permissions.includes(permission) || 
+               user.permissions.includes(this.PERMISSIONS.ADMIN);
     },
 
     // 检查当前用户权限
     checkCurrentUserPermission(permission) {
         const auth = typeof authManager !== 'undefined' ? authManager : null;
         if (!auth || !auth.getCurrentUser()) return false;
-\1        return this.hasPermission(auth.getCurrentUser(), permission);
+        
+        return this.hasPermission(auth.getCurrentUser(), permission);
     },
 
     // 获取权限列表

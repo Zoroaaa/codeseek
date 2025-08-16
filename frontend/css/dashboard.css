@@ -1,13 +1,3 @@
-/* Optimized dashboard.css — generated 2025-08-16 14:58:31 UTC. Non-breaking UI polish & variables. */
-:root{
-  --color-bg: #0b0b0c;
-  --color-fg: #e9e9ea;
-  --color-muted: #9aa0a6;
-  --color-primary: #4f46e5;
-  --color-accent: #22c55e;
-  --radius: 12px;
-  --shadow: 0 8px 24px rgba(0,0,0,.25);
-}
 
 /* Dashboard专用样式 */
 .dashboard-container {
@@ -738,56 +728,69 @@
     .dashboard-container {
         flex-direction: column;
     }
-\1    .sidebar {
+    
+    .sidebar {
         width: 100%;
         order: 2;
     }
-\1    .sidebar-menu {
+    
+    .sidebar-menu {
         display: flex;
         overflow-x: auto;
         padding: 0.5rem;
     }
-\1    .menu-item {
+    
+    .menu-item {
         flex-shrink: 0;
         border-left: none;
         border-bottom: 3px solid transparent;
         min-width: 120px;
         text-align: center;
     }
-\1    .menu-item.active {
+    
+    .menu-item.active {
         border-left: none;
         border-bottom-color: var(--accent-primary);
     }
-\1    .dashboard-container .main-content {
+    
+    .dashboard-container .main-content {
         order: 1;
         padding: 1rem;
     }
-\1    .stats-grid {
+    
+    .stats-grid {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
-\1    .action-buttons {
+    
+    .action-buttons {
         grid-template-columns: 1fr;
     }
-\1    .favorites-controls,
+    
+    .favorites-controls,
     .history-controls {
         flex-direction: column;
     }
-\1    .header-actions,
+    
+    .header-actions,
     .dangerous-actions,
     .settings-actions {
         flex-direction: column;
     }
-\1    .charts-container {
+    
+    .charts-container {
         grid-template-columns: 1fr;
     }
-\1    .setting-item {
+    
+    .setting-item {
         flex-direction: column;
         align-items: stretch;
     }
-\1    .setting-control {
+    
+    .setting-control {
         align-items: stretch;
     }
-\1    .setting-desc {
+    
+    .setting-desc {
         text-align: left;
         max-width: none;
     }
@@ -797,26 +800,17 @@
     .stats-grid {
         grid-template-columns: 1fr;
     }
-\1    .stat-card {
+    
+    .stat-card {
         flex-direction: column;
         text-align: center;
     }
-\1    .history-stats {
+    
+    .history-stats {
         justify-content: space-around;
     }
-\1    .time-range-selector {
+    
+    .time-range-selector {
         justify-content: center;
     }
 }
-
-/* Subtle UI polish */
-button, .btn {
-  border-radius: var(--radius);
-  transition: transform .06s ease, box-shadow .15s ease, background-color .15s ease;
-}
-button:active, .btn:active { transform: translateY(1px) scale(.98); }
-input, select, textarea {
-  border-radius: calc(var(--radius) - 6px);
-  outline: none;
-}
-::selection { background: var(--color-primary); color: #fff; }
