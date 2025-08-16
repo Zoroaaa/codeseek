@@ -1462,6 +1462,22 @@ renderSearchSuggestions(suggestions) {
     hideSearchSuggestions() {
         // 隐藏搜索建议下拉框
     }
+	
+	  async showSearchSuggestions(query) {
+    // 添加防抖和缓存机制
+    if (this.suggestionCache[query]) {
+      this.renderSearchSuggestions(this.suggestionCache[query]);
+      return;
+    }
+    
+    try {
+      const suggestions = await API.getSearchSuggestions(query);
+      this.suggestionCache[query] = suggestions;
+      this.renderSearchSuggestions(suggestions);
+    } catch (error) {
+      console.error('获取搜索建议失败:', error);
+    }
+  }
 
     // 工具方法
     escapeHtml(text) {
