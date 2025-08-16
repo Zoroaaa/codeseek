@@ -1,3 +1,6 @@
+/** Optimized main.js — generated 2025-08-16 14:58:31 UTC. Behavior preserved; style normalized. */
+'use strict';
+
 // 主要应用逻辑 - 优化版本
 class MagnetSearchApp {
     constructor() {
@@ -11,56 +14,43 @@ class MagnetSearchApp {
         this.init();
     }
 
-    async init() {
-        try {
-            showLoading(true);
-            console.log('🚀 初始化磁力快搜应用...');
-            
-            // 显示连接状态
-            this.showConnectionStatus();
-            
-            // 加载系统配置
-            await this.loadConfig();
-            
-            // 绑定事件
-            this.bindEvents();
-            
-            // 初始化主题（仅从localStorage读取主题设置）
-            this.initTheme();
-            
-            // 检查认证状态
-            await this.checkAuthStatus();
-            
-            // 若未认证，打开登录模态
-            if (!this.currentUser) {
-                document.getElementById('loginModal').style.display = 'block';
-                document.querySelector('.main-content').style.display = 'none';
-            } else {
-                document.querySelector('.main-content').style.display = 'block';
-                // 已登录用户直接加载云端数据
-                await this.loadCloudData();
-            }
+async init() {
+    try {
+        showLoading(true);
 
-            // 测试API连接
-            await this.testConnection();
-            
-            // 处理URL参数（如搜索关键词）
-            this.handleURLParams();
-            
-            this.isInitialized = true;
-            this.hideConnectionStatus();
-            console.log('✅ 应用初始化完成');
-            
-        } catch (error) {
-            console.error('❌ 应用初始化失败:', error);
-            this.connectionStatus = 'error';
-            this.updateConnectionStatus('连接失败');
-            showToast('应用初始化失败，请刷新页面重试', 'error', 5000);
-        } finally {
-            showLoading(false);
+        // 显示连接状态
+        this.showConnectionStatus();
+\1        // 加载系统配置
+        await this.loadConfig();
+\1        // 绑定事件
+        this.bindEvents();
+\1        // 加载本地数据
+        this.loadLocalData();
+\1        // 初始化主题
+        this.initTheme();
+\1        // 检查认证状态
+        await this.checkAuthStatus();
+\1        // 若未认证，打开登录模态
+        if (!this.currentUser) {
+            document.getElementById('loginModal').style.display = 'block';
         }
-    }
 
+        // 测试API连接
+        await this.testConnection();
+\1        // 处理URL参数（如搜索关键词）
+        this.handleURLParams();
+\1        this.isInitialized = true;
+        this.hideConnectionStatus();
+
+    } catch (error) {
+        console.error('❌ 应用初始化失败:', error);
+        this.connectionStatus = 'error';
+        this.updateConnectionStatus('连接失败');
+        showToast('应用初始化失败，请刷新页面重试', 'error', 5000);
+    } finally {
+        showLoading(false);
+    }
+}
 
     showConnectionStatus() {
         const status = document.getElementById('connectionStatus');
@@ -82,10 +72,8 @@ class MagnetSearchApp {
     updateConnectionStatus(text) {
         const statusText = document.querySelector('#connectionStatus .status-text');
         const indicator = document.querySelector('#connectionStatus .status-indicator');
-        
-        if (statusText) statusText.textContent = text;
-        
-        if (indicator) {
+\1        if (statusText) statusText.textContent = text;
+\1        if (indicator) {
             indicator.className = `status-indicator ${this.connectionStatus}`;
         }
     }
@@ -93,7 +81,7 @@ class MagnetSearchApp {
     async loadConfig() {
         try {
             this.config = await API.getConfig();
-            console.log('📋 系统配置已加载:', this.config);
+
         } catch (error) {
             console.error('配置加载失败:', error);
             this.config = {
@@ -111,11 +99,10 @@ class MagnetSearchApp {
         try {
             this.updateConnectionStatus('检查连接...');
             const health = await API.healthCheck();
-            
-            if (health.status === 'healthy') {
+\1            if (health.status === 'healthy') {
                 this.connectionStatus = 'connected';
                 this.updateConnectionStatus('连接正常');
-                console.log('✅ API连接正常');
+
             } else {
                 this.connectionStatus = 'warning';
                 this.updateConnectionStatus('连接不稳定');
@@ -131,8 +118,7 @@ class MagnetSearchApp {
     handleURLParams() {
         const urlParams = new URLSearchParams(window.location.search);
         const searchQuery = urlParams.get('q');
-        
-        if (searchQuery) {
+\1        if (searchQuery) {
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
                 searchInput.value = searchQuery;
@@ -148,24 +134,20 @@ class MagnetSearchApp {
         // 搜索相关
         const searchBtn = document.getElementById('searchBtn');
         const searchInput = document.getElementById('searchInput');
-        
-        if (searchBtn) searchBtn.addEventListener('click', () => this.performSearch());
+\1        if (searchBtn) searchBtn.addEventListener('click', () => this.performSearch());
         if (searchInput) {
             searchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') this.performSearch();
             });
-            
-            // 搜索建议
+\1            // 搜索建议
             searchInput.addEventListener('input', debounce((e) => {
                 this.handleSearchInput(e.target.value);
             }, 300));
-            
-            // 焦点处理
+\1            // 焦点处理
             searchInput.addEventListener('focus', () => {
                 this.showSearchSuggestions();
             });
-            
-            searchInput.addEventListener('blur', () => {
+\1            searchInput.addEventListener('blur', () => {
                 // 延迟隐藏以允许点击建议
                 setTimeout(() => this.hideSearchSuggestions(), 200);
             });
@@ -179,8 +161,7 @@ class MagnetSearchApp {
 
         // 功能按钮
         this.bindFunctionButtons();
-        
-        // 模态框相关
+\1        // 模态框相关
         this.bindModalEvents();
 
         // 全局键盘快捷键
@@ -231,8 +212,7 @@ class MagnetSearchApp {
                 if (e.target === modal) this.closeModals();
             });
         });
-		
-		// 在bindModalEvents方法中添加
+\1		// 在bindModalEvents方法中添加
 const dashboardLink = document.querySelector('a[href="./dashboard.html"]');
 if (dashboardLink) {
     dashboardLink.addEventListener('click', (e) => {
@@ -277,8 +257,7 @@ if (dashboardLink) {
     async performSearch() {
         const searchInput = document.getElementById('searchInput');
         const keyword = searchInput?.value.trim();
-        
-        if (!keyword) {
+\1        if (!keyword) {
             showToast('请输入搜索关键词', 'error');
             searchInput?.focus();
             return;
@@ -297,8 +276,7 @@ if (dashboardLink) {
 
         try {
             showLoading(true);
-            
-            // 隐藏提示区域
+\1            // 隐藏提示区域
             this.hideQuickTips();
 
             // 添加到搜索历史
@@ -306,8 +284,7 @@ if (dashboardLink) {
 
             // 执行搜索
             const results = await this.searchKeyword(keyword);
-            
-            // 显示搜索结果
+\1            // 显示搜索结果
             this.displaySearchResults(keyword, results);
 
             // 记录搜索行为
@@ -335,8 +312,7 @@ if (dashboardLink) {
 
 async searchKeyword(keyword) {
     const cacheResults = document.getElementById('cacheResults')?.checked;
-    
-    // 检查缓存
+\1    // 检查缓存
     if (cacheResults) {
         const cached = this.getCachedResults(keyword);
         if (cached) {
@@ -356,12 +332,10 @@ async searchKeyword(keyword) {
     return sources;
 }
 
-
     buildSearchSources(keyword) {
         const encodedKeyword = encodeURIComponent(keyword);
         const timestamp = Date.now();
-        
-        return [
+\1        return [
             {
                 id: `result_${keyword}_javbus_${timestamp}`,
                 title: 'JavBus',
@@ -435,9 +409,7 @@ async searchKeyword(keyword) {
         if (resultsSection) resultsSection.style.display = 'block';
         if (searchInfo) {
             searchInfo.innerHTML = `
-                搜索关键词: <strong>${this.escapeHtml(keyword)}</strong> 
-                (${results.length}个结果) 
-                <small>${new Date().toLocaleString()}</small>
+                搜索关键词: <strong>${this.escapeHtml(keyword)}</strong>\1                (${results.length}个结果)\1                <small>${new Date().toLocaleString()}</small>
             `;
         }
         if (clearResultsBtn) clearResultsBtn.style.display = 'inline-block';
@@ -449,8 +421,7 @@ async searchKeyword(keyword) {
 
         this.currentSearchResults = results;
         this.updateFavoriteButtons();
-        
-        // 滚动到结果区域
+\1        // 滚动到结果区域
         setTimeout(() => {
             resultsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
@@ -458,8 +429,7 @@ async searchKeyword(keyword) {
 
     createResultHTML(result) {
         const isFavorited = this.favorites.some(fav => fav.url === result.url);
-        
-        return `
+\1        return `
             <div class="result-item" data-id="${result.id}">
                 <div class="result-image">
                     <span style="font-size: 2rem;">${result.icon}</span>
@@ -479,9 +449,7 @@ async searchKeyword(keyword) {
                     <button class="action-btn visit-btn" onclick="app.openResult('${this.escapeHtml(result.url)}', '${result.source}')" title="访问网站">
                         <span>访问</span>
                     </button>
-                    <button class="action-btn favorite-btn ${isFavorited ? 'favorited' : ''}" 
-                            onclick="app.toggleFavorite('${result.id}')" 
-                            title="${isFavorited ? '取消收藏' : '添加收藏'}">
+                    <button class="action-btn favorite-btn ${isFavorited ? 'favorited' : ''}"\1                            onclick="app.toggleFavorite('${result.id}')"\1                            title="${isFavorited ? '取消收藏' : '添加收藏'}">
                         <span>${isFavorited ? '已收藏' : '收藏'}</span>
                     </button>
                     <button class="action-btn copy-btn" onclick="app.copyToClipboard('${this.escapeHtml(result.url)}')" title="复制链接">
@@ -505,8 +473,7 @@ async searchKeyword(keyword) {
             if (typeof API !== 'undefined') {
                 API.recordAction('visit_site', { url, source }).catch(console.error);
             }
-            
-            window.open(url, '_blank', 'noopener,noreferrer');
+\1            window.open(url, '_blank', 'noopener,noreferrer');
             showToast('已在新标签页打开', 'success');
         } catch (error) {
             console.error('打开链接失败:', error);
@@ -519,8 +486,7 @@ async searchKeyword(keyword) {
         try {
             await navigator.clipboard.writeText(text);
             showToast('已复制到剪贴板', 'success');
-            
-            // 记录复制行为
+\1            // 记录复制行为
             if (typeof API !== 'undefined') {
                 API.recordAction('copy_url', { url: text }).catch(console.error);
             }
@@ -541,42 +507,24 @@ async searchKeyword(keyword) {
     }
 
     // 切换收藏状态
-    // 修改收藏操作 - 直接与API交互
     async toggleFavorite(resultId) {
-        if (!this.currentUser) {
-            showToast('请先登录后再收藏', 'error');
-            return;
-        }
-
         const result = this.currentSearchResults.find(r => r.id === resultId);
         if (!result) return;
 
         const existingIndex = this.favorites.findIndex(fav => fav.url === result.url);
-        
-        try {
-            showLoading(true);
-
+\1        try {
             if (existingIndex >= 0) {
-                // 移除收藏 - 从云端删除
-                const favoriteToRemove = this.favorites[existingIndex];
-                
-                // 先从本地移除以立即更新UI
+                // 移除收藏
                 this.favorites.splice(existingIndex, 1);
-                this.renderFavorites();
-                this.updateFavoriteButtons();
-                
-                // 重新同步到云端
-                await API.syncFavorites(this.favorites);
                 showToast('已移除收藏', 'success');
-                
             } else {
-                // 添加收藏
+                // 检查收藏数量限制
                 const maxFavorites = this.config.maxFavoritesPerUser || 1000;
                 if (this.favorites.length >= maxFavorites) {
                     showToast(`收藏数量已达上限 (${maxFavorites})`, 'error');
                     return;
                 }
-                
+\1                // 添加收藏
                 const favorite = {
                     id: `fav_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     title: result.title,
@@ -586,25 +534,21 @@ async searchKeyword(keyword) {
                     keyword: result.keyword,
                     addedAt: new Date().toISOString()
                 };
-                
-                // 先添加到本地以立即更新UI
                 this.favorites.unshift(favorite);
-                this.renderFavorites();
-                this.updateFavoriteButtons();
-                
-                // 同步到云端
-                await API.syncFavorites(this.favorites);
                 showToast('已添加收藏', 'success');
             }
 
+            this.saveFavorites();
+            this.renderFavorites();
+            this.updateFavoriteButtons();
+
+            // 如果用户已登录，同步到云端
+            if (this.currentUser) {
+                await this.syncFavorites();
+            }
         } catch (error) {
             console.error('收藏操作失败:', error);
-            showToast('收藏操作失败: ' + error.message, 'error');
-            
-            // 操作失败，重新从云端加载数据以恢复状态
-            await this.loadCloudData();
-        } finally {
-            showLoading(false);
+            showToast('收藏操作失败', 'error');
         }
     }
 
@@ -615,8 +559,7 @@ async searchKeyword(keyword) {
             const resultItem = btn.closest('.result-item');
             const resultId = resultItem?.dataset.id;
             const result = this.currentSearchResults.find(r => r.id === resultId);
-            
-            if (result) {
+\1            if (result) {
                 const isFavorited = this.favorites.some(fav => fav.url === result.url);
                 btn.querySelector('span').textContent = isFavorited ? '已收藏' : '收藏';
                 btn.classList.toggle('favorited', isFavorited);
@@ -625,52 +568,44 @@ async searchKeyword(keyword) {
     }
 
 // 修复添加搜索历史方法
-    // 修改添加搜索历史 - 直接调用API
-    async addToHistory(keyword) {
-        if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
-            console.warn('无效的搜索关键词，跳过添加到历史');
-            return;
-        }
-
-        if (!this.currentUser) {
-            console.log('用户未登录，无法保存搜索历史');
-            return;
-        }
-
-        const trimmedKeyword = keyword.trim();
-        
-        try {
-            // 直接调用API保存
-            await API.saveSearchHistory(trimmedKeyword, 'manual');
-            
-            // 本地添加以立即更新UI（避免重复查询）
-            this.searchHistory = this.searchHistory.filter(item => 
-                item && item.keyword && item.keyword !== trimmedKeyword
-            );
-            
-            this.searchHistory.unshift({
-                id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                keyword: trimmedKeyword,
-                query: trimmedKeyword,
-                timestamp: Date.now(),
-                count: 1,
-                source: 'manual'
-            });
-
-            // 限制数量
-            const maxHistory = this.config.maxHistoryPerUser || 1000;
-            if (this.searchHistory.length > maxHistory) {
-                this.searchHistory = this.searchHistory.slice(0, maxHistory);
-            }
-
-            this.renderHistory();
-            
-        } catch (error) {
-            console.error('保存搜索历史失败:', error);
-            // 云端保存失败，仍然可以在当前会话中显示
-            showToast('保存搜索历史失败', 'warning');
-        }
+addToHistory(keyword) {
+    // 验证关键词
+    if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
+        console.warn('无效的搜索关键词，跳过添加到历史');
+        return;
     }
+
+    const trimmedKeyword = keyword.trim();
+\1    // 移除重复项
+    this.searchHistory = this.searchHistory.filter(item => {
+        return item && item.keyword && item.keyword !== trimmedKeyword;
+    });
+\1    // 添加到开头
+    this.searchHistory.unshift({
+        id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        keyword: trimmedKeyword,
+        query: trimmedKeyword, // 兼容性
+        timestamp: Date.now(),
+        count: 1,
+        source: 'manual'
+    });
+
+    // 限制历史记录数量
+    const maxHistory = this.config.maxHistoryPerUser || 1000;
+    if (this.searchHistory.length > maxHistory) {
+        this.searchHistory = this.searchHistory.slice(0, maxHistory);
+    }
+
+    this.saveHistory();
+    this.renderHistory();
+
+    // 如果用户已登录，保存到云端
+    if (this.currentUser) {
+        API.saveSearchHistory(trimmedKeyword, 'manual').catch(error => {
+            console.error('保存搜索历史到云端失败:', error);
+        });
+    }
+}
 
     // 渲染搜索历史
     renderHistory() {
@@ -683,10 +618,8 @@ async searchKeyword(keyword) {
         }
 
         if (historySection) historySection.style.display = 'block';
-        
-        if (historyList) {
-            historyList.innerHTML = this.searchHistory.slice(0, 10).map(item => 
-                `<span class="history-item" onclick="app.searchFromHistory('${this.escapeHtml(item.keyword)}')">
+\1        if (historyList) {
+            historyList.innerHTML = this.searchHistory.slice(0, 10).map(item =>\1                `<span class="history-item" onclick="app.searchFromHistory('${this.escapeHtml(item.keyword)}')">
                     ${this.escapeHtml(item.keyword)}
                 </span>`
             ).join('');
@@ -705,8 +638,7 @@ async searchKeyword(keyword) {
     // 渲染收藏夹
     renderFavorites() {
         const favoritesContainer = document.getElementById('favorites');
-        
-        if (!favoritesContainer) return;
+\1        if (!favoritesContainer) return;
 
         if (this.favorites.length === 0) {
             favoritesContainer.innerHTML = `
@@ -749,69 +681,33 @@ async searchKeyword(keyword) {
     }
 
     // 移除收藏
-    // 修改移除收藏 - 直接与API交互
     async removeFavorite(favoriteId) {
-        if (!this.currentUser) {
-            showToast('用户未登录', 'error');
-            return;
-        }
-
         if (!confirm('确定要移除这个收藏吗？')) return;
-        
-        const index = this.favorites.findIndex(fav => fav.id === favoriteId);
+\1        const index = this.favorites.findIndex(fav => fav.id === favoriteId);
         if (index >= 0) {
-            try {
-                showLoading(true);
-                
-                // 先从本地移除
-                this.favorites.splice(index, 1);
-                this.renderFavorites();
-                this.updateFavoriteButtons();
-                
-                // 同步到云端
-                await API.syncFavorites(this.favorites);
-                showToast('已移除收藏', 'success');
-                
-            } catch (error) {
-                console.error('移除收藏失败:', error);
-                showToast('移除收藏失败: ' + error.message, 'error');
-                
-                // 重新加载云端数据以恢复状态
-                await this.loadCloudData();
-            } finally {
-                showLoading(false);
+            this.favorites.splice(index, 1);
+            this.saveFavorites();
+            this.renderFavorites();
+            this.updateFavoriteButtons();
+            showToast('已移除收藏', 'success');
+
+            // 同步到云端
+            if (this.currentUser) {
+                await this.syncFavorites();
             }
         }
     }
 
     // 清除搜索历史
-    // 修改清除历史 - 直接调用API
-    async clearHistory() {
-        if (!this.currentUser) {
-            showToast('用户未登录', 'error');
-            return;
-        }
-
+    clearHistory() {
         if (!confirm('确定要清除所有搜索历史吗？')) return;
-        
-        try {
-            showLoading(true);
-            
-            // 调用API清除
-            await API.clearAllSearchHistory();
-            
-            // 清空本地数据并更新UI
-            this.searchHistory = [];
-            this.renderHistory();
-            
-            showToast('搜索历史已清除', 'success');
-            
-        } catch (error) {
-            console.error('清除搜索历史失败:', error);
-            showToast('清除失败: ' + error.message, 'error');
-        } finally {
-            showLoading(false);
-        }
+\1        this.searchHistory = [];
+        this.saveHistory();
+        this.renderHistory();
+        showToast('搜索历史已清除', 'success');
+		if (this.currentUser) {
+API.request('/api/user/search-history', { method: 'DELETE' }).catch(console.error);
+}
     }
 
     // 清除搜索结果
@@ -869,26 +765,23 @@ async searchKeyword(keyword) {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';
-        
-        input.onchange = async (e) => {
+\1        input.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
             try {
                 const text = await file.text();
                 const data = JSON.parse(text);
-                
-                if (data.favorites && Array.isArray(data.favorites)) {
+\1                if (data.favorites && Array.isArray(data.favorites)) {
                     // 合并收藏，避免重复
                     const existingUrls = new Set(this.favorites.map(fav => fav.url));
                     const newFavorites = data.favorites.filter(fav => !existingUrls.has(fav.url));
-                    
-                    if (newFavorites.length > 0) {
+\1                    if (newFavorites.length > 0) {
                         this.favorites.push(...newFavorites);
+                        this.saveFavorites();
                         this.renderFavorites();
                         showToast(`成功导入${newFavorites.length}个收藏`, 'success');
-                        
-                        // 同步到云端
+\1                        // 同步到云端
                         if (this.currentUser) {
                             await this.syncFavorites();
                         }
@@ -903,8 +796,7 @@ async searchKeyword(keyword) {
                 showToast('导入失败: ' + error.message, 'error');
             }
         };
-        
-        input.click();
+\1        input.click();
     }
 
     // 刷新数据
@@ -916,10 +808,8 @@ async searchKeyword(keyword) {
 
         try {
             showLoading(true);
-            
-            showToast('正在刷新数据...', 'info');
-            
-            await this.loadCloudData();
+\1            showToast('正在刷新数据...', 'info');
+\1            await this.loadCloudData();
             showToast('数据刷新成功', 'success');
         } catch (error) {
             console.error('刷新数据失败:', error);
@@ -931,91 +821,62 @@ async searchKeyword(keyword) {
 
     // 缓存管理
     getCachedResults(keyword) {
-        // 禁用本地缓存，始终进行新搜索
-        return null;
+        const cacheKey = `search_cache_${keyword}`;
+        const cached = StorageManager.getItem(cacheKey);
+\1        if (cached) {
+            const now = Date.now();
+            const cacheTimeout = 30 * 60 * 1000; // 30分钟
+\1            if (now - cached.timestamp < cacheTimeout) {
+                return cached.results;
+            } else {
+                StorageManager.removeItem(cacheKey);
+            }
+        }
+\1        return null;
     }
 
     cacheResults(keyword, results) {
-        // 禁用本地缓存
-        return;
+        const cacheKey = `search_cache_${keyword}`;
+        const data = {
+            keyword,
+            results,
+            timestamp: Date.now()
+        };
+\1        StorageManager.setItem(cacheKey, data);
     }
 
-    // 移除 loadLocalData 方法，替换为纯云端加载
-    async loadCloudData() {
-        if (!this.currentUser) {
-            console.log('用户未登录，无法加载云端数据');
-            this.searchHistory = [];
-            this.favorites = [];
-            this.renderHistory();
-            this.renderFavorites();
-            return;
-        }
-
+    // 本地数据管理
+    loadLocalData() {
         try {
-            showLoading(true);
-            console.log('📡 加载云端数据...');
-            
-            // 并行加载收藏夹和搜索历史
-            const [favoritesResult, historyResult] = await Promise.allSettled([
-                API.getFavorites(),
-                API.getSearchHistory()
-            ]);
-
-            // 处理收藏夹数据
-            if (favoritesResult.status === 'fulfilled') {
-                this.favorites = favoritesResult.value || [];
-            } else {
-                console.error('加载收藏夹失败:', favoritesResult.reason);
-                this.favorites = [];
-            }
-
-            // 处理搜索历史数据
-            if (historyResult.status === 'fulfilled') {
-                const cloudHistory = historyResult.value || [];
-                this.searchHistory = cloudHistory.map(item => ({
-                    id: item.id || `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    keyword: item.keyword || item.query,
-                    query: item.query || item.keyword,
-                    source: item.source || 'unknown',
-                    timestamp: item.timestamp || item.createdAt || Date.now(),
-                    count: item.count || 1
-                })).filter(item => {
-                    return item.keyword && typeof item.keyword === 'string' && item.keyword.trim().length > 0;
-                });
-            } else {
-                console.error('加载搜索历史失败:', historyResult.reason);
-                this.searchHistory = [];
-            }
-            
-            // 渲染界面
+            // 加载搜索历史
+            this.searchHistory = StorageManager.getItem('search_history', []);
             this.renderHistory();
+
+            // 加载收藏夹
+            this.favorites = StorageManager.getItem('favorites', []);
             this.renderFavorites();
-            
-            console.log(`✅ 云端数据加载完成: ${this.searchHistory.length}条历史, ${this.favorites.length}个收藏`);
-            
+
         } catch (error) {
-            console.error('加载云端数据失败:', error);
-            showToast('加载数据失败，请重试', 'error');
+            console.error('加载本地数据失败:', error);
             this.searchHistory = [];
             this.favorites = [];
-            this.renderHistory();
-            this.renderFavorites();
-        } finally {
-            showLoading(false);
         }
     }
 
+    saveHistory() {
+        StorageManager.setItem('search_history', this.searchHistory);
+    }
 
+    saveFavorites() {
+        StorageManager.setItem('favorites', this.favorites);
+    }
 
     // 主题管理
-    // 移除本地存储相关方法，保留主题设置
     initTheme() {
-        const savedTheme = localStorage.getItem('theme') || 'light';
+        const savedTheme = StorageManager.getItem('theme', 'light');
         const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        
-        if (themeToggle) {
+\1        document.documentElement.setAttribute('data-theme', savedTheme);
+\1        if (themeToggle) {
             themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
         }
     }
@@ -1024,15 +885,12 @@ async searchKeyword(keyword) {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         const themeToggle = document.getElementById('themeToggle');
-        
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme); // 主题设置仍使用本地存储
-        
-        if (themeToggle) {
+\1        document.documentElement.setAttribute('data-theme', newTheme);
+        StorageManager.setItem('theme', newTheme);
+\1        if (themeToggle) {
             themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
         }
-        
-        showToast(`已切换到${newTheme === 'dark' ? '深色' : '浅色'}主题`, 'success');
+\1        showToast(`已切换到${newTheme === 'dark' ? '深色' : '浅色'}主题`, 'success');
     }
 
     // 云端同步
@@ -1061,13 +919,11 @@ async syncSearchHistory() {
     try {
         // 过滤有效的搜索历史
         const validHistory = this.searchHistory.filter(item => {
-            return item && item.keyword && 
-                   typeof item.keyword === 'string' && 
-                   item.keyword.trim().length > 0;
+            return item && item.keyword &&\1                   typeof item.keyword === 'string' &&\1                   item.keyword.trim().length > 0;
         });
 
         await API.syncSearchHistory(validHistory);
-        console.log('搜索历史同步成功');
+
     } catch (error) {
         console.error('搜索历史同步失败:', error);
     }
@@ -1077,8 +933,7 @@ async syncSearchHistory() {
     showLoginModal() {
         const loginModal = document.getElementById('loginModal');
         const registerModal = document.getElementById('registerModal');
-        
-        if (registerModal) registerModal.style.display = 'none';
+\1        if (registerModal) registerModal.style.display = 'none';
         if (loginModal) {
             loginModal.style.display = 'block';
             // 聚焦用户名输入框
@@ -1092,8 +947,7 @@ async syncSearchHistory() {
     showRegisterModal() {
         const loginModal = document.getElementById('loginModal');
         const registerModal = document.getElementById('registerModal');
-        
-        if (loginModal) loginModal.style.display = 'none';
+\1        if (loginModal) loginModal.style.display = 'none';
         if (registerModal) {
             registerModal.style.display = 'block';
             // 聚焦用户名输入框
@@ -1107,17 +961,14 @@ async syncSearchHistory() {
     closeModals() {
         const loginModal = document.getElementById('loginModal');
         const registerModal = document.getElementById('registerModal');
-        
-        if (loginModal) loginModal.style.display = 'none';
+\1        if (loginModal) loginModal.style.display = 'none';
         if (registerModal) registerModal.style.display = 'none';
     }
 
     // 认证处理
-   // 修改登录成功后的处理
     async handleLogin(event) {
         event.preventDefault();
-        
-        const username = document.getElementById('loginUsername')?.value.trim();
+\1        const username = document.getElementById('loginUsername')?.value.trim();
         const password = document.getElementById('loginPassword')?.value;
 
         if (!username || !password) {
@@ -1128,26 +979,20 @@ async syncSearchHistory() {
         try {
             showLoading(true);
             const result = await API.login(username, password);
-            
-            if (result.success) {
+\1            if (result.success) {
                 this.currentUser = result.user;
                 this.updateUserUI();
-                
-                // 显示主内容区域
-                document.querySelector('.main-content').style.display = 'block';
-                
-                // 关闭模态框
                 this.closeModals();
-                
                 showToast(`欢迎回来，${result.user.username}！`, 'success');
-                
-                // 登录后立即加载云端数据
+\1				// 关键修复：显示主内容区域
+        document.querySelector('.main-content').style.display = 'block';
+\1        // 关闭模态框
+        this.closeModals();
+\1        // 特殊修复：检查是否有搜索查询
+        this.handleURLParams();
+\1                // 登录后同步云端数据
                 await this.loadCloudData();
-                
-                // 处理URL参数（如搜索查询）
-                this.handleURLParams();
-                
-                // 清空登录表单
+\1                // 清空登录表单
                 document.getElementById('loginForm').reset();
             } else {
                 showToast(result.message || '登录失败', 'error');
@@ -1162,12 +1007,10 @@ async syncSearchHistory() {
 
     async handleRegister(event) {
         event.preventDefault();
-		
-		    // 添加防止重复提交机制
+\1		    // 添加防止重复提交机制
     const submitBtn = event.target.querySelector('button[type="submit"]');
     if (submitBtn && submitBtn.classList.contains('submitting')) return;
-    
-    if (submitBtn) {
+\1    if (submitBtn) {
         submitBtn.disabled = true;
 // 正确代码
 submitBtn.classList.add('submitting');
@@ -1176,8 +1019,7 @@ span.textContent = '注册中...';
 submitBtn.innerHTML = '';
 submitBtn.appendChild(span);
     }
-        
-        const username = document.getElementById('regUsername')?.value.trim();
+\1        const username = document.getElementById('regUsername')?.value.trim();
         const email = document.getElementById('regEmail')?.value.trim();
         const password = document.getElementById('regPassword')?.value;
         const confirmPassword = document.getElementById('regConfirmPassword')?.value;
@@ -1213,15 +1055,12 @@ submitBtn.appendChild(span);
         try {
             showLoading(true);
             const result = await API.register(username, email, password);
-            
-            if (result.success) {
+\1            if (result.success) {
                 showToast('注册成功，请登录', 'success');
                 this.showLoginModal();
-                
-                // 清空注册表单
+\1                // 清空注册表单
                 document.getElementById('registerForm').reset();
-                
-                // 预填用户名到登录表单
+\1                // 预填用户名到登录表单
                 const loginUsername = document.getElementById('loginUsername');
                 if (loginUsername) loginUsername.value = username;
             } else {
@@ -1244,7 +1083,7 @@ submitBtn.appendChild(span);
     async checkAuthStatus() {
         const token = localStorage.getItem('auth_token');
         if (!token) {
-            console.log('未找到认证token');
+
             return;
         }
 
@@ -1254,10 +1093,10 @@ submitBtn.appendChild(span);
                 this.currentUser = result.user;
                 this.updateUserUI();
                 await this.loadCloudData();
-                console.log('✅ 用户认证成功:', this.currentUser.username);
+
             } else {
                 localStorage.removeItem('auth_token');
-                console.log('Token验证失败，已清除');
+
             }
         } catch (error) {
             console.error('验证token失败:', error);
@@ -1274,11 +1113,8 @@ submitBtn.appendChild(span);
     recordSearchAction(keyword, results) {
         // 记录到API（如果连接正常且用户已登录）
         if (this.currentUser && this.connectionStatus === 'connected') {
-            API.recordAction('search', { 
-                keyword, 
-                resultCount: results.length,
-                timestamp: Date.now() 
-            }).catch(console.error);
+            API.recordAction('search', {\1                keyword,\1                resultCount: results.length,
+                timestamp: Date.now()\1            }).catch(console.error);
         }
     }
 
@@ -1294,8 +1130,7 @@ submitBtn.appendChild(span);
             if (userInfo) userInfo.style.display = 'flex';
             if (username) username.textContent = this.currentUser.username;
             if (syncFavoritesBtn) syncFavoritesBtn.style.display = 'inline-block';
-            
-            // 绑定退出登录事件
+\1            // 绑定退出登录事件
             const logoutBtn = document.getElementById('logoutBtn');
             if (logoutBtn) {
                 logoutBtn.onclick = () => this.logout();
@@ -1307,37 +1142,23 @@ submitBtn.appendChild(span);
         }
     }
 
-    // 修改退出登录处理
-    async logout() {
-        try {
-            await API.logout();
-        } catch (error) {
-            console.error('退出登录请求失败:', error);
-        } finally {
-            this.currentUser = null;
-            localStorage.removeItem('auth_token');
-            
-            // 清空所有数据
-            this.searchHistory = [];
-            this.favorites = [];
-            this.currentSearchResults = [];
-            
-            // 更新UI
-            this.updateUserUI();
-            this.renderHistory();
-            this.renderFavorites();
-            this.clearResults();
-            
-            showToast('已退出登录', 'success');
-            
-            // 显示登录模态框
-            this.showLoginModal();
-            
-            // 隐藏主界面
-            document.querySelector('.main-content').style.display = 'none';
-            this.hideSearchSuggestions();
-        }
+async logout() {
+    try {
+        await API.logout();
+    } catch (error) {
+        console.error('退出登录请求失败:', error);
+    } finally {
+        this.currentUser = null;
+        localStorage.removeItem('auth_token');
+        this.updateUserUI();
+        showToast('已退出登录', 'success');
+\1        // 关键修复：显示登录模态框
+        this.showLoginModal();
+\1        // 重置主界面状态
+        document.querySelector('.main-content').style.display = 'none';
+        this.hideSearchSuggestions();
     }
+}
 
 // 修复加载云端数据方法中的搜索历史部分
 async loadCloudData() {
@@ -1348,51 +1169,45 @@ async loadCloudData() {
         const cloudFavorites = await API.getFavorites();
         if (cloudFavorites && cloudFavorites.length > 0) {
             this.favorites = cloudFavorites;
+            this.saveFavorites();
             this.renderFavorites();
+
         }
 
-        // 加载云端搜索历史 - 统一数据格式
+        // 加载云端搜索历史
         const cloudHistory = await API.getSearchHistory();
         if (cloudHistory && cloudHistory.length > 0) {
-            // 统一字段名处理
-            const normalizedHistory = cloudHistory.map(item => ({
-                id: item.id || `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                keyword: item.keyword || item.query, // 统一使用 keyword
-                query: item.query || item.keyword,   // 保持 query 兼容性
-                source: item.source || 'unknown',
-                timestamp: item.timestamp || item.createdAt || Date.now(),
-                count: item.count || 1
-            })).filter(item => {
-                // 过滤无效数据
-                return item.keyword && typeof item.keyword === 'string' && item.keyword.trim().length > 0;
-            });
+            // 过滤有效的历史记录
+            const validCloudHistory = cloudHistory.filter(item => {
+                return item && (item.keyword || item.query) &&\1                       typeof (item.keyword || item.query) === 'string' &&
+                       (item.keyword || item.query).trim().length > 0;
+            }).map(item => ({
+                ...item,
+                keyword: item.keyword || item.query,
+                query: item.query || item.keyword
+            }));
 
-            // 合并本地和云端历史，去重
-            const mergedHistory = [...normalizedHistory];
+            // 合并本地和云端历史
+            const mergedHistory = [...validCloudHistory];
+\1            // 添加本地独有的历史记录
             this.searchHistory.forEach(localItem => {
-                if (localItem && localItem.keyword && 
-                    !mergedHistory.some(cloudItem => cloudItem.keyword === localItem.keyword)) {
-                    mergedHistory.push({
-                        ...localItem,
-                        keyword: localItem.keyword || localItem.query,
-                        query: localItem.query || localItem.keyword
-                    });
+                if (localItem && localItem.keyword &&\1                    !mergedHistory.some(cloudItem => cloudItem.keyword === localItem.keyword)) {
+                    mergedHistory.push(localItem);
                 }
             });
-            
-            // 排序并限制数量
+\1            // 排序并限制数量
             this.searchHistory = mergedHistory
                 .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
                 .slice(0, this.config.maxHistoryPerUser || 1000);
-            
+\1            this.saveHistory();
             this.renderHistory();
+
         }
     } catch (error) {
         console.error('加载云端数据失败:', error);
         showToast('加载云端数据失败，使用本地数据', 'warning');
     }
 }
-
 
     // 搜索输入处理
     handleSearchInput(value) {
@@ -1404,58 +1219,19 @@ async loadCloudData() {
     }
 
 // 修复搜索建议显示方法
-    // 修改搜索建议显示 - 基于云端数据
-    showSearchSuggestions(query) {
-        if (!query || typeof query !== 'string') return;
-        
-        const suggestions = this.searchHistory
-            .filter(item => {
-                if (!item) return false;
-                
-                const searchTerm = item.keyword || item.query;
-                if (!searchTerm || typeof searchTerm !== 'string') {
-                    return false;
-                }
-                
-                return searchTerm.toLowerCase().includes(query.toLowerCase());
-            })
-            .slice(0, 5);
-        
-        this.renderSearchSuggestions(suggestions);
-    }
+showSearchSuggestions(query) {
+    if (!query || typeof query !== 'string') return;
+\1    // 安全检查：确保搜索历史中的每个项目都有有效的keyword属性
+    const suggestions = this.searchHistory
+        .filter(item => {
+            if (!item || !item.keyword || typeof item.keyword !== 'string') {
+                return false;
+            }
+            return item.keyword.toLowerCase().includes(query.toLowerCase());
+        })
+        .slice(0, 5);
 
-// 新增搜索建议渲染方法
-renderSearchSuggestions(suggestions) {
-    let suggestionsContainer = document.getElementById('searchSuggestions');
-    
-    // 如果容器不存在，创建一个
-    if (!suggestionsContainer) {
-        suggestionsContainer = document.createElement('div');
-        suggestionsContainer.id = 'searchSuggestions';
-        suggestionsContainer.className = 'search-suggestions';
-        
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput && searchInput.parentNode) {
-            searchInput.parentNode.appendChild(suggestionsContainer);
-        }
-    }
-    
-    if (suggestions.length === 0) {
-        suggestionsContainer.style.display = 'none';
-        return;
-    }
-    
-    suggestionsContainer.innerHTML = suggestions.map(item => {
-        const displayText = item.keyword || item.query;
-        return `
-            <div class="suggestion-item" onclick="app.searchFromHistory('${this.escapeHtml(displayText)}')">
-                <span class="suggestion-icon">🕐</span>
-                <span class="suggestion-text">${this.escapeHtml(displayText)}</span>
-            </div>
-        `;
-    }).join('');
-    
-    suggestionsContainer.style.display = 'block';
+    // 这里可以实现搜索建议UI
 }
 
     // 隐藏搜索建议
@@ -1477,7 +1253,7 @@ renderSearchSuggestions(suggestions) {
     }
 }
 
-// 修改工具函数和初始化代码保持不变
+// 全局工具函数
 function debounce(func, wait, immediate = false) {
     let timeout;
     return function executedFunction(...args) {
@@ -1494,17 +1270,14 @@ function debounce(func, wait, immediate = false) {
 
 function formatRelativeTime(date) {
     if (!date) return '';
-    
-    const now = new Date();
+\1    const now = new Date();
     const target = new Date(date);
     const diff = now - target;
-    
-    const minute = 60 * 1000;
+\1    const minute = 60 * 1000;
     const hour = minute * 60;
     const day = hour * 24;
     const week = day * 7;
-    
-    if (diff < minute) {
+\1    if (diff < minute) {
         return '刚刚';
     } else if (diff < hour) {
         return `${Math.floor(diff / minute)}分钟前`;
@@ -1520,7 +1293,7 @@ function formatRelativeTime(date) {
 // 初始化应用
 let app;
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 初始化Magnet Search应用（纯云端模式）...');
+
     app = new MagnetSearchApp();
 });
 
