@@ -37,21 +37,18 @@ class APIService {
 
 async request(endpoint, options = {}) {
 	
-	    // 添加请求签名
-    const timestamp = Date.now();
-    const signature = await this.generateRequestSignature(endpoint, options, timestamp);
-    
-    const headers = {
-      'X-Request-Timestamp': timestamp,
-      'X-Request-Signature': signature,
-      ...options.headers
-    };
-	
     const url = `${this.baseURL}${endpoint}`;
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers
     };
+	
+		    // 添加请求签名
+    const timestamp = Date.now();
+    const signature = await this.generateRequestSignature(endpoint, options, timestamp);
+        // 添加到已存在的 headers 对象
+    headers['X-Request-Timestamp'] = timestamp;
+    headers['X-Request-Signature'] = signature;
 
     if (this.token) {
         headers['Authorization'] = `Bearer ${this.token}`;

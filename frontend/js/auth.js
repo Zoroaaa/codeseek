@@ -426,7 +426,6 @@ class AuthManager {
     }
     
     return { valid: true };
-  }
 },
 
     // 验证搜索关键词
