@@ -10,15 +10,17 @@
     <title>磁力快搜 - 专业版</title>
     
     <!-- 预加载关键资源 -->
-    <link rel="preload" href="css/variables.css" as="style">
-    <link rel="preload" href="css/base.css" as="style">
+    <link rel="preload" href="/css/variables.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="/css/base.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+</noscript>
     
     <!-- 样式文件 -->
-    <link rel="stylesheet" href="css/variables.css">
-    <link rel="stylesheet" href="css/base.css">
-    <link rel="stylesheet" href="css/components.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/pages/index.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/pages/index.css">
     
     <!-- PWA配置 -->
 <!--     <link rel="manifest" href="manifest.json">
