@@ -72,7 +72,7 @@
                                     </svg>
                                 </button>
                                 <div class="dropdown-content" role="menu">
-                                    <a href="#" role="menuitem" onclick="navigateToDashboard(); return false;">个人中心</a>
+                                    <a id="userCenterLink">个人中心</a>
                                     <a href="#" role="menuitem" id="logoutBtn">退出登录</a>
                                 </div>
                             </div>
@@ -392,6 +392,14 @@
 
     <!-- ES6 模块化脚本 -->
     <script type="module" src="/src/main.js"></script>
+	<script type="module">
+  import { navigateToDashboard } from './src/modules/navigation/navigation-manager.js';
+
+  document.getElementById("userCenterLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    navigateToDashboard();
+  });
+</script>
     
     <!-- 非模块浏览器的降级处理 -->
     <script nomodule>
