@@ -1,6 +1,7 @@
 // 临时替换main.js内容进行测试
 // 逐步添加import来找出问题模块
-
+// 测试1：添加error-handler
+import { errorHandler } from './shared/error-handler.js';
 console.log('开始最小化测试...');
 
 // 第一步：测试基本功能
