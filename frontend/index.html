@@ -30,7 +30,7 @@
     <script>
         // 环境变量配置
         window.ENV_CONFIG = {
-            API_BASE_URL: typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined,
+            API_BASE_URL: typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : 'https://codeseek.zadi.workers.dev',
             APP_NAME: typeof process !== 'undefined' && process.env ? process.env.APP_NAME : '磁力快搜',
             APP_VERSION: typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : '1.1.0',
             ENABLE_ANALYTICS: typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : false,
