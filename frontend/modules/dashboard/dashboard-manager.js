@@ -3,7 +3,7 @@ import { favoritesManager } from '../favorites/favorites-manager.js';
 import { searchManager } from '../search/search-manager.js';
 import { apiClient } from '../api/api-client.js';
 import { modal } from '../ui/modal.js';
-import { toast } from '../utils/toast.js';
+import { toast } from '../ui/toast.js';
 import { loading } from '../ui/loading.js';
 import { themeManager } from '../ui/theme-manager.js';
 import { APP_CONSTANTS, EVENT_NAMES } from '../../shared/constants.js';

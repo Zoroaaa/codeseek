@@ -1,5 +1,5 @@
 import { isDevEnv } from '../utils/common.js';
-import { toast } from '../utils/toast.js';
+import { toast } from '../ui/toast.js';
 import { loading } from '../ui/loading.js';
 import { APP_CONSTANTS } from '../../shared/constants.js';
 
