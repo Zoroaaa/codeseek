@@ -8,8 +8,6 @@ import { configManager } from './modules/core/config.js';
 // 测试3：添加页面应用
 import { indexApp } from './pages/index-app.js';
 
-// 测试4：添加dashboard
-import { dashboardApp } from './pages/dashboard-app.js';
 console.log('开始最小化测试...');
 
 // 第一步：测试基本功能
