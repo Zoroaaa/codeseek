@@ -425,43 +425,7 @@
     </div>
 
     <!-- ES6 模块化脚本 -->
-    <script type="module">
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', async () => {
-            console.log('🚀 初始化仪表板...');
+	    <script type="module" src="./main.js"></script>
 
-            try {
-                // 动态导入配置
-                const { CONFIG } = await import('./modules/core/config.js');
-                
-                // 更新页面标题和品牌名称
-                const appName = CONFIG.APP_NAME || '磁力快搜';
-                document.getElementById('page-title').textContent = `用户面板 - ${appName}`;
-                document.getElementById('brand-text').textContent = appName;
-                
-                // 检查用户是否已登录
-                const { AuthManager } = await import('./modules/auth/auth-manager.js');
-                const authManager = new AuthManager();
-                
-                if (!authManager.isLoggedIn()) {
-                    // 未登录，重定向到首页
-                    window.location.href = './index.html';
-                    return;
-                }
-                
-                // 创建仪表板应用实例
-                const { DashboardApp } = await import('./pages/dashboard-app.js');
-                window.app = new DashboardApp();
-                
-                console.log('✅ 仪表板初始化完成');
-            } catch (error) {
-                console.error('❌ 仪表板初始化失败:', error);
-                
-                // 显示错误信息
-                const { showToast } = await import('./modules/ui/toast.js');
-                showToast('仪表板初始化失败，请刷新页面重试', 'error');
-            }
-        });
-    </script>
 </body>
 </html>
