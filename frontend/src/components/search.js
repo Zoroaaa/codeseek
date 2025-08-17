@@ -22,10 +22,22 @@ export class SearchManager {
       await this.loadSearchHistory();
       this.bindEvents();
       this.handleURLParams();
+	  this.exposeGlobalMethods(); // 🔧 新增：暴露全局方法
       this.isInitialized = true;
     } catch (error) {
       console.error('搜索管理器初始化失败:', error);
     }
+  }
+  
+    // 🔧 新增：暴露必要的全局方法
+  exposeGlobalMethods() {
+    // 暴露到window对象，供HTML内联事件使用
+    window.searchManager = {
+      openResult: (url, source) => this.openResult(url, source),
+      toggleFavorite: (resultId) => this.toggleFavorite(resultId),
+      copyToClipboard: (text) => this.copyToClipboard(text),
+      searchFromHistory: (keyword) => this.searchFromHistory(keyword)
+    };
   }
 
   // 绑定事件
@@ -45,7 +57,6 @@ export class SearchManager {
         if (e.key === 'Enter') this.performSearch();
       });
 
-      // 搜索建议
       searchInput.addEventListener('input', debounce((e) => {
         this.handleSearchInput(e.target.value);
       }, 300));
@@ -71,14 +82,12 @@ export class SearchManager {
       clearHistoryBtn.addEventListener('click', () => this.clearAllHistory());
     }
 
-    // 绑定键盘快捷键
     this.bindKeyboardShortcuts();
   }
 
   // 绑定键盘快捷键
   bindKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-      // Ctrl/Cmd + K 聚焦搜索框
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         const searchInput = document.getElementById('searchInput');
@@ -88,7 +97,6 @@ export class SearchManager {
         }
       }
 
-      // Escape 关闭搜索建议
       if (e.key === 'Escape') {
         this.hideSearchSuggestions();
       }
@@ -161,7 +169,7 @@ export class SearchManager {
     }
   }
 
-  // 显示搜索结果
+  // 显示搜索结果 (修复事件绑定)
   displaySearchResults(keyword, results) {
     const resultsSection = document.getElementById('resultsSection');
     const searchInfo = document.getElementById('searchInfo');
@@ -184,18 +192,45 @@ export class SearchManager {
 
     if (resultsContainer) {
       resultsContainer.innerHTML = results.map(result => this.createResultHTML(result)).join('');
+      
+      // 🔧 绑定事件委托
+      this.bindResultsEvents(resultsContainer);
     }
 
     this.currentResults = results;
-    this.updateFavoriteButtons();
     
     // 滚动到结果区域
     setTimeout(() => {
       resultsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   }
+  
+    // 🔧 新增：绑定结果区域事件
+  bindResultsEvents(container) {
+    container.addEventListener('click', (e) => {
+      const button = e.target.closest('[data-action]');
+      if (!button) return;
 
-  // 创建搜索结果HTML
+      const action = button.dataset.action;
+      const url = button.dataset.url;
+      const resultId = button.dataset.resultId;
+      const source = button.dataset.source;
+
+      switch (action) {
+        case 'visit':
+          this.openResult(url, source);
+          break;
+        case 'favorite':
+          this.toggleFavorite(resultId);
+          break;
+        case 'copy':
+          this.copyToClipboard(url);
+          break;
+      }
+    });
+  }
+
+  // 创建搜索结果HTML (移除内联事件)
   createResultHTML(result) {
     const isFavorited = favoritesManager.isFavorited(result.url);
     
@@ -216,15 +251,14 @@ export class SearchManager {
           </div>
         </div>
         <div class="result-actions">
-          <button class="action-btn visit-btn" onclick="searchManager.openResult('${escapeHtml(result.url)}', '${result.source}')" title="访问网站">
+          <button class="action-btn visit-btn" data-action="visit" data-url="${escapeHtml(result.url)}" data-source="${result.source}">
             <span>访问</span>
           </button>
           <button class="action-btn favorite-btn ${isFavorited ? 'favorited' : ''}" 
-                  onclick="searchManager.toggleFavorite('${result.id}')" 
-                  title="${isFavorited ? '取消收藏' : '添加收藏'}">
+                  data-action="favorite" data-result-id="${result.id}">
             <span>${isFavorited ? '已收藏' : '收藏'}</span>
           </button>
-          <button class="action-btn copy-btn" onclick="searchManager.copyToClipboard('${escapeHtml(result.url)}')" title="复制链接">
+          <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(result.url)}">
             <span>复制</span>
           </button>
         </div>
@@ -238,7 +272,6 @@ export class SearchManager {
       window.open(url, '_blank', 'noopener,noreferrer');
       showToast('已在新标签页打开', 'success');
       
-      // 记录访问行为
       if (authManager.isAuthenticated()) {
         apiService.recordAction('visit_site', { url, source }).catch(console.error);
       }
@@ -254,12 +287,10 @@ export class SearchManager {
       await navigator.clipboard.writeText(text);
       showToast('已复制到剪贴板', 'success');
       
-      // 记录复制行为
       if (authManager.isAuthenticated()) {
         apiService.recordAction('copy_url', { url: text }).catch(console.error);
       }
     } catch (error) {
-      // 降级到旧方法
       const textArea = document.createElement('textarea');
       textArea.value = text;
       document.body.appendChild(textArea);
@@ -287,13 +318,11 @@ export class SearchManager {
     const isFavorited = favoritesManager.isFavorited(result.url);
     
     if (isFavorited) {
-      // 查找并移除收藏
       const favorite = favoritesManager.favorites.find(fav => fav.url === result.url);
       if (favorite) {
         await favoritesManager.removeFavorite(favorite.id);
       }
     } else {
-      // 添加收藏
       await favoritesManager.addFavorite(result);
     }
 
@@ -339,10 +368,8 @@ export class SearchManager {
     if (!authManager.isAuthenticated()) return;
 
     try {
-      // 添加到云端
       await searchHistoryManager.addToHistory(keyword, 'manual');
       
-      // 更新本地历史
       this.searchHistory = this.searchHistory.filter(item => 
         item.keyword !== keyword
       );
@@ -356,7 +383,6 @@ export class SearchManager {
         source: 'manual'
       });
 
-      // 限制数量
       const maxHistory = APP_CONSTANTS.LIMITS.MAX_HISTORY;
       if (this.searchHistory.length > maxHistory) {
         this.searchHistory = this.searchHistory.slice(0, maxHistory);
@@ -370,7 +396,7 @@ export class SearchManager {
     }
   }
 
-  // 渲染搜索历史
+  // 渲染搜索历史 (移除内联事件)
   renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyList = document.getElementById('historyList');
@@ -384,10 +410,19 @@ export class SearchManager {
     
     if (historyList) {
       historyList.innerHTML = this.searchHistory.slice(0, 10).map(item => 
-        `<span class="history-item" onclick="searchManager.searchFromHistory('${escapeHtml(item.keyword)}')">
+        `<span class="history-item" data-keyword="${escapeHtml(item.keyword)}">
           ${escapeHtml(item.keyword)}
         </span>`
       ).join('');
+
+      // 🔧 绑定历史点击事件
+      historyList.addEventListener('click', (e) => {
+        const historyItem = e.target.closest('.history-item');
+        if (historyItem) {
+          const keyword = historyItem.dataset.keyword;
+          this.searchFromHistory(keyword);
+        }
+      });
     }
   }
 
@@ -424,6 +459,7 @@ export class SearchManager {
       showLoading(false);
     }
   }
+}
 
   // 清空搜索结果
   clearResults() {
@@ -492,7 +528,7 @@ export class SearchManager {
     this.renderSearchSuggestions(suggestions);
   }
 
-  // 渲染搜索建议
+  // 渲染搜索建议 (移除内联事件)
   renderSearchSuggestions(suggestions) {
     let suggestionsContainer = document.getElementById('searchSuggestions');
     
@@ -515,12 +551,21 @@ export class SearchManager {
     suggestionsContainer.innerHTML = suggestions.map(item => {
       const displayText = item.keyword || item.query;
       return `
-        <div class="suggestion-item" onclick="searchManager.searchFromHistory('${escapeHtml(displayText)}')">
+        <div class="suggestion-item" data-keyword="${escapeHtml(displayText)}">
           <span class="suggestion-icon">🕐</span>
           <span class="suggestion-text">${escapeHtml(displayText)}</span>
         </div>
       `;
     }).join('');
+    
+    // 🔧 绑定建议点击事件
+    suggestionsContainer.addEventListener('click', (e) => {
+      const suggestionItem = e.target.closest('.suggestion-item');
+      if (suggestionItem) {
+        const keyword = suggestionItem.dataset.keyword;
+        this.searchFromHistory(keyword);
+      }
+    });
     
     suggestionsContainer.style.display = 'block';
   }

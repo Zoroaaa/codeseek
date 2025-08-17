@@ -3,7 +3,7 @@ import { APP_CONSTANTS } from '../core/constants.js';
 import configManager from '../core/config.js';
 import { showLoading, showToast } from '../utils/dom.js';
 import { escapeHtml, formatRelativeTime } from '../utils/format.js';
-import { isDevEnv } from '../utils/helpers.js';
+import { isDevEnv, debounce } from '../utils/helpers.js'; // 🔧 添加debounce导入
 import authManager from '../services/auth.js';
 import themeManager from '../services/theme.js';
 import apiService from '../services/api.js';
@@ -185,20 +185,27 @@ export class DashboardApp {
     });
   }
 
-  // 绑定收藏夹控件
+  // 绑定收藏夹控件 (修复debounce使用)
   bindFavoritesControls() {
     const favoritesSearchBtn = document.getElementById('favoritesSearchBtn');
     const favoritesSearch = document.getElementById('favoritesSearch');
     const favoritesSort = document.getElementById('favoritesSort');
     
-    if (favoritesSearchBtn) favoritesSearchBtn.addEventListener('click', () => this.searchFavorites());
+    if (favoritesSearchBtn) {
+      favoritesSearchBtn.addEventListener('click', () => this.searchFavorites());
+    }
+    
     if (favoritesSearch) {
+      // 🔧 使用正确导入的debounce
       favoritesSearch.addEventListener('input', debounce(() => this.searchFavorites(), 300));
       favoritesSearch.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') this.searchFavorites();
       });
     }
-    if (favoritesSort) favoritesSort.addEventListener('change', () => this.searchFavorites());
+    
+    if (favoritesSort) {
+      favoritesSort.addEventListener('change', () => this.searchFavorites());
+    }
   }
 
   // 绑定模态框事件
