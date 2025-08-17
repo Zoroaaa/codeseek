@@ -5,8 +5,6 @@ import { errorHandler } from './shared/error-handler.js';
 // 测试2：添加config  
 import { configManager } from './modules/core/config.js';
 
-// 测试3：添加页面应用
-import { indexApp } from './pages/index-app.js';
 
 console.log('开始最小化测试...');
 
