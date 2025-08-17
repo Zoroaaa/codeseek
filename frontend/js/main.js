@@ -171,11 +171,7 @@ class MagnetSearchApp {
             });
         }
 
-        // 主题切换
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
+
 
         // 功能按钮
         this.bindFunctionButtons();
@@ -1009,15 +1005,19 @@ async searchKeyword(keyword) {
 
     // 主题管理
     // 移除本地存储相关方法，保留主题设置
-    initTheme() {
-		window.themeManager.applyTheme();
-
+initTheme() {
+    // 只调用主题管理器的应用方法，不绑定事件
+    if (window.themeManager) {
+        window.themeManager.applyTheme();
     }
+}
 
-    toggleTheme() {
-		window.themeManager.toggleTheme();
-
+toggleTheme() {
+    // 直接调用全局主题管理器，不需要额外绑定事件
+    if (window.themeManager) {
+        window.themeManager.toggleTheme();
     }
+}
 
     // 云端同步
     async syncFavorites() {

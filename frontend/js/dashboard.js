@@ -465,16 +465,19 @@ class DashboardApp {
         showToast('设置已重置为默认值，请点击保存', 'success');
     }
 
-    // 保留主题管理（仅此项使用本地存储）
-    initTheme() {
-		window.themeManager.toggleTheme();
-
+initTheme() {
+    // 只调用主题管理器的应用方法，不绑定事件
+    if (window.themeManager) {
+        window.themeManager.applyTheme();
     }
+}
 
-    toggleTheme() {
-		window.themeManager.toggleTheme();
-
+toggleTheme() {
+    // 直接调用全局主题管理器，不需要额外绑定事件
+    if (window.themeManager) {
+        window.themeManager.toggleTheme();
     }
+}
 
     // 修改退出登录
     async logout() {
@@ -503,11 +506,6 @@ class DashboardApp {
             });
         });
 
-        // 主题切换
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
 
         // 退出登录
         const logoutBtn = document.getElementById('logoutBtn');
