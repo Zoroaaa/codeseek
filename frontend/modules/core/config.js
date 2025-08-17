@@ -12,7 +12,7 @@ export class ConfigManager {
 
     this.config = {
       BASE_URL: this.getAPIBaseURL(),
-      DEV_URL: this.getConfigValue('CF_DEV_API_URL', 'http://localhost:8787'),
+      DEV_URL: this.getConfigValue('CF_DEV_API_URL', 'https://codeseek.zadi.workers.dev'),
       PROD_URL: this.getConfigValue('CF_PROD_API_URL', this.getDefaultProdURL()),
       APP_NAME: this.getConfigValue('CF_APP_NAME', '磁力快搜'),
       APP_VERSION: this.getConfigValue('CF_APP_VERSION', '1.1.0'),
@@ -82,7 +82,7 @@ export class ConfigManager {
     }
     
     if (this.isDevelopment()) {
-      return this.getConfigValue('CF_DEV_API_URL', 'http://localhost:8787');
+      return this.getConfigValue('CF_DEV_API_URL', 'https://codeseek.zadi.workers.dev');
     }
     
     return this.getConfigValue('CF_PROD_API_URL', this.getDefaultProdURL());
