@@ -16,6 +16,15 @@
         window.CF_APP_VERSION = typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : undefined;
         window.CF_ENABLE_ANALYTICS = typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : undefined;
         window.CF_ENABLE_DEBUG = typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : undefined;
+        
+        // 检查用户是否已登录的函数
+        window.onload = function() {
+            const authToken = localStorage.getItem('auth_token');
+            if (!authToken) {
+                // 用户未登录，显示登录模态框
+                document.getElementById('loginModal').style.display = 'block';
+            }
+        };
     </script>
 </head>
 <body>
@@ -35,8 +44,8 @@
                         <div class="dropdown">
                             <button class="dropdown-btn" title="用户菜单">▼</button>
                             <div class="dropdown-content">
-                                <a href="dashboard.html" class="dropdown-item">个人中心</a>
-                                <a href="#" id="logoutBtn" class="dropdown-item">退出登录</a>
+                                <a href="#" onclick="navigateToDashboard(); return false;">个人中心</a>
+                                <a href="#" id="logoutBtn">退出登录</a>
                             </div>
                         </div>
                     </div>
@@ -45,8 +54,8 @@
         </div>
     </nav>
 
-    <!-- 主内容区域 -->
-    <main class="main-content" id="mainContent" style="display:none;">
+    <!-- 仅显示主内容区域如果用户已登录 -->
+    <main class="main-content" style="display:none;">
         <!-- Hero区域 -->
         <section class="hero">
             <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
@@ -71,12 +80,6 @@
                         <span>搜索</span>
                     </button>
                 </div>
-                
-                <!-- 搜索建议 -->
-                <div id="searchSuggestions" class="search-suggestions">
-                    <!-- 搜索建议将通过JavaScript动态加载 -->
-                </div>
-                
                 <div class="search-options">
                     <label class="checkbox-label">
                         <input type="checkbox" id="cacheResults" checked>
@@ -122,11 +125,6 @@
             </div>
             <div id="searchInfo" class="search-info"></div>
             <div id="results" class="results-grid"></div>
-            
-            <!-- 分页控件 -->
-            <div id="pagination" class="pagination" style="display:none;">
-                <!-- 分页按钮将通过JavaScript动态生成 -->
-            </div>
         </section>
 
         <!-- 收藏夹 -->
@@ -293,7 +291,7 @@
                         maxlength="50"
                     >
                 </div>
-                <button type="submit" class="submit-btn">注册</button>
+				<button type="submit" class="submit-btn">注册</button>
                 <div class="form-links">
                     <a href="#" id="showLogin">已有账号？登录</a>
                 </div>
@@ -315,65 +313,58 @@
         <span class="status-text">检查连接...</span>
     </div>
 
-    <!-- ES6模块化脚本加载 -->
+    <!-- ES6 模块化脚本 -->
+    <script type="module" src="main.js"></script>
     <script type="module">
-        import { IndexApp } from './pages/index-app.js';
-        
-        // 页面加载完成后初始化应用
+        // 页面加载完成后的初始行为
         document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 初始化应用...');
+
             try {
-                console.log('🚀 初始化主页应用...');
+                // 动态导入配置
+                const { CONFIG } = await import('./modules/core/config.js');
+                
+                // 修改页面标题与品牌名称
+                const appName = CONFIG.APP_NAME || '磁力快搜';
+                document.getElementById('page-title').textContent = `${appName} - 专业版`;
+                document.getElementById('brand-text').textContent = appName;
+                document.getElementById('hero-title').textContent = `${appName} - 专业版`;
+                
+                // 检查登录状态
+                const authToken = localStorage.getItem('auth_token');
+                if (authToken) {
+                    document.querySelector('.main-content').style.display = 'block';
+                }
                 
                 // 创建应用实例
-                window.indexApp = new IndexApp();
+                const { IndexApp } = await import('./pages/index-app.js');
+                window.app = new IndexApp();
                 
-                // 初始化应用
-                await window.indexApp.init();
-                
-                console.log('✅ 主页应用初始化完成');
+                console.log('✅ 应用初始化完成');
             } catch (error) {
-                console.error('❌ 主页应用初始化失败:', error);
+                console.error('❌ 应用初始化失败:', error);
                 
-                // 显示错误提示
-                const toast = document.getElementById('toast');
-                if (toast) {
-                    toast.textContent = '应用初始化失败，请刷新页面重试';
-                    toast.className = 'toast error show';
-                    setTimeout(() => {
-                        toast.classList.remove('show');
-                    }, 3000);
-                }
+                // 显示错误信息
+                const { showToast } = await import('./modules/ui/toast.js');
+                showToast('应用初始化失败，请刷新页面重试', 'error');
             }
         });
 
         // 处理页面可见性变化
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && window.indexApp) {
+            if (!document.hidden && window.app) {
                 setTimeout(() => {
-                    if (window.indexApp.isInitialized) {
-                        window.indexApp.checkConnectionStatus();
+                    if (window.app.isInitialized) {
+                        window.app.checkConnectionStatus();
                     }
                 }, 100);
             }
         });
 
-        // 处理页面卸载
-        window.addEventListener('beforeunload', () => {
-            if (window.indexApp && typeof window.indexApp.cleanup === 'function') {
-                window.indexApp.cleanup();
-            }
-        });
-    </script>
-
-    <!-- 性能监控 -->
-    <script type="module">
-        import { PerformanceMonitor } from './modules/performance/performance-monitor.js';
-        
-        // 启动性能监控
-        if (window.CF_ENABLE_DEBUG === 'true') {
-            const performanceMonitor = new PerformanceMonitor();
-            performanceMonitor.startMonitoring();
-        }
+        // 全局导航函数
+        window.navigateToDashboard = () => {
+            window.location.href = './dashboard.html';
+        };
     </script>
 </body>
 </html>
