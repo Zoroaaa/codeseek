@@ -42,16 +42,16 @@ export class IndexApp {
       themeManager.init();
       
       // 检查认证状态
-      //await this.checkAuthStatus();
+      await this.checkAuthStatus();
       
       // 根据认证状态显示界面
-/*       if (!this.currentUser) {
+      if (!this.currentUser) {
         document.getElementById('loginModal').style.display = 'block';
         document.querySelector('.main-content').style.display = 'none';
       } else {
         document.querySelector('.main-content').style.display = 'block';
         await this.loadUserData();
-      } */
+      }
 
       // 测试API连接
       await this.testConnection();

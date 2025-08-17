@@ -65,6 +65,7 @@ class AppInitializer {
         window.app = indexApp;
         
         await indexApp.init();
+		console.log('[Init] IndexApp初始化完成');
         break;
     }
   }
