@@ -214,7 +214,7 @@ const utils = {
 
     getCorsHeaders(origin = '*') {
         // 更严格的CORS配置
-        const allowedOrigins = ['http://localhost:3000', 'https://*.pages.dev'];
+        const allowedOrigins = ['http://localhost:3000', 'https://*.pages.dev', 'https://*.tvhub.pp.ua'];
         const isAllowedOrigin = origin === '*' || allowedOrigins.some(allowed => {
             if (allowed.includes('*')) {
                 const pattern = allowed.replace('*', '.*');
