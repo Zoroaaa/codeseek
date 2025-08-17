@@ -22,7 +22,8 @@ export class ModalManager {
   }
 
   bindCloseButtons() {
-    document.querySelectorAll('.modal .close').forEach(btn => {
+    // 使用更通用的选择器
+    document.querySelectorAll('.modal .modal-close, .modal .close').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const modal = e.target.closest('.modal');
         if (modal) {
@@ -48,16 +49,27 @@ export class ModalManager {
       return false;
     }
 
-    // 设置显示
+    console.log(`🔓 打开模态框: ${modalId}`);
+
+    // 关键修复：设置显示并添加show类
     modal.style.display = 'block';
+    modal.classList.add('show');
+    
+    // 移除可能的隐藏属性
+    modal.hidden = false;
+    modal.removeAttribute('aria-hidden');
+    
     this.activeModals.add(modalId);
 
     // 焦点管理
     if (options.focusElement) {
       setTimeout(() => {
         const focusEl = modal.querySelector(options.focusElement);
-        if (focusEl) focusEl.focus();
-      }, APP_CONSTANTS.UI.MODAL_ANIMATION_DURATION);
+        if (focusEl) {
+          focusEl.focus();
+          console.log(`🎯 聚焦到: ${options.focusElement}`);
+        }
+      }, APP_CONSTANTS.UI.MODAL_ANIMATION_DURATION || 150);
     }
 
     // 防止页面滚动
@@ -65,6 +77,7 @@ export class ModalManager {
       document.body.style.overflow = 'hidden';
     }
 
+    console.log(`✅ 模态框 ${modalId} 已打开`);
     return true;
   }
 
@@ -72,7 +85,12 @@ export class ModalManager {
     const modal = document.getElementById(modalId);
     if (!modal) return false;
 
+    console.log(`🔒 关闭模态框: ${modalId}`);
+
+    // 关键修复：隐藏并移除show类
     modal.style.display = 'none';
+    modal.classList.remove('show');
+    
     this.activeModals.delete(modalId);
 
     // 恢复页面滚动
@@ -84,10 +102,12 @@ export class ModalManager {
     const forms = modal.querySelectorAll('form');
     forms.forEach(form => form.reset());
 
+    console.log(`✅ 模态框 ${modalId} 已关闭`);
     return true;
   }
 
   closeAll() {
+    console.log('🔒 关闭所有模态框');
     this.activeModals.forEach(modalId => {
       this.close(modalId);
     });
@@ -101,19 +121,55 @@ export class ModalManager {
     return Array.from(this.activeModals);
   }
 
-  // 便捷方法
+  // 便捷方法 - 修复版本
   showLogin() {
-    return this.open('loginModal', { focusElement: '#loginUsername' });
+    // 先关闭注册框
+    this.close('registerModal');
+    
+    const success = this.open('loginModal', { focusElement: '#loginUsername' });
+    if (success) {
+      console.log('🔑 显示登录框');
+    }
+    return success;
   }
 
   showRegister() {
-    return this.open('registerModal', { focusElement: '#regUsername' });
+    // 先关闭登录框
+    this.close('loginModal');
+    
+    const success = this.open('registerModal', { focusElement: '#regUsername' });
+    if (success) {
+      console.log('📝 显示注册框');
+    }
+    return success;
   }
 
   showPasswordChange() {
     return this.open('passwordModal', { focusElement: '#currentPassword' });
   }
+
+  // 调试方法
+  diagnose() {
+    console.group('🔍 模态框管理器诊断');
+    console.log('活跃模态框:', Array.from(this.activeModals));
+    
+    document.querySelectorAll('.modal').forEach(modal => {
+      const computedStyle = window.getComputedStyle(modal);
+      console.log(`模态框 ${modal.id}:`, {
+        display: modal.style.display,
+        computedDisplay: computedStyle.display,
+        visibility: computedStyle.visibility,
+        opacity: computedStyle.opacity,
+        hasShowClass: modal.classList.contains('show'),
+        isActive: this.activeModals.has(modal.id)
+      });
+    });
+    console.groupEnd();
+  }
 }
 
 // 创建全局实例
 export const modal = new ModalManager();
+
+// 添加调试方法到全局
+window.modalDiagnose = () => modal.diagnose();

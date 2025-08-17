@@ -47,11 +47,22 @@ export class IndexApp {
       
       // 根据认证状态显示界面
       if (!this.currentUser) {
-        document.getElementById('loginModal').style.display = 'block';
-        document.querySelector('.main-content').style.display = 'none';
+        // 使用modal管理器正确显示登录框
+        modal.showLogin();
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+          mainContent.style.display = 'none';
+        }
+        console.log('🔑 未登录 - 显示登录框');
       } else {
-        document.querySelector('.main-content').style.display = 'block';
+        // 确保所有模态框关闭
+        modal.closeAll();
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+          mainContent.style.display = 'block';
+        }
         await this.loadUserData();
+        console.log('✅ 已登录 - 显示主内容');
       }
 
       // 测试API连接
@@ -88,9 +99,20 @@ export class IndexApp {
       loadingElement.style.display = 'none';
     }
     
+    // 检查模态框状态 - 确保未登录用户看到登录框
+    if (!this.currentUser) {
+      const loginModal = document.getElementById('loginModal');
+      if (loginModal && (!loginModal.classList.contains('show') || loginModal.style.display === 'none')) {
+        console.warn('⚠️ 检测到登录框未正确显示，执行修复');
+        modal.showLogin();
+      }
+    }
+    
     console.log('🔍 最终状态检查:', {
       appVisible: appElement?.style.display,
-      loadingVisible: loadingElement?.style.display
+      loadingVisible: loadingElement?.style.display,
+      currentUser: this.currentUser ? '已登录' : '未登录',
+      activeModals: modal.getActiveModals()
     });
   }, 100);
 }
@@ -378,9 +400,12 @@ export class IndexApp {
     this.updateUserUI();
     
     // 隐藏主界面
-    document.querySelector('.main-content').style.display = 'none';
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+      mainContent.style.display = 'none';
+    }
     
-    // 显示登录模态框
+    // 显示登录模态框 - 使用modal管理器
     modal.showLogin();
     
     // 隐藏同步相关按钮
@@ -388,6 +413,8 @@ export class IndexApp {
     syncButtons.forEach(btn => {
       if (btn) btn.style.display = 'none';
     });
+    
+    console.log('👋 用户已登出');
   }
 
   updateUserUI() {
