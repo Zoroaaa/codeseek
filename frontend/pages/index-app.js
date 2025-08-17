@@ -3,7 +3,7 @@ import { searchManager } from '../modules/search/search-manager.js';
 import { favoritesManager } from '../modules/favorites/favorites-manager.js';
 import { themeManager } from '../modules/ui/theme-manager.js';
 import { modal } from '../modules/ui/modal.js';
-import { toast } from '../modules/utils/toast.js';
+//import { toast } from '../modules/ui/toast.js';
 import { loading } from '../modules/ui/loading.js';
 import { cloudSyncManager } from '../modules/sync/cloud-sync-manager.js';
 import { navigationManager } from '../modules/navigation/navigation-manager.js';
