@@ -21,13 +21,13 @@
     // API地址配置
     BASE_URL: isDev() 
       ? 'http://localhost:8787' 
-      : 'https://codeseek.zadi.workers.dev',
+      : 'https://codeseek-backend.tvhub.pp.ua',
       
     // 开发环境URL
     DEV_URL: 'http://localhost:8787',
     
     // 生产环境URL
-    PROD_URL: 'https://codeseek.zadi.workers.dev',
+    PROD_URL: 'https://codeseek-backend.tvhub.pp.ua',
     
     // API超时设置
     TIMEOUT: 30000,
