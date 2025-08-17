@@ -1,7 +1,7 @@
 import { apiClient } from '../api/api-client.js';
 import { storage } from '../storage/storage-manager.js';
 import { EVENT_NAMES, APP_CONSTANTS } from '../../shared/constants.js';
-import { toast } from '../ui/toast.js';
+import { toast } from '../utils/toast.js';
 import { loading } from '../ui/loading.js';
 
 /**

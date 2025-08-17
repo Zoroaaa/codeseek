@@ -1,6 +1,6 @@
 import { searchEngine } from './search-engine.js';
 import { apiClient } from '../api/api-client.js';
-import { toast } from '../ui/toast.js';
+import { toast } from '../utils/toast.js';
 import { loading } from '../ui/loading.js';
 import { APP_CONSTANTS } from '../../shared/constants.js';
 import { debounce } from '../utils/common.js';
