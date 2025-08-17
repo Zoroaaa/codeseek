@@ -1,48 +1,63 @@
 frontend/
-frontend/css/
-frontend/css/dashboard.css
-frontend/css/style.css
-frontend/dashboard.html
-frontend/index.html
-frontend/main.js
-frontend/modules/
-frontend/modules/api/
-frontend/modules/api/api-client.js
-frontend/modules/auth/
-frontend/modules/auth/auth-manager.js
-frontend/modules/core/
-frontend/modules/core/config.js
-frontend/modules/dashboard/
-frontend/modules/dashboard/dashboard-manager.js
-frontend/modules/favorites/
-frontend/modules/favorites/favorites-manager.js
-frontend/modules/navigation/
-frontend/modules/navigation/navigation-manager.js
-frontend/modules/network/
-frontend/modules/network/network-utils.js
-frontend/modules/performance/
-frontend/modules/performance/performance-monitor.js
-frontend/modules/search/
-frontend/modules/search/search-engine.js
-frontend/modules/search/search-manager.js
-frontend/modules/storage/
-frontend/modules/storage/storage-manager.js
-frontend/modules/sync/
-frontend/modules/sync/cloud-sync-manager.js
-frontend/modules/ui/
-frontend/modules/ui/loading.js
-frontend/modules/ui/modal.js
-frontend/modules/ui/theme-manager.js
-frontend/modules/ui/toast.js
-frontend/modules/utils/
-frontend/modules/utils/array.js
-frontend/modules/utils/common.js
-frontend/modules/utils/date.js
-frontend/modules/utils/string.js
-frontend/modules/utils/url.js
-frontend/pages/
-frontend/pages/dashboard-app.js
-frontend/pages/index-app.js
-frontend/shared/
-frontend/shared/constants.js
-frontend/shared/error-handler.js
+├── src/                          # ES6模块化源码（已完成）
+│   ├── modules/                  # 功能模块
+│   ├── pages/                    # 页面应用
+│   ├── shared/                   # 共享工具
+│   └── main.js                   # 主入口
+├── css/                          # 样式系统（新增）
+│   ├── variables.css             # CSS变量和设计系统
+│   ├── base.css                  # 基础重置和通用样式
+│   ├── components.css            # 通用组件样式
+│   ├── layout.css                # 布局系统
+│   └── pages/                    # 页面专用样式
+│       ├── index.css             # 首页样式
+│       └── dashboard.css         # 仪表板样式
+├── images/                       # 图片资源
+├── index.html                    # 重构后的首页
+├── dashboard.html                # 重构后的仪表板
+└── manifest.json                 # PWA配置文件
+
+
+frontend/src/
+frontend/src/main.js
+frontend/src/modules/
+frontend/src/modules/api/
+frontend/src/modules/api/api-client.js
+frontend/src/modules/auth/
+frontend/src/modules/auth/auth-manager.js
+frontend/src/modules/core/
+frontend/src/modules/core/config.js
+frontend/src/modules/dashboard/
+frontend/src/modules/dashboard/dashboard-manager.js
+frontend/src/modules/favorites/
+frontend/src/modules/favorites/favorites-manager.js
+frontend/src/modules/navigation/
+frontend/src/modules/navigation/navigation-manager.js
+frontend/src/modules/network/
+frontend/src/modules/network/network-utils.js
+frontend/src/modules/performance/
+frontend/src/modules/performance/performance-monitor.js
+frontend/src/modules/search/
+frontend/src/modules/search/search-engine.js
+frontend/src/modules/search/search-manager.js
+frontend/src/modules/storage/
+frontend/src/modules/storage/storage-manager.js
+frontend/src/modules/sync/
+frontend/src/modules/sync/cloud-sync-manager.js
+frontend/src/modules/ui/
+frontend/src/modules/ui/loading.js
+frontend/src/modules/ui/modal.js
+frontend/src/modules/ui/theme-manager.js
+frontend/src/modules/ui/toast.js
+frontend/src/modules/utils/
+frontend/src/modules/utils/array.js
+frontend/src/modules/utils/common.js
+frontend/src/modules/utils/date.js
+frontend/src/modules/utils/string.js
+frontend/src/modules/utils/url.js
+frontend/src/pages/
+frontend/src/pages/dashboard-app.js
+frontend/src/pages/index-app.js
+frontend/src/shared/
+frontend/src/shared/constants.js
+frontend/src/shared/error-handler.js

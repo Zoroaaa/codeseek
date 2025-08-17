@@ -3,222 +3,280 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">磁力快搜 - 专业版</title>
     <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索">
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    <meta name="keywords" content="磁力搜索,番号搜索,云端同步,磁力快搜">
+    <meta name="author" content="磁力快搜">
+    
+    <title>磁力快搜 - 专业版</title>
+    
+    <!-- 预加载关键资源 -->
+    <link rel="preload" href="css/variables.css" as="style">
+    <link rel="preload" href="css/base.css" as="style">
+    
+    <!-- 样式文件 -->
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/pages/index.css">
+    
+    <!-- PWA配置 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    
+    <!-- 图标 -->
+    <link rel="icon" type="image/svg+xml" href="images/icon.svg">
+    <link rel="icon" type="image/png" href="images/favicon.ico">
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
     
     <!-- 环境配置 -->
     <script>
         // 环境变量配置
-        window.CF_API_BASE_URL = typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined;
-        window.CF_APP_NAME = typeof process !== 'undefined' && process.env ? process.env.APP_NAME : undefined;
-        window.CF_APP_VERSION = typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : undefined;
-        window.CF_ENABLE_ANALYTICS = typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : undefined;
-        window.CF_ENABLE_DEBUG = typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : undefined;
-        
-        // 检查用户是否已登录的函数
-        window.onload = function() {
-            const authToken = localStorage.getItem('auth_token');
-            if (!authToken) {
-                // 用户未登录，显示登录模态框
-                document.getElementById('loginModal').style.display = 'block';
-            }
+        window.ENV_CONFIG = {
+            API_BASE_URL: typeof process !== 'undefined' && process.env ? process.env.API_BASE_URL : undefined,
+            APP_NAME: typeof process !== 'undefined' && process.env ? process.env.APP_NAME : '磁力快搜',
+            APP_VERSION: typeof process !== 'undefined' && process.env ? process.env.APP_VERSION : '1.1.0',
+            ENABLE_ANALYTICS: typeof process !== 'undefined' && process.env ? process.env.ENABLE_ANALYTICS : false,
+            ENABLE_DEBUG: typeof process !== 'undefined' && process.env ? process.env.ENABLE_DEBUG : false
         };
     </script>
 </head>
 <body>
-    <!-- 导航栏 -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="nav-brand">
-                <img src="images/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
-                <span class="brand-text" id="brand-text">磁力快搜</span>
-            </div>
-            <div class="nav-menu">
-                <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
-                <div id="userMenu" class="user-menu">
-                    <button id="loginBtn" class="login-btn">登录</button>
-                    <div id="userInfo" class="user-info" style="display:none;">
-                        <span id="username" class="username"></span>
-                        <div class="dropdown">
-                            <button class="dropdown-btn" title="用户菜单">▼</button>
-                            <div class="dropdown-content">
-                                <a href="#" onclick="navigateToDashboard(); return false;">个人中心</a>
-                                <a href="#" id="logoutBtn">退出登录</a>
+    <!-- 加载状态 -->
+    <div id="loading" class="loading" style="display:flex;" aria-label="应用加载中">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p class="loading-text">应用初始化中...</p>
+        </div>
+    </div>
+
+    <!-- 应用容器 -->
+    <div id="app" class="app-container" style="display:none;">
+        <!-- 导航栏 -->
+        <header class="navbar" role="banner">
+            <div class="nav-container">
+                <div class="nav-brand">
+                    <img src="images/logo.png" alt="磁力快搜 Logo" class="logo" 
+                         onerror="this.style.display='none'">
+                    <span class="brand-text">磁力快搜</span>
+                </div>
+                <nav class="nav-menu" role="navigation" aria-label="主导航">
+                    <button id="themeToggle" class="theme-btn" title="切换主题" aria-label="切换深色/浅色主题">
+                        🌙
+                    </button>
+                    <div class="user-section">
+                        <button id="loginBtn" class="login-btn">登录</button>
+                        <div id="userInfo" class="user-info" style="display:none;">
+                            <span id="username" class="username"></span>
+                            <div class="dropdown">
+                                <button class="dropdown-btn" title="用户菜单" aria-label="用户菜单" aria-expanded="false">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6,9 12,15 18,9"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="dropdown-content" role="menu">
+                                    <a href="#" role="menuitem" onclick="navigateToDashboard(); return false;">个人中心</a>
+                                    <a href="#" role="menuitem" id="logoutBtn">退出登录</a>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                </nav>
             </div>
-        </div>
-    </nav>
+        </header>
 
-    <!-- 仅显示主内容区域如果用户已登录 -->
-    <main class="main-content" style="display:none;">
-        <!-- Hero区域 -->
-        <section class="hero">
-            <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
-            <p class="hero-subtitle">智能搜索，云端同步，极致体验</p>
-            
-            <!-- 搜索框 -->
-            <div class="search-container">
-                <div class="search-box">
-                    <input 
-                        type="text" 
-                        id="searchInput" 
-                        class="search-input" 
-                        placeholder="请输入番号或关键词" 
-                        autocomplete="off"
-                        maxlength="100"
-                    >
-                    <button id="searchBtn" class="search-btn" title="搜索">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <path d="M21 21l-4.35-4.35"></path>
-                        </svg>
-                        <span>搜索</span>
+        <!-- 主内容区域 -->
+        <main class="main-content" role="main">
+            <!-- Hero区域 -->
+            <section class="hero" aria-labelledby="hero-title">
+                <h1 id="hero-title" class="hero-title">磁力快搜 - 专业版</h1>
+                <p class="hero-subtitle">智能搜索，云端同步，极致体验</p>
+                
+                <!-- 搜索容器 -->
+                <div class="search-container">
+                    <form class="search-form" role="search" aria-label="磁力搜索">
+                        <div class="search-box">
+                            <label for="searchInput" class="sr-only">搜索关键词</label>
+                            <input 
+                                type="search" 
+                                id="searchInput" 
+                                class="search-input" 
+                                placeholder="请输入番号或关键词" 
+                                autocomplete="off"
+                                maxlength="100"
+                                aria-describedby="search-tips"
+                                required
+                            >
+                            <button type="submit" id="searchBtn" class="search-btn" aria-label="开始搜索">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="M21 21l-4.35-4.35"></path>
+                                </svg>
+                                <span>搜索</span>
+                            </button>
+                        </div>
+                        
+                        <!-- 搜索选项 -->
+                        <div class="search-options" role="group" aria-label="搜索选项">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="cacheResults" checked>
+                                <span>缓存搜索结果</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="autoSync" checked>
+                                <span>自动同步到云端</span>
+                            </label>
+                        </div>
+                    </form>
+                    
+                    <!-- 搜索建议 -->
+                    <div id="searchSuggestions" class="search-suggestions" role="listbox" aria-label="搜索建议">
+                        <!-- 动态生成的搜索建议 -->
+                    </div>
+                </div>
+                
+                <!-- 搜索提示 -->
+                <div id="search-tips" class="search-tips">
+                    <details class="tips-details">
+                        <summary class="tips-summary">💡 搜索技巧</summary>
+                        <ul class="tips-list">
+                            <li>输入完整番号获得最精确结果</li>
+                            <li>使用空格分隔多个关键词</li>
+                            <li>登录后可享受云端同步服务</li>
+                        </ul>
+                    </details>
+                </div>
+            </section>
+
+            <!-- 搜索历史 -->
+            <section id="historySection" class="history-section" style="display:none;" aria-labelledby="history-title">
+                <div class="section-header">
+                    <h2 id="history-title">🕘 搜索历史</h2>
+                    <button id="clearHistoryBtn" class="btn btn-outline btn-sm" aria-label="清空搜索历史">
+                        清空历史
                     </button>
                 </div>
-                <div class="search-options">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="cacheResults" checked>
-                        <span>缓存搜索结果</span>
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="autoSync" checked>
-                        <span>自动同步到云端</span>
-                    </label>
+                <div id="historyList" class="history-list" role="list">
+                    <!-- 动态生成的历史记录 -->
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- 快速提示 -->
-        <section id="quickTips" class="quick-tips" style="display:none;">
-            <div class="tips-content">
-                <h3>💡 搜索技巧</h3>
-                <ul>
-                    <li>输入完整番号获得最精确结果</li>
-                    <li>使用空格分隔多个关键词</li>
-                    <li>登录后可享受云端同步服务</li>
-                </ul>
-            </div>
-        </section>
-
-        <!-- 搜索历史 -->
-        <section id="historySection" class="history-section" style="display:none;">
-            <div class="section-header">
-                <h2>🕐 搜索历史</h2>
-                <button id="clearHistoryBtn" class="clear-btn">清空历史</button>
-            </div>
-            <div id="historyList" class="history-list"></div>
-        </section>
-
-        <!-- 搜索结果 -->
-        <section id="resultsSection" class="results-section" style="display:none;">
-            <div class="section-header">
-                <h2>🔍 搜索结果</h2>
-                <div class="section-actions">
-                    <button id="exportResultsBtn" class="action-btn" style="display:none;">导出结果</button>
-                    <button id="clearResultsBtn" class="clear-btn">清空结果</button>
-                </div>
-            </div>
-            <div id="searchInfo" class="search-info"></div>
-            <div id="results" class="results-grid"></div>
-        </section>
-
-        <!-- 收藏夹 -->
-        <section class="favorites-section">
-            <div class="section-header">
-                <h2>⭐ 我的收藏</h2>
-                <div class="section-actions">
-                    <button id="syncFavoritesBtn" class="sync-btn" style="display:none;">同步收藏</button>
-                    <button id="importFavoritesBtn" class="action-btn" style="display:none;">导入收藏</button>
-                </div>
-            </div>
-            <div id="favorites" class="favorites-grid"></div>
-        </section>
-
-        <!-- 站点导航 -->
-        <section class="sites-section">
-            <h2>🌐 资源站点导航</h2>
-            <div class="sites-grid">
-                <div class="site-category">
-                    <h3>📚 番号资料站</h3>
-                    <div class="site-list">
-                        <a href="https://www.javlibrary.com/cn" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavLibrary</strong>
-                                <span>评论活跃，女优搜索详尽</span>
-                            </div>
-                        </a>
-                        <a href="https://www.javbus.com" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavBus</strong>
-                                <span>番号+磁力一体站，信息完善</span>
-                            </div>
-                        </a>
-                        <a href="https://javdb.com" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavDB</strong>
-                                <span>极简风格番号资料站，轻量快速</span>
-                            </div>
-                        </a>
+            <!-- 搜索结果 -->
+            <section id="resultsSection" class="results-section" style="display:none;" aria-labelledby="results-title">
+                <div class="section-header">
+                    <h2 id="results-title">🔍 搜索结果</h2>
+                    <div class="section-actions">
+                        <button id="exportResultsBtn" class="btn btn-outline btn-sm" style="display:none;">
+                            导出结果
+                        </button>
+                        <button id="clearResultsBtn" class="btn btn-outline btn-sm">
+                            清空结果
+                        </button>
                     </div>
                 </div>
+                <div id="searchInfo" class="search-info" role="status" aria-live="polite">
+                    <!-- 搜索信息 -->
+                </div>
+                <div id="results" class="results-grid" role="list">
+                    <!-- 动态生成的搜索结果 -->
+                </div>
+            </section>
 
-                <div class="site-category">
-                    <h3>🎥 在线播放平台</h3>
-                    <div class="site-list">
-                        <a href="https://jable.tv" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>Jable</strong>
-                                <span>播放速度快，进度可跟踪</span>
-                            </div>
-                        </a>
-                        <a href="https://www5.javmost.com/" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavMost</strong>
-                                <span>简洁界面，中文支持</span>
-                            </div>
-                        </a>
-                        <a href="https://jav.guru" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavGuru</strong>
-                                <span>播放+评论一体，有项目评分</span>
-                            </div>
-                        </a>
+            <!-- 收藏夹 -->
+            <section class="favorites-section" aria-labelledby="favorites-title">
+                <div class="section-header">
+                    <h2 id="favorites-title">⭐ 我的收藏</h2>
+                    <div class="section-actions">
+                        <button id="syncFavoritesBtn" class="btn btn-primary btn-sm" style="display:none;">
+                            同步收藏
+                        </button>
+                        <button id="importFavoritesBtn" class="btn btn-outline btn-sm" style="display:none;">
+                            导入收藏
+                        </button>
                     </div>
                 </div>
+                <div id="favorites" class="favorites-grid" role="list">
+                    <!-- 动态生成的收藏内容 -->
+                </div>
+            </section>
 
-                <div class="site-category">
-                    <h3>💬 社区论坛</h3>
-                    <div class="site-list">
-                        <a href="https://sehuatang.net" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>色花堂</strong>
-                                <span>网盘资源丰富，需注册登陆</span>
-                            </div>
-                        </a>
-                        <a href="https://t66y.com" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>草榴社区</strong>
-                                <span>老牌论坛，需代理访问</span>
-                            </div>
-                        </a>
+            <!-- 站点导航 -->
+            <section class="sites-section" aria-labelledby="sites-title">
+                <h2 id="sites-title">🌐 资源站点导航</h2>
+                <div class="sites-grid">
+                    <div class="site-category">
+                        <h3>📚 番号资料站</h3>
+                        <div class="site-list" role="list">
+                            <a href="https://www.javlibrary.com/cn" target="_blank" class="site-item" 
+                               rel="noopener noreferrer" role="listitem">
+                                <div class="site-info">
+                                    <strong>JavLibrary</strong>
+                                    <span>评论活跃，女优搜索详尽</span>
+                                </div>
+                            </a>
+                            <a href="https://www.javbus.com" target="_blank" class="site-item" 
+                               rel="noopener noreferrer" role="listitem">
+                                <div class="site-info">
+                                    <strong>JavBus</strong>
+                                    <span>番号+磁力一体站，信息完善</span>
+                                </div>
+                            </a>
+                            <a href="https://javdb.com" target="_blank" class="site-item" 
+                               rel="noopener noreferrer" role="listitem">
+                                <div class="site-info">
+                                    <strong>JavDB</strong>
+                                    <span>极简风格番号资料站，轻量快速</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="site-category">
+                        <h3>🎥 在线播放平台</h3>
+                        <div class="site-list" role="list">
+                            <a href="https://jable.tv" target="_blank" class="site-item" 
+                               rel="noopener noreferrer" role="listitem">
+                                <div class="site-info">
+                                    <strong>Jable</strong>
+                                    <span>播放速度快，进度可跟踪</span>
+                                </div>
+                            </a>
+                            <a href="https://www5.javmost.com/" target="_blank" class="site-item" 
+                               rel="noopener noreferrer" role="listitem">
+                                <div class="site-info">
+                                    <strong>JavMost</strong>
+                                    <span>简洁界面，中文支持</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="site-category">
+                        <h3>💬 社区论坛</h3>
+                        <div class="site-list" role="list">
+                            <a href="https://sehuatang.net" target="_blank" class="site-item" 
+                               rel="noopener noreferrer" role="listitem">
+                                <div class="site-info">
+                                    <strong>色花堂</strong>
+                                    <span>网盘资源丰富，需注册登陆</span>
+                                </div>
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
-    </main>
+            </section>
+        </main>
+    </div>
 
+    <!-- 模态框 -->
     <!-- 登录模态框 -->
-    <div id="loginModal" class="modal" aria-labelledby="login-title" role="dialog">
+    <div id="loginModal" class="modal" aria-labelledby="login-title" role="dialog" aria-modal="true">
         <div class="modal-content">
-            <span class="close" aria-label="关闭">&times;</span>
+            <button class="modal-close" aria-label="关闭登录对话框">&times;</button>
             <h2 id="login-title">用户登录</h2>
             <form id="loginForm" novalidate>
                 <div class="form-group">
+                    <label for="loginUsername" class="sr-only">用户名或邮箱</label>
                     <input 
                         type="text" 
                         id="loginUsername" 
@@ -226,9 +284,12 @@
                         required 
                         autocomplete="username"
                         maxlength="50"
+                        aria-describedby="login-username-error"
                     >
+                    <div id="login-username-error" class="error-message" aria-live="polite"></div>
                 </div>
                 <div class="form-group">
+                    <label for="loginPassword" class="sr-only">密码</label>
                     <input 
                         type="password" 
                         id="loginPassword" 
@@ -236,9 +297,11 @@
                         required 
                         autocomplete="current-password"
                         maxlength="50"
+                        aria-describedby="login-password-error"
                     >
+                    <div id="login-password-error" class="error-message" aria-live="polite"></div>
                 </div>
-                <button type="submit" class="submit-btn">登录</button>
+                <button type="submit" class="btn btn-primary btn-full">登录</button>
                 <div class="form-links">
                     <a href="#" id="showRegister">还没有账号？注册</a>
                 </div>
@@ -247,12 +310,13 @@
     </div>
 
     <!-- 注册模态框 -->
-    <div id="registerModal" class="modal" aria-labelledby="register-title" role="dialog">
+    <div id="registerModal" class="modal" aria-labelledby="register-title" role="dialog" aria-modal="true">
         <div class="modal-content">
-            <span class="close" aria-label="关闭">&times;</span>
+            <button class="modal-close" aria-label="关闭注册对话框">&times;</button>
             <h2 id="register-title">用户注册</h2>
             <form id="registerForm" novalidate>
                 <div class="form-group">
+                    <label for="regUsername" class="sr-only">用户名</label>
                     <input 
                         type="text" 
                         id="regUsername" 
@@ -260,28 +324,39 @@
                         required 
                         autocomplete="username"
                         maxlength="20"
+                        pattern="[a-zA-Z0-9_]{3,20}"
+                        aria-describedby="reg-username-error"
                     >
+                    <div id="reg-username-error" class="error-message" aria-live="polite"></div>
                 </div>
                 <div class="form-group">
+                    <label for="regEmail" class="sr-only">邮箱</label>
                     <input 
                         type="email" 
                         id="regEmail" 
                         placeholder="邮箱" 
                         required 
                         autocomplete="email"
+                        aria-describedby="reg-email-error"
                     >
+                    <div id="reg-email-error" class="error-message" aria-live="polite"></div>
                 </div>
                 <div class="form-group">
+                    <label for="regPassword" class="sr-only">密码</label>
                     <input 
                         type="password" 
                         id="regPassword" 
-                        placeholder="密码" 
+                        placeholder="密码（至少6位）" 
                         required 
                         autocomplete="new-password"
+                        minlength="6"
                         maxlength="50"
+                        aria-describedby="reg-password-error"
                     >
+                    <div id="reg-password-error" class="error-message" aria-live="polite"></div>
                 </div>
                 <div class="form-group">
+                    <label for="regConfirmPassword" class="sr-only">确认密码</label>
                     <input 
                         type="password" 
                         id="regConfirmPassword" 
@@ -289,9 +364,11 @@
                         required 
                         autocomplete="new-password"
                         maxlength="50"
+                        aria-describedby="reg-confirm-error"
                     >
+                    <div id="reg-confirm-error" class="error-message" aria-live="polite"></div>
                 </div>
-				<button type="submit" class="submit-btn">注册</button>
+                <button type="submit" class="btn btn-primary btn-full">注册</button>
                 <div class="form-links">
                     <a href="#" id="showLogin">已有账号？登录</a>
                 </div>
@@ -300,20 +377,29 @@
     </div>
 
     <!-- Toast通知 -->
-    <div id="toast" class="toast" role="alert" aria-live="polite"></div>
-
-    <!-- Loading -->
-    <div id="loading" class="loading" style="display:none;" aria-label="加载中">
-        <div class="spinner"></div>
+    <div id="toast" class="toast" role="alert" aria-live="assertive">
+        <div class="toast-content">
+            <span class="toast-icon"></span>
+            <span class="toast-message"></span>
+        </div>
     </div>
 
     <!-- 连接状态指示器 -->
-    <div id="connectionStatus" class="connection-status" style="display:none;">
+    <div id="connectionStatus" class="connection-status" style="display:none;" role="status" aria-live="polite">
         <span class="status-indicator"></span>
         <span class="status-text">检查连接...</span>
     </div>
 
+    <!-- 无障碍跳转链接 -->
+    <a href="#main-content" class="skip-link">跳转到主内容</a>
+
     <!-- ES6 模块化脚本 -->
-    <script type="module" src="./main.js"></script>
+    <script type="module" src="src/main.js"></script>
+    
+    <!-- 非模块浏览器的降级处理 -->
+    <script nomodule>
+        document.getElementById('loading').innerHTML = 
+            '<div class="loading-content"><p>您的浏览器不支持ES6模块，请升级到现代浏览器。</p></div>';
+    </script>
 </body>
 </html>
