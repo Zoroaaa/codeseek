@@ -314,57 +314,6 @@
     </div>
 
     <!-- ES6 模块化脚本 -->
-    <script type="module" src="main.js"></script>
-    <script type="module">
-        // 页面加载完成后的初始行为
-        document.addEventListener('DOMContentLoaded', async () => {
-            console.log('🚀 初始化应用...');
-
-            try {
-                // 动态导入配置
-                const { CONFIG } = await import('./modules/core/config.js');
-                
-                // 修改页面标题与品牌名称
-                const appName = CONFIG.APP_NAME || '磁力快搜';
-                document.getElementById('page-title').textContent = `${appName} - 专业版`;
-                document.getElementById('brand-text').textContent = appName;
-                document.getElementById('hero-title').textContent = `${appName} - 专业版`;
-                
-                // 检查登录状态
-                const authToken = localStorage.getItem('auth_token');
-                if (authToken) {
-                    document.querySelector('.main-content').style.display = 'block';
-                }
-                
-                // 创建应用实例
-                const { IndexApp } = await import('./pages/index-app.js');
-                window.app = new IndexApp();
-                
-                console.log('✅ 应用初始化完成');
-            } catch (error) {
-                console.error('❌ 应用初始化失败:', error);
-                
-                // 显示错误信息
-                const { showToast } = await import('./modules/ui/toast.js');
-                showToast('应用初始化失败，请刷新页面重试', 'error');
-            }
-        });
-
-        // 处理页面可见性变化
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && window.app) {
-                setTimeout(() => {
-                    if (window.app.isInitialized) {
-                        window.app.checkConnectionStatus();
-                    }
-                }, 100);
-            }
-        });
-
-        // 全局导航函数
-        window.navigateToDashboard = () => {
-            window.location.href = './dashboard.html';
-        };
-    </script>
+    <script type="module" src="./main.js"></script>
 </body>
 </html>
