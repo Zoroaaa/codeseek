@@ -16,7 +16,7 @@ export class FavoritesManager {
     try {
       await this.loadFavorites();
       this.bindEvents();
-	  this.exposeGlobalMethods(); // 🔧 新增
+      this.exposeGlobalMethods(); // 🔧 新增
       this.isInitialized = true;
     } catch (error) {
       console.error('收藏管理器初始化失败:', error);
@@ -77,91 +77,91 @@ export class FavoritesManager {
     }
   }
 
-// 渲染收藏 (添加事件委托)
-renderFavorites(favoritesToRender = null) {
-  const container = document.getElementById('favorites');
-  if (!container) return;
+  // 渲染收藏 (添加事件委托)
+  renderFavorites(favoritesToRender = null) {
+    const container = document.getElementById('favorites');
+    if (!container) return;
 
-  const renderList = favoritesToRender || this.favorites;
+    const renderList = favoritesToRender || this.favorites;
 
-  if (renderList.length === 0) {
-    container.innerHTML = this.createEmptyState();
-    return;
+    if (renderList.length === 0) {
+      container.innerHTML = this.createEmptyState();
+      return;
+    }
+
+    container.innerHTML = renderList.map(fav => this.createFavoriteHTML(fav)).join('');
+    
+    // 🔧 绑定事件委托
+    this.bindFavoritesEvents(container);
   }
 
-  container.innerHTML = renderList.map(fav => this.createFavoriteHTML(fav)).join('');
-  
-  // 🔧 绑定事件委托
-  this.bindFavoritesEvents(container);
-}
+  // 🔧 新增：绑定收藏夹事件
+  bindFavoritesEvents(container) {
+    // 移除旧的事件监听器
+    const newContainer = container.cloneNode(true);
+    container.parentNode.replaceChild(newContainer, container);
+    
+    newContainer.addEventListener('click', (e) => {
+      const button = e.target.closest('[data-action]');
+      if (!button) return;
 
-// 🔧 新增：绑定收藏夹事件
-bindFavoritesEvents(container) {
-  // 移除旧的事件监听器
-  const oldContainer = container.cloneNode(true);
-  container.parentNode.replaceChild(oldContainer, container);
-  
-  oldContainer.addEventListener('click', (e) => {
-    const button = e.target.closest('[data-action]');
-    if (!button) return;
+      const action = button.dataset.action;
+      const url = button.dataset.url;
+      const id = button.dataset.id;
 
-    const action = button.dataset.action;
-    const url = button.dataset.url;
-    const id = button.dataset.id;
+      switch (action) {
+        case 'visit':
+          this.openFavorite(url);
+          break;
+        case 'copy':
+          this.copyFavoriteUrl(url);
+          break;
+        case 'remove':
+          this.removeFavorite(id);
+          break;
+      }
+    });
+  }
 
-    switch (action) {
-      case 'visit':
-        this.openFavorite(url);
-        break;
-      case 'copy':
-        this.copyFavoriteUrl(url);
-        break;
-      case 'remove':
-        this.removeFavorite(id);
-        break;
-    }
-  });
-}
+  // 暴露全局方法
+  exposeGlobalMethods() {
+    window.favoritesManager = {
+      openFavorite: (url) => this.openFavorite(url),
+      copyFavoriteUrl: (url) => this.copyFavoriteUrl(url),
+      removeFavorite: (id) => this.removeFavorite(id)
+    };
+  }
 
-// 暴露全局方法
-exposeGlobalMethods() {
-  window.favoritesManager = {
-    openFavorite: (url) => this.openFavorite(url),
-    copyFavoriteUrl: (url) => this.copyFavoriteUrl(url),
-    removeFavorite: (id) => this.removeFavorite(id)
-  };
-}
-
-// 创建收藏HTML (移除内联事件)
-createFavoriteHTML(favorite) {
-  return `
-    <div class="favorite-item" data-id="${favorite.id}">
-      <div class="favorite-content">
-        <div class="favorite-title">
-          <span class="favorite-icon">${favorite.icon}</span>
-          <span class="favorite-name">${escapeHtml(favorite.title)}</span>
+  // 创建收藏HTML (移除内联事件)
+  createFavoriteHTML(favorite) {
+    return `
+      <div class="favorite-item" data-id="${favorite.id}">
+        <div class="favorite-content">
+          <div class="favorite-title">
+            <span class="favorite-icon">${favorite.icon}</span>
+            <span class="favorite-name">${escapeHtml(favorite.title)}</span>
+          </div>
+          <div class="favorite-subtitle">${escapeHtml(favorite.subtitle)}</div>
+          <div class="favorite-url">${escapeHtml(favorite.url)}</div>
+          <div class="favorite-meta">
+            <span>关键词: ${escapeHtml(favorite.keyword)}</span>
+            <span>添加时间: ${formatRelativeTime(favorite.addedAt)}</span>
+          </div>
         </div>
-        <div class="favorite-subtitle">${escapeHtml(favorite.subtitle)}</div>
-        <div class="favorite-url">${escapeHtml(favorite.url)}</div>
-        <div class="favorite-meta">
-          <span>关键词: ${escapeHtml(favorite.keyword)}</span>
-          <span>添加时间: ${formatRelativeTime(favorite.addedAt)}</span>
+        <div class="favorite-actions">
+          <button class="action-btn visit-btn" data-action="visit" data-url="${escapeHtml(favorite.url)}">
+            访问
+          </button>
+          <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(favorite.url)}">
+            复制
+          </button>
+          <button class="action-btn remove-btn" data-action="remove" data-id="${favorite.id}">
+            删除
+          </button>
         </div>
       </div>
-      <div class="favorite-actions">
-        <button class="action-btn visit-btn" data-action="visit" data-url="${escapeHtml(favorite.url)}">
-          访问
-        </button>
-        <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(favorite.url)}">
-          复制
-        </button>
-        <button class="action-btn remove-btn" data-action="remove" data-id="${favorite.id}">
-          删除
-        </button>
-      </div>
-    </div>
-  `;
-}
+    `;
+  }
 
   // 创建空状态
   createEmptyState() {

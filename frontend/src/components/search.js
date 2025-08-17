@@ -7,6 +7,7 @@ import { debounce } from '../utils/helpers.js';
 import searchService, { searchHistoryManager } from '../services/search.js';
 import authManager from '../services/auth.js';
 import favoritesManager from './favorites.js';
+import apiService from '../services/api.js';
 
 export class SearchManager {
   constructor() {
@@ -22,14 +23,14 @@ export class SearchManager {
       await this.loadSearchHistory();
       this.bindEvents();
       this.handleURLParams();
-	  this.exposeGlobalMethods(); // 🔧 新增：暴露全局方法
+      this.exposeGlobalMethods(); // 🔧 新增：暴露全局方法
       this.isInitialized = true;
     } catch (error) {
       console.error('搜索管理器初始化失败:', error);
     }
   }
   
-    // 🔧 新增：暴露必要的全局方法
+  // 🔧 新增：暴露必要的全局方法
   exposeGlobalMethods() {
     // 暴露到window对象，供HTML内联事件使用
     window.searchManager = {
@@ -205,7 +206,7 @@ export class SearchManager {
     }, 100);
   }
   
-    // 🔧 新增：绑定结果区域事件
+  // 🔧 新增：绑定结果区域事件
   bindResultsEvents(container) {
     container.addEventListener('click', (e) => {
       const button = e.target.closest('[data-action]');
@@ -459,7 +460,6 @@ export class SearchManager {
       showLoading(false);
     }
   }
-}
 
   // 清空搜索结果
   clearResults() {
