@@ -33,12 +33,12 @@ frontend/modules/ui/
 frontend/modules/ui/loading.js
 frontend/modules/ui/modal.js
 frontend/modules/ui/theme-manager.js
+frontend/modules/ui/toast.js
 frontend/modules/utils/
 frontend/modules/utils/array.js
 frontend/modules/utils/common.js
 frontend/modules/utils/date.js
 frontend/modules/utils/string.js
-frontend/modules/utils/toast.js
 frontend/modules/utils/url.js
 frontend/pages/
 frontend/pages/dashboard-app.js
