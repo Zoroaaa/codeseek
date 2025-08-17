@@ -26,7 +26,7 @@ class APIService {
     }
     
     // 生产环境默认值
-    return window.API_CONFIG?.PROD_URL || 'https://codeseek.zadi.workers.dev';
+    return window.API_CONFIG?.PROD_URL || 'https://codeseek-backend.tvhub.pp.ua';
   }
 
   setToken(token) {
