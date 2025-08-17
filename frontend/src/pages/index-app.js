@@ -28,6 +28,7 @@ export class IndexApp {
       
       // 显示连接状态
       this.showConnectionStatus();
+	  
       
       // 加载系统配置
       await this.loadConfig();
@@ -69,9 +70,31 @@ export class IndexApp {
       this.updateConnectionStatus('连接失败');
       toast.error('应用初始化失败，请刷新页面重试');
     } finally {
-      loading.hide();
+  // 隐藏loading
+  loading.hide();
+  
+  // 安全检查：确保app容器一定会显示
+  setTimeout(() => {
+    const appElement = document.getElementById('app');
+    const loadingElement = document.getElementById('loading');
+    
+    if (appElement && appElement.style.display === 'none') {
+      console.warn('⚠️ 检测到App容器仍然隐藏，执行强制显示');
+      appElement.style.display = 'block';
     }
-  }
+    
+    if (loadingElement && loadingElement.style.display !== 'none') {
+      console.warn('⚠️ 检测到Loading仍然显示，执行强制隐藏');
+      loadingElement.style.display = 'none';
+    }
+    
+    console.log('🔍 最终状态检查:', {
+      appVisible: appElement?.style.display,
+      loadingVisible: loadingElement?.style.display
+    });
+  }, 100);
+}
+}
 
   async loadConfig() {
     try {
