@@ -1,11 +1,11 @@
 // Dashboard主应用 - 重构版本，负责总体协调
-import { APP_CONSTANTS } from '.../core/constants.js';
-import configManager from '.../core/config.js';
-import { showLoading, showToast } from '.../utils/dom.js';
-import { isDevEnv } from '.../utils/helpers.js';
-import authManager from '.../services/auth.js';
-import themeManager from '.../services/theme.js';
-import apiService from '.../services/api.js';
+import { APP_CONSTANTS } from '../../core/constants.js';
+import configManager from '../../core/config.js';
+import { showLoading, showToast } from '../../utils/dom.js';
+import { isDevEnv } from '../../utils/helpers.js';
+import authManager from '../../services/auth.js';
+import themeManager from '../../services/theme.js';
+import apiService from '../../services/api.js';
 
 // 导入页面管理器
 import OverviewManager from './overview-manager.js';

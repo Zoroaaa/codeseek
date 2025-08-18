@@ -1,14 +1,14 @@
 // 主应用入口 - 优化版本，从constants.js获取搜索源
-import { APP_CONSTANTS } from '.../core/constants.js';
-import configManager from '.../core/config.js';
-import { showLoading, showToast } from '.../utils/dom.js';
-import { isDevEnv } from '.../utils/helpers.js';
-import networkUtils from '.../utils/network.js';
-import authManager from '.../services/auth.js';
-import themeManager from '.../services/theme.js';
-import searchManager from '.../components/search.js';
-import favoritesManager from '.../components/favorites.js';
-import apiService from '.../services/api.js';
+import { APP_CONSTANTS } from '../../core/constants.js';
+import configManager from '../../core/config.js';
+import { showLoading, showToast } from '../../utils/dom.js';
+import { isDevEnv } from '../../utils/helpers.js';
+import networkUtils from '../../utils/network.js';
+import authManager from '../../services/auth.js';
+import themeManager from '../../services/theme.js';
+import searchManager from '../../components/search.js';
+import favoritesManager from '../../components/favorites.js';
+import apiService from '../../services/api.js';
 
 class MagnetSearchApp {
   constructor() {
