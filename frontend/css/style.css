@@ -1208,3 +1208,332 @@ section:hover {
     border: 1px solid #ccc;
   }
 }
+
+/* 搜索历史删除功能相关样式 - 添加到 style.css */
+
+/* 主页面搜索历史容器样式 */
+.history-item-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 2rem;
+  padding: 0.4rem 0.6rem;
+  transition: var(--transition-base);
+  position: relative;
+}
+
+.history-item-container:hover {
+  background: var(--accent-light);
+  transform: scale(1.02);
+  box-shadow: var(--shadow-sm);
+}
+
+.history-item-container .history-item {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0.2rem 0.75rem;
+  border-radius: 1.5rem;
+  cursor: pointer;
+  transition: var(--transition-base);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.history-item-container .history-item:hover {
+  background: var(--accent-primary);
+  color: white;
+}
+
+/* 主页面历史删除按钮 */
+.history-delete-btn {
+  background: var(--error-color);
+  color: white;
+  border: none;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-base);
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.history-delete-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+  opacity: 1;
+  box-shadow: var(--shadow-sm);
+}
+
+.history-delete-btn:active {
+  transform: scale(0.95);
+}
+
+/* Dashboard历史记录样式更新 */
+.history-item .history-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.history-actions .action-btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: var(--transition-base);
+}
+
+.search-again-btn {
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+}
+
+.search-again-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.delete-history-btn {
+  background: var(--error-color);
+  color: white;
+  border: none;
+}
+
+.delete-history-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 确保历史项在不同状态下的布局 */
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease-in-out;
+  gap: 1rem;
+}
+
+.history-item:hover {
+  background: var(--bg-tertiary);
+  transform: translateX(2px);
+}
+
+.history-content {
+  flex: 1;
+  min-width: 0; /* 允许文本溢出时被截断 */
+}
+
+.history-keyword {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+  word-break: break-word;
+}
+
+.history-time {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* 响应式设计优化 */
+@media (max-width: 768px) {
+  .history-item-container {
+    padding: 0.3rem 0.5rem;
+    gap: 0.3rem;
+  }
+  
+  .history-item-container .history-item {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.85rem;
+  }
+  
+  .history-delete-btn {
+    width: 1.6rem;
+    height: 1.6rem;
+    font-size: 0.9rem;
+  }
+  
+  .history-actions {
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 80px;
+  }
+  
+  .history-actions .action-btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+  }
+  
+  .history-item {
+    padding: 0.875rem 1rem;
+    gap: 0.75rem;
+  }
+  
+  .history-keyword {
+    font-size: 0.9rem;
+  }
+  
+  .history-time {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .history-list {
+    gap: 0.5rem;
+  }
+  
+  .history-item-container {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+  }
+  
+  .history-item-container .history-item {
+    border-radius: var(--radius-sm);
+    text-align: center;
+    padding: 0.5rem;
+  }
+  
+  .history-delete-btn {
+    align-self: flex-end;
+    margin-top: 0.25rem;
+  }
+  
+  .history-actions {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+  
+  .history-actions .action-btn {
+    flex: 1;
+    text-align: center;
+  }
+  
+  .history-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+  
+  .history-content {
+    text-align: center;
+  }
+}
+
+/* 深色主题适配 */
+[data-theme="dark"] .history-item-container {
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .history-item-container:hover {
+  background: var(--accent-light);
+}
+
+[data-theme="dark"] .history-delete-btn {
+  background: #ef4444;
+}
+
+[data-theme="dark"] .history-delete-btn:hover {
+  background: #dc2626;
+}
+
+[data-theme="dark"] .delete-history-btn {
+  background: #ef4444;
+}
+
+[data-theme="dark"] .delete-history-btn:hover {
+  background: #dc2626;
+}
+
+/* 确保删除按钮在所有状态下都可见和可点击 */
+.history-delete-btn,
+.delete-history-btn {
+  min-width: 1.8rem;
+  min-height: 1.8rem;
+  z-index: 10;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .history-delete-btn,
+  .delete-history-btn {
+    min-width: 1.6rem;
+    min-height: 1.6rem;
+  }
+}
+
+/* 无障碍改进 */
+.history-delete-btn:focus,
+.delete-history-btn:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* 删除确认动画效果 */
+@keyframes deleteConfirm {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); background: #dc2626; }
+  100% { transform: scale(1); }
+}
+
+.history-delete-btn.confirming,
+.delete-history-btn.confirming {
+  animation: deleteConfirm 0.3s ease-in-out;
+}
+
+/* 当历史记录为空时的样式 */
+.empty-history-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.empty-history-state .empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.empty-history-state p {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* 确保按钮组在各种屏幕尺寸下的布局 */
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+/* 打印样式 - 隐藏删除按钮 */
+@media print {
+  .history-delete-btn,
+  .delete-history-btn,
+  .history-actions {
+    display: none !important;
+  }
+}

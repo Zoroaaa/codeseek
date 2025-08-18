@@ -1,4 +1,4 @@
-// 搜索组件
+// 搜索组件 - 添加删除单条历史记录功能
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../utils/format.js';
@@ -23,21 +23,22 @@ export class SearchManager {
       await this.loadSearchHistory();
       this.bindEvents();
       this.handleURLParams();
-      this.exposeGlobalMethods(); // 🔧 新增：暴露全局方法
+      this.exposeGlobalMethods();
       this.isInitialized = true;
     } catch (error) {
       console.error('搜索管理器初始化失败:', error);
     }
   }
   
-  // 🔧 新增：暴露必要的全局方法
+  // 暴露必要的全局方法
   exposeGlobalMethods() {
     // 暴露到window对象，供HTML内联事件使用
     window.searchManager = {
       openResult: (url, source) => this.openResult(url, source),
       toggleFavorite: (resultId) => this.toggleFavorite(resultId),
       copyToClipboard: (text) => this.copyToClipboard(text),
-      searchFromHistory: (keyword) => this.searchFromHistory(keyword)
+      searchFromHistory: (keyword) => this.searchFromHistory(keyword),
+      deleteHistoryItem: (historyId) => this.deleteHistoryItem(historyId) // 🔧 新增
     };
   }
 
@@ -170,7 +171,7 @@ export class SearchManager {
     }
   }
 
-  // 显示搜索结果 (修复事件绑定)
+  // 显示搜索结果
   displaySearchResults(keyword, results) {
     const resultsSection = document.getElementById('resultsSection');
     const searchInfo = document.getElementById('searchInfo');
@@ -194,7 +195,7 @@ export class SearchManager {
     if (resultsContainer) {
       resultsContainer.innerHTML = results.map(result => this.createResultHTML(result)).join('');
       
-      // 🔧 绑定事件委托
+      // 绑定事件委托
       this.bindResultsEvents(resultsContainer);
     }
 
@@ -206,7 +207,7 @@ export class SearchManager {
     }, 100);
   }
   
-  // 🔧 新增：绑定结果区域事件
+  // 绑定结果区域事件
   bindResultsEvents(container) {
     container.addEventListener('click', (e) => {
       const button = e.target.closest('[data-action]');
@@ -231,7 +232,7 @@ export class SearchManager {
     });
   }
 
-  // 创建搜索结果HTML (移除内联事件)
+  // 创建搜索结果HTML
   createResultHTML(result) {
     const isFavorited = favoritesManager.isFavorited(result.url);
     
@@ -397,7 +398,37 @@ export class SearchManager {
     }
   }
 
-  // 渲染搜索历史 (移除内联事件)
+  // 🔧 新增：删除单条历史记录
+  async deleteHistoryItem(historyId) {
+    if (!authManager.isAuthenticated()) {
+      showToast('用户未登录', 'error');
+      return;
+    }
+
+    if (!confirm('确定要删除这条搜索记录吗？')) return;
+
+    try {
+      showLoading(true);
+      
+      // 调用API删除
+      await apiService.deleteSearchHistory(historyId);
+      
+      // 从本地数组中移除
+      this.searchHistory = this.searchHistory.filter(item => item.id !== historyId);
+      
+      // 重新渲染历史列表
+      this.renderHistory();
+      
+      showToast('搜索记录已删除', 'success');
+    } catch (error) {
+      console.error('删除搜索历史失败:', error);
+      showToast('删除失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🔧 修改：渲染搜索历史，添加删除按钮
   renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyList = document.getElementById('historyList');
@@ -411,15 +442,26 @@ export class SearchManager {
     
     if (historyList) {
       historyList.innerHTML = this.searchHistory.slice(0, 10).map(item => 
-        `<span class="history-item" data-keyword="${escapeHtml(item.keyword)}">
-          ${escapeHtml(item.keyword)}
-        </span>`
+        `<div class="history-item-container">
+          <span class="history-item" data-keyword="${escapeHtml(item.keyword)}">
+            ${escapeHtml(item.keyword)}
+          </span>
+          <button class="history-delete-btn" data-history-id="${item.id}" title="删除这条记录">
+            ×
+          </button>
+        </div>`
       ).join('');
 
-      // 🔧 绑定历史点击事件
+      // 绑定历史项点击事件
       historyList.addEventListener('click', (e) => {
         const historyItem = e.target.closest('.history-item');
-        if (historyItem) {
+        const deleteBtn = e.target.closest('.history-delete-btn');
+        
+        if (deleteBtn) {
+          e.stopPropagation();
+          const historyId = deleteBtn.dataset.historyId;
+          this.deleteHistoryItem(historyId);
+        } else if (historyItem) {
           const keyword = historyItem.dataset.keyword;
           this.searchFromHistory(keyword);
         }
@@ -528,7 +570,7 @@ export class SearchManager {
     this.renderSearchSuggestions(suggestions);
   }
 
-  // 渲染搜索建议 (移除内联事件)
+  // 渲染搜索建议
   renderSearchSuggestions(suggestions) {
     let suggestionsContainer = document.getElementById('searchSuggestions');
     
@@ -552,13 +594,13 @@ export class SearchManager {
       const displayText = item.keyword || item.query;
       return `
         <div class="suggestion-item" data-keyword="${escapeHtml(displayText)}">
-          <span class="suggestion-icon">🕐</span>
+          <span class="suggestion-icon">🕒</span>
           <span class="suggestion-text">${escapeHtml(displayText)}</span>
         </div>
       `;
     }).join('');
     
-    // 🔧 绑定建议点击事件
+    // 绑定建议点击事件
     suggestionsContainer.addEventListener('click', (e) => {
       const suggestionItem = e.target.closest('.suggestion-item');
       if (suggestionItem) {

@@ -1,9 +1,9 @@
-// Dashboard应用逻辑
+// Dashboard应用逻辑 - 添加删除单条搜索历史记录功能
 import { APP_CONSTANTS } from '../core/constants.js';
 import configManager from '../core/config.js';
 import { showLoading, showToast } from '../utils/dom.js';
 import { escapeHtml, formatRelativeTime } from '../utils/format.js';
-import { isDevEnv, debounce } from '../utils/helpers.js'; // 🔧 添加debounce导入
+import { isDevEnv, debounce } from '../utils/helpers.js';
 import authManager from '../services/auth.js';
 import themeManager from '../services/theme.js';
 import apiService from '../services/api.js';
@@ -185,7 +185,7 @@ export class DashboardApp {
     });
   }
 
-  // 绑定收藏夹控件 (修复debounce使用)
+  // 绑定收藏夹控件
   bindFavoritesControls() {
     const favoritesSearchBtn = document.getElementById('favoritesSearchBtn');
     const favoritesSearch = document.getElementById('favoritesSearch');
@@ -196,7 +196,6 @@ export class DashboardApp {
     }
     
     if (favoritesSearch) {
-      // 🔧 使用正确导入的debounce
       favoritesSearch.addEventListener('input', debounce(() => this.searchFavorites(), 300));
       favoritesSearch.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') this.searchFavorites();
@@ -384,6 +383,39 @@ export class DashboardApp {
       } finally {
         showLoading(false);
       }
+    }
+  }
+
+  // 🔧 新增：删除单条搜索历史记录
+  async deleteHistoryItem(historyId) {
+    if (!this.currentUser) {
+      showToast('用户未登录', 'error');
+      return;
+    }
+
+    if (!confirm('确定要删除这条搜索记录吗？')) return;
+
+    try {
+      showLoading(true);
+      
+      // 调用API删除
+      await apiService.deleteSearchHistory(historyId);
+      
+      // 从本地数组中移除
+      this.searchHistory = this.searchHistory.filter(item => item.id !== historyId);
+      
+      // 重新加载历史数据
+      await this.loadHistoryData();
+      
+      showToast('搜索记录已删除', 'success');
+    } catch (error) {
+      console.error('删除搜索历史失败:', error);
+      showToast('删除失败: ' + error.message, 'error');
+      
+      // 重新加载云端数据以恢复状态
+      await this.loadCloudData();
+    } finally {
+      showLoading(false);
     }
   }
 
@@ -701,6 +733,7 @@ export class DashboardApp {
     `).join('');
   }
 
+  // 🔧 修改：加载历史数据，添加删除按钮
   async loadHistoryData() {
     const historyList = document.getElementById('historyList');
     const historyCount = document.getElementById('historyCount');
@@ -720,7 +753,7 @@ export class DashboardApp {
     if (this.searchHistory.length === 0) {
       historyList.innerHTML = `
         <div class="empty-state">
-          <span style="font-size: 3rem;">🕐</span>
+          <span style="font-size: 3rem;">🕒</span>
           <p>暂无搜索历史</p>
         </div>
       `;
@@ -734,8 +767,11 @@ export class DashboardApp {
           <div class="history-time">${formatRelativeTime(item.timestamp)}</div>
         </div>
         <div class="history-actions">
-          <button class="action-btn" onclick="window.location.href='./index.html?q=${encodeURIComponent(item.keyword)}'">
+          <button class="action-btn search-again-btn" onclick="window.location.href='./index.html?q=${encodeURIComponent(item.keyword)}'">
             重新搜索
+          </button>
+          <button class="action-btn delete-history-btn" onclick="app.deleteHistoryItem('${item.id}')" title="删除这条记录">
+            删除
           </button>
         </div>
       </div>
