@@ -2329,4 +2329,4 @@ export class EnhancedDashboardApp {
   }
 }
 
-export default DashboardApp;
+export default EnhancedDashboardApp;
