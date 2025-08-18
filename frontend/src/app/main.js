@@ -686,6 +686,9 @@ class MagnetSearchApp {
     }
   }
 
+  // 导航到Dashboard
+  async navigateToDashboard() {
+    try {
       showLoading(true);
       console.log('🏠 导航到Dashboard');
 
