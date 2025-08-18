@@ -367,6 +367,17 @@ export class SearchManager {
 
   // 添加到历史记录
   async addToHistory(keyword) {
+	  
+	const settings = await apiService.getUserSettings();
+    const maxHistory = settings.maxHistoryPerUser || 100;
+    
+    // 如果超出限制，删除最旧的记录
+    if (this.searchHistory.length >= maxHistory) {
+        const oldestId = this.searchHistory[this.searchHistory.length - 1].id;
+        await apiService.deleteSearchHistory(oldestId);
+        this.searchHistory.pop();
+    }
+	  
     if (!authManager.isAuthenticated()) return;
 
     try {

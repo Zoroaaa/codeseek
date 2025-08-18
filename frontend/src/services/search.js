@@ -30,8 +30,8 @@ class SearchService {
       }
     }
 
-    // 构建搜索结果
-    const results = this.buildSearchResults(keyword);
+    // 构建搜索结果（现在会根据用户设置过滤搜索源）
+    const results = await this.buildSearchResults(keyword);
 
     // 缓存结果
     if (useCache) {
@@ -45,13 +45,80 @@ class SearchService {
 
     return results;
   }
+  
+    // 新增：清除用户设置缓存（当用户更改设置后调用）
+  clearUserSettingsCache() {
+    this.userSettings = null;
+    console.log('用户设置缓存已清除');
+  }
+  
+    // 新增：获取用户设置的搜索源
+  async getEnabledSearchSources() {
+    try {
+      // 如果用户未登录，使用默认搜索源
+      if (!authManager.isAuthenticated()) {
+        const defaultSources = ['javbus', 'javdb', 'javlibrary'];
+        return APP_CONSTANTS.SEARCH_SOURCES.filter(
+          source => defaultSources.includes(source.id)
+        );
+      }
 
-  // 构建搜索结果
-  buildSearchResults(keyword) {
+      // 获取用户设置（缓存1分钟避免频繁请求）
+      if (!this.userSettings || Date.now() - this.userSettings.timestamp > 60000) {
+        try {
+          const settings = await apiService.getUserSettings();
+          this.userSettings = {
+            data: settings,
+            timestamp: Date.now()
+          };
+        } catch (error) {
+          console.error('获取用户设置失败，使用默认搜索源:', error);
+          // 如果获取失败，使用默认搜索源
+          const defaultSources = ['javbus', 'javdb', 'javlibrary'];
+          return APP_CONSTANTS.SEARCH_SOURCES.filter(
+            source => defaultSources.includes(source.id)
+          );
+        }
+      }
+
+      const enabledSources = this.userSettings.data.searchSources || ['javbus', 'javdb', 'javlibrary'];
+      
+      // 过滤出用户启用的搜索源
+      const filteredSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
+        source => enabledSources.includes(source.id)
+      );
+
+      // 如果用户没有启用任何搜索源，使用默认源
+      if (filteredSources.length === 0) {
+        console.warn('用户未启用任何搜索源，使用默认源');
+        const defaultSources = ['javbus', 'javdb', 'javlibrary'];
+        return APP_CONSTANTS.SEARCH_SOURCES.filter(
+          source => defaultSources.includes(source.id)
+        );
+      }
+
+      return filteredSources;
+    } catch (error) {
+      console.error('获取搜索源配置失败:', error);
+      // 出错时返回默认搜索源
+      const defaultSources = ['javbus', 'javdb', 'javlibrary'];
+      return APP_CONSTANTS.SEARCH_SOURCES.filter(
+        source => defaultSources.includes(source.id)
+      );
+    }
+  }
+
+  // 修改：构建搜索结果 - 使用用户选择的搜索源
+  async buildSearchResults(keyword) {
     const encodedKeyword = encodeURIComponent(keyword);
     const timestamp = Date.now();
     
-    return APP_CONSTANTS.SEARCH_SOURCES.map(source => ({
+    // 获取用户启用的搜索源
+    const enabledSources = await this.getEnabledSearchSources();
+    
+    console.log(`使用 ${enabledSources.length} 个搜索源:`, enabledSources.map(s => s.name));
+    
+    return enabledSources.map(source => ({
       id: `result_${keyword}_${source.id}_${timestamp}`,
       title: source.name,
       subtitle: source.subtitle,

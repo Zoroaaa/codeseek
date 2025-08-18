@@ -177,6 +177,16 @@ export class FavoritesManager {
 
   // 添加收藏
   async addFavorite(item) {
+	  
+	      // 检查收藏数量限制
+    const settings = await apiService.getUserSettings();
+    const maxFavorites = settings.maxFavoritesPerUser || 500;
+    
+    if (this.favorites.length >= maxFavorites) {
+        showToast(`收藏已达上限（${maxFavorites}个）`, 'error');
+        return false;
+    }
+	  
     if (!authManager.isAuthenticated()) {
       showToast('请先登录后再收藏', 'error');
       return false;

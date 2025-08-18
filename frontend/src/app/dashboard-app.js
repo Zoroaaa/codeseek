@@ -7,6 +7,7 @@ import { isDevEnv, debounce } from '../utils/helpers.js';
 import authManager from '../services/auth.js';
 import themeManager from '../services/theme.js';
 import apiService from '../services/api.js';
+import searchService from '../services/search.js';
 
 export class DashboardApp {
   constructor() {
@@ -311,25 +312,34 @@ export class DashboardApp {
   }
 
   // 加载设置数据
-  async loadSettingsData() {
+async loadSettingsData() {
     try {
-      const settings = await apiService.getUserSettings();
-      
-      const autoSyncEl = document.getElementById('autoSync');
-      const enableCacheEl = document.getElementById('enableCache');
-      const themeModeEl = document.getElementById('themeMode');
-      const maxFavoritesEl = document.getElementById('maxFavorites');
+        const settings = await apiService.getUserSettings();
+        
+        const enableCacheEl = document.getElementById('enableCache');
+        const themeModeEl = document.getElementById('themeMode');
+        const maxFavoritesEl = document.getElementById('maxFavorites');
+        const allowAnalyticsEl = document.getElementById('allowAnalytics');
+        const searchSuggestionsEl = document.getElementById('searchSuggestions');
 
-      if (autoSyncEl) autoSyncEl.checked = settings.autoSync !== false;
-      if (enableCacheEl) enableCacheEl.checked = settings.cacheResults !== false;
-      if (themeModeEl) themeModeEl.value = settings.theme || 'auto';
-      if (maxFavoritesEl) maxFavoritesEl.value = settings.maxFavoritesPerUser ?? 500;
+        if (enableCacheEl) enableCacheEl.checked = settings.cacheResults !== false;
+        if (themeModeEl) themeModeEl.value = settings.theme || 'auto';
+        if (maxFavoritesEl) maxFavoritesEl.value = settings.maxFavoritesPerUser ?? 500;
+        if (allowAnalyticsEl) allowAnalyticsEl.checked = settings.allowAnalytics !== false;
+        if (searchSuggestionsEl) searchSuggestionsEl.checked = settings.searchSuggestions !== false;
+
+        // 新增：加载搜索源设置
+        const enabledSources = settings.searchSources || ['javbus', 'javdb', 'javlibrary'];
+        const sourceCheckboxes = document.querySelectorAll('.checkbox-group input[type="checkbox"]');
+        sourceCheckboxes.forEach(checkbox => {
+            checkbox.checked = enabledSources.includes(checkbox.value);
+        });
 
     } catch (error) {
-      console.error('加载设置失败:', error);
-      showToast('加载设置失败', 'error');
+        console.error('加载设置失败:', error);
+        showToast('加载设置失败', 'error');
     }
-  }
+}
 
   // 同步收藏 - 直接与API交互
   async syncFavorites() {
@@ -485,33 +495,53 @@ export class DashboardApp {
   }
 
   // 保存设置
-  async saveSettings() {
+async saveSettings() {
     if (!this.currentUser) {
-      showToast('用户未登录', 'error');
-      return;
+        showToast('用户未登录', 'error');
+        return;
     }
 
     try {
-      showLoading(true);
-      const ui = this.collectSettings();
-      const payload = {
-        theme: ui.themeMode,
-        autoSync: !!ui.autoSync,
-        cacheResults: !!ui.enableCache,
-        maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
-        maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10)
-      };
-      
-      await apiService.updateUserSettings(payload);
-      showToast('设置保存成功', 'success');
-      this.markSettingsSaved();
+        showLoading(true);
+        const ui = this.collectSettings();
+        
+        // 验证至少选择了一个搜索源
+        if (!ui.searchSources || ui.searchSources.length === 0) {
+            showToast('请至少选择一个搜索源', 'error');
+            return;
+        }
+        
+        const payload = {
+            theme: ui.themeMode,
+            cacheResults: !!ui.enableCache,
+            searchSources: ui.searchSources,
+            maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
+            maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
+            allowAnalytics: !!ui.allowAnalytics,
+            searchSuggestions: !!ui.searchSuggestions
+        };
+        
+        await apiService.updateUserSettings(payload);
+        
+        // 立即应用主题设置
+        if (payload.theme) {
+            themeManager.setTheme(payload.theme);
+        }
+        
+        // 清除搜索服务的用户设置缓存，确保下次搜索使用新设置
+        if (typeof searchService !== 'undefined' && searchService.clearUserSettingsCache) {
+            searchService.clearUserSettingsCache();
+        }
+        
+        showToast('设置保存成功', 'success');
+        this.markSettingsSaved();
     } catch (error) {
-      console.error('保存设置失败:', error);
-      showToast('保存设置失败: ' + error.message, 'error');
+        console.error('保存设置失败:', error);
+        showToast('保存设置失败: ' + error.message, 'error');
     } finally {
-      showLoading(false);
+        showLoading(false);
     }
-  }
+}
 
   // 数据同步
   async syncAllData() {
@@ -620,34 +650,40 @@ export class DashboardApp {
   }
 
   // 重置设置
-  resetSettings() {
+resetSettings() {
     if (!confirm('确定要重置所有设置为默认值吗？')) return;
 
     // 重置为默认设置
     const defaultSettings = {
-      autoSync: true,
-      enableCache: true,
-      themeMode: 'auto',
-      historyRetention: '90',
-      maxFavorites: '500',
-      allowAnalytics: true,
-      searchSuggestions: true
+        enableCache: true,
+        themeMode: 'auto',
+        historyRetention: '90',
+        maxFavorites: '500',
+        allowAnalytics: true,
+        searchSuggestions: true,
+        searchSources: ['javbus', 'javdb', 'javlibrary'] // 新增：默认搜索源
     };
 
     Object.entries(defaultSettings).forEach(([key, value]) => {
-      const element = document.getElementById(key);
-      if (element) {
-        if (element.type === 'checkbox') {
-          element.checked = value;
-        } else {
-          element.value = value;
+        const element = document.getElementById(key);
+        if (element) {
+            if (element.type === 'checkbox') {
+                element.checked = value;
+            } else {
+                element.value = value;
+            }
         }
-      }
+    });
+
+    // 特殊处理搜索源复选框
+    const sourceCheckboxes = document.querySelectorAll('.checkbox-group input[type="checkbox"]');
+    sourceCheckboxes.forEach(checkbox => {
+        checkbox.checked = defaultSettings.searchSources.includes(checkbox.value);
     });
 
     this.markSettingsChanged();
     showToast('设置已重置为默认值，请点击保存', 'success');
-  }
+}
 
   // 初始化主题
   initTheme() {
@@ -834,20 +870,31 @@ export class DashboardApp {
     }
   }
 
-  collectSettings() {
+// 收集设置时需要特殊处理搜索源
+collectSettings() {
     const settings = {};
     const settingInputs = document.querySelectorAll('#settings input, #settings select');
     
     settingInputs.forEach(input => {
-      if (input.type === 'checkbox') {
-        settings[input.id] = input.checked;
-      } else {
-        settings[input.id] = input.value;
-      }
+        if (input.type === 'checkbox') {
+            // 特殊处理搜索源复选框组
+            if (input.closest('.checkbox-group')) {
+                if (!settings.searchSources) {
+                    settings.searchSources = [];
+                }
+                if (input.checked) {
+                    settings.searchSources.push(input.value);
+                }
+            } else {
+                settings[input.id] = input.checked;
+            }
+        } else {
+            settings[input.id] = input.value;
+        }
     });
     
     return settings;
-  }
+}
 
   markSettingsChanged() {
     const saveBtn = document.querySelector('#settings .btn-primary');
