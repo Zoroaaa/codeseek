@@ -4,7 +4,7 @@ import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
 import { showToast } from '../utils/dom.js';
 import apiService from './api.js';
-import authManager from './auth.js'; // 🔧 修复：添加缺失的导入
+import authManager from './auth.js';
 
 class SearchService {
   constructor() {
@@ -13,7 +13,7 @@ class SearchService {
     this.userSettings = null; // 缓存用户设置
   }
 
-  // 执行搜索 - 修改为从后端获取缓存设置
+  // 🔧 修复：执行搜索 - 从用户设置获取缓存配置
   async performSearch(keyword, options = {}) {
     // 验证搜索关键词
     const validation = validateSearchKeyword(keyword);
@@ -26,8 +26,13 @@ class SearchService {
     if (useCache === undefined) {
       // 如果没有明确指定，从用户设置获取
       try {
-        const userSettings = await this.getUserSettings();
-        useCache = userSettings.cacheResults !== false; // 默认启用缓存
+        if (authManager.isAuthenticated()) {
+          const userSettings = await this.getUserSettings();
+          // 注意：由于前端已移除缓存设置，这里总是默认启用缓存
+          useCache = true; // 总是启用缓存以提升性能
+        } else {
+          useCache = true; // 未登录用户也启用缓存
+        }
       } catch (error) {
         console.warn('获取缓存设置失败，使用默认值:', error);
         useCache = true; // 默认启用缓存
@@ -54,7 +59,7 @@ class SearchService {
     }
 
     // 保存到搜索历史
-    if (saveToHistory) {
+    if (saveToHistory && authManager.isAuthenticated()) {
       this.saveToHistory(keyword).catch(console.error);
     }
 
@@ -78,7 +83,7 @@ class SearchService {
     return this.userSettings.data;
   }
   
-  // 新增：清除用户设置缓存（当用户更改设置后调用）
+  // 🔧 新增：清除用户设置缓存（当用户更改设置后调用）
   clearUserSettingsCache() {
     this.userSettings = null;
     console.log('用户设置缓存已清除');
@@ -110,24 +115,28 @@ class SearchService {
 
       const enabledSources = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary'];
       
-      // 过滤出用户启用的搜索源
-      const filteredSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
-        source => enabledSources.includes(source.id)
+      // 🔧 新增：验证搜索源ID的有效性
+      const validSources = enabledSources.filter(sourceId => 
+        APP_CONSTANTS.SEARCH_SOURCES.some(source => source.id === sourceId)
       );
-
-      // 如果用户没有启用任何搜索源，使用默认源
-      if (filteredSources.length === 0) {
-        console.warn('用户未启用任何搜索源，使用默认源');
+      
+      if (validSources.length === 0) {
+        console.warn('用户设置的搜索源无效，使用默认源');
         const defaultSources = ['javbus', 'javdb', 'javlibrary'];
         return APP_CONSTANTS.SEARCH_SOURCES.filter(
           source => defaultSources.includes(source.id)
         );
       }
+      
+      // 过滤出用户启用的搜索源
+      const filteredSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
+        source => validSources.includes(source.id)
+      );
 
       return filteredSources;
     } catch (error) {
       console.error('获取搜索源配置失败:', error);
-      // 出错时返回默认搜索源
+      // 🔧 增强错误处理：出错时返回默认搜索源
       const defaultSources = ['javbus', 'javdb', 'javlibrary'];
       return APP_CONSTANTS.SEARCH_SOURCES.filter(
         source => defaultSources.includes(source.id)
@@ -135,26 +144,45 @@ class SearchService {
     }
   }
 
-  // 修改：构建搜索结果 - 使用用户选择的搜索源
+  // 🔧 修复：构建搜索结果 - 使用用户选择的搜索源
   async buildSearchResults(keyword) {
     const encodedKeyword = encodeURIComponent(keyword);
     const timestamp = Date.now();
     
-    // 获取用户启用的搜索源
-    const enabledSources = await this.getEnabledSearchSources();
-    
-    console.log(`使用 ${enabledSources.length} 个搜索源:`, enabledSources.map(s => s.name));
-    
-    return enabledSources.map(source => ({
-      id: `result_${keyword}_${source.id}_${timestamp}`,
-      title: source.name,
-      subtitle: source.subtitle,
-      url: source.urlTemplate.replace('{keyword}', encodedKeyword),
-      icon: source.icon,
-      keyword: keyword,
-      timestamp: timestamp,
-      source: source.id
-    }));
+    try {
+      // 获取用户启用的搜索源
+      const enabledSources = await this.getEnabledSearchSources();
+      
+      console.log(`使用 ${enabledSources.length} 个搜索源:`, enabledSources.map(s => s.name));
+      
+      return enabledSources.map(source => ({
+        id: `result_${keyword}_${source.id}_${timestamp}`,
+        title: source.name,
+        subtitle: source.subtitle,
+        url: source.urlTemplate.replace('{keyword}', encodedKeyword),
+        icon: source.icon,
+        keyword: keyword,
+        timestamp: timestamp,
+        source: source.id
+      }));
+    } catch (error) {
+      console.error('构建搜索结果失败:', error);
+      // 🔧 增强错误处理：如果获取搜索源失败，使用默认源
+      const defaultSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
+        source => ['javbus', 'javdb', 'javlibrary'].includes(source.id)
+      );
+      
+      return defaultSources.map(source => ({
+        id: `result_${keyword}_${source.id}_${timestamp}`,
+        title: source.name,
+        subtitle: source.subtitle,
+        url: source.urlTemplate.replace('{keyword}', encodedKeyword),
+        icon: source.icon,
+        keyword: keyword,
+        timestamp: timestamp,
+        source: source.id
+      }));
+    }
   }
 
   // 获取缓存结果

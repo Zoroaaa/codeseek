@@ -230,13 +230,6 @@
                     <div class="settings-section">
                         <h3>基本设置</h3>
                         <div class="setting-item">
-                            <label>搜索缓存</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="enableCache" checked>
-                                <span class="setting-desc">启用搜索结果缓存，提升加载速度</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
                             <label>主题模式</label>
                             <div class="setting-control">
                                 <select id="themeMode">
@@ -248,19 +241,17 @@
                         </div>
                     </div>
 
-                    <!-- 搜索设置 -->
+                    <!-- 🔧 修改：搜索设置 - 动态加载搜索源 -->
                     <div class="settings-section">
                         <h3>搜索设置</h3>
                         <div class="setting-item">
-                            <label>默认搜索源</label>
+                            <label>启用的搜索源</label>
                             <div class="setting-control">
-                                <div class="checkbox-group">
-                                    <label><input type="checkbox" value="javbus" checked> JavBus</label>
-                                    <label><input type="checkbox" value="javdb" checked> JavDB</label>
-                                    <label><input type="checkbox" value="javlibrary" checked> JavLibrary</label>
-                                    <label><input type="checkbox" value="av01"> AV01</label>
-                                    <label><input type="checkbox" value="missav"> MissAV</label>
+                                <div class="checkbox-group" id="searchSourcesContainer">
+                                    <!-- 搜索源复选框将通过JavaScript动态加载 -->
+                                    <div class="loading-sources">正在加载搜索源...</div>
                                 </div>
+                                <span class="setting-desc">选择您要使用的搜索源（至少选择一个）</span>
                             </div>
                         </div>
                         <div class="setting-item">

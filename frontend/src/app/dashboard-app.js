@@ -7,7 +7,7 @@ import { isDevEnv, debounce } from '../utils/helpers.js';
 import authManager from '../services/auth.js';
 import themeManager from '../services/theme.js';
 import apiService from '../services/api.js';
-import searchService from '../services/search.js'; // 🔧 修复：添加缺失的导入
+import searchService from '../services/search.js';
 
 export class DashboardApp {
   constructor() {
@@ -153,12 +153,6 @@ export class DashboardApp {
 
     // 设置表单事件
     this.bindSettingsEvents();
-    
-    // 密码修改按钮
-    const changePasswordBtn = document.getElementById('changePasswordBtn');
-    if (changePasswordBtn) {
-      changePasswordBtn.addEventListener('click', () => this.changePassword());
-    }
 
     // 数据操作按钮
     this.bindDataActionButtons();
@@ -311,33 +305,186 @@ export class DashboardApp {
     }
   }
 
-  // 🔧 修复：加载设置数据 - 移除缓存设置处理
+  // 🔧 修复：加载设置数据 - 动态加载搜索源
   async loadSettingsData() {
     try {
-        const settings = await apiService.getUserSettings();
-        
-        // 移除了enableCache相关的处理
-        const themeModeEl = document.getElementById('themeMode');
-        const maxFavoritesEl = document.getElementById('maxFavorites');
-        const allowAnalyticsEl = document.getElementById('allowAnalytics');
-        const searchSuggestionsEl = document.getElementById('searchSuggestions');
+      const settings = await apiService.getUserSettings();
+      
+      const themeModeEl = document.getElementById('themeMode');
+      const maxFavoritesEl = document.getElementById('maxFavorites');
+      const allowAnalyticsEl = document.getElementById('allowAnalytics');
+      const searchSuggestionsEl = document.getElementById('searchSuggestions');
 
-        if (themeModeEl) themeModeEl.value = settings.theme || 'auto';
-        if (maxFavoritesEl) maxFavoritesEl.value = settings.maxFavoritesPerUser ?? 500;
-        if (allowAnalyticsEl) allowAnalyticsEl.checked = settings.allowAnalytics !== false;
-        if (searchSuggestionsEl) searchSuggestionsEl.checked = settings.searchSuggestions !== false;
+      if (themeModeEl) themeModeEl.value = settings.theme || 'auto';
+      if (maxFavoritesEl) maxFavoritesEl.value = settings.maxFavoritesPerUser ?? 500;
+      if (allowAnalyticsEl) allowAnalyticsEl.checked = settings.allowAnalytics !== false;
+      if (searchSuggestionsEl) searchSuggestionsEl.checked = settings.searchSuggestions !== false;
 
-        // 加载搜索源设置
-        const enabledSources = settings.searchSources || ['javbus', 'javdb', 'javlibrary'];
-        const sourceCheckboxes = document.querySelectorAll('.checkbox-group input[type="checkbox"]');
-        sourceCheckboxes.forEach(checkbox => {
-            checkbox.checked = enabledSources.includes(checkbox.value);
-        });
+      // 🔧 修复：加载搜索源设置，使用配置中的所有搜索源
+      await this.loadSearchSourceSettings(settings.searchSources || ['javbus', 'javdb', 'javlibrary']);
 
     } catch (error) {
-        console.error('加载设置失败:', error);
-        showToast('加载设置失败', 'error');
+      console.error('加载设置失败:', error);
+      showToast('加载设置失败', 'error');
+      // 出错时加载默认搜索源设置
+      await this.loadSearchSourceSettings(['javbus', 'javdb', 'javlibrary']);
     }
+  }
+
+  // 🔧 新增：专门的搜索源设置加载方法
+  async loadSearchSourceSettings(enabledSources) {
+    // 清空现有的搜索源设置区域
+    const searchSourcesContainer = document.getElementById('searchSourcesContainer');
+    if (!searchSourcesContainer) {
+      console.warn('找不到搜索源设置容器');
+      return;
+    }
+    
+    // 从常量中获取所有可用的搜索源
+    const allSources = APP_CONSTANTS.SEARCH_SOURCES;
+    
+    // 生成搜索源复选框HTML
+    const checkboxesHTML = allSources.map(source => `
+      <label class="search-source-item">
+        <input type="checkbox" value="${source.id}" ${enabledSources.includes(source.id) ? 'checked' : ''}>
+        <span class="source-info">
+          <span class="source-name">${source.icon} ${source.name}</span>
+          <span class="source-subtitle">${source.subtitle}</span>
+        </span>
+      </label>
+    `).join('');
+    
+    searchSourcesContainer.innerHTML = checkboxesHTML;
+  }
+
+  // 🔧 修复：保存设置 - 添加搜索源变更检测和前端更新
+  async saveSettings() {
+    if (!this.currentUser) {
+      showToast('用户未登录', 'error');
+      return;
+    }
+
+    try {
+      showLoading(true);
+      const ui = this.collectSettings();
+      
+      // 验证至少选择了一个搜索源
+      if (!ui.searchSources || ui.searchSources.length === 0) {
+        showToast('请至少选择一个搜索源', 'error');
+        return;
+      }
+      
+      // 🔧 新增：获取当前搜索源设置用于比较
+      let oldSearchSources = [];
+      try {
+        const currentSettings = await apiService.getUserSettings();
+        oldSearchSources = currentSettings.searchSources || [];
+      } catch (error) {
+        console.warn('获取当前设置失败:', error);
+      }
+      
+      const payload = {
+        theme: ui.themeMode,
+        searchSources: ui.searchSources,
+        maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
+        maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
+        allowAnalytics: !!ui.allowAnalytics,
+        searchSuggestions: !!ui.searchSuggestions
+      };
+      
+      await apiService.updateUserSettings(payload);
+      
+      // 立即应用主题设置
+      if (payload.theme) {
+        themeManager.setTheme(payload.theme);
+      }
+      
+      // 🔧 修复：清除搜索服务的用户设置缓存，确保下次搜索使用新设置
+      if (searchService && searchService.clearUserSettingsCache) {
+        searchService.clearUserSettingsCache();
+      }
+      
+      // 🔧 新增：如果搜索源发生变化，通知主页面更新站点导航
+      const searchSourcesChanged = JSON.stringify(oldSearchSources.sort()) !== JSON.stringify(ui.searchSources.sort());
+      if (searchSourcesChanged) {
+        // 发送自定义事件通知主页面更新站点导航
+        window.dispatchEvent(new CustomEvent('searchSourcesChanged', {
+          detail: { newSources: ui.searchSources }
+        }));
+        
+        console.log('搜索源设置已变更，已通知主页面更新站点导航');
+      }
+      
+      showToast('设置保存成功', 'success');
+      this.markSettingsSaved();
+    } catch (error) {
+      console.error('保存设置失败:', error);
+      showToast('保存设置失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🔧 修复：收集设置时处理搜索源
+  collectSettings() {
+    const settings = {};
+    
+    // 基础设置
+    const themeModeEl = document.getElementById('themeMode');
+    const maxFavoritesEl = document.getElementById('maxFavorites');
+    const historyRetentionEl = document.getElementById('historyRetention');
+    const allowAnalyticsEl = document.getElementById('allowAnalytics');
+    const searchSuggestionsEl = document.getElementById('searchSuggestions');
+    
+    if (themeModeEl) settings.themeMode = themeModeEl.value;
+    if (maxFavoritesEl) settings.maxFavorites = maxFavoritesEl.value;
+    if (historyRetentionEl) settings.historyRetention = historyRetentionEl.value;
+    if (allowAnalyticsEl) settings.allowAnalytics = allowAnalyticsEl.checked;
+    if (searchSuggestionsEl) settings.searchSuggestions = searchSuggestionsEl.checked;
+    
+    // 🔧 修复：收集搜索源设置
+    const searchSourceCheckboxes = document.querySelectorAll('#searchSourcesContainer input[type="checkbox"]:checked');
+    settings.searchSources = Array.from(searchSourceCheckboxes).map(checkbox => checkbox.value);
+    
+    return settings;
+  }
+
+  // 🔧 修复：重置设置
+  resetSettings() {
+    if (!confirm('确定要重置所有设置为默认值吗？')) return;
+
+    // 重置为默认设置
+    const defaultSettings = {
+      themeMode: 'auto',
+      historyRetention: '90',
+      maxFavorites: '500',
+      allowAnalytics: true,
+      searchSuggestions: true,
+      searchSources: ['javbus', 'javdb', 'javlibrary'] // 默认搜索源
+    };
+
+    // 重置基础设置
+    Object.entries(defaultSettings).forEach(([key, value]) => {
+      if (key === 'searchSources') return; // 搜索源单独处理
+      
+      const element = document.getElementById(key);
+      if (element) {
+        if (element.type === 'checkbox') {
+          element.checked = value;
+        } else {
+          element.value = value;
+        }
+      }
+    });
+
+    // 🔧 重置搜索源设置
+    const sourceCheckboxes = document.querySelectorAll('#searchSourcesContainer input[type="checkbox"]');
+    sourceCheckboxes.forEach(checkbox => {
+      checkbox.checked = defaultSettings.searchSources.includes(checkbox.value);
+    });
+
+    this.markSettingsChanged();
+    showToast('设置已重置为默认值，请点击保存', 'success');
   }
 
   // 同步收藏 - 直接与API交互
@@ -493,55 +640,6 @@ export class DashboardApp {
     }
   }
 
-  // 🔧 修复：保存设置 - 移除缓存设置处理，添加searchService缓存清理
-  async saveSettings() {
-    if (!this.currentUser) {
-        showToast('用户未登录', 'error');
-        return;
-    }
-
-    try {
-        showLoading(true);
-        const ui = this.collectSettings();
-        
-        // 验证至少选择了一个搜索源
-        if (!ui.searchSources || ui.searchSources.length === 0) {
-            showToast('请至少选择一个搜索源', 'error');
-            return;
-        }
-        
-        const payload = {
-            theme: ui.themeMode,
-            // 移除了cacheResults设置
-            searchSources: ui.searchSources,
-            maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
-            maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
-            allowAnalytics: !!ui.allowAnalytics,
-            searchSuggestions: !!ui.searchSuggestions
-        };
-        
-        await apiService.updateUserSettings(payload);
-        
-        // 立即应用主题设置
-        if (payload.theme) {
-            themeManager.setTheme(payload.theme);
-        }
-        
-        // 🔧 修复：清除搜索服务的用户设置缓存，确保下次搜索使用新设置
-        if (searchService && searchService.clearUserSettingsCache) {
-            searchService.clearUserSettingsCache();
-        }
-        
-        showToast('设置保存成功', 'success');
-        this.markSettingsSaved();
-    } catch (error) {
-        console.error('保存设置失败:', error);
-        showToast('保存设置失败: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-  }
-
   // 数据同步
   async syncAllData() {
     if (!this.currentUser) {
@@ -648,72 +746,94 @@ export class DashboardApp {
     }
   }
 
-  // 🔧 修复：重置设置 - 移除缓存设置
-  resetSettings() {
-    if (!confirm('确定要重置所有设置为默认值吗？')) return;
-
-    // 重置为默认设置（移除了enableCache）
-    const defaultSettings = {
-        themeMode: 'auto',
-        historyRetention: '90',
-        maxFavorites: '500',
-        allowAnalytics: true,
-        searchSuggestions: true,
-        searchSources: ['javbus', 'javdb', 'javlibrary'] // 默认搜索源
-    };
-
-    Object.entries(defaultSettings).forEach(([key, value]) => {
-        const element = document.getElementById(key);
-        if (element) {
-            if (element.type === 'checkbox') {
-                element.checked = value;
-            } else {
-                element.value = value;
-            }
-        }
-    });
-
-    // 特殊处理搜索源复选框
-    const sourceCheckboxes = document.querySelectorAll('.checkbox-group input[type="checkbox"]');
-    sourceCheckboxes.forEach(checkbox => {
-        checkbox.checked = defaultSettings.searchSources.includes(checkbox.value);
-    });
-
-    this.markSettingsChanged();
-    showToast('设置已重置为默认值，请点击保存', 'success');
-  }
-
-  // 初始化主题
-  initTheme() {
-    // 只调用主题管理器的应用方法，不绑定事件
-    themeManager.applyTheme();
-  }
-
-  // 切换主题
-  toggleTheme() {
-    // 直接调用全局主题管理器，不需要额外绑定事件
-    themeManager.toggleTheme();
-  }
-
-  // 退出登录
-  async logout() {
-    if (confirm('确定要退出登录吗？')) {
-      try {
-        await apiService.logout();
-        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-        showToast('已退出登录', 'success');
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 1000);
-      } catch (error) {
-        console.error('退出登录失败:', error);
-        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-        window.location.href = 'index.html';
-      }
+  // 修改密码
+  changePassword() {
+    const modal = document.getElementById('passwordModal');
+    if (modal) {
+      modal.style.display = 'block';
+      setTimeout(() => {
+        const currentPassword = document.getElementById('currentPassword');
+        if (currentPassword) currentPassword.focus();
+      }, 100);
     }
   }
 
-  // 以下方法保持不变，但移除任何本地存储引用
+  async handlePasswordChange(event) {
+    event.preventDefault();
+    
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmNewPassword').value;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showToast('请填写所有字段', 'error');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showToast('新密码确认不一致', 'error');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      showToast('新密码至少6个字符', 'error');
+      return;
+    }
+
+    try {
+      showLoading(true);
+      
+      const response = await apiService.changePassword(currentPassword, newPassword);
+      
+      if (response.success) {
+        showToast('密码修改成功', 'success');
+        this.closeModals();
+        document.getElementById('passwordForm').reset();
+      } else {
+        throw new Error(response.message || '密码修改失败');
+      }
+    } catch (error) {
+      showToast('密码修改失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  markSettingsChanged() {
+    const saveBtn = document.querySelector('#settings .btn-primary');
+    if (saveBtn) {
+      saveBtn.textContent = '保存设置*';
+      saveBtn.classList.add('changed');
+    }
+  }
+
+  markSettingsSaved() {
+    const saveBtn = document.querySelector('#settings .btn-primary');
+    if (saveBtn) {
+      saveBtn.textContent = '保存设置';
+      saveBtn.classList.remove('changed');
+    }
+  }
+
+  calculateActiveDays() {
+    if (this.searchHistory.length === 0) return 0;
+    
+    const dates = new Set(
+      this.searchHistory.map(h => new Date(h.timestamp).toDateString())
+    );
+    return dates.size;
+  }
+
+  calculateUserLevel() {
+    const totalActions = this.searchHistory.length + this.favorites.length;
+    
+    if (totalActions < 10) return '新手';
+    if (totalActions < 50) return '熟练';
+    if (totalActions < 200) return '专业';
+    if (totalActions < 500) return '专家';
+    return '大师';
+  }
+
   loadOverviewDataFromLocal() {
     const totalSearchesEl = document.getElementById('totalSearches');
     const totalFavoritesEl = document.getElementById('totalFavorites');
@@ -816,119 +936,6 @@ export class DashboardApp {
     console.log('加载统计数据');
   }
 
-  changePassword() {
-    const modal = document.getElementById('passwordModal');
-    if (modal) {
-      modal.style.display = 'block';
-      setTimeout(() => {
-        const currentPassword = document.getElementById('currentPassword');
-        if (currentPassword) currentPassword.focus();
-      }, 100);
-    }
-  }
-
-  async handlePasswordChange(event) {
-    event.preventDefault();
-    
-    const currentPassword = document.getElementById('currentPassword').value;
-    const newPassword = document.getElementById('newPassword').value;
-    const confirmPassword = document.getElementById('confirmNewPassword').value;
-
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      showToast('请填写所有字段', 'error');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      showToast('新密码确认不一致', 'error');
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      showToast('新密码至少6个字符', 'error');
-      return;
-    }
-
-    try {
-      showLoading(true);
-      
-      const response = await apiService.changePassword(currentPassword, newPassword);
-      
-      if (response.success) {
-        showToast('密码修改成功', 'success');
-        this.closeModals();
-        document.getElementById('passwordForm').reset();
-      } else {
-        throw new Error(response.message || '密码修改失败');
-      }
-    } catch (error) {
-      showToast('密码修改失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
-    }
-  }
-
-  // 🔧 修复：收集设置时移除缓存相关处理
-  collectSettings() {
-    const settings = {};
-    const settingInputs = document.querySelectorAll('#settings input, #settings select');
-    
-    settingInputs.forEach(input => {
-        if (input.type === 'checkbox') {
-            // 特殊处理搜索源复选框组
-            if (input.closest('.checkbox-group')) {
-                if (!settings.searchSources) {
-                    settings.searchSources = [];
-                }
-                if (input.checked) {
-                    settings.searchSources.push(input.value);
-                }
-            } else {
-                settings[input.id] = input.checked;
-            }
-        } else {
-            settings[input.id] = input.value;
-        }
-    });
-    
-    return settings;
-  }
-
-  markSettingsChanged() {
-    const saveBtn = document.querySelector('#settings .btn-primary');
-    if (saveBtn) {
-      saveBtn.textContent = '保存设置*';
-      saveBtn.classList.add('changed');
-    }
-  }
-
-  markSettingsSaved() {
-    const saveBtn = document.querySelector('#settings .btn-primary');
-    if (saveBtn) {
-      saveBtn.textContent = '保存设置';
-      saveBtn.classList.remove('changed');
-    }
-  }
-
-  calculateActiveDays() {
-    if (this.searchHistory.length === 0) return 0;
-    
-    const dates = new Set(
-      this.searchHistory.map(h => new Date(h.timestamp).toDateString())
-    );
-    return dates.size;
-  }
-
-  calculateUserLevel() {
-    const totalActions = this.searchHistory.length + this.favorites.length;
-    
-    if (totalActions < 10) return '新手';
-    if (totalActions < 50) return '熟练';
-    if (totalActions < 200) return '专业';
-    if (totalActions < 500) return '专家';
-    return '大师';
-  }
-
   async loadRecentActivity() {
     const activityList = document.getElementById('activityList');
     if (!activityList) return;
@@ -964,10 +971,6 @@ export class DashboardApp {
     `).join('');
   }
 
-  escapeHtml(text) {
-    return escapeHtml(text);
-  }
-
   updateUserUI() {
     const username = document.getElementById('username');
     if (username && this.currentUser) {
@@ -979,6 +982,24 @@ export class DashboardApp {
     document.querySelectorAll('.modal').forEach(modal => {
       modal.style.display = 'none';
     });
+  }
+
+  // 退出登录
+  async logout() {
+    if (confirm('确定要退出登录吗？')) {
+      try {
+        await apiService.logout();
+        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+        showToast('已退出登录', 'success');
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 1000);
+      } catch (error) {
+        console.error('退出登录失败:', error);
+        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+        window.location.href = 'index.html';
+      }
+    }
   }
 
   async deleteAccount() {
@@ -1082,6 +1103,10 @@ export class DashboardApp {
         </div>
       </div>
     `).join('');
+  }
+
+  escapeHtml(text) {
+    return escapeHtml(text);
   }
 }
 

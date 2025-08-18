@@ -63,12 +63,7 @@
                         <span>搜索</span>
                     </button>
                 </div>
-                <div class="search-options">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="cacheResults" checked>
-                        <span>缓存搜索结果</span>
-                    </label>
-                </div>
+                <!-- 🔧 移除了缓存设置选项 -->
             </div>
         </section>
 
@@ -118,75 +113,11 @@
             <div id="favorites" class="favorites-grid"></div>
         </section>
 
-        <!-- 站点导航 -->
-        <section class="sites-section">
-            <h2>🌐 资源站点导航</h2>
-            <div class="sites-grid">
-                <div class="site-category">
-                    <h3>📚 番号资料站</h3>
-                    <div class="site-list">
-                        <a href="https://www.javlibrary.com/cn" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavLibrary</strong>
-                                <span>评论活跃，女优搜索详尽</span>
-                            </div>
-                        </a>
-                        <a href="https://www.javbus.com" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavBus</strong>
-                                <span>番号+磁力一体站，信息完善</span>
-                            </div>
-                        </a>
-                        <a href="https://javdb.com" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavDB</strong>
-                                <span>极简风格番号资料站，轻量快速</span>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="site-category">
-                    <h3>🎥 在线播放平台</h3>
-                    <div class="site-list">
-                        <a href="https://jable.tv" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>Jable</strong>
-                                <span>播放速度快，进度可跟踪</span>
-                            </div>
-                        </a>
-                        <a href="https://www5.javmost.com/" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavMost</strong>
-                                <span>简洁界面，中文支持</span>
-                            </div>
-                        </a>
-                        <a href="https://jav.guru" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>JavGuru</strong>
-                                <span>播放+评论一体，有项目评分</span>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="site-category">
-                    <h3>💬 社区论坛</h3>
-                    <div class="site-list">
-                        <a href="https://sehuatang.net" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>色花堂</strong>
-                                <span>网盘资源丰富，需注册登陆</span>
-                            </div>
-                        </a>
-                        <a href="https://t66y.com" target="_blank" class="site-item" rel="noopener noreferrer">
-                            <div class="site-info">
-                                <strong>草榴社区</strong>
-                                <span>老牌论坛，需代理访问</span>
-                            </div>
-                        </a>
-                    </div>
-                </div>
+        <!-- 🔧 修改：站点导航 - 现在是动态加载的 -->
+        <section id="sitesSection" class="sites-section">
+            <!-- 内容将通过JavaScript动态加载 -->
+            <div class="loading-sites">
+                <p>正在加载站点导航...</p>
             </div>
         </section>
     </main>

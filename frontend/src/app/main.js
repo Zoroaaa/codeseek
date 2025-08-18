@@ -1,4 +1,4 @@
-// 主应用入口
+// 主应用入口 - 修复版本
 import { APP_CONSTANTS } from '../core/constants.js';
 import configManager from '../core/config.js';
 import { showLoading, showToast } from '../utils/dom.js';
@@ -8,6 +8,7 @@ import authManager from '../services/auth.js';
 import themeManager from '../services/theme.js';
 import searchManager from '../components/search.js';
 import favoritesManager from '../components/favorites.js';
+import apiService from '../services/api.js';
 
 class MagnetSearchApp {
   constructor() {
@@ -47,6 +48,9 @@ class MagnetSearchApp {
         await this.initComponents();
       }
 
+      // 🔧 新增：初始化站点导航
+      await this.initSiteNavigation();
+
       // 测试API连接
       await this.testConnection();
       
@@ -65,6 +69,113 @@ class MagnetSearchApp {
     } finally {
       showLoading(false);
     }
+  }
+
+  // 🔧 新增：初始化站点导航
+  async initSiteNavigation() {
+    try {
+      let enabledSources = [];
+      
+      // 如果用户已登录，获取用户设置的搜索源
+      if (this.currentUser) {
+        try {
+          const userSettings = await apiService.getUserSettings();
+          enabledSources = userSettings.searchSources || [];
+        } catch (error) {
+          console.warn('获取用户搜索源设置失败，使用默认设置:', error);
+        }
+      }
+      
+      // 如果没有用户设置或获取失败，使用默认搜索源
+      if (enabledSources.length === 0) {
+        enabledSources = ['javbus', 'javdb', 'javlibrary']; // 默认启用的搜索源
+      }
+      
+      this.renderSiteNavigation(enabledSources);
+    } catch (error) {
+      console.error('初始化站点导航失败:', error);
+      // 出错时使用默认配置
+      this.renderSiteNavigation(['javbus', 'javdb', 'javlibrary']);
+    }
+  }
+
+  // 🔧 新增：渲染站点导航
+  renderSiteNavigation(enabledSourceIds) {
+    const sitesSection = document.getElementById('sitesSection');
+    if (!sitesSection) return;
+
+    // 从常量中获取所有可用的搜索源
+    const allSources = APP_CONSTANTS.SEARCH_SOURCES;
+    
+    // 按类别分组搜索源
+    const sourcesByCategory = {
+      database: ['javlibrary', 'javbus', 'javdb'],
+      streaming: ['jable', 'javmost', 'javguru'],
+      community: ['sehuatang', 't66y'],
+      others: ['av01', 'missav', 'btsow']
+    };
+
+    // 过滤出用户启用的搜索源
+    const enabledSources = allSources.filter(source => 
+      enabledSourceIds.includes(source.id)
+    );
+
+    // 如果没有启用的搜索源，显示提示
+    if (enabledSources.length === 0) {
+      sitesSection.innerHTML = `
+        <h2>🌐 资源站点导航</h2>
+        <div class="empty-state">
+          <p>暂无可用的搜索源</p>
+          <p>请在个人中心设置页面启用搜索源</p>
+          <button onclick="window.app && window.app.navigateToDashboard()" class="btn-primary">前往设置</button>
+        </div>
+      `;
+      return;
+    }
+
+    // 生成HTML
+    const categoryMap = {
+      database: { name: '📚 番号资料站', sources: [] },
+      streaming: { name: '🎥 在线播放平台', sources: [] },
+      community: { name: '💬 社区论坛', sources: [] },
+      others: { name: '🌟 其他资源', sources: [] }
+    };
+
+    // 将启用的搜索源分配到对应类别
+    enabledSources.forEach(source => {
+      for (const [categoryKey, sourceIds] of Object.entries(sourcesByCategory)) {
+        if (sourceIds.includes(source.id)) {
+          categoryMap[categoryKey].sources.push(source);
+          break;
+        }
+      }
+    });
+
+    // 生成站点导航HTML
+    let navigationHTML = '<h2>🌐 资源站点导航</h2><div class="sites-grid">';
+    
+    Object.values(categoryMap).forEach(category => {
+      if (category.sources.length > 0) {
+        navigationHTML += `
+          <div class="site-category">
+            <h3>${category.name}</h3>
+            <div class="site-list">
+              ${category.sources.map(source => `
+                <a href="${source.urlTemplate.replace('{keyword}', 'search')}" target="_blank" class="site-item" rel="noopener noreferrer">
+                  <div class="site-info">
+                    <strong>${source.icon} ${source.name}</strong>
+                    <span>${source.subtitle}</span>
+                  </div>
+                </a>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+    });
+    
+    navigationHTML += '</div>';
+    sitesSection.innerHTML = navigationHTML;
   }
 
   // 初始化组件
@@ -165,6 +276,23 @@ class MagnetSearchApp {
 
     // 网络状态监听
     this.bindNetworkEvents();
+    
+    // 🔧 新增：监听搜索源变更事件
+    this.bindSearchSourcesChangeEvent();
+  }
+
+  // 🔧 新增：绑定搜索源变更事件监听
+  bindSearchSourcesChangeEvent() {
+    window.addEventListener('searchSourcesChanged', async (event) => {
+      console.log('检测到搜索源设置变更，更新站点导航');
+      try {
+        // 重新渲染站点导航
+        this.renderSiteNavigation(event.detail.newSources);
+        showToast('站点导航已更新', 'success', 2000);
+      } catch (error) {
+        console.error('更新站点导航失败:', error);
+      }
+    });
   }
 
   // 绑定模态框事件
@@ -283,7 +411,7 @@ class MagnetSearchApp {
     if (registerModal) registerModal.style.display = 'none';
   }
 
-  // 处理登录
+  // 🔧 修改：用户登录后更新站点导航
   async handleLogin(event) {
     event.preventDefault();
     
@@ -310,6 +438,9 @@ class MagnetSearchApp {
         
         // 登录后初始化组件
         await this.initComponents();
+        
+        // 🔧 新增：重新初始化站点导航（使用用户设置）
+        await this.initSiteNavigation();
         
         // 处理URL参数（如搜索查询）
         this.handleURLParams();
@@ -455,6 +586,9 @@ class MagnetSearchApp {
         favoritesManager.favorites = [];
         favoritesManager.renderFavorites();
       }
+      
+      // 🔧 新增：重新初始化站点导航（使用默认设置）
+      await this.initSiteNavigation();
       
       // 显示登录模态框
       this.showLoginModal();
