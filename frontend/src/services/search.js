@@ -1,17 +1,19 @@
-// 搜索服务模块
+// 搜索服务模块 - 修复版本
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
 import { showToast } from '../utils/dom.js';
 import apiService from './api.js';
+import authManager from './auth.js'; // 🔧 修复：添加缺失的导入
 
 class SearchService {
   constructor() {
     this.searchCache = new Map();
     this.cacheExpiration = APP_CONSTANTS.API.CACHE_DURATION;
+    this.userSettings = null; // 缓存用户设置
   }
 
-  // 执行搜索
+  // 执行搜索 - 修改为从后端获取缓存设置
   async performSearch(keyword, options = {}) {
     // 验证搜索关键词
     const validation = validateSearchKeyword(keyword);
@@ -19,7 +21,20 @@ class SearchService {
       throw new Error(validation.errors[0]);
     }
 
-    const { useCache = true, saveToHistory = true } = options;
+    // 🔧 修复：从用户设置获取缓存配置而不是前端元素
+    let useCache = options.useCache;
+    if (useCache === undefined) {
+      // 如果没有明确指定，从用户设置获取
+      try {
+        const userSettings = await this.getUserSettings();
+        useCache = userSettings.cacheResults !== false; // 默认启用缓存
+      } catch (error) {
+        console.warn('获取缓存设置失败，使用默认值:', error);
+        useCache = true; // 默认启用缓存
+      }
+    }
+
+    const { saveToHistory = true } = options;
 
     // 检查缓存
     if (useCache) {
@@ -46,13 +61,30 @@ class SearchService {
     return results;
   }
   
-    // 新增：清除用户设置缓存（当用户更改设置后调用）
+  // 🔧 修复：统一的用户设置获取方法
+  async getUserSettings() {
+    if (!this.userSettings || Date.now() - this.userSettings.timestamp > 60000) {
+      try {
+        const settings = await apiService.getUserSettings();
+        this.userSettings = {
+          data: settings,
+          timestamp: Date.now()
+        };
+      } catch (error) {
+        console.error('获取用户设置失败:', error);
+        throw error;
+      }
+    }
+    return this.userSettings.data;
+  }
+  
+  // 新增：清除用户设置缓存（当用户更改设置后调用）
   clearUserSettingsCache() {
     this.userSettings = null;
     console.log('用户设置缓存已清除');
   }
   
-    // 新增：获取用户设置的搜索源
+  // 🔧 修复：获取用户设置的搜索源
   async getEnabledSearchSources() {
     try {
       // 如果用户未登录，使用默认搜索源
@@ -63,25 +95,20 @@ class SearchService {
         );
       }
 
-      // 获取用户设置（缓存1分钟避免频繁请求）
-      if (!this.userSettings || Date.now() - this.userSettings.timestamp > 60000) {
-        try {
-          const settings = await apiService.getUserSettings();
-          this.userSettings = {
-            data: settings,
-            timestamp: Date.now()
-          };
-        } catch (error) {
-          console.error('获取用户设置失败，使用默认搜索源:', error);
-          // 如果获取失败，使用默认搜索源
-          const defaultSources = ['javbus', 'javdb', 'javlibrary'];
-          return APP_CONSTANTS.SEARCH_SOURCES.filter(
-            source => defaultSources.includes(source.id)
-          );
-        }
+      // 获取用户设置
+      let userSettings;
+      try {
+        userSettings = await this.getUserSettings();
+      } catch (error) {
+        console.error('获取用户设置失败，使用默认搜索源:', error);
+        // 如果获取失败，使用默认搜索源
+        const defaultSources = ['javbus', 'javdb', 'javlibrary'];
+        return APP_CONSTANTS.SEARCH_SOURCES.filter(
+          source => defaultSources.includes(source.id)
+        );
       }
 
-      const enabledSources = this.userSettings.data.searchSources || ['javbus', 'javdb', 'javlibrary'];
+      const enabledSources = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary'];
       
       // 过滤出用户启用的搜索源
       const filteredSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
@@ -216,7 +243,7 @@ class SearchService {
   async warmupCache(keywords = []) {
     for (const keyword of keywords) {
       try {
-        const results = this.buildSearchResults(keyword);
+        const results = await this.buildSearchResults(keyword);
         this.cacheResults(keyword, results);
         console.log(`缓存预热: ${keyword}`);
       } catch (error) {

@@ -1,4 +1,4 @@
-// Dashboard应用逻辑 - 添加删除单条搜索历史记录功能
+// Dashboard应用逻辑 - 修复版本
 import { APP_CONSTANTS } from '../core/constants.js';
 import configManager from '../core/config.js';
 import { showLoading, showToast } from '../utils/dom.js';
@@ -7,7 +7,7 @@ import { isDevEnv, debounce } from '../utils/helpers.js';
 import authManager from '../services/auth.js';
 import themeManager from '../services/theme.js';
 import apiService from '../services/api.js';
-import searchService from '../services/search.js';
+import searchService from '../services/search.js'; // 🔧 修复：添加缺失的导入
 
 export class DashboardApp {
   constructor() {
@@ -311,24 +311,23 @@ export class DashboardApp {
     }
   }
 
-  // 加载设置数据
-async loadSettingsData() {
+  // 🔧 修复：加载设置数据 - 移除缓存设置处理
+  async loadSettingsData() {
     try {
         const settings = await apiService.getUserSettings();
         
-        const enableCacheEl = document.getElementById('enableCache');
+        // 移除了enableCache相关的处理
         const themeModeEl = document.getElementById('themeMode');
         const maxFavoritesEl = document.getElementById('maxFavorites');
         const allowAnalyticsEl = document.getElementById('allowAnalytics');
         const searchSuggestionsEl = document.getElementById('searchSuggestions');
 
-        if (enableCacheEl) enableCacheEl.checked = settings.cacheResults !== false;
         if (themeModeEl) themeModeEl.value = settings.theme || 'auto';
         if (maxFavoritesEl) maxFavoritesEl.value = settings.maxFavoritesPerUser ?? 500;
         if (allowAnalyticsEl) allowAnalyticsEl.checked = settings.allowAnalytics !== false;
         if (searchSuggestionsEl) searchSuggestionsEl.checked = settings.searchSuggestions !== false;
 
-        // 新增：加载搜索源设置
+        // 加载搜索源设置
         const enabledSources = settings.searchSources || ['javbus', 'javdb', 'javlibrary'];
         const sourceCheckboxes = document.querySelectorAll('.checkbox-group input[type="checkbox"]');
         sourceCheckboxes.forEach(checkbox => {
@@ -339,7 +338,7 @@ async loadSettingsData() {
         console.error('加载设置失败:', error);
         showToast('加载设置失败', 'error');
     }
-}
+  }
 
   // 同步收藏 - 直接与API交互
   async syncFavorites() {
@@ -396,7 +395,7 @@ async loadSettingsData() {
     }
   }
 
-  // 🔧 新增：删除单条搜索历史记录
+  // 删除单条搜索历史记录
   async deleteHistoryItem(historyId) {
     if (!this.currentUser) {
       showToast('用户未登录', 'error');
@@ -494,8 +493,8 @@ async loadSettingsData() {
     }
   }
 
-  // 保存设置
-async saveSettings() {
+  // 🔧 修复：保存设置 - 移除缓存设置处理，添加searchService缓存清理
+  async saveSettings() {
     if (!this.currentUser) {
         showToast('用户未登录', 'error');
         return;
@@ -513,7 +512,7 @@ async saveSettings() {
         
         const payload = {
             theme: ui.themeMode,
-            cacheResults: !!ui.enableCache,
+            // 移除了cacheResults设置
             searchSources: ui.searchSources,
             maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
             maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
@@ -528,8 +527,8 @@ async saveSettings() {
             themeManager.setTheme(payload.theme);
         }
         
-        // 清除搜索服务的用户设置缓存，确保下次搜索使用新设置
-        if (typeof searchService !== 'undefined' && searchService.clearUserSettingsCache) {
+        // 🔧 修复：清除搜索服务的用户设置缓存，确保下次搜索使用新设置
+        if (searchService && searchService.clearUserSettingsCache) {
             searchService.clearUserSettingsCache();
         }
         
@@ -541,7 +540,7 @@ async saveSettings() {
     } finally {
         showLoading(false);
     }
-}
+  }
 
   // 数据同步
   async syncAllData() {
@@ -649,19 +648,18 @@ async saveSettings() {
     }
   }
 
-  // 重置设置
-resetSettings() {
+  // 🔧 修复：重置设置 - 移除缓存设置
+  resetSettings() {
     if (!confirm('确定要重置所有设置为默认值吗？')) return;
 
-    // 重置为默认设置
+    // 重置为默认设置（移除了enableCache）
     const defaultSettings = {
-        enableCache: true,
         themeMode: 'auto',
         historyRetention: '90',
         maxFavorites: '500',
         allowAnalytics: true,
         searchSuggestions: true,
-        searchSources: ['javbus', 'javdb', 'javlibrary'] // 新增：默认搜索源
+        searchSources: ['javbus', 'javdb', 'javlibrary'] // 默认搜索源
     };
 
     Object.entries(defaultSettings).forEach(([key, value]) => {
@@ -683,7 +681,7 @@ resetSettings() {
 
     this.markSettingsChanged();
     showToast('设置已重置为默认值，请点击保存', 'success');
-}
+  }
 
   // 初始化主题
   initTheme() {
@@ -769,7 +767,7 @@ resetSettings() {
     `).join('');
   }
 
-  // 🔧 修改：加载历史数据，添加删除按钮
+  // 修改：加载历史数据，添加删除按钮
   async loadHistoryData() {
     const historyList = document.getElementById('historyList');
     const historyCount = document.getElementById('historyCount');
@@ -870,8 +868,8 @@ resetSettings() {
     }
   }
 
-// 收集设置时需要特殊处理搜索源
-collectSettings() {
+  // 🔧 修复：收集设置时移除缓存相关处理
+  collectSettings() {
     const settings = {};
     const settingInputs = document.querySelectorAll('#settings input, #settings select');
     
@@ -894,7 +892,7 @@ collectSettings() {
     });
     
     return settings;
-}
+  }
 
   markSettingsChanged() {
     const saveBtn = document.querySelector('#settings .btn-primary');
