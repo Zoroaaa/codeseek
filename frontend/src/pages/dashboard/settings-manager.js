@@ -1,9 +1,9 @@
 // 设置管理器
-import { APP_CONSTANTS } from '../core/constants.js';
-import { showLoading, showToast } from '../utils/dom.js';
-import apiService from '../services/api.js';
-import themeManager from '../services/theme.js';
-import searchService from '../services/search.js';
+import { APP_CONSTANTS } from '../../core/constants.js';
+import { showLoading, showToast } from '../../utils/dom.js';
+import apiService from '../../services/api.js';
+import themeManager from '../../services/theme.js';
+import searchService from '../../services/search.js';
 
 export class SettingsManager {
   constructor(dashboardApp) {

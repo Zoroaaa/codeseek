@@ -1,7 +1,7 @@
 // 历史页面管理器
-import { showLoading, showToast } from '../utils/dom.js';
-import { escapeHtml, formatRelativeTime } from '../utils/format.js';
-import apiService from '../services/api.js';
+import { showLoading, showToast } from '../../utils/dom.js';
+import { escapeHtml, formatRelativeTime } from '../../utils/format.js';
+import apiService from '../../services/api.js';
 
 export class HistoryManager {
   constructor(dashboardApp) {

@@ -1,8 +1,8 @@
 // 分类管理器
-import { APP_CONSTANTS } from '../core/constants.js';
-import { showLoading, showToast } from '../utils/dom.js';
-import { escapeHtml } from '../utils/format.js';
-import apiService from '../services/api.js';
+import { APP_CONSTANTS } from '../../core/constants.js';
+import { showLoading, showToast } from '../../utils/dom.js';
+import { escapeHtml } from '../../utils/format.js';
+import apiService from '../../services/api.js';
 
 export class CategoriesManager {
   constructor(dashboardApp) {

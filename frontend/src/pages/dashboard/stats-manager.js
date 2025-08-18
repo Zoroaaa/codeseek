@@ -1,7 +1,7 @@
 // 统计页面管理器
-import { escapeHtml, formatRelativeTime } from '../utils/format.js';
-import { showToast } from '../utils/dom.js';
-import apiService from '../services/api.js';
+import { escapeHtml, formatRelativeTime } from '../../utils/format.js';
+import { showToast } from '../../utils/dom.js';
+import apiService from '../../services/api.js';
 
 export class StatsManager {
   constructor(dashboardApp) {

@@ -1,6 +1,6 @@
 // 概览页面管理器
-import { escapeHtml, formatRelativeTime } from '../utils/format.js';
-import apiService from '../services/api.js';
+import { escapeHtml, formatRelativeTime } from '../../utils/format.js';
+import apiService from '../../services/api.js';
 
 export class OverviewManager {
   constructor(dashboardApp) {
