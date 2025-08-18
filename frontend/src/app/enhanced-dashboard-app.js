@@ -114,41 +114,43 @@ export class EnhancedDashboardApp {
   }
 
   // 🔧 新增：加载用户搜索源和分类设置
-  async loadUserSearchSettings() {
-    if (!this.currentUser) return;
+// 🔧 修复2：在 enhanced-dashboard-app.js 中统一字段名处理
+// 修改 loadUserSearchSettings 方法
+async loadUserSearchSettings() {
+  if (!this.currentUser) return;
+  
+  try {
+    const userSettings = await apiService.getUserSettings();
     
-    try {
-      const userSettings = await apiService.getUserSettings();
-      
-      // 加载用户的自定义搜索源和分类
-      this.customSearchSources = userSettings.customSearchSources || [];
-      this.customCategories = userSettings.customSourceCategories || [];
-      this.enabledSources = userSettings.searchSources || APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
-      
-      // 合并内置和自定义数据
-      this.allSearchSources = [
-        ...this.builtinSearchSources,
-        ...this.customSearchSources.map(s => ({ ...s, isBuiltin: false, isCustom: true }))
-      ];
-      
-      this.allCategories = [
-        ...this.builtinCategories,
-        ...this.customCategories.map(c => ({ ...c, isBuiltin: false, isCustom: true }))
-      ];
-      
-      console.log(`用户设置：启用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源和 ${this.customCategories.length} 个自定义分类`);
-      
-    } catch (error) {
-      console.warn('加载用户搜索源设置失败，使用默认设置:', error);
-      this.customSearchSources = [];
-      this.customCategories = [];
-      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
-      
-      // 重置为仅内置数据
-      this.allSearchSources = [...this.builtinSearchSources];
-      this.allCategories = [...this.builtinCategories];
-    }
+    // 🔧 修复：统一使用 customSourceCategories 字段名
+    this.customSearchSources = userSettings.customSearchSources || [];
+    this.customCategories = userSettings.customSourceCategories || []; // 统一字段名
+    this.enabledSources = userSettings.searchSources || APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+    
+    // 合并内置和自定义数据
+    this.allSearchSources = [
+      ...this.builtinSearchSources,
+      ...this.customSearchSources.map(s => ({ ...s, isBuiltin: false, isCustom: true }))
+    ];
+    
+    this.allCategories = [
+      ...this.builtinCategories,
+      ...this.customCategories.map(c => ({ ...c, isBuiltin: false, isCustom: true }))
+    ];
+    
+    console.log(`用户设置：启用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源和 ${this.customCategories.length} 个自定义分类`);
+    
+  } catch (error) {
+    console.warn('加载用户搜索源设置失败，使用默认设置:', error);
+    this.customSearchSources = [];
+    this.customCategories = [];
+    this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+    
+    // 重置为仅内置数据
+    this.allSearchSources = [...this.builtinSearchSources];
+    this.allCategories = [...this.builtinCategories];
   }
+}
 
   // 检查认证状态
   async checkAuth() {
@@ -1497,42 +1499,52 @@ validateCustomCategory(categoryData) {
   }
 
   // 🔧 新增：保存自定义搜索源到云端
-  async saveCustomSearchSources() {
-    const settings = {
-      customSearchSources: this.customSearchSources,
-      searchSources: this.enabledSources,
-      customSourceCategories: this.customCategories
-    };
-    
-    await apiService.updateUserSettings(settings);
-  }
+// 🔧 修复4：同时修改 saveCustomSearchSources 方法保持一致
+async saveCustomSearchSources() {
+  const settings = {
+    customSearchSources: this.customSearchSources,
+    searchSources: this.enabledSources,
+    customSourceCategories: this.customCategories // 统一字段名
+  };
+  
+  console.log('保存自定义搜索源设置:', settings); // 添加调试日志
+  
+  await apiService.updateUserSettings(settings);
+}
+
 
   // 🔧 新增：保存自定义分类到云端
-  async saveCustomCategories() {
-    const settings = {
-      customSourceCategories: this.customCategories,
-      customSearchSources: this.customSearchSources,
-      searchSources: this.enabledSources
-    };
-    
-    await apiService.updateUserSettings(settings);
-  }
+// 🔧 修复3：修改保存自定义分类的方法，确保字段名一致
+async saveCustomCategories() {
+  const settings = {
+    customSourceCategories: this.customCategories, // 统一使用这个字段名
+    customSearchSources: this.customSearchSources,
+    searchSources: this.enabledSources
+  };
+  
+  console.log('保存自定义分类设置:', settings); // 添加调试日志
+  
+  await apiService.updateUserSettings(settings);
+}
 
   // 🔧 新增：保存搜索源设置
-  async saveSearchSourcesSettings() {
-    const settings = {
-      searchSources: this.enabledSources,
-      customSearchSources: this.customSearchSources,
-      customSourceCategories: this.customCategories
-    };
-    
-    await apiService.updateUserSettings(settings);
-    
-    // 🔧 通知主页面更新站点导航
-    window.dispatchEvent(new CustomEvent('searchSourcesChanged', {
-      detail: { newSources: this.enabledSources }
-    }));
-  }
+// 🔧 修复5：修改 saveSearchSourcesSettings 方法
+async saveSearchSourcesSettings() {
+  const settings = {
+    searchSources: this.enabledSources,
+    customSearchSources: this.customSearchSources,
+    customSourceCategories: this.customCategories // 统一字段名
+  };
+  
+  console.log('保存搜索源设置:', settings); // 添加调试日志
+  
+  await apiService.updateUserSettings(settings);
+  
+  // 通知主页面更新站点导航
+  window.dispatchEvent(new CustomEvent('searchSourcesChanged', {
+    detail: { newSources: this.enabledSources }
+  }));
+}
 
   // 🔧 新增：导出搜索源配置
   async exportSources() {

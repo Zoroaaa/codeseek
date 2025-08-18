@@ -343,67 +343,87 @@ class APIService {
     }
   }
 
-  async updateUserSettings(settings) {
-    if (!this.token) {
-      throw new Error('用户未登录');
+// 🔧 修复1：在 api.js 的 updateUserSettings 方法中添加缺失的字段
+async updateUserSettings(settings) {
+  if (!this.token) {
+    throw new Error('用户未登录');
+  }
+  
+  if (!settings || typeof settings !== 'object') {
+    throw new Error('设置数据格式错误');
+  }
+  
+  // 🔧 修复：扩展允许的设置字段，添加搜索源支持
+  const allowedSettings = [
+    'theme', 
+    'autoSync', 
+    'cacheResults', 
+    'maxHistoryPerUser', 
+    'maxFavoritesPerUser',
+    'searchSources',        // 启用的搜索源列表
+    'customSearchSources',  // 自定义搜索源列表
+    'customSourceCategories', // 🔧 修复：添加自定义分类字段
+    'allowAnalytics',       // 行为统计设置
+    'searchSuggestions'     // 搜索建议设置
+  ];
+  
+  const validSettings = {};
+  Object.keys(settings).forEach(key => {
+    if (allowedSettings.includes(key)) {
+      validSettings[key] = settings[key];
     }
+  });
+  
+  // 验证搜索源数据格式
+  if (validSettings.searchSources && !Array.isArray(validSettings.searchSources)) {
+    throw new Error('搜索源格式错误：必须是数组');
+  }
+  
+  if (validSettings.customSearchSources && !Array.isArray(validSettings.customSearchSources)) {
+    throw new Error('自定义搜索源格式错误：必须是数组');
+  }
+  
+  // 🔧 修复：添加自定义分类验证
+  if (validSettings.customSourceCategories && !Array.isArray(validSettings.customSourceCategories)) {
+    throw new Error('自定义分类格式错误：必须是数组');
+  }
+  
+  // 验证自定义搜索源格式
+  if (validSettings.customSearchSources) {
+    const invalidSources = validSettings.customSearchSources.filter(source => 
+      !source || !source.id || !source.name || !source.urlTemplate ||
+      typeof source.id !== 'string' || typeof source.name !== 'string' || 
+      typeof source.urlTemplate !== 'string'
+    );
     
-    if (!settings || typeof settings !== 'object') {
-      throw new Error('设置数据格式错误');
-    }
-    
-    // 🔧 修复：扩展允许的设置字段，添加搜索源支持
-    const allowedSettings = [
-      'theme', 
-      'autoSync', 
-      'cacheResults', 
-      'maxHistoryPerUser', 
-      'maxFavoritesPerUser',
-      'searchSources',        // 🔧 新增：启用的搜索源列表
-      'customSearchSources',  // 🔧 新增：自定义搜索源列表
-      'allowAnalytics',       // 🔧 新增：行为统计设置
-      'searchSuggestions'     // 🔧 新增：搜索建议设置
-    ];
-    
-    const validSettings = {};
-    Object.keys(settings).forEach(key => {
-      if (allowedSettings.includes(key)) {
-        validSettings[key] = settings[key];
-      }
-    });
-    
-    // 🔧 新增：验证搜索源数据格式
-    if (validSettings.searchSources && !Array.isArray(validSettings.searchSources)) {
-      throw new Error('搜索源格式错误：必须是数组');
-    }
-    
-    if (validSettings.customSearchSources && !Array.isArray(validSettings.customSearchSources)) {
-      throw new Error('自定义搜索源格式错误：必须是数组');
-    }
-    
-    // 🔧 新增：验证自定义搜索源格式
-    if (validSettings.customSearchSources) {
-      const invalidSources = validSettings.customSearchSources.filter(source => 
-        !source || !source.id || !source.name || !source.urlTemplate ||
-        typeof source.id !== 'string' || typeof source.name !== 'string' || 
-        typeof source.urlTemplate !== 'string'
-      );
-      
-      if (invalidSources.length > 0) {
-        throw new Error('自定义搜索源格式错误：缺少必需字段');
-      }
-    }
-    
-    try {
-      return await this.request('/api/user/settings', {
-        method: 'PUT',
-        body: JSON.stringify({ settings: validSettings })
-      });
-    } catch (error) {
-      console.error('更新用户设置失败:', error);
-      throw error;
+    if (invalidSources.length > 0) {
+      throw new Error('自定义搜索源格式错误：缺少必需字段');
     }
   }
+  
+  // 🔧 修复：添加自定义分类格式验证
+  if (validSettings.customSourceCategories) {
+    const invalidCategories = validSettings.customSourceCategories.filter(category => 
+      !category || !category.id || !category.name || !category.icon ||
+      typeof category.id !== 'string' || typeof category.name !== 'string' || 
+      typeof category.icon !== 'string'
+    );
+    
+    if (invalidCategories.length > 0) {
+      throw new Error('自定义分类格式错误：缺少必需字段');
+    }
+  }
+  
+  try {
+    return await this.request('/api/user/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ settings: validSettings })
+    });
+  } catch (error) {
+    console.error('更新用户设置失败:', error);
+    throw error;
+  }
+}
 
   // 🔧 新增：自定义搜索源管理API
   async addCustomSearchSource(source) {
