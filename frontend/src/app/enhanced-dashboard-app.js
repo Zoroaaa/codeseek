@@ -1012,98 +1012,107 @@ export class EnhancedDashboardApp {
   }
 
   // 🔧 新增：处理自定义搜索源表单提交
-  async handleCustomSourceSubmit(event) {
-    event.preventDefault();
-    
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    const sourceData = {
-      id: formData.get('sourceId') || null,
-      name: formData.get('sourceName').trim(),
-      subtitle: formData.get('sourceSubtitle').trim(),
-      icon: formData.get('sourceIcon').trim() || '🔍',
-      urlTemplate: formData.get('sourceUrl').trim(),
-      category: formData.get('sourceCategory')
-    };
-    
-    // 验证数据
-    const validation = this.validateCustomSource(sourceData);
-    if (!validation.valid) {
-      showToast(validation.message, 'error');
-      return;
-    }
-    
-    try {
-      showLoading(true);
-      
-      if (this.editingCustomSource) {
-        // 更新现有搜索源
-        await this.updateCustomSource(sourceData);
-        showToast('自定义搜索源更新成功', 'success');
-      } else {
-        // 添加新的搜索源
-        await this.addCustomSource(sourceData);
-        showToast('自定义搜索源添加成功', 'success');
-      }
-      
-      // 重新加载数据
-      await this.loadUserSearchSettings();
-      await this.loadSourcesData();
-      
-      // 关闭模态框
-      this.closeModals();
-      
-    } catch (error) {
-      console.error('保存自定义搜索源失败:', error);
-      showToast('保存失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
-    }
+// 🔧 修复：handleCustomSourceSubmit 方法中的ID处理
+async handleCustomSourceSubmit(event) {
+  event.preventDefault();
+  
+  const form = event.target;
+  const formData = new FormData(form);
+  
+  const sourceData = {
+    id: formData.get('sourceId') || null, // 修复：允许为null
+    name: formData.get('sourceName').trim(),
+    subtitle: formData.get('sourceSubtitle').trim(),
+    icon: formData.get('sourceIcon').trim() || '🔍',
+    urlTemplate: formData.get('sourceUrl').trim(),
+    category: formData.get('sourceCategory')
+  };
+  
+  // 🔧 修复：验证数据时考虑新增模式
+  const validation = this.validateCustomSource(sourceData);
+  if (!validation.valid) {
+    showToast(validation.message, 'error');
+    return;
   }
+  
+  try {
+    showLoading(true);
+    
+    if (this.editingCustomSource && sourceData.id) {
+      // 编辑模式：有ID才进行更新
+      await this.updateCustomSource(sourceData);
+      showToast('自定义搜索源更新成功', 'success');
+    } else {
+      // 新增模式：添加新的搜索源
+      await this.addCustomSource(sourceData);
+      showToast('自定义搜索源添加成功', 'success');
+    }
+    
+    // 重新加载数据
+    await this.loadUserSearchSettings();
+    await this.loadSourcesData();
+    
+    // 关闭模态框
+    this.closeModals();
+    
+  } catch (error) {
+    console.error('保存自定义搜索源失败:', error);
+    showToast('保存失败: ' + error.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
 
   // 🔧 新增：验证自定义搜索源
-  validateCustomSource(sourceData) {
-    const rules = APP_CONSTANTS.VALIDATION_RULES.SOURCE;
-    
-    // 检查必需字段
-    for (const field of rules.REQUIRED_FIELDS) {
-      if (!sourceData[field] || sourceData[field].trim() === '') {
-        return { valid: false, message: `${field} 是必需的` };
-      }
+// 🔧 修复：validateCustomSource 方法 - 修改验证逻辑
+validateCustomSource(sourceData) {
+  const rules = APP_CONSTANTS.VALIDATION_RULES.SOURCE;
+  
+  // 🔧 修复：只验证非ID的必需字段
+  const requiredFieldsForValidation = rules.REQUIRED_FIELDS.filter(field => field !== 'id');
+  
+  // 检查必需字段（除了ID）
+  for (const field of requiredFieldsForValidation) {
+    if (!sourceData[field] || sourceData[field].trim() === '') {
+      return { valid: false, message: `${field} 是必需的` };
     }
-    
-    // 检查名称格式
-    if (!rules.NAME_PATTERN.test(sourceData.name)) {
-      return { valid: false, message: '搜索源名称格式不正确' };
-    }
-    
-    // 检查URL格式
-    if (!rules.URL_PATTERN.test(sourceData.urlTemplate)) {
-      return { valid: false, message: 'URL模板必须包含{keyword}占位符' };
-    }
-    
-    // 检查禁用域名
+  }
+  
+  // 检查名称格式
+  if (!rules.NAME_PATTERN.test(sourceData.name)) {
+    return { valid: false, message: '搜索源名称格式不正确' };
+  }
+  
+  // 检查URL格式
+  if (!rules.URL_PATTERN.test(sourceData.urlTemplate)) {
+    return { valid: false, message: 'URL模板必须包含{keyword}占位符' };
+  }
+  
+  // 检查禁用域名
+  try {
     const hostname = new URL(sourceData.urlTemplate.replace('{keyword}', 'test')).hostname;
     if (rules.FORBIDDEN_DOMAINS.some(domain => hostname.includes(domain))) {
       return { valid: false, message: '不允许使用该域名' };
     }
-    
-    // 检查ID重复（仅新增时）
-    if (!sourceData.id) {
-      const generatedId = this.generateSourceId(sourceData.name);
-      if (this.allSearchSources.some(s => s.id === generatedId)) {
-        return { valid: false, message: '搜索源名称已存在，请使用不同的名称' };
-      }
-    }
-    
-    // 检查分类是否存在
-    if (!this.getCategoryById(sourceData.category)) {
-      return { valid: false, message: '选择的分类不存在' };
-    }
-    
-    return { valid: true };
+  } catch (error) {
+    return { valid: false, message: 'URL格式无效' };
   }
+  
+  // 🔧 修复：只在新增时检查ID重复（编辑时跳过）
+  if (!sourceData.id) {
+    const generatedId = this.generateSourceId(sourceData.name);
+    if (this.allSearchSources.some(s => s.id === generatedId)) {
+      return { valid: false, message: '搜索源名称已存在，请使用不同的名称' };
+    }
+  }
+  
+  // 检查分类是否存在
+  if (!this.getCategoryById(sourceData.category)) {
+    return { valid: false, message: '选择的分类不存在' };
+  }
+  
+  return { valid: true };
+}
 
   // 🔧 新增：生成搜索源ID
   generateSourceId(name) {
@@ -1299,91 +1308,96 @@ export class EnhancedDashboardApp {
   }
 
   // 🔧 新增：处理自定义分类表单提交
-  async handleCustomCategorySubmit(event) {
-    event.preventDefault();
-    
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    const categoryData = {
-      id: formData.get('categoryId') || null,
-      name: formData.get('categoryName').trim(),
-      description: formData.get('categoryDescription').trim(),
-      icon: formData.get('categoryIcon'),
-      color: formData.get('categoryColor')
-    };
-    
-    // 验证数据
-    const validation = this.validateCustomCategory(categoryData);
-    if (!validation.valid) {
-      showToast(validation.message, 'error');
-      return;
-    }
-    
-    try {
-      showLoading(true);
-      
-      if (this.editingCustomCategory) {
-        // 更新现有分类
-        await this.updateCustomCategory(categoryData);
-        showToast('自定义分类更新成功', 'success');
-      } else {
-        // 添加新的分类
-        await this.addCustomCategory(categoryData);
-        showToast('自定义分类添加成功', 'success');
-      }
-      
-      // 重新加载数据
-      await this.loadUserSearchSettings();
-      await this.loadCategoriesData();
-      
-      // 关闭模态框
-      this.closeModals();
-      
-    } catch (error) {
-      console.error('保存自定义分类失败:', error);
-      showToast('保存失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
-    }
+// 🔧 修复：handleCustomCategorySubmit 方法中的ID处理
+async handleCustomCategorySubmit(event) {
+  event.preventDefault();
+  
+  const form = event.target;
+  const formData = new FormData(form);
+  
+  const categoryData = {
+    id: formData.get('categoryId') || null, // 修复：允许为null
+    name: formData.get('categoryName').trim(),
+    description: formData.get('categoryDescription').trim(),
+    icon: formData.get('categoryIcon'),
+    color: formData.get('categoryColor')
+  };
+  
+  // 🔧 修复：验证数据时考虑新增模式
+  const validation = this.validateCustomCategory(categoryData);
+  if (!validation.valid) {
+    showToast(validation.message, 'error');
+    return;
   }
+  
+  try {
+    showLoading(true);
+    
+    if (this.editingCustomCategory && categoryData.id) {
+      // 编辑模式：有ID才进行更新
+      await this.updateCustomCategory(categoryData);
+      showToast('自定义分类更新成功', 'success');
+    } else {
+      // 新增模式：添加新的分类
+      await this.addCustomCategory(categoryData);
+      showToast('自定义分类添加成功', 'success');
+    }
+    
+    // 重新加载数据
+    await this.loadUserSearchSettings();
+    await this.loadCategoriesData();
+    
+    // 关闭模态框
+    this.closeModals();
+    
+  } catch (error) {
+    console.error('保存自定义分类失败:', error);
+    showToast('保存失败: ' + error.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
 
   // 🔧 新增：验证自定义分类
-  validateCustomCategory(categoryData) {
-    const rules = APP_CONSTANTS.VALIDATION_RULES.CATEGORY;
-    
-    // 检查必需字段
-    for (const field of rules.REQUIRED_FIELDS) {
-      if (!categoryData[field] || categoryData[field].trim() === '') {
-        return { valid: false, message: `${field} 是必需的` };
-      }
+// 🔧 修复：validateCustomCategory 方法 - 修改验证逻辑
+validateCustomCategory(categoryData) {
+  const rules = APP_CONSTANTS.VALIDATION_RULES.CATEGORY;
+  
+  // 🔧 修复：只验证非ID的必需字段
+  const requiredFieldsForValidation = rules.REQUIRED_FIELDS.filter(field => field !== 'id');
+  
+  // 检查必需字段（除了ID）
+  for (const field of requiredFieldsForValidation) {
+    if (!categoryData[field] || categoryData[field].trim() === '') {
+      return { valid: false, message: `${field} 是必需的` };
     }
-    
-    // 检查名称格式
-    if (!rules.NAME_PATTERN.test(categoryData.name)) {
-      return { valid: false, message: '分类名称格式不正确' };
-    }
-    
-    // 检查颜色格式
-    if (categoryData.color && !rules.COLOR_PATTERN.test(categoryData.color)) {
-      return { valid: false, message: '颜色格式不正确' };
-    }
-    
-    // 检查ID重复（仅新增时）
-    if (!categoryData.id) {
-      const generatedId = this.generateCategoryId(categoryData.name);
-      if (this.allCategories.some(c => c.id === generatedId)) {
-        return { valid: false, message: '分类名称已存在，请使用不同的名称' };
-      }
-    }
-    
-    // 检查是否超过限制
-    if (!categoryData.id && this.customCategories.length >= APP_CONSTANTS.LIMITS.MAX_CUSTOM_CATEGORIES) {
-      return { valid: false, message: `最多只能创建 ${APP_CONSTANTS.LIMITS.MAX_CUSTOM_CATEGORIES} 个自定义分类` };
-    }
-    
-    return { valid: true };
   }
+  
+  // 检查名称格式
+  if (!rules.NAME_PATTERN.test(categoryData.name)) {
+    return { valid: false, message: '分类名称格式不正确' };
+  }
+  
+  // 检查颜色格式
+  if (categoryData.color && !rules.COLOR_PATTERN.test(categoryData.color)) {
+    return { valid: false, message: '颜色格式不正确' };
+  }
+  
+  // 🔧 修复：只在新增时检查ID重复（编辑时跳过）
+  if (!categoryData.id) {
+    const generatedId = this.generateCategoryId(categoryData.name);
+    if (this.allCategories.some(c => c.id === generatedId)) {
+      return { valid: false, message: '分类名称已存在，请使用不同的名称' };
+    }
+  }
+  
+  // 检查是否超过限制
+  if (!categoryData.id && this.customCategories.length >= APP_CONSTANTS.LIMITS.MAX_CUSTOM_CATEGORIES) {
+    return { valid: false, message: `最多只能创建 ${APP_CONSTANTS.LIMITS.MAX_CUSTOM_CATEGORIES} 个自定义分类` };
+  }
+  
+  return { valid: true };
+}
 
   // 🔧 新增：生成分类ID
   generateCategoryId(name) {

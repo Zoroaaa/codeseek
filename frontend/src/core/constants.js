@@ -315,7 +315,7 @@ export const APP_CONSTANTS = {
   // 🔧 新增：搜索源和分类验证规则
   VALIDATION_RULES: {
     SOURCE: {
-      REQUIRED_FIELDS: ['id', 'name', 'urlTemplate', 'category'],
+      REQUIRED_FIELDS: [ 'name', 'urlTemplate', 'category'],
       URL_PATTERN: /^https?:\/\/.+\{keyword\}.*/,
       NAME_PATTERN: /^[a-zA-Z0-9\u4e00-\u9fa5\s\-_.()（）]+$/,
       ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
@@ -325,7 +325,7 @@ export const APP_CONSTANTS = {
       ]
     },
     CATEGORY: {
-      REQUIRED_FIELDS: ['id', 'name', 'icon'],
+      REQUIRED_FIELDS: ['name', 'icon'],
       NAME_PATTERN: /^[a-zA-Z0-9\u4e00-\u9fa5\s\-_.()（）]+$/,
       ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
       ICON_PATTERN: /^[\u{1F000}-\u{1F9FF}]|^[\u{2600}-\u{26FF}]|^[\u{2700}-\u{27BF}]/u,
