@@ -218,7 +218,7 @@
                 </div>
             </div>
 
-            <!-- 设置标签页 -->
+            <!-- 🔧 增强版设置标签页 - 支持自定义搜索源管理 -->
             <div id="settings" class="tab-content">
                 <div class="tab-header">
                     <h1>用户设置</h1>
@@ -241,13 +241,13 @@
                         </div>
                     </div>
 
-                    <!-- 🔧 修改：搜索设置 - 动态加载搜索源 -->
+                    <!-- 🔧 增强版搜索设置 - 支持自定义搜索源管理 -->
                     <div class="settings-section">
                         <h3>搜索设置</h3>
-                        <div class="setting-item">
+                        <div class="setting-item search-sources-setting">
                             <label>启用的搜索源</label>
                             <div class="setting-control">
-                                <div class="checkbox-group" id="searchSourcesContainer">
+                                <div class="search-sources-container" id="searchSourcesContainer">
                                     <!-- 搜索源复选框将通过JavaScript动态加载 -->
                                     <div class="loading-sources">正在加载搜索源...</div>
                                 </div>
@@ -388,6 +388,9 @@
             </form>
         </div>
     </div>
+
+    <!-- 🔧 新增：自定义搜索源模态框 -->
+    <!-- 注意：模态框将通过JavaScript动态创建，这里不需要预定义 -->
 
     <!-- Toast通知 -->
     <div id="toast" class="toast" role="alert" aria-live="polite"></div>

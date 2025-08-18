@@ -643,7 +643,7 @@ router.post('/api/auth/delete-account', async (request, env) => {
     }
 });
 
-// 用户设置
+// 用户设置路由 - 修复版本，支持搜索源设置
 router.get('/api/user/settings', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) {
@@ -659,11 +659,16 @@ router.get('/api/user/settings', async (request, env) => {
 
         return utils.successResponse({ 
             settings: {
-                theme: settings.theme || 'light',
+                theme: settings.theme || 'auto',
                 autoSync: settings.autoSync !== false,
                 cacheResults: settings.cacheResults !== false,
                 maxHistoryPerUser: settings.maxHistoryPerUser || 1000,
                 maxFavoritesPerUser: settings.maxFavoritesPerUser || 1000,
+                allowAnalytics: settings.allowAnalytics !== false,
+                searchSuggestions: settings.searchSuggestions !== false,
+                // 🔧 新增：搜索源相关设置
+                searchSources: settings.searchSources || ['javbus', 'javdb', 'javlibrary'],
+                customSearchSources: settings.customSearchSources || [],
                 ...settings
             }
         });
@@ -688,7 +693,19 @@ router.put('/api/user/settings', async (request, env) => {
             return utils.errorResponse('设置数据格式错误');
         }
 
-        const allowedSettings = ['theme', 'autoSync', 'cacheResults', 'maxHistoryPerUser', 'maxFavoritesPerUser'];
+        // 🔧 修复：扩展允许的设置字段，添加搜索源支持
+        const allowedSettings = [
+            'theme', 
+            'autoSync', 
+            'cacheResults', 
+            'maxHistoryPerUser', 
+            'maxFavoritesPerUser',
+            'allowAnalytics',
+            'searchSuggestions',
+            'searchSources',        // 🔧 新增：启用的搜索源列表
+            'customSearchSources'   // 🔧 新增：自定义搜索源列表
+        ];
+        
         const filteredSettings = {};
         
         Object.keys(settings).forEach(key => {
@@ -697,6 +714,77 @@ router.put('/api/user/settings', async (request, env) => {
             }
         });
 
+        // 🔧 新增：验证搜索源数据格式
+        if (filteredSettings.searchSources) {
+            if (!Array.isArray(filteredSettings.searchSources)) {
+                return utils.errorResponse('搜索源格式错误：必须是数组');
+            }
+            
+            // 验证至少选择了一个搜索源
+            if (filteredSettings.searchSources.length === 0) {
+                return utils.errorResponse('至少需要选择一个搜索源');
+            }
+            
+            // 验证搜索源ID格式
+            const invalidSources = filteredSettings.searchSources.filter(sourceId => 
+                !sourceId || typeof sourceId !== 'string' || sourceId.trim().length === 0
+            );
+            
+            if (invalidSources.length > 0) {
+                return utils.errorResponse('搜索源ID格式错误');
+            }
+        }
+
+        // 🔧 新增：验证自定义搜索源格式
+        if (filteredSettings.customSearchSources) {
+            if (!Array.isArray(filteredSettings.customSearchSources)) {
+                return utils.errorResponse('自定义搜索源格式错误：必须是数组');
+            }
+            
+            const invalidCustomSources = filteredSettings.customSearchSources.filter(source => 
+                !source || 
+                !source.id || 
+                !source.name || 
+                !source.urlTemplate ||
+                typeof source.id !== 'string' || 
+                typeof source.name !== 'string' || 
+                typeof source.urlTemplate !== 'string' ||
+                source.id.trim().length === 0 ||
+                source.name.trim().length === 0 ||
+                source.urlTemplate.trim().length === 0
+            );
+            
+            if (invalidCustomSources.length > 0) {
+                return utils.errorResponse('自定义搜索源格式错误：缺少必需字段或格式不正确');
+            }
+            
+            // 验证URL模板格式（必须包含{keyword}占位符）
+            const invalidUrlSources = filteredSettings.customSearchSources.filter(source => 
+                !source.urlTemplate.includes('{keyword}')
+            );
+            
+            if (invalidUrlSources.length > 0) {
+                return utils.errorResponse('自定义搜索源URL模板必须包含{keyword}占位符');
+            }
+            
+            // 检查自定义搜索源ID是否重复
+            const sourceIds = filteredSettings.customSearchSources.map(s => s.id);
+            const duplicateIds = sourceIds.filter((id, index) => sourceIds.indexOf(id) !== index);
+            
+            if (duplicateIds.length > 0) {
+                return utils.errorResponse(`自定义搜索源ID重复: ${duplicateIds.join(', ')}`);
+            }
+            
+            // 检查自定义搜索源名称是否重复
+            const sourceNames = filteredSettings.customSearchSources.map(s => s.name);
+            const duplicateNames = sourceNames.filter((name, index) => sourceNames.indexOf(name) !== index);
+            
+            if (duplicateNames.length > 0) {
+                return utils.errorResponse(`自定义搜索源名称重复: ${duplicateNames.join(', ')}`);
+            }
+        }
+
+        // 获取当前设置
         const userRecord = await env.DB.prepare(`
             SELECT settings FROM users WHERE id = ?
         `).bind(user.id).first();
@@ -704,9 +792,16 @@ router.put('/api/user/settings', async (request, env) => {
         const currentSettings = userRecord ? JSON.parse(userRecord.settings || '{}') : {};
         const updatedSettings = { ...currentSettings, ...filteredSettings };
 
+        // 更新数据库
         await env.DB.prepare(`
             UPDATE users SET settings = ?, updated_at = ? WHERE id = ?
         `).bind(JSON.stringify(updatedSettings), Date.now(), user.id).run();
+
+        // 🔧 新增：记录设置更改行为
+        await utils.logUserAction(env, user.id, 'settings_update', {
+            changedFields: Object.keys(filteredSettings),
+            hasCustomSources: !!(filteredSettings.customSearchSources && filteredSettings.customSearchSources.length > 0)
+        }, request);
 
         return utils.successResponse({ 
             message: '设置更新成功',
@@ -715,7 +810,132 @@ router.put('/api/user/settings', async (request, env) => {
 
     } catch (error) {
         console.error('更新用户设置失败:', error);
-        return utils.errorResponse('更新用户设置失败', 500);
+        return utils.errorResponse('更新用户设置失败: ' + error.message, 500);
+    }
+});
+
+// 🔧 新增：获取所有可用搜索源（包括内置和自定义）
+router.get('/api/search-sources', async (request, env) => {
+    try {
+        // 内置搜索源
+        const builtinSources = [
+            {
+                id: 'javbus',
+                name: 'JavBus',
+                subtitle: '番号+磁力一体站，信息完善',
+                icon: '🎬',
+                urlTemplate: 'https://www.javbus.com/search/{keyword}',
+                isBuiltin: true
+            },
+            {
+                id: 'javdb',
+                name: 'JavDB',
+                subtitle: '极简风格番号资料站，轻量快速',
+                icon: '📚',
+                urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
+                isBuiltin: true
+            },
+            {
+                id: 'javlibrary',
+                name: 'JavLibrary',
+                subtitle: '评论活跃，女优搜索详尽',
+                icon: '📖',
+                urlTemplate: 'https://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}',
+                isBuiltin: true
+            },
+            {
+                id: 'av01',
+                name: 'AV01',
+                subtitle: '快速预览站点，封面大图清晰',
+                icon: '🎥',
+                urlTemplate: 'https://av01.tv/search?keyword={keyword}',
+                isBuiltin: true
+            },
+            {
+                id: 'missav',
+                name: 'MissAV',
+                subtitle: '中文界面，封面高清，信息丰富',
+                icon: '💫',
+                urlTemplate: 'https://missav.com/search/{keyword}',
+                isBuiltin: true
+            },
+            {
+                id: 'btsow',
+                name: 'btsow',
+                subtitle: '中文磁力搜索引擎，番号资源丰富',
+                icon: '🧲',
+                urlTemplate: 'https://btsow.com/search/{keyword}',
+                isBuiltin: true
+            },
+            {
+                id: 'jable',
+                name: 'Jable',
+                subtitle: '在线观看平台，支持多种格式',
+                icon: '📺',
+                urlTemplate: 'https://jable.tv/search/{keyword}/',
+                isBuiltin: true
+            },
+            {
+                id: 'javmost',
+                name: 'JavMost',
+                subtitle: '免费在线观看，更新及时',
+                icon: '🎦',
+                urlTemplate: 'https://javmost.com/search/{keyword}/',
+                isBuiltin: true
+            },
+            {
+                id: 'javguru',
+                name: 'JavGuru',
+                subtitle: '多线路播放，观看流畅',
+                icon: '🎭',
+                urlTemplate: 'https://jav.guru/?s={keyword}',
+                isBuiltin: true
+            },
+            {
+                id: 'sehuatang',
+                name: '色花堂',
+                subtitle: '综合论坛社区，资源丰富',
+                icon: '🌸',
+                urlTemplate: 'https://sehuatang.org/search.php?keyword={keyword}',
+                isBuiltin: true
+            },
+            {
+                id: 't66y',
+                name: 'T66Y',
+                subtitle: '老牌论坛，资源更新快',
+                icon: '📋',
+                urlTemplate: 'https://t66y.com/search.php?keyword={keyword}',
+                isBuiltin: true
+            }
+        ];
+
+        // 如果用户已登录，获取其自定义搜索源
+        let customSources = [];
+        const user = await authenticate(request, env);
+        if (user) {
+            try {
+                const userRecord = await env.DB.prepare(`
+                    SELECT settings FROM users WHERE id = ?
+                `).bind(user.id).first();
+
+                if (userRecord) {
+                    const settings = JSON.parse(userRecord.settings || '{}');
+                    customSources = settings.customSearchSources || [];
+                }
+            } catch (error) {
+                console.warn('获取用户自定义搜索源失败:', error);
+            }
+        }
+
+        return utils.successResponse({
+            builtinSources,
+            customSources,
+            allSources: [...builtinSources, ...customSources]
+        });
+
+    } catch (error) {
+        console.error('获取搜索源失败:', error);
+        return utils.errorResponse('获取搜索源失败', 500);
     }
 });
 

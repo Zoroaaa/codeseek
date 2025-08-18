@@ -1,4 +1,4 @@
-// Dashboard应用逻辑 - 修复版本
+// Dashboard应用逻辑 - 增强版本，支持自定义搜索源管理
 import { APP_CONSTANTS } from '../core/constants.js';
 import configManager from '../core/config.js';
 import { showLoading, showToast } from '../utils/dom.js';
@@ -15,6 +15,9 @@ export class DashboardApp {
     this.favorites = [];
     this.searchHistory = [];
     this.currentTab = 'overview';
+    this.allSearchSources = []; // 🔧 新增：所有可用搜索源
+    this.customSearchSources = []; // 🔧 新增：自定义搜索源
+    this.editingCustomSource = null; // 🔧 新增：正在编辑的自定义搜索源
     this.isInitialized = false;
     this.init();
   }
@@ -42,6 +45,9 @@ export class DashboardApp {
       
       // 加载云端数据
       await this.loadCloudData();
+      
+      // 🔧 新增：加载搜索源数据
+      await this.loadSearchSources();
       
       // 初始化主题
       themeManager.init();
@@ -79,6 +85,21 @@ export class DashboardApp {
     } catch (error) {
       localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
       throw new Error('认证失败');
+    }
+  }
+
+  // 🔧 新增：加载搜索源数据
+  async loadSearchSources() {
+    try {
+      const response = await apiService.request('/api/search-sources');
+      this.allSearchSources = response.allSources || [];
+      this.customSearchSources = response.customSources || [];
+      console.log(`加载了 ${this.allSearchSources.length} 个搜索源，其中 ${this.customSearchSources.length} 个自定义`);
+    } catch (error) {
+      console.error('加载搜索源失败:', error);
+      // 使用默认搜索源
+      this.allSearchSources = APP_CONSTANTS.SEARCH_SOURCES;
+      this.customSearchSources = [];
     }
   }
 
@@ -157,8 +178,36 @@ export class DashboardApp {
     // 数据操作按钮
     this.bindDataActionButtons();
 
-    // 收藏夹搜索和排序
+    // 收藏夹控件
     this.bindFavoritesControls();
+
+    // 🔧 新增：自定义搜索源管理事件
+    this.bindCustomSourceEvents();
+  }
+
+  // 🔧 新增：绑定自定义搜索源管理事件
+  bindCustomSourceEvents() {
+    const addCustomSourceBtn = document.getElementById('addCustomSourceBtn');
+    const customSourceForm = document.getElementById('customSourceForm');
+    const customSourceModal = document.getElementById('customSourceModal');
+
+    if (addCustomSourceBtn) {
+      addCustomSourceBtn.addEventListener('click', () => this.showCustomSourceModal());
+    }
+
+    if (customSourceForm) {
+      customSourceForm.addEventListener('submit', (e) => this.handleCustomSourceSubmit(e));
+    }
+
+    // 模态框关闭事件
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal')) {
+        this.closeModals();
+      }
+      if (e.target.classList.contains('close')) {
+        this.closeModals();
+      }
+    });
   }
 
   // 绑定数据操作按钮
@@ -305,7 +354,7 @@ export class DashboardApp {
     }
   }
 
-  // 🔧 修复：加载设置数据 - 动态加载搜索源
+  // 🔧 修复：加载设置数据 - 支持自定义搜索源
   async loadSettingsData() {
     try {
       const settings = await apiService.getUserSettings();
@@ -320,8 +369,11 @@ export class DashboardApp {
       if (allowAnalyticsEl) allowAnalyticsEl.checked = settings.allowAnalytics !== false;
       if (searchSuggestionsEl) searchSuggestionsEl.checked = settings.searchSuggestions !== false;
 
-      // 🔧 修复：加载搜索源设置，使用配置中的所有搜索源
-      await this.loadSearchSourceSettings(settings.searchSources || ['javbus', 'javdb', 'javlibrary']);
+      // 🔧 修复：加载搜索源设置，结合自定义搜索源
+      const enabledSources = settings.searchSources || ['javbus', 'javdb', 'javlibrary'];
+      this.customSearchSources = settings.customSearchSources || [];
+      
+      await this.loadSearchSourceSettings(enabledSources);
 
     } catch (error) {
       console.error('加载设置失败:', error);
@@ -331,7 +383,7 @@ export class DashboardApp {
     }
   }
 
-  // 🔧 新增：专门的搜索源设置加载方法
+  // 🔧 修复：专门的搜索源设置加载方法
   async loadSearchSourceSettings(enabledSources) {
     // 清空现有的搜索源设置区域
     const searchSourcesContainer = document.getElementById('searchSourcesContainer');
@@ -340,21 +392,61 @@ export class DashboardApp {
       return;
     }
     
-    // 从常量中获取所有可用的搜索源
-    const allSources = APP_CONSTANTS.SEARCH_SOURCES;
+    // 重新加载搜索源数据以确保最新
+    await this.loadSearchSources();
     
     // 生成搜索源复选框HTML
-    const checkboxesHTML = allSources.map(source => `
-      <label class="search-source-item">
+    const sourceCheckboxesHTML = this.allSearchSources.map(source => `
+      <label class="search-source-item" ${source.isCustom ? 'data-custom="true"' : ''}>
         <input type="checkbox" value="${source.id}" ${enabledSources.includes(source.id) ? 'checked' : ''}>
         <span class="source-info">
           <span class="source-name">${source.icon} ${source.name}</span>
           <span class="source-subtitle">${source.subtitle}</span>
+          ${source.isCustom ? `
+            <div class="custom-source-actions">
+              <button type="button" class="btn-edit-source" data-source-id="${source.id}" title="编辑">✏️</button>
+              <button type="button" class="btn-delete-source" data-source-id="${source.id}" title="删除">🗑️</button>
+            </div>
+          ` : ''}
         </span>
       </label>
     `).join('');
     
-    searchSourcesContainer.innerHTML = checkboxesHTML;
+    const addButtonHTML = `
+      <div class="add-custom-source-section">
+        <button type="button" id="addCustomSourceBtn" class="btn-primary add-custom-source-btn">
+          <span>➕</span>
+          <span>添加自定义搜索源</span>
+        </button>
+      </div>
+    `;
+    
+    searchSourcesContainer.innerHTML = sourceCheckboxesHTML + addButtonHTML;
+    
+    // 重新绑定自定义搜索源事件
+    this.bindCustomSourceEvents();
+    this.bindCustomSourceActionEvents();
+  }
+
+  // 🔧 新增：绑定自定义搜索源操作事件
+  bindCustomSourceActionEvents() {
+    // 编辑按钮事件
+    document.querySelectorAll('.btn-edit-source').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const sourceId = btn.dataset.sourceId;
+        this.editCustomSource(sourceId);
+      });
+    });
+
+    // 删除按钮事件
+    document.querySelectorAll('.btn-delete-source').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const sourceId = btn.dataset.sourceId;
+        this.deleteCustomSource(sourceId);
+      });
+    });
   }
 
   // 🔧 修复：保存设置 - 添加搜索源变更检测和前端更新
@@ -389,7 +481,8 @@ export class DashboardApp {
         maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
         maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
         allowAnalytics: !!ui.allowAnalytics,
-        searchSuggestions: !!ui.searchSuggestions
+        searchSuggestions: !!ui.searchSuggestions,
+        customSearchSources: this.customSearchSources // 🔧 新增：包含自定义搜索源
       };
       
       await apiService.updateUserSettings(payload);
@@ -485,6 +578,194 @@ export class DashboardApp {
 
     this.markSettingsChanged();
     showToast('设置已重置为默认值，请点击保存', 'success');
+  }
+
+  // 🔧 新增：显示自定义搜索源模态框
+  showCustomSourceModal(source = null) {
+    this.editingCustomSource = source;
+    
+    // 获取或创建模态框
+    let modal = document.getElementById('customSourceModal');
+    if (!modal) {
+      modal = this.createCustomSourceModal();
+      document.body.appendChild(modal);
+    }
+    
+    // 填充表单数据
+    const form = document.getElementById('customSourceForm');
+    if (form) {
+      if (source) {
+        // 编辑模式
+        form.sourceId.value = source.id;
+        form.sourceName.value = source.name;
+        form.sourceSubtitle.value = source.subtitle || '';
+        form.sourceIcon.value = source.icon || '🔍';
+        form.sourceUrl.value = source.urlTemplate;
+        modal.querySelector('h2').textContent = '编辑自定义搜索源';
+        modal.querySelector('[type="submit"]').textContent = '更新搜索源';
+      } else {
+        // 新增模式
+        form.reset();
+        form.sourceIcon.value = '🔍';
+        modal.querySelector('h2').textContent = '添加自定义搜索源';
+        modal.querySelector('[type="submit"]').textContent = '添加搜索源';
+      }
+    }
+    
+    modal.style.display = 'block';
+    setTimeout(() => {
+      const nameInput = form.sourceName;
+      if (nameInput) nameInput.focus();
+    }, 100);
+  }
+
+  // 🔧 新增：创建自定义搜索源模态框
+  createCustomSourceModal() {
+    const modal = document.createElement('div');
+    modal.id = 'customSourceModal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>添加自定义搜索源</h2>
+        <form id="customSourceForm">
+          <input type="hidden" name="sourceId">
+          
+          <div class="form-group">
+            <label for="sourceName">搜索源名称 *</label>
+            <input type="text" name="sourceName" id="sourceName" required maxlength="50" 
+                   placeholder="例如：我的搜索站">
+          </div>
+          
+          <div class="form-group">
+            <label for="sourceSubtitle">描述信息</label>
+            <input type="text" name="sourceSubtitle" id="sourceSubtitle" maxlength="100" 
+                   placeholder="例如：专业的搜索引擎">
+          </div>
+          
+          <div class="form-group">
+            <label for="sourceIcon">图标</label>
+            <input type="text" name="sourceIcon" id="sourceIcon" maxlength="5" 
+                   placeholder="🔍" value="🔍">
+          </div>
+          
+          <div class="form-group">
+            <label for="sourceUrl">搜索URL模板 *</label>
+            <input type="url" name="sourceUrl" id="sourceUrl" required 
+                   placeholder="https://example.com/search?q={keyword}">
+            <small class="form-help">
+              URL中必须包含 <code>{keyword}</code> 占位符，搜索时会被替换为实际关键词
+            </small>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" onclick="app.closeModals()">取消</button>
+            <button type="submit" class="btn-primary">添加搜索源</button>
+          </div>
+        </form>
+      </div>
+    `;
+    return modal;
+  }
+
+  // 🔧 新增：处理自定义搜索源表单提交
+  async handleCustomSourceSubmit(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const sourceData = {
+      id: formData.get('sourceId') || null,
+      name: formData.get('sourceName').trim(),
+      subtitle: formData.get('sourceSubtitle').trim(),
+      icon: formData.get('sourceIcon').trim() || '🔍',
+      urlTemplate: formData.get('sourceUrl').trim()
+    };
+    
+    // 验证数据
+    if (!sourceData.name || !sourceData.urlTemplate) {
+      showToast('请填写必需的字段', 'error');
+      return;
+    }
+    
+    if (!sourceData.urlTemplate.includes('{keyword}')) {
+      showToast('URL模板必须包含{keyword}占位符', 'error');
+      return;
+    }
+    
+    try {
+      showLoading(true);
+      
+      if (this.editingCustomSource) {
+        // 更新现有搜索源
+        await apiService.updateCustomSearchSource(sourceData.id, sourceData);
+        showToast('自定义搜索源更新成功', 'success');
+      } else {
+        // 添加新的搜索源
+        await apiService.addCustomSearchSource(sourceData);
+        showToast('自定义搜索源添加成功', 'success');
+      }
+      
+      // 重新加载搜索源数据
+      await this.loadSearchSources();
+      
+      // 重新加载设置页面
+      await this.loadSettingsData();
+      
+      // 关闭模态框
+      this.closeModals();
+      
+    } catch (error) {
+      console.error('保存自定义搜索源失败:', error);
+      showToast('保存失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🔧 新增：编辑自定义搜索源
+  editCustomSource(sourceId) {
+    const source = this.customSearchSources.find(s => s.id === sourceId);
+    if (!source) {
+      showToast('未找到指定的自定义搜索源', 'error');
+      return;
+    }
+    
+    this.showCustomSourceModal(source);
+  }
+
+  // 🔧 新增：删除自定义搜索源
+  async deleteCustomSource(sourceId) {
+    const source = this.customSearchSources.find(s => s.id === sourceId);
+    if (!source) {
+      showToast('未找到指定的自定义搜索源', 'error');
+      return;
+    }
+    
+    if (!confirm(`确定要删除自定义搜索源"${source.name}"吗？此操作不可撤销。`)) {
+      return;
+    }
+    
+    try {
+      showLoading(true);
+      
+      await apiService.deleteCustomSearchSource(sourceId);
+      
+      // 重新加载搜索源数据
+      await this.loadSearchSources();
+      
+      // 重新加载设置页面
+      await this.loadSettingsData();
+      
+      showToast('自定义搜索源删除成功', 'success');
+      
+    } catch (error) {
+      console.error('删除自定义搜索源失败:', error);
+      showToast('删除失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
   }
 
   // 同步收藏 - 直接与API交互
@@ -685,6 +966,7 @@ export class DashboardApp {
         favorites: favorites || this.favorites,
         searchHistory: history || this.searchHistory,
         settings: settings || this.collectSettings(),
+        customSearchSources: this.customSearchSources, // 🔧 新增：导出自定义搜索源
         exportTime: new Date().toISOString(),
         version: window.API_CONFIG?.APP_VERSION || '1.0.0'
       };
@@ -982,6 +1264,7 @@ export class DashboardApp {
     document.querySelectorAll('.modal').forEach(modal => {
       modal.style.display = 'none';
     });
+    this.editingCustomSource = null; // 🔧 重置编辑状态
   }
 
   // 退出登录

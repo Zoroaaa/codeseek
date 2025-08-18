@@ -1,4 +1,4 @@
-// API服务模块
+// API服务模块 - 修复搜索源设置保存
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 
@@ -332,7 +332,7 @@ class APIService {
     }
   }
 
-  // 用户设置相关API
+  // 🔧 修复：用户设置相关API - 添加搜索源和自定义搜索源支持
   async getUserSettings() {
     try {
       const response = await this.request('/api/user/settings');
@@ -352,10 +352,17 @@ class APIService {
       throw new Error('设置数据格式错误');
     }
     
-    // 验证设置字段
+    // 🔧 修复：扩展允许的设置字段，添加搜索源支持
     const allowedSettings = [
-      'theme', 'autoSync', 'cacheResults', 
-      'maxHistoryPerUser', 'maxFavoritesPerUser'
+      'theme', 
+      'autoSync', 
+      'cacheResults', 
+      'maxHistoryPerUser', 
+      'maxFavoritesPerUser',
+      'searchSources',        // 🔧 新增：启用的搜索源列表
+      'customSearchSources',  // 🔧 新增：自定义搜索源列表
+      'allowAnalytics',       // 🔧 新增：行为统计设置
+      'searchSuggestions'     // 🔧 新增：搜索建议设置
     ];
     
     const validSettings = {};
@@ -365,6 +372,28 @@ class APIService {
       }
     });
     
+    // 🔧 新增：验证搜索源数据格式
+    if (validSettings.searchSources && !Array.isArray(validSettings.searchSources)) {
+      throw new Error('搜索源格式错误：必须是数组');
+    }
+    
+    if (validSettings.customSearchSources && !Array.isArray(validSettings.customSearchSources)) {
+      throw new Error('自定义搜索源格式错误：必须是数组');
+    }
+    
+    // 🔧 新增：验证自定义搜索源格式
+    if (validSettings.customSearchSources) {
+      const invalidSources = validSettings.customSearchSources.filter(source => 
+        !source || !source.id || !source.name || !source.urlTemplate ||
+        typeof source.id !== 'string' || typeof source.name !== 'string' || 
+        typeof source.urlTemplate !== 'string'
+      );
+      
+      if (invalidSources.length > 0) {
+        throw new Error('自定义搜索源格式错误：缺少必需字段');
+      }
+    }
+    
     try {
       return await this.request('/api/user/settings', {
         method: 'PUT',
@@ -372,6 +401,126 @@ class APIService {
       });
     } catch (error) {
       console.error('更新用户设置失败:', error);
+      throw error;
+    }
+  }
+
+  // 🔧 新增：自定义搜索源管理API
+  async addCustomSearchSource(source) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    // 验证必需字段
+    if (!source || !source.name || !source.urlTemplate) {
+      throw new Error('缺少必需字段：name, urlTemplate');
+    }
+    
+    // 自动生成ID
+    if (!source.id) {
+      source.id = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    
+    // 设置默认值
+    const newSource = {
+      id: source.id,
+      name: source.name.trim(),
+      subtitle: source.subtitle?.trim() || '自定义搜索源',
+      icon: source.icon?.trim() || '🔍',
+      urlTemplate: source.urlTemplate.trim(),
+      isCustom: true,
+      createdAt: Date.now()
+    };
+    
+    try {
+      const currentSettings = await this.getUserSettings();
+      const customSources = currentSettings.customSearchSources || [];
+      
+      // 检查是否已存在相同ID或名称
+      const existingSource = customSources.find(s => 
+        s.id === newSource.id || s.name === newSource.name
+      );
+      
+      if (existingSource) {
+        throw new Error('搜索源ID或名称已存在');
+      }
+      
+      // 添加到自定义搜索源列表
+      const updatedCustomSources = [...customSources, newSource];
+      
+      // 更新设置
+      return await this.updateUserSettings({
+        ...currentSettings,
+        customSearchSources: updatedCustomSources
+      });
+    } catch (error) {
+      console.error('添加自定义搜索源失败:', error);
+      throw error;
+    }
+  }
+
+  async updateCustomSearchSource(sourceId, updates) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    try {
+      const currentSettings = await this.getUserSettings();
+      const customSources = currentSettings.customSearchSources || [];
+      
+      const sourceIndex = customSources.findIndex(s => s.id === sourceId);
+      if (sourceIndex === -1) {
+        throw new Error('未找到指定的自定义搜索源');
+      }
+      
+      // 更新搜索源
+      customSources[sourceIndex] = {
+        ...customSources[sourceIndex],
+        ...updates,
+        updatedAt: Date.now()
+      };
+      
+      // 更新设置
+      return await this.updateUserSettings({
+        ...currentSettings,
+        customSearchSources: customSources
+      });
+    } catch (error) {
+      console.error('更新自定义搜索源失败:', error);
+      throw error;
+    }
+  }
+
+  async deleteCustomSearchSource(sourceId) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    try {
+      const currentSettings = await this.getUserSettings();
+      let customSources = currentSettings.customSearchSources || [];
+      let enabledSources = currentSettings.searchSources || [];
+      
+      // 检查搜索源是否存在
+      const sourceExists = customSources.some(s => s.id === sourceId);
+      if (!sourceExists) {
+        throw new Error('未找到指定的自定义搜索源');
+      }
+      
+      // 从自定义搜索源列表中移除
+      customSources = customSources.filter(s => s.id !== sourceId);
+      
+      // 从启用的搜索源中移除
+      enabledSources = enabledSources.filter(id => id !== sourceId);
+      
+      // 更新设置
+      return await this.updateUserSettings({
+        ...currentSettings,
+        customSearchSources: customSources,
+        searchSources: enabledSources
+      });
+    } catch (error) {
+      console.error('删除自定义搜索源失败:', error);
       throw error;
     }
   }
