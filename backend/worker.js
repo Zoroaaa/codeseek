@@ -1,4 +1,4 @@
-// Cloudflare Worker 后端主文件 - 简化版路由修复
+// Cloudflare Worker 后端主文件 - 优化版本，移除内置搜索源定义
 
 // 🔧 简化的路由器实现 - 专门修复参数路由问题
 class Router {
@@ -379,7 +379,7 @@ router.get('/api/health', async (request, env) => {
     return utils.successResponse({
         status: 'healthy',
         timestamp: Date.now(),
-        version: env.APP_VERSION || '1.0.0'
+        version: env.APP_VERSION || '1.3.0'
     });
 });
 
@@ -643,7 +643,7 @@ router.post('/api/auth/delete-account', async (request, env) => {
     }
 });
 
-// 用户设置路由 - 修复版本，支持搜索源设置
+// 🔧 优化：用户设置路由 - 支持搜索源和分类管理
 router.get('/api/user/settings', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) {
@@ -666,9 +666,10 @@ router.get('/api/user/settings', async (request, env) => {
                 maxFavoritesPerUser: settings.maxFavoritesPerUser || 1000,
                 allowAnalytics: settings.allowAnalytics !== false,
                 searchSuggestions: settings.searchSuggestions !== false,
-                // 🔧 新增：搜索源相关设置
+                // 🔧 搜索源相关设置
                 searchSources: settings.searchSources || ['javbus', 'javdb', 'javlibrary'],
                 customSearchSources: settings.customSearchSources || [],
+                customSourceCategories: settings.customSourceCategories || [], // 🔧 新增：自定义分类
                 ...settings
             }
         });
@@ -693,7 +694,7 @@ router.put('/api/user/settings', async (request, env) => {
             return utils.errorResponse('设置数据格式错误');
         }
 
-        // 🔧 修复：扩展允许的设置字段，添加搜索源支持
+        // 🔧 扩展允许的设置字段，添加分类管理支持
         const allowedSettings = [
             'theme', 
             'autoSync', 
@@ -702,8 +703,9 @@ router.put('/api/user/settings', async (request, env) => {
             'maxFavoritesPerUser',
             'allowAnalytics',
             'searchSuggestions',
-            'searchSources',        // 🔧 新增：启用的搜索源列表
-            'customSearchSources'   // 🔧 新增：自定义搜索源列表
+            'searchSources',            // 启用的搜索源列表
+            'customSearchSources',      // 自定义搜索源列表
+            'customSourceCategories'    // 🔧 新增：自定义分类列表
         ];
         
         const filteredSettings = {};
@@ -714,28 +716,18 @@ router.put('/api/user/settings', async (request, env) => {
             }
         });
 
-        // 🔧 新增：验证搜索源数据格式
+        // 🔧 验证搜索源数据格式
         if (filteredSettings.searchSources) {
             if (!Array.isArray(filteredSettings.searchSources)) {
                 return utils.errorResponse('搜索源格式错误：必须是数组');
             }
             
-            // 验证至少选择了一个搜索源
             if (filteredSettings.searchSources.length === 0) {
                 return utils.errorResponse('至少需要选择一个搜索源');
             }
-            
-            // 验证搜索源ID格式
-            const invalidSources = filteredSettings.searchSources.filter(sourceId => 
-                !sourceId || typeof sourceId !== 'string' || sourceId.trim().length === 0
-            );
-            
-            if (invalidSources.length > 0) {
-                return utils.errorResponse('搜索源ID格式错误');
-            }
         }
 
-        // 🔧 新增：验证自定义搜索源格式
+        // 🔧 验证自定义搜索源格式
         if (filteredSettings.customSearchSources) {
             if (!Array.isArray(filteredSettings.customSearchSources)) {
                 return utils.errorResponse('自定义搜索源格式错误：必须是数组');
@@ -746,41 +738,52 @@ router.put('/api/user/settings', async (request, env) => {
                 !source.id || 
                 !source.name || 
                 !source.urlTemplate ||
+                !source.category ||
                 typeof source.id !== 'string' || 
                 typeof source.name !== 'string' || 
                 typeof source.urlTemplate !== 'string' ||
-                source.id.trim().length === 0 ||
-                source.name.trim().length === 0 ||
-                source.urlTemplate.trim().length === 0
+                typeof source.category !== 'string'
             );
             
             if (invalidCustomSources.length > 0) {
                 return utils.errorResponse('自定义搜索源格式错误：缺少必需字段或格式不正确');
             }
+        }
+
+        // 🔧 新增：验证自定义分类格式
+        if (filteredSettings.customSourceCategories) {
+            if (!Array.isArray(filteredSettings.customSourceCategories)) {
+                return utils.errorResponse('自定义分类格式错误：必须是数组');
+            }
             
-            // 验证URL模板格式（必须包含{keyword}占位符）
-            const invalidUrlSources = filteredSettings.customSearchSources.filter(source => 
-                !source.urlTemplate.includes('{keyword}')
+            const invalidCategories = filteredSettings.customSourceCategories.filter(category => 
+                !category || 
+                !category.id || 
+                !category.name || 
+                !category.icon ||
+                typeof category.id !== 'string' || 
+                typeof category.name !== 'string' || 
+                typeof category.icon !== 'string'
             );
             
-            if (invalidUrlSources.length > 0) {
-                return utils.errorResponse('自定义搜索源URL模板必须包含{keyword}占位符');
+            if (invalidCategories.length > 0) {
+                return utils.errorResponse('自定义分类格式错误：缺少必需字段或格式不正确');
             }
             
-            // 检查自定义搜索源ID是否重复
-            const sourceIds = filteredSettings.customSearchSources.map(s => s.id);
-            const duplicateIds = sourceIds.filter((id, index) => sourceIds.indexOf(id) !== index);
+            // 检查分类ID重复
+            const categoryIds = filteredSettings.customSourceCategories.map(c => c.id);
+            const duplicateIds = categoryIds.filter((id, index) => categoryIds.indexOf(id) !== index);
             
             if (duplicateIds.length > 0) {
-                return utils.errorResponse(`自定义搜索源ID重复: ${duplicateIds.join(', ')}`);
+                return utils.errorResponse(`自定义分类ID重复: ${duplicateIds.join(', ')}`);
             }
             
-            // 检查自定义搜索源名称是否重复
-            const sourceNames = filteredSettings.customSearchSources.map(s => s.name);
-            const duplicateNames = sourceNames.filter((name, index) => sourceNames.indexOf(name) !== index);
+            // 检查分类名称重复
+            const categoryNames = filteredSettings.customSourceCategories.map(c => c.name);
+            const duplicateNames = categoryNames.filter((name, index) => categoryNames.indexOf(name) !== index);
             
             if (duplicateNames.length > 0) {
-                return utils.errorResponse(`自定义搜索源名称重复: ${duplicateNames.join(', ')}`);
+                return utils.errorResponse(`自定义分类名称重复: ${duplicateNames.join(', ')}`);
             }
         }
 
@@ -797,10 +800,11 @@ router.put('/api/user/settings', async (request, env) => {
             UPDATE users SET settings = ?, updated_at = ? WHERE id = ?
         `).bind(JSON.stringify(updatedSettings), Date.now(), user.id).run();
 
-        // 🔧 新增：记录设置更改行为
+        // 🔧 记录设置更改行为
         await utils.logUserAction(env, user.id, 'settings_update', {
             changedFields: Object.keys(filteredSettings),
-            hasCustomSources: !!(filteredSettings.customSearchSources && filteredSettings.customSearchSources.length > 0)
+            hasCustomSources: !!(filteredSettings.customSearchSources && filteredSettings.customSearchSources.length > 0),
+            hasCustomCategories: !!(filteredSettings.customSourceCategories && filteredSettings.customSourceCategories.length > 0)
         }, request);
 
         return utils.successResponse({ 
@@ -814,103 +818,13 @@ router.put('/api/user/settings', async (request, env) => {
     }
 });
 
-// 🔧 新增：获取所有可用搜索源（包括内置和自定义）
+// 🔧 优化：搜索源API - 移除内置定义，从前端获取
 router.get('/api/search-sources', async (request, env) => {
     try {
-        // 内置搜索源
-        const builtinSources = [
-            {
-                id: 'javbus',
-                name: 'JavBus',
-                subtitle: '番号+磁力一体站，信息完善',
-                icon: '🎬',
-                urlTemplate: 'https://www.javbus.com/search/{keyword}',
-                isBuiltin: true
-            },
-            {
-                id: 'javdb',
-                name: 'JavDB',
-                subtitle: '极简风格番号资料站，轻量快速',
-                icon: '📚',
-                urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
-                isBuiltin: true
-            },
-            {
-                id: 'javlibrary',
-                name: 'JavLibrary',
-                subtitle: '评论活跃，女优搜索详尽',
-                icon: '📖',
-                urlTemplate: 'https://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}',
-                isBuiltin: true
-            },
-            {
-                id: 'av01',
-                name: 'AV01',
-                subtitle: '快速预览站点，封面大图清晰',
-                icon: '🎥',
-                urlTemplate: 'https://av01.tv/search?keyword={keyword}',
-                isBuiltin: true
-            },
-            {
-                id: 'missav',
-                name: 'MissAV',
-                subtitle: '中文界面，封面高清，信息丰富',
-                icon: '💫',
-                urlTemplate: 'https://missav.com/search/{keyword}',
-                isBuiltin: true
-            },
-            {
-                id: 'btsow',
-                name: 'btsow',
-                subtitle: '中文磁力搜索引擎，番号资源丰富',
-                icon: '🧲',
-                urlTemplate: 'https://btsow.com/search/{keyword}',
-                isBuiltin: true
-            },
-            {
-                id: 'jable',
-                name: 'Jable',
-                subtitle: '在线观看平台，支持多种格式',
-                icon: '📺',
-                urlTemplate: 'https://jable.tv/search/{keyword}/',
-                isBuiltin: true
-            },
-            {
-                id: 'javmost',
-                name: 'JavMost',
-                subtitle: '免费在线观看，更新及时',
-                icon: '🎦',
-                urlTemplate: 'https://javmost.com/search/{keyword}/',
-                isBuiltin: true
-            },
-            {
-                id: 'javguru',
-                name: 'JavGuru',
-                subtitle: '多线路播放，观看流畅',
-                icon: '🎭',
-                urlTemplate: 'https://jav.guru/?s={keyword}',
-                isBuiltin: true
-            },
-            {
-                id: 'sehuatang',
-                name: '色花堂',
-                subtitle: '综合论坛社区，资源丰富',
-                icon: '🌸',
-                urlTemplate: 'https://sehuatang.org/search.php?keyword={keyword}',
-                isBuiltin: true
-            },
-            {
-                id: 't66y',
-                name: 'T66Y',
-                subtitle: '老牌论坛，资源更新快',
-                icon: '📋',
-                urlTemplate: 'https://t66y.com/search.php?keyword={keyword}',
-                isBuiltin: true
-            }
-        ];
-
-        // 如果用户已登录，获取其自定义搜索源
+        // 不再在后端定义内置搜索源，而是返回用户的自定义搜索源
         let customSources = [];
+        let customCategories = [];
+        
         const user = await authenticate(request, env);
         if (user) {
             try {
@@ -921,6 +835,7 @@ router.get('/api/search-sources', async (request, env) => {
                 if (userRecord) {
                     const settings = JSON.parse(userRecord.settings || '{}');
                     customSources = settings.customSearchSources || [];
+                    customCategories = settings.customSourceCategories || [];
                 }
             } catch (error) {
                 console.warn('获取用户自定义搜索源失败:', error);
@@ -928,9 +843,10 @@ router.get('/api/search-sources', async (request, env) => {
         }
 
         return utils.successResponse({
-            builtinSources,
             customSources,
-            allSources: [...builtinSources, ...customSources]
+            customCategories,
+            // 🔧 提示前端从constants.js获取内置搜索源
+            message: 'Built-in sources should be loaded from frontend constants'
         });
 
     } catch (error) {
@@ -1118,7 +1034,7 @@ router.get('/api/user/search-history', async (request, env) => {
     }
 });
 
-// 🔧 关键修复：删除单条搜索历史（参数路由）
+// 删除单条搜索历史记录（参数路由）
 router.delete('/api/user/search-history/:id', async (request, env) => {
     console.log('🔧 删除单条历史路由被调用');
     
@@ -1163,7 +1079,7 @@ router.delete('/api/user/search-history/:id', async (request, env) => {
     }
 });
 
-// 🔧 清空所有搜索历史（精确路由）
+// 清空所有搜索历史（精确路由）
 router.delete('/api/user/search-history', async (request, env) => {
     console.log('🔧 清空历史路由被调用');
     
@@ -1274,7 +1190,9 @@ router.post('/api/actions/record', async (request, env) => {
         const allowedActions = [
             'search', 'login', 'logout', 'register', 'visit_site', 'copy_url',
             'favorite_add', 'favorite_remove', 'settings_update', 'export_data',
-            'sync_data', 'page_view', 'session_start', 'session_end'
+            'sync_data', 'page_view', 'session_start', 'session_end',
+            'custom_source_add', 'custom_source_edit', 'custom_source_delete',
+            'custom_category_add', 'custom_category_edit', 'custom_category_delete'
         ];
 
         if (!allowedActions.includes(actionType)) {
@@ -1313,7 +1231,7 @@ router.get('/api/config', async (request, env) => {
         minPasswordLength: parseInt(env.MIN_PASSWORD_LENGTH || '6'),
         maxFavoritesPerUser: parseInt(env.MAX_FAVORITES_PER_USER || '1000'),
         maxHistoryPerUser: parseInt(env.MAX_HISTORY_PER_USER || '1000'),
-        version: env.APP_VERSION || '1.0.0'
+        version: env.APP_VERSION || '1.3.0'
     });
 });
 

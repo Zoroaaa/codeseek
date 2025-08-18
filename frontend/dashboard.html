@@ -52,9 +52,19 @@
                     <span class="menu-icon">🕐</span>
                     <span class="menu-text">搜索历史</span>
                 </div>
+                <!-- 🔧 新增：搜索源管理独立页面 -->
+                <div class="menu-item" data-tab="sources">
+                    <span class="menu-icon">🔍</span>
+                    <span class="menu-text">搜索源管理</span>
+                </div>
+                <!-- 🔧 新增：分类管理独立页面 -->
+                <div class="menu-item" data-tab="categories">
+                    <span class="menu-icon">📂</span>
+                    <span class="menu-text">分类管理</span>
+                </div>
                 <div class="menu-item" data-tab="settings">
                     <span class="menu-icon">⚙️</span>
-                    <span class="menu-text">设置</span>
+                    <span class="menu-text">系统设置</span>
                 </div>
                 <div class="menu-item" data-tab="stats">
                     <span class="menu-icon">📈</span>
@@ -89,14 +99,14 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">📅</div>
+                        <div class="stat-icon">🔍</div>
                         <div class="stat-info">
-                            <div class="stat-number" id="activeDays">0</div>
-                            <div class="stat-label">活跃天数</div>
+                            <div class="stat-number" id="totalSources">0</div>
+                            <div class="stat-label">搜索源数量</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">🏆</div>
+                        <div class="stat-icon">🆔</div>
                         <div class="stat-info">
                             <div class="stat-number" id="userLevel">新手</div>
                             <div class="stat-label">用户等级</div>
@@ -116,9 +126,9 @@
                             <span class="btn-icon">⭐</span>
                             <span>查看收藏</span>
                         </button>
-                        <button class="action-btn" onclick="app.syncAllData()">
-                            <span class="btn-icon">🔄</span>
-                            <span>同步数据</span>
+                        <button class="action-btn" onclick="app.switchTab('sources')">
+                            <span class="btn-icon">🔍</span>
+                            <span>管理搜索源</span>
                         </button>
                         <button class="action-btn" onclick="app.exportData()">
                             <span class="btn-icon">📤</span>
@@ -218,11 +228,145 @@
                 </div>
             </div>
 
-            <!-- 🔧 增强版设置标签页 - 支持自定义搜索源管理 -->
+            <!-- 🔧 新增：搜索源管理标签页 -->
+            <div id="sources" class="tab-content">
+                <div class="tab-header">
+                    <h1>搜索源管理</h1>
+                    <p>管理您的搜索源配置，启用或禁用特定搜索源</p>
+                    <div class="header-actions">
+                        <button class="btn-primary" id="addCustomSourceBtn">
+                            <span>➕</span>
+                            <span>添加自定义搜索源</span>
+                        </button>
+                        <button class="btn-secondary" onclick="app.exportSources()">导出搜索源</button>
+                    </div>
+                </div>
+
+                <!-- 搜索源控制面板 -->
+                <div class="sources-controls">
+                    <div class="control-group">
+                        <label>过滤条件：</label>
+                        <select id="sourcesFilter">
+                            <option value="all">全部搜索源</option>
+                            <option value="enabled">已启用</option>
+                            <option value="disabled">已禁用</option>
+                            <option value="builtin">内置搜索源</option>
+                            <option value="custom">自定义搜索源</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>按分类：</label>
+                        <select id="categoryFilter">
+                            <option value="all">全部分类</option>
+                            <!-- 分类选项将动态加载 -->
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>排序方式：</label>
+                        <select id="sourcesSort">
+                            <option value="priority">按优先级</option>
+                            <option value="name">按名称</option>
+                            <option value="category">按分类</option>
+                            <option value="status">按状态</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 批量操作 -->
+                <div class="bulk-actions">
+                    <button class="btn-secondary" onclick="app.enableAllSources()">全部启用</button>
+                    <button class="btn-secondary" onclick="app.disableAllSources()">全部禁用</button>
+                    <button class="btn-warning" onclick="app.resetToDefaults()">重置为默认</button>
+                </div>
+
+                <!-- 搜索源列表 -->
+                <div id="sourcesList" class="sources-list">
+                    <div class="loading-sources">正在加载搜索源...</div>
+                </div>
+
+                <!-- 搜索源统计 -->
+                <div class="sources-stats">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value" id="totalSourcesCount">0</span>
+                            <span class="stat-desc">总搜索源数</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="enabledSourcesCount">0</span>
+                            <span class="stat-desc">已启用</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="customSourcesCount">0</span>
+                            <span class="stat-desc">自定义搜索源</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="categoriesCount">0</span>
+                            <span class="stat-desc">分类数量</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🔧 新增：分类管理标签页 -->
+            <div id="categories" class="tab-content">
+                <div class="tab-header">
+                    <h1>分类管理</h1>
+                    <p>管理搜索源的分类，创建和编辑自定义分类</p>
+                    <div class="header-actions">
+                        <button class="btn-primary" id="addCustomCategoryBtn">
+                            <span>➕</span>
+                            <span>添加自定义分类</span>
+                        </button>
+                        <button class="btn-secondary" onclick="app.exportCategories()">导出分类</button>
+                    </div>
+                </div>
+
+                <!-- 分类统计 -->
+                <div class="categories-stats">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value" id="totalCategoriesCount">0</span>
+                            <span class="stat-desc">总分类数</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="builtinCategoriesCount">0</span>
+                            <span class="stat-desc">内置分类</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="customCategoriesCount">0</span>
+                            <span class="stat-desc">自定义分类</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="usedCategoriesCount">0</span>
+                            <span class="stat-desc">使用中分类</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 内置分类列表 -->
+                <div class="categories-section">
+                    <h3>📚 内置分类</h3>
+                    <p class="section-desc">系统预定义的搜索源分类，不可删除</p>
+                    <div id="builtinCategoriesList" class="categories-list">
+                        <!-- 内置分类将动态加载 -->
+                    </div>
+                </div>
+
+                <!-- 自定义分类列表 -->
+                <div class="categories-section">
+                    <h3>🎨 自定义分类</h3>
+                    <p class="section-desc">您创建的个性化分类，可以编辑和删除</p>
+                    <div id="customCategoriesList" class="categories-list">
+                        <!-- 自定义分类将动态加载 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统设置标签页（简化版） -->
             <div id="settings" class="tab-content">
                 <div class="tab-header">
-                    <h1>用户设置</h1>
-                    <p>个性化您的使用体验</p>
+                    <h1>系统设置</h1>
+                    <p>配置系统基本设置和个人偏好</p>
                 </div>
 
                 <div class="settings-sections">
@@ -237,21 +381,6 @@
                                     <option value="light">浅色模式</option>
                                     <option value="dark">深色模式</option>
                                 </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 🔧 增强版搜索设置 - 支持自定义搜索源管理 -->
-                    <div class="settings-section">
-                        <h3>搜索设置</h3>
-                        <div class="setting-item search-sources-setting">
-                            <label>启用的搜索源</label>
-                            <div class="setting-control">
-                                <div class="search-sources-container" id="searchSourcesContainer">
-                                    <!-- 搜索源复选框将通过JavaScript动态加载 -->
-                                    <div class="loading-sources">正在加载搜索源...</div>
-                                </div>
-                                <span class="setting-desc">选择您要使用的搜索源（至少选择一个）</span>
                             </div>
                         </div>
                         <div class="setting-item">
@@ -392,6 +521,9 @@
     <!-- 🔧 新增：自定义搜索源模态框 -->
     <!-- 注意：模态框将通过JavaScript动态创建，这里不需要预定义 -->
 
+    <!-- 🔧 新增：自定义分类模态框 -->
+    <!-- 注意：模态框将通过JavaScript动态创建，这里不需要预定义 -->
+
     <!-- Toast通知 -->
     <div id="toast" class="toast" role="alert" aria-live="polite"></div>
 
@@ -402,7 +534,7 @@
 
     <!-- 脚本文件 - ES6模块化 -->
     <script type="module">
-        import DashboardApp from './src/app/dashboard-app.js';
+        import EnhancedDashboardApp from './src/app/enhanced-dashboard-app.js';
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', () => {
@@ -413,8 +545,8 @@
                 document.getElementById('brand-text').textContent = appName;
             }
             
-            if (typeof DashboardApp !== 'undefined') {
-                window.app = new DashboardApp();
+            if (typeof EnhancedDashboardApp !== 'undefined') {
+                window.app = new EnhancedDashboardApp();
             }
         });
     </script>

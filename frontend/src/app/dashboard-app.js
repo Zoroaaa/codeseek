@@ -1,4 +1,4 @@
-// Dashboard应用逻辑 - 增强版本，支持自定义搜索源管理
+// Enhanced Dashboard应用逻辑 - 深度优化版本，支持搜索源和分类管理
 import { APP_CONSTANTS } from '../core/constants.js';
 import configManager from '../core/config.js';
 import { showLoading, showToast } from '../utils/dom.js';
@@ -9,15 +9,26 @@ import themeManager from '../services/theme.js';
 import apiService from '../services/api.js';
 import searchService from '../services/search.js';
 
-export class DashboardApp {
+export class EnhancedDashboardApp {
   constructor() {
     this.currentUser = null;
     this.favorites = [];
     this.searchHistory = [];
     this.currentTab = 'overview';
-    this.allSearchSources = []; // 🔧 新增：所有可用搜索源
-    this.customSearchSources = []; // 🔧 新增：自定义搜索源
-    this.editingCustomSource = null; // 🔧 新增：正在编辑的自定义搜索源
+    
+    // 🔧 优化：从constants.js获取内置数据
+    this.builtinSearchSources = [];
+    this.builtinCategories = [];
+    this.allSearchSources = []; // 内置 + 自定义搜索源
+    this.allCategories = []; // 内置 + 自定义分类
+    this.customSearchSources = [];
+    this.customCategories = [];
+    this.enabledSources = [];
+    
+    // 编辑状态
+    this.editingCustomSource = null;
+    this.editingCustomCategory = null;
+    
     this.isInitialized = false;
     this.init();
   }
@@ -34,6 +45,9 @@ export class DashboardApp {
       
       showLoading(true);
       
+      // 🔧 新增：加载内置数据
+      this.loadBuiltinData();
+      
       // 初始化配置
       await configManager.init();
       
@@ -46,14 +60,14 @@ export class DashboardApp {
       // 加载云端数据
       await this.loadCloudData();
       
-      // 🔧 新增：加载搜索源数据
-      await this.loadSearchSources();
+      // 🔧 新增：加载用户搜索源和分类设置
+      await this.loadUserSearchSettings();
       
       // 初始化主题
       themeManager.init();
       
       this.isInitialized = true;
-      console.log('✅ Dashboard初始化完成');
+      console.log('✅ Enhanced Dashboard初始化完成');
       
     } catch (error) {
       console.error('❌ Dashboard初始化失败:', error);
@@ -64,6 +78,75 @@ export class DashboardApp {
       }, 2000);
     } finally {
       showLoading(false);
+    }
+  }
+
+  // 🔧 新增：从constants.js加载内置数据
+  loadBuiltinData() {
+    try {
+      // 加载内置搜索源
+      this.builtinSearchSources = APP_CONSTANTS.SEARCH_SOURCES.map(source => ({
+        ...source,
+        isBuiltin: true,
+        isCustom: false
+      }));
+      
+      // 加载内置分类
+      this.builtinCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(category => ({
+        ...category,
+        isBuiltin: true,
+        isCustom: false
+      }));
+      
+      // 初始化所有数据
+      this.allSearchSources = [...this.builtinSearchSources];
+      this.allCategories = [...this.builtinCategories];
+      
+      console.log(`从constants.js加载了 ${this.builtinSearchSources.length} 个内置搜索源和 ${this.builtinCategories.length} 个内置分类`);
+      
+    } catch (error) {
+      console.error('加载内置数据失败:', error);
+      this.builtinSearchSources = [];
+      this.builtinCategories = [];
+      this.allSearchSources = [];
+      this.allCategories = [];
+    }
+  }
+
+  // 🔧 新增：加载用户搜索源和分类设置
+  async loadUserSearchSettings() {
+    if (!this.currentUser) return;
+    
+    try {
+      const userSettings = await apiService.getUserSettings();
+      
+      // 加载用户的自定义搜索源和分类
+      this.customSearchSources = userSettings.customSearchSources || [];
+      this.customCategories = userSettings.customSourceCategories || [];
+      this.enabledSources = userSettings.searchSources || APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+      
+      // 合并内置和自定义数据
+      this.allSearchSources = [
+        ...this.builtinSearchSources,
+        ...this.customSearchSources.map(s => ({ ...s, isBuiltin: false, isCustom: true }))
+      ];
+      
+      this.allCategories = [
+        ...this.builtinCategories,
+        ...this.customCategories.map(c => ({ ...c, isBuiltin: false, isCustom: true }))
+      ];
+      
+      console.log(`用户设置：启用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源和 ${this.customCategories.length} 个自定义分类`);
+      
+    } catch (error) {
+      console.warn('加载用户搜索源设置失败，使用默认设置:', error);
+      this.customSearchSources = [];
+      this.customCategories = [];
+      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+      
+      // 重置为仅内置数据
+      this.allSearchSources = [...this.builtinSearchSources];
+      this.allCategories = [...this.builtinCategories];
     }
   }
 
@@ -85,21 +168,6 @@ export class DashboardApp {
     } catch (error) {
       localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
       throw new Error('认证失败');
-    }
-  }
-
-  // 🔧 新增：加载搜索源数据
-  async loadSearchSources() {
-    try {
-      const response = await apiService.request('/api/search-sources');
-      this.allSearchSources = response.allSources || [];
-      this.customSearchSources = response.customSources || [];
-      console.log(`加载了 ${this.allSearchSources.length} 个搜索源，其中 ${this.customSearchSources.length} 个自定义`);
-    } catch (error) {
-      console.error('加载搜索源失败:', error);
-      // 使用默认搜索源
-      this.allSearchSources = APP_CONSTANTS.SEARCH_SOURCES;
-      this.customSearchSources = [];
     }
   }
 
@@ -183,31 +251,51 @@ export class DashboardApp {
 
     // 🔧 新增：自定义搜索源管理事件
     this.bindCustomSourceEvents();
+    
+    // 🔧 新增：自定义分类管理事件
+    this.bindCustomCategoryEvents();
   }
 
   // 🔧 新增：绑定自定义搜索源管理事件
   bindCustomSourceEvents() {
+    // 添加自定义搜索源按钮
     const addCustomSourceBtn = document.getElementById('addCustomSourceBtn');
-    const customSourceForm = document.getElementById('customSourceForm');
-    const customSourceModal = document.getElementById('customSourceModal');
-
     if (addCustomSourceBtn) {
       addCustomSourceBtn.addEventListener('click', () => this.showCustomSourceModal());
     }
 
-    if (customSourceForm) {
-      customSourceForm.addEventListener('submit', (e) => this.handleCustomSourceSubmit(e));
+    // 搜索源筛选和排序
+    const sourcesFilter = document.getElementById('sourcesFilter');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const sourcesSort = document.getElementById('sourcesSort');
+
+    if (sourcesFilter) {
+      sourcesFilter.addEventListener('change', () => this.filterAndSortSources());
+    }
+    if (categoryFilter) {
+      categoryFilter.addEventListener('change', () => this.filterAndSortSources());
+    }
+    if (sourcesSort) {
+      sourcesSort.addEventListener('change', () => this.filterAndSortSources());
     }
 
-    // 模态框关闭事件
-    document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('modal')) {
-        this.closeModals();
-      }
-      if (e.target.classList.contains('close')) {
-        this.closeModals();
-      }
-    });
+    // 批量操作按钮
+    const enableAllBtn = document.querySelector('[onclick*="enableAllSources"]');
+    const disableAllBtn = document.querySelector('[onclick*="disableAllSources"]');
+    const resetToDefaultsBtn = document.querySelector('[onclick*="resetToDefaults"]');
+
+    if (enableAllBtn) enableAllBtn.addEventListener('click', () => this.enableAllSources());
+    if (disableAllBtn) disableAllBtn.addEventListener('click', () => this.disableAllSources());
+    if (resetToDefaultsBtn) resetToDefaultsBtn.addEventListener('click', () => this.resetToDefaults());
+  }
+
+  // 🔧 新增：绑定自定义分类管理事件
+  bindCustomCategoryEvents() {
+    // 添加自定义分类按钮
+    const addCustomCategoryBtn = document.getElementById('addCustomCategoryBtn');
+    if (addCustomCategoryBtn) {
+      addCustomCategoryBtn.addEventListener('click', () => this.showCustomCategoryModal());
+    }
   }
 
   // 绑定数据操作按钮
@@ -216,6 +304,8 @@ export class DashboardApp {
       syncAllDataBtn: () => this.syncAllData(),
       exportDataBtn: () => this.exportData(),
       exportFavoritesBtn: () => this.exportFavorites(),
+      exportSourcesBtn: () => this.exportSources(), // 🔧 新增
+      exportCategoriesBtn: () => this.exportCategories(), // 🔧 新增
       clearAllHistoryBtn: () => this.clearAllHistory(),
       clearAllDataBtn: () => this.clearAllData(),
       deleteAccountBtn: () => this.deleteAccount(),
@@ -270,6 +360,16 @@ export class DashboardApp {
     if (passwordForm) {
       passwordForm.addEventListener('submit', (e) => this.handlePasswordChange(e));
     }
+
+    // 模态框外部点击关闭
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal')) {
+        this.closeModals();
+      }
+      if (e.target.classList.contains('close')) {
+        this.closeModals();
+      }
+    });
   }
 
   // 绑定设置事件
@@ -308,6 +408,12 @@ export class DashboardApp {
       case 'history':
         await this.loadHistoryData();
         break;
+      case 'sources': // 🔧 新增：搜索源管理
+        await this.loadSourcesData();
+        break;
+      case 'categories': // 🔧 新增：分类管理
+        await this.loadCategoriesData();
+        break;
       case 'settings':
         await this.loadSettingsData();
         break;
@@ -334,14 +440,12 @@ export class DashboardApp {
       // 更新UI
       const totalSearchesEl = document.getElementById('totalSearches');
       const totalFavoritesEl = document.getElementById('totalFavorites');
-      const activeDaysEl = document.getElementById('activeDays');
+      const totalSourcesEl = document.getElementById('totalSources'); // 🔧 新增
       const userLevelEl = document.getElementById('userLevel');
 
       if (totalSearchesEl) totalSearchesEl.textContent = stats.total || 0;
       if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
-      
-      const activeDays = this.calculateActiveDays();
-      if (activeDaysEl) activeDaysEl.textContent = activeDays;
+      if (totalSourcesEl) totalSourcesEl.textContent = this.allSearchSources.length; // 🔧 新增
       
       const level = this.calculateUserLevel();
       if (userLevelEl) userLevelEl.textContent = level;
@@ -354,230 +458,435 @@ export class DashboardApp {
     }
   }
 
-  // 🔧 修复：加载设置数据 - 支持自定义搜索源
-  async loadSettingsData() {
+  // 🔧 新增：加载搜索源管理数据
+  async loadSourcesData() {
     try {
-      const settings = await apiService.getUserSettings();
+      // 重新加载用户设置以确保最新
+      await this.loadUserSearchSettings();
       
-      const themeModeEl = document.getElementById('themeMode');
-      const maxFavoritesEl = document.getElementById('maxFavorites');
-      const allowAnalyticsEl = document.getElementById('allowAnalytics');
-      const searchSuggestionsEl = document.getElementById('searchSuggestions');
-
-      if (themeModeEl) themeModeEl.value = settings.theme || 'auto';
-      if (maxFavoritesEl) maxFavoritesEl.value = settings.maxFavoritesPerUser ?? 500;
-      if (allowAnalyticsEl) allowAnalyticsEl.checked = settings.allowAnalytics !== false;
-      if (searchSuggestionsEl) searchSuggestionsEl.checked = settings.searchSuggestions !== false;
-
-      // 🔧 修复：加载搜索源设置，结合自定义搜索源
-      const enabledSources = settings.searchSources || ['javbus', 'javdb', 'javlibrary'];
-      this.customSearchSources = settings.customSearchSources || [];
+      // 更新分类筛选选项
+      this.updateCategoryFilterOptions();
       
-      await this.loadSearchSourceSettings(enabledSources);
-
+      // 渲染搜索源列表
+      this.renderSourcesList();
+      
+      // 更新统计数据
+      this.updateSourcesStats();
+      
     } catch (error) {
-      console.error('加载设置失败:', error);
-      showToast('加载设置失败', 'error');
-      // 出错时加载默认搜索源设置
-      await this.loadSearchSourceSettings(['javbus', 'javdb', 'javlibrary']);
+      console.error('加载搜索源数据失败:', error);
+      showToast('加载搜索源数据失败', 'error');
     }
   }
 
-  // 🔧 修复：专门的搜索源设置加载方法
-  async loadSearchSourceSettings(enabledSources) {
-    // 清空现有的搜索源设置区域
-    const searchSourcesContainer = document.getElementById('searchSourcesContainer');
-    if (!searchSourcesContainer) {
-      console.warn('找不到搜索源设置容器');
+  // 🔧 新增：加载分类管理数据
+  async loadCategoriesData() {
+    try {
+      // 重新加载用户设置以确保最新
+      await this.loadUserSearchSettings();
+      
+      // 渲染内置分类列表
+      this.renderBuiltinCategories();
+      
+      // 渲染自定义分类列表
+      this.renderCustomCategories();
+      
+      // 更新统计数据
+      this.updateCategoriesStats();
+      
+    } catch (error) {
+      console.error('加载分类数据失败:', error);
+      showToast('加载分类数据失败', 'error');
+    }
+  }
+
+  // 🔧 新增：更新分类筛选选项
+  updateCategoryFilterOptions() {
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (!categoryFilter) return;
+
+    const categoriesHTML = this.allCategories
+      .sort((a, b) => (a.order || 999) - (b.order || 999))
+      .map(category => `
+        <option value="${category.id}">${category.icon} ${category.name}</option>
+      `).join('');
+
+    categoryFilter.innerHTML = `
+      <option value="all">全部分类</option>
+      ${categoriesHTML}
+    `;
+  }
+
+  // 🔧 新增：渲染搜索源列表
+  renderSourcesList() {
+    const sourcesList = document.getElementById('sourcesList');
+    if (!sourcesList) return;
+
+    // 获取当前筛选和排序设置
+    const filter = document.getElementById('sourcesFilter')?.value || 'all';
+    const categoryFilter = document.getElementById('categoryFilter')?.value || 'all';
+    const sort = document.getElementById('sourcesSort')?.value || 'priority';
+
+    // 应用筛选
+    let filteredSources = this.allSearchSources;
+
+    if (filter !== 'all') {
+      filteredSources = filteredSources.filter(source => {
+        switch (filter) {
+          case 'enabled':
+            return this.enabledSources.includes(source.id);
+          case 'disabled':
+            return !this.enabledSources.includes(source.id);
+          case 'builtin':
+            return source.isBuiltin;
+          case 'custom':
+            return source.isCustom;
+          default:
+            return true;
+        }
+      });
+    }
+
+    if (categoryFilter !== 'all') {
+      filteredSources = filteredSources.filter(source => source.category === categoryFilter);
+    }
+
+    // 应用排序
+    filteredSources.sort((a, b) => {
+      switch (sort) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'category':
+          const catA = this.getCategoryById(a.category)?.name || 'Unknown';
+          const catB = this.getCategoryById(b.category)?.name || 'Unknown';
+          return catA.localeCompare(catB);
+        case 'status':
+          const statusA = this.enabledSources.includes(a.id) ? 0 : 1;
+          const statusB = this.enabledSources.includes(b.id) ? 0 : 1;
+          return statusA - statusB;
+        case 'priority':
+        default:
+          if (a.isBuiltin && b.isBuiltin) {
+            return (a.priority || 999) - (b.priority || 999);
+          }
+          if (a.isBuiltin && !b.isBuiltin) return -1;
+          if (!a.isBuiltin && b.isBuiltin) return 1;
+          return (b.createdAt || 0) - (a.createdAt || 0);
+      }
+    });
+
+    if (filteredSources.length === 0) {
+      sourcesList.innerHTML = `
+        <div class="empty-state">
+          <span style="font-size: 3rem;">🔍</span>
+          <p>没有找到匹配的搜索源</p>
+          <button class="btn-primary" onclick="app.showCustomSourceModal()">添加自定义搜索源</button>
+        </div>
+      `;
       return;
     }
-    
-    // 重新加载搜索源数据以确保最新
-    await this.loadSearchSources();
-    
-    // 生成搜索源复选框HTML
-    const sourceCheckboxesHTML = this.allSearchSources.map(source => `
-      <label class="search-source-item" ${source.isCustom ? 'data-custom="true"' : ''}>
-        <input type="checkbox" value="${source.id}" ${enabledSources.includes(source.id) ? 'checked' : ''}>
-        <span class="source-info">
-          <span class="source-name">${source.icon} ${source.name}</span>
-          <span class="source-subtitle">${source.subtitle}</span>
-          ${source.isCustom ? `
-            <div class="custom-source-actions">
-              <button type="button" class="btn-edit-source" data-source-id="${source.id}" title="编辑">✏️</button>
-              <button type="button" class="btn-delete-source" data-source-id="${source.id}" title="删除">🗑️</button>
-            </div>
-          ` : ''}
-        </span>
-      </label>
-    `).join('');
-    
-    const addButtonHTML = `
-      <div class="add-custom-source-section">
-        <button type="button" id="addCustomSourceBtn" class="btn-primary add-custom-source-btn">
-          <span>➕</span>
-          <span>添加自定义搜索源</span>
-        </button>
+
+    sourcesList.innerHTML = `
+      <div class="sources-grid">
+        ${filteredSources.map(source => this.renderSourceItem(source)).join('')}
       </div>
     `;
-    
-    searchSourcesContainer.innerHTML = sourceCheckboxesHTML + addButtonHTML;
-    
-    // 重新绑定自定义搜索源事件
-    this.bindCustomSourceEvents();
-    this.bindCustomSourceActionEvents();
+
+    // 重新绑定事件
+    this.bindSourceItemEvents();
   }
 
-  // 🔧 新增：绑定自定义搜索源操作事件
-  bindCustomSourceActionEvents() {
-    // 编辑按钮事件
-    document.querySelectorAll('.btn-edit-source').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const sourceId = btn.dataset.sourceId;
-        this.editCustomSource(sourceId);
-      });
-    });
-
-    // 删除按钮事件
-    document.querySelectorAll('.btn-delete-source').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const sourceId = btn.dataset.sourceId;
-        this.deleteCustomSource(sourceId);
-      });
-    });
+  // 🔧 新增：渲染单个搜索源项目
+  renderSourceItem(source) {
+    const category = this.getCategoryById(source.category);
+    const isEnabled = this.enabledSources.includes(source.id);
+    
+    return `
+      <div class="source-item ${isEnabled ? 'enabled' : 'disabled'}" data-source-id="${source.id}">
+        <div class="source-header">
+          <div class="source-toggle">
+            <input type="checkbox" ${isEnabled ? 'checked' : ''} 
+                   onchange="app.toggleSourceEnabled('${source.id}', this.checked)">
+          </div>
+          <div class="source-info">
+            <div class="source-name">
+              <span class="source-icon">${source.icon}</span>
+              <span class="source-title">${escapeHtml(source.name)}</span>
+              ${source.isCustom ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
+            </div>
+            <div class="source-subtitle">${escapeHtml(source.subtitle || '')}</div>
+            <div class="source-meta">
+              <div class="source-category">
+                <span>分类：${category ? `${category.icon} ${category.name}` : '未知分类'}</span>
+              </div>
+              <div class="source-url">${escapeHtml(source.urlTemplate)}</div>
+            </div>
+          </div>
+        </div>
+        <div class="source-actions">
+          <button class="action-btn test-btn" onclick="app.testSource('${source.id}')" title="测试搜索">
+            测试
+          </button>
+          <button class="action-btn visit-btn" onclick="app.visitSource('${source.id}')" title="访问网站">
+            访问
+          </button>
+          ${source.isCustom ? `
+            <button class="action-btn edit-btn" onclick="app.editCustomSource('${source.id}')" title="编辑">
+              编辑
+            </button>
+            <button class="action-btn delete-btn" onclick="app.deleteCustomSource('${source.id}')" title="删除">
+              删除
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
   }
 
-  // 🔧 修复：保存设置 - 添加搜索源变更检测和前端更新
-  async saveSettings() {
-    if (!this.currentUser) {
-      showToast('用户未登录', 'error');
+  // 🔧 新增：绑定搜索源项目事件
+  bindSourceItemEvents() {
+    // 这里可以绑定额外的事件，目前使用onclick处理
+  }
+
+  // 🔧 新增：渲染内置分类列表
+  renderBuiltinCategories() {
+    const builtinCategoriesList = document.getElementById('builtinCategoriesList');
+    if (!builtinCategoriesList) return;
+
+    if (this.builtinCategories.length === 0) {
+      builtinCategoriesList.innerHTML = '<p class="empty-state">没有内置分类</p>';
+      return;
+    }
+
+    builtinCategoriesList.innerHTML = `
+      <div class="categories-grid">
+        ${this.builtinCategories
+          .sort((a, b) => (a.order || 999) - (b.order || 999))
+          .map(category => this.renderCategoryItem(category)).join('')}
+      </div>
+    `;
+  }
+
+  // 🔧 新增：渲染自定义分类列表
+  renderCustomCategories() {
+    const customCategoriesList = document.getElementById('customCategoriesList');
+    if (!customCategoriesList) return;
+
+    if (this.customCategories.length === 0) {
+      customCategoriesList.innerHTML = `
+        <div class="empty-state">
+          <span style="font-size: 3rem;">🎨</span>
+          <p>暂无自定义分类</p>
+          <button class="btn-primary" onclick="app.showCustomCategoryModal()">添加自定义分类</button>
+        </div>
+      `;
+      return;
+    }
+
+    customCategoriesList.innerHTML = `
+      <div class="categories-grid">
+        ${this.customCategories.map(category => this.renderCategoryItem(category)).join('')}
+      </div>
+    `;
+  }
+
+  // 🔧 新增：渲染单个分类项目
+  renderCategoryItem(category) {
+    const sourceCount = this.allSearchSources.filter(s => s.category === category.id).length;
+    const enabledSourceCount = this.allSearchSources.filter(s => 
+      s.category === category.id && this.enabledSources.includes(s.id)
+    ).length;
+    
+    return `
+      <div class="category-item ${category.isCustom ? 'custom' : 'builtin'}" data-category-id="${category.id}">
+        <div class="category-header">
+          <div class="category-icon">${category.icon}</div>
+          <div class="category-info">
+            <div class="category-name">${escapeHtml(category.name)}</div>
+            <div class="category-description">${escapeHtml(category.description || '')}</div>
+            <div class="category-meta">
+              <span class="category-usage">
+                ${enabledSourceCount}/${sourceCount} 个搜索源已启用
+              </span>
+              ${category.isCustom ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
+            </div>
+          </div>
+        </div>
+        <div class="category-actions">
+          <button class="action-btn view-btn" onclick="app.viewCategorySources('${category.id}')" title="查看搜索源">
+            查看源
+          </button>
+          ${category.isCustom ? `
+            <button class="action-btn edit-btn" onclick="app.editCustomCategory('${category.id}')" title="编辑">
+              编辑
+            </button>
+            <button class="action-btn delete-btn" onclick="app.deleteCustomCategory('${category.id}')" title="删除">
+              删除
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // 🔧 新增：更新搜索源统计数据
+  updateSourcesStats() {
+    const totalSourcesCount = document.getElementById('totalSourcesCount');
+    const enabledSourcesCount = document.getElementById('enabledSourcesCount');
+    const customSourcesCount = document.getElementById('customSourcesCount');
+    const categoriesCount = document.getElementById('categoriesCount');
+
+    if (totalSourcesCount) totalSourcesCount.textContent = this.allSearchSources.length;
+    if (enabledSourcesCount) enabledSourcesCount.textContent = this.enabledSources.length;
+    if (customSourcesCount) customSourcesCount.textContent = this.customSearchSources.length;
+    if (categoriesCount) categoriesCount.textContent = this.allCategories.length;
+  }
+
+  // 🔧 新增：更新分类统计数据
+  updateCategoriesStats() {
+    const totalCategoriesCount = document.getElementById('totalCategoriesCount');
+    const builtinCategoriesCount = document.getElementById('builtinCategoriesCount');
+    const customCategoriesCount = document.getElementById('customCategoriesCount');
+    const usedCategoriesCount = document.getElementById('usedCategoriesCount');
+
+    // 计算使用中的分类数量
+    const usedCategories = new Set(this.allSearchSources.map(s => s.category));
+
+    if (totalCategoriesCount) totalCategoriesCount.textContent = this.allCategories.length;
+    if (builtinCategoriesCount) builtinCategoriesCount.textContent = this.builtinCategories.length;
+    if (customCategoriesCount) customCategoriesCount.textContent = this.customCategories.length;
+    if (usedCategoriesCount) usedCategoriesCount.textContent = usedCategories.size;
+  }
+
+  // 🔧 新增：筛选和排序搜索源
+  filterAndSortSources() {
+    this.renderSourcesList();
+  }
+
+  // 🔧 新增：切换搜索源启用状态
+  async toggleSourceEnabled(sourceId, enabled) {
+    try {
+      if (enabled) {
+        if (!this.enabledSources.includes(sourceId)) {
+          this.enabledSources.push(sourceId);
+        }
+      } else {
+        this.enabledSources = this.enabledSources.filter(id => id !== sourceId);
+      }
+
+      // 保存到云端
+      await this.saveSearchSourcesSettings();
+      
+      // 更新统计
+      this.updateSourcesStats();
+      
+      showToast(`搜索源已${enabled ? '启用' : '禁用'}`, 'success', 2000);
+      
+    } catch (error) {
+      console.error('切换搜索源状态失败:', error);
+      showToast('操作失败: ' + error.message, 'error');
+      
+      // 恢复UI状态
+      this.renderSourcesList();
+    }
+  }
+
+  // 🔧 新增：启用所有搜索源
+  async enableAllSources() {
+    try {
+      this.enabledSources = this.allSearchSources.map(s => s.id);
+      await this.saveSearchSourcesSettings();
+      this.renderSourcesList();
+      this.updateSourcesStats();
+      showToast('已启用所有搜索源', 'success');
+    } catch (error) {
+      console.error('启用所有搜索源失败:', error);
+      showToast('操作失败: ' + error.message, 'error');
+    }
+  }
+
+  // 🔧 新增：禁用所有搜索源
+  async disableAllSources() {
+    if (!confirm('确定要禁用所有搜索源吗？这将影响搜索功能。')) return;
+    
+    try {
+      this.enabledSources = [];
+      await this.saveSearchSourcesSettings();
+      this.renderSourcesList();
+      this.updateSourcesStats();
+      showToast('已禁用所有搜索源', 'success');
+    } catch (error) {
+      console.error('禁用所有搜索源失败:', error);
+      showToast('操作失败: ' + error.message, 'error');
+    }
+  }
+
+  // 🔧 新增：重置为默认搜索源
+  async resetToDefaults() {
+    if (!confirm('确定要重置为默认搜索源配置吗？')) return;
+    
+    try {
+      this.enabledSources = [...APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources];
+      await this.saveSearchSourcesSettings();
+      this.renderSourcesList();
+      this.updateSourcesStats();
+      showToast('已重置为默认配置', 'success');
+    } catch (error) {
+      console.error('重置搜索源失败:', error);
+      showToast('操作失败: ' + error.message, 'error');
+    }
+  }
+
+  // 🔧 新增：测试搜索源
+  async testSource(sourceId) {
+    const source = this.getSourceById(sourceId);
+    if (!source) {
+      showToast('未找到指定的搜索源', 'error');
       return;
     }
 
     try {
-      showLoading(true);
-      const ui = this.collectSettings();
-      
-      // 验证至少选择了一个搜索源
-      if (!ui.searchSources || ui.searchSources.length === 0) {
-        showToast('请至少选择一个搜索源', 'error');
-        return;
-      }
-      
-      // 🔧 新增：获取当前搜索源设置用于比较
-      let oldSearchSources = [];
-      try {
-        const currentSettings = await apiService.getUserSettings();
-        oldSearchSources = currentSettings.searchSources || [];
-      } catch (error) {
-        console.warn('获取当前设置失败:', error);
-      }
-      
-      const payload = {
-        theme: ui.themeMode,
-        searchSources: ui.searchSources,
-        maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
-        maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
-        allowAnalytics: !!ui.allowAnalytics,
-        searchSuggestions: !!ui.searchSuggestions,
-        customSearchSources: this.customSearchSources // 🔧 新增：包含自定义搜索源
-      };
-      
-      await apiService.updateUserSettings(payload);
-      
-      // 立即应用主题设置
-      if (payload.theme) {
-        themeManager.setTheme(payload.theme);
-      }
-      
-      // 🔧 修复：清除搜索服务的用户设置缓存，确保下次搜索使用新设置
-      if (searchService && searchService.clearUserSettingsCache) {
-        searchService.clearUserSettingsCache();
-      }
-      
-      // 🔧 新增：如果搜索源发生变化，通知主页面更新站点导航
-      const searchSourcesChanged = JSON.stringify(oldSearchSources.sort()) !== JSON.stringify(ui.searchSources.sort());
-      if (searchSourcesChanged) {
-        // 发送自定义事件通知主页面更新站点导航
-        window.dispatchEvent(new CustomEvent('searchSourcesChanged', {
-          detail: { newSources: ui.searchSources }
-        }));
-        
-        console.log('搜索源设置已变更，已通知主页面更新站点导航');
-      }
-      
-      showToast('设置保存成功', 'success');
-      this.markSettingsSaved();
+      const testUrl = source.urlTemplate.replace('{keyword}', 'test');
+      window.open(testUrl, '_blank', 'noopener,noreferrer');
+      showToast('已在新窗口中打开测试链接', 'success', 2000);
     } catch (error) {
-      console.error('保存设置失败:', error);
-      showToast('保存设置失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
+      console.error('测试搜索源失败:', error);
+      showToast('测试失败: ' + error.message, 'error');
     }
   }
 
-  // 🔧 修复：收集设置时处理搜索源
-  collectSettings() {
-    const settings = {};
-    
-    // 基础设置
-    const themeModeEl = document.getElementById('themeMode');
-    const maxFavoritesEl = document.getElementById('maxFavorites');
-    const historyRetentionEl = document.getElementById('historyRetention');
-    const allowAnalyticsEl = document.getElementById('allowAnalytics');
-    const searchSuggestionsEl = document.getElementById('searchSuggestions');
-    
-    if (themeModeEl) settings.themeMode = themeModeEl.value;
-    if (maxFavoritesEl) settings.maxFavorites = maxFavoritesEl.value;
-    if (historyRetentionEl) settings.historyRetention = historyRetentionEl.value;
-    if (allowAnalyticsEl) settings.allowAnalytics = allowAnalyticsEl.checked;
-    if (searchSuggestionsEl) settings.searchSuggestions = searchSuggestionsEl.checked;
-    
-    // 🔧 修复：收集搜索源设置
-    const searchSourceCheckboxes = document.querySelectorAll('#searchSourcesContainer input[type="checkbox"]:checked');
-    settings.searchSources = Array.from(searchSourceCheckboxes).map(checkbox => checkbox.value);
-    
-    return settings;
+  // 🔧 新增：访问搜索源
+  async visitSource(sourceId) {
+    const source = this.getSourceById(sourceId);
+    if (!source) {
+      showToast('未找到指定的搜索源', 'error');
+      return;
+    }
+
+    try {
+      // 提取域名
+      const urlObj = new URL(source.urlTemplate.replace('{keyword}', ''));
+      const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+      window.open(baseUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('访问搜索源失败:', error);
+      showToast('访问失败: ' + error.message, 'error');
+    }
   }
 
-  // 🔧 修复：重置设置
-  resetSettings() {
-    if (!confirm('确定要重置所有设置为默认值吗？')) return;
-
-    // 重置为默认设置
-    const defaultSettings = {
-      themeMode: 'auto',
-      historyRetention: '90',
-      maxFavorites: '500',
-      allowAnalytics: true,
-      searchSuggestions: true,
-      searchSources: ['javbus', 'javdb', 'javlibrary'] // 默认搜索源
-    };
-
-    // 重置基础设置
-    Object.entries(defaultSettings).forEach(([key, value]) => {
-      if (key === 'searchSources') return; // 搜索源单独处理
-      
-      const element = document.getElementById(key);
-      if (element) {
-        if (element.type === 'checkbox') {
-          element.checked = value;
-        } else {
-          element.value = value;
-        }
+  // 🔧 新增：查看分类下的搜索源
+  viewCategorySources(categoryId) {
+    // 切换到搜索源管理页面
+    this.switchTab('sources');
+    
+    // 设置分类筛选
+    setTimeout(() => {
+      const categoryFilter = document.getElementById('categoryFilter');
+      if (categoryFilter) {
+        categoryFilter.value = categoryId;
+        this.filterAndSortSources();
       }
-    });
-
-    // 🔧 重置搜索源设置
-    const sourceCheckboxes = document.querySelectorAll('#searchSourcesContainer input[type="checkbox"]');
-    sourceCheckboxes.forEach(checkbox => {
-      checkbox.checked = defaultSettings.searchSources.includes(checkbox.value);
-    });
-
-    this.markSettingsChanged();
-    showToast('设置已重置为默认值，请点击保存', 'success');
+    }, 100);
   }
 
   // 🔧 新增：显示自定义搜索源模态框
@@ -601,15 +910,20 @@ export class DashboardApp {
         form.sourceSubtitle.value = source.subtitle || '';
         form.sourceIcon.value = source.icon || '🔍';
         form.sourceUrl.value = source.urlTemplate;
+        form.sourceCategory.value = source.category || 'others';
         modal.querySelector('h2').textContent = '编辑自定义搜索源';
         modal.querySelector('[type="submit"]').textContent = '更新搜索源';
       } else {
         // 新增模式
         form.reset();
         form.sourceIcon.value = '🔍';
+        form.sourceCategory.value = 'others';
         modal.querySelector('h2').textContent = '添加自定义搜索源';
         modal.querySelector('[type="submit"]').textContent = '添加搜索源';
       }
+      
+      // 更新分类选择器
+      this.updateSourceCategorySelect(form.sourceCategory);
     }
     
     modal.style.display = 'block';
@@ -631,10 +945,18 @@ export class DashboardApp {
         <form id="customSourceForm">
           <input type="hidden" name="sourceId">
           
-          <div class="form-group">
-            <label for="sourceName">搜索源名称 *</label>
-            <input type="text" name="sourceName" id="sourceName" required maxlength="50" 
-                   placeholder="例如：我的搜索站">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="sourceName">搜索源名称 *</label>
+              <input type="text" name="sourceName" id="sourceName" required maxlength="50" 
+                     placeholder="例如：我的搜索站">
+            </div>
+            
+            <div class="form-group">
+              <label for="sourceIcon">图标</label>
+              <input type="text" name="sourceIcon" id="sourceIcon" maxlength="5" 
+                     placeholder="🔍" value="🔍">
+            </div>
           </div>
           
           <div class="form-group">
@@ -644,9 +966,10 @@ export class DashboardApp {
           </div>
           
           <div class="form-group">
-            <label for="sourceIcon">图标</label>
-            <input type="text" name="sourceIcon" id="sourceIcon" maxlength="5" 
-                   placeholder="🔍" value="🔍">
+            <label for="sourceCategory">搜索源分类 *</label>
+            <select name="sourceCategory" id="sourceCategory" required>
+              <!-- 分类选项将动态生成 -->
+            </select>
           </div>
           
           <div class="form-group">
@@ -665,7 +988,27 @@ export class DashboardApp {
         </form>
       </div>
     `;
+    
+    // 绑定表单提交事件
+    const form = modal.querySelector('#customSourceForm');
+    if (form) {
+      form.addEventListener('submit', (e) => this.handleCustomSourceSubmit(e));
+    }
+    
     return modal;
+  }
+
+  // 🔧 新增：更新搜索源分类选择器
+  updateSourceCategorySelect(selectElement) {
+    if (!selectElement) return;
+
+    const categoriesHTML = this.allCategories
+      .sort((a, b) => (a.order || 999) - (b.order || 999))
+      .map(category => `
+        <option value="${category.id}">${category.icon} ${category.name}</option>
+      `).join('');
+
+    selectElement.innerHTML = categoriesHTML;
   }
 
   // 🔧 新增：处理自定义搜索源表单提交
@@ -680,17 +1023,14 @@ export class DashboardApp {
       name: formData.get('sourceName').trim(),
       subtitle: formData.get('sourceSubtitle').trim(),
       icon: formData.get('sourceIcon').trim() || '🔍',
-      urlTemplate: formData.get('sourceUrl').trim()
+      urlTemplate: formData.get('sourceUrl').trim(),
+      category: formData.get('sourceCategory')
     };
     
     // 验证数据
-    if (!sourceData.name || !sourceData.urlTemplate) {
-      showToast('请填写必需的字段', 'error');
-      return;
-    }
-    
-    if (!sourceData.urlTemplate.includes('{keyword}')) {
-      showToast('URL模板必须包含{keyword}占位符', 'error');
+    const validation = this.validateCustomSource(sourceData);
+    if (!validation.valid) {
+      showToast(validation.message, 'error');
       return;
     }
     
@@ -699,19 +1039,17 @@ export class DashboardApp {
       
       if (this.editingCustomSource) {
         // 更新现有搜索源
-        await apiService.updateCustomSearchSource(sourceData.id, sourceData);
+        await this.updateCustomSource(sourceData);
         showToast('自定义搜索源更新成功', 'success');
       } else {
         // 添加新的搜索源
-        await apiService.addCustomSearchSource(sourceData);
+        await this.addCustomSource(sourceData);
         showToast('自定义搜索源添加成功', 'success');
       }
       
-      // 重新加载搜索源数据
-      await this.loadSearchSources();
-      
-      // 重新加载设置页面
-      await this.loadSettingsData();
+      // 重新加载数据
+      await this.loadUserSearchSettings();
+      await this.loadSourcesData();
       
       // 关闭模态框
       this.closeModals();
@@ -722,6 +1060,92 @@ export class DashboardApp {
     } finally {
       showLoading(false);
     }
+  }
+
+  // 🔧 新增：验证自定义搜索源
+  validateCustomSource(sourceData) {
+    const rules = APP_CONSTANTS.VALIDATION_RULES.SOURCE;
+    
+    // 检查必需字段
+    for (const field of rules.REQUIRED_FIELDS) {
+      if (!sourceData[field] || sourceData[field].trim() === '') {
+        return { valid: false, message: `${field} 是必需的` };
+      }
+    }
+    
+    // 检查名称格式
+    if (!rules.NAME_PATTERN.test(sourceData.name)) {
+      return { valid: false, message: '搜索源名称格式不正确' };
+    }
+    
+    // 检查URL格式
+    if (!rules.URL_PATTERN.test(sourceData.urlTemplate)) {
+      return { valid: false, message: 'URL模板必须包含{keyword}占位符' };
+    }
+    
+    // 检查禁用域名
+    const hostname = new URL(sourceData.urlTemplate.replace('{keyword}', 'test')).hostname;
+    if (rules.FORBIDDEN_DOMAINS.some(domain => hostname.includes(domain))) {
+      return { valid: false, message: '不允许使用该域名' };
+    }
+    
+    // 检查ID重复（仅新增时）
+    if (!sourceData.id) {
+      const generatedId = this.generateSourceId(sourceData.name);
+      if (this.allSearchSources.some(s => s.id === generatedId)) {
+        return { valid: false, message: '搜索源名称已存在，请使用不同的名称' };
+      }
+    }
+    
+    // 检查分类是否存在
+    if (!this.getCategoryById(sourceData.category)) {
+      return { valid: false, message: '选择的分类不存在' };
+    }
+    
+    return { valid: true };
+  }
+
+  // 🔧 新增：生成搜索源ID
+  generateSourceId(name) {
+    return name.toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 20) + '_' + Date.now().toString(36);
+  }
+
+  // 🔧 新增：添加自定义搜索源
+  async addCustomSource(sourceData) {
+    // 生成唯一ID
+    sourceData.id = this.generateSourceId(sourceData.name);
+    sourceData.createdAt = Date.now();
+    sourceData.isCustom = true;
+    sourceData.isBuiltin = false;
+    
+    // 添加到本地数组
+    this.customSearchSources.push(sourceData);
+    this.allSearchSources.push({ ...sourceData, isCustom: true, isBuiltin: false });
+    
+    // 保存到云端
+    await this.saveCustomSearchSources();
+  }
+
+  // 🔧 新增：更新自定义搜索源
+  async updateCustomSource(sourceData) {
+    const index = this.customSearchSources.findIndex(s => s.id === sourceData.id);
+    if (index === -1) {
+      throw new Error('未找到要更新的搜索源');
+    }
+    
+    // 更新本地数据
+    this.customSearchSources[index] = { ...this.customSearchSources[index], ...sourceData };
+    
+    const allIndex = this.allSearchSources.findIndex(s => s.id === sourceData.id);
+    if (allIndex !== -1) {
+      this.allSearchSources[allIndex] = { ...this.allSearchSources[allIndex], ...sourceData };
+    }
+    
+    // 保存到云端
+    await this.saveCustomSearchSources();
   }
 
   // 🔧 新增：编辑自定义搜索源
@@ -750,13 +1174,16 @@ export class DashboardApp {
     try {
       showLoading(true);
       
-      await apiService.deleteCustomSearchSource(sourceId);
+      // 从本地数组中移除
+      this.customSearchSources = this.customSearchSources.filter(s => s.id !== sourceId);
+      this.allSearchSources = this.allSearchSources.filter(s => s.id !== sourceId);
+      this.enabledSources = this.enabledSources.filter(id => id !== sourceId);
       
-      // 重新加载搜索源数据
-      await this.loadSearchSources();
+      // 保存到云端
+      await this.saveCustomSearchSources();
       
-      // 重新加载设置页面
-      await this.loadSettingsData();
+      // 重新加载页面
+      await this.loadSourcesData();
       
       showToast('自定义搜索源删除成功', 'success');
       
@@ -766,6 +1193,513 @@ export class DashboardApp {
     } finally {
       showLoading(false);
     }
+  }
+
+  // 🔧 新增：显示自定义分类模态框
+  showCustomCategoryModal(category = null) {
+    this.editingCustomCategory = category;
+    
+    // 获取或创建模态框
+    let modal = document.getElementById('customCategoryModal');
+    if (!modal) {
+      modal = this.createCustomCategoryModal();
+      document.body.appendChild(modal);
+    }
+    
+    // 填充表单数据
+    const form = document.getElementById('customCategoryForm');
+    if (form) {
+      if (category) {
+        // 编辑模式
+        form.categoryId.value = category.id;
+        form.categoryName.value = category.name;
+        form.categoryDescription.value = category.description || '';
+        form.categoryIcon.value = category.icon || '🌟';
+        form.categoryColor.value = category.color || '#6b7280';
+        modal.querySelector('h2').textContent = '编辑自定义分类';
+        modal.querySelector('[type="submit"]').textContent = '更新分类';
+      } else {
+        // 新增模式
+        form.reset();
+        form.categoryIcon.value = '🌟';
+        form.categoryColor.value = '#6b7280';
+        modal.querySelector('h2').textContent = '添加自定义分类';
+        modal.querySelector('[type="submit"]').textContent = '添加分类';
+      }
+    }
+    
+    modal.style.display = 'block';
+    setTimeout(() => {
+      const nameInput = form.categoryName;
+      if (nameInput) nameInput.focus();
+    }, 100);
+  }
+
+  // 🔧 新增：创建自定义分类模态框
+  createCustomCategoryModal() {
+    const modal = document.createElement('div');
+    modal.id = 'customCategoryModal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>添加自定义分类</h2>
+        <form id="customCategoryForm">
+          <input type="hidden" name="categoryId">
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="categoryName">分类名称 *</label>
+              <input type="text" name="categoryName" id="categoryName" required maxlength="30" 
+                     placeholder="例如：我的分类">
+            </div>
+            
+            <div class="form-group">
+              <label for="categoryIcon">图标 *</label>
+              <select name="categoryIcon" id="categoryIcon" required>
+                ${APP_CONSTANTS.DEFAULT_ICONS.map(icon => `
+                  <option value="${icon}">${icon}</option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="categoryDescription">分类描述</label>
+            <input type="text" name="categoryDescription" id="categoryDescription" maxlength="100" 
+                   placeholder="例如：专门的搜索资源分类">
+          </div>
+          
+          <div class="form-group">
+            <label for="categoryColor">分类颜色</label>
+            <select name="categoryColor" id="categoryColor">
+              ${APP_CONSTANTS.DEFAULT_COLORS.map(color => `
+                <option value="${color}" style="background-color: ${color}; color: white;">
+                  ${color}
+                </option>
+              `).join('')}
+            </select>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" onclick="app.closeModals()">取消</button>
+            <button type="submit" class="btn-primary">添加分类</button>
+          </div>
+        </form>
+      </div>
+    `;
+    
+    // 绑定表单提交事件
+    const form = modal.querySelector('#customCategoryForm');
+    if (form) {
+      form.addEventListener('submit', (e) => this.handleCustomCategorySubmit(e));
+    }
+    
+    return modal;
+  }
+
+  // 🔧 新增：处理自定义分类表单提交
+  async handleCustomCategorySubmit(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const categoryData = {
+      id: formData.get('categoryId') || null,
+      name: formData.get('categoryName').trim(),
+      description: formData.get('categoryDescription').trim(),
+      icon: formData.get('categoryIcon'),
+      color: formData.get('categoryColor')
+    };
+    
+    // 验证数据
+    const validation = this.validateCustomCategory(categoryData);
+    if (!validation.valid) {
+      showToast(validation.message, 'error');
+      return;
+    }
+    
+    try {
+      showLoading(true);
+      
+      if (this.editingCustomCategory) {
+        // 更新现有分类
+        await this.updateCustomCategory(categoryData);
+        showToast('自定义分类更新成功', 'success');
+      } else {
+        // 添加新的分类
+        await this.addCustomCategory(categoryData);
+        showToast('自定义分类添加成功', 'success');
+      }
+      
+      // 重新加载数据
+      await this.loadUserSearchSettings();
+      await this.loadCategoriesData();
+      
+      // 关闭模态框
+      this.closeModals();
+      
+    } catch (error) {
+      console.error('保存自定义分类失败:', error);
+      showToast('保存失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🔧 新增：验证自定义分类
+  validateCustomCategory(categoryData) {
+    const rules = APP_CONSTANTS.VALIDATION_RULES.CATEGORY;
+    
+    // 检查必需字段
+    for (const field of rules.REQUIRED_FIELDS) {
+      if (!categoryData[field] || categoryData[field].trim() === '') {
+        return { valid: false, message: `${field} 是必需的` };
+      }
+    }
+    
+    // 检查名称格式
+    if (!rules.NAME_PATTERN.test(categoryData.name)) {
+      return { valid: false, message: '分类名称格式不正确' };
+    }
+    
+    // 检查颜色格式
+    if (categoryData.color && !rules.COLOR_PATTERN.test(categoryData.color)) {
+      return { valid: false, message: '颜色格式不正确' };
+    }
+    
+    // 检查ID重复（仅新增时）
+    if (!categoryData.id) {
+      const generatedId = this.generateCategoryId(categoryData.name);
+      if (this.allCategories.some(c => c.id === generatedId)) {
+        return { valid: false, message: '分类名称已存在，请使用不同的名称' };
+      }
+    }
+    
+    // 检查是否超过限制
+    if (!categoryData.id && this.customCategories.length >= APP_CONSTANTS.LIMITS.MAX_CUSTOM_CATEGORIES) {
+      return { valid: false, message: `最多只能创建 ${APP_CONSTANTS.LIMITS.MAX_CUSTOM_CATEGORIES} 个自定义分类` };
+    }
+    
+    return { valid: true };
+  }
+
+  // 🔧 新增：生成分类ID
+  generateCategoryId(name) {
+    return name.toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 15) + '_' + Date.now().toString(36);
+  }
+
+  // 🔧 新增：添加自定义分类
+  async addCustomCategory(categoryData) {
+    // 生成唯一ID
+    categoryData.id = this.generateCategoryId(categoryData.name);
+    categoryData.createdAt = Date.now();
+    categoryData.isCustom = true;
+    categoryData.isBuiltin = false;
+    categoryData.order = 50; // 自定义分类排序权重
+    
+    // 添加到本地数组
+    this.customCategories.push(categoryData);
+    this.allCategories.push({ ...categoryData, isCustom: true, isBuiltin: false });
+    
+    // 保存到云端
+    await this.saveCustomCategories();
+  }
+
+  // 🔧 新增：更新自定义分类
+  async updateCustomCategory(categoryData) {
+    const index = this.customCategories.findIndex(c => c.id === categoryData.id);
+    if (index === -1) {
+      throw new Error('未找到要更新的分类');
+    }
+    
+    // 更新本地数据
+    this.customCategories[index] = { ...this.customCategories[index], ...categoryData };
+    
+    const allIndex = this.allCategories.findIndex(c => c.id === categoryData.id);
+    if (allIndex !== -1) {
+      this.allCategories[allIndex] = { ...this.allCategories[allIndex], ...categoryData };
+    }
+    
+    // 保存到云端
+    await this.saveCustomCategories();
+  }
+
+  // 🔧 新增：编辑自定义分类
+  editCustomCategory(categoryId) {
+    const category = this.customCategories.find(c => c.id === categoryId);
+    if (!category) {
+      showToast('未找到指定的自定义分类', 'error');
+      return;
+    }
+    
+    this.showCustomCategoryModal(category);
+  }
+
+  // 🔧 新增：删除自定义分类
+  async deleteCustomCategory(categoryId) {
+    const category = this.customCategories.find(c => c.id === categoryId);
+    if (!category) {
+      showToast('未找到指定的自定义分类', 'error');
+      return;
+    }
+    
+    // 检查是否有搜索源使用此分类
+    const sourcesUsingCategory = this.allSearchSources.filter(s => s.category === categoryId);
+    if (sourcesUsingCategory.length > 0) {
+      showToast(`无法删除分类"${category.name}"，因为有 ${sourcesUsingCategory.length} 个搜索源正在使用此分类`, 'error');
+      return;
+    }
+    
+    if (!confirm(`确定要删除自定义分类"${category.name}"吗？此操作不可撤销。`)) {
+      return;
+    }
+    
+    try {
+      showLoading(true);
+      
+      // 从本地数组中移除
+      this.customCategories = this.customCategories.filter(c => c.id !== categoryId);
+      this.allCategories = this.allCategories.filter(c => c.id !== categoryId);
+      
+      // 保存到云端
+      await this.saveCustomCategories();
+      
+      // 重新加载页面
+      await this.loadCategoriesData();
+      
+      showToast('自定义分类删除成功', 'success');
+      
+    } catch (error) {
+      console.error('删除自定义分类失败:', error);
+      showToast('删除失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🔧 新增：保存自定义搜索源到云端
+  async saveCustomSearchSources() {
+    const settings = {
+      customSearchSources: this.customSearchSources,
+      searchSources: this.enabledSources,
+      customSourceCategories: this.customCategories
+    };
+    
+    await apiService.updateUserSettings(settings);
+  }
+
+  // 🔧 新增：保存自定义分类到云端
+  async saveCustomCategories() {
+    const settings = {
+      customSourceCategories: this.customCategories,
+      customSearchSources: this.customSearchSources,
+      searchSources: this.enabledSources
+    };
+    
+    await apiService.updateUserSettings(settings);
+  }
+
+  // 🔧 新增：保存搜索源设置
+  async saveSearchSourcesSettings() {
+    const settings = {
+      searchSources: this.enabledSources,
+      customSearchSources: this.customSearchSources,
+      customSourceCategories: this.customCategories
+    };
+    
+    await apiService.updateUserSettings(settings);
+    
+    // 🔧 通知主页面更新站点导航
+    window.dispatchEvent(new CustomEvent('searchSourcesChanged', {
+      detail: { newSources: this.enabledSources }
+    }));
+  }
+
+  // 🔧 新增：导出搜索源配置
+  async exportSources() {
+    try {
+      const data = {
+        builtinSources: this.builtinSearchSources,
+        customSources: this.customSearchSources,
+        enabledSources: this.enabledSources,
+        exportTime: new Date().toISOString(),
+        version: window.API_CONFIG?.APP_VERSION || '1.3.0'
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json'
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `search-sources-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('搜索源配置导出成功', 'success');
+    } catch (error) {
+      console.error('导出搜索源失败:', error);
+      showToast('导出失败: ' + error.message, 'error');
+    }
+  }
+
+  // 🔧 新增：导出分类配置
+  async exportCategories() {
+    try {
+      const data = {
+        builtinCategories: this.builtinCategories,
+        customCategories: this.customCategories,
+        exportTime: new Date().toISOString(),
+        version: window.API_CONFIG?.APP_VERSION || '1.3.0'
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json'
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `source-categories-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('分类配置导出成功', 'success');
+    } catch (error) {
+      console.error('导出分类失败:', error);
+      showToast('导出失败: ' + error.message, 'error');
+    }
+  }
+
+  // 🔧 修改：加载设置数据 - 移除搜索源管理（已独立为单独页面）
+  async loadSettingsData() {
+    try {
+      const settings = await apiService.getUserSettings();
+      
+      const themeModeEl = document.getElementById('themeMode');
+      const maxFavoritesEl = document.getElementById('maxFavorites');
+      const allowAnalyticsEl = document.getElementById('allowAnalytics');
+      const searchSuggestionsEl = document.getElementById('searchSuggestions');
+
+      if (themeModeEl) themeModeEl.value = settings.theme || 'auto';
+      if (maxFavoritesEl) maxFavoritesEl.value = settings.maxFavoritesPerUser ?? 500;
+      if (allowAnalyticsEl) allowAnalyticsEl.checked = settings.allowAnalytics !== false;
+      if (searchSuggestionsEl) searchSuggestionsEl.checked = settings.searchSuggestions !== false;
+
+    } catch (error) {
+      console.error('加载设置失败:', error);
+      showToast('加载设置失败', 'error');
+    }
+  }
+
+  // 🔧 修改：保存设置 - 移除搜索源相关逻辑
+  async saveSettings() {
+    if (!this.currentUser) {
+      showToast('用户未登录', 'error');
+      return;
+    }
+
+    try {
+      showLoading(true);
+      const ui = this.collectSettings();
+      
+      const payload = {
+        theme: ui.themeMode,
+        maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
+        maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
+        allowAnalytics: !!ui.allowAnalytics,
+        searchSuggestions: !!ui.searchSuggestions
+      };
+      
+      await apiService.updateUserSettings(payload);
+      
+      // 立即应用主题设置
+      if (payload.theme) {
+        themeManager.setTheme(payload.theme);
+      }
+      
+      // 🔧 清除搜索服务的用户设置缓存，确保下次搜索使用新设置
+      if (searchService && searchService.clearUserSettingsCache) {
+        searchService.clearUserSettingsCache();
+      }
+      
+      showToast('设置保存成功', 'success');
+      this.markSettingsSaved();
+    } catch (error) {
+      console.error('保存设置失败:', error);
+      showToast('保存设置失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🔧 修改：收集设置时移除搜索源
+  collectSettings() {
+    const settings = {};
+    
+    // 基础设置
+    const themeModeEl = document.getElementById('themeMode');
+    const maxFavoritesEl = document.getElementById('maxFavorites');
+    const historyRetentionEl = document.getElementById('historyRetention');
+    const allowAnalyticsEl = document.getElementById('allowAnalytics');
+    const searchSuggestionsEl = document.getElementById('searchSuggestions');
+    
+    if (themeModeEl) settings.themeMode = themeModeEl.value;
+    if (maxFavoritesEl) settings.maxFavorites = maxFavoritesEl.value;
+    if (historyRetentionEl) settings.historyRetention = historyRetentionEl.value;
+    if (allowAnalyticsEl) settings.allowAnalytics = allowAnalyticsEl.checked;
+    if (searchSuggestionsEl) settings.searchSuggestions = searchSuggestionsEl.checked;
+    
+    return settings;
+  }
+
+  // 🔧 修改：重置设置
+  resetSettings() {
+    if (!confirm('确定要重置所有设置为默认值吗？')) return;
+
+    // 重置为默认设置
+    const defaultSettings = {
+      themeMode: 'auto',
+      historyRetention: '90',
+      maxFavorites: '500',
+      allowAnalytics: true,
+      searchSuggestions: true
+    };
+
+    // 重置基础设置
+    Object.entries(defaultSettings).forEach(([key, value]) => {
+      const element = document.getElementById(key);
+      if (element) {
+        if (element.type === 'checkbox') {
+          element.checked = value;
+        } else {
+          element.value = value;
+        }
+      }
+    });
+
+    this.markSettingsChanged();
+    showToast('设置已重置为默认值，请点击保存', 'success');
+  }
+
+  // 🔧 新增：根据ID获取搜索源
+  getSourceById(sourceId) {
+    return this.allSearchSources.find(source => source.id === sourceId);
+  }
+
+  // 🔧 新增：根据ID获取分类
+  getCategoryById(categoryId) {
+    return this.allCategories.find(category => category.id === categoryId);
   }
 
   // 同步收藏 - 直接与API交互
@@ -967,8 +1901,9 @@ export class DashboardApp {
         searchHistory: history || this.searchHistory,
         settings: settings || this.collectSettings(),
         customSearchSources: this.customSearchSources, // 🔧 新增：导出自定义搜索源
+        customCategories: this.customCategories, // 🔧 新增：导出自定义分类
         exportTime: new Date().toISOString(),
-        version: window.API_CONFIG?.APP_VERSION || '1.0.0'
+        version: window.API_CONFIG?.APP_VERSION || '1.3.0'
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -1005,7 +1940,7 @@ export class DashboardApp {
       const data = {
         favorites: favorites || this.favorites,
         exportTime: new Date().toISOString(),
-        version: window.API_CONFIG?.APP_VERSION || '1.0.0'
+        version: window.API_CONFIG?.APP_VERSION || '1.3.0'
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -1119,12 +2054,12 @@ export class DashboardApp {
   loadOverviewDataFromLocal() {
     const totalSearchesEl = document.getElementById('totalSearches');
     const totalFavoritesEl = document.getElementById('totalFavorites');
-    const activeDaysEl = document.getElementById('activeDays');
+    const totalSourcesEl = document.getElementById('totalSources');
     const userLevelEl = document.getElementById('userLevel');
 
     if (totalSearchesEl) totalSearchesEl.textContent = this.searchHistory.length;
     if (totalFavoritesEl) totalFavoritesEl.textContent = this.favorites.length;
-    if (activeDaysEl) activeDaysEl.textContent = this.calculateActiveDays();
+    if (totalSourcesEl) totalSourcesEl.textContent = this.allSearchSources.length;
     if (userLevelEl) userLevelEl.textContent = this.calculateUserLevel();
   }
 
@@ -1265,6 +2200,7 @@ export class DashboardApp {
       modal.style.display = 'none';
     });
     this.editingCustomSource = null; // 🔧 重置编辑状态
+    this.editingCustomCategory = null; // 🔧 重置编辑状态
   }
 
   // 退出登录

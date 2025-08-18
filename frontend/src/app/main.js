@@ -1,4 +1,4 @@
-// 主应用入口 - 修复版本
+// 主应用入口 - 优化版本，从constants.js获取搜索源
 import { APP_CONSTANTS } from '../core/constants.js';
 import configManager from '../core/config.js';
 import { showLoading, showToast } from '../utils/dom.js';
@@ -15,6 +15,14 @@ class MagnetSearchApp {
     this.currentUser = null;
     this.isInitialized = false;
     this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS.CHECKING;
+    
+    // 🔧 新增：搜索源和分类管理
+    this.allSearchSources = [];
+    this.allCategories = [];
+    this.enabledSources = [];
+    this.customSearchSources = [];
+    this.customCategories = [];
+    
     this.init();
   }
 
@@ -28,6 +36,9 @@ class MagnetSearchApp {
       
       // 初始化配置
       await configManager.init();
+      
+      // 🔧 优化：从constants.js加载内置搜索源和分类
+      this.loadBuiltinData();
       
       // 绑定事件
       this.bindEvents();
@@ -46,9 +57,11 @@ class MagnetSearchApp {
         document.querySelector('.main-content').style.display = 'block';
         // 已登录用户初始化组件
         await this.initComponents();
+        // 🔧 加载用户的搜索源设置
+        await this.loadUserSearchSettings();
       }
 
-      // 🔧 新增：初始化站点导航
+      // 🔧 优化：初始化站点导航
       await this.initSiteNavigation();
 
       // 测试API连接
@@ -71,52 +84,91 @@ class MagnetSearchApp {
     }
   }
 
-  // 🔧 新增：初始化站点导航
-  async initSiteNavigation() {
+  // 🔧 新增：从constants.js加载内置数据
+  loadBuiltinData() {
     try {
-      let enabledSources = [];
+      // 加载内置搜索源
+      const builtinSources = APP_CONSTANTS.SEARCH_SOURCES.map(source => ({
+        ...source,
+        isBuiltin: true,
+        isCustom: false
+      }));
       
-      // 如果用户已登录，获取用户设置的搜索源
-      if (this.currentUser) {
-        try {
-          const userSettings = await apiService.getUserSettings();
-          enabledSources = userSettings.searchSources || [];
-        } catch (error) {
-          console.warn('获取用户搜索源设置失败，使用默认设置:', error);
-        }
-      }
+      // 加载内置分类
+      const builtinCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(category => ({
+        ...category,
+        isBuiltin: true,
+        isCustom: false
+      }));
       
-      // 如果没有用户设置或获取失败，使用默认搜索源
-      if (enabledSources.length === 0) {
-        enabledSources = ['javbus', 'javdb', 'javlibrary']; // 默认启用的搜索源
-      }
+      console.log(`从constants.js加载了 ${builtinSources.length} 个内置搜索源和 ${builtinCategories.length} 个内置分类`);
       
-      this.renderSiteNavigation(enabledSources);
+      // 初始化数据
+      this.allSearchSources = [...builtinSources];
+      this.allCategories = [...builtinCategories];
+      
+      // 设置默认启用的搜索源
+      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+      
     } catch (error) {
-      console.error('初始化站点导航失败:', error);
-      // 出错时使用默认配置
-      this.renderSiteNavigation(['javbus', 'javdb', 'javlibrary']);
+      console.error('加载内置数据失败:', error);
+      // 使用空数组作为后备
+      this.allSearchSources = [];
+      this.allCategories = [];
+      this.enabledSources = [];
     }
   }
 
-  // 🔧 新增：渲染站点导航
+  // 🔧 新增：加载用户的搜索源设置
+  async loadUserSearchSettings() {
+    if (!this.currentUser) return;
+    
+    try {
+      const userSettings = await apiService.getUserSettings();
+      
+      // 加载用户的自定义搜索源和分类
+      this.customSearchSources = userSettings.customSearchSources || [];
+      this.customCategories = userSettings.customSourceCategories || [];
+      this.enabledSources = userSettings.searchSources || APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+      
+      // 合并内置和自定义数据
+      this.allSearchSources = [
+        ...APP_CONSTANTS.SEARCH_SOURCES.map(s => ({ ...s, isBuiltin: true, isCustom: false })),
+        ...this.customSearchSources.map(s => ({ ...s, isBuiltin: false, isCustom: true }))
+      ];
+      
+      this.allCategories = [
+        ...Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(c => ({ ...c, isBuiltin: true, isCustom: false })),
+        ...this.customCategories.map(c => ({ ...c, isBuiltin: false, isCustom: true }))
+      ];
+      
+      console.log(`用户设置：启用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源`);
+      
+    } catch (error) {
+      console.warn('加载用户搜索源设置失败，使用默认设置:', error);
+      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+    }
+  }
+
+  // 🔧 优化：初始化站点导航
+  async initSiteNavigation() {
+    try {
+      // 使用当前启用的搜索源
+      this.renderSiteNavigation(this.enabledSources);
+    } catch (error) {
+      console.error('初始化站点导航失败:', error);
+      // 出错时使用默认配置
+      this.renderSiteNavigation(APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources);
+    }
+  }
+
+  // 🔧 优化：渲染站点导航
   renderSiteNavigation(enabledSourceIds) {
     const sitesSection = document.getElementById('sitesSection');
     if (!sitesSection) return;
 
-    // 从常量中获取所有可用的搜索源
-    const allSources = APP_CONSTANTS.SEARCH_SOURCES;
-    
-    // 按类别分组搜索源
-    const sourcesByCategory = {
-      database: ['javlibrary', 'javbus', 'javdb'],
-      streaming: ['jable', 'javmost', 'javguru'],
-      community: ['sehuatang', 't66y'],
-      others: ['av01', 'missav', 'btsow']
-    };
-
     // 过滤出用户启用的搜索源
-    const enabledSources = allSources.filter(source => 
+    const enabledSources = this.allSearchSources.filter(source => 
       enabledSourceIds.includes(source.id)
     );
 
@@ -126,41 +178,30 @@ class MagnetSearchApp {
         <h2>🌐 资源站点导航</h2>
         <div class="empty-state">
           <p>暂无可用的搜索源</p>
-          <p>请在个人中心设置页面启用搜索源</p>
+          <p>请在个人中心搜索源管理页面启用搜索源</p>
           <button onclick="window.app && window.app.navigateToDashboard()" class="btn-primary">前往设置</button>
         </div>
       `;
       return;
     }
 
+    // 按分类组织搜索源
+    const sourcesByCategory = this.groupSourcesByCategory(enabledSources);
+
     // 生成HTML
-    const categoryMap = {
-      database: { name: '📚 番号资料站', sources: [] },
-      streaming: { name: '🎥 在线播放平台', sources: [] },
-      community: { name: '💬 社区论坛', sources: [] },
-      others: { name: '🌟 其他资源', sources: [] }
-    };
-
-    // 将启用的搜索源分配到对应类别
-    enabledSources.forEach(source => {
-      for (const [categoryKey, sourceIds] of Object.entries(sourcesByCategory)) {
-        if (sourceIds.includes(source.id)) {
-          categoryMap[categoryKey].sources.push(source);
-          break;
-        }
-      }
-    });
-
-    // 生成站点导航HTML
     let navigationHTML = '<h2>🌐 资源站点导航</h2><div class="sites-grid">';
     
-    Object.values(categoryMap).forEach(category => {
-      if (category.sources.length > 0) {
+    // 按分类顺序渲染
+    this.allCategories
+      .filter(category => sourcesByCategory[category.id] && sourcesByCategory[category.id].length > 0)
+      .sort((a, b) => (a.order || 999) - (b.order || 999))
+      .forEach(category => {
+        const sources = sourcesByCategory[category.id];
         navigationHTML += `
           <div class="site-category">
-            <h3>${category.name}</h3>
+            <h3 style="color: ${category.color || '#6b7280'}">${category.icon} ${category.name}</h3>
             <div class="site-list">
-              ${category.sources.map(source => `
+              ${sources.map(source => `
                 <a href="${source.urlTemplate.replace('{keyword}', 'search')}" target="_blank" class="site-item" rel="noopener noreferrer">
                   <div class="site-info">
                     <strong>${source.icon} ${source.name}</strong>
@@ -171,11 +212,37 @@ class MagnetSearchApp {
             </div>
           </div>
         `;
-      }
-    });
+      });
     
     navigationHTML += '</div>';
     sitesSection.innerHTML = navigationHTML;
+  }
+
+  // 🔧 新增：按分类组织搜索源
+  groupSourcesByCategory(sources) {
+    const grouped = {};
+    
+    sources.forEach(source => {
+      const categoryId = source.category || 'others';
+      if (!grouped[categoryId]) {
+        grouped[categoryId] = [];
+      }
+      grouped[categoryId].push(source);
+    });
+    
+    // 按优先级排序每个分类内的搜索源
+    Object.keys(grouped).forEach(categoryId => {
+      grouped[categoryId].sort((a, b) => {
+        if (a.isBuiltin && b.isBuiltin) {
+          return (a.priority || 999) - (b.priority || 999);
+        }
+        if (a.isBuiltin && !b.isBuiltin) return -1;
+        if (!a.isBuiltin && b.isBuiltin) return 1;
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      });
+    });
+    
+    return grouped;
   }
 
   // 初始化组件
@@ -286,8 +353,11 @@ class MagnetSearchApp {
     window.addEventListener('searchSourcesChanged', async (event) => {
       console.log('检测到搜索源设置变更，更新站点导航');
       try {
+        // 更新启用的搜索源列表
+        this.enabledSources = event.detail.newSources;
+        
         // 重新渲染站点导航
-        this.renderSiteNavigation(event.detail.newSources);
+        this.renderSiteNavigation(this.enabledSources);
         showToast('站点导航已更新', 'success', 2000);
       } catch (error) {
         console.error('更新站点导航失败:', error);
@@ -439,7 +509,8 @@ class MagnetSearchApp {
         // 登录后初始化组件
         await this.initComponents();
         
-        // 🔧 新增：重新初始化站点导航（使用用户设置）
+        // 🔧 新增：重新加载用户搜索源设置并更新站点导航
+        await this.loadUserSearchSettings();
         await this.initSiteNavigation();
         
         // 处理URL参数（如搜索查询）
@@ -587,7 +658,21 @@ class MagnetSearchApp {
         favoritesManager.renderFavorites();
       }
       
-      // 🔧 新增：重新初始化站点导航（使用默认设置）
+      // 🔧 新增：重置为默认搜索源设置并更新站点导航
+      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+      this.customSearchSources = [];
+      this.customCategories = [];
+      this.allSearchSources = APP_CONSTANTS.SEARCH_SOURCES.map(s => ({ 
+        ...s, 
+        isBuiltin: true, 
+        isCustom: false 
+      }));
+      this.allCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(c => ({ 
+        ...c, 
+        isBuiltin: true, 
+        isCustom: false 
+      }));
+      
       await this.initSiteNavigation();
       
       // 显示登录模态框
@@ -600,15 +685,6 @@ class MagnetSearchApp {
       console.error('退出登录失败:', error);
     }
   }
-
-  // 导航到Dashboard
-  async navigateToDashboard() {
-    try {
-      if (!this.currentUser) {
-        showToast('请先登录', 'error');
-        this.showLoginModal();
-        return;
-      }
 
       showLoading(true);
       console.log('🏠 导航到Dashboard');
@@ -632,6 +708,35 @@ class MagnetSearchApp {
     if (this.isInitialized) {
       this.testConnection();
     }
+  }
+
+  // 🔧 新增：获取当前启用的搜索源
+  getEnabledSources() {
+    return this.allSearchSources.filter(source => 
+      this.enabledSources.includes(source.id)
+    );
+  }
+
+  // 🔧 新增：获取指定分类的搜索源
+  getSourcesByCategory(categoryId) {
+    return this.allSearchSources.filter(source => 
+      source.category === categoryId && this.enabledSources.includes(source.id)
+    );
+  }
+
+  // 🔧 新增：根据ID获取搜索源
+  getSourceById(sourceId) {
+    return this.allSearchSources.find(source => source.id === sourceId);
+  }
+
+  // 🔧 新增：根据ID获取分类
+  getCategoryById(categoryId) {
+    return this.allCategories.find(category => category.id === categoryId);
+  }
+
+  // 🔧 新增：检查搜索源是否启用
+  isSourceEnabled(sourceId) {
+    return this.enabledSources.includes(sourceId);
   }
 }
 
