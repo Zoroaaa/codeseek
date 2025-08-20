@@ -1,591 +1,276 @@
 # 磁力快搜 - 专业版
 
-## 🌟 项目简介
+<div align="center">
 
-磁力快搜是一款现代化的磁力搜索聚合工具，采用ES6模块化架构重构，提供智能搜索、云端同步、收藏管理等功能。支持多平台资源站点聚合，为用户提供一站式搜索体验。
+![Logo](images/logo.png)
 
-## ✨ 功能特性
+**一个现代化的磁力搜索聚合平台**
 
-### 🔍 智能搜索
-- **多源聚合**: 支持JavBus、JavDB、JavLibrary等主流站点
-- **搜索建议**: 基于历史记录的智能搜索建议
-- **结果缓存**: 智能缓存机制，提升搜索速度
-- **快捷键支持**: Ctrl+K快速聚焦搜索框
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/yourusername/magnet-search)
+[![Cloudflare](https://img.shields.io/badge/Powered%20by-Cloudflare-orange.svg)](https://www.cloudflare.com/)
 
-### ☁️ 云端同步
-- **跨设备同步**: 搜索历史、收藏夹云端实时同步
-- **数据备份**: 完整的数据导入导出功能
-- **离线支持**: 本地缓存，离线也能查看历史数据
+</div>
 
-### 📚 收藏管理
-- **智能收藏**: 一键收藏搜索结果
-- **分类整理**: 按关键词、时间等多维度管理
-- **批量操作**: 支持批量导入、导出、删除
+## ✨ 项目特色
 
-### 🎨 用户体验
-- **响应式设计**: 完美适配桌面、平板、手机
-- **主题切换**: 支持浅色/深色主题自动切换
-- **现代化UI**: 基于现代设计语言的精美界面
+- 🚀 **现代化架构**: 基于ES6模块化开发，无框架依赖
+- 🌐 **多搜索源聚合**: 支持15+主流磁力搜索站点
+- 🔧 **高度可定制**: 自定义搜索源和分类管理
+- ☁️ **云端同步**: 基于Cloudflare生态的数据同步
+- 📱 **响应式设计**: 完美适配桌面和移动设备
+- 🎨 **主题切换**: 支持亮色/暗色/自动主题
+- 📊 **数据统计**: 详细的使用统计和分析
 
-### 🛡️ 安全隐私
-- **数据加密**: 本地存储数据加密保护
-- **隐私保护**: 最小化数据收集，用户隐私优先
-- **安全认证**: 完整的用户认证和权限管理
+## 🏗️ 技术架构
 
-## 🏗️ 技术栈
+### 前端技术栈
+- **核心**: 原生JavaScript ES6+ 模块化
+- **样式**: CSS3 + 响应式设计
+- **存储**: LocalStorage + IndexedDB
+- **部署**: Cloudflare Pages
 
-### 前端技术
-- **前端**: Cloudflare Pages
-- **ES6+ Modules**: 现代化模块系统
-- **Vanilla JavaScript**: 原生JS，无框架依赖
-- **CSS3**: 现代CSS特性，CSS变量
-- **HTML5**: 语义化标记，可访问性优化
-
-### 后端技术
-- **后端**: Cloudflare Workers
+### 后端技术栈
+- **运行时**: Cloudflare Workers
 - **数据库**: Cloudflare D1 (SQLite)
-- **认证**: JWT + Session管理
+- **认证**: JWT Token
+- **API**: RESTful 风格
 
-### 开发工具
-- **ES6 Import/Export**: 模块化开发
-- **CSS Custom Properties**: 动态主题切换
-- **Web APIs**: 现代浏览器API充分利用
-- **Progressive Enhancement**: 渐进式增强
-
-### 浏览器支持
-- **现代浏览器**: Chrome 61+, Firefox 60+, Safari 11+, Edge 16+
-- **ES6 Modules**: 原生支持ES6模块的浏览器
-- **响应式设计**: 支持各种屏幕尺寸
-
-
-## 🔧 模块依赖关系
-
-```mermaid
-graph TD
-    A[index.html] --> B[src/app/main.js]
-    C[dashboard.html] --> D[src/app/dashboard-app.js]
-    
-    B --> E[src/services/auth.js]
-    B --> F[src/services/theme.js]
-    B --> G[src/components/search.js]
-    B --> H[src/components/favorites.js]
-    
-    D --> E
-    D --> F
-    D --> I[src/services/api.js]
-    
-    E --> I
-    E --> J[src/utils/validation.js]
-    E --> K[src/utils/dom.js]
-    
-    F --> L[src/core/constants.js]
-    F --> K
-    
-    G --> M[src/services/search.js]
-    G --> J
-    G --> K
-    
-    H --> I
-    H --> K
-    H --> N[src/utils/format.js]
-    
-    I --> O[src/core/config.js]
-    I --> P[src/utils/helpers.js]
-    
-    M --> I
-    M --> L
-    M --> J
-    
-    O --> L
-    
-    K --> P
-    N --> P
-    J --> P
+### 项目结构
+```
+magnet-search-app/
+├── 📄 index.html                  # 主搜索页面
+├── 📄 dashboard.html              # 用户仪表板
+├── 📁 src/                        # ES6源码目录
+│   ├── 📁 core/                   # 核心配置层
+│   ├── 📁 utils/                  # 工具函数层
+│   ├── 📁 services/               # 服务层
+│   ├── 📁 components/             # 组件层
+│   └── 📁 pages/                  # 页面应用层
+├── 📁 css/                        # 样式文件
+├── 📁 images/                     # 静态资源
+└── 📄 worker.js                   # Cloudflare Worker后端
 ```
 
 ## 🚀 快速开始
 
 ### 环境要求
+- Node.js 16+ (开发环境)
+- Cloudflare 账户
+- Git
 
-- **现代浏览器**: 支持ES6 Modules
-- **Web服务器**: 本地开发服务器或生产环境
-- **Node.js**: 可选，用于开发工具
-
-### 安装部署
-
-#### 方法一：直接部署
+### 本地开发
 ```bash
-# 1. 克隆项目
-git clone https://github.com/your-repo/magnet-search-app.git
+# 克隆项目
+git clone https://github.com/yourusername/magnet-search.git
+cd magnet-search
 
-# 2. 进入项目目录
-cd magnet-search-app
+# 启动本地服务器
+npx http-server . -p 3000
 
-# 3. 使用Web服务器运行
-# Python 3
-python -m http.server 8000
-
-# Python 2
-python -m SimpleHTTPServer 8000
-
-# Node.js
-npx serve .
-
-# 4. 访问应用
-open http://localhost:8000
+# 或使用Live Server扩展（推荐）
 ```
 
-#### 方法二：开发环境
+### 部署到Cloudflare
+
+#### 前端部署 (Cloudflare Pages)
+1. 连接GitHub仓库到Cloudflare Pages
+2. 构建设置：
+   - 框架预设：`None`
+   - 构建命令：`echo "Static site"`
+   - 构建输出目录：`/`
+
+#### 后端部署 (Cloudflare Workers)
 ```bash
-# 1. 安装开发依赖
-npm install
+# 安装Wrangler CLI
+npm install -g wrangler
 
-# 2. 启动开发服务器
-npm run dev
+# 登录Cloudflare
+wrangler auth login
 
-# 3. 构建生产版本
-npm run build
+# 创建D1数据库
+wrangler d1 create magnet-search-db
+
+# 部署Worker
+wrangler deploy
 ```
 
-### 配置说明
+#### 环境变量配置
+在Cloudflare Workers中设置以下环境变量：
+```
+JWT_SECRET=your-super-secret-key
+APP_VERSION=1.3.0
+ENABLE_ACTION_LOGGING=true
+MAX_FAVORITES_PER_USER=1000
+MAX_HISTORY_PER_USER=1000
+```
 
-#### 环境配置
-在 `js/config.js` 中配置应用参数：
+### 数据库初始化
+```bash
+# 运行数据库迁移
+wrangler d1 execute magnet-search-db --file=./schema.sql
+```
 
+## 🎯 核心功能
+
+### 1. 智能搜索系统
+- **多源聚合**: 同时搜索15+主流站点
+- **结果缓存**: 智能缓存提升搜索速度
+- **搜索建议**: 基于历史的智能提示
+- **源管理**: 可自由启用/禁用搜索源
+
+### 2. 自定义搜索源
+- **源配置**: 支持添加自定义搜索站点
+- **分类管理**: 自定义搜索源分类
+- **模板系统**: 灵活的URL模板配置
+- **批量操作**: 批量启用/禁用搜索源
+
+### 3. 收藏系统
+- **云端同步**: 收藏数据云端存储
+- **分类整理**: 按关键词自动分类
+- **搜索过滤**: 收藏内容快速搜索
+- **批量管理**: 批量导入/导出功能
+
+### 4. 用户系统
+- **安全认证**: JWT基础的安全认证
+- **个人设置**: 丰富的个性化配置
+- **数据同步**: 跨设备数据同步
+- **隐私保护**: 本地优先的隐私策略
+
+### 5. 数据统计
+- **使用分析**: 详细的搜索行为分析
+- **趋势图表**: 可视化的数据趋势
+- **热门统计**: 热门关键词和搜索源
+- **活动热力图**: 用户活动时间分布
+
+## 🔧 配置说明
+
+### 前端配置
+在`src/core/config.js`中配置API地址：
 ```javascript
-// API配置
-const API_CONFIG = {
-  APP_NAME: 'CodeSeek',
-  APP_VERSION: '2.0.0',
-  BASE_URL: isDev() ? 'http://localhost:8787' : 'https://your-api.com',
-  TIMEOUT: 30000,
-  MAX_RETRIES: 3
-};
+const config = {
+  BASE_URL: 'https://your-worker.your-subdomain.workers.dev',
+  DEV_URL: 'http://localhost:8787',
+  PROD_URL: 'https://your-production-api.com'
+}
 ```
 
-#### 搜索源配置
-在 `src/core/constants.js` 中配置搜索源：
-
+### 搜索源配置
+在`src/core/constants.js`中管理内置搜索源：
 ```javascript
 SEARCH_SOURCES: [
   {
-    id: 'javbus',
-    name: 'JavBus',
-    subtitle: '番号+磁力一体站，信息完善',
-    icon: '🌐',
-    urlTemplate: 'https://www.javbus.com/search/{keyword}'
+    id: 'custom-site',
+    name: '自定义站点',
+    urlTemplate: 'https://example.com/search?q={keyword}',
+    category: 'database',
+    icon: '🔍'
   }
-  // 添加更多搜索源...
 ]
-```
-
-## 💻 开发指南
-
-### 代码规范
-
-#### ES6模块导入
-```javascript
-// ✅ 正确的导入方式
-import { showToast } from '../utils/dom.js';
-import apiService from '../services/api.js';
-import { APP_CONSTANTS } from '../core/constants.js';
-
-// ❌ 避免的导入方式
-import * as everything from './module.js';
-```
-
-#### 异步处理
-```javascript
-// ✅ 使用async/await
-async function fetchData() {
-  try {
-    const result = await apiService.getData();
-    return result;
-  } catch (error) {
-    console.error('获取数据失败:', error);
-    showToast('操作失败', 'error');
-  }
-}
-
-// ✅ 错误处理
-try {
-  await someAsyncOperation();
-} catch (error) {
-  console.error('操作失败:', error);
-  // 用户友好的错误提示
-  showToast('操作失败，请重试', 'error');
-}
-```
-
-#### 事件处理
-```javascript
-// ✅ 使用事件委托
-container.addEventListener('click', (e) => {
-  const button = e.target.closest('[data-action]');
-  if (!button) return;
-  
-  const action = button.dataset.action;
-  this.handleAction(action, button);
-});
-
-// ✅ 防抖处理
-import { debounce } from '../utils/helpers.js';
-
-searchInput.addEventListener('input', debounce((e) => {
-  this.handleSearch(e.target.value);
-}, 300));
-```
-
-### 新增功能
-
-#### 添加新的工具函数
-1. 在 `src/utils/` 目录创建新文件
-2. 使用ES6模块导出
-3. 在需要的地方导入使用
-
-```javascript
-// src/utils/new-util.js
-export function newUtilFunction(param) {
-  // 实现逻辑
-  return result;
-}
-
-// 使用
-import { newUtilFunction } from '../utils/new-util.js';
-```
-
-#### 添加新的服务
-1. 在 `src/services/` 目录创建服务文件
-2. 创建服务类并导出
-3. 在应用层导入并使用
-
-```javascript
-// src/services/new-service.js
-class NewService {
-  async doSomething() {
-    // 服务逻辑
-  }
-}
-
-export const newService = new NewService();
-export default newService;
-```
-
-### 调试技巧
-
-#### 开发者工具
-- **Console**: 查看错误信息和调试输出
-- **Network**: 监控API请求和响应
-- **Application**: 检查本地存储和缓存
-- **Sources**: 设置断点调试ES6模块
-
-#### 日志输出
-```javascript
-// 开发环境调试日志
-if (window.API_CONFIG?.ENABLE_DEBUG) {
-  console.log('调试信息:', data);
-}
-
-// 错误追踪
-console.error('错误详情:', {
-  error: error.message,
-  stack: error.stack,
-  context: additionalInfo
-});
-```
-
-## 📡 API集成
-
-### 配置API端点
-```javascript
-// src/core/config.js
-const API_ENDPOINTS = {
-  AUTH: '/api/auth',
-  SEARCH: '/api/search',
-  FAVORITES: '/api/favorites',
-  USER: '/api/user'
-};
-```
-
-### API请求示例
-```javascript
-// src/services/api.js
-async function request(endpoint, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    ...options
-  });
-  
-  if (!response.ok) {
-    throw new Error(`API请求失败: ${response.status}`);
-  }
-  
-  return response.json();
-}
-```
-
-## 🎨 主题定制
-
-### CSS变量系统
-```css
-:root {
-  /* 浅色主题 */
-  --bg-primary: #ffffff;
-  --text-primary: #111827;
-  --accent-primary: #3b82f6;
-}
-
-[data-theme="dark"] {
-  /* 深色主题 */
-  --bg-primary: #111827;
-  --text-primary: #f9fafb;
-  --accent-primary: #60a5fa;
-}
-```
-
-### 主题切换
-```javascript
-// src/services/theme.js
-toggleTheme() {
-  const currentTheme = this.getCurrentTheme();
-  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-  
-  document.documentElement.setAttribute('data-theme', newTheme);
-  localStorage.setItem('theme', newTheme);
-}
-```
-
-## 📱 响应式设计
-
-### 断点系统
-```css
-/* 移动设备 */
-@media (max-width: 768px) {
-  .container {
-    padding: 1rem;
-  }
-}
-
-/* 平板设备 */
-@media (max-width: 1024px) {
-  .sidebar {
-    width: 240px;
-  }
-}
-
-/* 桌面设备 */
-@media (min-width: 1025px) {
-  .container {
-    max-width: 1280px;
-  }
-}
-```
-
-## 🔒 安全考虑
-
-### XSS防护
-```javascript
-// 使用HTML转义
-import { escapeHtml } from '../utils/format.js';
-
-element.innerHTML = escapeHtml(userInput);
-```
-
-### CSRF防护
-```javascript
-// API请求中包含CSRF令牌
-headers: {
-  'X-CSRF-Token': getCsrfToken(),
-  'Content-Type': 'application/json'
-}
-```
-
-### 数据验证
-```javascript
-// 输入验证
-import { validateSearchKeyword } from '../utils/validation.js';
-
-const validation = validateSearchKeyword(input);
-if (!validation.valid) {
-  showToast(validation.errors[0], 'error');
-  return;
-}
-```
-
-## 🚀 部署指南
-
-### 生产环境配置
-
-#### Nginx配置
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    root /path/to/magnet-search-app;
-    index index.html;
-
-    # ES6模块MIME类型
-    location ~* \.js$ {
-        add_header Content-Type application/javascript;
-    }
-
-    # SPA路由支持
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # 缓存静态资源
-    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-#### CDN部署
-```bash
-# 构建优化版本
-npm run build
-
-# 上传到CDN
-aws s3 sync dist/ s3://your-bucket-name/ --delete
-
-# 配置CloudFront缓存策略
-```
-
-### 环境变量
-```bash
-# 生产环境
-export NODE_ENV=production
-export API_BASE_URL=https://api.your-domain.com
-export ENABLE_ANALYTICS=true
-
-# 开发环境
-export NODE_ENV=development
-export API_BASE_URL=http://localhost:8787
-export ENABLE_DEBUG=true
 ```
 
 ## 📊 性能优化
 
-### 代码分割
-```javascript
-// 动态导入
-async function loadDashboard() {
-  const { DashboardApp } = await import('./src/app/dashboard-app.js');
-  return new DashboardApp();
-}
+### 前端优化
+- **模块化加载**: ES6模块按需加载
+- **缓存策略**: 多层次缓存机制
+- **响应式图片**: 适配不同屏幕尺寸
+- **代码压缩**: 生产环境代码压缩
+
+### 后端优化
+- **边缘计算**: Cloudflare全球边缘节点
+- **数据库优化**: 索引优化和查询优化
+- **连接池**: 数据库连接复用
+- **缓存层**: Redis兼容的KV存储
+
+## 🔒 安全特性
+
+- **XSS防护**: 输入输出严格过滤
+- **CSRF保护**: Token验证机制
+- **SQL注入防护**: 参数化查询
+- **访问控制**: 基于角色的权限管理
+- **数据加密**: 敏感数据加密存储
+
+## 🧪 测试
+
+```bash
+# 运行单元测试
+npm test
+
+# 运行集成测试
+npm run test:integration
+
+# 生成测试覆盖率报告
+npm run test:coverage
 ```
 
-### 资源预加载
-```html
-<!-- 预加载关键资源 -->
-<link rel="preload" href="src/app/main.js" as="script">
-<link rel="preload" href="css/style.css" as="style">
-```
+## 📝 API文档
 
-### 缓存策略
-```javascript
-// Service Worker缓存
-const CACHE_NAME = 'magnet-search-v2.0.0';
-const CACHE_URLS = [
-  '/index.html',
-  '/css/style.css',
-  '/src/app/main.js'
-];
-```
+### 认证接口
+- `POST /api/auth/register` - 用户注册
+- `POST /api/auth/login` - 用户登录
+- `POST /api/auth/verify-token` - Token验证
+- `POST /api/auth/logout` - 用户登出
 
-## 🐛 错误处理
+### 用户数据接口
+- `GET /api/user/settings` - 获取用户设置
+- `PUT /api/user/settings` - 更新用户设置
+- `GET /api/user/favorites` - 获取收藏列表
+- `POST /api/user/favorites` - 同步收藏数据
 
-### 全局错误捕获
-```javascript
-// 捕获未处理的错误
-window.addEventListener('error', (event) => {
-  console.error('全局错误:', event.error);
-  // 发送错误报告
-  reportError(event.error);
-});
-
-// 捕获Promise拒绝
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('未处理的Promise拒绝:', event.reason);
-  event.preventDefault();
-});
-```
-
-### 用户友好错误
-```javascript
-// 显示用户友好的错误信息
-function handleError(error, context) {
-  const userMessage = ERROR_MESSAGES[error.code] || '操作失败，请重试';
-  showToast(userMessage, 'error');
-  
-  // 开发环境显示详细错误
-  if (isDev()) {
-    console.error(`错误上下文: ${context}`, error);
-  }
-}
-```
-
-## 🔄 更新日志
-
-### v2.0.0 (2024-12-XX)
-- ✨ **ES6模块化重构**: 完全重写为现代化模块架构
-- 🎨 **UI/UX优化**: 全新的响应式设计和主题系统
-- ☁️ **云端同步**: 完整的数据同步和备份功能
-- 🔒 **安全增强**: 改进的认证系统和数据保护
-- 📱 **移动优化**: 更好的移动端体验
-- 🚀 **性能提升**: 优化加载速度和内存使用
-
-### v1.0.0 (2024-XX-XX)
-- 🎉 **初始发布**: 基础搜索和收藏功能
-- 🔍 **多源聚合**: 支持主流磁力站点
-- 💾 **本地存储**: 基础的数据存储功能
+### 搜索接口
+- `GET /api/user/search-history` - 获取搜索历史
+- `POST /api/user/search-history` - 保存搜索记录
+- `DELETE /api/user/search-history/:id` - 删除历史记录
+- `GET /api/user/search-stats` - 获取搜索统计
 
 ## 🤝 贡献指南
 
-### 参与贡献
-
-1. **Fork项目** 到你的GitHub账户
-2. **创建特性分支** `git checkout -b feature/amazing-feature`
-3. **提交更改** `git commit -m 'Add amazing feature'`
-4. **推送分支** `git push origin feature/amazing-feature`
-5. **创建Pull Request**
+1. Fork 项目
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开 Pull Request
 
 ### 代码规范
+- 使用ES6+现代JavaScript语法
+- 遵循ESLint规则
+- 保持代码注释完整
+- 单元测试覆盖率>80%
 
-- 使用ES6+语法
-- 遵循模块化设计原则
-- 添加适当的注释和文档
-- 包含单元测试（如适用）
-- 遵循现有的代码风格
+## 📋 更新日志
 
-### 问题报告
+### v1.3.0 (2024-12-19)
+- ✨ 新增自定义搜索源和分类管理
+- 🚀 优化搜索性能和缓存机制
+- 🎨 改进用户界面和交互体验
+- 🔧 重构Dashboard架构，提升可维护性
+- 📊 增强数据统计和可视化功能
 
-提交Issue时请包含：
-- 操作系统和浏览器版本
-- 重现步骤
-- 期望行为
-- 实际行为
-- 错误截图或日志
+### v1.2.0
+- 🔐 完善用户认证和安全机制
+- ☁️ 实现云端数据同步功能
+- 📱 优化移动端适配
+- 🐛 修复若干已知问题
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
-## 💬 联系我们
-
-- **项目主页**: [GitHub Repository](https://github.com/your-repo/magnet-search-app)
-- **问题反馈**: [Issues](https://github.com/your-repo/magnet-search-app/issues)
-- **功能建议**: [Discussions](https://github.com/your-repo/magnet-search-app/discussions)
+本项目基于 [MIT License](LICENSE) 开源协议。
 
 ## 🙏 致谢
 
-感谢所有为这个项目做出贡献的开发者们！
+- [Cloudflare](https://www.cloudflare.com/) - 提供优秀的边缘计算平台
+- [各搜索站点](docs/SOURCES.md) - 提供丰富的搜索资源
+- 所有贡献者和用户的支持
+
+## 📧 联系方式
+
+- 项目主页: [https://github.com/yourusername/magnet-search](https://github.com/yourusername/magnet-search)
+- 问题反馈: [Issues](https://github.com/yourusername/magnet-search/issues)
+- 功能建议: [Discussions](https://github.com/yourusername/magnet-search/discussions)
 
 ---
 
-**⭐ 如果这个项目对你有帮助，请给我们一个Star！**
+<div align="center">
+<p>⭐ 如果这个项目对你有帮助，请给我们一个Star！⭐</p>
+</div>
