@@ -1,7 +1,6 @@
 magnet-search-app/
 ├── 📄 index.html                              # 主页面
 ├── 📄 dashboard.html                          # 仪表板页面
-├── 📄 README.md                               # 项目文档
 │
 ├── 📁 src/                                    # ES6源码目录
 │   ├── 📁 core/                              # 🎯 核心配置层
@@ -45,11 +44,6 @@ magnet-search-app/
 │   └── 📄 dashboard.css                      # Dashboard专用样式
 │
 │
-├── 📁 images/                                # 🖼️ 静态资源
-│   ├── 📄 favicon.ico                        # 网站图标
-│   └── 📄 logo.png                           # 应用Logo
-│
-└── 📁 docs/                                  # 📚 项目文档
-    ├── 📄 API.md                             # API接口文档
-    ├── 📄 DEPLOYMENT.md                      # 部署指南
-    └── 📄 CHANGELOG.md                       # 更新日志
+└── 📁 images/                                # 🖼️ 静态资源
+    ├── 📄 favicon.ico                        # 网站图标
+    └── 📄 logo.png                           # 应用Logo
