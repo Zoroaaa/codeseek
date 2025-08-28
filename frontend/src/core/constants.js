@@ -506,12 +506,15 @@ export const APP_CONSTANTS = {
     autoSync: true,
     cacheResults: true,
     // 新增：搜索源状态检查设置
-    checkSourceStatus: false, // 是否启用搜索源状态检查
-    sourceStatusCheckTimeout: 8000, // 状态检查超时时间
-    sourceStatusCacheDuration: 300000, // 状态缓存持续时间（5分钟）
-    skipUnavailableSources: true, // 是否跳过不可用的搜索源
-    showSourceStatus: true, // 是否在结果中显示搜索源状态
-    retryFailedSources: false // 是否重试失败的搜索源
+	checkSourceStatus: false,               // 是否启用搜索源状态检查
+    sourceStatusCheckTimeout: 10000,        // 状态检查超时时间
+    sourceStatusCacheDuration: 300000,      // 状态缓存持续时间（5分钟）
+    skipUnavailableSources: true,          // 是否跳过不可用的搜索源
+    showSourceStatus: true,                // 是否在结果中显示搜索源状态
+    retryFailedSources: false,             // 是否重试失败的搜索源
+    quickSearch: false,                    // 快速搜索模式
+    thoroughCheck: false                   // 彻底检查模式
+
   },
   
   // 搜索源管理相关常量

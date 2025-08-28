@@ -1,4 +1,4 @@
-magnet-search-app/
+frontend-tree/
 ├── 📄 index.html                              # 主页面
 ├── 📄 dashboard.html                          # 仪表板页面
 │
@@ -47,3 +47,13 @@ magnet-search-app/
 └── 📁 images/                                # 🖼️ 静态资源
     ├── 📄 favicon.ico                        # 网站图标
     └── 📄 logo.png                           # 应用Logo
+	
+前端部署在cloudflare pages
+	
+	
+backend-tree/
+├── 📄 schema.sql                             # 数据库结构
+├── 📄 worker.js                              # 后端主逻辑
+
+后端部署在cloudflare workers
+数据库部署在cloudflare D1
