@@ -92,45 +92,89 @@ export class SettingsManager {
   }
 
   // 🔧 修复版本的加载设置数据方法
-  async loadSettingsData() {
-    if (this.isLoading) return;
+async loadSettingsData() {
+  if (this.isLoading) return;
+  
+  try {
+    this.isLoading = true;
+    console.log('📄 开始加载设置数据...');
     
-    try {
-      this.isLoading = true;
-      console.log('🔄 开始加载设置数据...');
-      
-      // 🔧 清除API缓存，确保获取最新数据
-      if (searchService && searchService.clearUserSettingsCache) {
-        searchService.clearUserSettingsCache();
-      }
-      
-      const settings = await apiService.getUserSettings();
-      console.log('📥 从API获取的设置:', settings);
-      
-      this.currentSettings = settings;
-      
-      // 合并默认设置
-      const mergedSettings = { ...APP_CONSTANTS.DEFAULT_USER_SETTINGS, ...settings };
-      console.log('🔀 合并后的设置:', mergedSettings);
-      
-      // 🔧 更新UI元素 - 添加调试日志
-      this.updateUIElements(mergedSettings);
-      
-      // 更新状态检查控件
-      this.updateSourceStatusCheckControls();
-      
-      this.hasUnsavedChanges = false;
-      this.updateSaveButtonState();
-      
-      console.log('✅ 设置数据加载完成');
-
-    } catch (error) {
-      console.error('❌ 加载设置失败:', error);
-      showToast('加载设置失败', 'error');
-    } finally {
-      this.isLoading = false;
+    // 🔧 清除API缓存，确保获取最新数据
+    if (searchService && searchService.clearUserSettingsCache) {
+      searchService.clearUserSettingsCache();
     }
+    
+    const settings = await apiService.getUserSettings();
+    console.log('📥 从API获取的设置:', settings);
+    
+    this.currentSettings = settings;
+    
+    // 🔧 修复：只对未定义的设置使用默认值
+    const processedSettings = {};
+    
+    // 遍历所有可能的设置项
+    const allPossibleSettings = {
+      ...APP_CONSTANTS.DEFAULT_USER_SETTINGS,
+      ...settings
+    };
+    
+    Object.keys(allPossibleSettings).forEach(key => {
+      if (settings.hasOwnProperty(key)) {
+        // 如果API返回了这个设置，使用API的值
+        processedSettings[key] = settings[key];
+      } else {
+        // 只有API没有返回的设置才使用默认值
+        processedSettings[key] = APP_CONSTANTS.DEFAULT_USER_SETTINGS[key];
+      }
+    });
+    
+    console.log('🔀 处理后的设置:', processedSettings);
+    console.log('🔍 状态检查设置处理详情:', {
+      API返回值: settings.checkSourceStatus,
+      是否有该字段: settings.hasOwnProperty('checkSourceStatus'),
+      最终使用值: processedSettings.checkSourceStatus
+    });
+    
+    // 更新UI元素
+    this.updateUIElementsDirectly(processedSettings);
+    this.updateSourceStatusCheckControls();
+    
+    this.hasUnsavedChanges = false;
+    this.updateSaveButtonState();
+    
+    console.log('✅ 设置数据加载完成');
+
+  } catch (error) {
+    console.error('❌ 加载设置失败:', error);
+    showToast('加载设置失败', 'error');
+  } finally {
+    this.isLoading = false;
   }
+}
+
+// 4. 添加设置保存后的验证方法
+async verifySettingsSaved(expectedSettings) {
+  try {
+    // 等待一秒后重新获取设置进行验证
+    setTimeout(async () => {
+      const freshSettings = await apiService.getUserSettings();
+      const isCheckSourceStatusCorrect = freshSettings.checkSourceStatus === expectedSettings.checkSourceStatus;
+      
+      console.log('🔍 设置保存验证:', {
+        期望值: expectedSettings.checkSourceStatus,
+        实际值: freshSettings.checkSourceStatus,
+        验证通过: isCheckSourceStatusCorrect
+      });
+      
+      if (!isCheckSourceStatusCorrect) {
+        console.error('⚠️ 设置保存验证失败，状态检查设置未正确保存');
+        showToast('设置可能未正确保存，请重试', 'warning');
+      }
+    }, 1000);
+  } catch (error) {
+    console.error('设置验证失败:', error);
+  }
+}
 
   // 🔧 新增：更新UI元素的独立方法，包含详细日志
   updateUIElements(settings) {
@@ -232,100 +276,188 @@ export class SettingsManager {
   }
 
   // 🔧 修复版本的保存设置方法
-  async saveSettings() {
-    if (!this.app.getCurrentUser()) {
-      showToast('用户未登录', 'error');
-      return;
-    }
-
-    if (this.isLoading) {
-      showToast('正在处理中，请稍候...', 'warning');
-      return;
-    }
-
-    try {
-      showLoading(true);
-      this.isLoading = true;
-      
-      console.log('💾 开始保存设置...');
-      
-      const ui = this.collectSettings();
-      console.log('📝 收集的UI设置:', ui);
-      
-      const payload = {
-        theme: ui.themeMode,
-        maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
-        maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
-        allowAnalytics: !!ui.allowAnalytics,
-        searchSuggestions: !!ui.searchSuggestions,
-        
-        // 搜索源状态检查设置
-        checkSourceStatus: !!ui.enableSourceStatusCheck,
-        sourceStatusCheckTimeout: parseInt(ui.sourceCheckTimeout, 10) || 8000,
-        sourceStatusCacheDuration: (parseInt(ui.sourceStatusCacheDuration, 10) || 300) * 1000,
-        skipUnavailableSources: !!ui.skipUnavailableSources,
-        showSourceStatus: !!ui.showSourceStatus,
-        retryFailedSources: !!ui.retryFailedSources
-      };
-      
-      console.log('📤 准备发送的设置:', payload);
-      
-      // 验证设置
-      const validation = this.validateSettings(payload);
-      if (!validation.valid) {
-        showToast(validation.message, 'error');
-        return;
-      }
-      
-      // 保存到API
-      const response = await apiService.updateUserSettings(payload);
-      console.log('📡 API保存响应:', response);
-      
-      // 🔧 立即应用主题设置
-      if (payload.theme) {
-        themeManager.setTheme(payload.theme);
-      }
-      
-      // 🔧 强制清除所有相关缓存
-      if (searchService) {
-        if (searchService.clearUserSettingsCache) {
-          searchService.clearUserSettingsCache();
-        }
-        if (searchService.clearCache) {
-          searchService.clearCache();
-        }
-        // 如果禁用了状态检查，清除状态缓存
-        if (!payload.checkSourceStatus && searchService.clearStatusCache) {
-          searchService.clearStatusCache();
-        }
-      }
-      
-      // 🔧 更新本地设置并强制同步UI
-      this.currentSettings = { ...this.currentSettings, ...payload };
-      console.log('🔄 更新本地设置:', this.currentSettings);
-      
-      // 🔧 立即更新UI以反映保存的状态
-      await this.syncUIWithCurrentSettings();
-      
-      showToast('设置保存成功', 'success');
-      this.markSettingsSaved();
-      
-      // 记录分析事件
-      apiService.recordAction('settings_updated', {
-        checkSourceStatus: payload.checkSourceStatus,
-        sourceStatusCheckTimeout: payload.sourceStatusCheckTimeout
-      }).catch(console.error);
-      
-      console.log('✅ 设置保存完成');
-      
-    } catch (error) {
-      console.error('❌ 保存设置失败:', error);
-      showToast('保存设置失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
-      this.isLoading = false;
-    }
+async saveSettings() {
+  if (!this.app.getCurrentUser()) {
+    showToast('用户未登录', 'error');
+    return;
   }
+
+  if (this.isLoading) {
+    showToast('正在处理中，请稍候...', 'warning');
+    return;
+  }
+
+  try {
+    showLoading(true);
+    this.isLoading = true;
+    
+    console.log('💾 开始保存设置...');
+    
+    const ui = this.collectSettings();
+    console.log('📝 收集的UI设置:', ui);
+    
+    const payload = {
+      theme: ui.themeMode,
+      maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
+      maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
+      allowAnalytics: !!ui.allowAnalytics,
+      searchSuggestions: !!ui.searchSuggestions,
+      
+      // 搜索源状态检查设置 - 确保布尔值正确转换
+      checkSourceStatus: !!ui.enableSourceStatusCheck,
+      sourceStatusCheckTimeout: parseInt(ui.sourceCheckTimeout, 10) || 8000,
+      sourceStatusCacheDuration: (parseInt(ui.sourceStatusCacheDuration, 10) || 300) * 1000,
+      skipUnavailableSources: !!ui.skipUnavailableSources,
+      showSourceStatus: !!ui.showSourceStatus,
+      retryFailedSources: !!ui.retryFailedSources
+    };
+    
+    console.log('📤 准备发送的设置:', payload);
+    console.log('🔍 状态检查设置详情:', {
+      原始UI值: ui.enableSourceStatusCheck,
+      转换后值: payload.checkSourceStatus,
+      类型检查: typeof payload.checkSourceStatus
+    });
+    
+    // 验证设置
+    const validation = this.validateSettings(payload);
+    if (!validation.valid) {
+      showToast(validation.message, 'error');
+      return;
+    }
+    
+    // 保存到API
+    const response = await apiService.updateUserSettings(payload);
+    console.log('📡 API保存响应:', response);
+    
+    // 🔧 重要：确保API响应包含我们刚才保存的设置
+    if (response && response.settings) {
+      // 使用API返回的设置更新本地状态
+      this.currentSettings = { ...this.currentSettings, ...response.settings };
+      console.log('✅ 使用API响应更新本地设置:', this.currentSettings);
+    } else {
+      // 如果API没有返回设置，使用我们发送的设置
+      this.currentSettings = { ...this.currentSettings, ...payload };
+      console.log('⚠️ API未返回设置，使用发送的设置:', this.currentSettings);
+    }
+    
+    // 🔧 立即应用主题设置
+    if (payload.theme) {
+      themeManager.setTheme(payload.theme);
+    }
+    
+    // 🔧 强制清除所有相关缓存
+    if (searchService) {
+      if (searchService.clearUserSettingsCache) {
+        searchService.clearUserSettingsCache();
+      }
+      if (searchService.clearCache) {
+        searchService.clearCache();
+      }
+      if (!payload.checkSourceStatus && searchService.clearStatusCache) {
+        searchService.clearStatusCache();
+      }
+    }
+    
+    // 🔧 立即更新UI以反映保存的状态 - 不合并默认设置
+    this.updateUIElementsDirectly(this.currentSettings);
+    this.updateSourceStatusCheckControls();
+    
+    showToast('设置保存成功', 'success');
+    this.markSettingsSaved();
+    
+    // 记录分析事件
+    apiService.recordAction('settings_updated', {
+      checkSourceStatus: payload.checkSourceStatus,
+      sourceStatusCheckTimeout: payload.sourceStatusCheckTimeout
+    }).catch(console.error);
+    
+    console.log('✅ 设置保存完成');
+    
+  } catch (error) {
+    console.error('❌ 保存设置失败:', error);
+    showToast('保存设置失败: ' + error.message, 'error');
+  } finally {
+    showLoading(false);
+    this.isLoading = false;
+  }
+}
+
+// 2. 新增直接更新UI的方法，不合并默认设置
+updateUIElementsDirectly(settings) {
+  console.log('🔄 直接更新UI元素，不合并默认设置...');
+  
+  const elements = {
+    themeMode: document.getElementById('themeMode'),
+    maxFavorites: document.getElementById('maxFavorites'),
+    historyRetention: document.getElementById('historyRetention'),
+    allowAnalytics: document.getElementById('allowAnalytics'),
+    searchSuggestions: document.getElementById('searchSuggestions'),
+    
+    enableSourceStatusCheck: document.getElementById('enableSourceStatusCheck'),
+    sourceCheckTimeout: document.getElementById('sourceCheckTimeout'),
+    sourceStatusCacheDuration: document.getElementById('sourceStatusCacheDuration'),
+    skipUnavailableSources: document.getElementById('skipUnavailableSources'),
+    showSourceStatus: document.getElementById('showSourceStatus'),
+    retryFailedSources: document.getElementById('retryFailedSources')
+  };
+
+  // 🔧 基本设置
+  if (elements.themeMode && settings.theme !== undefined) {
+    elements.themeMode.value = settings.theme;
+  }
+  
+  if (elements.maxFavorites && settings.maxFavoritesPerUser !== undefined) {
+    elements.maxFavorites.value = settings.maxFavoritesPerUser;
+  }
+  
+  if (elements.historyRetention && settings.maxHistoryPerUser !== undefined) {
+    elements.historyRetention.value = settings.maxHistoryPerUser;
+  }
+  
+  if (elements.allowAnalytics && settings.allowAnalytics !== undefined) {
+    elements.allowAnalytics.checked = settings.allowAnalytics;
+  }
+  
+  if (elements.searchSuggestions && settings.searchSuggestions !== undefined) {
+    elements.searchSuggestions.checked = settings.searchSuggestions;
+  }
+
+  // 🔧 搜索源状态检查设置 - 关键修复
+  if (elements.enableSourceStatusCheck) {
+    // 直接使用设置值，不做任何默认值合并
+    const checkSourceStatus = settings.checkSourceStatus === true;
+    elements.enableSourceStatusCheck.checked = checkSourceStatus;
+    
+    console.log('🔍 直接更新搜索源状态检查设置:', {
+      设置值: settings.checkSourceStatus,
+      UI状态: checkSourceStatus,
+      元素checked: elements.enableSourceStatusCheck.checked
+    });
+  }
+  
+  // 其他状态检查相关设置
+  if (elements.sourceCheckTimeout && settings.sourceStatusCheckTimeout !== undefined) {
+    elements.sourceCheckTimeout.value = settings.sourceStatusCheckTimeout;
+  }
+  
+  if (elements.sourceStatusCacheDuration && settings.sourceStatusCacheDuration !== undefined) {
+    elements.sourceStatusCacheDuration.value = Math.floor(settings.sourceStatusCacheDuration / 1000);
+  }
+  
+  if (elements.skipUnavailableSources && settings.skipUnavailableSources !== undefined) {
+    elements.skipUnavailableSources.checked = settings.skipUnavailableSources;
+  }
+  
+  if (elements.showSourceStatus && settings.showSourceStatus !== undefined) {
+    elements.showSourceStatus.checked = settings.showSourceStatus;
+  }
+  
+  if (elements.retryFailedSources && settings.retryFailedSources !== undefined) {
+    elements.retryFailedSources.checked = settings.retryFailedSources;
+  }
+}
+
 
   // 🔧 新增：同步UI与当前设置的方法
   async syncUIWithCurrentSettings() {
