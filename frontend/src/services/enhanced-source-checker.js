@@ -1,10 +1,8 @@
-// 增强版搜索源可用性检查服务
+// 修复版增强搜索源可用性检查服务
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
 import { showToast } from '../utils/dom.js';
-import apiService from './api.js';
-import authManager from './auth.js';
 
 class EnhancedSearchSourceChecker {
   constructor() {
@@ -13,7 +11,7 @@ class EnhancedSearchSourceChecker {
     this.concurrentChecks = 0;
     this.maxConcurrentChecks = 5;
     
-    // 检查策略配置
+    // 检查策略配置 - 修复：确保所有方法都已定义
     this.checkStrategies = {
       favicon: this.checkFaviconAvailability.bind(this),
       actualSearch: this.checkActualSearchCapability.bind(this),
@@ -139,6 +137,20 @@ class EnhancedSearchSourceChecker {
   }
 
   /**
+   * favicon 可用性检查
+   */
+  async checkFaviconAvailability(source, timeout) {
+    const baseUrl = this.extractBaseUrl(source.urlTemplate);
+    const result = await this.checkEndpoint(`${baseUrl}/favicon.ico`, timeout);
+    
+    return {
+      available: result.success || false,
+      status: result.success ? 'online' : 'offline',
+      method: 'favicon'
+    };
+  }
+
+  /**
    * 综合检查策略 - 多种方法组合使用
    */
   async comprehensiveCheck(source, timeout) {
@@ -173,7 +185,7 @@ class EnhancedSearchSourceChecker {
     ];
 
     const results = await Promise.allSettled(checks);
-    const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
+    const successCount = results.filter(r => r.status === 'fulfilled' && r.value && r.value.success).length;
     
     return {
       available: successCount > 0,
@@ -259,7 +271,6 @@ class EnhancedSearchSourceChecker {
       `${baseUrl}`,
       `${baseUrl}/search`,
       `${baseUrl}/index.html`,
-      `${baseUrl}/api`,
       source.statusCheckUrl // 如果有自定义检查URL
     ].filter(Boolean);
 
@@ -269,7 +280,7 @@ class EnhancedSearchSourceChecker {
 
     const results = await Promise.allSettled(endpointChecks);
     const successfulEndpoints = results.filter(r => 
-      r.status === 'fulfilled' && r.value
+      r.status === 'fulfilled' && r.value && r.value.success
     ).length;
 
     return {
@@ -542,15 +553,15 @@ class EnhancedSearchSourceChecker {
     const { total, available, partial, offline, availabilityRate } = analysis;
     
     if (availabilityRate >= 0.8) {
-      showToast(`✅ 检查完成: ${available}/${total} 个源可用 (优秀)`, 'success');
+      showToast(`检查完成: ${available}/${total} 个源可用 (优秀)`, 'success');
     } else if (availabilityRate >= 0.6) {
-      showToast(`⚠️ 检查完成: ${available}/${total} 个源可用 (良好)`, 'warning');
+      showToast(`检查完成: ${available}/${total} 个源可用 (良好)`, 'warning');
     } else {
-      showToast(`❌ 检查完成: ${available}/${total} 个源可用 (需要关注)`, 'error');
+      showToast(`检查完成: ${available}/${total} 个源可用 (需要关注)`, 'error');
     }
 
     if (partial > 0) {
-      console.log(`📊 其中 ${partial} 个源部分可用`);
+      console.log(`其中 ${partial} 个源部分可用`);
     }
   }
 
@@ -561,7 +572,7 @@ class EnhancedSearchSourceChecker {
     results.forEach(result => {
       if (result.reliability !== undefined) {
         // 可靠性数据已在calculateReliability中更新
-        console.log(`🔍 ${result.name}: 可靠性 ${(result.reliability * 100).toFixed(1)}%`);
+        console.log(`${result.name}: 可靠性 ${(result.reliability * 100).toFixed(1)}%`);
       }
     });
   }
