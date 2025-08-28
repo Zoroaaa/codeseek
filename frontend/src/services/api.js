@@ -1,4 +1,4 @@
-// API服务模块 - 修复搜索源设置保存
+// API服务模块 - 完整支持搜索源状态检查功能
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 
@@ -10,14 +10,11 @@ class APIService {
     this.retryDelay = 1000;
   }
 
-  // 从环境变量或配置获取API基础URL
   getAPIBaseURL() {
-    // 优先级：window配置 > 环境变量 > 默认值
     if (window.API_CONFIG && window.API_CONFIG.BASE_URL) {
       return window.API_CONFIG.BASE_URL;
     }
     
-    // 开发环境检测
     const isDev = window.location.hostname === 'localhost' || 
                  window.location.hostname === '127.0.0.1';
     
@@ -25,7 +22,6 @@ class APIService {
       return window.API_CONFIG?.DEV_URL || 'http://localhost:8787';
     }
     
-    // 生产环境默认值
     return window.API_CONFIG?.PROD_URL || 'https://codeseek-backend.tvhub.pp.ua';
   }
 
@@ -59,7 +55,6 @@ class APIService {
     let lastError;
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        // 网络状态检查
         if (!navigator.onLine) {
           throw new Error('网络连接不可用');
         }
@@ -74,13 +69,11 @@ class APIService {
           return await response.text();
         }
         
-        // 401错误特殊处理
         if (response.status === 401) {
           this.setToken(null);
           throw new Error('认证失败，请重新登录');
         }
         
-        // 5xx错误可以重试
         if (response.status >= 500 && attempt < this.maxRetries - 1) {
           await this.delay(this.retryDelay * (attempt + 1));
           continue;
@@ -101,7 +94,6 @@ class APIService {
       } catch (error) {
         lastError = error;
         
-        // 网络错误可以重试
         if ((error.name === 'TypeError' || error.message.includes('fetch')) && 
             attempt < this.maxRetries - 1) {
           await this.delay(this.retryDelay * (attempt + 1));
@@ -207,7 +199,6 @@ class APIService {
       throw new Error('收藏数据格式错误');
     }
     
-    // 验证收藏数据结构
     const validFavorites = favorites.filter(fav => {
       return fav && fav.title && fav.url && 
              typeof fav.title === 'string' && 
@@ -237,7 +228,6 @@ class APIService {
   // 搜索历史相关API
   async syncSearchHistory(history) {
     try {
-      // 确保数据格式正确
       const validHistory = history.filter(item => {
         return item && (item.query || item.keyword) && 
                typeof (item.query || item.keyword) === 'string' && 
@@ -283,7 +273,6 @@ class APIService {
       const response = await this.request('/api/user/search-history');
       const history = response.history || response.searchHistory || [];
       
-      // 确保返回的数据格式正确
       return history.filter(item => {
         return item && (item.query || item.keyword) && 
                typeof (item.query || item.keyword) === 'string';
@@ -332,131 +321,213 @@ class APIService {
     }
   }
 
-  // 🔧 修复：用户设置相关API - 添加搜索源和自定义搜索源支持
+  // 🔧 完整的用户设置API - 支持所有状态检查相关设置
   async getUserSettings() {
     try {
       const response = await this.request('/api/user/settings');
-      return response.settings || {};
+      const settings = response.settings || {};
+      
+      // 🆕 确保状态检查相关设置有默认值
+      return {
+        ...APP_CONSTANTS.DEFAULT_USER_SETTINGS,
+        ...settings,
+        // 确保状态检查设置的数据类型正确
+        checkSourceStatus: Boolean(settings.checkSourceStatus),
+        sourceStatusCheckTimeout: Number(settings.sourceStatusCheckTimeout) || 8000,
+        sourceStatusCacheDuration: Number(settings.sourceStatusCacheDuration) || 300000,
+        skipUnavailableSources: settings.skipUnavailableSources !== false,
+        showSourceStatus: settings.showSourceStatus !== false,
+        retryFailedSources: Boolean(settings.retryFailedSources)
+      };
     } catch (error) {
       console.error('获取用户设置失败:', error);
-      return {};
+      return { ...APP_CONSTANTS.DEFAULT_USER_SETTINGS };
     }
   }
 
-// 🔧 修复1：在 api.js 的 updateUserSettings 方法中添加缺失的字段
-async updateUserSettings(settings) {
-  if (!this.token) {
-    throw new Error('用户未登录');
-  }
-  
-  if (!settings || typeof settings !== 'object') {
-    throw new Error('设置数据格式错误');
-  }
-  
-  // 🔧 修复：扩展允许的设置字段，添加搜索源支持
-  const allowedSettings = [
-    'theme', 
-    'autoSync', 
-    'cacheResults', 
-    'maxHistoryPerUser', 
-    'maxFavoritesPerUser',
-    'searchSources',        // 启用的搜索源列表
-    'customSearchSources',  // 自定义搜索源列表
-    'customSourceCategories', // 🔧 修复：添加自定义分类字段
-    'allowAnalytics',       // 行为统计设置
-    'searchSuggestions'     // 搜索建议设置
-  ];
-  
-  const validSettings = {};
-  Object.keys(settings).forEach(key => {
-    if (allowedSettings.includes(key)) {
-      validSettings[key] = settings[key];
+  // 🔧 增强的用户设置更新API - 完整支持状态检查设置
+  async updateUserSettings(settings) {
+    if (!this.token) {
+      throw new Error('用户未登录');
     }
-  });
-  
-  // 验证搜索源数据格式
-  if (validSettings.searchSources && !Array.isArray(validSettings.searchSources)) {
-    throw new Error('搜索源格式错误：必须是数组');
-  }
-  
-  if (validSettings.customSearchSources && !Array.isArray(validSettings.customSearchSources)) {
-    throw new Error('自定义搜索源格式错误：必须是数组');
-  }
-  
-  // 🔧 修复：添加自定义分类验证
-  if (validSettings.customSourceCategories && !Array.isArray(validSettings.customSourceCategories)) {
-    throw new Error('自定义分类格式错误：必须是数组');
-  }
-  
-  // 验证自定义搜索源格式
-  if (validSettings.customSearchSources) {
-    const invalidSources = validSettings.customSearchSources.filter(source => 
-      !source || !source.id || !source.name || !source.urlTemplate ||
-      typeof source.id !== 'string' || typeof source.name !== 'string' || 
-      typeof source.urlTemplate !== 'string'
-    );
     
-    if (invalidSources.length > 0) {
-      throw new Error('自定义搜索源格式错误：缺少必需字段');
+    if (!settings || typeof settings !== 'object') {
+      throw new Error('设置数据格式错误');
     }
-  }
-  
-  // 🔧 修复：添加自定义分类格式验证
-  if (validSettings.customSourceCategories) {
-    const invalidCategories = validSettings.customSourceCategories.filter(category => 
-      !category || !category.id || !category.name || !category.icon ||
-      typeof category.id !== 'string' || typeof category.name !== 'string' || 
-      typeof category.icon !== 'string'
-    );
     
-    if (invalidCategories.length > 0) {
-      throw new Error('自定义分类格式错误：缺少必需字段');
-    }
-  }
-  
-  try {
-    return await this.request('/api/user/settings', {
-      method: 'PUT',
-      body: JSON.stringify({ settings: validSettings })
+    // 🆕 扩展允许的设置字段，包含所有状态检查相关设置
+    const allowedSettings = [
+      'theme', 
+      'autoSync', 
+      'cacheResults', 
+      'maxHistoryPerUser', 
+      'maxFavoritesPerUser',
+      'searchSources',
+      'customSearchSources',
+      'customSourceCategories',
+      'allowAnalytics',
+      'searchSuggestions',
+      // 🆕 状态检查相关设置
+      'checkSourceStatus',
+      'sourceStatusCheckTimeout',
+      'sourceStatusCacheDuration',
+      'skipUnavailableSources',
+      'showSourceStatus',
+      'retryFailedSources'
+    ];
+    
+    const validSettings = {};
+    Object.keys(settings).forEach(key => {
+      if (allowedSettings.includes(key)) {
+        validSettings[key] = settings[key];
+      }
     });
-  } catch (error) {
-    console.error('更新用户设置失败:', error);
-    throw error;
+    
+    // 🆕 验证状态检查设置
+    if (validSettings.hasOwnProperty('checkSourceStatus')) {
+      validSettings.checkSourceStatus = Boolean(validSettings.checkSourceStatus);
+    }
+    
+    if (validSettings.hasOwnProperty('sourceStatusCheckTimeout')) {
+      const timeout = Number(validSettings.sourceStatusCheckTimeout);
+      const [minTimeout, maxTimeout] = APP_CONSTANTS.VALIDATION_RULES.STATUS_CHECK.TIMEOUT_RANGE;
+      if (timeout < minTimeout || timeout > maxTimeout) {
+        throw new Error(`状态检查超时时间必须在 ${minTimeout}-${maxTimeout} 毫秒之间`);
+      }
+      validSettings.sourceStatusCheckTimeout = timeout;
+    }
+    
+    if (validSettings.hasOwnProperty('sourceStatusCacheDuration')) {
+      const cacheDuration = Number(validSettings.sourceStatusCacheDuration);
+      if (cacheDuration < 60000 || cacheDuration > 3600000) { // 1分钟到1小时
+        throw new Error('状态缓存时间必须在 60000-3600000 毫秒之间');
+      }
+      validSettings.sourceStatusCacheDuration = cacheDuration;
+    }
+    
+    // 其他布尔类型设置的验证
+    ['skipUnavailableSources', 'showSourceStatus', 'retryFailedSources'].forEach(key => {
+      if (validSettings.hasOwnProperty(key)) {
+        validSettings[key] = Boolean(validSettings[key]);
+      }
+    });
+    
+    // 验证搜索源数据格式
+    if (validSettings.searchSources && !Array.isArray(validSettings.searchSources)) {
+      throw new Error('搜索源格式错误：必须是数组');
+    }
+    
+    if (validSettings.customSearchSources && !Array.isArray(validSettings.customSearchSources)) {
+      throw new Error('自定义搜索源格式错误：必须是数组');
+    }
+    
+    if (validSettings.customSourceCategories && !Array.isArray(validSettings.customSourceCategories)) {
+      throw new Error('自定义分类格式错误：必须是数组');
+    }
+    
+    // 验证自定义搜索源格式
+    if (validSettings.customSearchSources) {
+      const invalidSources = validSettings.customSearchSources.filter(source => 
+        !source || !source.id || !source.name || !source.urlTemplate ||
+        typeof source.id !== 'string' || typeof source.name !== 'string' || 
+        typeof source.urlTemplate !== 'string'
+      );
+      
+      if (invalidSources.length > 0) {
+        throw new Error('自定义搜索源格式错误：缺少必需字段');
+      }
+    }
+    
+    if (validSettings.customSourceCategories) {
+      const invalidCategories = validSettings.customSourceCategories.filter(category => 
+        !category || !category.id || !category.name || !category.icon ||
+        typeof category.id !== 'string' || typeof category.name !== 'string' || 
+        typeof category.icon !== 'string'
+      );
+      
+      if (invalidCategories.length > 0) {
+        throw new Error('自定义分类格式错误：缺少必需字段');
+      }
+    }
+    
+    try {
+      const response = await this.request('/api/user/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ settings: validSettings })
+      });
+      
+      // 🆕 记录状态检查设置变更的分析事件
+      if (validSettings.hasOwnProperty('checkSourceStatus')) {
+        const eventName = validSettings.checkSourceStatus ? 
+          'SOURCE_STATUS_CHECK_ENABLED' : 
+          'SOURCE_STATUS_CHECK_DISABLED';
+        
+        this.recordAction(APP_CONSTANTS.ANALYTICS_EVENTS[eventName], {
+          timeout: validSettings.sourceStatusCheckTimeout,
+          cacheDuration: validSettings.sourceStatusCacheDuration,
+          skipUnavailable: validSettings.skipUnavailableSources,
+          showStatus: validSettings.showSourceStatus
+        }).catch(console.error);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('更新用户设置失败:', error);
+      throw error;
+    }
   }
-}
 
-  // 🔧 新增：自定义搜索源管理API
+  // 🆕 新增：搜索源状态检查相关API
+  async recordSourceStatusCheck(checkResults) {
+    if (!this.token) return;
+    
+    try {
+      const summary = {
+        totalSources: checkResults.length,
+        availableSources: checkResults.filter(s => s.available).length,
+        avgResponseTime: checkResults.reduce((sum, s) => sum + (s.responseTime || 0), 0) / checkResults.length,
+        checkTimestamp: Date.now()
+      };
+      
+      return await this.recordAction(APP_CONSTANTS.ANALYTICS_EVENTS.SOURCE_STATUS_CHECKED, summary);
+    } catch (error) {
+      console.error('记录状态检查结果失败:', error);
+    }
+  }
+
+  // 自定义搜索源管理API
   async addCustomSearchSource(source) {
     if (!this.token) {
       throw new Error('用户未登录');
     }
     
-    // 验证必需字段
     if (!source || !source.name || !source.urlTemplate) {
       throw new Error('缺少必需字段：name, urlTemplate');
     }
     
-    // 自动生成ID
     if (!source.id) {
       source.id = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
     
-    // 设置默认值
     const newSource = {
       id: source.id,
       name: source.name.trim(),
       subtitle: source.subtitle?.trim() || '自定义搜索源',
       icon: source.icon?.trim() || '🔍',
       urlTemplate: source.urlTemplate.trim(),
+      category: source.category || 'others',
       isCustom: true,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      // 🆕 状态检查配置
+      checkMethod: source.checkMethod || 'favicon',
+      statusCheckUrl: source.statusCheckUrl || null,
+      timeout: source.timeout || APP_CONSTANTS.API.SOURCE_CHECK_TIMEOUT
     };
     
     try {
       const currentSettings = await this.getUserSettings();
       const customSources = currentSettings.customSearchSources || [];
       
-      // 检查是否已存在相同ID或名称
       const existingSource = customSources.find(s => 
         s.id === newSource.id || s.name === newSource.name
       );
@@ -465,10 +536,8 @@ async updateUserSettings(settings) {
         throw new Error('搜索源ID或名称已存在');
       }
       
-      // 添加到自定义搜索源列表
       const updatedCustomSources = [...customSources, newSource];
       
-      // 更新设置
       return await this.updateUserSettings({
         ...currentSettings,
         customSearchSources: updatedCustomSources
@@ -493,14 +562,12 @@ async updateUserSettings(settings) {
         throw new Error('未找到指定的自定义搜索源');
       }
       
-      // 更新搜索源
       customSources[sourceIndex] = {
         ...customSources[sourceIndex],
         ...updates,
         updatedAt: Date.now()
       };
       
-      // 更新设置
       return await this.updateUserSettings({
         ...currentSettings,
         customSearchSources: customSources
@@ -521,19 +588,14 @@ async updateUserSettings(settings) {
       let customSources = currentSettings.customSearchSources || [];
       let enabledSources = currentSettings.searchSources || [];
       
-      // 检查搜索源是否存在
       const sourceExists = customSources.some(s => s.id === sourceId);
       if (!sourceExists) {
         throw new Error('未找到指定的自定义搜索源');
       }
       
-      // 从自定义搜索源列表中移除
       customSources = customSources.filter(s => s.id !== sourceId);
-      
-      // 从启用的搜索源中移除
       enabledSources = enabledSources.filter(id => id !== sourceId);
       
-      // 更新设置
       return await this.updateUserSettings({
         ...currentSettings,
         customSearchSources: customSources,
@@ -592,6 +654,5 @@ async updateUserSettings(settings) {
   }
 }
 
-// 创建单例实例
 export const apiService = new APIService();
 export default apiService;

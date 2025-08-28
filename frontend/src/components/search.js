@@ -1,4 +1,4 @@
-// 搜索组件 - 添加删除单条历史记录功能
+// 搜索组件 - 添加搜索源状态显示功能
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../utils/format.js';
@@ -14,6 +14,8 @@ export class SearchManager {
     this.currentResults = [];
     this.searchHistory = [];
     this.isInitialized = false;
+    // 新增：用户设置缓存
+    this.userSettings = null;
   }
 
   async init() {
@@ -21,6 +23,7 @@ export class SearchManager {
 
     try {
       await this.loadSearchHistory();
+      await this.loadUserSettings(); // 新增：加载用户设置
       this.bindEvents();
       this.handleURLParams();
       this.exposeGlobalMethods();
@@ -30,19 +33,34 @@ export class SearchManager {
     }
   }
   
-  // 暴露必要的全局方法
+  // 🆕 新增：加载用户设置
+  async loadUserSettings() {
+    if (authManager.isAuthenticated()) {
+      try {
+        this.userSettings = await apiService.getUserSettings();
+      } catch (error) {
+        console.error('加载用户设置失败:', error);
+        this.userSettings = APP_CONSTANTS.DEFAULT_USER_SETTINGS;
+      }
+    } else {
+      this.userSettings = APP_CONSTANTS.DEFAULT_USER_SETTINGS;
+    }
+  }
+  
   exposeGlobalMethods() {
-    // 暴露到window对象，供HTML内联事件使用
     window.searchManager = {
       openResult: (url, source) => this.openResult(url, source),
       toggleFavorite: (resultId) => this.toggleFavorite(resultId),
       copyToClipboard: (text) => this.copyToClipboard(text),
       searchFromHistory: (keyword) => this.searchFromHistory(keyword),
-      deleteHistoryItem: (historyId) => this.deleteHistoryItem(historyId) // 🔧 新增
+      deleteHistoryItem: (historyId) => this.deleteHistoryItem(historyId),
+      // 🆕 新增：重新检查搜索源状态
+      recheckSourceStatus: (resultId) => this.recheckSourceStatus(resultId),
+      // 🆕 新增：显示搜索源详细状态
+      showSourceStatus: (resultId) => this.showSourceStatus(resultId)
     };
   }
 
-  // 绑定事件
   bindEvents() {
     const searchBtn = document.getElementById('searchBtn');
     const searchInput = document.getElementById('searchInput');
@@ -87,7 +105,6 @@ export class SearchManager {
     this.bindKeyboardShortcuts();
   }
 
-  // 绑定键盘快捷键
   bindKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -105,7 +122,6 @@ export class SearchManager {
     });
   }
 
-  // 处理URL参数
   handleURLParams() {
     const urlParams = new URLSearchParams(window.location.search);
     const searchQuery = urlParams.get('q');
@@ -121,7 +137,7 @@ export class SearchManager {
     }
   }
 
-  // 执行搜索
+  // 🔧 修改：执行搜索 - 支持状态检查
   async performSearch() {
     const searchInput = document.getElementById('searchInput');
     const keyword = searchInput?.value.trim();
@@ -132,7 +148,6 @@ export class SearchManager {
       return;
     }
 
-    // 验证关键词
     const validation = validateSearchKeyword(keyword);
     if (!validation.valid) {
       showToast(validation.errors[0], 'error');
@@ -142,23 +157,20 @@ export class SearchManager {
     try {
       showLoading(true);
       
-      // 隐藏提示区域
       this.hideQuickTips();
 
-      // 获取搜索选项
-      const useCache = document.getElementById('cacheResults')?.checked;
+      // 🆕 使用用户设置中的状态检查配置
+      const checkSourceStatus = this.userSettings?.checkSourceStatus || false;
       const saveToHistory = authManager.isAuthenticated();
 
-      // 执行搜索
+      // 执行搜索（会自动进行状态检查如果启用）
       const results = await searchService.performSearch(keyword, {
-        useCache,
+        checkSourceStatus,
         saveToHistory
       });
       
-      // 显示搜索结果
       this.displaySearchResults(keyword, results);
 
-      // 更新搜索历史
       if (saveToHistory) {
         await this.addToHistory(keyword);
       }
@@ -171,7 +183,7 @@ export class SearchManager {
     }
   }
 
-  // 显示搜索结果
+  // 🔧 修改：显示搜索结果 - 支持状态信息显示
   displaySearchResults(keyword, results) {
     const resultsSection = document.getElementById('resultsSection');
     const searchInfo = document.getElementById('searchInfo');
@@ -182,9 +194,13 @@ export class SearchManager {
     if (resultsSection) resultsSection.style.display = 'block';
     
     if (searchInfo) {
+      const availableCount = results.filter(r => r.available !== false).length;
+      const statusInfo = this.userSettings?.checkSourceStatus ? 
+        ` (${availableCount}/${results.length} 个源可用)` : '';
+      
       searchInfo.innerHTML = `
         搜索关键词: <strong>${escapeHtml(keyword)}</strong> 
-        (${results.length}个结果) 
+        (${results.length}个结果${statusInfo}) 
         <small>${new Date().toLocaleString()}</small>
       `;
     }
@@ -194,20 +210,16 @@ export class SearchManager {
 
     if (resultsContainer) {
       resultsContainer.innerHTML = results.map(result => this.createResultHTML(result)).join('');
-      
-      // 绑定事件委托
       this.bindResultsEvents(resultsContainer);
     }
 
     this.currentResults = results;
     
-    // 滚动到结果区域
     setTimeout(() => {
       resultsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   }
   
-  // 绑定结果区域事件
   bindResultsEvents(container) {
     container.addEventListener('click', (e) => {
       const button = e.target.closest('[data-action]');
@@ -228,32 +240,59 @@ export class SearchManager {
         case 'copy':
           this.copyToClipboard(url);
           break;
+        case 'recheck': // 🆕 新增：重新检查状态
+          this.recheckSourceStatus(resultId);
+          break;
+        case 'status': // 🆕 新增：显示详细状态
+          this.showSourceStatus(resultId);
+          break;
       }
     });
   }
 
-  // 创建搜索结果HTML
+  // 🔧 修改：创建搜索结果HTML - 添加状态显示
   createResultHTML(result) {
     const isFavorited = favoritesManager.isFavorited(result.url);
+    const showStatus = this.userSettings?.showSourceStatus && result.hasOwnProperty('available');
+    
+    // 🆕 状态指示器
+    let statusIndicator = '';
+    if (showStatus) {
+      const statusClass = this.getStatusClass(result.status);
+      const statusText = this.getStatusText(result.status, result.available);
+      const responseTimeText = result.responseTime ? ` (${result.responseTime}ms)` : '';
+      
+      statusIndicator = `
+        <div class="result-status ${statusClass}" title="${statusText}${responseTimeText}">
+          <span class="status-dot"></span>
+          <span class="status-text">${statusText}</span>
+          ${result.responseTime ? `<span class="response-time">${result.responseTime}ms</span>` : ''}
+        </div>
+      `;
+    }
     
     return `
-      <div class="result-item" data-id="${result.id}">
+      <div class="result-item ${result.available === false ? 'result-unavailable' : ''}" data-id="${result.id}">
         <div class="result-image">
           <span style="font-size: 2rem;">${result.icon}</span>
         </div>
         <div class="result-content">
           <div class="result-title">${escapeHtml(result.title)}</div>
           <div class="result-subtitle">${escapeHtml(result.subtitle)}</div>
+          ${statusIndicator}
           <div class="result-url" title="${escapeHtml(result.url)}">
             ${truncateUrl(result.url)}
           </div>
           <div class="result-meta">
             <span class="result-source">${result.source}</span>
             <span class="result-time">${formatRelativeTime(result.timestamp)}</span>
+            ${result.lastChecked ? `<span class="result-checked">检查于 ${new Date(result.lastChecked).toLocaleTimeString()}</span>` : ''}
           </div>
         </div>
         <div class="result-actions">
-          <button class="action-btn visit-btn" data-action="visit" data-url="${escapeHtml(result.url)}" data-source="${result.source}">
+          <button class="action-btn visit-btn ${result.available === false ? 'disabled' : ''}" 
+                  data-action="visit" data-url="${escapeHtml(result.url)}" data-source="${result.source}"
+                  ${result.available === false ? 'disabled title="搜索源当前不可用"' : ''}>
             <span>访问</span>
           </button>
           <button class="action-btn favorite-btn ${isFavorited ? 'favorited' : ''}" 
@@ -263,12 +302,165 @@ export class SearchManager {
           <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(result.url)}">
             <span>复制</span>
           </button>
+          ${showStatus ? `
+            <button class="action-btn status-btn" data-action="recheck" data-result-id="${result.id}" 
+                    title="重新检查状态">
+              <span>🔄</span>
+            </button>
+            <button class="action-btn info-btn" data-action="status" data-result-id="${result.id}" 
+                    title="查看详细状态">
+              <span>ℹ️</span>
+            </button>
+          ` : ''}
         </div>
       </div>
     `;
   }
 
-  // 打开搜索结果
+  // 🆕 新增：获取状态CSS类
+  getStatusClass(status) {
+    switch (status) {
+      case 'online': return 'status-online';
+      case 'offline': return 'status-offline';
+      case 'error': return 'status-error';
+      case 'timeout': return 'status-timeout';
+      case 'checking': return 'status-checking';
+      default: return 'status-unknown';
+    }
+  }
+
+  // 🆕 新增：获取状态文本
+  getStatusText(status, available) {
+    if (available === true) return '可用';
+    if (available === false) {
+      switch (status) {
+        case 'timeout': return '超时';
+        case 'error': return '错误';
+        case 'offline': return '离线';
+        default: return '不可用';
+      }
+    }
+    return '未检查';
+  }
+
+  // 🆕 新增：重新检查单个搜索源状态
+  async recheckSourceStatus(resultId) {
+    const result = this.currentResults.find(r => r.id === resultId);
+    if (!result) return;
+
+    const resultElement = document.querySelector(`[data-id="${resultId}"]`);
+    if (resultElement) {
+      // 显示检查中状态
+      const statusElement = resultElement.querySelector('.result-status');
+      if (statusElement) {
+        statusElement.className = 'result-status status-checking';
+        statusElement.querySelector('.status-text').textContent = '检查中...';
+      }
+    }
+
+    try {
+      // 创建源对象进行检查
+      const sourceToCheck = {
+        id: result.source,
+        name: result.title,
+        urlTemplate: result.url.replace(encodeURIComponent(result.keyword), '{keyword}'),
+        icon: result.icon
+      };
+
+      const checkedSources = await searchService.checkSourcesAvailability([sourceToCheck], {
+        showProgress: false,
+        useCache: false // 强制重新检查
+      });
+
+      if (checkedSources.length > 0) {
+        const checkedResult = checkedSources[0];
+        
+        // 更新结果数据
+        Object.assign(result, {
+          available: checkedResult.available,
+          status: checkedResult.status,
+          responseTime: checkedResult.responseTime,
+          lastChecked: checkedResult.lastChecked
+        });
+
+        // 更新显示
+        this.updateResultStatus(resultId, checkedResult);
+        
+        const statusText = this.getStatusText(checkedResult.status, checkedResult.available);
+        showToast(`${result.title}: ${statusText}`, checkedResult.available ? 'success' : 'warning');
+      }
+    } catch (error) {
+      console.error('重新检查状态失败:', error);
+      showToast('状态检查失败', 'error');
+      
+      // 恢复未知状态
+      if (resultElement) {
+        const statusElement = resultElement.querySelector('.result-status');
+        if (statusElement) {
+          statusElement.className = 'result-status status-unknown';
+          statusElement.querySelector('.status-text').textContent = '检查失败';
+        }
+      }
+    }
+  }
+
+  // 🆕 新增：更新结果状态显示
+  updateResultStatus(resultId, statusData) {
+    const resultElement = document.querySelector(`[data-id="${resultId}"]`);
+    if (!resultElement) return;
+
+    const statusElement = resultElement.querySelector('.result-status');
+    if (statusElement) {
+      const statusClass = this.getStatusClass(statusData.status);
+      const statusText = this.getStatusText(statusData.status, statusData.available);
+      
+      statusElement.className = `result-status ${statusClass}`;
+      statusElement.querySelector('.status-text').textContent = statusText;
+      
+      const responseTimeElement = statusElement.querySelector('.response-time');
+      if (responseTimeElement) {
+        responseTimeElement.textContent = statusData.responseTime ? `${statusData.responseTime}ms` : '';
+      }
+    }
+
+    // 更新访问按钮状态
+    const visitBtn = resultElement.querySelector('.visit-btn');
+    if (visitBtn) {
+      if (statusData.available === false) {
+        visitBtn.classList.add('disabled');
+        visitBtn.disabled = true;
+        visitBtn.title = '搜索源当前不可用';
+      } else {
+        visitBtn.classList.remove('disabled');
+        visitBtn.disabled = false;
+        visitBtn.title = '';
+      }
+    }
+
+    // 更新整个结果项的类
+    if (statusData.available === false) {
+      resultElement.classList.add('result-unavailable');
+    } else {
+      resultElement.classList.remove('result-unavailable');
+    }
+  }
+
+  // 🆕 新增：显示详细状态信息
+  showSourceStatus(resultId) {
+    const result = this.currentResults.find(r => r.id === resultId);
+    if (!result) return;
+
+    const statusInfo = `
+搜索源: ${result.title}
+状态: ${this.getStatusText(result.status, result.available)}
+响应时间: ${result.responseTime ? result.responseTime + 'ms' : '未知'}
+最后检查: ${result.lastChecked ? new Date(result.lastChecked).toLocaleString() : '未检查'}
+URL: ${result.url}
+    `.trim();
+
+    alert(statusInfo);
+  }
+
   openResult(url, source) {
     try {
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -283,7 +475,6 @@ export class SearchManager {
     }
   }
 
-  // 复制到剪贴板
   async copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
@@ -307,7 +498,6 @@ export class SearchManager {
     }
   }
 
-  // 切换收藏状态
   async toggleFavorite(resultId) {
     if (!authManager.isAuthenticated()) {
       showToast('请先登录后再收藏', 'error');
@@ -331,7 +521,6 @@ export class SearchManager {
     this.updateFavoriteButtons();
   }
 
-  // 更新收藏按钮状态
   updateFavoriteButtons() {
     const favoriteButtons = document.querySelectorAll('.favorite-btn');
     favoriteButtons.forEach(btn => {
@@ -347,7 +536,6 @@ export class SearchManager {
     });
   }
 
-  // 加载搜索历史
   async loadSearchHistory() {
     if (!authManager.isAuthenticated()) {
       this.searchHistory = [];
@@ -365,19 +553,16 @@ export class SearchManager {
     }
   }
 
-  // 添加到历史记录
   async addToHistory(keyword) {
-	  
-	const settings = await apiService.getUserSettings();
+    const settings = await apiService.getUserSettings();
     const maxHistory = settings.maxHistoryPerUser || 100;
     
-    // 如果超出限制，删除最旧的记录
     if (this.searchHistory.length >= maxHistory) {
         const oldestId = this.searchHistory[this.searchHistory.length - 1].id;
         await apiService.deleteSearchHistory(oldestId);
         this.searchHistory.pop();
     }
-	  
+
     if (!authManager.isAuthenticated()) return;
 
     try {
@@ -409,7 +594,6 @@ export class SearchManager {
     }
   }
 
-  // 🔧 新增：删除单条历史记录
   async deleteHistoryItem(historyId) {
     if (!authManager.isAuthenticated()) {
       showToast('用户未登录', 'error');
@@ -421,13 +605,10 @@ export class SearchManager {
     try {
       showLoading(true);
       
-      // 调用API删除
       await apiService.deleteSearchHistory(historyId);
       
-      // 从本地数组中移除
       this.searchHistory = this.searchHistory.filter(item => item.id !== historyId);
       
-      // 重新渲染历史列表
       this.renderHistory();
       
       showToast('搜索记录已删除', 'success');
@@ -439,7 +620,6 @@ export class SearchManager {
     }
   }
 
-  // 🔧 修改：渲染搜索历史，添加删除按钮
   renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyList = document.getElementById('historyList');
@@ -463,7 +643,6 @@ export class SearchManager {
         </div>`
       ).join('');
 
-      // 绑定历史项点击事件
       historyList.addEventListener('click', (e) => {
         const historyItem = e.target.closest('.history-item');
         const deleteBtn = e.target.closest('.history-delete-btn');
@@ -480,7 +659,6 @@ export class SearchManager {
     }
   }
 
-  // 从历史记录搜索
   searchFromHistory(keyword) {
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
@@ -489,7 +667,6 @@ export class SearchManager {
     }
   }
 
-  // 清空搜索历史
   async clearAllHistory() {
     if (!authManager.isAuthenticated()) {
       showToast('用户未登录', 'error');
@@ -514,7 +691,6 @@ export class SearchManager {
     }
   }
 
-  // 清空搜索结果
   clearResults() {
     const resultsSection = document.getElementById('resultsSection');
     const resultsContainer = document.getElementById('results');
@@ -530,7 +706,6 @@ export class SearchManager {
     showToast('搜索结果已清除', 'success');
   }
 
-  // 导出搜索结果
   async exportResults() {
     if (this.currentResults.length === 0) {
       showToast('没有搜索结果可以导出', 'error');
@@ -564,7 +739,6 @@ export class SearchManager {
     }
   }
 
-  // 处理搜索输入
   handleSearchInput(value) {
     if (value.length > 0) {
       this.showSearchSuggestions(value);
@@ -573,7 +747,6 @@ export class SearchManager {
     }
   }
 
-  // 显示搜索建议
   showSearchSuggestions(query) {
     if (!query || typeof query !== 'string') return;
     
@@ -581,7 +754,6 @@ export class SearchManager {
     this.renderSearchSuggestions(suggestions);
   }
 
-  // 渲染搜索建议
   renderSearchSuggestions(suggestions) {
     let suggestionsContainer = document.getElementById('searchSuggestions');
     
@@ -611,7 +783,6 @@ export class SearchManager {
       `;
     }).join('');
     
-    // 绑定建议点击事件
     suggestionsContainer.addEventListener('click', (e) => {
       const suggestionItem = e.target.closest('.suggestion-item');
       if (suggestionItem) {
@@ -623,7 +794,6 @@ export class SearchManager {
     suggestionsContainer.style.display = 'block';
   }
 
-  // 隐藏搜索建议
   hideSearchSuggestions() {
     const suggestionsContainer = document.getElementById('searchSuggestions');
     if (suggestionsContainer) {
@@ -631,7 +801,6 @@ export class SearchManager {
     }
   }
 
-  // 隐藏快速提示
   hideQuickTips() {
     const quickTips = document.getElementById('quickTips');
     if (quickTips) {
@@ -640,6 +809,5 @@ export class SearchManager {
   }
 }
 
-// 创建全局实例
 export const searchManager = new SearchManager();
 export default searchManager;

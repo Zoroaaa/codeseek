@@ -362,83 +362,158 @@
                 </div>
             </div>
 
-            <!-- 系统设置标签页（简化版） -->
-            <div id="settings" class="tab-content">
-                <div class="tab-header">
-                    <h1>系统设置</h1>
-                    <p>配置系统基本设置和个人偏好</p>
-                </div>
-
-                <div class="settings-sections">
-                    <!-- 基本设置 -->
-                    <div class="settings-section">
-                        <h3>基本设置</h3>
-                        <div class="setting-item">
-                            <label>主题模式</label>
-                            <div class="setting-control">
-                                <select id="themeMode">
-                                    <option value="auto">跟随系统</option>
-                                    <option value="light">浅色模式</option>
-                                    <option value="dark">深色模式</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>搜索历史保留</label>
-                            <div class="setting-control">
-                                <select id="historyRetention">
-                                    <option value="30">30天</option>
-                                    <option value="90" selected>90天</option>
-                                    <option value="365">1年</option>
-                                    <option value="-1">永久保留</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>最大收藏数量</label>
-                            <div class="setting-control">
-                                <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
-                                <span class="setting-desc">收藏夹最大容量限制</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 隐私设置 -->
-                    <div class="settings-section">
-                        <h3>隐私设置</h3>
-                        <div class="setting-item">
-                            <label>行为统计</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="allowAnalytics" checked>
-                                <span class="setting-desc">允许收集匿名使用统计，帮助改进产品</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label>搜索建议</label>
-                            <div class="setting-control">
-                                <input type="checkbox" id="searchSuggestions" checked>
-                                <span class="setting-desc">基于历史记录提供搜索建议</span>
-                            </div>
-                        </div>
-                    </div>
-
-<!-- 账户操作区域 - 修复后版本 -->
-<div class="settings-section">
-    <h3>账户操作</h3>
-    <div class="dangerous-actions">
-        <button class="btn-warning" id="changePasswordBtn">修改密码</button>
-        <button class="btn-danger" id="clearAllDataBtn">清空所有数据</button>
-        <button class="btn-danger" id="deleteAccountBtn">删除账户</button>
+<!-- Dashboard设置页面中的系统设置标签页 - 添加搜索源状态检查设置 -->
+<div id="settings" class="tab-content">
+    <div class="tab-header">
+        <h1>系统设置</h1>
+        <p>配置系统基本设置和个人偏好</p>
     </div>
-</div>
 
-<!-- 保存设置区域 - 修复后版本 -->
-<div class="settings-actions">
-    <button class="btn-primary" id="saveSettingsBtn">保存设置</button>
-    <button class="btn-secondary" id="resetSettingsBtn">重置默认</button>
-</div>
+    <div class="settings-sections">
+        <!-- 基本设置 -->
+        <div class="settings-section">
+            <h3>基本设置</h3>
+            <div class="setting-item">
+                <label>主题模式</label>
+                <div class="setting-control">
+                    <select id="themeMode">
+                        <option value="auto">跟随系统</option>
+                        <option value="light">浅色模式</option>
+                        <option value="dark">深色模式</option>
+                    </select>
                 </div>
             </div>
+            <div class="setting-item">
+                <label>搜索历史保留</label>
+                <div class="setting-control">
+                    <select id="historyRetention">
+                        <option value="30">30天</option>
+                        <option value="90" selected>90天</option>
+                        <option value="365">1年</option>
+                        <option value="-1">永久保留</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-item">
+                <label>最大收藏数量</label>
+                <div class="setting-control">
+                    <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
+                    <span class="setting-desc">收藏夹最大容量限制</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🆕 新增：搜索源状态检查设置 -->
+        <div class="settings-section status-check-settings">
+            <h4>🔍 搜索源状态检查</h4>
+            <p style="margin-bottom: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+                启用此功能可在搜索前检查搜索源的可用性，提供更准确的搜索结果，但可能增加搜索时间。
+            </p>
+
+            <div class="setting-group">
+                <h5>启用状态检查</h5>
+                <div class="setting-row">
+                    <label class="setting-label">启用搜索源状态检查</label>
+                    <div class="setting-input">
+                        <input type="checkbox" id="enableSourceStatusCheck">
+                        <span class="setting-help">开启后会在搜索前检查每个搜索源的可用性</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <h5>检查参数</h5>
+                <div class="setting-row">
+                    <label class="setting-label">检查超时时间</label>
+                    <div class="setting-input">
+                        <input type="number" id="sourceCheckTimeout" min="1" max="30" step="1" value="8">
+                        <span class="setting-help">单个搜索源状态检查的超时时间（秒）</span>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <label class="setting-label">状态缓存时间</label>
+                    <div class="setting-input">
+                        <input type="number" id="sourceStatusCacheDuration" min="60" max="3600" step="60" value="300">
+                        <span class="setting-help">搜索源状态缓存有效期（秒），避免频繁检查</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <h5>搜索行为</h5>
+                <div class="setting-row">
+                    <label class="setting-label">跳过不可用搜索源</label>
+                    <div class="setting-input">
+                        <input type="checkbox" id="skipUnavailableSources" checked>
+                        <span class="setting-help">搜索结果中只显示可用的搜索源</span>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <label class="setting-label">显示搜索源状态</label>
+                    <div class="setting-input">
+                        <input type="checkbox" id="showSourceStatus" checked>
+                        <span class="setting-help">在搜索结果中显示搜索源的状态信息</span>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <label class="setting-label">重试失败的搜索源</label>
+                    <div class="setting-input">
+                        <input type="checkbox" id="retryFailedSources">
+                        <span class="setting-help">当搜索源检查失败时是否自动重试</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 测试按钮 -->
+            <button type="button" class="test-status-check-btn" onclick="app.getManager('settings').testSourceStatusCheck()">
+                <span>⚡</span>
+                <span>测试状态检查功能</span>
+            </button>
+
+            <!-- 状态检查进度指示器 -->
+            <div id="statusCheckProgress" class="status-check-progress">
+                <div class="progress-spinner"></div>
+                <div class="progress-text">正在检查搜索源状态...</div>
+                <div class="progress-stats">0/0</div>
+            </div>
+        </div>
+
+        <!-- 隐私设置 -->
+        <div class="settings-section">
+            <h3>隐私设置</h3>
+            <div class="setting-item">
+                <label>行为统计</label>
+                <div class="setting-control">
+                    <input type="checkbox" id="allowAnalytics" checked>
+                    <span class="setting-desc">允许收集匿名使用统计，帮助改进产品</span>
+                </div>
+            </div>
+            <div class="setting-item">
+                <label>搜索建议</label>
+                <div class="setting-control">
+                    <input type="checkbox" id="searchSuggestions" checked>
+                    <span class="setting-desc">基于历史记录提供搜索建议</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 账户操作区域 -->
+        <div class="settings-section">
+            <h3>账户操作</h3>
+            <div class="dangerous-actions">
+                <button class="btn-warning" id="changePasswordBtn">修改密码</button>
+                <button class="btn-danger" id="clearAllDataBtn">清空所有数据</button>
+                <button class="btn-danger" id="deleteAccountBtn">删除账户</button>
+            </div>
+        </div>
+
+        <!-- 保存设置区域 -->
+        <div class="settings-actions">
+            <button class="btn-primary" id="saveSettingsBtn">保存设置</button>
+            <button class="btn-secondary" id="resetSettingsBtn">重置默认</button>
+        </div>
+    </div>
+</div>
 
             <!-- 统计标签页 -->
             <div id="stats" class="tab-content">
