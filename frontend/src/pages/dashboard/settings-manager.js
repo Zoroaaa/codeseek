@@ -235,14 +235,14 @@ export class SettingsManager {
     if (elements.enableSourceStatusCheck) {
       settings.enableSourceStatusCheck = elements.enableSourceStatusCheck.checked;
     }
-// 🆕🆕🆕 加载设置时转换为秒显示
+// 🆕🆕🆕 
 if (elements.sourceCheckTimeout) {
-    // 后端存储的是毫秒，转换为秒显示
-    elements.sourceCheckTimeout.value = Math.round((settings.sourceStatusCheckTimeout || 8000) / 1000);
+    // 后端存储的是毫秒
+    elements.sourceCheckTimeout.value = settings.sourceStatusCheckTimeout || 8000;
 }
 if (elements.sourceStatusCacheDuration) {
-    // 后端存储的是毫秒，转换为秒显示
-    elements.sourceStatusCacheDuration.value = Math.round((settings.sourceStatusCacheDuration || 300000) / 1000);
+    // 后端存储的是毫秒
+    elements.sourceStatusCacheDuration.value = settings.sourceStatusCacheDuration || 300000;
 }
     if (elements.skipUnavailableSources) {
       settings.skipUnavailableSources = elements.skipUnavailableSources.checked;

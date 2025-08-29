@@ -407,7 +407,7 @@ if (validSettings.sourceStatusCheckTimeout !== undefined) {
     
     // 验证毫秒范围
     if (isNaN(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
-        throw new Error('搜索源检查超时时间格式错误：必须是1-30秒（1000-30000毫秒）');
+        throw new Error('搜索源检查超时时间格式错误：必须是1000-30000毫秒');
     }
     // 存储毫秒值
     validSettings.sourceStatusCheckTimeout = timeoutMs;
@@ -419,7 +419,7 @@ if (validSettings.sourceStatusCacheDuration !== undefined) {
     
     // 验证毫秒范围
     if (isNaN(durationMs) || durationMs < 60000 || durationMs > 3600000) {
-        throw new Error('搜索源状态缓存时间格式错误：必须是60-3600秒（60000-3600000毫秒）');
+        throw new Error('搜索源状态缓存时间格式错误：必须是60000-3600000毫秒');
     }
     // 存储毫秒值
     validSettings.sourceStatusCacheDuration = durationMs;
