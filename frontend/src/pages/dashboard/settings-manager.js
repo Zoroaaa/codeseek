@@ -195,6 +195,8 @@ export class SettingsManager {
       }
       
       showToast('设置保存成功', 'success');
+	  console.log('保存前的用户输入:', settings.sourceStatusCheckTimeout, settings.sourceStatusCacheDuration);
+
       this.markSettingsSaved();
     } catch (error) {
       console.error('保存设置失败:', error);
