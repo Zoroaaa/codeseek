@@ -1,4 +1,4 @@
-// 搜索服务模块 - 修复版本
+// 搜索服务模块 - 支持搜索源状态检查功能
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
@@ -11,9 +11,15 @@ class SearchService {
     this.searchCache = new Map();
     this.cacheExpiration = APP_CONSTANTS.API.CACHE_DURATION;
     this.userSettings = null; // 缓存用户设置
+    
+    // 🆕 搜索源状态检查相关
+    this.statusCache = new Map();
+    this.statusCheckInProgress = new Set();
+    this.statusCheckTimeout = APP_CONSTANTS.API.SOURCE_CHECK_TIMEOUT;
+    this.statusCacheDuration = APP_CONSTANTS.API.SOURCE_STATUS_CACHE_DURATION;
   }
 
-  // 🔧 修复：执行搜索 - 从用户设置获取缓存配置
+  // 执行搜索 - 支持搜索源状态检查
   async performSearch(keyword, options = {}) {
     // 验证搜索关键词
     const validation = validateSearchKeyword(keyword);
@@ -21,15 +27,13 @@ class SearchService {
       throw new Error(validation.errors[0]);
     }
 
-    // 🔧 修复：从用户设置获取缓存配置而不是前端元素
+    // 从用户设置或选项获取配置
     let useCache = options.useCache;
     if (useCache === undefined) {
-      // 如果没有明确指定，从用户设置获取
       try {
         if (authManager.isAuthenticated()) {
           const userSettings = await this.getUserSettings();
-          // 注意：由于前端已移除缓存设置，这里总是默认启用缓存
-          useCache = true; // 总是启用缓存以提升性能
+          useCache = true; // 总是启用搜索结果缓存以提升性能
         } else {
           useCache = true; // 未登录用户也启用缓存
         }
@@ -41,7 +45,7 @@ class SearchService {
 
     const { saveToHistory = true } = options;
 
-    // 检查缓存
+    // 检查搜索结果缓存
     if (useCache) {
       const cached = this.getCachedResults(keyword);
       if (cached) {
@@ -50,8 +54,24 @@ class SearchService {
       }
     }
 
-    // 构建搜索结果（现在会根据用户设置过滤搜索源）
-    const results = await this.buildSearchResults(keyword);
+    // 🆕 获取用户的搜索源状态检查设置
+    let shouldCheckStatus = false;
+    let userSettings = null;
+    
+    try {
+      if (authManager.isAuthenticated()) {
+        userSettings = await this.getUserSettings();
+        shouldCheckStatus = userSettings.checkSourceStatus === true;
+      }
+    } catch (error) {
+      console.warn('获取状态检查设置失败:', error);
+    }
+
+    // 构建搜索结果
+    const results = await this.buildSearchResults(keyword, {
+      checkStatus: shouldCheckStatus,
+      userSettings
+    });
 
     // 缓存结果
     if (useCache) {
@@ -66,7 +86,7 @@ class SearchService {
     return results;
   }
   
-  // 🔧 修复：统一的用户设置获取方法
+  // 统一的用户设置获取方法
   async getUserSettings() {
     if (!this.userSettings || Date.now() - this.userSettings.timestamp > 60000) {
       try {
@@ -83,13 +103,13 @@ class SearchService {
     return this.userSettings.data;
   }
   
-  // 🔧 新增：清除用户设置缓存（当用户更改设置后调用）
+  // 清除用户设置缓存（当用户更改设置后调用）
   clearUserSettingsCache() {
     this.userSettings = null;
     console.log('用户设置缓存已清除');
   }
   
-  // 🔧 修复：获取用户设置的搜索源
+  // 获取用户启用的搜索源
   async getEnabledSearchSources() {
     try {
       // 如果用户未登录，使用默认搜索源
@@ -106,7 +126,6 @@ class SearchService {
         userSettings = await this.getUserSettings();
       } catch (error) {
         console.error('获取用户设置失败，使用默认搜索源:', error);
-        // 如果获取失败，使用默认搜索源
         const defaultSources = ['javbus', 'javdb', 'javlibrary'];
         return APP_CONSTANTS.SEARCH_SOURCES.filter(
           source => defaultSources.includes(source.id)
@@ -115,7 +134,7 @@ class SearchService {
 
       const enabledSources = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary'];
       
-      // 🔧 新增：验证搜索源ID的有效性
+      // 验证搜索源ID的有效性
       const validSources = enabledSources.filter(sourceId => 
         APP_CONSTANTS.SEARCH_SOURCES.some(source => source.id === sourceId)
       );
@@ -128,15 +147,19 @@ class SearchService {
         );
       }
       
-      // 过滤出用户启用的搜索源
-      const filteredSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
+      // 合并内置搜索源和自定义搜索源
+      const builtinSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
+        source => validSources.includes(source.id)
+      );
+      
+      const customSources = userSettings.customSearchSources || [];
+      const enabledCustomSources = customSources.filter(
         source => validSources.includes(source.id)
       );
 
-      return filteredSources;
+      return [...builtinSources, ...enabledCustomSources];
     } catch (error) {
       console.error('获取搜索源配置失败:', error);
-      // 🔧 增强错误处理：出错时返回默认搜索源
       const defaultSources = ['javbus', 'javdb', 'javlibrary'];
       return APP_CONSTANTS.SEARCH_SOURCES.filter(
         source => defaultSources.includes(source.id)
@@ -144,10 +167,11 @@ class SearchService {
     }
   }
 
-  // 🔧 修复：构建搜索结果 - 使用用户选择的搜索源
-  async buildSearchResults(keyword) {
+  // 🆕 构建搜索结果 - 支持搜索源状态检查
+  async buildSearchResults(keyword, options = {}) {
     const encodedKeyword = encodeURIComponent(keyword);
     const timestamp = Date.now();
+    const { checkStatus = false, userSettings = null } = options;
     
     try {
       // 获取用户启用的搜索源
@@ -155,19 +179,47 @@ class SearchService {
       
       console.log(`使用 ${enabledSources.length} 个搜索源:`, enabledSources.map(s => s.name));
       
-      return enabledSources.map(source => ({
-        id: `result_${keyword}_${source.id}_${timestamp}`,
-        title: source.name,
-        subtitle: source.subtitle,
-        url: source.urlTemplate.replace('{keyword}', encodedKeyword),
-        icon: source.icon,
-        keyword: keyword,
-        timestamp: timestamp,
-        source: source.id
-      }));
+      // 🆕 如果启用了状态检查，先检查搜索源状态
+      let sourcesWithStatus = enabledSources;
+      if (checkStatus && userSettings) {
+        console.log('开始检查搜索源状态...');
+        sourcesWithStatus = await this.checkSourcesStatus(enabledSources, userSettings);
+        
+        // 根据用户设置决定是否跳过不可用的搜索源
+        if (userSettings.skipUnavailableSources) {
+          const availableSources = sourcesWithStatus.filter(
+            source => source.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ||
+                     source.status === APP_CONSTANTS.SOURCE_STATUS.UNKNOWN
+          );
+          console.log(`跳过不可用搜索源，剩余 ${availableSources.length} 个可用源`);
+          sourcesWithStatus = availableSources;
+        }
+      }
+      
+      return sourcesWithStatus.map(source => {
+        const result = {
+          id: `result_${keyword}_${source.id}_${timestamp}`,
+          title: source.name,
+          subtitle: source.subtitle,
+          url: source.urlTemplate.replace('{keyword}', encodedKeyword),
+          icon: source.icon,
+          keyword: keyword,
+          timestamp: timestamp,
+          source: source.id
+        };
+        
+        // 🆕 如果进行了状态检查，添加状态信息
+        if (checkStatus && source.status) {
+          result.status = source.status;
+          result.statusText = this.getStatusText(source.status);
+          result.lastChecked = source.lastChecked;
+        }
+        
+        return result;
+      });
     } catch (error) {
       console.error('构建搜索结果失败:', error);
-      // 🔧 增强错误处理：如果获取搜索源失败，使用默认源
+      // 增强错误处理：如果获取搜索源失败，使用默认源
       const defaultSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
         source => ['javbus', 'javdb', 'javlibrary'].includes(source.id)
       );
@@ -183,6 +235,227 @@ class SearchService {
         source: source.id
       }));
     }
+  }
+
+  // 🆕 检查搜索源状态
+  async checkSourcesStatus(sources, userSettings) {
+    const timeout = (userSettings.sourceStatusCheckTimeout || 8) * 1000;
+    const cacheDuration = (userSettings.sourceStatusCacheDuration || 300) * 1000;
+    const concurrentChecks = APP_CONSTANTS.SOURCE_STATUS_CHECK.CONCURRENT_CHECKS;
+    
+    console.log(`开始检查 ${sources.length} 个搜索源状态，超时时间: ${timeout}ms, 缓存时间: ${cacheDuration}ms`);
+    
+    const sourcesWithStatus = [];
+    
+    // 分批并发检查
+    for (let i = 0; i < sources.length; i += concurrentChecks) {
+      const batch = sources.slice(i, i + concurrentChecks);
+      const batchPromises = batch.map(source => this.checkSingleSourceStatus(source, timeout, cacheDuration));
+      
+      try {
+        const batchResults = await Promise.allSettled(batchPromises);
+        
+        batchResults.forEach((result, index) => {
+          const source = batch[index];
+          if (result.status === 'fulfilled') {
+            sourcesWithStatus.push({ ...source, ...result.value });
+          } else {
+            console.warn(`检查搜索源 ${source.name} 状态失败:`, result.reason);
+            sourcesWithStatus.push({
+              ...source,
+              status: APP_CONSTANTS.SOURCE_STATUS.ERROR,
+              lastChecked: Date.now(),
+              error: result.reason?.message || '检查失败'
+            });
+          }
+        });
+      } catch (error) {
+        console.error('批量检查搜索源状态失败:', error);
+        // 添加未检查的源
+        batch.forEach(source => {
+          sourcesWithStatus.push({
+            ...source,
+            status: APP_CONSTANTS.SOURCE_STATUS.ERROR,
+            lastChecked: Date.now(),
+            error: '批量检查失败'
+          });
+        });
+      }
+    }
+    
+    console.log('搜索源状态检查完成');
+    return sourcesWithStatus;
+  }
+
+  // 🆕 检查单个搜索源状态
+  async checkSingleSourceStatus(source, timeout, cacheDuration) {
+    const cacheKey = `status_${source.id}`;
+    const now = Date.now();
+    
+    // 检查缓存
+    if (this.statusCache.has(cacheKey)) {
+      const cached = this.statusCache.get(cacheKey);
+      if (now - cached.timestamp < cacheDuration) {
+        console.log(`使用缓存状态: ${source.name} - ${cached.status}`);
+        return {
+          status: cached.status,
+          lastChecked: cached.timestamp,
+          fromCache: true
+        };
+      } else {
+        // 缓存过期
+        this.statusCache.delete(cacheKey);
+      }
+    }
+    
+    // 防止重复检查
+    if (this.statusCheckInProgress.has(source.id)) {
+      console.log(`跳过重复检查: ${source.name}`);
+      return {
+        status: APP_CONSTANTS.SOURCE_STATUS.CHECKING,
+        lastChecked: now
+      };
+    }
+    
+    this.statusCheckInProgress.add(source.id);
+    
+    try {
+      // 构造测试URL（使用通用关键词）
+      const testUrl = source.urlTemplate.replace('{keyword}', 'test');
+      
+      console.log(`检查搜索源状态: ${source.name} - ${testUrl}`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      
+      try {
+        const response = await fetch(testUrl, {
+          method: 'HEAD', // 使用HEAD方法减少带宽
+          signal: controller.signal,
+          headers: {
+            'User-Agent': APP_CONSTANTS.SOURCE_STATUS_CHECK.USER_AGENT
+          },
+          redirect: 'follow'
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const status = response.ok ? 
+          APP_CONSTANTS.SOURCE_STATUS.AVAILABLE : 
+          APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE;
+        
+        const statusInfo = {
+          status,
+          lastChecked: now,
+          httpStatus: response.status,
+          responseTime: Date.now() - now
+        };
+        
+        // 缓存结果
+        this.statusCache.set(cacheKey, {
+          ...statusInfo,
+          timestamp: now
+        });
+        
+        console.log(`搜索源状态检查完成: ${source.name} - ${status} (${response.status})`);
+        
+        return statusInfo;
+        
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          console.warn(`搜索源状态检查超时: ${source.name}`);
+          const statusInfo = {
+            status: APP_CONSTANTS.SOURCE_STATUS.TIMEOUT,
+            lastChecked: now,
+            error: '检查超时'
+          };
+          
+          // 缓存超时结果（较短时间）
+          this.statusCache.set(cacheKey, {
+            ...statusInfo,
+            timestamp: now
+          });
+          
+          return statusInfo;
+        } else {
+          throw fetchError;
+        }
+      }
+      
+    } catch (error) {
+      console.error(`检查搜索源 ${source.name} 状态失败:`, error);
+      
+      const statusInfo = {
+        status: APP_CONSTANTS.SOURCE_STATUS.ERROR,
+        lastChecked: now,
+        error: error.message
+      };
+      
+      // 缓存错误结果（较短时间）
+      this.statusCache.set(cacheKey, {
+        ...statusInfo,
+        timestamp: now
+      });
+      
+      return statusInfo;
+      
+    } finally {
+      this.statusCheckInProgress.delete(source.id);
+    }
+  }
+
+  // 🆕 获取状态文本描述
+  getStatusText(status) {
+    const statusTexts = {
+      [APP_CONSTANTS.SOURCE_STATUS.UNKNOWN]: '未知',
+      [APP_CONSTANTS.SOURCE_STATUS.CHECKING]: '检查中',
+      [APP_CONSTANTS.SOURCE_STATUS.AVAILABLE]: '可用',
+      [APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE]: '不可用',
+      [APP_CONSTANTS.SOURCE_STATUS.TIMEOUT]: '超时',
+      [APP_CONSTANTS.SOURCE_STATUS.ERROR]: '错误'
+    };
+    
+    return statusTexts[status] || '未知';
+  }
+
+  // 🆕 手动检查所有搜索源状态（用于测试功能）
+  async checkAllSourcesStatus() {
+    try {
+      const userSettings = await this.getUserSettings();
+      const enabledSources = await this.getEnabledSearchSources();
+      
+      console.log('手动检查所有搜索源状态...');
+      
+      // 清除缓存以强制重新检查
+      this.statusCache.clear();
+      
+      const sourcesWithStatus = await this.checkSourcesStatus(enabledSources, userSettings);
+      
+      // 返回状态摘要
+      const statusSummary = {
+        total: sourcesWithStatus.length,
+        available: sourcesWithStatus.filter(s => s.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE).length,
+        unavailable: sourcesWithStatus.filter(s => s.status === APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE).length,
+        timeout: sourcesWithStatus.filter(s => s.status === APP_CONSTANTS.SOURCE_STATUS.TIMEOUT).length,
+        error: sourcesWithStatus.filter(s => s.status === APP_CONSTANTS.SOURCE_STATUS.ERROR).length,
+        sources: sourcesWithStatus
+      };
+      
+      console.log('所有搜索源状态检查完成:', statusSummary);
+      
+      return statusSummary;
+    } catch (error) {
+      console.error('检查所有搜索源状态失败:', error);
+      throw error;
+    }
+  }
+
+  // 🆕 清除搜索源状态缓存
+  clearSourceStatusCache() {
+    this.statusCache.clear();
+    console.log('搜索源状态缓存已清除');
   }
 
   // 获取缓存结果
@@ -248,19 +521,44 @@ class SearchService {
     console.log('搜索缓存已清理');
   }
 
+  // 🆕 清理所有缓存
+  clearAllCache() {
+    this.searchCache.clear();
+    this.statusCache.clear();
+    console.log('所有缓存已清理');
+  }
+
   // 获取缓存统计
   getCacheStats() {
     const stats = {
-      size: this.searchCache.size,
-      items: []
+      searchCache: {
+        size: this.searchCache.size,
+        items: []
+      },
+      statusCache: {
+        size: this.statusCache.size,
+        items: []
+      }
     };
     
+    // 搜索结果缓存统计
     for (const [keyword, data] of this.searchCache) {
-      stats.items.push({
+      stats.searchCache.items.push({
         keyword,
         timestamp: data.timestamp,
         age: Date.now() - data.timestamp,
         expired: Date.now() - data.timestamp > this.cacheExpiration
+      });
+    }
+    
+    // 搜索源状态缓存统计
+    for (const [sourceId, data] of this.statusCache) {
+      stats.statusCache.items.push({
+        sourceId,
+        status: data.status,
+        timestamp: data.timestamp,
+        age: Date.now() - data.timestamp,
+        expired: Date.now() - data.timestamp > this.statusCacheDuration
       });
     }
     
