@@ -14,8 +14,11 @@ class SearchService {
     this.cacheExpiration = APP_CONSTANTS.API.CACHE_DURATION;
     this.userSettings = null;
     
-    // 使用增强的搜索源检查器
-    this.sourceChecker = new AdvancedSourceChecker();
+    // 替换原有的检查器
+    this.advancedChecker = new AdvancedSourceChecker();
+    
+    // 创建高级UI实例
+    this.advancedUI = new AdvancedSearchUI(this);
   }
 
   /**
@@ -23,36 +26,50 @@ class SearchService {
    */
   async checkSourcesAvailability(sources, options = {}) {
     const { 
-      timeout = 10000, 
+      timeout = 15000, 
       showProgress = true,
       useCache = true,
-      strategy = 'comprehensive', // comprehensive, basic, fast
+      strategy = 'functional', // basic, functional, content, deep
+      keyword = null,
       parallel = true
     } = options;
     
+    // 将strategy映射到检查级别
+    const levelMapping = {
+      'basic': this.advancedChecker.checkLevels.BASIC,
+      'functional': this.advancedChecker.checkLevels.FUNCTIONAL,
+      'content': this.advancedChecker.checkLevels.CONTENT,
+      'comprehensive': this.advancedChecker.checkLevels.DEEP,
+      'deep': this.advancedChecker.checkLevels.DEEP
+    };
+    
+    const checkLevel = levelMapping[strategy] || this.advancedChecker.checkLevels.FUNCTIONAL;
+    
     try {
-      return await this.sourceChecker.checkSourcesAvailability(sources, {
+      return await this.advancedChecker.checkSourcesWithLevels(sources, {
+        level: checkLevel,
+        keyword,
         timeout,
-        showProgress,
         useCache,
-        strategy,
+        showProgress,
         parallel
       });
     } catch (error) {
-      console.error('搜索源可用性检查失败:', error);
+      console.error('高级搜索源检查失败:', error);
       
       if (showProgress) {
-        showToast('搜索源检查失败，将使用所有配置的搜索源', 'warning');
+        showToast('搜索源检查失败，使用基础检查模式', 'warning');
       }
       
       // 降级处理：返回所有源但标记为未检查
       return sources.map(source => ({
         ...source,
         available: true, // 假设可用以免影响搜索
-        status: 'unchecked',
+        availabilityLevel: '未检查',
+        availabilityColor: '#6b7280',
+        availabilityRank: 3,
         error: '检查器故障',
-        lastChecked: Date.now(),
-        reliability: 0.5 // 中等可靠性
+        lastChecked: Date.now()
       }));
     }
   }
@@ -62,16 +79,17 @@ class SearchService {
    */
   async filterOptimalSources(checkedSources, options = {}) {
     const {
-      minReliability = 0.3,    // 最低可靠性阈值
-      maxSources = 10,         // 最大搜索源数量
-      preferFastSources = true, // 优先选择快速响应的源
-      includePartial = true     // 是否包含部分可用的源
+      minReliability = 0.3,
+      maxSources = 12,
+      preferFastSources = true,
+      includePartial = true,
+      prioritizeContentMatch = false
     } = options;
 
     let filteredSources = checkedSources.filter(source => {
       // 基本可用性过滤
       if (!source.available && !includePartial) return false;
-      if (source.status === 'error') return false;
+      if (source.availabilityRank <= 1) return false; // 过滤故障源
       
       // 可靠性过滤
       if (source.reliability !== undefined && source.reliability < minReliability) {
@@ -83,24 +101,31 @@ class SearchService {
 
     // 按优先级排序
     filteredSources.sort((a, b) => {
-      // 1. 优先考虑完全可用的源
-      if (a.available !== b.available) {
-        return b.available - a.available;
+      // 1. 优先考虑可用性等级
+      if (a.availabilityRank !== b.availabilityRank) {
+        return b.availabilityRank - a.availabilityRank;
       }
       
-      // 2. 可靠性排序
+      // 2. 如果启用内容匹配优先，优先考虑内容匹配度
+      if (prioritizeContentMatch && a.contentScore !== undefined && b.contentScore !== undefined) {
+        if (Math.abs(a.contentScore - b.contentScore) > 0.1) {
+          return b.contentScore - a.contentScore;
+        }
+      }
+      
+      // 3. 可靠性排序
       const reliabilityA = a.reliability || 0.5;
       const reliabilityB = b.reliability || 0.5;
       if (Math.abs(reliabilityA - reliabilityB) > 0.1) {
         return reliabilityB - reliabilityA;
       }
       
-      // 3. 响应时间排序（如果启用快速偏好）
+      // 4. 响应时间排序（如果启用快速优先）
       if (preferFastSources && a.responseTime && b.responseTime) {
         return a.responseTime - b.responseTime;
       }
       
-      // 4. 内置优先级
+      // 5. 内置源优先级
       return (a.priority || 999) - (b.priority || 999);
     });
 
@@ -108,8 +133,21 @@ class SearchService {
     filteredSources = filteredSources.slice(0, maxSources);
     
     console.log(`智能筛选：从 ${checkedSources.length} 个源中选择了 ${filteredSources.length} 个优质源`);
+    console.log('筛选结果分布:', this.getFilteredDistribution(filteredSources));
     
     return filteredSources;
+  }
+  
+    /**
+   * 获取筛选结果分布
+   */
+  getFilteredDistribution(sources) {
+    const distribution = {};
+    sources.forEach(source => {
+      const level = source.availabilityLevel || '未知';
+      distribution[level] = (distribution[level] || 0) + 1;
+    });
+    return distribution;
   }
 
   /**
@@ -124,7 +162,7 @@ class SearchService {
     // 获取用户设置
     let useCache = options.useCache;
     let checkSourceStatus = options.checkSourceStatus;
-    let checkStrategy = options.checkStrategy || 'fast';
+    let checkStrategy = options.checkStrategy || 'functional';
     
     if (useCache === undefined || checkSourceStatus === undefined) {
       try {
@@ -140,7 +178,7 @@ class SearchService {
           if (userSettings.quickSearch === true) {
             checkStrategy = 'basic';
           } else if (userSettings.thoroughCheck === true) {
-            checkStrategy = 'comprehensive';
+            checkStrategy = 'content'; // 使用内容匹配检查
           }
         } else {
           useCache = true;
@@ -169,26 +207,29 @@ class SearchService {
     
     if (checkSourceStatus && enabledSources.length > 0) {
       try {
-        console.log(`开始进行 ${checkStrategy} 级别的搜索源检查...`);
+        console.log(`开始进行 ${checkStrategy} 级别的搜索源检查，关键词: ${keyword}`);
         
         const checkedSources = await this.checkSourcesAvailability(enabledSources, {
           showProgress: true,
           useCache: true,
           strategy: checkStrategy,
-          timeout: checkStrategy === 'fast' ? 5000 : 10000
+          keyword: keyword, // 传递实际搜索关键词
+          timeout: checkStrategy === 'basic' ? 8000 : 15000,
+          parallel: true
         });
         
         // 智能筛选最优搜索源
         const optimalSources = await this.filterOptimalSources(checkedSources, {
-          minReliability: 0.2, // 降低阈值以包含更多源
-          maxSources: 12,
-          preferFastSources: checkStrategy === 'fast',
-          includePartial: true
+          minReliability: 0.2,
+          maxSources: 15,
+          preferFastSources: checkStrategy === 'basic',
+          includePartial: true,
+          prioritizeContentMatch: checkStrategy === 'content' // 优先考虑内容匹配的源
         });
 
         if (optimalSources.length > 0) {
           enabledSources = optimalSources;
-          console.log(`选择了 ${optimalSources.length} 个优质搜索源`);
+          console.log(`智能筛选后使用 ${optimalSources.length} 个优质搜索源`);
         } else {
           console.warn('没有找到合适的搜索源，使用原始配置');
           showToast('搜索源质量检查完成，将显示所有结果', 'info');
@@ -196,7 +237,7 @@ class SearchService {
         
         // 记录检查结果到分析系统
         if (authManager.isAuthenticated()) {
-          await this.recordSourceCheckAnalytics(checkedSources, optimalSources);
+          await this.recordSourceCheckAnalytics(checkedSources, optimalSources, keyword);
         }
         
       } catch (error) {
@@ -206,7 +247,7 @@ class SearchService {
     }
 
     // 构建搜索结果
-    const results = this.buildSearchResultsFromSources(keyword, enabledSources);
+    const results = this.buildAdvancedSearchResults(keyword, enabledSources);
 
     // 缓存结果
     if (useCache) {
@@ -220,6 +261,62 @@ class SearchService {
 
     return results;
   }
+  
+    /**
+   * 构建高级搜索结果 - 包含详细的源信息
+   */
+  buildAdvancedSearchResults(keyword, sources) {
+    const encodedKeyword = encodeURIComponent(keyword);
+    const timestamp = Date.now();
+    
+    return sources.map(source => ({
+      id: `result_${keyword}_${source.id}_${timestamp}`,
+      title: source.name,
+      subtitle: source.subtitle,
+      url: source.urlTemplate.replace('{keyword}', encodedKeyword),
+      icon: source.icon,
+      keyword: keyword,
+      timestamp: timestamp,
+      source: source.id,
+      
+      // 高级状态信息
+      available: source.available,
+      availabilityLevel: source.availabilityLevel,
+      availabilityColor: source.availabilityColor,
+      availabilityRank: source.availabilityRank,
+      
+      // 检查详情
+      basicScore: source.basicScore,
+      functionalScore: source.functionalScore,
+      contentScore: source.contentScore,
+      deepScore: source.deepScore,
+      finalScore: source.finalScore,
+      
+      // 内容相关信息
+      contentMatched: source.contentMatched,
+      keywordPresence: source.keywordPresence,
+      estimatedResults: source.estimatedResults,
+      contentQuality: source.contentQuality,
+      targetKeyword: source.targetKeyword,
+      
+      // 性能指标
+      responseTime: source.responseTime,
+      lastChecked: source.lastChecked,
+      reliability: source.reliability,
+      
+      // 详细检查数据
+      basicDetails: source.basicDetails,
+      contentDetails: source.contentDetails,
+      searchTests: source.searchTests,
+      multiKeywordTests: source.multiKeywordTests,
+      
+      // 质量评估
+      qualityAssessment: source.qualityAssessment,
+      overallQuality: source.overallQuality
+    }));
+  }
+  
+  
 
   /**
    * 从指定的搜索源构建结果 - 增强版本
@@ -307,29 +404,126 @@ class SearchService {
   /**
    * 记录搜索源检查分析数据
    */
-  async recordSourceCheckAnalytics(checkedSources, selectedSources) {
+  async recordSourceCheckAnalytics(checkedSources, selectedSources, keyword) {
     try {
       const analytics = {
-        totalChecked: checkedSources.length,
-        availableSources: checkedSources.filter(s => s.available).length,
+        totalSources: checkedSources.length,
         selectedSources: selectedSources.length,
-        avgReliability: this.calculateAverageReliability(checkedSources),
+        keyword: keyword,
+        
+        // 可用性分布
+        availabilityDistribution: this.getAvailabilityDistribution(checkedSources),
+        
+        // 性能指标
         avgResponseTime: this.calculateAverageResponseTime(checkedSources),
-        statusDistribution: this.getStatusDistribution(checkedSources),
+        avgReliability: this.calculateAverageReliability(checkedSources),
+        
+        // 内容匹配统计
+        contentMatchStats: this.getContentMatchStats(checkedSources),
+        
+        // 质量评估
+        qualityDistribution: this.getQualityDistribution(checkedSources),
+        
         timestamp: Date.now()
       };
       
-      await apiService.recordAction('source_availability_check', analytics);
+      await apiService.recordAction('advanced_source_check', analytics);
       
       // 如果有API支持，也记录到后端
-      if (apiService.recordSourceStatusCheck) {
-        await apiService.recordSourceStatusCheck(checkedSources);
+      if (apiService.recordAdvancedSourceCheck) {
+        await apiService.recordAdvancedSourceCheck(checkedSources, keyword);
       }
       
     } catch (error) {
-      console.error('记录搜索源分析数据失败:', error);
+      console.error('记录高级搜索源分析数据失败:', error);
     }
   }
+  
+    /**
+   * 获取可用性分布
+   */
+  getAvailabilityDistribution(sources) {
+    const distribution = {};
+    sources.forEach(source => {
+      const level = source.availabilityLevel || '未知';
+      distribution[level] = (distribution[level] || 0) + 1;
+    });
+    return distribution;
+  }
+
+  /**
+   * 获取内容匹配统计
+   */
+  getContentMatchStats(sources) {
+    const stats = {
+      totalWithContentCheck: sources.filter(s => s.contentScore !== undefined).length,
+      contentMatched: sources.filter(s => s.contentMatched).length,
+      avgContentScore: 0,
+      keywordPresenceCount: sources.filter(s => s.keywordPresence).length
+    };
+    
+    const sourcesWithContentScore = sources.filter(s => s.contentScore !== undefined);
+    if (sourcesWithContentScore.length > 0) {
+      stats.avgContentScore = sourcesWithContentScore.reduce(
+        (sum, s) => sum + s.contentScore, 0
+      ) / sourcesWithContentScore.length;
+    }
+    
+    return stats;
+  }
+
+  /**
+   * 获取质量分布
+   */
+  getQualityDistribution(sources) {
+    const distribution = {};
+    sources.forEach(source => {
+      if (source.qualityAssessment) {
+        const level = source.qualityAssessment.level;
+        distribution[level] = (distribution[level] || 0) + 1;
+      }
+    });
+    return distribution;
+  }
+
+  /**
+   * 公共接口：执行内容匹配检查
+   */
+  async performContentMatchCheck(sources, keyword, options = {}) {
+    return await this.checkSourcesAvailability(sources, {
+      strategy: 'content',
+      keyword,
+      ...options
+    });
+  }
+
+  /**
+   * 公共接口：执行深度验证检查
+   */
+  async performDeepVerification(sources, keyword, options = {}) {
+    return await this.checkSourcesAvailability(sources, {
+      strategy: 'deep',
+      keyword,
+      timeout: 20000,
+      ...options
+    });
+  }
+
+  /**
+   * 获取检查器统计信息
+   */
+  getAdvancedCheckerStats() {
+    return this.advancedChecker.getStatistics();
+  }
+
+  /**
+   * 清除高级检查器缓存
+   */
+  clearAdvancedCache() {
+    this.advancedChecker.clearCache();
+    console.log('高级检查器缓存已清理');
+  }
+}
 
   /**
    * 计算平均可靠性

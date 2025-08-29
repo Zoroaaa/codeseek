@@ -8,6 +8,7 @@ import searchService, { searchHistoryManager } from '../services/search.js';
 import authManager from '../services/auth.js';
 import favoritesManager from './favorites.js';
 import apiService from '../services/api.js';
+import { AdvancedSearchUI } from './advanced-search-ui.js';
 
 export class SearchManager {
   constructor() {
@@ -16,6 +17,17 @@ export class SearchManager {
     this.isInitialized = false;
     // 新增：用户设置缓存
     this.userSettings = null;
+	this.advancedUI = null;
+  }
+  
+    /**
+   * 初始化高级UI
+   */
+  initAdvancedUI() {
+    this.advancedUI = new AdvancedSearchUI(this);
+    
+    // 将高级检查器暴露到全局
+    window.advancedSourceChecker = searchService.advancedChecker;
   }
 
   async init() {
@@ -24,6 +36,7 @@ export class SearchManager {
     try {
       await this.loadSearchHistory();
       await this.loadUserSettings(); // 新增：加载用户设置
+	  this.advancedUI.init();
       this.bindEvents();
       this.handleURLParams();
       this.exposeGlobalMethods();
@@ -184,7 +197,10 @@ export class SearchManager {
   }
 
   // 🔧 修改：显示搜索结果 - 支持状态信息显示
-  displaySearchResults(keyword, results) {
+  /**
+   * 显示高级搜索结果 - 替换原有的显示方法
+   */
+  displayAdvancedSearchResults(keyword, results) {
     const resultsSection = document.getElementById('resultsSection');
     const searchInfo = document.getElementById('searchInfo');
     const resultsContainer = document.getElementById('results');
@@ -193,14 +209,15 @@ export class SearchManager {
 
     if (resultsSection) resultsSection.style.display = 'block';
     
+    // 更新搜索信息
     if (searchInfo) {
-      const availableCount = results.filter(r => r.available !== false).length;
-      const statusInfo = this.userSettings?.checkSourceStatus ? 
-        ` (${availableCount}/${results.length} 个源可用)` : '';
+      const excellentCount = results.filter(r => r.availabilityLevel === '优秀').length;
+      const goodCount = results.filter(r => r.availabilityLevel === '良好').length;
+      const qualityCount = excellentCount + goodCount;
       
       searchInfo.innerHTML = `
         搜索关键词: <strong>${escapeHtml(keyword)}</strong> 
-        (${results.length}个结果${statusInfo}) 
+        (${results.length}个结果，${qualityCount}个优质源) 
         <small>${new Date().toLocaleString()}</small>
       `;
     }
@@ -208,9 +225,18 @@ export class SearchManager {
     if (clearResultsBtn) clearResultsBtn.style.display = 'inline-block';
     if (exportResultsBtn) exportResultsBtn.style.display = 'inline-block';
 
-    if (resultsContainer) {
-      resultsContainer.innerHTML = results.map(result => this.createResultHTML(result)).join('');
-      this.bindResultsEvents(resultsContainer);
+    // 使用高级UI渲染结果
+    if (resultsContainer && this.advancedUI) {
+      this.advancedUI.setCurrentResults(results);
+      this.advancedUI.renderAdvancedResults(results, keyword, resultsContainer);
+    } else {
+      // 降级到原始显示方法
+      if (resultsContainer) {
+        resultsContainer.innerHTML = results.map(result => 
+          this.createBasicResultHTML(result)
+        ).join('');
+        this.bindResultsEvents(resultsContainer);
+      }
     }
 
     this.currentResults = results;
@@ -218,6 +244,55 @@ export class SearchManager {
     setTimeout(() => {
       resultsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
+  }
+  
+    /**
+   * 处理结果操作 - 增强版本
+   */
+  async handleResultAction(button, action) {
+    const url = button.dataset.url;
+    const resultId = button.dataset.resultId;
+    const source = button.dataset.source;
+
+    switch (action) {
+      case 'visit':
+        this.openResult(url, source);
+        break;
+      case 'favorite':
+        await this.toggleFavorite(resultId);
+        break;
+      case 'copy':
+        await this.copyToClipboard(url);
+        break;
+      case 'recheck':
+        await this.recheckSourceAdvanced(resultId);
+        break;
+      case 'detail':
+        this.showAdvancedSourceDetail(resultId);
+        break;
+    }
+  }
+
+  /**
+   * 高级重新检查
+   */
+  async recheckSourceAdvanced(resultId) {
+    if (!this.advancedUI) {
+      // 降级到基础重新检查
+      return this.recheckSourceStatus(resultId);
+    }
+    
+    return await this.advancedUI.recheckAdvancedSource(resultId);
+  }
+
+  /**
+   * 显示高级源详情
+   */
+  showAdvancedSourceDetail(resultId) {
+    const result = this.currentResults.find(r => r.id === resultId);
+    if (result && this.advancedUI) {
+      this.advancedUI.showDetailedAnalysisModal(result);
+    }
   }
   
   bindResultsEvents(container) {
