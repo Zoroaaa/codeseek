@@ -1,193 +1,41 @@
-// 集成增强检查器的搜索服务 - 替换原有的search.js
+// 搜索服务模块 - 修复版本
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
 import { showToast } from '../utils/dom.js';
 import apiService from './api.js';
 import authManager from './auth.js';
-import EnhancedSearchSourceChecker from './advanced-source-checker.js';
-import { AdvancedSearchUI } from '../components/advanced-search-ui.js';
 
 class SearchService {
   constructor() {
     this.searchCache = new Map();
     this.cacheExpiration = APP_CONSTANTS.API.CACHE_DURATION;
-    this.userSettings = null;
-    
-    // 替换原有的检查器
-    this.advancedChecker = new AdvancedSourceChecker();
-    
-    // 创建高级UI实例
-    this.advancedUI = new AdvancedSearchUI(this);
+    this.userSettings = null; // 缓存用户设置
   }
 
-  /**
-   * 升级版搜索源可用性检查 - 使用增强检查器
-   */
-  async checkSourcesAvailability(sources, options = {}) {
-    const { 
-      timeout = 15000, 
-      showProgress = true,
-      useCache = true,
-      strategy = 'functional', // basic, functional, content, deep
-      keyword = null,
-      parallel = true
-    } = options;
-    
-    // 将strategy映射到检查级别
-    const levelMapping = {
-      'basic': this.advancedChecker.checkLevels.BASIC,
-      'functional': this.advancedChecker.checkLevels.FUNCTIONAL,
-      'content': this.advancedChecker.checkLevels.CONTENT,
-      'comprehensive': this.advancedChecker.checkLevels.DEEP,
-      'deep': this.advancedChecker.checkLevels.DEEP
-    };
-    
-    const checkLevel = levelMapping[strategy] || this.advancedChecker.checkLevels.FUNCTIONAL;
-    
-    try {
-      return await this.advancedChecker.checkSourcesWithLevels(sources, {
-        level: checkLevel,
-        keyword,
-        timeout,
-        useCache,
-        showProgress,
-        parallel
-      });
-    } catch (error) {
-      console.error('高级搜索源检查失败:', error);
-      
-      if (showProgress) {
-        showToast('搜索源检查失败，使用基础检查模式', 'warning');
-      }
-      
-      // 降级处理：返回所有源但标记为未检查
-      return sources.map(source => ({
-        ...source,
-        available: true, // 假设可用以免影响搜索
-        availabilityLevel: '未检查',
-        availabilityColor: '#6b7280',
-        availabilityRank: 3,
-        error: '检查器故障',
-        lastChecked: Date.now()
-      }));
-    }
-  }
-
-  /**
-   * 智能搜索源筛选 - 基于可靠性和用户偏好
-   */
-  async filterOptimalSources(checkedSources, options = {}) {
-    const {
-      minReliability = 0.3,
-      maxSources = 12,
-      preferFastSources = true,
-      includePartial = true,
-      prioritizeContentMatch = false
-    } = options;
-
-    let filteredSources = checkedSources.filter(source => {
-      // 基本可用性过滤
-      if (!source.available && !includePartial) return false;
-      if (source.availabilityRank <= 1) return false; // 过滤故障源
-      
-      // 可靠性过滤
-      if (source.reliability !== undefined && source.reliability < minReliability) {
-        return false;
-      }
-      
-      return true;
-    });
-
-    // 按优先级排序
-    filteredSources.sort((a, b) => {
-      // 1. 优先考虑可用性等级
-      if (a.availabilityRank !== b.availabilityRank) {
-        return b.availabilityRank - a.availabilityRank;
-      }
-      
-      // 2. 如果启用内容匹配优先，优先考虑内容匹配度
-      if (prioritizeContentMatch && a.contentScore !== undefined && b.contentScore !== undefined) {
-        if (Math.abs(a.contentScore - b.contentScore) > 0.1) {
-          return b.contentScore - a.contentScore;
-        }
-      }
-      
-      // 3. 可靠性排序
-      const reliabilityA = a.reliability || 0.5;
-      const reliabilityB = b.reliability || 0.5;
-      if (Math.abs(reliabilityA - reliabilityB) > 0.1) {
-        return reliabilityB - reliabilityA;
-      }
-      
-      // 4. 响应时间排序（如果启用快速优先）
-      if (preferFastSources && a.responseTime && b.responseTime) {
-        return a.responseTime - b.responseTime;
-      }
-      
-      // 5. 内置源优先级
-      return (a.priority || 999) - (b.priority || 999);
-    });
-
-    // 限制数量
-    filteredSources = filteredSources.slice(0, maxSources);
-    
-    console.log(`智能筛选：从 ${checkedSources.length} 个源中选择了 ${filteredSources.length} 个优质源`);
-    console.log('筛选结果分布:', this.getFilteredDistribution(filteredSources));
-    
-    return filteredSources;
-  }
-  
-    /**
-   * 获取筛选结果分布
-   */
-  getFilteredDistribution(sources) {
-    const distribution = {};
-    sources.forEach(source => {
-      const level = source.availabilityLevel || '未知';
-      distribution[level] = (distribution[level] || 0) + 1;
-    });
-    return distribution;
-  }
-
-  /**
-   * 执行搜索 - 集成增强检查功能
-   */
+  // 🔧 修复：执行搜索 - 从用户设置获取缓存配置
   async performSearch(keyword, options = {}) {
+    // 验证搜索关键词
     const validation = validateSearchKeyword(keyword);
     if (!validation.valid) {
       throw new Error(validation.errors[0]);
     }
 
-    // 获取用户设置
+    // 🔧 修复：从用户设置获取缓存配置而不是前端元素
     let useCache = options.useCache;
-    let checkSourceStatus = options.checkSourceStatus;
-    let checkStrategy = options.checkStrategy || 'functional';
-    
-    if (useCache === undefined || checkSourceStatus === undefined) {
+    if (useCache === undefined) {
+      // 如果没有明确指定，从用户设置获取
       try {
         if (authManager.isAuthenticated()) {
           const userSettings = await this.getUserSettings();
-          if (useCache === undefined) {
-            useCache = userSettings.cacheResults !== false;
-          }
-          if (checkSourceStatus === undefined) {
-            checkSourceStatus = userSettings.checkSourceStatus === true;
-          }
-          // 根据用户设置调整检查策略
-          if (userSettings.quickSearch === true) {
-            checkStrategy = 'basic';
-          } else if (userSettings.thoroughCheck === true) {
-            checkStrategy = 'content'; // 使用内容匹配检查
-          }
+          // 注意：由于前端已移除缓存设置，这里总是默认启用缓存
+          useCache = true; // 总是启用缓存以提升性能
         } else {
-          useCache = true;
-          checkSourceStatus = false;
+          useCache = true; // 未登录用户也启用缓存
         }
       } catch (error) {
-        console.warn('获取用户设置失败，使用默认值:', error);
-        useCache = true;
-        checkSourceStatus = false;
+        console.warn('获取缓存设置失败，使用默认值:', error);
+        useCache = true; // 默认启用缓存
       }
     }
 
@@ -202,52 +50,8 @@ class SearchService {
       }
     }
 
-    // 获取并检查搜索源
-    let enabledSources = await this.getEnabledSearchSources();
-    
-    if (checkSourceStatus && enabledSources.length > 0) {
-      try {
-        console.log(`开始进行 ${checkStrategy} 级别的搜索源检查，关键词: ${keyword}`);
-        
-        const checkedSources = await this.checkSourcesAvailability(enabledSources, {
-          showProgress: true,
-          useCache: true,
-          strategy: checkStrategy,
-          keyword: keyword, // 传递实际搜索关键词
-          timeout: checkStrategy === 'basic' ? 8000 : 15000,
-          parallel: true
-        });
-        
-        // 智能筛选最优搜索源
-        const optimalSources = await this.filterOptimalSources(checkedSources, {
-          minReliability: 0.2,
-          maxSources: 15,
-          preferFastSources: checkStrategy === 'basic',
-          includePartial: true,
-          prioritizeContentMatch: checkStrategy === 'content' // 优先考虑内容匹配的源
-        });
-
-        if (optimalSources.length > 0) {
-          enabledSources = optimalSources;
-          console.log(`智能筛选后使用 ${optimalSources.length} 个优质搜索源`);
-        } else {
-          console.warn('没有找到合适的搜索源，使用原始配置');
-          showToast('搜索源质量检查完成，将显示所有结果', 'info');
-        }
-        
-        // 记录检查结果到分析系统
-        if (authManager.isAuthenticated()) {
-          await this.recordSourceCheckAnalytics(checkedSources, optimalSources, keyword);
-        }
-        
-      } catch (error) {
-        console.error('搜索源状态检查失败:', error);
-        showToast('搜索源检查遇到问题，使用所有配置的源', 'warning');
-      }
-    }
-
-    // 构建搜索结果
-    const results = this.buildAdvancedSearchResults(keyword, enabledSources);
+    // 构建搜索结果（现在会根据用户设置过滤搜索源）
+    const results = await this.buildSearchResults(keyword);
 
     // 缓存结果
     if (useCache) {
@@ -262,347 +66,7 @@ class SearchService {
     return results;
   }
   
-    /**
-   * 构建高级搜索结果 - 包含详细的源信息
-   */
-  buildAdvancedSearchResults(keyword, sources) {
-    const encodedKeyword = encodeURIComponent(keyword);
-    const timestamp = Date.now();
-    
-    return sources.map(source => ({
-      id: `result_${keyword}_${source.id}_${timestamp}`,
-      title: source.name,
-      subtitle: source.subtitle,
-      url: source.urlTemplate.replace('{keyword}', encodedKeyword),
-      icon: source.icon,
-      keyword: keyword,
-      timestamp: timestamp,
-      source: source.id,
-      
-      // 高级状态信息
-      available: source.available,
-      availabilityLevel: source.availabilityLevel,
-      availabilityColor: source.availabilityColor,
-      availabilityRank: source.availabilityRank,
-      
-      // 检查详情
-      basicScore: source.basicScore,
-      functionalScore: source.functionalScore,
-      contentScore: source.contentScore,
-      deepScore: source.deepScore,
-      finalScore: source.finalScore,
-      
-      // 内容相关信息
-      contentMatched: source.contentMatched,
-      keywordPresence: source.keywordPresence,
-      estimatedResults: source.estimatedResults,
-      contentQuality: source.contentQuality,
-      targetKeyword: source.targetKeyword,
-      
-      // 性能指标
-      responseTime: source.responseTime,
-      lastChecked: source.lastChecked,
-      reliability: source.reliability,
-      
-      // 详细检查数据
-      basicDetails: source.basicDetails,
-      contentDetails: source.contentDetails,
-      searchTests: source.searchTests,
-      multiKeywordTests: source.multiKeywordTests,
-      
-      // 质量评估
-      qualityAssessment: source.qualityAssessment,
-      overallQuality: source.overallQuality
-    }));
-  }
-  
-  
-
-  /**
-   * 从指定的搜索源构建结果 - 增强版本
-   */
-  buildSearchResultsFromSources(keyword, sources) {
-    const encodedKeyword = encodeURIComponent(keyword);
-    const timestamp = Date.now();
-    
-    return sources.map(source => ({
-      id: `result_${keyword}_${source.id}_${timestamp}`,
-      title: source.name,
-      subtitle: source.subtitle,
-      url: source.urlTemplate.replace('{keyword}', encodedKeyword),
-      icon: source.icon,
-      keyword: keyword,
-      timestamp: timestamp,
-      source: source.id,
-      
-      // 增强信息
-      available: source.available,
-      status: source.status,
-      responseTime: source.responseTime,
-      lastChecked: source.lastChecked,
-      reliability: source.reliability,
-      
-      // 质量指标
-      qualityScore: this.calculateSourceQualityScore(source),
-      
-      // 推荐级别
-      recommendLevel: this.calculateRecommendLevel(source)
-    }));
-  }
-
-  /**
-   * 计算搜索源质量评分
-   */
-  calculateSourceQualityScore(source) {
-    let score = 0;
-    
-    // 可用性评分 (40%)
-    if (source.available) {
-      score += 40;
-      if (source.status === 'online') score += 10;
-    }
-    
-    // 可靠性评分 (30%)
-    if (source.reliability !== undefined) {
-      score += source.reliability * 30;
-    } else {
-      score += 15; // 默认中等可靠性
-    }
-    
-    // 响应时间评分 (20%)
-    if (source.responseTime) {
-      if (source.responseTime < 2000) score += 20;
-      else if (source.responseTime < 5000) score += 15;
-      else if (source.responseTime < 8000) score += 10;
-      else score += 5;
-    } else {
-      score += 10; // 默认中等速度
-    }
-    
-    // 内置源加分 (10%)
-    if (source.isBuiltin) {
-      score += 10;
-    } else {
-      score += 5; // 自定义源稍低评分
-    }
-    
-    return Math.min(100, Math.max(0, Math.round(score)));
-  }
-
-  /**
-   * 计算推荐级别
-   */
-  calculateRecommendLevel(source) {
-    const qualityScore = this.calculateSourceQualityScore(source);
-    
-    if (qualityScore >= 85) return 'excellent';
-    if (qualityScore >= 70) return 'good';
-    if (qualityScore >= 50) return 'fair';
-    return 'poor';
-  }
-
-  /**
-   * 记录搜索源检查分析数据
-   */
-  async recordSourceCheckAnalytics(checkedSources, selectedSources, keyword) {
-    try {
-      const analytics = {
-        totalSources: checkedSources.length,
-        selectedSources: selectedSources.length,
-        keyword: keyword,
-        
-        // 可用性分布
-        availabilityDistribution: this.getAvailabilityDistribution(checkedSources),
-        
-        // 性能指标
-        avgResponseTime: this.calculateAverageResponseTime(checkedSources),
-        avgReliability: this.calculateAverageReliability(checkedSources),
-        
-        // 内容匹配统计
-        contentMatchStats: this.getContentMatchStats(checkedSources),
-        
-        // 质量评估
-        qualityDistribution: this.getQualityDistribution(checkedSources),
-        
-        timestamp: Date.now()
-      };
-      
-      await apiService.recordAction('advanced_source_check', analytics);
-      
-      // 如果有API支持，也记录到后端
-      if (apiService.recordAdvancedSourceCheck) {
-        await apiService.recordAdvancedSourceCheck(checkedSources, keyword);
-      }
-      
-    } catch (error) {
-      console.error('记录高级搜索源分析数据失败:', error);
-    }
-  }
-  
-    /**
-   * 获取可用性分布
-   */
-  getAvailabilityDistribution(sources) {
-    const distribution = {};
-    sources.forEach(source => {
-      const level = source.availabilityLevel || '未知';
-      distribution[level] = (distribution[level] || 0) + 1;
-    });
-    return distribution;
-  }
-
-  /**
-   * 获取内容匹配统计
-   */
-  getContentMatchStats(sources) {
-    const stats = {
-      totalWithContentCheck: sources.filter(s => s.contentScore !== undefined).length,
-      contentMatched: sources.filter(s => s.contentMatched).length,
-      avgContentScore: 0,
-      keywordPresenceCount: sources.filter(s => s.keywordPresence).length
-    };
-    
-    const sourcesWithContentScore = sources.filter(s => s.contentScore !== undefined);
-    if (sourcesWithContentScore.length > 0) {
-      stats.avgContentScore = sourcesWithContentScore.reduce(
-        (sum, s) => sum + s.contentScore, 0
-      ) / sourcesWithContentScore.length;
-    }
-    
-    return stats;
-  }
-
-  /**
-   * 获取质量分布
-   */
-  getQualityDistribution(sources) {
-    const distribution = {};
-    sources.forEach(source => {
-      if (source.qualityAssessment) {
-        const level = source.qualityAssessment.level;
-        distribution[level] = (distribution[level] || 0) + 1;
-      }
-    });
-    return distribution;
-  }
-
-  /**
-   * 公共接口：执行内容匹配检查
-   */
-  async performContentMatchCheck(sources, keyword, options = {}) {
-    return await this.checkSourcesAvailability(sources, {
-      strategy: 'content',
-      keyword,
-      ...options
-    });
-  }
-
-  /**
-   * 公共接口：执行深度验证检查
-   */
-  async performDeepVerification(sources, keyword, options = {}) {
-    return await this.checkSourcesAvailability(sources, {
-      strategy: 'deep',
-      keyword,
-      timeout: 20000,
-      ...options
-    });
-  }
-
-  /**
-   * 获取检查器统计信息
-   */
-  getAdvancedCheckerStats() {
-    return this.advancedChecker.getStatistics();
-  }
-
-  /**
-   * 清除高级检查器缓存
-   */
-  clearAdvancedCache() {
-    this.advancedChecker.clearCache();
-    console.log('高级检查器缓存已清理');
-  }
-}
-
-  /**
-   * 计算平均可靠性
-   */
-  calculateAverageReliability(sources) {
-    const reliableSources = sources.filter(s => s.reliability !== undefined);
-    if (reliableSources.length === 0) return 0;
-    
-    return reliableSources.reduce((sum, s) => sum + s.reliability, 0) / reliableSources.length;
-  }
-
-  /**
-   * 计算平均响应时间
-   */
-  calculateAverageResponseTime(sources) {
-    const sourcesWithTime = sources.filter(s => s.responseTime);
-    if (sourcesWithTime.length === 0) return 0;
-    
-    return sourcesWithTime.reduce((sum, s) => sum + s.responseTime, 0) / sourcesWithTime.length;
-  }
-
-  /**
-   * 获取状态分布
-   */
-  getStatusDistribution(sources) {
-    const distribution = {};
-    sources.forEach(source => {
-      const status = source.status || 'unknown';
-      distribution[status] = (distribution[status] || 0) + 1;
-    });
-    return distribution;
-  }
-
-  /**
-   * 获取检查器统计信息
-   */
-  getSourceCheckerStats() {
-    return this.sourceChecker.getStatistics();
-  }
-
-  /**
-   * 清除所有缓存
-   */
-  clearCache() {
-    this.searchCache.clear();
-    this.sourceChecker.clearCache();
-    console.log('所有缓存已清理');
-  }
-
-  /**
-   * 手动触发单个搜索源的详细检查
-   */
-  async performDetailedSourceCheck(sourceId) {
-    try {
-      const allSources = await this.getEnabledSearchSources();
-      const source = allSources.find(s => s.id === sourceId);
-      
-      if (!source) {
-        throw new Error('找不到指定的搜索源');
-      }
-      
-      const result = await this.sourceChecker.checkSingleSource(source, {
-        timeout: 15000,
-        useCache: false,
-        strategy: 'comprehensive'
-      });
-      
-      showToast(`${source.name} 详细检查完成`, 'success');
-      return result;
-      
-    } catch (error) {
-      console.error('详细搜索源检查失败:', error);
-      showToast('详细检查失败: ' + error.message, 'error');
-      throw error;
-    }
-  }
-
-  // 以下是原有方法的保留，保持向后兼容性
-  
+  // 🔧 修复：统一的用户设置获取方法
   async getUserSettings() {
     if (!this.userSettings || Date.now() - this.userSettings.timestamp > 60000) {
       try {
@@ -619,13 +83,16 @@ class SearchService {
     return this.userSettings.data;
   }
   
+  // 🔧 新增：清除用户设置缓存（当用户更改设置后调用）
   clearUserSettingsCache() {
     this.userSettings = null;
     console.log('用户设置缓存已清除');
   }
   
+  // 🔧 修复：获取用户设置的搜索源
   async getEnabledSearchSources() {
     try {
+      // 如果用户未登录，使用默认搜索源
       if (!authManager.isAuthenticated()) {
         const defaultSources = ['javbus', 'javdb', 'javlibrary'];
         return APP_CONSTANTS.SEARCH_SOURCES.filter(
@@ -633,11 +100,13 @@ class SearchService {
         );
       }
 
+      // 获取用户设置
       let userSettings;
       try {
         userSettings = await this.getUserSettings();
       } catch (error) {
         console.error('获取用户设置失败，使用默认搜索源:', error);
+        // 如果获取失败，使用默认搜索源
         const defaultSources = ['javbus', 'javdb', 'javlibrary'];
         return APP_CONSTANTS.SEARCH_SOURCES.filter(
           source => defaultSources.includes(source.id)
@@ -646,6 +115,7 @@ class SearchService {
 
       const enabledSources = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary'];
       
+      // 🔧 新增：验证搜索源ID的有效性
       const validSources = enabledSources.filter(sourceId => 
         APP_CONSTANTS.SEARCH_SOURCES.some(source => source.id === sourceId)
       );
@@ -658,6 +128,7 @@ class SearchService {
         );
       }
       
+      // 过滤出用户启用的搜索源
       const filteredSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
         source => validSources.includes(source.id)
       );
@@ -665,6 +136,7 @@ class SearchService {
       return filteredSources;
     } catch (error) {
       console.error('获取搜索源配置失败:', error);
+      // 🔧 增强错误处理：出错时返回默认搜索源
       const defaultSources = ['javbus', 'javdb', 'javlibrary'];
       return APP_CONSTANTS.SEARCH_SOURCES.filter(
         source => defaultSources.includes(source.id)
@@ -672,12 +144,55 @@ class SearchService {
     }
   }
 
+  // 🔧 修复：构建搜索结果 - 使用用户选择的搜索源
+  async buildSearchResults(keyword) {
+    const encodedKeyword = encodeURIComponent(keyword);
+    const timestamp = Date.now();
+    
+    try {
+      // 获取用户启用的搜索源
+      const enabledSources = await this.getEnabledSearchSources();
+      
+      console.log(`使用 ${enabledSources.length} 个搜索源:`, enabledSources.map(s => s.name));
+      
+      return enabledSources.map(source => ({
+        id: `result_${keyword}_${source.id}_${timestamp}`,
+        title: source.name,
+        subtitle: source.subtitle,
+        url: source.urlTemplate.replace('{keyword}', encodedKeyword),
+        icon: source.icon,
+        keyword: keyword,
+        timestamp: timestamp,
+        source: source.id
+      }));
+    } catch (error) {
+      console.error('构建搜索结果失败:', error);
+      // 🔧 增强错误处理：如果获取搜索源失败，使用默认源
+      const defaultSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
+        source => ['javbus', 'javdb', 'javlibrary'].includes(source.id)
+      );
+      
+      return defaultSources.map(source => ({
+        id: `result_${keyword}_${source.id}_${timestamp}`,
+        title: source.name,
+        subtitle: source.subtitle,
+        url: source.urlTemplate.replace('{keyword}', encodedKeyword),
+        icon: source.icon,
+        keyword: keyword,
+        timestamp: timestamp,
+        source: source.id
+      }));
+    }
+  }
+
+  // 获取缓存结果
   getCachedResults(keyword) {
     const cached = this.searchCache.get(keyword);
     if (cached && Date.now() - cached.timestamp < this.cacheExpiration) {
       return cached.results;
     }
     
+    // 清理过期缓存
     if (cached) {
       this.searchCache.delete(keyword);
     }
@@ -685,8 +200,11 @@ class SearchService {
     return null;
   }
 
+  // 缓存搜索结果
   cacheResults(keyword, results) {
+    // 限制缓存大小
     if (this.searchCache.size >= 100) {
+      // 删除最旧的缓存项
       const firstKey = this.searchCache.keys().next().value;
       this.searchCache.delete(firstKey);
     }
@@ -697,6 +215,7 @@ class SearchService {
     });
   }
 
+  // 保存到搜索历史
   async saveToHistory(keyword) {
     try {
       await apiService.saveSearchHistory(keyword, 'manual');
@@ -705,6 +224,7 @@ class SearchService {
     }
   }
 
+  // 获取搜索建议
   getSearchSuggestions(query, history = []) {
     if (!query || typeof query !== 'string') return [];
     
@@ -722,14 +242,21 @@ class SearchService {
       .slice(0, 5);
   }
 
+  // 清理搜索缓存
+  clearCache() {
+    this.searchCache.clear();
+    console.log('搜索缓存已清理');
+  }
+
+  // 获取缓存统计
   getCacheStats() {
-    const searchStats = {
+    const stats = {
       size: this.searchCache.size,
       items: []
     };
     
     for (const [keyword, data] of this.searchCache) {
-      searchStats.items.push({
+      stats.items.push({
         keyword,
         timestamp: data.timestamp,
         age: Date.now() - data.timestamp,
@@ -737,19 +264,14 @@ class SearchService {
       });
     }
     
-    const sourceCheckerStats = this.getSourceCheckerStats();
-    
-    return {
-      searchCache: searchStats,
-      sourceChecker: sourceCheckerStats
-    };
+    return stats;
   }
 
+  // 预热缓存（预加载常用搜索）
   async warmupCache(keywords = []) {
     for (const keyword of keywords) {
       try {
-        const sources = await this.getEnabledSearchSources();
-        const results = this.buildSearchResultsFromSources(keyword, sources);
+        const results = await this.buildSearchResults(keyword);
         this.cacheResults(keyword, results);
         console.log(`缓存预热: ${keyword}`);
       } catch (error) {
@@ -759,12 +281,13 @@ class SearchService {
   }
 }
 
-// 搜索历史管理器保持不变
+// 搜索历史管理器
 export class SearchHistoryManager {
   constructor() {
     this.maxHistorySize = APP_CONSTANTS.LIMITS.MAX_HISTORY;
   }
 
+  // 添加到历史记录
   async addToHistory(keyword, source = 'manual') {
     if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
       console.warn('无效的搜索关键词，跳过添加到历史');
@@ -780,6 +303,7 @@ export class SearchHistoryManager {
     }
   }
 
+  // 获取搜索历史
   async getHistory() {
     try {
       return await apiService.getSearchHistory();
@@ -789,6 +313,7 @@ export class SearchHistoryManager {
     }
   }
 
+  // 删除历史记录项
   async deleteHistoryItem(historyId) {
     try {
       await apiService.deleteSearchHistory(historyId);
@@ -799,6 +324,7 @@ export class SearchHistoryManager {
     }
   }
 
+  // 清空所有历史记录
   async clearAllHistory() {
     try {
       await apiService.clearAllSearchHistory();
@@ -809,6 +335,7 @@ export class SearchHistoryManager {
     }
   }
 
+  // 获取搜索统计
   async getSearchStats() {
     try {
       return await apiService.getSearchStats();
@@ -818,6 +345,7 @@ export class SearchHistoryManager {
     }
   }
 
+  // 搜索历史去重
   deduplicateHistory(history) {
     const seen = new Set();
     return history.filter(item => {
@@ -830,6 +358,7 @@ export class SearchHistoryManager {
     });
   }
 
+  // 按时间排序历史记录
   sortHistoryByTime(history, descending = true) {
     return history.sort((a, b) => {
       const timeA = a.timestamp || a.createdAt || 0;
@@ -838,6 +367,7 @@ export class SearchHistoryManager {
     });
   }
 
+  // 按频率排序历史记录
   sortHistoryByFrequency(history, descending = true) {
     return history.sort((a, b) => {
       const countA = a.count || 1;
@@ -847,6 +377,7 @@ export class SearchHistoryManager {
   }
 }
 
+// 创建服务实例
 export const searchService = new SearchService();
 export const searchHistoryManager = new SearchHistoryManager();
 export default searchService;

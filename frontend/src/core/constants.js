@@ -1,8 +1,8 @@
-// 应用常量定义 - 添加搜索源状态检查相关配置
+// 应用常量定义 - 优化版本，支持分类管理和更多搜索源
 export const APP_CONSTANTS = {
   // 应用信息
   APP_NAME: '磁力快搜',
-  DEFAULT_VERSION: '1.3.1', // 版本升级，支持搜索源状态检查
+  DEFAULT_VERSION: '1.3.0', // 🔧 版本升级，支持搜索源分类管理
   
   // 本地存储键名
   STORAGE_KEYS: {
@@ -12,25 +12,22 @@ export const APP_CONSTANTS = {
     APP_VERSION: 'app_version',
     API_CONFIG: 'api_config',
     CUSTOM_SOURCES: 'custom_search_sources',
-    CUSTOM_CATEGORIES: 'custom_source_categories',
-    SOURCE_STATUS_CACHE: 'source_status_cache' // 新增：搜索源状态缓存
+    CUSTOM_CATEGORIES: 'custom_source_categories' // 🔧 新增：自定义分类缓存
   },
   
   // API配置
   API: {
     TIMEOUT: 10000,
     RETRY_ATTEMPTS: 3,
-    CACHE_DURATION: 1800000, // 30分钟
-    SOURCE_CHECK_TIMEOUT: 8000, // 新增：搜索源状态检查超时时间
-    SOURCE_STATUS_CACHE_DURATION: 300000 // 新增：搜索源状态缓存时间（5分钟）
+    CACHE_DURATION: 1800000 // 30分钟
   },
   
   // 用户限制
   LIMITS: {
     MAX_FAVORITES: 1000,
     MAX_HISTORY: 1000,
-    MAX_CUSTOM_SOURCES: 100,
-    MAX_CUSTOM_CATEGORIES: 20,
+    MAX_CUSTOM_SOURCES: 100, // 🔧 增加自定义搜索源限制
+    MAX_CUSTOM_CATEGORIES: 20, // 🔧 新增：最大自定义分类数量
     MIN_USERNAME_LENGTH: 3,
     MAX_USERNAME_LENGTH: 20,
     MIN_PASSWORD_LENGTH: 6,
@@ -38,9 +35,8 @@ export const APP_CONSTANTS = {
     MIN_SEARCH_KEYWORD_LENGTH: 2,
     MAX_SOURCE_NAME_LENGTH: 50,
     MAX_SOURCE_SUBTITLE_LENGTH: 100,
-    MAX_CATEGORY_NAME_LENGTH: 30,
-    MAX_CATEGORY_DESC_LENGTH: 100,
-    MAX_CONCURRENT_SOURCE_CHECKS: 10 // 新增：最大并发检查搜索源数量
+    MAX_CATEGORY_NAME_LENGTH: 30, // 🔧 新增：分类名称最大长度
+    MAX_CATEGORY_DESC_LENGTH: 100 // 🔧 新增：分类描述最大长度
   },
   
   // 主题选项
@@ -58,17 +54,7 @@ export const APP_CONSTANTS = {
     ERROR: 'error'
   },
   
-  // 新增：搜索源状态
-  SOURCE_STATUS: {
-    ONLINE: 'online',
-    OFFLINE: 'offline',
-    ERROR: 'error',
-    CHECKING: 'checking',
-    UNKNOWN: 'unknown',
-    TIMEOUT: 'timeout'
-  },
-  
-  // 搜索源分类定义
+  // 🔧 优化：搜索源分类定义 - 支持扩展和自定义
   SOURCE_CATEGORIES: {
     database: {
       id: 'database',
@@ -117,7 +103,7 @@ export const APP_CONSTANTS = {
     }
   },
   
-  // 搜索来源配置 - 添加状态检查相关信息
+  // 🔧 增强版搜索来源 - 完整的内置搜索源配置
   SEARCH_SOURCES: [
     // 番号资料站
     {
@@ -129,12 +115,7 @@ export const APP_CONSTANTS = {
       category: 'database',
       isBuiltin: true,
       priority: 1,
-      isActive: true,
-      // 新增：状态检查配置
-      checkMethod: 'favicon', // 检查方式：favicon, image, custom, fetch
-      statusCheckUrl: 'https://www.javbus.com/favicon.ico', // 用于状态检查的URL
-      expectedStatusCode: [200, 301, 302], // 期望的HTTP状态码
-      timeout: 8000 // 超时时间（毫秒）
+      isActive: true
     },
     {
       id: 'javdb',
@@ -145,11 +126,7 @@ export const APP_CONSTANTS = {
       category: 'database',
       isBuiltin: true,
       priority: 2,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://javdb.com/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'javlibrary',
@@ -160,11 +137,7 @@ export const APP_CONSTANTS = {
       category: 'database',
       isBuiltin: true,
       priority: 3,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://www.javlibrary.com/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 10000 // JavLibrary通常较慢
+      isActive: true
     },
     {
       id: 'javfinder',
@@ -175,11 +148,7 @@ export const APP_CONSTANTS = {
       category: 'database',
       isBuiltin: true,
       priority: 4,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://javfinder.is/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     
     // 在线播放平台
@@ -192,11 +161,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 1,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://jable.tv/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'javmost',
@@ -207,11 +172,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 2,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://javmost.com/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'javguru',
@@ -222,11 +183,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 3,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://jav.guru/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'av01',
@@ -237,11 +194,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 4,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://av01.tv/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'missav',
@@ -252,11 +205,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 5,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://missav.com/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'javhdporn',
@@ -267,11 +216,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 6,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://javhd.porn/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'javgg',
@@ -282,11 +227,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 7,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://javgg.net/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'javhihi',
@@ -297,11 +238,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 8,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://javhihi.com/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     
     // 磁力搜索
@@ -314,11 +251,7 @@ export const APP_CONSTANTS = {
       category: 'torrent',
       isBuiltin: true,
       priority: 1,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://btsow.com/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'magnetdl',
@@ -329,11 +262,7 @@ export const APP_CONSTANTS = {
       category: 'torrent',
       isBuiltin: true,
       priority: 2,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://www.magnetdl.com/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'torrentkitty',
@@ -344,11 +273,7 @@ export const APP_CONSTANTS = {
       category: 'torrent',
       isBuiltin: true,
       priority: 3,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://www.torrentkitty.tv/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     {
       id: 'sukebei',
@@ -359,11 +284,7 @@ export const APP_CONSTANTS = {
       category: 'torrent',
       isBuiltin: true,
       priority: 4,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://sukebei.nyaa.si/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 8000
+      isActive: true
     },
     
     // 社区论坛
@@ -376,11 +297,7 @@ export const APP_CONSTANTS = {
       category: 'community',
       isBuiltin: true,
       priority: 1,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://sehuatang.org/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 10000 // 论坛通常较慢
+      isActive: true
     },
     {
       id: 't66y',
@@ -391,18 +308,14 @@ export const APP_CONSTANTS = {
       category: 'community',
       isBuiltin: true,
       priority: 2,
-      isActive: true,
-      checkMethod: 'favicon',
-      statusCheckUrl: 'https://t66y.com/favicon.ico',
-      expectedStatusCode: [200, 301, 302],
-      timeout: 10000
+      isActive: true
     }
   ],
   
-  // 搜索源和分类验证规则
+  // 🔧 新增：搜索源和分类验证规则
   VALIDATION_RULES: {
     SOURCE: {
-      REQUIRED_FIELDS: ['name', 'urlTemplate', 'category'],
+      REQUIRED_FIELDS: [ 'name', 'urlTemplate', 'category'],
       URL_PATTERN: /^https?:\/\/.+\{keyword\}.*/,
       NAME_PATTERN: /^[a-zA-Z0-9\u4e00-\u9fa5\s\-_.()（）]+$/,
       ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
@@ -417,23 +330,17 @@ export const APP_CONSTANTS = {
       ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
       ICON_PATTERN: /^[\u{1F000}-\u{1F9FF}]|^[\u{2600}-\u{26FF}]|^[\u{2700}-\u{27BF}]/u,
       COLOR_PATTERN: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
-    },
-    // 新增：状态检查验证规则
-    STATUS_CHECK: {
-      TIMEOUT_RANGE: [1000, 30000], // 超时时间范围 1-30秒
-      VALID_CHECK_METHODS: ['favicon', 'image', 'fetch', 'custom'],
-      VALID_STATUS_CODES: [200, 201, 301, 302, 304, 403, 404] // 有效的HTTP状态码
     }
   },
   
-  // 默认颜色选项
+  // 🔧 新增：默认颜色选项
   DEFAULT_COLORS: [
     '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
     '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
     '#f97316', '#6366f1', '#14b8a6', '#eab308'
   ],
   
-  // 默认图标选项
+  // 🔧 新增：默认图标选项
   DEFAULT_ICONS: [
     '📚', '🎥', '🧲', '💬', '🌟', '🔍', '📺', '🎬',
     '🎭', '🎪', '🎦', '📽️', '⚡', '💫', '🌙', '🔗',
@@ -447,13 +354,12 @@ export const APP_CONSTANTS = {
     HISTORY: 'history',
     SYNC: 'sync',
     CUSTOM_SOURCES: 'custom_sources',
-    CUSTOM_CATEGORIES: 'custom_categories',
-    SOURCE_STATUS_CHECK: 'source_status_check', // 新增：搜索源状态检查权限
+    CUSTOM_CATEGORIES: 'custom_categories', // 🔧 新增：自定义分类权限
     ADMIN: 'admin',
     PREMIUM: 'premium'
   },
   
-  // 用户行为追踪事件
+  // 🔧 新增：用户行为追踪事件
   ANALYTICS_EVENTS: {
     SEARCH_PERFORMED: 'search_performed',
     RESULT_CLICKED: 'result_clicked',
@@ -462,18 +368,15 @@ export const APP_CONSTANTS = {
     CUSTOM_SOURCE_ADDED: 'custom_source_added',
     CUSTOM_SOURCE_EDITED: 'custom_source_edited',
     CUSTOM_SOURCE_DELETED: 'custom_source_deleted',
-    CUSTOM_CATEGORY_ADDED: 'custom_category_added',
-    CUSTOM_CATEGORY_EDITED: 'custom_category_edited',
-    CUSTOM_CATEGORY_DELETED: 'custom_category_deleted',
-    SOURCE_STATUS_CHECKED: 'source_status_checked', // 新增
-    SOURCE_STATUS_CHECK_ENABLED: 'source_status_check_enabled', // 新增
-    SOURCE_STATUS_CHECK_DISABLED: 'source_status_check_disabled', // 新增
+    CUSTOM_CATEGORY_ADDED: 'custom_category_added', // 🔧 新增
+    CUSTOM_CATEGORY_EDITED: 'custom_category_edited', // 🔧 新增
+    CUSTOM_CATEGORY_DELETED: 'custom_category_deleted', // 🔧 新增
     SETTINGS_UPDATED: 'settings_updated',
     DATA_EXPORTED: 'data_exported',
     HISTORY_CLEARED: 'history_cleared'
   },
   
-  // 错误代码定义
+  // 🔧 新增：错误代码定义
   ERROR_CODES: {
     INVALID_SEARCH_SOURCE: 'INVALID_SEARCH_SOURCE',
     INVALID_SOURCE_CATEGORY: 'INVALID_SOURCE_CATEGORY',
@@ -487,37 +390,24 @@ export const APP_CONSTANTS = {
     FORBIDDEN_DOMAIN: 'FORBIDDEN_DOMAIN',
     SOURCE_NOT_FOUND: 'SOURCE_NOT_FOUND',
     CATEGORY_NOT_FOUND: 'CATEGORY_NOT_FOUND',
-    CATEGORY_IN_USE: 'CATEGORY_IN_USE',
-    SOURCE_STATUS_CHECK_FAILED: 'SOURCE_STATUS_CHECK_FAILED', // 新增
-    SOURCE_STATUS_CHECK_TIMEOUT: 'SOURCE_STATUS_CHECK_TIMEOUT', // 新增
-    INVALID_STATUS_CHECK_METHOD: 'INVALID_STATUS_CHECK_METHOD' // 新增
+    CATEGORY_IN_USE: 'CATEGORY_IN_USE'
   },
   
-  // 默认用户设置 - 添加状态检查相关选项
+  // 🔧 增强：默认用户设置
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
-    searchSources: ['javbus', 'javdb', 'javlibrary'],
-    customSearchSources: [],
-    customSourceCategories: [],
+    searchSources: ['javbus', 'javdb', 'javlibrary'], // 默认启用的搜索源
+    customSearchSources: [], // 用户自定义搜索源
+    customSourceCategories: [], // 🔧 新增：用户自定义分类
     maxFavoritesPerUser: 1000,
     maxHistoryPerUser: 1000,
     allowAnalytics: true,
     searchSuggestions: true,
     autoSync: true,
-    cacheResults: true,
-    // 新增：搜索源状态检查设置
-	checkSourceStatus: false,               // 是否启用搜索源状态检查
-    sourceStatusCheckTimeout: 10000,        // 状态检查超时时间
-    sourceStatusCacheDuration: 300000,      // 状态缓存持续时间（5分钟）
-    skipUnavailableSources: true,          // 是否跳过不可用的搜索源
-    showSourceStatus: true,                // 是否在结果中显示搜索源状态
-    retryFailedSources: false,             // 是否重试失败的搜索源
-    quickSearch: false,                    // 快速搜索模式
-    thoroughCheck: false                   // 彻底检查模式
-
+    cacheResults: true
   },
   
-  // 搜索源管理相关常量
+  // 🔧 新增：搜索源管理相关常量
   SOURCE_MANAGEMENT: {
     DEFAULT_CATEGORY: 'others',
     SORT_OPTIONS: {
@@ -525,8 +415,6 @@ export const APP_CONSTANTS = {
       NAME_DESC: 'name_desc',
       CATEGORY: 'category',
       PRIORITY: 'priority',
-      STATUS: 'status', // 新增：按状态排序
-      RESPONSE_TIME: 'response_time', // 新增：按响应时间排序
       CREATED_DATE: 'created_date'
     },
     FILTER_OPTIONS: {
@@ -534,24 +422,7 @@ export const APP_CONSTANTS = {
       BUILTIN: 'builtin',
       CUSTOM: 'custom',
       ENABLED: 'enabled',
-      DISABLED: 'disabled',
-      ONLINE: 'online', // 新增：在线状态
-      OFFLINE: 'offline', // 新增：离线状态
-      ERROR: 'error' // 新增：错误状态
-    },
-    // 新增：状态检查相关选项
-    STATUS_CHECK_OPTIONS: {
-      CHECK_METHODS: {
-        FAVICON: 'favicon',
-        IMAGE: 'image',
-        FETCH: 'fetch',
-        CUSTOM: 'custom'
-      },
-      DEFAULT_TIMEOUT: 8000,
-      MIN_TIMEOUT: 1000,
-      MAX_TIMEOUT: 30000,
-      RETRY_ATTEMPTS: 1,
-      CACHE_DURATION: 300000
+      DISABLED: 'disabled'
     }
   }
 };
