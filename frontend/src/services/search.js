@@ -5,7 +5,8 @@ import { validateSearchKeyword } from '../utils/validation.js';
 import { showToast } from '../utils/dom.js';
 import apiService from './api.js';
 import authManager from './auth.js';
-import EnhancedSearchSourceChecker from './enhanced-source-checker.js';
+import EnhancedSearchSourceChecker from './advanced-source-checker.js';
+import { AdvancedSearchUI } from '../components/advanced-search-ui.js';
 
 class SearchService {
   constructor() {
@@ -14,7 +15,7 @@ class SearchService {
     this.userSettings = null;
     
     // 使用增强的搜索源检查器
-    this.sourceChecker = new EnhancedSearchSourceChecker();
+    this.sourceChecker = new AdvancedSourceChecker();
   }
 
   /**
