@@ -1,23 +1,20 @@
-// 增强版搜索源状态检查服务 - 提高准确性和可靠性
+// 修复版搜索源状态检查服务 - 解决CORS问题
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast } from '../utils/dom.js';
 
-class EnhancedSourceChecker {
+class FixedSourceChecker {
   constructor() {
     this.statusCache = new Map();
     this.retryQueue = new Map();
     this.activeChecks = new Set();
     
-    // 检查策略配置
+    // 修改检查策略 - 避免CORS问题
     this.checkStrategies = [
-      { method: 'HEAD', weight: 0.4, timeout: 5000 },
-      { method: 'GET', weight: 0.6, timeout: 8000, maxBytes: 1024 }
+      { method: 'no-cors-head', weight: 0.6, timeout: 5000 },
+      { method: 'image-fallback', weight: 0.4, timeout: 8000 }
     ];
     
-    // 域名健康度缓存
     this.domainHealth = new Map();
-    
-    // 网络质量检测
     this.networkQuality = {
       rtt: 0,
       bandwidth: 0,
@@ -25,10 +22,9 @@ class EnhancedSourceChecker {
     };
   }
 
-  // 主要的状态检查方法 - 使用多策略验证
+  // 主要的状态检查方法 - 使用CORS友好的策略
   async checkSourceStatus(source, userSettings = {}) {
     const sourceId = source.id;
-    const cacheKey = `status_${sourceId}`;
     
     // 防止重复检查
     if (this.activeChecks.has(sourceId)) {
@@ -48,31 +44,13 @@ class EnhancedSourceChecker {
     this.activeChecks.add(sourceId);
 
     try {
-      // 预检查：域名DNS解析和基础连通性
-      const preCheckResult = await this.performPreCheck(source);
-      if (!preCheckResult.success) {
-        const result = {
-          status: preCheckResult.status,
-          lastChecked: Date.now(),
-          error: preCheckResult.error,
-          responseTime: preCheckResult.responseTime || 0
-        };
-        this.cacheResult(sourceId, result, userSettings);
-        return result;
-      }
-
-      // 主检查：使用多种策略验证
-      const mainCheckResult = await this.performMainCheck(source, userSettings);
+      // 使用CORS友好的检查方法
+      const checkResult = await this.performCORSFriendlyCheck(source, userSettings);
       
-      // 后验证：对可疑结果进行二次确认
-      const finalResult = await this.performPostValidation(source, mainCheckResult, userSettings);
+      this.cacheResult(sourceId, checkResult, userSettings);
+      this.updateDomainHealth(source, checkResult);
       
-      this.cacheResult(sourceId, finalResult, userSettings);
-      
-      // 更新域名健康度
-      this.updateDomainHealth(source, finalResult);
-      
-      return finalResult;
+      return checkResult;
 
     } catch (error) {
       console.error(`检查源状态失败 ${sourceId}:`, error);
@@ -91,307 +69,230 @@ class EnhancedSourceChecker {
     }
   }
 
-  // 预检查：DNS解析和基础连通性
-  async performPreCheck(source) {
-    try {
-      const url = new URL(source.urlTemplate.replace('{keyword}', 'test'));
-      const hostname = url.hostname;
-      
-      // 检查域名是否在黑名单中
-      if (this.isHostnameBlacklisted(hostname)) {
-        return {
-          success: false,
-          status: APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE,
-          error: '域名在黑名单中'
-        };
-      }
-
-      // DNS预解析检查（使用简单的连接测试）
-      const dnsStart = Date.now();
-      try {
-        // 使用fetch进行快速DNS解析检查
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 3000);
-        
-        await fetch(`https://${hostname}/favicon.ico`, {
-          method: 'HEAD',
-          signal: controller.signal,
-          mode: 'no-cors' // 避免CORS问题
-        });
-        
-        const dnsTime = Date.now() - dnsStart;
-        
-        // DNS解析时间过长可能表示网络问题
-        if (dnsTime > 2000) {
-          console.warn(`${hostname} DNS解析较慢: ${dnsTime}ms`);
-        }
-        
-        return { success: true, dnsTime };
-        
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          return {
-            success: false,
-            status: APP_CONSTANTS.SOURCE_STATUS.TIMEOUT,
-            error: 'DNS解析超时',
-            responseTime: Date.now() - dnsStart
-          };
-        }
-        
-        // 网络错误通常意味着连接问题
-        return {
-          success: false,
-          status: APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE,
-          error: 'DNS解析失败',
-          responseTime: Date.now() - dnsStart
-        };
-      }
-      
-    } catch (error) {
-      return {
-        success: false,
-        status: APP_CONSTANTS.SOURCE_STATUS.ERROR,
-        error: `预检查失败: ${error.message}`
-      };
-    }
-  }
-
-  // 主检查：多策略验证
-  async performMainCheck(source, userSettings) {
+  // CORS友好的检查方法
+  async performCORSFriendlyCheck(source, userSettings) {
     const testUrl = source.urlTemplate.replace('{keyword}', 'test');
     const timeout = (userSettings.sourceStatusCheckTimeout || 8) * 1000;
     
-    const results = [];
+    console.log(`开始检查源: ${source.name} - ${testUrl}`);
     
-    // 并发执行多个检查策略
-    const checkPromises = this.checkStrategies.map(strategy => 
-      this.executeCheckStrategy(testUrl, strategy, timeout)
-    );
+    // 策略1: 使用no-cors模式进行基础连接测试
+    const noCorsResult = await this.checkWithNoCORS(testUrl, timeout);
     
-    const strategyResults = await Promise.allSettled(checkPromises);
+    // 策略2: 使用图片加载测试favicon可达性
+    const faviconResult = await this.checkFavicon(testUrl, timeout);
     
-    // 分析结果并计算加权分数
-    let totalWeight = 0;
-    let availableWeight = 0;
+    // 策略3: 使用script标签测试资源可达性
+    const scriptResult = await this.checkWithScript(testUrl, timeout);
     
-    strategyResults.forEach((result, index) => {
-      const strategy = this.checkStrategies[index];
-      totalWeight += strategy.weight;
-      
-      if (result.status === 'fulfilled' && result.value.success) {
-        availableWeight += strategy.weight;
-        results.push(result.value);
-      } else {
-        results.push({
-          success: false,
-          error: result.reason?.message || '检查失败',
-          strategy: strategy.method
-        });
-      }
-    });
-    
-    // 计算可用性分数
-    const availabilityScore = totalWeight > 0 ? availableWeight / totalWeight : 0;
-    
-    // 根据分数和结果模式确定最终状态
-    const finalStatus = this.determineStatus(availabilityScore, results);
-    
-    return {
-      status: finalStatus,
-      lastChecked: Date.now(),
-      availabilityScore,
-      responseTime: this.calculateAverageResponseTime(results),
-      checkDetails: results.map(r => ({
-        success: r.success,
-        responseTime: r.responseTime || 0,
-        httpStatus: r.httpStatus,
-        error: r.error
-      }))
-    };
+    // 综合分析结果
+    return this.analyzeCheckResults([noCorsResult, faviconResult, scriptResult], source);
   }
 
-  // 执行单个检查策略
-  async executeCheckStrategy(url, strategy, globalTimeout) {
+  // 使用no-cors模式检查
+  async checkWithNoCORS(url, timeout) {
     const startTime = Date.now();
-    const timeout = Math.min(strategy.timeout, globalTimeout);
-    
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
     
     try {
-      const options = {
-        method: strategy.method,
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'no-cors', // 关键：使用no-cors模式
         signal: controller.signal,
+        cache: 'no-cache',
         headers: {
-          'User-Agent': 'MagnetSearch-StatusChecker/1.0',
-          'Accept': strategy.method === 'GET' ? 'text/html,*/*' : '*/*',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        },
-        mode: 'cors',
-        credentials: 'omit'
-      };
-      
-      const response = await fetch(url, options);
-      const responseTime = Date.now() - startTime;
+          'User-Agent': 'MagnetSearch-StatusChecker/1.0'
+        }
+      });
       
       clearTimeout(timeoutId);
+      const responseTime = Date.now() - startTime;
       
-      // 对于GET请求，尝试读取部分内容以确认服务正常
-      let contentCheck = true;
-      if (strategy.method === 'GET' && response.ok) {
-        contentCheck = await this.validateResponseContent(response, strategy.maxBytes || 1024);
-      }
-      
-      const success = response.ok && contentCheck;
+      // no-cors模式下，成功的请求通常返回opaque响应
+      const success = response.type === 'opaque' || response.ok;
       
       return {
+        method: 'no-cors',
         success,
-        httpStatus: response.status,
-        statusText: response.statusText,
         responseTime,
-        contentLength: response.headers.get('content-length'),
-        contentType: response.headers.get('content-type'),
-        server: response.headers.get('server'),
-        strategy: strategy.method
+        type: response.type,
+        status: response.status || 0
       };
       
     } catch (error) {
       clearTimeout(timeoutId);
       const responseTime = Date.now() - startTime;
       
-      if (error.name === 'AbortError') {
-        return {
-          success: false,
-          error: `${strategy.method}请求超时`,
-          responseTime,
-          strategy: strategy.method
-        };
-      }
-      
       return {
+        method: 'no-cors',
         success: false,
         error: error.message,
         responseTime,
-        strategy: strategy.method
+        isTimeout: error.name === 'AbortError'
       };
     }
   }
 
-  // 验证响应内容
-  async validateResponseContent(response, maxBytes) {
+  // 使用favicon检查域名可达性
+  async checkFavicon(originalUrl, timeout) {
+    const startTime = Date.now();
+    
     try {
-      const reader = response.body.getReader();
-      let bytesRead = 0;
-      let hasValidContent = false;
+      const url = new URL(originalUrl);
+      const faviconUrl = `${url.protocol}//${url.hostname}/favicon.ico`;
       
-      while (bytesRead < maxBytes) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      return new Promise((resolve) => {
+        const img = new Image();
+        const timeoutId = setTimeout(() => {
+          img.src = ''; // 取消加载
+          resolve({
+            method: 'favicon',
+            success: false,
+            error: '超时',
+            responseTime: Date.now() - startTime,
+            isTimeout: true
+          });
+        }, timeout);
         
-        bytesRead += value.length;
+        img.onload = () => {
+          clearTimeout(timeoutId);
+          resolve({
+            method: 'favicon',
+            success: true,
+            responseTime: Date.now() - startTime
+          });
+        };
         
-        // 检查是否包含HTML标签或其他有效内容指示
-        const chunk = new TextDecoder().decode(value);
-        if (chunk.includes('<html') || chunk.includes('<HTML') || 
-            chunk.includes('<body') || chunk.includes('<title')) {
-          hasValidContent = true;
-          break;
-        }
-      }
-      
-      reader.releaseLock();
-      return hasValidContent || bytesRead > 100; // 如果有足够内容也认为有效
+        img.onerror = () => {
+          clearTimeout(timeoutId);
+          resolve({
+            method: 'favicon',
+            success: false,
+            error: '加载失败',
+            responseTime: Date.now() - startTime
+          });
+        };
+        
+        img.src = faviconUrl;
+      });
       
     } catch (error) {
-      console.warn('内容验证失败:', error);
-      return true; // 内容验证失败时不影响主要检查结果
+      return {
+        method: 'favicon',
+        success: false,
+        error: error.message,
+        responseTime: Date.now() - startTime
+      };
     }
   }
 
-  // 后验证：对可疑结果进行二次确认
-  async performPostValidation(source, mainResult, userSettings) {
-    // 如果主检查结果确信度很高，直接返回
-    if (mainResult.availabilityScore >= 0.8 || mainResult.availabilityScore <= 0.2) {
-      return mainResult;
-    }
-    
-    // 对于不确定的结果，进行二次验证
-    console.log(`对 ${source.name} 进行二次验证，分数: ${mainResult.availabilityScore}`);
+  // 使用动态script标签检查
+  async checkWithScript(url, timeout) {
+    const startTime = Date.now();
     
     try {
-      const testUrl = source.urlTemplate.replace('{keyword}', 'verification');
-      const quickCheck = await this.executeCheckStrategy(testUrl, 
-        { method: 'HEAD', timeout: 3000 }, 5000);
+      const urlObj = new URL(url);
+      // 尝试加载一个可能存在的JS文件
+      const scriptUrl = `${urlObj.protocol}//${urlObj.hostname}/robots.txt`;
       
-      if (quickCheck.success && mainResult.availabilityScore >= 0.4) {
-        return {
-          ...mainResult,
-          status: APP_CONSTANTS.SOURCE_STATUS.AVAILABLE,
-          verified: true
+      return new Promise((resolve) => {
+        const script = document.createElement('script');
+        const timeoutId = setTimeout(() => {
+          document.head.removeChild(script);
+          resolve({
+            method: 'script',
+            success: false,
+            error: '超时',
+            responseTime: Date.now() - startTime,
+            isTimeout: true
+          });
+        }, timeout);
+        
+        script.onload = () => {
+          clearTimeout(timeoutId);
+          document.head.removeChild(script);
+          resolve({
+            method: 'script',
+            success: true,
+            responseTime: Date.now() - startTime
+          });
         };
-      } else if (!quickCheck.success && mainResult.availabilityScore <= 0.6) {
-        return {
-          ...mainResult,
-          status: APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE,
-          verified: true
+        
+        script.onerror = () => {
+          clearTimeout(timeoutId);
+          document.head.removeChild(script);
+          // 对于script标签，404等错误也说明服务器是可达的
+          resolve({
+            method: 'script',
+            success: true, // 能收到错误响应说明服务器在线
+            responseTime: Date.now() - startTime,
+            note: '服务器可达（404等正常响应）'
+          });
         };
-      }
+        
+        script.src = scriptUrl;
+        script.async = true;
+        document.head.appendChild(script);
+      });
       
     } catch (error) {
-      console.warn('二次验证失败:', error);
+      return {
+        method: 'script',
+        success: false,
+        error: error.message,
+        responseTime: Date.now() - startTime
+      };
     }
-    
-    return mainResult;
   }
 
-  // 根据分数和结果确定最终状态
-  determineStatus(score, results) {
-    if (score >= 0.7) {
-      return APP_CONSTANTS.SOURCE_STATUS.AVAILABLE;
-    } else if (score <= 0.3) {
-      // 检查是否所有结果都是超时
-      const allTimeout = results.every(r => 
-        !r.success && (r.error?.includes('超时') || r.error?.includes('timeout'))
-      );
-      
-      return allTimeout ? 
-        APP_CONSTANTS.SOURCE_STATUS.TIMEOUT : 
-        APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE;
+  // 分析检查结果
+  analyzeCheckResults(results, source) {
+    const successCount = results.filter(r => r.success).length;
+    const totalCount = results.length;
+    const successRate = successCount / totalCount;
+    
+    // 计算平均响应时间
+    const validResponseTimes = results
+      .filter(r => r.responseTime && r.responseTime > 0)
+      .map(r => r.responseTime);
+    const avgResponseTime = validResponseTimes.length > 0 
+      ? Math.round(validResponseTimes.reduce((a, b) => a + b, 0) / validResponseTimes.length)
+      : 0;
+    
+    // 检查是否有超时
+    const hasTimeout = results.some(r => r.isTimeout);
+    
+    // 决定最终状态
+    let status;
+    if (successRate >= 0.5) {
+      status = APP_CONSTANTS.SOURCE_STATUS.AVAILABLE;
+    } else if (hasTimeout && successRate === 0) {
+      status = APP_CONSTANTS.SOURCE_STATUS.TIMEOUT;
     } else {
-      // 中等分数时需要更仔细的判断
-      const hasSuccessfulCheck = results.some(r => r.success);
-      const hasTimeoutError = results.some(r => 
-        r.error?.includes('超时') || r.error?.includes('timeout')
-      );
-      
-      if (hasSuccessfulCheck) {
-        return APP_CONSTANTS.SOURCE_STATUS.AVAILABLE;
-      } else if (hasTimeoutError) {
-        return APP_CONSTANTS.SOURCE_STATUS.TIMEOUT;
-      } else {
-        return APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE;
-      }
+      status = APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE;
     }
-  }
-
-  // 计算平均响应时间
-  calculateAverageResponseTime(results) {
-    const validResults = results.filter(r => r.responseTime && r.responseTime > 0);
-    if (validResults.length === 0) return 0;
     
-    const totalTime = validResults.reduce((sum, r) => sum + r.responseTime, 0);
-    return Math.round(totalTime / validResults.length);
+    console.log(`${source.name} 检查结果: 成功率 ${successRate}, 状态 ${status}`);
+    
+    return {
+      status,
+      lastChecked: Date.now(),
+      responseTime: avgResponseTime,
+      successRate,
+      checkDetails: results,
+      method: 'cors-friendly'
+    };
   }
 
-  // 批量检查多个搜索源
+  // 简化的批量检查
   async checkMultipleSources(sources, userSettings = {}) {
-    const concurrency = userSettings.maxConcurrentChecks || 3;
+    const concurrency = Math.min(userSettings.maxConcurrentChecks || 2, 3); // 降低并发数
     const results = [];
     
     console.log(`开始批量检查 ${sources.length} 个搜索源，并发数: ${concurrency}`);
     
-    // 分批处理
+    // 分批处理，增加延迟
     for (let i = 0; i < sources.length; i += concurrency) {
       const batch = sources.slice(i, i + concurrency);
       const batchPromises = batch.map(source => 
@@ -410,16 +311,52 @@ class EnhancedSourceChecker {
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
       
-      // 批次间短暂延迟，避免过度请求
+      // 增加批次间延迟
       if (i + concurrency < sources.length) {
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
     
     return results;
   }
 
-  // 缓存管理
+  // 备用检查方法：基于域名解析
+  async performDNSCheck(hostname) {
+    try {
+      // 使用一个始终存在的公共资源测试域名解析
+      const testUrl = `https://${hostname}/favicon.ico`;
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 3000);
+      
+      const response = await fetch(testUrl, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        signal: controller.signal
+      });
+      
+      // 即使是错误响应，也说明域名可解析
+      return {
+        success: true,
+        method: 'dns-check',
+        note: '域名可解析'
+      };
+      
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        return { success: false, error: '域名解析超时' };
+      }
+      
+      // 网络错误可能表示域名不可达
+      if (error.message.includes('ERR_NAME_NOT_RESOLVED')) {
+        return { success: false, error: '域名不存在' };
+      }
+      
+      // 其他错误可能是网络问题，不能确定域名状态
+      return { success: null, error: error.message };
+    }
+  }
+
+  // 缓存管理方法保持不变
   getCachedStatus(sourceId) {
     return this.statusCache.get(`status_${sourceId}`);
   }
@@ -430,12 +367,11 @@ class EnhancedSourceChecker {
     const cacheDuration = (userSettings.sourceStatusCacheDuration || 300) * 1000;
     const age = Date.now() - cached.lastChecked;
     
-    // 根据状态调整缓存有效期
     const statusMultiplier = {
       [APP_CONSTANTS.SOURCE_STATUS.AVAILABLE]: 1.0,
-      [APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE]: 0.5, // 不可用状态缓存时间减半
-      [APP_CONSTANTS.SOURCE_STATUS.TIMEOUT]: 0.3,     // 超时状态缓存时间更短
-      [APP_CONSTANTS.SOURCE_STATUS.ERROR]: 0.2        // 错误状态缓存时间最短
+      [APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE]: 0.5,
+      [APP_CONSTANTS.SOURCE_STATUS.TIMEOUT]: 0.3,
+      [APP_CONSTANTS.SOURCE_STATUS.ERROR]: 0.2
     };
     
     const multiplier = statusMultiplier[cached.status] || 1.0;
@@ -451,14 +387,12 @@ class EnhancedSourceChecker {
       timestamp: Date.now()
     });
     
-    // 限制缓存大小
     if (this.statusCache.size > 1000) {
       const oldestKey = this.statusCache.keys().next().value;
       this.statusCache.delete(oldestKey);
     }
   }
 
-  // 域名健康度管理
   updateDomainHealth(source, result) {
     try {
       const hostname = new URL(source.urlTemplate.replace('{keyword}', 'test')).hostname;
@@ -486,90 +420,10 @@ class EnhancedSourceChecker {
     }
   }
 
-  getDomainHealth(hostname) {
-    return this.domainHealth.get(hostname) || {
-      successRate: 0.5,
-      successCount: 0,
-      totalCount: 0
-    };
-  }
-
-  // 黑名单检查
-  isHostnameBlacklisted(hostname) {
-    const blacklist = [
-      'localhost',
-      '127.0.0.1',
-      '0.0.0.0',
-      '192.168.',
-      '10.',
-      '172.16.'
-    ];
-    
-    return blacklist.some(blocked => hostname.includes(blocked));
-  }
-
-  // 网络质量自适应
-  async detectNetworkQuality() {
-    const start = Date.now();
-    
-    try {
-      // 使用多个CDN端点测试网络质量
-      const testEndpoints = [
-        'https://www.google.com/favicon.ico',
-        'https://www.cloudflare.com/favicon.ico',
-        'https://cdn.jsdelivr.net/gh/jquery/jquery@3.6.0/dist/jquery.min.js'
-      ];
-      
-      const promises = testEndpoints.map(url => 
-        fetch(url, { method: 'HEAD', mode: 'no-cors' })
-          .then(() => Date.now() - start)
-          .catch(() => Infinity)
-      );
-      
-      const results = await Promise.all(promises);
-      const validResults = results.filter(time => time !== Infinity);
-      
-      if (validResults.length > 0) {
-        this.networkQuality.rtt = Math.min(...validResults);
-        this.networkQuality.lastUpdate = Date.now();
-        
-        // 根据网络质量调整检查策略
-        this.adaptCheckStrategies();
-      }
-      
-    } catch (error) {
-      console.warn('网络质量检测失败:', error);
-    }
-  }
-
-  adaptCheckStrategies() {
-    const { rtt } = this.networkQuality;
-    
-    if (rtt > 2000) {
-      // 网络较慢时，减少GET请求权重
-      this.checkStrategies[0].weight = 0.7; // HEAD
-      this.checkStrategies[1].weight = 0.3; // GET
-    } else if (rtt < 500) {
-      // 网络较快时，增加GET请求权重以获得更准确结果
-      this.checkStrategies[0].weight = 0.3; // HEAD
-      this.checkStrategies[1].weight = 0.7; // GET
-    }
-  }
-
-  // 统计和监控
-  getCheckingStats() {
-    return {
-      cacheSize: this.statusCache.size,
-      activeChecks: this.activeChecks.size,
-      domainHealthEntries: this.domainHealth.size,
-      networkQuality: this.networkQuality
-    };
-  }
-
-  // 清理过期缓存
+  // 清理方法
   cleanupExpiredCache() {
     const now = Date.now();
-    const maxAge = 24 * 60 * 60 * 1000; // 24小时
+    const maxAge = 24 * 60 * 60 * 1000;
     
     for (const [key, value] of this.statusCache.entries()) {
       if (now - value.timestamp > maxAge) {
@@ -580,30 +434,23 @@ class EnhancedSourceChecker {
     console.log(`缓存清理完成，剩余 ${this.statusCache.size} 个条目`);
   }
 
-  // 导出检查结果用于分析
-  exportCheckResults() {
-    const results = {
-      cache: Array.from(this.statusCache.entries()),
-      domainHealth: Array.from(this.domainHealth.entries()),
-      networkQuality: this.networkQuality,
-      timestamp: Date.now()
+  // 获取统计信息
+  getCheckingStats() {
+    return {
+      cacheSize: this.statusCache.size,
+      activeChecks: this.activeChecks.size,
+      domainHealthEntries: this.domainHealth.size,
+      networkQuality: this.networkQuality
     };
-    
-    return JSON.stringify(results, null, 2);
   }
 }
 
-// 创建全局实例
-export const enhancedSourceChecker = new EnhancedSourceChecker();
+// 创建修复版实例
+export const fixedSourceChecker = new FixedSourceChecker();
 
 // 定期清理缓存
 setInterval(() => {
-  enhancedSourceChecker.cleanupExpiredCache();
-}, 60 * 60 * 1000); // 每小时清理一次
+  fixedSourceChecker.cleanupExpiredCache();
+}, 60 * 60 * 1000);
 
-// 定期检测网络质量
-setInterval(() => {
-  enhancedSourceChecker.detectNetworkQuality();
-}, 5 * 60 * 1000); // 每5分钟检测一次
-
-export default enhancedSourceChecker;
+export default fixedSourceChecker;
