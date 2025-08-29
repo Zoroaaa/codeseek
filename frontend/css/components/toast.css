@@ -1,44 +1,535 @@
-/* Toast通知增强 */
-.toast {
+/* 现代化通知系统 */
+
+/* Toast 容器 */
+.toast-container {
   position: fixed;
-  top: 1.5rem;
-  right: 1.5rem;
+  top: var(--space-6);
+  right: var(--space-6);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  pointer-events: none;
+  max-width: 24rem;
+}
+
+/* Toast 基础样式 */
+.toast {
+  position: relative;
   background: var(--gradient-primary);
   color: white;
-  padding: 1rem 1.5rem;
-  border-radius: var(--radius-lg);
-  z-index: 1001;
-  transform: translateX(400px);
-  transition: var(--transition-base);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
-  max-width: 320px;
   font-weight: 500;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  pointer-events: auto;
+  transform: translateX(120%);
+  opacity: 0;
+  transition: all var(--duration-300) var(--ease-out);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .toast.show {
   transform: translateX(0);
+  opacity: 1;
+}
+
+.toast.hide {
+  transform: translateX(120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Toast 图标 */
+.toast-icon {
+  flex-shrink: 0;
+  font-size: var(--text-lg);
+  margin-top: 1px;
+}
+
+/* Toast 内容 */
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+  line-height: var(--leading-tight);
+}
+
+.toast-message {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  opacity: 0.9;
+}
+
+/* Toast 关闭按钮 */
+.toast-close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: var(--radius-full);
+  color: white;
+  cursor: pointer;
+  font-size: var(--text-xs);
+  line-height: 1;
+  transition: var(--transition-fast);
+  opacity: 0.8;
+}
+
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Toast 进度条 */
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  transform-origin: left;
+  animation: toast-progress 5s linear;
+}
+
+/* Toast 类型样式 */
+.toast.success {
+  background: linear-gradient(135deg, var(--success) 0%, var(--success-600) 100%);
 }
 
 .toast.error {
-  background: var(--error-color);
-}
-
-.toast.success {
-  background: var(--success-color);
+  background: linear-gradient(135deg, var(--error) 0%, var(--error-600) 100%);
 }
 
 .toast.warning {
-  background: var(--warning-color);
+  background: linear-gradient(135deg, var(--warning) 0%, var(--warning-600) 100%);
 }
 
 .toast.info {
-  background: var(--info-color);
+  background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+}
+
+/* 带操作的 Toast */
+.toast-with-action {
+  padding-bottom: var(--space-3);
+}
+
+.toast-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  justify-content: flex-end;
+}
+
+.toast-action {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.toast-action:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.toast-action.primary {
+  background: white;
+  color: var(--text-primary);
+  border-color: white;
+}
+
+.toast-action.primary:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* Toast 动画 */
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+@keyframes toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Toast 弹跳效果 */
+.toast.bounce {
+  animation: toast-bounce var(--duration-500) var(--ease-out);
+}
+
+@keyframes toast-bounce {
+  0%, 20%, 40%, 60%, 80%, 100% {
+    animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+  0% {
+    opacity: 0;
+    transform: scale3d(0.3, 0.3, 0.3) translateX(120%);
+  }
+  20% {
+    transform: scale3d(1.1, 1.1, 1.1) translateX(0);
+  }
+  40% {
+    transform: scale3d(0.9, 0.9, 0.9) translateX(0);
+  }
+  60% {
+    opacity: 1;
+    transform: scale3d(1.03, 1.03, 1.03) translateX(0);
+  }
+  80% {
+    transform: scale3d(0.97, 0.97, 0.97) translateX(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale3d(1, 1, 1) translateX(0);
+  }
+}
+
+/* 堆叠 Toast */
+.toast:nth-child(n+2) {
+  margin-top: calc(-1 * var(--space-2));
+  transform: scale(0.95) translateX(120%);
+  opacity: 0.8;
+  z-index: -1;
+}
+
+.toast.show:nth-child(n+2) {
+  transform: scale(0.95) translateX(0);
+}
+
+.toast:nth-child(n+3) {
+  transform: scale(0.9) translateX(120%);
+  opacity: 0.6;
+  z-index: -2;
+}
+
+.toast.show:nth-child(n+3) {
+  transform: scale(0.9) translateX(0);
+}
+
+/* 特殊 Toast 类型 */
+.toast.loading {
+  pointer-events: none;
+}
+
+.toast.loading .toast-icon {
+  animation: spin 1s linear infinite;
+}
+
+.toast.persistent .toast-progress {
+  display: none;
+}
+
+/* 紧凑模式 */
+.toast.compact {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-xs);
+}
+
+.toast.compact .toast-title {
+  font-size: var(--text-xs);
+}
+
+.toast.compact .toast-close {
+  width: 1.25rem;
+  height: 1.25rem;
+  top: var(--space-1);
+  right: var(--space-1);
+}
+
+/* 大尺寸 Toast */
+.toast.large {
+  padding: var(--space-6) var(--space-8);
+  max-width: 28rem;
+}
+
+.toast.large .toast-title {
+  font-size: var(--text-base);
+  margin-bottom: var(--space-2);
+}
+
+.toast.large .toast-message {
+  font-size: var(--text-sm);
+}
+
+.toast.large .toast-icon {
+  font-size: var(--text-xl);
+}
+
+/* 全宽 Toast */
+.toast.full-width {
+  max-width: none;
+  left: var(--space-6);
+  right: var(--space-6);
+  transform: translateY(-120%);
+}
+
+.toast.full-width.show {
+  transform: translateY(0);
+}
+
+.toast.full-width.hide {
+  transform: translateY(-120%);
+}
+
+/* 底部 Toast */
+.toast-container.bottom {
+  top: auto;
+  bottom: var(--space-6);
+  flex-direction: column-reverse;
+}
+
+.toast-container.bottom .toast {
+  transform: translateY(120%);
+}
+
+.toast-container.bottom .toast.show {
+  transform: translateY(0);
+}
+
+.toast-container.bottom .toast.hide {
+  transform: translateY(120%);
+}
+
+/* 左侧 Toast */
+.toast-container.left {
+  right: auto;
+  left: var(--space-6);
+}
+
+.toast-container.left .toast {
+  transform: translateX(-120%);
+}
+
+.toast-container.left .toast.show {
+  transform: translateX(0);
+}
+
+.toast-container.left .toast.hide {
+  transform: translateX(-120%);
+}
+
+/* 居中 Toast */
+.toast-container.center {
+  right: 50%;
+  transform: translateX(50%);
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .toast {
-    right: 1rem;
-    max-width: calc(100vw - 2rem);
+  .toast-container {
+    right: var(--space-4);
+    max-width: calc(100vw - var(--space-8));
   }
+  
+  .toast {
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-sm);
+  }
+  
+  .toast.large {
+    padding: var(--space-4) var(--space-5);
+    max-width: none;
+  }
+  
+  .toast-container.left {
+    left: var(--space-4);
+  }
+  
+  .toast.full-width {
+    left: var(--space-4);
+    right: var(--space-4);
+  }
+}
+
+@media (max-width: 480px) {
+  .toast-container {
+    top: var(--space-4);
+    right: var(--space-3);
+    bottom: var(--space-4);
+    left: var(--space-3);
+    max-width: none;
+  }
+  
+  .toast-container.bottom {
+    bottom: var(--space-4);
+  }
+  
+  .toast-container.left {
+    left: var(--space-3);
+  }
+  
+  .toast {
+    font-size: var(--text-sm);
+    border-radius: var(--radius-lg);
+  }
+  
+  .toast-title {
+    font-size: var(--text-sm);
+  }
+  
+  .toast-actions {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  
+  .toast-action {
+    text-align: center;
+    padding: var(--space-2) var(--space-4);
+  }
+}
+
+/* 深色模式适配 */
+[data-theme="dark"] .toast {
+  border-color: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+}
+
+[data-theme="dark"] .toast-close {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .toast-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .toast-action {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .toast-action:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* 高对比度支持 */
+@media (prefers-contrast: high) {
+  .toast {
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+  
+  .toast-close {
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+  
+  .toast-action {
+    border-width: 2px;
+  }
+}
+
+/* 无障碍增强 */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+    transition: opacity var(--duration-200) var(--ease-out);
+  }
+  
+  .toast.show {
+    transform: translateX(0);
+  }
+  
+  .toast.hide {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  
+  .toast-progress {
+    animation: none;
+  }
+  
+  .toast.loading .toast-icon {
+    animation: none;
+  }
+  
+  .toast.bounce {
+    animation: none;
+  }
+}
+
+/* 打印时隐藏 */
+@media print {
+  .toast,
+  .toast-container {
+    display: none !important;
+  }
+}
+
+/* 旋转动画 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Toast 队列管理 */
+.toast-queue-limit .toast:nth-child(n+4) {
+  display: none;
+}
+
+/* 拖动关闭效果 */
+.toast.dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+.toast.drag-right {
+  transform: translateX(var(--drag-distance, 0));
+  opacity: calc(1 - var(--drag-progress, 0));
+}
+
+.toast.drag-left {
+  transform: translateX(calc(-1 * var(--drag-distance, 0)));
+  opacity: calc(1 - var(--drag-progress, 0));
 }
