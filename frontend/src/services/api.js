@@ -401,21 +401,29 @@ class APIService {
       throw new Error('搜索源状态检查设置格式错误：必须是布尔值');
     }
     
-    if (validSettings.sourceStatusCheckTimeout !== undefined) {
-      const timeout = parseInt(validSettings.sourceStatusCheckTimeout, 10);
-      if (isNaN(timeout) || timeout < 1 || timeout > 30) {
-        throw new Error('搜索源检查超时时间格式错误：必须是1-30之间的数字');
-      }
-      validSettings.sourceStatusCheckTimeout = timeout;
-    }
+if (validSettings.sourceStatusCheckTimeout !== undefined) {
+    // 前端输入的是秒，转换为毫秒
+    const timeoutMs = parseInt(validSettings.sourceStatusCheckTimeout, 10) * 1000;
     
-    if (validSettings.sourceStatusCacheDuration !== undefined) {
-      const duration = parseInt(validSettings.sourceStatusCacheDuration, 10);
-      if (isNaN(duration) || duration < 60 || duration > 3600) {
-        throw new Error('搜索源状态缓存时间格式错误：必须是60-3600之间的数字');
-      }
-      validSettings.sourceStatusCacheDuration = duration;
+    // 验证毫秒范围
+    if (isNaN(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
+        throw new Error('搜索源检查超时时间格式错误：必须是1-30秒（1000-30000毫秒）');
     }
+    // 存储毫秒值
+    validSettings.sourceStatusCheckTimeout = timeoutMs;
+}
+
+if (validSettings.sourceStatusCacheDuration !== undefined) {
+    // 前端输入的是秒，转换为毫秒
+    const durationMs = parseInt(validSettings.sourceStatusCacheDuration, 10) * 1000;
+    
+    // 验证毫秒范围
+    if (isNaN(durationMs) || durationMs < 60000 || durationMs > 3600000) {
+        throw new Error('搜索源状态缓存时间格式错误：必须是60-3600秒（60000-3600000毫秒）');
+    }
+    // 存储毫秒值
+    validSettings.sourceStatusCacheDuration = durationMs;
+}
     
     if (validSettings.skipUnavailableSources !== undefined && 
         typeof validSettings.skipUnavailableSources !== 'boolean') {

@@ -195,8 +195,6 @@ export class SettingsManager {
       }
       
       showToast('设置保存成功', 'success');
-	  console.log('保存前的用户输入:', settings.sourceStatusCheckTimeout, settings.sourceStatusCacheDuration);
-
       this.markSettingsSaved();
     } catch (error) {
       console.error('保存设置失败:', error);
@@ -237,12 +235,15 @@ export class SettingsManager {
     if (elements.enableSourceStatusCheck) {
       settings.enableSourceStatusCheck = elements.enableSourceStatusCheck.checked;
     }
-    if (elements.sourceCheckTimeout) {
-      settings.sourceCheckTimeout = elements.sourceCheckTimeout.value;
-    }
-    if (elements.sourceStatusCacheDuration) {
-      settings.sourceStatusCacheDuration = elements.sourceStatusCacheDuration.value;
-    }
+// 🆕🆕🆕 加载设置时转换为秒显示
+if (elements.sourceCheckTimeout) {
+    // 后端存储的是毫秒，转换为秒显示
+    elements.sourceCheckTimeout.value = Math.round((settings.sourceStatusCheckTimeout || 8000) / 1000);
+}
+if (elements.sourceStatusCacheDuration) {
+    // 后端存储的是毫秒，转换为秒显示
+    elements.sourceStatusCacheDuration.value = Math.round((settings.sourceStatusCacheDuration || 300000) / 1000);
+}
     if (elements.skipUnavailableSources) {
       settings.skipUnavailableSources = elements.skipUnavailableSources.checked;
     }

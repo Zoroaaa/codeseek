@@ -72,7 +72,7 @@ class FixedSourceChecker {
   // CORS友好的检查方法
   async performCORSFriendlyCheck(source, userSettings) {
     const testUrl = source.urlTemplate.replace('{keyword}', 'test');
-    const timeout = (userSettings.sourceStatusCheckTimeout || 8) * 1000;
+    const timeout = userSettings.sourceStatusCheckTimeout || 8000; // 已经是毫秒值
     
     console.log(`开始检查源: ${source.name} - ${testUrl}`);
     

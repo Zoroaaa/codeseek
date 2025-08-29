@@ -183,12 +183,13 @@ export class SearchManager {
       if (!authManager.isAuthenticated()) return;
 
       const userSettings = await apiService.getUserSettings();
+	  const checkTimeout = userSettings.sourceStatusCheckTimeout || 8000;
       if (!userSettings.checkSourceStatus) return;
 
       this.statusCheckInProgress = true;
 
       // 显示状态检查提示
-      showToast('正在检查搜索源状态...', 'info', 3000);
+      showToast('正在检查搜索源状态...', 'info', checkTimeout);
 
       // 如果页面有状态指示器，显示它
       const statusIndicator = document.getElementById('searchStatusIndicator');
