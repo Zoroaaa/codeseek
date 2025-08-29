@@ -449,15 +449,15 @@
                 <div class="setting-row">
                     <label class="setting-label">检查超时时间</label>
                     <div class="setting-input">
-                        <input type="number" id="sourceCheckTimeout" min="1" max="30" step="1" value="8">
-                        <span class="setting-help">单个搜索源状态检查的超时时间（秒）</span>
+                        <input type="number" id="sourceCheckTimeout" min="1000" max="30000" step="1000" value="8000">
+                        <span class="setting-help">单个搜索源状态检查的超时时间（毫秒）</span>
                     </div>
                 </div>
                 <div class="setting-row">
                     <label class="setting-label">状态缓存时间</label>
                     <div class="setting-input">
-                        <input type="number" id="sourceStatusCacheDuration" min="60" max="3600" step="60" value="300">
-                        <span class="setting-help">搜索源状态缓存有效期（秒），避免频繁检查</span>
+                        <input type="number" id="sourceStatusCacheDuration" min="6000" max="3600000" step="60000" value="300000">
+                        <span class="setting-help">搜索源状态缓存有效期（毫秒），避免频繁检查</span>
                     </div>
                 </div>
             </div>

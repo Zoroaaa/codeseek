@@ -131,10 +131,10 @@ export class SettingsManager {
         elements.enableSourceStatusCheck.checked = settings.checkSourceStatus === true;
       }
       if (elements.sourceCheckTimeout) {
-        elements.sourceCheckTimeout.value = settings.sourceStatusCheckTimeout ?? 8;
+        elements.sourceCheckTimeout.value = settings.sourceStatusCheckTimeout ?? 8000;
       }
       if (elements.sourceStatusCacheDuration) {
-        elements.sourceStatusCacheDuration.value = settings.sourceStatusCacheDuration ?? 300;
+        elements.sourceStatusCacheDuration.value = settings.sourceStatusCacheDuration ?? 300000;
       }
       if (elements.skipUnavailableSources) {
         elements.skipUnavailableSources.checked = settings.skipUnavailableSources !== false;
@@ -171,10 +171,10 @@ export class SettingsManager {
         allowAnalytics: !!ui.allowAnalytics,
         searchSuggestions: !!ui.searchSuggestions,
         
-        // 🆕 搜索源状态检查设置
+// 🆕 搜索源状态检查设置（直接毫秒）
         checkSourceStatus: !!ui.enableSourceStatusCheck,
-        sourceStatusCheckTimeout: parseInt(ui.sourceCheckTimeout, 10) || 8,
-        sourceStatusCacheDuration: parseInt(ui.sourceStatusCacheDuration, 10) || 300,
+        sourceStatusCheckTimeout: parseInt(ui.sourceCheckTimeout, 10) || 8000,
+        sourceStatusCacheDuration: parseInt(ui.sourceStatusCacheDuration, 10) || 300000,
         skipUnavailableSources: !!ui.skipUnavailableSources,
         showSourceStatus: !!ui.showSourceStatus,
         retryFailedSources: !!ui.retryFailedSources

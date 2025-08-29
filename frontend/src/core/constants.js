@@ -41,11 +41,11 @@ export const APP_CONSTANTS = {
     MAX_CATEGORY_NAME_LENGTH: 30,
     MAX_CATEGORY_DESC_LENGTH: 100,
     
-    // 🆕 搜索源状态检查限制
-    MIN_SOURCE_CHECK_TIMEOUT: 1, // 最小超时时间（秒）
-    MAX_SOURCE_CHECK_TIMEOUT: 30, // 最大超时时间（秒）
-    MIN_STATUS_CACHE_DURATION: 60, // 最小缓存时间（秒）
-    MAX_STATUS_CACHE_DURATION: 3600 // 最大缓存时间（秒）
+// 🆕 搜索源状态检查限制（毫秒）
+    MIN_SOURCE_CHECK_TIMEOUT: 1000, // 最小超时时间（毫秒）
+    MAX_SOURCE_CHECK_TIMEOUT: 30000, // 最大超时时间（毫秒）
+    MIN_STATUS_CACHE_DURATION: 60000, // 最小缓存时间（毫秒）
+    MAX_STATUS_CACHE_DURATION: 3600000 // 最大缓存时间（毫秒）
   },
   
   // 主题选项
@@ -435,10 +435,10 @@ export const APP_CONSTANTS = {
     autoSync: true,
     cacheResults: true,
     
-    // 🆕 搜索源状态检查默认设置
+// 🆕 搜索源状态检查默认设置（毫秒）
     checkSourceStatus: false,              // 默认关闭状态检查
-    sourceStatusCheckTimeout: 8,          // 检查超时时间（秒）
-    sourceStatusCacheDuration: 300,       // 状态缓存时间（秒）
+    sourceStatusCheckTimeout: 8000,        // 检查超时时间（毫秒）
+    sourceStatusCacheDuration: 300000,     // 状态缓存时间（毫秒）
     skipUnavailableSources: true,         // 跳过不可用搜索源
     showSourceStatus: true,               // 显示搜索源状态
     retryFailedSources: false             // 不重试失败的搜索源

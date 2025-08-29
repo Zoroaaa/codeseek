@@ -402,8 +402,8 @@ class APIService {
     }
     
 if (validSettings.sourceStatusCheckTimeout !== undefined) {
-    // 前端输入的是秒，转换为毫秒
-    const timeoutMs = parseInt(validSettings.sourceStatusCheckTimeout, 10) * 1000;
+    // 前端输入的是毫秒，转换为毫秒
+    const timeoutMs = parseInt(validSettings.sourceStatusCheckTimeout, 10);
     
     // 验证毫秒范围
     if (isNaN(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
@@ -414,8 +414,8 @@ if (validSettings.sourceStatusCheckTimeout !== undefined) {
 }
 
 if (validSettings.sourceStatusCacheDuration !== undefined) {
-    // 前端输入的是秒，转换为毫秒
-    const durationMs = parseInt(validSettings.sourceStatusCacheDuration, 10) * 1000;
+    // 前端输入的是毫秒，转换为毫秒
+    const durationMs = parseInt(validSettings.sourceStatusCacheDuration, 10) ;
     
     // 验证毫秒范围
     if (isNaN(durationMs) || durationMs < 60000 || durationMs > 3600000) {
