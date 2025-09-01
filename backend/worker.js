@@ -1129,6 +1129,731 @@ async function updateSourceHealthStats(env, result) {
     }
 }
 
+// 社区功能后端API扩展 - 添加到现有 worker.js 文件中
+
+// ==================== 社区搜索源管理API ====================
+
+// 获取社区搜索源列表
+router.get('/api/community/sources', async (request, env) => {
+    try {
+        const url = new URL(request.url);
+        const page = Math.max(parseInt(url.searchParams.get('page') || '1'), 1);
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50);
+        const offset = (page - 1) * limit;
+        
+        const category = url.searchParams.get('category') || 'all';
+        const sortBy = url.searchParams.get('sort') || 'created_at';
+        const order = url.searchParams.get('order') || 'desc';
+        const search = url.searchParams.get('search');
+        const tags = url.searchParams.get('tags');
+        const featured = url.searchParams.get('featured') === 'true';
+        
+        // 构建查询条件
+        let whereConditions = ['status = ?'];
+        let params = ['active'];
+        
+        if (category !== 'all') {
+            whereConditions.push('source_category = ?');
+            params.push(category);
+        }
+        
+        if (search) {
+            whereConditions.push('(source_name LIKE ? OR description LIKE ?)');
+            params.push(`%${search}%`, `%${search}%`);
+        }
+        
+        if (featured) {
+            whereConditions.push('is_featured = ?');
+            params.push(1);
+        }
+        
+        // 构建排序条件
+        const validSortColumns = ['created_at', 'updated_at', 'rating_score', 'download_count', 'like_count', 'view_count'];
+        const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'created_at';
+        const sortOrder = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+        
+        // 查询总数
+        const countQuery = `
+            SELECT COUNT(*) as total FROM community_shared_sources css
+            LEFT JOIN users u ON css.user_id = u.id
+            WHERE ${whereConditions.join(' AND ')}
+        `;
+        const countResult = await env.DB.prepare(countQuery).bind(...params).first();
+        const total = countResult.total;
+        
+        // 查询数据
+        const dataQuery = `
+            SELECT 
+                css.*,
+                u.username as author_name,
+                (SELECT COUNT(*) FROM community_source_reviews WHERE shared_source_id = css.id) as review_count,
+                (SELECT GROUP_CONCAT(tag_name) FROM community_source_tags cst 
+                 WHERE cst.id IN (
+                     SELECT value FROM json_each(css.tags) WHERE json_valid(css.tags)
+                 )) as tag_names
+            FROM community_shared_sources css
+            LEFT JOIN users u ON css.user_id = u.id
+            WHERE ${whereConditions.join(' AND ')}
+            ORDER BY ${sortColumn} ${sortOrder}
+            LIMIT ? OFFSET ?
+        `;
+        
+        const result = await env.DB.prepare(dataQuery).bind(...params, limit, offset).all();
+        
+        const sources = result.results.map(source => ({
+            id: source.id,
+            name: source.source_name,
+            subtitle: source.source_subtitle,
+            icon: source.source_icon,
+            urlTemplate: source.source_url_template,
+            category: source.source_category,
+            description: source.description,
+            tags: source.tag_names ? source.tag_names.split(',') : [],
+            author: {
+                id: source.user_id,
+                name: source.author_name
+            },
+            stats: {
+                downloads: source.download_count,
+                likes: source.like_count,
+                views: source.view_count,
+                rating: source.rating_score,
+                reviewCount: source.review_count
+            },
+            isVerified: Boolean(source.is_verified),
+            isFeatured: Boolean(source.is_featured),
+            createdAt: source.created_at,
+            updatedAt: source.updated_at,
+            lastTestedAt: source.last_tested_at
+        }));
+        
+        return utils.successResponse({
+            sources,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: offset + limit < total,
+                hasPrev: page > 1
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取社区搜索源列表失败:', error);
+        return utils.errorResponse('获取搜索源列表失败', 500);
+    }
+});
+
+// 获取单个搜索源详情
+router.get('/api/community/sources/:id', async (request, env) => {
+    try {
+        const sourceId = request.params.id;
+        
+        // 增加浏览量
+        await env.DB.prepare(`
+            UPDATE community_shared_sources 
+            SET view_count = view_count + 1 
+            WHERE id = ?
+        `).bind(sourceId).run();
+        
+        // 获取搜索源详情
+        const sourceResult = await env.DB.prepare(`
+            SELECT 
+                css.*,
+                u.username as author_name,
+                u.id as author_id,
+                cus.reputation_score as author_reputation,
+                cus.shared_sources_count as author_total_shares
+            FROM community_shared_sources css
+            LEFT JOIN users u ON css.user_id = u.id
+            LEFT JOIN community_user_stats cus ON css.user_id = cus.user_id
+            WHERE css.id = ? AND css.status = ?
+        `).bind(sourceId, 'active').first();
+        
+        if (!sourceResult) {
+            return utils.errorResponse('搜索源不存在', 404);
+        }
+        
+        // 获取评论和评分
+        const reviewsResult = await env.DB.prepare(`
+            SELECT 
+                csr.*,
+                CASE WHEN csr.is_anonymous = 1 THEN '匿名用户' ELSE u.username END as reviewer_name
+            FROM community_source_reviews csr
+            LEFT JOIN users u ON csr.user_id = u.id
+            WHERE csr.shared_source_id = ?
+            ORDER BY csr.created_at DESC
+            LIMIT 10
+        `).bind(sourceId).all();
+        
+        const reviews = reviewsResult.results.map(review => ({
+            id: review.id,
+            rating: review.rating,
+            comment: review.comment,
+            reviewerName: review.reviewer_name,
+            isAnonymous: Boolean(review.is_anonymous),
+            createdAt: review.created_at
+        }));
+        
+        // 获取标签信息
+        const tags = sourceResult.tags ? JSON.parse(sourceResult.tags) : [];
+        const tagDetails = [];
+        
+        if (tags.length > 0) {
+            const tagQuery = `SELECT * FROM community_source_tags WHERE id IN (${tags.map(() => '?').join(',')})`;
+            const tagResult = await env.DB.prepare(tagQuery).bind(...tags).all();
+            tagDetails.push(...tagResult.results.map(tag => ({
+                id: tag.id,
+                name: tag.tag_name,
+                color: tag.tag_color,
+                isOfficial: Boolean(tag.is_official)
+            })));
+        }
+        
+        const source = {
+            id: sourceResult.id,
+            name: sourceResult.source_name,
+            subtitle: sourceResult.source_subtitle,
+            icon: sourceResult.source_icon,
+            urlTemplate: sourceResult.source_url_template,
+            category: sourceResult.source_category,
+            description: sourceResult.description,
+            tags: tagDetails,
+            author: {
+                id: sourceResult.author_id,
+                name: sourceResult.author_name,
+                reputation: sourceResult.author_reputation || 0,
+                totalShares: sourceResult.author_total_shares || 0
+            },
+            stats: {
+                downloads: sourceResult.download_count,
+                likes: sourceResult.like_count,
+                views: sourceResult.view_count,
+                rating: sourceResult.rating_score,
+                reviewCount: sourceResult.rating_count
+            },
+            reviews,
+            isVerified: Boolean(sourceResult.is_verified),
+            isFeatured: Boolean(sourceResult.is_featured),
+            createdAt: sourceResult.created_at,
+            updatedAt: sourceResult.updated_at,
+            lastTestedAt: sourceResult.last_tested_at
+        };
+        
+        return utils.successResponse({ source });
+        
+    } catch (error) {
+        console.error('获取搜索源详情失败:', error);
+        return utils.errorResponse('获取搜索源详情失败', 500);
+    }
+});
+
+// 分享搜索源到社区
+router.post('/api/community/sources', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { name, subtitle, icon, urlTemplate, category, description, tags } = body;
+        
+        // 验证必填字段
+        const missingFields = utils.validateRequiredParams(body, ['name', 'urlTemplate', 'category']);
+        if (missingFields.length > 0) {
+            return utils.errorResponse(`缺少必填字段: ${missingFields.join(', ')}`);
+        }
+        
+        // 验证URL模板
+        if (!urlTemplate.includes('{keyword}')) {
+            return utils.errorResponse('URL模板必须包含{keyword}占位符');
+        }
+        
+        // 验证URL格式
+        try {
+            new URL(urlTemplate.replace('{keyword}', 'test'));
+        } catch (error) {
+            return utils.errorResponse('URL格式无效');
+        }
+        
+        // 检查用户分享限制
+        const userShareCount = await env.DB.prepare(`
+            SELECT COUNT(*) as count FROM community_shared_sources 
+            WHERE user_id = ? AND status IN ('active', 'pending')
+        `).bind(user.id).first();
+        
+        const maxShares = parseInt(env.COMMUNITY_MAX_SHARES_PER_USER || '50');
+        if (userShareCount.count >= maxShares) {
+            return utils.errorResponse(`每个用户最多只能分享${maxShares}个搜索源`);
+        }
+        
+        // 检查是否已存在相同的搜索源
+        const existingSource = await env.DB.prepare(`
+            SELECT id FROM community_shared_sources 
+            WHERE (source_name = ? OR source_url_template = ?) 
+            AND status = 'active'
+        `).bind(name, urlTemplate).first();
+        
+        if (existingSource) {
+            return utils.errorResponse('相同名称或URL的搜索源已存在');
+        }
+        
+        // 创建新的分享搜索源
+        const sourceId = utils.generateId();
+        const now = Date.now();
+        
+        // 处理标签
+        const processedTags = Array.isArray(tags) ? tags.slice(0, 10) : [];
+        
+        await env.DB.prepare(`
+            INSERT INTO community_shared_sources (
+                id, user_id, source_name, source_subtitle, source_icon, 
+                source_url_template, source_category, description, tags,
+                status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+            sourceId, user.id, name.trim(), subtitle?.trim() || null, 
+            icon?.trim() || '🔍', urlTemplate.trim(), category, 
+            description?.trim() || null, JSON.stringify(processedTags),
+            env.COMMUNITY_REQUIRE_APPROVAL === 'true' ? 'pending' : 'active',
+            now, now
+        ).run();
+        
+        // 记录用户行为
+        await utils.logUserAction(env, user.id, 'community_source_shared', {
+            sourceId,
+            sourceName: name,
+            category
+        }, request);
+        
+        const status = env.COMMUNITY_REQUIRE_APPROVAL === 'true' ? 'pending' : 'active';
+        const message = status === 'pending' ? 
+            '搜索源已提交，等待管理员审核' : 
+            '搜索源分享成功';
+        
+        return utils.successResponse({
+            message,
+            sourceId,
+            status
+        });
+        
+    } catch (error) {
+        console.error('分享搜索源失败:', error);
+        return utils.errorResponse('分享搜索源失败: ' + error.message, 500);
+    }
+});
+
+// 下载/采用搜索源
+router.post('/api/community/sources/:id/download', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const sourceId = request.params.id;
+        
+        // 获取搜索源信息
+        const source = await env.DB.prepare(`
+            SELECT * FROM community_shared_sources 
+            WHERE id = ? AND status = 'active'
+        `).bind(sourceId).first();
+        
+        if (!source) {
+            return utils.errorResponse('搜索源不存在', 404);
+        }
+        
+        // 记录下载
+        const downloadId = utils.generateId();
+        const ip = utils.getClientIP(request);
+        const userAgent = request.headers.get('User-Agent') || '';
+        
+        await env.DB.prepare(`
+            INSERT INTO community_source_downloads (
+                id, shared_source_id, user_id, ip_address, user_agent, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(downloadId, sourceId, user.id, ip, userAgent, Date.now()).run();
+        
+        // 获取用户当前的自定义搜索源设置
+        const userSettings = await env.DB.prepare(`
+            SELECT settings FROM users WHERE id = ?
+        `).bind(user.id).first();
+        
+        const settings = userSettings ? JSON.parse(userSettings.settings || '{}') : {};
+        const customSources = settings.customSearchSources || [];
+        
+        // 生成新的搜索源ID
+        const newSourceId = `community_${sourceId}_${Date.now()}`;
+        
+        // 添加到用户的自定义搜索源
+        const newCustomSource = {
+            id: newSourceId,
+            name: source.source_name,
+            subtitle: source.source_subtitle,
+            icon: source.source_icon,
+            urlTemplate: source.source_url_template,
+            category: source.source_category,
+            isCustom: true,
+            isFromCommunity: true,
+            communitySourceId: sourceId,
+            createdAt: Date.now()
+        };
+        
+        customSources.push(newCustomSource);
+        
+        // 添加到启用的搜索源列表
+        const enabledSources = settings.searchSources || [];
+        if (!enabledSources.includes(newSourceId)) {
+            enabledSources.push(newSourceId);
+        }
+        
+        // 更新用户设置
+        const updatedSettings = {
+            ...settings,
+            customSearchSources: customSources,
+            searchSources: enabledSources
+        };
+        
+        await env.DB.prepare(`
+            UPDATE users SET settings = ?, updated_at = ? WHERE id = ?
+        `).bind(JSON.stringify(updatedSettings), Date.now(), user.id).run();
+        
+        // 记录用户行为
+        await utils.logUserAction(env, user.id, 'community_source_downloaded', {
+            sourceId,
+            sourceName: source.source_name,
+            newSourceId
+        }, request);
+        
+        return utils.successResponse({
+            message: '搜索源已添加到您的自定义搜索源',
+            newSourceId,
+            source: newCustomSource
+        });
+        
+    } catch (error) {
+        console.error('下载搜索源失败:', error);
+        return utils.errorResponse('下载搜索源失败: ' + error.message, 500);
+    }
+});
+
+// 点赞/收藏搜索源
+router.post('/api/community/sources/:id/like', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const sourceId = request.params.id;
+        const body = await request.json().catch(() => ({}));
+        const likeType = body.type || 'like'; // like, favorite, bookmark
+        
+        // 验证点赞类型
+        if (!['like', 'favorite', 'bookmark'].includes(likeType)) {
+            return utils.errorResponse('无效的操作类型');
+        }
+        
+        // 检查搜索源是否存在
+        const source = await env.DB.prepare(`
+            SELECT id FROM community_shared_sources 
+            WHERE id = ? AND status = 'active'
+        `).bind(sourceId).first();
+        
+        if (!source) {
+            return utils.errorResponse('搜索源不存在', 404);
+        }
+        
+        // 检查是否已经点赞/收藏
+        const existingLike = await env.DB.prepare(`
+            SELECT id FROM community_source_likes 
+            WHERE shared_source_id = ? AND user_id = ? AND like_type = ?
+        `).bind(sourceId, user.id, likeType).first();
+        
+        if (existingLike) {
+            // 取消点赞/收藏
+            await env.DB.prepare(`
+                DELETE FROM community_source_likes 
+                WHERE id = ?
+            `).bind(existingLike.id).run();
+            
+            // 更新统计（通过触发器自动处理）
+            
+            return utils.successResponse({
+                message: `已取消${likeType === 'like' ? '点赞' : '收藏'}`,
+                action: 'removed'
+            });
+        } else {
+            // 添加点赞/收藏
+            const likeId = utils.generateId();
+            await env.DB.prepare(`
+                INSERT INTO community_source_likes (
+                    id, shared_source_id, user_id, like_type, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+            `).bind(likeId, sourceId, user.id, likeType, Date.now()).run();
+            
+            return utils.successResponse({
+                message: `${likeType === 'like' ? '点赞' : '收藏'}成功`,
+                action: 'added'
+            });
+        }
+        
+    } catch (error) {
+        console.error('点赞/收藏失败:', error);
+        return utils.errorResponse('操作失败: ' + error.message, 500);
+    }
+});
+
+// 评价搜索源
+router.post('/api/community/sources/:id/review', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const sourceId = request.params.id;
+        const body = await request.json().catch(() => ({}));
+        const { rating, comment, isAnonymous } = body;
+        
+        // 验证评分
+        if (!rating || rating < 1 || rating > 5) {
+            return utils.errorResponse('评分必须在1-5之间');
+        }
+        
+        // 检查搜索源是否存在
+        const source = await env.DB.prepare(`
+            SELECT id, user_id FROM community_shared_sources 
+            WHERE id = ? AND status = 'active'
+        `).bind(sourceId).first();
+        
+        if (!source) {
+            return utils.errorResponse('搜索源不存在', 404);
+        }
+        
+        // 不能评价自己的搜索源
+        if (source.user_id === user.id) {
+            return utils.errorResponse('不能评价自己分享的搜索源');
+        }
+        
+        // 检查是否已经评价过
+        const existingReview = await env.DB.prepare(`
+            SELECT id FROM community_source_reviews 
+            WHERE shared_source_id = ? AND user_id = ?
+        `).bind(sourceId, user.id).first();
+        
+        if (existingReview) {
+            // 更新现有评价
+            await env.DB.prepare(`
+                UPDATE community_source_reviews 
+                SET rating = ?, comment = ?, is_anonymous = ?, updated_at = ?
+                WHERE id = ?
+            `).bind(rating, comment?.trim() || null, Boolean(isAnonymous), Date.now(), existingReview.id).run();
+            
+            return utils.successResponse({
+                message: '评价更新成功'
+            });
+        } else {
+            // 添加新评价
+            const reviewId = utils.generateId();
+            await env.DB.prepare(`
+                INSERT INTO community_source_reviews (
+                    id, shared_source_id, user_id, rating, comment, is_anonymous, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(reviewId, sourceId, user.id, rating, comment?.trim() || null, Boolean(isAnonymous), Date.now(), Date.now()).run();
+            
+            return utils.successResponse({
+                message: '评价提交成功'
+            });
+        }
+        
+    } catch (error) {
+        console.error('提交评价失败:', error);
+        return utils.errorResponse('提交评价失败: ' + error.message, 500);
+    }
+});
+
+// 举报搜索源
+router.post('/api/community/sources/:id/report', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const sourceId = request.params.id;
+        const body = await request.json().catch(() => ({}));
+        const { reason, details } = body;
+        
+        if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+            return utils.errorResponse('举报原因不能为空');
+        }
+        
+        // 检查搜索源是否存在
+        const source = await env.DB.prepare(`
+            SELECT id FROM community_shared_sources WHERE id = ?
+        `).bind(sourceId).first();
+        
+        if (!source) {
+            return utils.errorResponse('搜索源不存在', 404);
+        }
+        
+        // 创建举报记录
+        const reportId = utils.generateId();
+        await env.DB.prepare(`
+            INSERT INTO community_source_reports (
+                id, shared_source_id, reporter_user_id, report_reason, 
+                report_details, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(reportId, sourceId, user.id, reason.trim(), details?.trim() || null, 'pending', Date.now(), Date.now()).run();
+        
+        return utils.successResponse({
+            message: '举报已提交，我们会尽快处理'
+        });
+        
+    } catch (error) {
+        console.error('提交举报失败:', error);
+        return utils.errorResponse('提交举报失败: ' + error.message, 500);
+    }
+});
+
+// 获取用户在社区的统计信息
+router.get('/api/community/user/stats', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        // 获取用户统计
+        const statsResult = await env.DB.prepare(`
+            SELECT * FROM community_user_stats WHERE user_id = ?
+        `).bind(user.id).first();
+        
+        // 获取用户分享的搜索源
+        const sharedSourcesResult = await env.DB.prepare(`
+            SELECT 
+                id, source_name, source_category, download_count, 
+                like_count, rating_score, status, created_at
+            FROM community_shared_sources 
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT 10
+        `).bind(user.id).all();
+        
+        const stats = {
+            general: {
+                sharedSources: statsResult?.shared_sources_count || 0,
+                totalDownloads: statsResult?.total_downloads || 0,
+                totalLikes: statsResult?.total_likes || 0,
+                reviewsGiven: statsResult?.reviews_given || 0,
+                sourcesDownloaded: statsResult?.sources_downloaded || 0,
+                reputationScore: statsResult?.reputation_score || 0,
+                contributionLevel: statsResult?.contribution_level || 'beginner'
+            },
+            recentShares: sharedSourcesResult.results.map(source => ({
+                id: source.id,
+                name: source.source_name,
+                category: source.source_category,
+                downloads: source.download_count,
+                likes: source.like_count,
+                rating: source.rating_score,
+                status: source.status,
+                createdAt: source.created_at
+            }))
+        };
+        
+        return utils.successResponse({ stats });
+        
+    } catch (error) {
+        console.error('获取用户统计失败:', error);
+        return utils.errorResponse('获取用户统计失败', 500);
+    }
+});
+
+// 获取热门标签
+router.get('/api/community/tags', async (request, env) => {
+    try {
+        const result = await env.DB.prepare(`
+            SELECT * FROM community_source_tags 
+            ORDER BY usage_count DESC, is_official DESC, tag_name ASC
+            LIMIT 50
+        `).all();
+        
+        const tags = result.results.map(tag => ({
+            id: tag.id,
+            name: tag.tag_name,
+            color: tag.tag_color,
+            usageCount: tag.usage_count,
+            isOfficial: Boolean(tag.is_official)
+        }));
+        
+        return utils.successResponse({ tags });
+        
+    } catch (error) {
+        console.error('获取标签失败:', error);
+        return utils.errorResponse('获取标签失败', 500);
+    }
+});
+
+// 搜索社区搜索源
+router.get('/api/community/search', async (request, env) => {
+    try {
+        const url = new URL(request.url);
+        const query = url.searchParams.get('q');
+        const category = url.searchParams.get('category');
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '10'), 20);
+        
+        if (!query || query.trim().length < 2) {
+            return utils.errorResponse('搜索关键词至少需要2个字符');
+        }
+        
+        let whereConditions = ['status = ?', '(source_name LIKE ? OR description LIKE ?)'];
+        let params = ['active', `%${query}%`, `%${query}%`];
+        
+        if (category && category !== 'all') {
+            whereConditions.push('source_category = ?');
+            params.push(category);
+        }
+        
+        const searchQuery = `
+            SELECT 
+                css.*,
+                u.username as author_name,
+                (SELECT COUNT(*) FROM community_source_reviews WHERE shared_source_id = css.id) as review_count
+            FROM community_shared_sources css
+            LEFT JOIN users u ON css.user_id = u.id
+            WHERE ${whereConditions.join(' AND ')}
+            ORDER BY 
+                CASE WHEN source_name LIKE ? THEN 1 ELSE 2 END,
+                rating_score DESC,
+                download_count DESC
+            LIMIT ?
+        `;
+        
+        params.push(`%${query}%`, limit);
+        const result = await env.DB.prepare(searchQuery).bind(...params).all();
+        
+        const sources = result.results.map(source => ({
+            id: source.id,
+            name: source.source_name,
+            subtitle: source.source_subtitle,
+            icon: source.source_icon,
+            category: source.source_category,
+            description: source.description,
+            author: {
+                id: source.user_id,
+                name: source.author_name
+            },
+            stats: {
+                downloads: source.download_count,
+                likes: source.like_count,
+                rating: source.rating_score,
+                reviewCount: source.review_count
+            },
+            isVerified: Boolean(source.is_verified),
+            isFeatured: Boolean(source.is_featured),
+            createdAt: source.created_at
+        }));
+        
+        return utils.successResponse({ sources, query });
+        
+    } catch (error) {
+        console.error('搜索社区搜索源失败:', error);
+        return utils.errorResponse('搜索失败', 500);
+    }
+});
+
 router.post('/api/auth/delete-account', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
