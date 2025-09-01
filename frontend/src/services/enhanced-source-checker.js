@@ -278,17 +278,10 @@ class BackendSourceChecker {
   }
 
   // 生成测试关键词
-  generateTestKeyword() {
-    const testKeywords = [
-      'MIMK-001', 
-      'SSIS-001', 
-      'PRED-001',
-      'JUL-001',
-      'MIDE-001'
-    ];
-    
-    return testKeywords[Math.floor(Math.random() * testKeywords.length)];
-  }
+generateTestKeyword() {
+  // 固定使用 MIMK-186 作为测试番号
+  return 'MIMK-186';
+}
 
   // 分离已缓存和未缓存的搜索源
   separateCachedSources(sources, userSettings) {
