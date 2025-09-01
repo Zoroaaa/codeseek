@@ -1,0 +1,41 @@
+/* CSS变量定义 - 优化颜色对比度和现代感 */
+:root {
+  /* 浅色主题 */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-light: #dbeafe;
+  --border-color: #e2e8f0;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --info-color: #06b6d4;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --gradient-secondary: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --transition-base: 0.2s ease-in-out;
+}
+
+/* 深色主题 - 提高对比度 */
+[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --accent-primary: #60a5fa;
+  --accent-hover: #3b82f6;
+  --accent-light: #1e40af;
+  --border-color: #475569;
+}

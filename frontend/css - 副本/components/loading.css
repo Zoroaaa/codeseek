@@ -1,4 +1,4 @@
-/* Loading动画增强 - 移除重复的@keyframes定义 */
+/* Loading动画增强 */
 .loading {
   position: fixed;
   top: 0;
@@ -19,7 +19,7 @@
   border: 4px solid var(--bg-tertiary);
   border-top: 4px solid var(--accent-primary);
   border-radius: 50%;
-  animation: spin 1s linear infinite; /* 使用animations.css中的spin */
+  animation: spin 1s linear infinite;
 }
 
 /* 进度指示器 */
@@ -45,7 +45,7 @@
   border: 2px solid var(--bg-secondary);
   border-top: 2px solid var(--accent-primary);
   border-radius: 50%;
-  animation: spin 1s linear infinite; /* 使用animations.css中的spin */
+  animation: spin 1s linear infinite;
 }
 
 .progress-text {
@@ -64,4 +64,13 @@
   pointer-events: none;
 }
 
-/* 移除重复的@keyframes定义，使用animations.css中的统一定义 */
+/* 动画效果 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

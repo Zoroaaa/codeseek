@@ -1,4 +1,4 @@
-/* 模态框样式 - 优化版本，移除重复的动画定义 */
+/* 模态框样式 */
 .modal {
   display: none;
   position: fixed;
@@ -8,7 +8,7 @@
   height: 100%;
   background: rgba(0, 0, 0, 0.75);
   z-index: 1000;
-  animation: fadeIn 0.3s ease; /* 使用animations.css中的fadeIn */
+  animation: fadeIn 0.3s ease;
   backdrop-filter: blur(4px);
 }
 
@@ -23,7 +23,7 @@
   width: 90%;
   max-width: 480px;
   box-shadow: var(--shadow-lg);
-  animation: slideIn 0.3s ease; /* 使用animations.css中的slideIn */
+  animation: slideIn 0.3s ease;
   border: 1px solid var(--border-color);
 }
 
@@ -102,7 +102,7 @@
   text-decoration: underline;
 }
 
-/* 模态框表单样式 */
+/* 新增：模态框表单样式 */
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -184,7 +184,22 @@
   color: var(--error-color);
 }
 
-/* 移除重复的@keyframes定义，使用animations.css中的统一定义 */
+/* 动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { 
+    transform: translate(-50%, -60%); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translate(-50%, -50%); 
+    opacity: 1; 
+  }
+}
 
 /* 响应式设计 */
 @media (max-width: 768px) {
@@ -213,7 +228,7 @@
   }
 }
 
-/* 按钮居中样式 */
+/* 🔧 修复：按钮居中样式 */
 .modal form {
   display: flex;
   flex-direction: column;

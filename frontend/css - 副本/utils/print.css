@@ -1,0 +1,593 @@
+/* 打印样式优化 */
+
+@media print {
+  /* 重置打印边距 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  
+  @page {
+    margin: 2cm;
+    size: A4;
+  }
+  
+  /* 隐藏不需要打印的元素 */
+  .navbar,
+  .sidebar,
+  .modal,
+  .loading,
+  .toast,
+  .connection-status,
+  .skip-links,
+  .header-actions,
+  .dangerous-actions,
+  .settings-actions,
+  .source-actions,
+  .category-actions,
+  .bulk-actions,
+  .action-btn,
+  .history-actions,
+  .favorite-actions,
+  .result-actions,
+  .search-btn,
+  .theme-btn,
+  .login-btn,
+  .dropdown,
+  .menu-item,
+  button,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  .form-actions,
+  .quick-actions,
+  .action-buttons,
+  .controls,
+  .sources-controls,
+  .favorites-controls,
+  .history-controls,
+  .stats-controls,
+  .time-range-selector,
+  .search-suggestions,
+  .checkbox-label,
+  .search-options {
+    display: none !important;
+  }
+  
+  /* 基础布局调整 */
+  body {
+    font-family: 'Times New Roman', serif;
+    font-size: 12pt;
+    line-height: 1.4;
+    color: #000;
+    background: #fff;
+  }
+  
+  .dashboard-container {
+    flex-direction: column;
+  }
+  
+  .main-content {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  /* 标题和文本优化 */
+  h1, h2, h3, h4, h5, h6 {
+    color: #000;
+    page-break-after: avoid;
+    margin-top: 24pt;
+    margin-bottom: 12pt;
+  }
+  
+  h1 {
+    font-size: 18pt;
+    font-weight: bold;
+  }
+  
+  h2 {
+    font-size: 16pt;
+    font-weight: bold;
+  }
+  
+  h3 {
+    font-size: 14pt;
+    font-weight: bold;
+  }
+  
+  h4, h5, h6 {
+    font-size: 12pt;
+    font-weight: bold;
+  }
+  
+  p {
+    margin-bottom: 6pt;
+    text-align: justify;
+    orphans: 3;
+    widows: 3;
+  }
+  
+  /* 链接处理 */
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+  
+  a[href^="http"]:after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    color: #666;
+    font-style: italic;
+  }
+  
+  /* 避免在这些元素内分页 */
+  .source-item,
+  .category-item,
+  .result-item,
+  .favorite-item,
+  .history-item,
+  .stat-card,
+  .activity-item,
+  section,
+  .settings-section,
+  .categories-section,
+  .chart-section,
+  .detailed-stats,
+  .recent-activity {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 12pt;
+  }
+  
+  /* 表格优化 */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12pt;
+    break-inside: avoid;
+  }
+  
+  .stats-table table,
+  table {
+    border: 1px solid #000;
+  }
+  
+  .stats-table th,
+  .stats-table td,
+  th, td {
+    border: 1px solid #000;
+    padding: 6pt;
+    text-align: left;
+    vertical-align: top;
+  }
+  
+  .stats-table th,
+  th {
+    background-color: #f0f0f0 !important;
+    font-weight: bold;
+    font-size: 11pt;
+  }
+  
+  .stats-table td,
+  td {
+    font-size: 10pt;
+  }
+  
+  /* 统计卡片优化 */
+  .stats-grid {
+    display: block;
+  }
+  
+  .stat-card {
+    display: block;
+    border: 1px solid #000;
+    padding: 12pt;
+    margin-bottom: 12pt;
+    background: none;
+    box-shadow: none;
+  }
+  
+  .stat-card::before {
+    display: none;
+  }
+  
+  .stat-icon {
+    display: none;
+  }
+  
+  .stat-number {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #000;
+    display: block;
+    margin-bottom: 6pt;
+  }
+  
+  .stat-label {
+    font-size: 11pt;
+    color: #000;
+    font-weight: normal;
+  }
+  
+  /* 网格布局调整 */
+  .sources-grid,
+  .categories-grid,
+  .favorites-grid,
+  .results-grid,
+  .sites-grid {
+    display: block;
+  }
+  
+  .source-item,
+  .category-item,
+  .favorite-item,
+  .result-item,
+  .site-item {
+    display: block;
+    border: 1px solid #000;
+    padding: 12pt;
+    margin-bottom: 12pt;
+    background: none;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+  
+  .source-item::before,
+  .category-item::before,
+  .favorite-item::before,
+  .result-item::before {
+    display: none;
+  }
+  
+  /* 历史记录优化 */
+  .history-list {
+    display: block;
+  }
+  
+  .history-item {
+    display: block;
+    border-bottom: 1px solid #ccc;
+    padding: 6pt 0;
+    margin-bottom: 6pt;
+  }
+  
+  .history-keyword {
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 3pt;
+  }
+  
+  .history-time {
+    font-size: 9pt;
+    color: #666;
+  }
+  
+  /* 收藏夹优化 */
+  .favorite-title {
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 6pt;
+    display: block;
+  }
+  
+  .favorite-icon {
+    display: none;
+  }
+  
+  .favorite-url {
+    font-size: 9pt;
+    color: #666;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+  }
+  
+  /* 搜索结果优化 */
+  .result-title {
+    font-weight: bold;
+    font-size: 11pt;
+    color: #000;
+    margin-bottom: 6pt;
+  }
+  
+  .result-subtitle {
+    font-size: 10pt;
+    color: #333;
+    margin-bottom: 6pt;
+  }
+  
+  .result-url {
+    font-size: 9pt;
+    color: #666;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+  }
+  
+  .result-meta {
+    font-size: 9pt;
+    color: #666;
+    margin-top: 6pt;
+  }
+  
+  /* 状态指示器文本化 */
+  .result-status,
+  .source-status-indicator,
+  .status-badge {
+    font-size: 9pt;
+    color: #666;
+    background: none;
+    border: 1px solid #ccc;
+    padding: 3pt;
+  }
+  
+  .status-dot {
+    display: none;
+  }
+  
+  .status-online::after {
+    content: " [在线]";
+  }
+  
+  .status-offline::after {
+    content: " [离线]";
+  }
+  
+  .status-error::after {
+    content: " [错误]";
+  }
+  
+  .status-checking::after {
+    content: " [检查中]";
+  }
+  
+  /* 搜索源信息优化 */
+  .source-title {
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 3pt;
+  }
+  
+  .source-subtitle {
+    font-size: 10pt;
+    color: #333;
+    margin-bottom: 6pt;
+  }
+  
+  .source-url {
+    font-size: 9pt;
+    color: #666;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+  }
+  
+  .custom-badge,
+  .builtin-badge {
+    font-size: 8pt;
+    padding: 2pt 4pt;
+    border: 1px solid #666;
+    background: none;
+    color: #000;
+  }
+  
+  /* 分类信息优化 */
+  .category-name {
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 3pt;
+  }
+  
+  .category-description {
+    font-size: 10pt;
+    color: #333;
+    margin-bottom: 6pt;
+  }
+  
+  .category-icon {
+    display: none;
+  }
+  
+  /* 站点信息优化 */
+  .site-header strong {
+    font-weight: bold;
+    font-size: 11pt;
+    margin-bottom: 3pt;
+    display: block;
+  }
+  
+  .site-subtitle {
+    font-size: 10pt;
+    color: #333;
+    margin-bottom: 6pt;
+  }
+  
+  .site-badges {
+    display: none;
+  }
+  
+  /* 活动记录优化 */
+  .activity-list {
+    display: block;
+  }
+  
+  .activity-item {
+    border-bottom: 1px solid #ccc;
+    padding: 6pt 0;
+    margin-bottom: 6pt;
+    display: block;
+  }
+  
+  .activity-icon {
+    display: none;
+  }
+  
+  .activity-text {
+    font-size: 10pt;
+    margin-bottom: 3pt;
+  }
+  
+  .activity-time {
+    font-size: 9pt;
+    color: #666;
+  }
+  
+  /* 页眉页脚 */
+  .print-header {
+    display: block;
+    text-align: center;
+    font-size: 14pt;
+    font-weight: bold;
+    margin-bottom: 24pt;
+    padding-bottom: 12pt;
+    border-bottom: 2px solid #000;
+  }
+  
+  .print-footer {
+    display: block;
+    text-align: center;
+    font-size: 10pt;
+    color: #666;
+    margin-top: 24pt;
+    padding-top: 12pt;
+    border-top: 1px solid #ccc;
+  }
+  
+  /* 章节分页 */
+  .tab-content {
+    page-break-before: always;
+  }
+  
+  .tab-content:first-child {
+    page-break-before: avoid;
+  }
+  
+  .tab-header {
+    margin-bottom: 18pt;
+    padding-bottom: 12pt;
+    border-bottom: 1px solid #000;
+  }
+  
+  .tab-header h1 {
+    font-size: 16pt;
+    font-weight: bold;
+    margin-bottom: 6pt;
+  }
+  
+  .tab-header p {
+    font-size: 11pt;
+    color: #333;
+    margin: 0;
+  }
+  
+  /* 图表区域 */
+  .chart-section,
+  .chart-placeholder {
+    border: 1px solid #000;
+    padding: 12pt;
+    text-align: center;
+    font-size: 10pt;
+    color: #666;
+  }
+  
+  .chart-placeholder::after {
+    content: " [图表区域 - 打印时不显示]";
+  }
+  
+  /* 空状态处理 */
+  .empty-state {
+    text-align: center;
+    padding: 24pt;
+    font-size: 11pt;
+    color: #666;
+    border: 1px dashed #ccc;
+  }
+  
+  .empty-state span {
+    display: none;
+  }
+  
+  /* URL展开 */
+  .result-url::before,
+  .source-url::before,
+  .favorite-url::before {
+    content: "URL: ";
+    font-weight: bold;
+  }
+  
+  /* 元数据信息 */
+  .print-meta {
+    display: block;
+    font-size: 9pt;
+    color: #666;
+    margin-top: 24pt;
+    padding-top: 12pt;
+    border-top: 1px solid #ccc;
+    text-align: center;
+  }
+  
+  .print-meta::before {
+    content: "生成时间: ";
+  }
+  
+  /* 强制黑白打印 */
+  .force-bw * {
+    color: #000 !important;
+    background-color: #fff !important;
+    border-color: #000 !important;
+  }
+  
+  /* 确保重要内容的对比度 */
+  .stat-number,
+  .result-title,
+  .favorite-title,
+  .source-title,
+  .category-name,
+  .history-keyword,
+  h1, h2, h3, h4, h5, h6 {
+    color: #000 !important;
+    background-color: transparent !important;
+  }
+  
+  /* 分页控制 */
+  .page-break-before {
+    page-break-before: always;
+  }
+  
+  .page-break-after {
+    page-break-after: always;
+  }
+  
+  .page-break-avoid {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  
+  /* 打印时显示的元素 */
+  .print-only {
+    display: block !important;
+  }
+  
+  /* 打印时隐藏的元素 */
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* 打印预览模式 */
+@media screen and (max-width: 1024px) {
+  .print-preview {
+    background: #f5f5f5;
+    padding: 2rem;
+  }
+  
+  .print-preview .main-content {
+    background: white;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    max-width: 21cm;
+    margin: 0 auto;
+    padding: 2cm;
+  }
+  
+  .print-preview .no-print {
+    opacity: 0.3;
+  }
+}
