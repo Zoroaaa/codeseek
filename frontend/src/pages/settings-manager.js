@@ -84,12 +84,6 @@ export class SettingsManager {
       const btn = document.getElementById(id);
       if (btn) btn.addEventListener('click', handler);
     });
-
-    // ✅ 修复：绑定测试状态检查按钮
-    const testStatusBtn = document.querySelector('.test-status-check-btn');
-    if (testStatusBtn) {
-      testStatusBtn.addEventListener('click', () => this.testSourceStatusCheck());
-    }
   }
 
   bindPasswordEvents() {
@@ -299,7 +293,23 @@ export class SettingsManager {
     showToast('设置已重置为默认值，请点击保存', 'success');
   }
 
-  // ✅ 完全重写搜索源状态检查测试功能
+  markSettingsChanged() {
+    const saveBtn = document.querySelector('#settings .btn-primary');
+    if (saveBtn) {
+      saveBtn.textContent = '保存设置*';
+      saveBtn.classList.add('changed');
+    }
+  }
+
+  markSettingsSaved() {
+    const saveBtn = document.querySelector('#settings .btn-primary');
+    if (saveBtn) {
+      saveBtn.textContent = '保存设置';
+      saveBtn.classList.remove('changed');
+    }
+  }
+
+  // ✅ 修复：完全重写测试搜索源状态检查功能
   async testSourceStatusCheck() {
     try {
       showLoading(true);
@@ -311,43 +321,6 @@ export class SettingsManager {
         progressElement.style.display = 'block';
       }
 
-      // ✅ 修复：从sources manager获取用户启用的搜索源
-      const sourcesManager = this.app.getManager('sources');
-      let testSources = [];
-      
-      if (sourcesManager && sourcesManager.getEnabledSources) {
-        // 获取用户启用的搜索源（最多5个进行测试）
-        const enabledSources = sourcesManager.getEnabledSources();
-        testSources = enabledSources.slice(0, 5);
-        console.log(`使用用户启用的 ${testSources.length} 个搜索源进行测试:`, testSources.map(s => s.name));
-      } else {
-        // 降级到从API获取搜索源配置
-        try {
-          const userSettings = await apiService.getUserSettings();
-          const enabledSourceIds = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary'];
-          
-          // 从常量中获取对应的搜索源配置
-          testSources = APP_CONSTANTS.SEARCH_SOURCES.filter(source => 
-            enabledSourceIds.includes(source.id)
-          ).slice(0, 5);
-          
-          console.log(`从用户设置获取 ${testSources.length} 个搜索源进行测试:`, testSources.map(s => s.name));
-        } catch (apiError) {
-          console.error('无法获取用户搜索源设置:', apiError);
-          // 最后降级到硬编码的测试源
-          testSources = [
-            { id: 'javbus', name: 'JavBus', urlTemplate: 'https://www.javbus.com/search/{keyword}' },
-            { id: 'javdb', name: 'JavDB', urlTemplate: 'https://javdb.com/search?q={keyword}' },
-            { id: 'javlibrary', name: 'JavLibrary', urlTemplate: 'http://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}' }
-          ];
-          console.log('使用默认测试搜索源:', testSources.map(s => s.name));
-        }
-      }
-
-      if (testSources.length === 0) {
-        throw new Error('没有可用的搜索源进行测试');
-      }
-
       // 获取当前用户设置
       const currentSettings = this.collectSettings();
       const userSettings = {
@@ -357,6 +330,13 @@ export class SettingsManager {
       };
 
       console.log('使用设置进行测试:', userSettings);
+
+      // 准备测试的搜索源
+      const testSources = [
+        { id: 'javbus', name: 'JavBus', urlTemplate: 'https://www.javbus.com/search/{keyword}' },
+        { id: 'javdb', name: 'JavDB', urlTemplate: 'https://javdb.com/search?q={keyword}' },
+        { id: 'javlibrary', name: 'JavLibrary', urlTemplate: 'http://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}' }
+      ];
 
       // 更新进度显示
       let checkedCount = 0;
@@ -405,7 +385,6 @@ export class SettingsManager {
                 <span class="source-name">${item.source.name}</span>
                 <span class="status success">✅ 可用</span>
                 <span class="response-time">${item.result.responseTime || 0}ms</span>
-                ${item.result.contentMatch ? '<span class="content-match">✓ 内容匹配</span>' : ''}
               </div>
             `).join('')}
             ${unavailableResults.map(item => `
@@ -437,10 +416,7 @@ export class SettingsManager {
 
       updateProgress(testSources.length, testSources.length);
       
-      // 显示成功消息，包含内容匹配信息
-      const contentMatches = availableResults.filter(item => item.result.contentMatch).length;
-      const contentInfo = contentMatches > 0 ? `，${contentMatches} 个内容匹配` : '';
-      showToast(`搜索源状态检查测试完成: ${successCount}/${testSources.length} 可用${contentInfo}`, 'success');
+      showToast(`搜索源状态检查测试完成: ${successCount}/${testSources.length} 可用`, 'success');
       
     } catch (error) {
       console.error('测试搜索源状态检查失败:', error);
@@ -474,22 +450,6 @@ export class SettingsManager {
       if (progressElement) {
         progressElement.style.display = 'none';
       }
-    }
-  }
-
-  markSettingsChanged() {
-    const saveBtn = document.querySelector('#settings .btn-primary');
-    if (saveBtn) {
-      saveBtn.textContent = '保存设置*';
-      saveBtn.classList.add('changed');
-    }
-  }
-
-  markSettingsSaved() {
-    const saveBtn = document.querySelector('#settings .btn-primary');
-    if (saveBtn) {
-      saveBtn.textContent = '保存设置';
-      saveBtn.classList.remove('changed');
     }
   }
 
