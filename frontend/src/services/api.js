@@ -719,6 +719,256 @@ class APIService {
       return { status: 'error', message: error.message };
     }
   }
+  
+  // 获取社区搜索源列表
+async getCommunitySearchSources(options = {}) {
+  try {
+    const params = new URLSearchParams();
+    
+    // 处理分页参数
+    if (options.page) params.append('page', options.page.toString());
+    if (options.limit) params.append('limit', options.limit.toString());
+    
+    // 处理筛选参数
+    if (options.category && options.category !== 'all') {
+      params.append('category', options.category);
+    }
+    if (options.search) params.append('search', options.search);
+    if (options.sort) params.append('sort', options.sort);
+    if (options.order) params.append('order', options.order);
+    if (options.featured) params.append('featured', 'true');
+    
+    const endpoint = `/api/community/sources${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await this.request(endpoint);
+    
+    return {
+      success: true,
+      sources: response.sources || [],
+      pagination: response.pagination || {}
+    };
+    
+  } catch (error) {
+    console.error('获取社区搜索源列表失败:', error);
+    return {
+      success: false,
+      sources: [],
+      pagination: {},
+      error: error.message
+    };
+  }
+}
+
+// 获取单个搜索源详情
+async getCommunitySourceDetails(sourceId) {
+  try {
+    const response = await this.request(`/api/community/sources/${sourceId}`);
+    return {
+      success: true,
+      source: response.source
+    };
+  } catch (error) {
+    console.error('获取搜索源详情失败:', error);
+    return {
+      success: false,
+      source: null,
+      error: error.message
+    };
+  }
+}
+
+// 分享搜索源到社区
+async shareSourceToCommunity(sourceData) {
+  if (!this.token) {
+    throw new Error('用户未登录');
+  }
+  
+  try {
+    const response = await this.request('/api/community/sources', {
+      method: 'POST',
+      body: JSON.stringify(sourceData)
+    });
+    
+    return {
+      success: true,
+      message: response.message || '分享成功',
+      sourceId: response.sourceId
+    };
+    
+  } catch (error) {
+    console.error('分享搜索源失败:', error);
+    throw error;
+  }
+}
+
+// 下载/采用社区搜索源
+async downloadCommunitySource(sourceId) {
+  if (!this.token) {
+    throw new Error('用户未登录');
+  }
+  
+  try {
+    const response = await this.request(`/api/community/sources/${sourceId}/download`, {
+      method: 'POST'
+    });
+    
+    return {
+      success: true,
+      message: response.message || '下载成功',
+      newSourceId: response.newSourceId,
+      source: response.source
+    };
+    
+  } catch (error) {
+    console.error('下载社区搜索源失败:', error);
+    throw error;
+  }
+}
+
+// 点赞/收藏搜索源
+async toggleSourceLike(sourceId, likeType = 'like') {
+  if (!this.token) {
+    throw new Error('用户未登录');
+  }
+  
+  try {
+    const response = await this.request(`/api/community/sources/${sourceId}/like`, {
+      method: 'POST',
+      body: JSON.stringify({ type: likeType })
+    });
+    
+    return {
+      success: true,
+      action: response.action, // 'added' or 'removed'
+      message: response.message
+    };
+    
+  } catch (error) {
+    console.error('点赞操作失败:', error);
+    throw error;
+  }
+}
+
+// 评价搜索源
+async reviewCommunitySource(sourceId, reviewData) {
+  if (!this.token) {
+    throw new Error('用户未登录');
+  }
+  
+  try {
+    const response = await this.request(`/api/community/sources/${sourceId}/review`, {
+      method: 'POST',
+      body: JSON.stringify(reviewData)
+    });
+    
+    return {
+      success: true,
+      message: response.message || '评价提交成功'
+    };
+    
+  } catch (error) {
+    console.error('提交评价失败:', error);
+    throw error;
+  }
+}
+
+// 举报搜索源
+async reportCommunitySource(sourceId, reportData) {
+  if (!this.token) {
+    throw new Error('用户未登录');
+  }
+  
+  try {
+    const response = await this.request(`/api/community/sources/${sourceId}/report`, {
+      method: 'POST',
+      body: JSON.stringify(reportData)
+    });
+    
+    return {
+      success: true,
+      message: response.message || '举报已提交'
+    };
+    
+  } catch (error) {
+    console.error('提交举报失败:', error);
+    throw error;
+  }
+}
+
+// 获取用户社区统计
+async getUserCommunityStats() {
+  if (!this.token) {
+    return {
+      success: false,
+      stats: null,
+      error: '用户未登录'
+    };
+  }
+  
+  try {
+    const response = await this.request('/api/community/user/stats');
+    return {
+      success: true,
+      stats: response.stats
+    };
+  } catch (error) {
+    console.error('获取用户社区统计失败:', error);
+    return {
+      success: false,
+      stats: null,
+      error: error.message
+    };
+  }
+}
+
+// 获取热门标签
+async getPopularTags() {
+  try {
+    const response = await this.request('/api/community/tags');
+    return {
+      success: true,
+      tags: response.tags || []
+    };
+  } catch (error) {
+    console.error('获取热门标签失败:', error);
+    return {
+      success: false,
+      tags: [],
+      error: error.message
+    };
+  }
+}
+
+// 搜索社区搜索源
+async searchCommunityPosts(query, options = {}) {
+  try {
+    const params = new URLSearchParams();
+    params.append('q', query);
+    
+    if (options.category && options.category !== 'all') {
+      params.append('category', options.category);
+    }
+    if (options.limit) {
+      params.append('limit', options.limit.toString());
+    }
+    
+    const endpoint = `/api/community/search?${params.toString()}`;
+    const response = await this.request(endpoint);
+    
+    return {
+      success: true,
+      sources: response.sources || [],
+      query: response.query
+    };
+    
+  } catch (error) {
+    console.error('搜索社区内容失败:', error);
+    return {
+      success: false,
+      sources: [],
+      error: error.message
+    };
+  }
+}
 }
 
 // 创建单例实例

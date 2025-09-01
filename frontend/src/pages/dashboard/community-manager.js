@@ -1,4 +1,4 @@
-// 社区管理器 - 处理搜索源共享社区功能
+// 社区管理器 - 修复版本，使用apiService统一处理API调用
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
@@ -33,7 +33,6 @@ export class CommunityManager {
   }
 
   async loadData() {
-    // 由于社区数据较多，在加载标签页时再获取
     console.log('社区管理器 loadData 被调用');
   }
 
@@ -60,7 +59,7 @@ export class CommunityManager {
       
     } catch (error) {
       console.error('加载社区数据失败:', error);
-      showToast('加载社区数据失败', 'error');
+      showToast('加载社区数据失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
@@ -160,37 +159,28 @@ export class CommunityManager {
     console.log('社区管理器所有事件绑定完成');
   }
 
+  // 🔧 修复：使用apiService加载社区搜索源列表
   async loadCommunitySourcesList() {
     try {
-      console.log('开始加载社区搜索源列表');
+      console.log('开始加载社区搜索源列表，使用apiService');
       
-      const params = new URLSearchParams({
-        page: this.currentPage.toString(),
-        limit: this.currentLimit.toString(),
+      const options = {
+        page: this.currentPage,
+        limit: this.currentLimit,
         ...this.currentFilters
-      });
-
-      const token = localStorage.getItem('auth_token');
-      const headers = {
-        'Content-Type': 'application/json'
       };
+
+      console.log('请求参数:', options);
+
+      const result = await apiService.getCommunitySearchSources(options);
       
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`/api/community/sources?${params}`, {
-        headers
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: 获取社区搜索源失败`);
-      }
-
-      const data = await response.json();
-      console.log('社区数据加载成功:', data);
+      console.log('社区数据加载结果:', result);
       
-      this.renderCommunitySourcesList(data.sources || [], data.pagination || {});
+      if (result.success) {
+        this.renderCommunitySourcesList(result.sources, result.pagination);
+      } else {
+        throw new Error(result.error || '加载社区搜索源失败');
+      }
 
     } catch (error) {
       console.error('加载社区搜索源列表失败:', error);
@@ -201,9 +191,9 @@ export class CommunityManager {
       if (container) {
         container.innerHTML = `
           <div class="empty-state">
-            <span style="font-size: 3rem;">❌</span>
+            <span style="font-size: 3rem;">⚠</span>
             <p>加载搜索源失败</p>
-            <p>错误信息: ${error.message}</p>
+            <p>错误信息: ${escapeHtml(error.message)}</p>
             <button class="btn-primary" onclick="window.app.getManager('community').loadCommunitySourcesList()">
               重新加载
             </button>
@@ -213,6 +203,7 @@ export class CommunityManager {
     }
   }
 
+  // 🔧 修复：使用apiService加载用户社区统计
   async loadUserCommunityStats() {
     if (!this.app.getCurrentUser()) {
       console.log('用户未登录，跳过加载社区统计');
@@ -220,36 +211,30 @@ export class CommunityManager {
     }
 
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/community/user/stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        this.userStats = data.stats;
+      const result = await apiService.getUserCommunityStats();
+      
+      if (result.success) {
+        this.userStats = result.stats;
         console.log('用户社区统计加载成功:', this.userStats);
       } else {
-        console.warn('加载用户社区统计失败:', response.status);
+        console.warn('加载用户社区统计失败:', result.error);
       }
     } catch (error) {
       console.warn('加载用户社区统计失败:', error);
     }
   }
 
+  // 🔧 修复：使用apiService加载热门标签
   async loadPopularTags() {
     try {
-      const response = await fetch('/api/community/tags');
-      if (response.ok) {
-        const data = await response.json();
-        this.popularTags = data.tags || [];
+      const result = await apiService.getPopularTags();
+      
+      if (result.success) {
+        this.popularTags = result.tags;
         this.renderPopularTags();
         console.log('热门标签加载成功:', this.popularTags.length, '个标签');
       } else {
-        console.warn('加载热门标签失败:', response.status);
+        console.warn('加载热门标签失败:', result.error);
       }
     } catch (error) {
       console.warn('加载热门标签失败:', error);
@@ -484,6 +469,7 @@ export class CommunityManager {
     await this.loadCommunitySourcesList();
   }
 
+  // 🔧 修复：使用apiService下载搜索源
   async downloadSource(sourceId) {
     if (!this.app.getCurrentUser()) {
       showToast('请先登录', 'error');
@@ -495,38 +481,31 @@ export class CommunityManager {
     try {
       showLoading(true);
       
-      const response = await fetch(`/api/community/sources/${sourceId}/download`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        showToast(data.message || '下载成功', 'success');
+      const result = await apiService.downloadCommunitySource(sourceId);
+      
+      if (result.success) {
+        showToast(result.message || '下载成功', 'success');
         
         // 通知主页面更新搜索源
         window.dispatchEvent(new CustomEvent('searchSourcesChanged', {
-          detail: { action: 'added', source: data.source }
+          detail: { action: 'added', source: result.source }
         }));
         
         // 更新下载计数（可选：重新加载当前页面）
         setTimeout(() => this.loadCommunitySourcesList(), 1000);
       } else {
-        showToast(data.message || '下载失败', 'error');
+        showToast(result.message || '下载失败', 'error');
       }
 
     } catch (error) {
       console.error('下载搜索源失败:', error);
-      showToast('下载失败，请稍后重试', 'error');
+      showToast('下载失败，请稍后重试: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
   }
 
+  // 🔧 修复：使用apiService切换点赞状态
   async toggleLike(sourceId) {
     if (!this.app.getCurrentUser()) {
       showToast('请先登录', 'error');
@@ -536,24 +515,15 @@ export class CommunityManager {
     console.log('切换点赞状态:', sourceId);
 
     try {
-      const response = await fetch(`/api/community/sources/${sourceId}/like`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ type: 'like' })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        showToast(data.message || '操作成功', 'success', 2000);
+      const result = await apiService.toggleSourceLike(sourceId, 'like');
+      
+      if (result.success) {
+        showToast(result.message || '操作成功', 'success', 2000);
         
         // 更新按钮状态
         const likeBtn = document.querySelector(`[data-source-id="${sourceId}"].like-btn`);
         if (likeBtn) {
-          if (data.action === 'added') {
+          if (result.action === 'added') {
             likeBtn.classList.add('liked');
           } else {
             likeBtn.classList.remove('liked');
@@ -563,40 +533,29 @@ export class CommunityManager {
         // 可选：更新点赞计数
         setTimeout(() => this.loadCommunitySourcesList(), 1000);
       } else {
-        showToast(data.message || '操作失败', 'error');
+        showToast(result.message || '操作失败', 'error');
       }
 
     } catch (error) {
       console.error('点赞操作失败:', error);
-      showToast('操作失败，请稍后重试', 'error');
+      showToast('操作失败，请稍后重试: ' + error.message, 'error');
     }
   }
 
+  // 🔧 修复：使用apiService查看搜索源详情
   async viewSourceDetails(sourceId) {
     console.log('查看搜索源详情:', sourceId);
     
     try {
       showLoading(true);
       
-      const token = localStorage.getItem('auth_token');
-      const headers = {
-        'Content-Type': 'application/json'
-      };
+      const result = await apiService.getCommunitySourceDetails(sourceId);
       
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (result.success) {
+        this.showSourceDetailsModal(result.source);
+      } else {
+        throw new Error(result.error || '获取搜索源详情失败');
       }
-      
-      const response = await fetch(`/api/community/sources/${sourceId}`, {
-        headers
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: 获取搜索源详情失败`);
-      }
-
-      const data = await response.json();
-      this.showSourceDetailsModal(data.source);
 
     } catch (error) {
       console.error('获取搜索源详情失败:', error);
@@ -653,24 +612,16 @@ export class CommunityManager {
     });
   }
 
+  // 🔧 修复：使用apiService提交分享搜索源
   async submitShareSource(sourceData) {
     console.log('提交分享搜索源:', sourceData);
     
     try {
       showLoading(true);
       
-      const response = await fetch('/api/community/sources', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(sourceData)
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
+      const result = await apiService.shareSourceToCommunity(sourceData);
+      
+      if (result.success) {
         showToast(result.message || '分享成功', 'success');
         
         // 刷新社区列表
@@ -684,7 +635,7 @@ export class CommunityManager {
 
     } catch (error) {
       console.error('分享搜索源失败:', error);
-      showToast('分享失败，请稍后重试', 'error');
+      showToast('分享失败，请稍后重试: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
