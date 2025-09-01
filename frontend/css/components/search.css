@@ -7,14 +7,14 @@
 
 .search-box {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
   position: relative;
 }
 
 .search-input {
   flex: 1;
-  padding: 1rem 1.25rem;
+  padding: 0.75rem 1rem;
   border: 2px solid var(--border-color);
   border-radius: var(--radius-lg);
   background: var(--bg-primary);
@@ -36,8 +36,8 @@
 .search-options {
   display: flex;
   justify-content: center;
-  gap: 2rem;
-  margin-top: 1.5rem;
+  gap: 1.25rem;
+  margin-top: 1rem;
 }
 
 /* 搜索建议样式 */
@@ -45,7 +45,7 @@
   position: absolute;
   top: 100%;
   left: 0;
-  right: 75px; /* 为搜索按钮留出空间 */
+  right: 75px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-top: none;
@@ -69,7 +69,7 @@
 .suggestion-item {
   display: flex;
   align-items: center;
-  padding: 1rem 1.25rem;
+  padding: 0.6rem 1rem;
   cursor: pointer;
   transition: var(--transition-base);
   border-bottom: 1px solid var(--border-color);
@@ -84,32 +84,32 @@
 }
 
 .suggestion-icon {
-  margin-right: 0.75rem;
-  font-size: 1rem;
+  margin-right: 0.6rem;
+  font-size: 0.9rem;
   opacity: 0.7;
 }
 
 .suggestion-text {
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 /* 搜索历史样式 */
 .history-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .history-item {
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  padding: 0.6rem 1.25rem;
-  border-radius: 2rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 1.5rem;
   cursor: pointer;
   transition: var(--transition-base);
   border: 1px solid var(--border-color);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
@@ -124,11 +124,11 @@
 .history-item-container {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.3rem;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
-  border-radius: 2rem;
-  padding: 0.4rem 0.6rem;
+  border-radius: 1.5rem;
+  padding: 0.25rem 0.4rem;
   transition: var(--transition-base);
   position: relative;
 }
@@ -143,12 +143,12 @@
   flex: 1;
   background: transparent;
   border: none;
-  padding: 0.2rem 0.75rem;
-  border-radius: 1.5rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 1rem;
   cursor: pointer;
   transition: var(--transition-base);
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 500;
 }
 
@@ -157,33 +157,27 @@
   color: white;
 }
 
-/* 1. 优化网格布局 - 更灵活的列宽和更大的间距 */
+/* 大幅优化网格布局 - 更紧凑 */
 .results-grid {
   display: grid;
-  /* 修改：增加最小列宽到320px，增加间距到2rem */
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 2rem;
-  /* 新增：确保网格容器有足够宽度 */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem; /* 大幅减少间距 */
   width: 100%;
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
 .result-item {
   background: var(--bg-primary);
-  border-radius: var(--radius-lg);
-  /* 修改：调整内边距，顶部稍大为状态指示器留空间 */
-  padding: 1.25rem 1.5rem 1.5rem 1.5rem;
-  border: 2px solid var(--border-color); /* 修改：统一边框宽度为2px */
+  border-radius: var(--radius-md); /* 减少圆角 */
+  padding: 0.875rem 1rem 1rem 1rem; /* 大幅减少内边距 */
+  border: 1px solid var(--border-color); /* 减少边框宽度 */
   transition: var(--transition-base);
   position: relative;
   overflow: hidden;
-  /* 新增：确保所有卡片等高 */
   display: flex;
   flex-direction: column;
-  /* 新增：设置最小高度确保一致性 */
-  min-height: 280px;
-  /* 新增：防止内容溢出 */
+  min-height: 180px; /* 大幅减少最小高度 */
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -194,92 +188,84 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 3px;
   background: var(--gradient-primary);
 }
 
-/* 3. 优化悬停和选中状态 - 避免布局偏移 */
 .result-item:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md); /* 减少阴影 */
   border-color: var(--accent-primary);
-  /* 新增：确保悬停时不改变边框宽度 */
-  border-width: 2px;
 }
 
-/* 5. 优化内容区域布局 */
+/* 大幅优化内容区域 */
 .result-content {
-  flex: 1; /* 让内容区域占用可用空间 */
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  gap: 0.4rem; /* 大幅减少间距 */
+  margin-bottom: 0.6rem;
 }
 
-/* 6. 优化标题和副标题 */
+/* 优化标题 - 更紧凑 */
 .result-title {
   font-weight: 600;
   color: var(--accent-primary);
-  font-size: 1.1rem;
-  line-height: 1.4;
-  /* 新增：限制标题行数避免过高 */
+  font-size: 1rem; /* 减少字体大小 */
+  line-height: 1.3; /* 减少行高 */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.3rem;
 }
 
 .result-subtitle {
-  font-size: 0.9rem;
+  font-size: 0.8rem; /* 减少字体大小 */
   color: var(--text-secondary);
-  /* 新增：限制副标题行数 */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.3rem;
+  line-height: 1.3;
 }
 
-/* 7. 优化URL显示 */
+/* 大幅压缩URL显示 */
 .result-url {
-  font-size: 0.85rem;
+  font-size: 0.75rem; /* 进一步减少字体 */
   color: var(--text-muted);
-  /* 修改：改善URL换行 */
   word-break: break-all;
   overflow-wrap: anywhere;
-  /* 新增：限制URL显示行数 */
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.4rem;
 }
 
-/* 8. 优化元信息区域 */
+/* 压缩元信息区域 */
 .result-meta {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
+  gap: 0.3rem;
+  font-size: 0.7rem; /* 进一步减少字体 */
   color: var(--text-muted);
-  margin-bottom: 1rem;
-  /* 新增：确保元信息不会过度拉伸 */
-  min-height: 1.5rem;
+  margin-bottom: 0.5rem;
+  min-height: 1rem;
 }
 
-/* 9. 优化状态指示器 */
+/* 压缩状态指示器 */
 .result-status {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 1rem;
-  font-size: 0.75rem;
+  gap: 0.15rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 500;
-  /* 新增：确保状态指示器不影响布局 */
   flex-shrink: 0;
   max-width: 100%;
   white-space: nowrap;
@@ -287,52 +273,50 @@
   text-overflow: ellipsis;
 }
 
-/* 10. 优化操作按钮区域 */
+/* 大幅优化操作按钮 - 更紧凑的布局 */
 .result-actions {
-  /* 新增：确保按钮区域在底部 */
   margin-top: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  gap: 0.5rem;
-  /* 新增：限制按钮区域高度 */
+  display: flex; /* 改为flex布局，更紧凑 */
+  flex-wrap: wrap;
+  gap: 0.3rem;
   align-items: center;
 }
 
 .result-actions .action-btn {
-  /* 新增：统一按钮高度 */
-  height: 2.5rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
-  /* 新增：确保按钮文字不换行 */
+  height: 2rem; /* 减少按钮高度 */
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   justify-content: center;
+  flex: 0 0 auto; /* 按钮大小根据内容自适应 */
+  min-width: 60px; /* 设置最小宽度 */
 }
 
-/* 搜索信息区域状态显示 */
+/* 搜索信息区域 */
 .search-info {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.6rem;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
 }
 
 .search-status-summary {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
   background: var(--bg-tertiary);
-  border-radius: var(--radius-md);
-  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
 .status-summary-dot {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--accent-primary);
 }
@@ -341,10 +325,10 @@
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 500;
   transition: var(--transition-base);
 }
@@ -355,51 +339,51 @@
 
 .checkbox-label input[type="checkbox"] {
   accent-color: var(--accent-primary);
-  width: 1.2rem;
-  height: 1.2rem;
+  width: 1rem;
+  height: 1rem;
   cursor: pointer;
 }
 
 /* 收藏夹网格 */
 .favorites-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
 }
 
 .favorite-item {
   background: var(--bg-primary);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
+  border-radius: var(--radius-md);
+  padding: 1rem;
   border: 1px solid var(--border-color);
   transition: var(--transition-base);
 }
 
 .favorite-item:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
 .favorite-title {
   font-weight: 600;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   color: var(--text-primary);
-  font-size: 1.1rem;
+  font-size: 1rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .favorite-url {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
   word-break: break-all;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .favorite-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 /* 不可用的搜索结果样式 */
@@ -418,12 +402,12 @@
   background: repeating-linear-gradient(
     45deg,
     transparent,
-    transparent 10px,
-    rgba(107, 114, 128, 0.05) 10px,
-    rgba(107, 114, 128, 0.05) 20px
+    transparent 8px,
+    rgba(107, 114, 128, 0.05) 8px,
+    rgba(107, 114, 128, 0.05) 16px
   );
   pointer-events: none;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 }
 
 .result-unavailable .result-title {
@@ -445,13 +429,13 @@
 /* 过渡动画 */
 .sites-grid,
 .results-grid {
-  animation: fadeIn 0.3s ease-in-out;
+  animation: fadeIn 0.25s ease-in-out;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -459,191 +443,173 @@
   }
 }
 
-/* 响应式设计 */
+/* 响应式设计 - 平板以上 */
+@media (min-width: 769px) {
+  .results-grid {
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); /* 进一步减少列宽 */
+    gap: 0.875rem; /* 进一步减少间距 */
+  }
+  
+  .result-item {
+    min-height: 160px; /* 大幅减少高度 */
+  }
+}
+
+/* 响应式设计 - 中等屏幕 */
+@media (max-width: 1200px) and (min-width: 769px) {
+  .results-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.875rem;
+  }
+  
+  .result-item {
+    min-height: 155px;
+  }
+}
+
+/* 响应式设计 - 平板设备 */
 @media (max-width: 768px) {
   .search-box {
     flex-direction: column;
+    gap: 0.5rem;
   }
   
   .search-options {
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
     align-items: center;
   }
   
   .results-grid,
   .favorites-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); /* 进一步优化 */
+    gap: 0.875rem;
+  }
+  
+  .result-item {
+    padding: 0.75rem 0.875rem;
+    min-height: 145px;
   }
   
   .history-list {
     justify-content: center;
+    gap: 0.4rem;
   }
   
   .search-info {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
   
   .search-status-summary {
     justify-content: center;
   }
+  
+  .result-actions {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  
+  .result-actions .action-btn {
+    height: 1.875rem;
+    min-width: 55px;
+    flex: 0 0 calc(50% - 0.125rem); /* 两列布局，紧凑间距 */
+  }
 }
 
+/* 响应式设计 - 移动设备 */
 @media (max-width: 480px) {
   .search-container {
     max-width: 100%;
   }
   
+  .results-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
   .result-item,
   .favorite-item {
-    padding: 1.25rem;
+    padding: 0.75rem 0.875rem;
+    min-height: 140px;
   }
   
   .history-item-container {
     flex-direction: column;
     align-items: stretch;
-    padding: 0.5rem;
-    border-radius: var(--radius-md);
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
   }
   
   .history-item-container .history-item {
     border-radius: var(--radius-sm);
     text-align: center;
-    padding: 0.5rem;
+    padding: 0.35rem;
+    font-size: 0.8rem;
+  }
+  
+  .result-actions {
+    gap: 0.25rem;
   }
   
   .result-actions .action-btn {
     flex: 1;
-    min-width: calc(50% - 0.375rem/2);
+    min-width: calc(50% - 0.125rem);
     justify-content: center;
-  }
-  
-  /* 11. 响应式优化 - 中等屏幕 */
-@media (max-width: 1200px) and (min-width: 769px) {
-  .results-grid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.75rem;
-  }
-  
-  .result-item {
-    min-height: 260px;
+    height: 1.75rem;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.4rem;
   }
 }
 
-/* 12. 响应式优化 - 平板设备 */
-@media (max-width: 768px) {
-  .results-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1.5rem;
-  }
-  
-  .result-item {
-    padding: 1rem 1.25rem;
-    min-height: 240px;
-  }
-  
-  .result-actions {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.375rem;
-  }
-}
-
-/* 13. 响应式优化 - 移动设备 */
-@media (max-width: 480px) {
-  .results-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-  
-  .result-item {
-    padding: 1rem;
-    min-height: auto;
-  }
-  
-  .result-actions {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .result-actions .action-btn {
-    font-size: 0.8rem;
-    padding: 0.5rem;
-  }
-}
-
-/* 14. 容器优化 - 确保搜索结果容器有足够空间 */
+/* 容器优化 */
 .results-section {
-  /* 新增：确保结果区域有足够边距 */
-  margin: 2rem 0;
+  margin: 1.25rem 0;
 }
 
 #results {
-  /* 新增：确保结果容器不受父容器限制 */
   width: 100%;
   max-width: none;
 }
 
-/* 15. 网格项目对齐优化 */
-.results-grid .result-item:nth-child(odd) {
-  /* 新增：确保所有卡片对齐 */
+/* 网格项目对齐优化 */
+.results-grid .result-item {
   align-self: stretch;
 }
 
-.results-grid .result-item:nth-child(even) {
-  align-self: stretch;
-}
-
-/* 16. 修复可能的CSS冲突 */
+/* 修复CSS冲突 */
 .result-item * {
-  /* 新增：确保所有子元素使用border-box */
   box-sizing: border-box;
 }
 
-/* 17. 加载状态优化 */
+/* 加载状态优化 */
 .result-item.loading {
-  /* 新增：加载状态下保持布局稳定 */
-  min-height: 280px;
+  min-height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* 18. 状态标签优化 */
+/* 状态标签优化 - 更小巧 */
 .content-match-badge,
 .cache-badge {
-  /* 修改：确保小标签不影响布局 */
-  font-size: 0.65rem;
-  padding: 2px 4px;
-  border-radius: 3px;
-  margin-left: 4px;
+  font-size: 0.55rem;
+  padding: 1px 2px;
+  border-radius: 2px;
+  margin-left: 2px;
   flex-shrink: 0;
 }
 
-/* 19. 图片/图标区域优化 */
+/* 图片/图标区域优化 */
 .result-image {
-  /* 新增：确保图标区域一致 */
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 3rem;
-  height: 3rem;
-  margin-bottom: 1rem;
+  width: 2rem; /* 进一步减少图标大小 */
+  height: 2rem;
+  margin-bottom: 0.5rem;
   flex-shrink: 0;
-}
-
-/* 20. 调试模式 - 可临时启用查看布局 */
-/*
-.results-grid {
-  border: 2px dashed red;
-}
-.result-item {
-  border: 1px dashed blue !important;
-}
-.result-content {
-  border: 1px dashed green;
-}
-*/
 }
 
 /* 深色主题适配 */
@@ -659,8 +625,8 @@
   background: repeating-linear-gradient(
     45deg,
     transparent,
-    transparent 10px,
-    rgba(255, 255, 255, 0.03) 10px,
-    rgba(255, 255, 255, 0.03) 20px
+    transparent 8px,
+    rgba(255, 255, 255, 0.03) 8px,
+    rgba(255, 255, 255, 0.03) 16px
   );
 }
