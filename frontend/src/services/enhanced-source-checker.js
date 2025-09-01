@@ -3,7 +3,7 @@ import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast } from '../utils/dom.js';
 import apiService from './api.js';
 
-class backendSourceChecker {
+class BackendSourceChecker {
   constructor() {
     this.statusCache = new Map();
     this.retryQueue = new Map();
@@ -502,5 +502,4 @@ setInterval(() => {
 }, 60 * 60 * 1000); // 每小时清理一次
 
 // 兼容性导出
-export const backendSourceChecker = new BackendSourceChecker();
 export default backendSourceChecker;
