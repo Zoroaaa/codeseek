@@ -3,7 +3,7 @@ import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast } from '../utils/dom.js';
 import apiService from './api.js';
 
-class BackendSourceChecker {
+class backendSourceChecker {
   constructor() {
     this.statusCache = new Map();
     this.retryQueue = new Map();
