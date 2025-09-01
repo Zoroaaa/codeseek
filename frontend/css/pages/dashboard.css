@@ -23,24 +23,30 @@
 
 .sidebar-menu {
   padding: 1.5rem 0;
+  width: 100%;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  padding: 1rem 1.75rem;
+  padding: 1rem 0;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
   border-left: 4px solid transparent;
   color: var(--text-secondary);
   font-size: 0.95rem;
   font-weight: 500;
+  width: 100%;
+  margin: 0;
+  position: relative;
+  /* 确保背景色占满整个宽度 */
+  background: transparent;
 }
 
 .menu-item:hover {
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  transform: translateX(2px);
+  transform: none; /* 移除translateX变换，避免影响背景 */
 }
 
 .menu-item.active {
@@ -48,18 +54,27 @@
   border-left-color: var(--accent-primary);
   color: var(--accent-primary);
   font-weight: 600;
+  /* 确保选中状态占满整个宽度 */
+  width: 100%;
+  margin: 0;
 }
 
 .menu-icon {
   font-size: 1.25rem;
-  margin-right: 1rem;
+  margin-left: 1.75rem; /* 左边距 */
+  margin-right: 1rem;    /* 图标和文字的间距 */
   width: 1.5rem;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .menu-text {
   font-size: 0.95rem;
+  flex: 1;
+  padding-right: 1.75rem; /* 右边距，与左边距对称 */
 }
+
+
 
 /* 主内容区域优化 */
 .dashboard-container .main-content {
@@ -1505,11 +1520,14 @@
 }
 
 [data-theme="dark"] .menu-item.active {
-  background: rgba(96, 165, 250, 0.1);
+  background: rgba(96, 165, 250, 0.15);
+  border-left-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
-[data-theme="dark"] .stat-card:hover {
-  border-color: var(--accent-primary);
+[data-theme="dark"] .menu-item:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 [data-theme="dark"] .source-item,
