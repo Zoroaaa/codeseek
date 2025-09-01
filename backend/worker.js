@@ -631,6 +631,504 @@ router.post('/api/auth/logout', async (request, env) => {
     return utils.successResponse({ message: '退出成功' });
 });
 
+// 在现有 worker.js 文件末尾，删除账户API之前添加以下搜索源状态检查API
+
+// 🆕 搜索源状态检查相关API
+router.post('/api/source-status/check', async (request, env) => {
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { sources, keyword, options = {} } = body;
+        
+        if (!sources || !Array.isArray(sources) || sources.length === 0) {
+            return utils.errorResponse('搜索源列表不能为空', 400);
+        }
+        
+        if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
+            return utils.errorResponse('搜索关键词不能为空', 400);
+        }
+        
+        const trimmedKeyword = keyword.trim();
+        const keywordHash = await utils.hashPassword(`${trimmedKeyword}${Date.now()}`);
+        const timeout = Math.min(Math.max(options.timeout || 10000, 3000), 30000);
+        const checkContentMatch = options.checkContentMatch !== false;
+        
+        console.log(`开始检查 ${sources.length} 个搜索源，关键词: ${trimmedKeyword}`);
+        
+        const results = [];
+        const concurrency = Math.min(sources.length, 3); // 限制并发数
+        
+        // 分批并发处理
+        for (let i = 0; i < sources.length; i += concurrency) {
+            const batch = sources.slice(i, i + concurrency);
+            const batchPromises = batch.map(source => 
+                checkSingleSourceStatus(source, trimmedKeyword, keywordHash, {
+                    timeout,
+                    checkContentMatch,
+                    env
+                })
+            );
+            
+            const batchResults = await Promise.all(batchPromises);
+            results.push(...batchResults);
+            
+            // 添加批次间延迟
+            if (i + concurrency < sources.length) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+        
+        // 保存检查结果到数据库（异步）
+        saveStatusCheckResults(env, results, trimmedKeyword).catch(console.error);
+        
+        // 统计结果
+        const summary = {
+            total: results.length,
+            available: results.filter(r => r.status === 'available').length,
+            unavailable: results.filter(r => r.status === 'unavailable').length,
+            timeout: results.filter(r => r.status === 'timeout').length,
+            error: results.filter(r => r.status === 'error').length,
+            averageResponseTime: Math.round(
+                results.filter(r => r.responseTime > 0)
+                    .reduce((sum, r) => sum + r.responseTime, 0) / 
+                Math.max(results.filter(r => r.responseTime > 0).length, 1)
+            ),
+            keyword: trimmedKeyword,
+            timestamp: Date.now()
+        };
+        
+        return utils.successResponse({
+            summary,
+            results,
+            message: `搜索源状态检查完成: ${summary.available}/${summary.total} 可用`
+        });
+        
+    } catch (error) {
+        console.error('搜索源状态检查失败:', error);
+        return utils.errorResponse('搜索源状态检查失败: ' + error.message, 500);
+    }
+});
+
+// 获取搜索源状态检查历史
+router.get('/api/source-status/history', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+    
+    try {
+        const url = new URL(request.url);
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50);
+        const offset = Math.max(parseInt(url.searchParams.get('offset') || '0'), 0);
+        const keyword = url.searchParams.get('keyword');
+        
+        let query = `
+            SELECT * FROM source_status_cache 
+            WHERE 1=1
+        `;
+        const params = [];
+        
+        if (keyword) {
+            query += ` AND keyword LIKE ?`;
+            params.push(`%${keyword}%`);
+        }
+        
+        query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+        params.push(limit, offset);
+        
+        const result = await env.DB.prepare(query).bind(...params).all();
+        
+        const history = result.results.map(item => ({
+            id: item.id,
+            sourceId: item.source_id,
+            keyword: item.keyword,
+            status: item.status,
+            available: Boolean(item.available),
+            contentMatch: Boolean(item.content_match),
+            responseTime: item.response_time,
+            qualityScore: item.quality_score,
+            lastChecked: item.created_at,
+            checkError: item.check_error
+        }));
+        
+        return utils.successResponse({
+            history,
+            total: result.results.length,
+            limit,
+            offset
+        });
+        
+    } catch (error) {
+        console.error('获取状态检查历史失败:', error);
+        return utils.errorResponse('获取历史失败', 500);
+    }
+});
+
+// 单个搜索源状态检查函数
+async function checkSingleSourceStatus(source, keyword, keywordHash, options = {}) {
+    const { timeout, checkContentMatch, env } = options;
+    const sourceId = source.id || source.name;
+    const startTime = Date.now();
+    
+    try {
+        // 检查缓存
+        const cached = await getCachedSourceStatus(env, sourceId, keywordHash);
+        if (cached && isCacheValid(cached)) {
+            console.log(`使用缓存结果: ${sourceId}`);
+            return {
+                sourceId,
+                sourceName: source.name,
+                status: cached.status,
+                available: cached.available,
+                contentMatch: cached.content_match,
+                responseTime: cached.response_time,
+                lastChecked: cached.created_at,
+                fromCache: true
+            };
+        }
+        
+        // 构建检查URL
+        const checkUrl = source.urlTemplate.replace('{keyword}', encodeURIComponent(keyword));
+        console.log(`检查URL: ${checkUrl}`);
+        
+        // 执行HTTP检查
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        
+        const response = await fetch(checkUrl, {
+            method: 'GET',
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'MagnetSearch-StatusChecker/1.3.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6',
+                'Cache-Control': 'no-cache'
+            },
+            // 在Cloudflare Workers中不需要设置CORS相关选项
+        });
+        
+        clearTimeout(timeoutId);
+        const responseTime = Date.now() - startTime;
+        
+        // 基础可用性检查
+        const isAvailable = response.ok && response.status < 400;
+        let contentMatch = false;
+        let qualityScore = 0;
+        let matchDetails = {};
+        
+        // 内容匹配检查
+        if (isAvailable && checkContentMatch) {
+            try {
+                const content = await response.text();
+                const matchResult = analyzePageContent(content, keyword, source);
+                contentMatch = matchResult.hasMatch;
+                qualityScore = matchResult.qualityScore;
+                matchDetails = matchResult.details;
+                
+                console.log(`内容匹配检查 ${sourceId}: ${contentMatch ? '匹配' : '不匹配'}, 质量分数: ${qualityScore}`);
+            } catch (contentError) {
+                console.warn(`内容检查失败 ${sourceId}:`, contentError.message);
+            }
+        }
+        
+        // 确定最终状态
+        let finalStatus = 'error';
+        if (isAvailable) {
+            if (checkContentMatch) {
+                finalStatus = contentMatch ? 'available' : 'unavailable';
+            } else {
+                finalStatus = 'available';
+            }
+        } else if (response.status === 404) {
+            finalStatus = 'unavailable';
+        } else if (responseTime >= timeout * 0.9) {
+            finalStatus = 'timeout';
+        } else {
+            finalStatus = 'unavailable';
+        }
+        
+        const result = {
+            sourceId,
+            sourceName: source.name,
+            status: finalStatus,
+            available: finalStatus === 'available',
+            contentMatch,
+            responseTime,
+            qualityScore,
+            httpStatus: response.status,
+            lastChecked: Date.now(),
+            matchDetails,
+            fromCache: false
+        };
+        
+        // 异步保存到缓存
+        saveSingleStatusToCache(env, sourceId, keyword, keywordHash, result).catch(console.error);
+        
+        return result;
+        
+    } catch (error) {
+        clearTimeout(timeoutId);
+        const responseTime = Date.now() - startTime;
+        
+        console.error(`检查源失败 ${sourceId}:`, error.message);
+        
+        let status = 'error';
+        if (error.name === 'AbortError' || error.message.includes('timeout')) {
+            status = 'timeout';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            status = 'unavailable';
+        }
+        
+        const result = {
+            sourceId,
+            sourceName: source.name,
+            status,
+            available: false,
+            contentMatch: false,
+            responseTime,
+            qualityScore: 0,
+            lastChecked: Date.now(),
+            error: error.message,
+            fromCache: false
+        };
+        
+        // 异步保存错误结果到缓存
+        saveSingleStatusToCache(env, sourceId, keyword, keywordHash, result).catch(console.error);
+        
+        return result;
+    }
+}
+
+// 分析页面内容
+function analyzePageContent(content, keyword, source) {
+    const lowerContent = content.toLowerCase();
+    const lowerKeyword = keyword.toLowerCase();
+    
+    let qualityScore = 0;
+    const details = {
+        titleMatch: false,
+        bodyMatch: false,
+        exactMatch: false,
+        partialMatch: false,
+        resultCount: 0,
+        keywordPositions: []
+    };
+    
+    // 检查精确匹配
+    if (lowerContent.includes(lowerKeyword)) {
+        details.exactMatch = true;
+        qualityScore += 50;
+        
+        // 找到所有关键词位置
+        let position = 0;
+        while ((position = lowerContent.indexOf(lowerKeyword, position)) !== -1) {
+            details.keywordPositions.push(position);
+            position += lowerKeyword.length;
+        }
+    }
+    
+    // 检查标题匹配
+    const titleMatch = content.match(/<title[^>]*>([^<]*)</i);
+    if (titleMatch && titleMatch[1].toLowerCase().includes(lowerKeyword)) {
+        details.titleMatch = true;
+        qualityScore += 30;
+    }
+    
+    // 检查番号格式（如果是番号搜索）
+    if (/^[A-Za-z]+-?\d+$/i.test(keyword)) {
+        const numberPattern = keyword.replace('-', '-?');
+        const regex = new RegExp(numberPattern, 'gi');
+        const matches = content.match(regex);
+        if (matches) {
+            details.exactMatch = true;
+            qualityScore += 40;
+            details.resultCount = matches.length;
+        }
+    }
+    
+    // 检查部分匹配（关键词的各部分）
+    if (!details.exactMatch && keyword.length > 3) {
+        const parts = keyword.split(/[-_\s]+/);
+        let partialMatches = 0;
+        
+        parts.forEach(part => {
+            if (part.length > 2 && lowerContent.includes(part.toLowerCase())) {
+                partialMatches++;
+            }
+        });
+        
+        if (partialMatches > 0) {
+            details.partialMatch = true;
+            qualityScore += Math.min(partialMatches * 10, 30);
+        }
+    }
+    
+    // 检查是否有搜索结果列表
+    const resultIndicators = [
+        /result/gi,
+        /search.*result/gi,
+        /找到.*结果/gi,
+        /共.*条/gi,
+        /<div[^>]*class[^>]*result/gi
+    ];
+    
+    let resultCount = 0;
+    resultIndicators.forEach(indicator => {
+        const matches = content.match(indicator);
+        if (matches) resultCount += matches.length;
+    });
+    
+    if (resultCount > 0) {
+        details.resultCount = resultCount;
+        qualityScore += Math.min(resultCount * 5, 20);
+    }
+    
+    // 检查是否是"无结果"页面
+    const noResultIndicators = [
+        /no.*result/gi,
+        /not.*found/gi,
+        /没有.*结果/gi,
+        /未找到/gi,
+        /暂无.*内容/gi
+    ];
+    
+    const hasNoResultIndicator = noResultIndicators.some(indicator => 
+        content.match(indicator)
+    );
+    
+    if (hasNoResultIndicator) {
+        qualityScore = Math.max(0, qualityScore - 30);
+    }
+    
+    // 最终质量评分
+    qualityScore = Math.min(100, Math.max(0, qualityScore));
+    
+    const hasMatch = details.exactMatch || (details.partialMatch && qualityScore > 20);
+    
+    return {
+        hasMatch,
+        qualityScore,
+        details
+    };
+}
+
+// 缓存相关函数
+async function getCachedSourceStatus(env, sourceId, keywordHash) {
+    try {
+        return await env.DB.prepare(`
+            SELECT * FROM source_status_cache 
+            WHERE source_id = ? AND keyword_hash = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        `).bind(sourceId, keywordHash).first();
+    } catch (error) {
+        console.error('获取缓存状态失败:', error);
+        return null;
+    }
+}
+
+function isCacheValid(cached, maxAge = 300000) { // 5分钟默认缓存
+    if (!cached) return false;
+    return Date.now() - cached.created_at < maxAge;
+}
+
+async function saveSingleStatusToCache(env, sourceId, keyword, keywordHash, result) {
+    try {
+        const cacheId = utils.generateId();
+        await env.DB.prepare(`
+            INSERT INTO source_status_cache (
+                id, source_id, keyword, keyword_hash, status, available, content_match,
+                response_time, quality_score, match_details, page_info, check_error,
+                expires_at, created_at, last_accessed, access_count
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+            cacheId, sourceId, keyword, keywordHash, result.status,
+            result.available ? 1 : 0, result.contentMatch ? 1 : 0,
+            result.responseTime, result.qualityScore || 0,
+            JSON.stringify(result.matchDetails || {}),
+            JSON.stringify({ httpStatus: result.httpStatus }),
+            result.error || null,
+            Date.now() + 300000, // 5分钟后过期
+            Date.now(), Date.now(), 1
+        ).run();
+    } catch (error) {
+        console.error('保存缓存状态失败:', error);
+    }
+}
+
+async function saveStatusCheckResults(env, results, keyword) {
+    try {
+        // 更新健康度统计
+        for (const result of results) {
+            await updateSourceHealthStats(env, result);
+        }
+        
+        console.log(`已保存 ${results.length} 个搜索源的状态检查结果`);
+    } catch (error) {
+        console.error('保存状态检查结果失败:', error);
+    }
+}
+
+async function updateSourceHealthStats(env, result) {
+    try {
+        const sourceId = result.sourceId;
+        
+        // 获取当前统计
+        const currentStats = await env.DB.prepare(`
+            SELECT * FROM source_health_stats WHERE source_id = ?
+        `).bind(sourceId).first();
+        
+        if (currentStats) {
+            // 更新现有统计
+            const newTotalChecks = currentStats.total_checks + 1;
+            const newSuccessfulChecks = currentStats.successful_checks + (result.available ? 1 : 0);
+            const newContentMatches = currentStats.content_matches + (result.contentMatch ? 1 : 0);
+            const newSuccessRate = newSuccessfulChecks / newTotalChecks;
+            
+            // 更新平均响应时间
+            const newAvgResponseTime = Math.round(
+                (currentStats.average_response_time * currentStats.total_checks + result.responseTime) / newTotalChecks
+            );
+            
+            // 计算健康度分数
+            const healthScore = Math.round(newSuccessRate * 100);
+            
+            await env.DB.prepare(`
+                UPDATE source_health_stats SET
+                    total_checks = ?, successful_checks = ?, content_matches = ?,
+                    average_response_time = ?, success_rate = ?, health_score = ?,
+                    last_success = ?, last_failure = ?, updated_at = ?
+                WHERE source_id = ?
+            `).bind(
+                newTotalChecks, newSuccessfulChecks, newContentMatches,
+                newAvgResponseTime, newSuccessRate, healthScore,
+                result.available ? Date.now() : currentStats.last_success,
+                result.available ? currentStats.last_failure : Date.now(),
+                Date.now(), sourceId
+            ).run();
+        } else {
+            // 创建新统计
+            const statsId = utils.generateId();
+            await env.DB.prepare(`
+                INSERT INTO source_health_stats (
+                    id, source_id, total_checks, successful_checks, content_matches,
+                    average_response_time, last_success, last_failure, success_rate,
+                    health_score, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+                statsId, sourceId, 1, result.available ? 1 : 0, result.contentMatch ? 1 : 0,
+                result.responseTime,
+                result.available ? Date.now() : null,
+                result.available ? null : Date.now(),
+                result.available ? 1.0 : 0.0,
+                result.available ? 100 : 0,
+                Date.now()
+            ).run();
+        }
+    } catch (error) {
+        console.error('更新源健康度统计失败:', error);
+    }
+}
+
 router.post('/api/auth/delete-account', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -705,7 +1203,7 @@ router.put('/api/user/settings', async (request, env) => {
             'searchSuggestions',
             'searchSources',            // 启用的搜索源列表
             'customSearchSources',      // 自定义搜索源列表
-            'customSourceCategories'    // 🔧 新增：自定义分类列表
+            'customSourceCategories',    // 🔧 新增：自定义分类列表
 			// 🆕 添加搜索源状态检查相关设置
             'checkSourceStatus',
             'sourceStatusCheckTimeout',

@@ -1,11 +1,11 @@
-// 搜索服务模块 - 集成增强版搜索源状态检查功能
+// 搜索服务模块 - 集成后端版搜索源状态检查功能
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
 import { showToast } from '../utils/dom.js';
 import apiService from './api.js';
 import authManager from './auth.js';
-import enhancedSourceChecker from './enhanced-source-checker.js';
+import backendSourceChecker from './enhanced-source-checker.js'; // 🔧 使用后端版检查器
 
 class SearchService {
   constructor() {
@@ -18,11 +18,12 @@ class SearchService {
       totalChecks: 0,
       successfulChecks: 0,
       failedChecks: 0,
-      averageResponseTime: 0
+      averageResponseTime: 0,
+      backendCalls: 0
     };
   }
 
-  // 执行搜索 - 集成增强状态检查
+  // 执行搜索 - 集成后端状态检查
   async performSearch(keyword, options = {}) {
     const validation = validateSearchKeyword(keyword);
     if (!validation.valid) {
@@ -169,7 +170,7 @@ class SearchService {
     }
   }
 
-  // 构建搜索结果 - 使用增强状态检查
+  // 构建搜索结果 - 使用后端状态检查
   async buildSearchResults(keyword, options = {}) {
     const encodedKeyword = encodeURIComponent(keyword);
     const timestamp = Date.now();
@@ -181,16 +182,18 @@ class SearchService {
       
       console.log(`使用 ${enabledSources.length} 个搜索源:`, enabledSources.map(s => s.name));
       
-      // 如果启用了状态检查，使用增强检查器
+      // 🔧 如果启用了状态检查，使用后端检查器
       let sourcesWithStatus = enabledSources;
       if (checkStatus && userSettings) {
-        console.log('开始增强状态检查...');
+        console.log('开始后端状态检查...');
         this.updateCheckStats('started');
         
         try {
-          const checkResults = await enhancedSourceChecker.checkMultipleSources(
+          // 使用后端检查器，传入实际的搜索关键词以进行内容匹配检查
+          const checkResults = await backendSourceChecker.checkMultipleSources(
             enabledSources, 
-            userSettings
+            userSettings,
+            keyword // 🔧 传入实际关键词进行精确内容匹配
           );
           
           // 处理检查结果
@@ -198,8 +201,10 @@ class SearchService {
           
           this.updateCheckStats('completed', checkResults);
           
+          console.log(`后端状态检查完成: ${sourcesWithStatus.length}/${enabledSources.length} 个源可用`);
+          
         } catch (error) {
-          console.error('状态检查失败:', error);
+          console.error('后端状态检查失败:', error);
           this.updateCheckStats('failed');
           showToast('搜索源状态检查失败，使用默认配置', 'warning', 3000);
         }
@@ -218,7 +223,7 @@ class SearchService {
     }
   }
 
-  // 处理状态检查结果
+  // 🔧 重写处理状态检查结果方法，适配后端API返回格式
   processStatusCheckResults(originalSources, checkResults, userSettings) {
     const sourcesMap = new Map(originalSources.map(s => [s.id, s]));
     const processedSources = [];
@@ -236,8 +241,11 @@ class SearchService {
         statusText: this.getStatusText(result.status),
         lastChecked: result.lastChecked,
         responseTime: result.responseTime || 0,
-        availabilityScore: result.availabilityScore,
-        verified: result.verified || false
+        availabilityScore: result.availabilityScore || 0,
+        verified: result.verified || result.contentMatch || false,
+        contentMatch: result.contentMatch || false,
+        qualityScore: result.qualityScore || 0,
+        fromCache: result.fromCache || false
       };
       
       // 根据用户设置决定是否包含不可用的源
@@ -257,15 +265,20 @@ class SearchService {
     
     console.log(`状态检查完成: ${availableCount}/${checkResults.length} 个搜索源可用`);
     
-    if (availableCount === 0 && userSettings.skipUnavailableSources) {
+    // 🔧 优化：如果所有源都不可用且设置了跳过不可用源，回退到包含所有源
+    if (availableCount === 0 && userSettings.skipUnavailableSources && checkResults.length > 0) {
       console.warn('所有搜索源都不可用，回退到包含所有源');
-      return checkResults.map(({ source, result }) => ({
-        ...sourcesMap.get(source.id),
-        status: result.status,
-        statusText: this.getStatusText(result.status),
-        lastChecked: result.lastChecked,
-        responseTime: result.responseTime || 0
-      }));
+      return checkResults.map(({ source, result }) => {
+        const originalSource = sourcesMap.get(source.id);
+        return {
+          ...originalSource,
+          status: result.status,
+          statusText: this.getStatusText(result.status),
+          lastChecked: result.lastChecked,
+          responseTime: result.responseTime || 0,
+          contentMatch: result.contentMatch || false
+        };
+      });
     }
     
     return processedSources;
@@ -293,6 +306,9 @@ class SearchService {
         result.responseTime = source.responseTime;
         result.availabilityScore = source.availabilityScore;
         result.verified = source.verified;
+        result.contentMatch = source.contentMatch;
+        result.qualityScore = source.qualityScore;
+        result.fromCache = source.fromCache;
       }
       
       return result;
@@ -304,17 +320,18 @@ class SearchService {
     switch (action) {
       case 'started':
         this.checkStats.totalChecks++;
+        this.checkStats.backendCalls++;
         break;
       case 'completed':
         if (checkResults) {
-          const successful = checkResults.filter(r => 
-            r.result.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE
+          const successful = checkResults.filter(cr => 
+            cr.result && cr.result.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE
           ).length;
           this.checkStats.successfulChecks += successful;
           
           // 计算平均响应时间
           const responseTimes = checkResults
-            .map(r => r.result.responseTime)
+            .map(cr => cr.result?.responseTime)
             .filter(time => time && time > 0);
           
           if (responseTimes.length > 0) {
@@ -345,7 +362,7 @@ class SearchService {
     return statusTexts[status] || '未知';
   }
 
-  // 手动检查所有搜索源状态（用于测试功能）
+  // 🔧 使用后端API手动检查所有搜索源状态
   async checkAllSourcesStatus() {
     try {
       const userSettings = await this.getUserSettings();
@@ -353,7 +370,8 @@ class SearchService {
       
       console.log('手动检查所有搜索源状态...');
       
-      const checkResults = await enhancedSourceChecker.checkMultipleSources(
+      // 🔧 使用后端检查器
+      const checkResults = await backendSourceChecker.checkMultipleSources(
         enabledSources, 
         userSettings
       );
@@ -380,8 +398,10 @@ class SearchService {
           statusText: this.getStatusText(result.status),
           lastChecked: result.lastChecked,
           responseTime: result.responseTime || 0,
-          availabilityScore: result.availabilityScore,
-          verified: result.verified || false
+          availabilityScore: result.availabilityScore || 0,
+          verified: result.verified || false,
+          contentMatch: result.contentMatch || false,
+          fromCache: result.fromCache || false
         };
         
         statusSummary.sources.push(sourceResult);
@@ -437,7 +457,9 @@ class SearchService {
       }
       
       const userSettings = await this.getUserSettings();
-      const result = await enhancedSourceChecker.checkSourceStatus(source, userSettings);
+      
+      // 🔧 使用后端检查器
+      const result = await backendSourceChecker.checkSourceStatus(source, userSettings);
       
       return {
         id: source.id,
@@ -446,9 +468,11 @@ class SearchService {
         statusText: this.getStatusText(result.status),
         lastChecked: result.lastChecked,
         responseTime: result.responseTime || 0,
-        availabilityScore: result.availabilityScore,
+        availabilityScore: result.availabilityScore || 0,
         verified: result.verified || false,
-        checkDetails: result.checkDetails
+        contentMatch: result.contentMatch || false,
+        checkDetails: result.checkDetails || {},
+        fromCache: result.fromCache || false
       };
     } catch (error) {
       console.error(`检查搜索源 ${sourceId} 状态失败:`, error);
@@ -458,7 +482,7 @@ class SearchService {
 
   // 清除搜索源状态缓存
   clearSourceStatusCache() {
-    enhancedSourceChecker.statusCache.clear();
+    backendSourceChecker.clearCache();
     console.log('搜索源状态缓存已清除');
   }
 
@@ -466,7 +490,7 @@ class SearchService {
   getStatusCheckStats() {
     return {
       ...this.checkStats,
-      checkerStats: enhancedSourceChecker.getCheckingStats()
+      checkerStats: backendSourceChecker.getCheckingStats()
     };
   }
 
@@ -578,10 +602,12 @@ class SearchService {
   // 导出搜索服务状态
   exportServiceStatus() {
     return {
+      type: 'backend-integrated-search-service',
       cacheStats: this.getCacheStats(),
       checkStats: this.getStatusCheckStats(),
       userSettings: this.userSettings,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      version: '2.0.0'
     };
   }
 }

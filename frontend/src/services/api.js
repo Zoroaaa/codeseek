@@ -197,6 +197,90 @@ class APIService {
     }
   }
 
+  // 🆕 搜索源状态检查API
+  async checkSourcesStatus(sources, keyword, options = {}) {
+    try {
+      if (!sources || !Array.isArray(sources) || sources.length === 0) {
+        throw new Error('搜索源列表不能为空');
+      }
+      
+      if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
+        throw new Error('搜索关键词不能为空');
+      }
+      
+      const requestOptions = {
+        timeout: options.timeout || 10000,
+        checkContentMatch: options.checkContentMatch !== false,
+        maxConcurrency: options.maxConcurrency || 3
+      };
+      
+      console.log(`调用后端API检查 ${sources.length} 个搜索源状态`);
+      
+      const response = await this.request('/api/source-status/check', {
+        method: 'POST',
+        body: JSON.stringify({
+          sources: sources.map(source => ({
+            id: source.id,
+            name: source.name || source.id,
+            urlTemplate: source.urlTemplate
+          })),
+          keyword: keyword.trim(),
+          options: requestOptions
+        })
+      });
+      
+      console.log('搜索源状态检查API响应:', response);
+      
+      return {
+        success: response.success,
+        summary: response.summary || {},
+        results: response.results || [],
+        message: response.message
+      };
+      
+    } catch (error) {
+      console.error('调用搜索源状态检查API失败:', error);
+      throw error;
+    }
+  }
+
+  // 🆕 获取搜索源状态检查历史
+  async getSourceStatusHistory(options = {}) {
+    try {
+      const params = new URLSearchParams();
+      
+      if (options.keyword) {
+        params.append('keyword', options.keyword);
+      }
+      if (options.limit) {
+        params.append('limit', options.limit.toString());
+      }
+      if (options.offset) {
+        params.append('offset', options.offset.toString());
+      }
+      
+      const endpoint = `/api/source-status/history${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await this.request(endpoint);
+      
+      return {
+        success: true,
+        history: response.history || [],
+        total: response.total || 0,
+        limit: response.limit || 20,
+        offset: response.offset || 0
+      };
+      
+    } catch (error) {
+      console.error('获取状态检查历史失败:', error);
+      return {
+        success: false,
+        history: [],
+        total: 0,
+        error: error.message
+      };
+    }
+  }
+
   // 收藏相关API
   async syncFavorites(favorites) {
     if (!this.token) {
@@ -360,7 +444,7 @@ class APIService {
       'cacheResults', 
       'maxHistoryPerUser', 
       'maxFavoritesPerUser',
-      'searchSources',               // 启用的搜索源列表
+      'searchSources',               // 可用的搜索源列表
       'customSearchSources',         // 自定义搜索源列表
       'customSourceCategories',      // 自定义分类字段
       'allowAnalytics',              // 行为统计设置
@@ -401,29 +485,21 @@ class APIService {
       throw new Error('搜索源状态检查设置格式错误：必须是布尔值');
     }
     
-if (validSettings.sourceStatusCheckTimeout !== undefined) {
-    // 前端输入的是毫秒，转换为毫秒
-    const timeoutMs = parseInt(validSettings.sourceStatusCheckTimeout, 10);
-    
-    // 验证毫秒范围
-    if (isNaN(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
+    if (validSettings.sourceStatusCheckTimeout !== undefined) {
+      const timeout = Number(validSettings.sourceStatusCheckTimeout);
+      if (isNaN(timeout) || timeout < 1000 || timeout > 30000) {
         throw new Error('搜索源检查超时时间格式错误：必须是1000-30000毫秒');
+      }
+      validSettings.sourceStatusCheckTimeout = timeout;
     }
-    // 存储毫秒值
-    validSettings.sourceStatusCheckTimeout = timeoutMs;
-}
-
-if (validSettings.sourceStatusCacheDuration !== undefined) {
-    // 前端输入的是毫秒，转换为毫秒
-    const durationMs = parseInt(validSettings.sourceStatusCacheDuration, 10) ;
     
-    // 验证毫秒范围
-    if (isNaN(durationMs) || durationMs < 60000 || durationMs > 3600000) {
+    if (validSettings.sourceStatusCacheDuration !== undefined) {
+      const duration = Number(validSettings.sourceStatusCacheDuration);
+      if (isNaN(duration) || duration < 60000 || duration > 3600000) {
         throw new Error('搜索源状态缓存时间格式错误：必须是60000-3600000毫秒');
+      }
+      validSettings.sourceStatusCacheDuration = duration;
     }
-    // 存储毫秒值
-    validSettings.sourceStatusCacheDuration = durationMs;
-}
     
     if (validSettings.skipUnavailableSources !== undefined && 
         typeof validSettings.skipUnavailableSources !== 'boolean') {
@@ -583,7 +659,7 @@ if (validSettings.sourceStatusCacheDuration !== undefined) {
       // 从自定义搜索源列表中移除
       customSources = customSources.filter(s => s.id !== sourceId);
       
-      // 从启用的搜索源中移除
+      // 从可用的搜索源中移除
       enabledSources = enabledSources.filter(id => id !== sourceId);
       
       // 更新设置

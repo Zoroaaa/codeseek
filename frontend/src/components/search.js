@@ -1,4 +1,4 @@
-// 增强版搜索组件 - 支持搜索源状态检查和显示
+// 增强版搜索组件 - 支持后端搜索源状态检查和显示
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../utils/format.js';
@@ -15,6 +15,7 @@ export class SearchManager {
     this.searchHistory = [];
     this.isInitialized = false;
     this.statusCheckInProgress = false; // 状态检查进度标志
+    this.lastStatusCheckKeyword = null; // 最后检查的关键词
   }
 
   async init() {
@@ -39,8 +40,11 @@ export class SearchManager {
       copyToClipboard: (text) => this.copyToClipboard(text),
       searchFromHistory: (keyword) => this.searchFromHistory(keyword),
       deleteHistoryItem: (historyId) => this.deleteHistoryItem(historyId),
-      checkSourceStatus: (sourceId) => this.checkSingleSourceStatus(sourceId), // 新增
-      refreshSourceStatus: () => this.refreshAllSourcesStatus() // 新增
+      checkSourceStatus: (sourceId) => this.checkSingleSourceStatus(sourceId),
+      refreshSourceStatus: () => this.refreshAllSourcesStatus(),
+      // 🔧 新增：状态检查相关方法
+      toggleStatusCheck: () => this.toggleStatusCheck(),
+      viewStatusHistory: () => this.viewStatusHistory()
     };
   }
 
@@ -123,7 +127,7 @@ export class SearchManager {
     }
   }
 
-  // 执行搜索 - 增强版，支持状态检查
+  // 🔧 执行搜索 - 增强版，支持后端状态检查
   async performSearch() {
     const searchInput = document.getElementById('searchInput');
     const keyword = searchInput?.value.trim();
@@ -147,8 +151,8 @@ export class SearchManager {
       // 隐藏提示区域
       this.hideQuickTips();
 
-      // 显示搜索状态检查进度（如果启用）
-      await this.showSearchStatusIfEnabled();
+      // 🔧 显示搜索状态检查进度（如果启用）
+      await this.showSearchStatusIfEnabled(keyword);
 
       // 获取搜索选项
       const useCache = true; // 默认启用缓存
@@ -177,19 +181,21 @@ export class SearchManager {
     }
   }
 
-  // 新增：显示搜索状态检查进度
-  async showSearchStatusIfEnabled() {
+  // 🔧 新增：显示搜索状态检查进度
+  async showSearchStatusIfEnabled(keyword) {
     try {
       if (!authManager.isAuthenticated()) return;
 
       const userSettings = await apiService.getUserSettings();
-	  const checkTimeout = userSettings.sourceStatusCheckTimeout || 8000;
+      const checkTimeout = userSettings.sourceStatusCheckTimeout || 8000;
+      
       if (!userSettings.checkSourceStatus) return;
 
       this.statusCheckInProgress = true;
+      this.lastStatusCheckKeyword = keyword;
 
       // 显示状态检查提示
-      showToast('正在检查搜索源状态...', 'info', checkTimeout);
+      showToast('正在检查搜索源状态并进行内容匹配...', 'info', checkTimeout);
 
       // 如果页面有状态指示器，显示它
       const statusIndicator = document.getElementById('searchStatusIndicator');
@@ -199,6 +205,7 @@ export class SearchManager {
           <div class="status-check-progress">
             <div class="progress-spinner"></div>
             <span>检查搜索源状态中...</span>
+            <small>正在验证 "${escapeHtml(keyword)}" 的内容匹配</small>
           </div>
         `;
       }
@@ -207,7 +214,7 @@ export class SearchManager {
     }
   }
 
-  // 显示搜索结果 - 增强版，支持状态显示
+  // 🔧 显示搜索结果 - 增强版，支持状态显示
   displaySearchResults(keyword, results) {
     const resultsSection = document.getElementById('resultsSection');
     const searchInfo = document.getElementById('searchInfo');
@@ -217,7 +224,7 @@ export class SearchManager {
 
     if (resultsSection) resultsSection.style.display = 'block';
     
-    // 计算状态统计
+    // 🔧 计算状态统计
     const statusStats = this.calculateStatusStats(results);
     
     if (searchInfo) {
@@ -225,7 +232,13 @@ export class SearchManager {
       if (statusStats.hasStatus) {
         const availableCount = statusStats.available;
         const totalCount = results.length;
+        const contentMatches = statusStats.contentMatches || 0;
         statusInfo = ` | 可用: ${availableCount}/${totalCount}`;
+        
+        // 🔧 添加内容匹配信息
+        if (contentMatches > 0) {
+          statusInfo += ` | 内容匹配: ${contentMatches}`;
+        }
       }
       
       searchInfo.innerHTML = `
@@ -259,7 +272,7 @@ export class SearchManager {
     }, 100);
   }
 
-  // 新增：计算状态统计
+  // 🔧 新增：计算状态统计（包含内容匹配统计）
   calculateStatusStats(results) {
     const stats = {
       hasStatus: false,
@@ -267,7 +280,9 @@ export class SearchManager {
       unavailable: 0,
       timeout: 0,
       error: 0,
-      unknown: 0
+      unknown: 0,
+      contentMatches: 0,
+      fromCache: 0
     };
 
     results.forEach(result => {
@@ -288,6 +303,14 @@ export class SearchManager {
             break;
           default:
             stats.unknown++;
+        }
+        
+        // 统计内容匹配和缓存使用
+        if (result.contentMatch) {
+          stats.contentMatches++;
+        }
+        if (result.fromCache) {
+          stats.fromCache++;
         }
       }
     });
@@ -319,15 +342,18 @@ export class SearchManager {
         case 'checkStatus': // 新增：单独检查搜索源状态
           this.checkSingleSourceStatus(source, resultId);
           break;
+        case 'viewDetails': // 🔧 新增：查看详细状态信息
+          this.viewSourceStatusDetails(resultId);
+          break;
       }
     });
   }
 
-  // 创建搜索结果HTML - 增强版，支持状态显示
+  // 🔧 创建搜索结果HTML - 增强版，支持详细状态显示
   createResultHTML(result) {
     const isFavorited = favoritesManager.isFavorited(result.url);
     
-    // 状态指示器HTML
+    // 🔧 状态指示器HTML（增强版）
     let statusIndicator = '';
     if (result.status) {
       const statusClass = this.getStatusClass(result.status);
@@ -335,10 +361,29 @@ export class SearchManager {
       const statusTime = result.lastChecked ? 
         `检查时间: ${formatRelativeTime(result.lastChecked)}` : '';
       
+      // 🔧 详细状态信息
+      let statusDetails = [];
+      if (result.responseTime > 0) {
+        statusDetails.push(`响应: ${result.responseTime}ms`);
+      }
+      if (result.qualityScore > 0) {
+        statusDetails.push(`质量: ${result.qualityScore}/100`);
+      }
+      if (result.contentMatch) {
+        statusDetails.push('内容匹配');
+      }
+      if (result.fromCache) {
+        statusDetails.push('缓存');
+      }
+      
+      const detailsText = statusDetails.length > 0 ? ` (${statusDetails.join(', ')})` : '';
+      
       statusIndicator = `
-        <div class="result-status ${statusClass}" title="${statusText} ${statusTime}">
+        <div class="result-status ${statusClass}" title="${statusText}${detailsText} ${statusTime}">
           <span class="status-icon">${this.getStatusIcon(result.status)}</span>
           <span class="status-text">${statusText}</span>
+          ${result.contentMatch ? '<span class="content-match-badge">✓</span>' : ''}
+          ${result.fromCache ? '<span class="cache-badge">📋</span>' : ''}
         </div>
       `;
     }
@@ -375,6 +420,11 @@ export class SearchManager {
             <button class="action-btn status-btn" data-action="checkStatus" data-source="${result.source}" data-result-id="${result.id}" title="重新检查状态">
               <span>🔄</span>
             </button>
+            ${result.status !== APP_CONSTANTS.SOURCE_STATUS.UNKNOWN ? `
+              <button class="action-btn details-btn" data-action="viewDetails" data-result-id="${result.id}" title="查看详细状态">
+                <span>ℹ️</span>
+              </button>
+            ` : ''}
           ` : ''}
         </div>
       </div>
@@ -420,22 +470,30 @@ export class SearchManager {
     return statusIcons[status] || '❓';
   }
 
-  // 新增：检查单个搜索源状态
+  // 🔧 新增：检查单个搜索源状态
   async checkSingleSourceStatus(sourceId, resultId) {
     try {
       showLoading(true);
       showToast(`正在检查 ${sourceId} 状态...`, 'info');
 
       // 调用搜索服务检查状态
-      const statusSummary = await searchService.checkAllSourcesStatus();
-      const sourceStatus = statusSummary.sources.find(s => s.id === sourceId);
+      const statusResult = await searchService.checkSingleSourceStatus(sourceId);
 
-      if (sourceStatus) {
+      if (statusResult) {
         // 更新结果中的状态
         const resultIndex = this.currentResults.findIndex(r => r.id === resultId);
         if (resultIndex !== -1) {
-          this.currentResults[resultIndex].status = sourceStatus.status;
-          this.currentResults[resultIndex].lastChecked = sourceStatus.lastChecked;
+          this.currentResults[resultIndex] = {
+            ...this.currentResults[resultIndex],
+            status: statusResult.status,
+            statusText: statusResult.statusText,
+            lastChecked: statusResult.lastChecked,
+            responseTime: statusResult.responseTime,
+            availabilityScore: statusResult.availabilityScore,
+            verified: statusResult.verified,
+            contentMatch: statusResult.contentMatch,
+            fromCache: statusResult.fromCache
+          };
           
           // 重新渲染该结果项
           const resultElement = document.querySelector(`[data-id="${resultId}"]`);
@@ -444,8 +502,10 @@ export class SearchManager {
           }
         }
 
-        showToast(`${sourceId} 状态: ${this.getStatusText(sourceStatus.status)}`, 
-          sourceStatus.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ? 'success' : 'warning');
+        const statusEmoji = statusResult.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ? '✅' : '❌';
+        const contentInfo = statusResult.contentMatch ? '，内容匹配' : '';
+        showToast(`${sourceId} ${statusEmoji} ${statusResult.statusText}${contentInfo}`, 
+          statusResult.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ? 'success' : 'warning');
       }
     } catch (error) {
       console.error('检查搜索源状态失败:', error);
@@ -455,7 +515,7 @@ export class SearchManager {
     }
   }
 
-  // 新增：刷新所有搜索源状态
+  // 🔧 新增：刷新所有搜索源状态
   async refreshAllSourcesStatus() {
     if (!this.currentResults || this.currentResults.length === 0) {
       showToast('没有搜索结果需要刷新状态', 'warning');
@@ -473,7 +533,13 @@ export class SearchManager {
         const sourceStatus = statusSummary.sources.find(s => s.id === result.source);
         if (sourceStatus) {
           result.status = sourceStatus.status;
+          result.statusText = sourceStatus.statusText;
           result.lastChecked = sourceStatus.lastChecked;
+          result.responseTime = sourceStatus.responseTime;
+          result.availabilityScore = sourceStatus.availabilityScore;
+          result.verified = sourceStatus.verified;
+          result.contentMatch = sourceStatus.contentMatch;
+          result.fromCache = sourceStatus.fromCache;
         }
       });
 
@@ -481,10 +547,107 @@ export class SearchManager {
       const keyword = document.getElementById('searchInput')?.value || '';
       this.displaySearchResults(keyword, this.currentResults);
 
-      showToast(`状态刷新完成: ${statusSummary.available}/${statusSummary.total} 可用`, 'success');
+      const contentMatches = statusSummary.sources.filter(s => s.contentMatch).length;
+      const contentInfo = contentMatches > 0 ? `，${contentMatches} 个内容匹配` : '';
+      showToast(`状态刷新完成: ${statusSummary.available}/${statusSummary.total} 可用${contentInfo}`, 'success');
     } catch (error) {
       console.error('刷新搜索源状态失败:', error);
       showToast('刷新状态失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🔧 新增：查看搜索源状态详情
+  async viewSourceStatusDetails(resultId) {
+    const result = this.currentResults.find(r => r.id === resultId);
+    if (!result || !result.status) {
+      showToast('无状态详情可查看', 'warning');
+      return;
+    }
+
+    // 构建详情信息
+    const details = [
+      `搜索源: ${result.title}`,
+      `状态: ${result.statusText || this.getStatusText(result.status)}`,
+      `最后检查: ${result.lastChecked ? new Date(result.lastChecked).toLocaleString() : '未知'}`,
+    ];
+
+    if (result.responseTime > 0) {
+      details.push(`响应时间: ${result.responseTime}ms`);
+    }
+
+    if (result.availabilityScore > 0) {
+      details.push(`可用性评分: ${result.availabilityScore}/100`);
+    }
+
+    if (result.qualityScore > 0) {
+      details.push(`内容质量: ${result.qualityScore}/100`);
+    }
+
+    if (result.contentMatch !== undefined) {
+      details.push(`内容匹配: ${result.contentMatch ? '是' : '否'}`);
+    }
+
+    if (result.fromCache) {
+      details.push(`数据来源: 缓存`);
+    }
+
+    // 显示详情（这里简单用alert，实际项目中可以用模态框）
+    alert(details.join('\n'));
+  }
+
+  // 🔧 新增：切换状态检查功能
+  async toggleStatusCheck() {
+    if (!authManager.isAuthenticated()) {
+      showToast('请先登录以使用状态检查功能', 'error');
+      return;
+    }
+
+    try {
+      const userSettings = await apiService.getUserSettings();
+      const newStatus = !userSettings.checkSourceStatus;
+      
+      await apiService.updateUserSettings({
+        ...userSettings,
+        checkSourceStatus: newStatus
+      });
+      
+      showToast(`搜索源状态检查已${newStatus ? '启用' : '禁用'}`, 'success');
+      
+      // 清除搜索服务的用户设置缓存，强制重新获取
+      searchService.clearUserSettingsCache();
+      
+    } catch (error) {
+      console.error('切换状态检查失败:', error);
+      showToast('设置更新失败: ' + error.message, 'error');
+    }
+  }
+
+  // 🔧 新增：查看状态检查历史
+  async viewStatusHistory() {
+    if (!authManager.isAuthenticated()) {
+      showToast('请先登录以查看状态历史', 'error');
+      return;
+    }
+
+    try {
+      showLoading(true);
+      const historyData = await apiService.getSourceStatusHistory({ limit: 20 });
+      
+      if (historyData.success && historyData.history.length > 0) {
+        // 简单显示历史（实际项目中可以用更好的UI）
+        const historyText = historyData.history.map(item => 
+          `${item.sourceId}: ${item.status} (${item.keyword}) - ${new Date(item.lastChecked).toLocaleString()}`
+        ).join('\n');
+        
+        alert(`状态检查历史:\n\n${historyText}`);
+      } else {
+        showToast('暂无状态检查历史', 'info');
+      }
+    } catch (error) {
+      console.error('获取状态历史失败:', error);
+      showToast('获取历史失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
@@ -762,7 +925,9 @@ export class SearchManager {
       const data = {
         results: this.currentResults,
         exportTime: new Date().toISOString(),
-        version: window.API_CONFIG?.APP_VERSION || '1.0.0'
+        version: window.API_CONFIG?.APP_VERSION || '1.0.0',
+        statusCheckEnabled: this.statusCheckInProgress,
+        lastCheckKeyword: this.lastStatusCheckKeyword
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {

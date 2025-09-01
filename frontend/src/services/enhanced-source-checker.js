@@ -1,362 +1,332 @@
-// 修复版搜索源状态检查服务 - 解决CORS问题
+// 后端API调用版搜索源状态检查服务 - 解决CORS问题并实现内容匹配检查
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast } from '../utils/dom.js';
+import apiService from './api.js';
 
-class FixedSourceChecker {
+class BackendSourceChecker {
   constructor() {
     this.statusCache = new Map();
     this.retryQueue = new Map();
     this.activeChecks = new Set();
     
-    // 修改检查策略 - 避免CORS问题
-    this.checkStrategies = [
-      { method: 'no-cors-head', weight: 0.6, timeout: 5000 },
-      { method: 'image-fallback', weight: 0.4, timeout: 8000 }
-    ];
+    // 检查统计
+    this.checkStats = {
+      totalChecks: 0,
+      successfulChecks: 0,
+      failedChecks: 0,
+      averageResponseTime: 0,
+      cacheHits: 0,
+      backendCalls: 0
+    };
     
-    this.domainHealth = new Map();
-    this.networkQuality = {
-      rtt: 0,
-      bandwidth: 0,
-      lastUpdate: 0
+    // 本地缓存配置
+    this.localCacheConfig = {
+      maxSize: 1000,
+      defaultTTL: 300000, // 5分钟
+      statusMultipliers: {
+        [APP_CONSTANTS.SOURCE_STATUS.AVAILABLE]: 1.0,
+        [APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE]: 0.5,
+        [APP_CONSTANTS.SOURCE_STATUS.TIMEOUT]: 0.3,
+        [APP_CONSTANTS.SOURCE_STATUS.ERROR]: 0.2
+      }
     };
   }
 
-  // 主要的状态检查方法 - 使用CORS友好的策略
+  // 主要的状态检查方法 - 使用后端API
   async checkSourceStatus(source, userSettings = {}) {
     const sourceId = source.id;
     
     // 防止重复检查
     if (this.activeChecks.has(sourceId)) {
       console.log(`跳过重复检查: ${sourceId}`);
-      return this.getCachedStatus(sourceId) || {
+      const cached = this.getCachedStatus(sourceId);
+      return cached || {
         status: APP_CONSTANTS.SOURCE_STATUS.CHECKING,
-        lastChecked: Date.now()
+        lastChecked: Date.now(),
+        fromCache: false
       };
     }
 
-    // 检查缓存有效性
+    // 检查本地缓存有效性
     const cached = this.getCachedStatus(sourceId);
     if (this.isCacheValid(cached, userSettings)) {
-      return cached;
+      console.log(`使用本地缓存: ${sourceId}`);
+      this.checkStats.cacheHits++;
+      return {
+        ...cached,
+        fromCache: true
+      };
     }
 
     this.activeChecks.add(sourceId);
 
     try {
-      // 使用CORS友好的检查方法
-      const checkResult = await this.performCORSFriendlyCheck(source, userSettings);
+      // 调用后端API进行单个搜索源检查
+      const keyword = this.generateTestKeyword();
+      const result = await this.callBackendCheck([source], keyword, userSettings);
       
-      this.cacheResult(sourceId, checkResult, userSettings);
-      this.updateDomainHealth(source, checkResult);
-      
-      return checkResult;
+      if (result && result.results && result.results.length > 0) {
+        const sourceResult = result.results[0];
+        const processedResult = this.processBackendResult(sourceResult);
+        
+        this.cacheResult(sourceId, processedResult, userSettings);
+        this.updateCheckStats('completed', [processedResult]);
+        
+        return {
+          ...processedResult,
+          fromCache: false
+        };
+      } else {
+        throw new Error('后端API返回数据格式错误');
+      }
 
     } catch (error) {
       console.error(`检查源状态失败 ${sourceId}:`, error);
+      this.updateCheckStats('failed');
+      
       const errorResult = {
         status: APP_CONSTANTS.SOURCE_STATUS.ERROR,
         lastChecked: Date.now(),
         error: error.message,
-        responseTime: 0
+        responseTime: 0,
+        available: false,
+        contentMatch: false
       };
       
       this.cacheResult(sourceId, errorResult, userSettings);
-      return errorResult;
+      return {
+        ...errorResult,
+        fromCache: false
+      };
       
     } finally {
       this.activeChecks.delete(sourceId);
     }
   }
 
-  // CORS友好的检查方法
-  async performCORSFriendlyCheck(source, userSettings) {
-    const testUrl = source.urlTemplate.replace('{keyword}', 'test');
-    const timeout = userSettings.sourceStatusCheckTimeout || 8000; // 已经是毫秒值
-    
-    console.log(`开始检查源: ${source.name} - ${testUrl}`);
-    
-    // 策略1: 使用no-cors模式进行基础连接测试
-    const noCorsResult = await this.checkWithNoCORS(testUrl, timeout);
-    
-    // 策略2: 使用图片加载测试favicon可达性
-    const faviconResult = await this.checkFavicon(testUrl, timeout);
-    
-    // 策略3: 使用script标签测试资源可达性
-    const scriptResult = await this.checkWithScript(testUrl, timeout);
-    
-    // 综合分析结果
-    return this.analyzeCheckResults([noCorsResult, faviconResult, scriptResult], source);
-  }
+  // 批量检查多个搜索源状态
+  async checkMultipleSources(sources, userSettings = {}, keyword = null) {
+    if (!sources || !Array.isArray(sources) || sources.length === 0) {
+      console.warn('搜索源列表为空');
+      return [];
+    }
 
-  // 使用no-cors模式检查
-  async checkWithNoCORS(url, timeout) {
-    const startTime = Date.now();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    console.log(`开始批量检查 ${sources.length} 个搜索源状态`);
+    this.updateCheckStats('started');
     
     try {
-      const response = await fetch(url, {
-        method: 'GET',
-        mode: 'no-cors', // 关键：使用no-cors模式
-        signal: controller.signal,
-        cache: 'no-cache',
-        headers: {
-          'User-Agent': 'MagnetSearch-StatusChecker/1.0'
+      // 生成测试关键词
+      const testKeyword = keyword || this.generateTestKeyword();
+      
+      // 检查本地缓存，分离已缓存和需要检查的源
+      const { cachedResults, uncachedSources } = this.separateCachedSources(sources, userSettings);
+      
+      console.log(`本地缓存命中: ${cachedResults.length}/${sources.length}, 需要后端检查: ${uncachedSources.length}`);
+      
+      let backendResults = [];
+      
+      // 如果有需要检查的源，调用后端API
+      if (uncachedSources.length > 0) {
+        try {
+          const apiResponse = await this.callBackendCheck(uncachedSources, testKeyword, userSettings);
+          
+          if (apiResponse && apiResponse.results) {
+            backendResults = apiResponse.results.map(result => this.processBackendResult(result));
+            
+            // 缓存后端返回的结果
+            backendResults.forEach(result => {
+              const source = uncachedSources.find(s => s.id === result.sourceId);
+              if (source) {
+                this.cacheResult(result.sourceId, result, userSettings);
+              }
+            });
+            
+            this.checkStats.backendCalls++;
+          } else {
+            console.error('后端API返回数据格式错误:', apiResponse);
+          }
+        } catch (error) {
+          console.error('调用后端检查API失败:', error);
+          
+          // 为未检查的源生成错误结果
+          backendResults = uncachedSources.map(source => ({
+            sourceId: source.id,
+            sourceName: source.name,
+            status: APP_CONSTANTS.SOURCE_STATUS.ERROR,
+            available: false,
+            contentMatch: false,
+            responseTime: 0,
+            lastChecked: Date.now(),
+            error: error.message,
+            fromCache: false
+          }));
         }
+      }
+      
+      // 合并缓存结果和后端结果
+      const allResults = [...cachedResults, ...backendResults];
+      
+      // 构造返回格式，匹配原有接口
+      const finalResults = sources.map(source => {
+        const result = allResults.find(r => r.sourceId === source.id);
+        return result ? { 
+          source, 
+          result: {
+            ...result,
+            verified: result.contentMatch || false,
+            availabilityScore: this.calculateAvailabilityScore(result)
+          }
+        } : {
+          source,
+          result: {
+            sourceId: source.id,
+            sourceName: source.name,
+            status: APP_CONSTANTS.SOURCE_STATUS.UNKNOWN,
+            available: false,
+            contentMatch: false,
+            responseTime: 0,
+            lastChecked: Date.now(),
+            fromCache: false
+          }
+        };
       });
       
-      clearTimeout(timeoutId);
-      const responseTime = Date.now() - startTime;
+      this.updateCheckStats('completed', backendResults);
       
-      // no-cors模式下，成功的请求通常返回opaque响应
-      const success = response.type === 'opaque' || response.ok;
-      
-      return {
-        method: 'no-cors',
-        success,
-        responseTime,
-        type: response.type,
-        status: response.status || 0
-      };
+      console.log(`批量检查完成: ${finalResults.length} 个结果`);
+      return finalResults;
       
     } catch (error) {
-      clearTimeout(timeoutId);
-      const responseTime = Date.now() - startTime;
+      console.error('批量检查搜索源状态失败:', error);
+      this.updateCheckStats('failed');
       
-      return {
-        method: 'no-cors',
-        success: false,
-        error: error.message,
-        responseTime,
-        isTimeout: error.name === 'AbortError'
-      };
+      // 返回错误结果
+      return sources.map(source => ({
+        source,
+        result: {
+          sourceId: source.id,
+          sourceName: source.name,
+          status: APP_CONSTANTS.SOURCE_STATUS.ERROR,
+          available: false,
+          contentMatch: false,
+          responseTime: 0,
+          lastChecked: Date.now(),
+          error: error.message,
+          fromCache: false
+        }
+      }));
     }
   }
 
-  // 使用favicon检查域名可达性
-  async checkFavicon(originalUrl, timeout) {
-    const startTime = Date.now();
-    
+  // 调用后端检查API
+  async callBackendCheck(sources, keyword, userSettings = {}) {
     try {
-      const url = new URL(originalUrl);
-      const faviconUrl = `${url.protocol}//${url.hostname}/favicon.ico`;
+      const options = {
+        timeout: userSettings.sourceStatusCheckTimeout || 10000,
+        checkContentMatch: true,
+        maxConcurrency: 3
+      };
       
-      return new Promise((resolve) => {
-        const img = new Image();
-        const timeoutId = setTimeout(() => {
-          img.src = ''; // 取消加载
-          resolve({
-            method: 'favicon',
-            success: false,
-            error: '超时',
-            responseTime: Date.now() - startTime,
-            isTimeout: true
-          });
-        }, timeout);
-        
-        img.onload = () => {
-          clearTimeout(timeoutId);
-          resolve({
-            method: 'favicon',
-            success: true,
-            responseTime: Date.now() - startTime
-          });
-        };
-        
-        img.onerror = () => {
-          clearTimeout(timeoutId);
-          resolve({
-            method: 'favicon',
-            success: false,
-            error: '加载失败',
-            responseTime: Date.now() - startTime
-          });
-        };
-        
-        img.src = faviconUrl;
-      });
+      console.log(`调用后端API检查 ${sources.length} 个搜索源, 关键词: ${keyword}`);
+      
+      const response = await apiService.checkSourcesStatus(sources, keyword, options);
+      
+      if (!response.success) {
+        throw new Error(response.message || '后端检查失败');
+      }
+      
+      console.log(`后端检查完成: ${response.summary?.available || 0}/${response.summary?.total || 0} 可用`);
+      
+      return response;
       
     } catch (error) {
-      return {
-        method: 'favicon',
-        success: false,
-        error: error.message,
-        responseTime: Date.now() - startTime
-      };
+      console.error('调用后端检查API失败:', error);
+      throw error;
     }
   }
 
-  // 使用动态script标签检查
-  async checkWithScript(url, timeout) {
-    const startTime = Date.now();
-    
-    try {
-      const urlObj = new URL(url);
-      // 尝试加载一个可能存在的JS文件
-      const scriptUrl = `${urlObj.protocol}//${urlObj.hostname}/robots.txt`;
-      
-      return new Promise((resolve) => {
-        const script = document.createElement('script');
-        const timeoutId = setTimeout(() => {
-          document.head.removeChild(script);
-          resolve({
-            method: 'script',
-            success: false,
-            error: '超时',
-            responseTime: Date.now() - startTime,
-            isTimeout: true
-          });
-        }, timeout);
-        
-        script.onload = () => {
-          clearTimeout(timeoutId);
-          document.head.removeChild(script);
-          resolve({
-            method: 'script',
-            success: true,
-            responseTime: Date.now() - startTime
-          });
-        };
-        
-        script.onerror = () => {
-          clearTimeout(timeoutId);
-          document.head.removeChild(script);
-          // 对于script标签，404等错误也说明服务器是可达的
-          resolve({
-            method: 'script',
-            success: true, // 能收到错误响应说明服务器在线
-            responseTime: Date.now() - startTime,
-            note: '服务器可达（404等正常响应）'
-          });
-        };
-        
-        script.src = scriptUrl;
-        script.async = true;
-        document.head.appendChild(script);
-      });
-      
-    } catch (error) {
-      return {
-        method: 'script',
-        success: false,
-        error: error.message,
-        responseTime: Date.now() - startTime
-      };
-    }
-  }
-
-  // 分析检查结果
-  analyzeCheckResults(results, source) {
-    const successCount = results.filter(r => r.success).length;
-    const totalCount = results.length;
-    const successRate = successCount / totalCount;
-    
-    // 计算平均响应时间
-    const validResponseTimes = results
-      .filter(r => r.responseTime && r.responseTime > 0)
-      .map(r => r.responseTime);
-    const avgResponseTime = validResponseTimes.length > 0 
-      ? Math.round(validResponseTimes.reduce((a, b) => a + b, 0) / validResponseTimes.length)
-      : 0;
-    
-    // 检查是否有超时
-    const hasTimeout = results.some(r => r.isTimeout);
-    
-    // 决定最终状态
-    let status;
-    if (successRate >= 0.5) {
-      status = APP_CONSTANTS.SOURCE_STATUS.AVAILABLE;
-    } else if (hasTimeout && successRate === 0) {
-      status = APP_CONSTANTS.SOURCE_STATUS.TIMEOUT;
-    } else {
-      status = APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE;
-    }
-    
-    console.log(`${source.name} 检查结果: 成功率 ${successRate}, 状态 ${status}`);
-    
+  // 处理后端返回的结果
+  processBackendResult(backendResult) {
     return {
-      status,
-      lastChecked: Date.now(),
-      responseTime: avgResponseTime,
-      successRate,
-      checkDetails: results,
-      method: 'cors-friendly'
+      sourceId: backendResult.sourceId,
+      sourceName: backendResult.sourceName,
+      status: this.normalizeStatus(backendResult.status),
+      available: Boolean(backendResult.available),
+      contentMatch: Boolean(backendResult.contentMatch),
+      responseTime: backendResult.responseTime || 0,
+      qualityScore: backendResult.qualityScore || 0,
+      httpStatus: backendResult.httpStatus,
+      lastChecked: backendResult.lastChecked || Date.now(),
+      matchDetails: backendResult.matchDetails || {},
+      error: backendResult.error,
+      fromCache: false
     };
   }
 
-  // 简化的批量检查
-  async checkMultipleSources(sources, userSettings = {}) {
-    const concurrency = Math.min(userSettings.maxConcurrentChecks || 2, 3); // 降低并发数
-    const results = [];
+  // 标准化状态值
+  normalizeStatus(status) {
+    const statusMap = {
+      'available': APP_CONSTANTS.SOURCE_STATUS.AVAILABLE,
+      'unavailable': APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE,
+      'timeout': APP_CONSTANTS.SOURCE_STATUS.TIMEOUT,
+      'error': APP_CONSTANTS.SOURCE_STATUS.ERROR,
+      'checking': APP_CONSTANTS.SOURCE_STATUS.CHECKING,
+      'unknown': APP_CONSTANTS.SOURCE_STATUS.UNKNOWN
+    };
     
-    console.log(`开始批量检查 ${sources.length} 个搜索源，并发数: ${concurrency}`);
-    
-    // 分批处理，增加延迟
-    for (let i = 0; i < sources.length; i += concurrency) {
-      const batch = sources.slice(i, i + concurrency);
-      const batchPromises = batch.map(source => 
-        this.checkSourceStatus(source, userSettings)
-          .then(result => ({ source, result }))
-          .catch(error => ({ 
-            source, 
-            result: {
-              status: APP_CONSTANTS.SOURCE_STATUS.ERROR,
-              error: error.message,
-              lastChecked: Date.now()
-            }
-          }))
-      );
-      
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
-      
-      // 增加批次间延迟
-      if (i + concurrency < sources.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    
-    return results;
+    return statusMap[status] || APP_CONSTANTS.SOURCE_STATUS.UNKNOWN;
   }
 
-  // 备用检查方法：基于域名解析
-  async performDNSCheck(hostname) {
-    try {
-      // 使用一个始终存在的公共资源测试域名解析
-      const testUrl = `https://${hostname}/favicon.ico`;
-      const controller = new AbortController();
-      setTimeout(() => controller.abort(), 3000);
-      
-      const response = await fetch(testUrl, {
-        method: 'HEAD',
-        mode: 'no-cors',
-        signal: controller.signal
-      });
-      
-      // 即使是错误响应，也说明域名可解析
-      return {
-        success: true,
-        method: 'dns-check',
-        note: '域名可解析'
-      };
-      
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        return { success: false, error: '域名解析超时' };
-      }
-      
-      // 网络错误可能表示域名不可达
-      if (error.message.includes('ERR_NAME_NOT_RESOLVED')) {
-        return { success: false, error: '域名不存在' };
-      }
-      
-      // 其他错误可能是网络问题，不能确定域名状态
-      return { success: null, error: error.message };
-    }
+  // 生成测试关键词
+  generateTestKeyword() {
+    const testKeywords = [
+      'MIMK-001', 
+      'SSIS-001', 
+      'PRED-001',
+      'JUL-001',
+      'MIDE-001'
+    ];
+    
+    return testKeywords[Math.floor(Math.random() * testKeywords.length)];
   }
 
-  // 缓存管理方法保持不变
+  // 分离已缓存和未缓存的搜索源
+  separateCachedSources(sources, userSettings) {
+    const cachedResults = [];
+    const uncachedSources = [];
+    
+    sources.forEach(source => {
+      const cached = this.getCachedStatus(source.id);
+      
+      if (this.isCacheValid(cached, userSettings)) {
+        cachedResults.push({
+          ...cached,
+          sourceId: source.id,
+          sourceName: source.name,
+          fromCache: true
+        });
+        this.checkStats.cacheHits++;
+      } else {
+        uncachedSources.push(source);
+      }
+    });
+    
+    return { cachedResults, uncachedSources };
+  }
+
+  // 计算可用性评分
+  calculateAvailabilityScore(result) {
+    let score = 0;
+    
+    if (result.available) score += 60;
+    if (result.contentMatch) score += 30;
+    if (result.responseTime && result.responseTime < 3000) score += 10;
+    if (result.qualityScore) score += Math.min(result.qualityScore * 0.1, 10);
+    
+    return Math.min(100, score);
+  }
+
+  // 缓存管理方法
   getCachedStatus(sourceId) {
     return this.statusCache.get(`status_${sourceId}`);
   }
@@ -364,69 +334,68 @@ class FixedSourceChecker {
   isCacheValid(cached, userSettings) {
     if (!cached) return false;
     
-    const cacheDuration = (userSettings.sourceStatusCacheDuration || 300) * 1000;
+    const cacheDuration = userSettings.sourceStatusCacheDuration || this.localCacheConfig.defaultTTL;
     const age = Date.now() - cached.lastChecked;
     
-    const statusMultiplier = {
-      [APP_CONSTANTS.SOURCE_STATUS.AVAILABLE]: 1.0,
-      [APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE]: 0.5,
-      [APP_CONSTANTS.SOURCE_STATUS.TIMEOUT]: 0.3,
-      [APP_CONSTANTS.SOURCE_STATUS.ERROR]: 0.2
-    };
-    
-    const multiplier = statusMultiplier[cached.status] || 1.0;
-    const adjustedDuration = cacheDuration * multiplier;
+    // 根据状态调整缓存时间
+    const statusMultiplier = this.localCacheConfig.statusMultipliers[cached.status] || 1.0;
+    const adjustedDuration = cacheDuration * statusMultiplier;
     
     return age < adjustedDuration;
   }
 
   cacheResult(sourceId, result, userSettings) {
     const cacheKey = `status_${sourceId}`;
+    
     this.statusCache.set(cacheKey, {
       ...result,
-      timestamp: Date.now()
+      cacheTimestamp: Date.now()
     });
     
-    if (this.statusCache.size > 1000) {
+    // 限制缓存大小
+    if (this.statusCache.size > this.localCacheConfig.maxSize) {
       const oldestKey = this.statusCache.keys().next().value;
       this.statusCache.delete(oldestKey);
     }
   }
 
-  updateDomainHealth(source, result) {
-    try {
-      const hostname = new URL(source.urlTemplate.replace('{keyword}', 'test')).hostname;
-      const current = this.domainHealth.get(hostname) || {
-        successCount: 0,
-        totalCount: 0,
-        lastSuccess: 0,
-        lastFailure: 0
-      };
-      
-      current.totalCount++;
-      
-      if (result.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE) {
-        current.successCount++;
-        current.lastSuccess = Date.now();
-      } else {
-        current.lastFailure = Date.now();
-      }
-      
-      current.successRate = current.successCount / current.totalCount;
-      this.domainHealth.set(hostname, current);
-      
-    } catch (error) {
-      console.warn('更新域名健康度失败:', error);
+  // 统计管理方法
+  updateCheckStats(action, results = []) {
+    switch (action) {
+      case 'started':
+        this.checkStats.totalChecks++;
+        break;
+      case 'completed':
+        if (results && results.length > 0) {
+          const successful = results.filter(r => r.available).length;
+          this.checkStats.successfulChecks += successful;
+          
+          // 计算平均响应时间
+          const responseTimes = results
+            .map(r => r.responseTime)
+            .filter(time => time && time > 0);
+          
+          if (responseTimes.length > 0) {
+            const avgTime = responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length;
+            this.checkStats.averageResponseTime = Math.round(
+              (this.checkStats.averageResponseTime + avgTime) / 2
+            );
+          }
+        }
+        break;
+      case 'failed':
+        this.checkStats.failedChecks++;
+        break;
     }
   }
 
-  // 清理方法
+  // 清理过期缓存
   cleanupExpiredCache() {
     const now = Date.now();
-    const maxAge = 24 * 60 * 60 * 1000;
+    const maxAge = 24 * 60 * 60 * 1000; // 24小时
     
     for (const [key, value] of this.statusCache.entries()) {
-      if (now - value.timestamp > maxAge) {
+      if (value.cacheTimestamp && now - value.cacheTimestamp > maxAge) {
         this.statusCache.delete(key);
       }
     }
@@ -434,23 +403,103 @@ class FixedSourceChecker {
     console.log(`缓存清理完成，剩余 ${this.statusCache.size} 个条目`);
   }
 
-  // 获取统计信息
+  // 手动清理缓存
+  clearCache() {
+    this.statusCache.clear();
+    console.log('搜索源状态本地缓存已清空');
+  }
+
+  // 获取检查统计
   getCheckingStats() {
     return {
+      ...this.checkStats,
       cacheSize: this.statusCache.size,
       activeChecks: this.activeChecks.size,
-      domainHealthEntries: this.domainHealth.size,
-      networkQuality: this.networkQuality
+      cacheHitRate: this.checkStats.totalChecks > 0 ? 
+        (this.checkStats.cacheHits / this.checkStats.totalChecks * 100).toFixed(1) + '%' : '0%'
     };
+  }
+
+  // 预热缓存（使用后端API）
+  async warmupCache(sources, userSettings = {}) {
+    console.log(`开始预热缓存: ${sources.length} 个搜索源`);
+    
+    try {
+      const keyword = this.generateTestKeyword();
+      await this.checkMultipleSources(sources, userSettings, keyword);
+      console.log('缓存预热完成');
+    } catch (error) {
+      console.error('缓存预热失败:', error);
+    }
+  }
+
+  // 获取状态检查历史（从后端）
+  async getStatusHistory(options = {}) {
+    try {
+      return await apiService.getSourceStatusHistory(options);
+    } catch (error) {
+      console.error('获取状态检查历史失败:', error);
+      return {
+        success: false,
+        history: [],
+        total: 0,
+        error: error.message
+      };
+    }
+  }
+
+  // 导出服务状态
+  exportServiceStatus() {
+    return {
+      type: 'backend-checker',
+      checkStats: this.getCheckingStats(),
+      cacheConfig: this.localCacheConfig,
+      timestamp: Date.now(),
+      version: '2.0.0'
+    };
+  }
+
+  // 健康检查
+  async performHealthCheck() {
+    try {
+      // 测试后端API连接
+      const testSources = [{
+        id: 'test',
+        name: 'Test Source',
+        urlTemplate: 'https://example.com/search/{keyword}'
+      }];
+      
+      const startTime = Date.now();
+      const result = await this.callBackendCheck(testSources, 'test');
+      const responseTime = Date.now() - startTime;
+      
+      return {
+        status: 'healthy',
+        backendConnected: true,
+        responseTime,
+        cacheSize: this.statusCache.size,
+        timestamp: Date.now()
+      };
+      
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        backendConnected: false,
+        error: error.message,
+        cacheSize: this.statusCache.size,
+        timestamp: Date.now()
+      };
+    }
   }
 }
 
-// 创建修复版实例
-export const fixedSourceChecker = new FixedSourceChecker();
+// 创建后端版检查器实例
+export const backendSourceChecker = new BackendSourceChecker();
 
 // 定期清理缓存
 setInterval(() => {
-  fixedSourceChecker.cleanupExpiredCache();
-}, 60 * 60 * 1000);
+  backendSourceChecker.cleanupExpiredCache();
+}, 60 * 60 * 1000); // 每小时清理一次
 
-export default fixedSourceChecker;
+// 兼容性导出
+export default backendSourceChecker;

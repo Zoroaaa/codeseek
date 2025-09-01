@@ -102,6 +102,68 @@ CREATE TABLE IF NOT EXISTS analytics_events (
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
 );
 
+-- 搜索源状态检查缓存表
+CREATE TABLE IF NOT EXISTS source_status_cache (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    keyword TEXT NOT NULL,
+    keyword_hash TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'unknown',
+    available INTEGER DEFAULT 0,
+    content_match INTEGER DEFAULT 0,
+    response_time INTEGER DEFAULT 0,
+    quality_score INTEGER DEFAULT 0,
+    match_details TEXT DEFAULT '{}',
+    page_info TEXT DEFAULT '{}',
+    check_error TEXT,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_accessed INTEGER NOT NULL,
+    access_count INTEGER DEFAULT 0
+);
+
+-- 搜索源健康度统计表
+CREATE TABLE IF NOT EXISTS source_health_stats (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    total_checks INTEGER DEFAULT 0,
+    successful_checks INTEGER DEFAULT 0,
+    content_matches INTEGER DEFAULT 0,
+    average_response_time INTEGER DEFAULT 0,
+    last_success INTEGER,
+    last_failure INTEGER,
+    success_rate REAL DEFAULT 0.0,
+    health_score INTEGER DEFAULT 0,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(source_id)
+);
+
+-- 状态检查任务队列表（如需异步处理）
+CREATE TABLE IF NOT EXISTS status_check_jobs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    sources TEXT NOT NULL, -- JSON array
+    keyword TEXT NOT NULL,
+    status TEXT DEFAULT 'pending', -- pending, processing, completed, failed
+    progress INTEGER DEFAULT 0,
+    results TEXT DEFAULT '{}',
+    error_message TEXT,
+    created_at INTEGER NOT NULL,
+    started_at INTEGER,
+    completed_at INTEGER,
+    expires_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_status_cache_source_keyword ON source_status_cache(source_id, keyword_hash);
+CREATE INDEX IF NOT EXISTS idx_status_cache_expires ON source_status_cache(expires_at);
+CREATE INDEX IF NOT EXISTS idx_health_stats_source ON source_health_stats(source_id);
+CREATE INDEX IF NOT EXISTS idx_check_jobs_user_status ON status_check_jobs(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_check_jobs_expires ON status_check_jobs(expires_at);
+
+
+
 -- 创建相关索引
 CREATE INDEX IF NOT EXISTS idx_analytics_user_created ON analytics_events(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);
@@ -143,8 +205,32 @@ INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_pu
 ('enable_registration', '1', '是否开放注册', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('min_username_length', '3', '用户名最小长度', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('max_username_length', '20', '用户名最大长度', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('min_password_length', '6', '密码最小长度', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+('min_password_length', '6', '密码最小长度', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('source_check_enabled', '1', '启用搜索源状态检查', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('max_concurrent_checks', '3', '最大并发检查数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('default_check_timeout', '10000', '默认检查超时时间（毫秒）', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('cache_duration_ms', '300000', '状态缓存时间（毫秒）', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('max_cache_entries', '10000', '最大缓存条目数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('health_update_interval', '3600000', '健康度统计更新间隔（毫秒）', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
+
+-- 初始化系统配置（添加到现有配置中）
+--INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_public, created_at, updated_at) VALUES
+--('source_check_enabled', '1', '启用搜索源状态检查', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+--('max_concurrent_checks', '3', '最大并发检查数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+--('default_check_timeout', '10000', '默认检查超时时间（毫秒）', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+--('cache_duration_ms', '300000', '状态缓存时间（毫秒）', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+--('max_cache_entries', '10000', '最大缓存条目数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+--('health_update_interval', '3600000', '健康度统计更新间隔（毫秒）', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+
+-- 清理过期缓存的触发器
+CREATE TRIGGER IF NOT EXISTS cleanup_expired_status_cache
+    AFTER INSERT ON source_status_cache
+    FOR EACH ROW
+    BEGIN
+        DELETE FROM source_status_cache WHERE expires_at < strftime('%s', 'now') * 1000;
+        DELETE FROM status_check_jobs WHERE expires_at < strftime('%s', 'now') * 1000;
+    END;
 -- 触发器
 CREATE TRIGGER IF NOT EXISTS update_users_timestamp 
     AFTER UPDATE ON users
