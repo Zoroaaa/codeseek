@@ -1,4 +1,4 @@
-// 设置管理器 - 支持搜索源状态检查设置
+// 设置管理器
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import apiService from '../../services/api.js';
@@ -42,26 +42,6 @@ export class SettingsManager {
         this.markSettingsChanged();
       });
     });
-
-    // 特别绑定搜索源状态检查相关设置
-    const statusCheckSettings = [
-      'enableSourceStatusCheck',
-      'sourceCheckTimeout', 
-      'sourceStatusCacheDuration',
-      'skipUnavailableSources',
-      'showSourceStatus',
-      'retryFailedSources'
-    ];
-
-    statusCheckSettings.forEach(settingId => {
-      const element = document.getElementById(settingId);
-      if (element) {
-        element.addEventListener('change', () => {
-          console.log(`搜索源状态检查设置 ${settingId} 已更改:`, element.type === 'checkbox' ? element.checked : element.value);
-          this.markSettingsChanged();
-        });
-      }
-    });
   }
 
   bindDataActionButtons() {
@@ -104,49 +84,17 @@ export class SettingsManager {
       const settings = await apiService.getUserSettings();
       this.currentSettings = settings;
       
-      // 基础设置
       const elements = {
         themeMode: document.getElementById('themeMode'),
         maxFavorites: document.getElementById('maxFavorites'),
         allowAnalytics: document.getElementById('allowAnalytics'),
-        searchSuggestions: document.getElementById('searchSuggestions'),
-        
-        // 🆕 搜索源状态检查设置
-        enableSourceStatusCheck: document.getElementById('enableSourceStatusCheck'),
-        sourceCheckTimeout: document.getElementById('sourceCheckTimeout'),
-        sourceStatusCacheDuration: document.getElementById('sourceStatusCacheDuration'),
-        skipUnavailableSources: document.getElementById('skipUnavailableSources'),
-        showSourceStatus: document.getElementById('showSourceStatus'),
-        retryFailedSources: document.getElementById('retryFailedSources')
+        searchSuggestions: document.getElementById('searchSuggestions')
       };
 
-      // 加载基础设置
       if (elements.themeMode) elements.themeMode.value = settings.theme || 'auto';
       if (elements.maxFavorites) elements.maxFavorites.value = settings.maxFavoritesPerUser ?? 500;
       if (elements.allowAnalytics) elements.allowAnalytics.checked = settings.allowAnalytics !== false;
       if (elements.searchSuggestions) elements.searchSuggestions.checked = settings.searchSuggestions !== false;
-
-      // 🆕 加载搜索源状态检查设置
-      if (elements.enableSourceStatusCheck) {
-        elements.enableSourceStatusCheck.checked = settings.checkSourceStatus === true;
-      }
-      if (elements.sourceCheckTimeout) {
-        elements.sourceCheckTimeout.value = settings.sourceStatusCheckTimeout ?? 8000;
-      }
-      if (elements.sourceStatusCacheDuration) {
-        elements.sourceStatusCacheDuration.value = settings.sourceStatusCacheDuration ?? 300000;
-      }
-      if (elements.skipUnavailableSources) {
-        elements.skipUnavailableSources.checked = settings.skipUnavailableSources !== false;
-      }
-      if (elements.showSourceStatus) {
-        elements.showSourceStatus.checked = settings.showSourceStatus !== false;
-      }
-      if (elements.retryFailedSources) {
-        elements.retryFailedSources.checked = settings.retryFailedSources === true;
-      }
-
-      console.log('设置加载完成:', settings);
 
     } catch (error) {
       console.error('加载设置失败:', error);
@@ -169,18 +117,8 @@ export class SettingsManager {
         maxFavoritesPerUser: parseInt(ui.maxFavorites, 10),
         maxHistoryPerUser: ui.historyRetention === '-1' ? 999999 : parseInt(ui.historyRetention, 10),
         allowAnalytics: !!ui.allowAnalytics,
-        searchSuggestions: !!ui.searchSuggestions,
-        
-// 🆕 搜索源状态检查设置（直接毫秒）
-        checkSourceStatus: !!ui.enableSourceStatusCheck,
-        sourceStatusCheckTimeout: parseInt(ui.sourceCheckTimeout, 10) || 8000,
-        sourceStatusCacheDuration: parseInt(ui.sourceStatusCacheDuration, 10) || 300000,
-        skipUnavailableSources: !!ui.skipUnavailableSources,
-        showSourceStatus: !!ui.showSourceStatus,
-        retryFailedSources: !!ui.retryFailedSources
+        searchSuggestions: !!ui.searchSuggestions
       };
-      
-      console.log('保存设置payload:', payload);
       
       await apiService.updateUserSettings(payload);
       
@@ -213,46 +151,14 @@ export class SettingsManager {
       maxFavorites: document.getElementById('maxFavorites'),
       historyRetention: document.getElementById('historyRetention'),
       allowAnalytics: document.getElementById('allowAnalytics'),
-      searchSuggestions: document.getElementById('searchSuggestions'),
-      
-      // 🆕 搜索源状态检查设置
-      enableSourceStatusCheck: document.getElementById('enableSourceStatusCheck'),
-      sourceCheckTimeout: document.getElementById('sourceCheckTimeout'),
-      sourceStatusCacheDuration: document.getElementById('sourceStatusCacheDuration'),
-      skipUnavailableSources: document.getElementById('skipUnavailableSources'),
-      showSourceStatus: document.getElementById('showSourceStatus'),
-      retryFailedSources: document.getElementById('retryFailedSources')
+      searchSuggestions: document.getElementById('searchSuggestions')
     };
     
-    // 收集基础设置
     if (elements.themeMode) settings.themeMode = elements.themeMode.value;
     if (elements.maxFavorites) settings.maxFavorites = elements.maxFavorites.value;
     if (elements.historyRetention) settings.historyRetention = elements.historyRetention.value;
     if (elements.allowAnalytics) settings.allowAnalytics = elements.allowAnalytics.checked;
     if (elements.searchSuggestions) settings.searchSuggestions = elements.searchSuggestions.checked;
-    
-    // 🆕 收集搜索源状态检查设置
-    if (elements.enableSourceStatusCheck) {
-      settings.enableSourceStatusCheck = elements.enableSourceStatusCheck.checked;
-    }
-// 🆕🆕🆕 
-if (elements.sourceCheckTimeout) {
-    // 后端存储的是毫秒
-    elements.sourceCheckTimeout.value = settings.sourceStatusCheckTimeout || 8000;
-}
-if (elements.sourceStatusCacheDuration) {
-    // 后端存储的是毫秒
-    elements.sourceStatusCacheDuration.value = settings.sourceStatusCacheDuration || 300000;
-}
-    if (elements.skipUnavailableSources) {
-      settings.skipUnavailableSources = elements.skipUnavailableSources.checked;
-    }
-    if (elements.showSourceStatus) {
-      settings.showSourceStatus = elements.showSourceStatus.checked;
-    }
-    if (elements.retryFailedSources) {
-      settings.retryFailedSources = elements.retryFailedSources.checked;
-    }
     
     return settings;
   }
@@ -266,15 +172,7 @@ if (elements.sourceStatusCacheDuration) {
       historyRetention: '90',
       maxFavorites: '500',
       allowAnalytics: true,
-      searchSuggestions: true,
-      
-      // 🆕 搜索源状态检查默认设置
-      enableSourceStatusCheck: false,
-      sourceCheckTimeout: 8,
-      sourceStatusCacheDuration: 300,
-      skipUnavailableSources: true,
-      showSourceStatus: true,
-      retryFailedSources: false
+      searchSuggestions: true
     };
 
     // 重置基础设置
@@ -306,50 +204,6 @@ if (elements.sourceStatusCacheDuration) {
     if (saveBtn) {
       saveBtn.textContent = '保存设置';
       saveBtn.classList.remove('changed');
-    }
-  }
-
-  // 🆕 新增：测试搜索源状态检查功能
-  async testSourceStatusCheck() {
-    try {
-      showLoading(true);
-      showToast('开始测试搜索源状态检查...', 'info');
-      
-      // 显示进度指示器
-      const progressElement = document.getElementById('statusCheckProgress');
-      if (progressElement) {
-        progressElement.style.display = 'block';
-      }
-      
-      // 这里可以调用搜索源状态检查服务进行测试
-      // 模拟测试过程
-      const testSources = ['javbus', 'javdb', 'javlibrary'];
-      let checkedCount = 0;
-      
-      for (const sourceId of testSources) {
-        // 更新进度
-        checkedCount++;
-        const progressStats = document.querySelector('.progress-stats');
-        if (progressStats) {
-          progressStats.textContent = `${checkedCount}/${testSources.length}`;
-        }
-        
-        // 模拟检查延迟
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      showToast('搜索源状态检查测试完成', 'success');
-    } catch (error) {
-      console.error('测试搜索源状态检查失败:', error);
-      showToast('测试失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
-      
-      // 隐藏进度指示器
-      const progressElement = document.getElementById('statusCheckProgress');
-      if (progressElement) {
-        progressElement.style.display = 'none';
-      }
     }
   }
 

@@ -706,13 +706,6 @@ router.put('/api/user/settings', async (request, env) => {
             'searchSources',            // 启用的搜索源列表
             'customSearchSources',      // 自定义搜索源列表
             'customSourceCategories'    // 🔧 新增：自定义分类列表
-			// 🆕 添加搜索源状态检查相关设置
-            'checkSourceStatus',
-            'sourceStatusCheckTimeout',
-            'sourceStatusCacheDuration', 
-            'skipUnavailableSources',
-            'showSourceStatus',
-            'retryFailedSources'
         ];
         
         const filteredSettings = {};
@@ -720,30 +713,6 @@ router.put('/api/user/settings', async (request, env) => {
         Object.keys(settings).forEach(key => {
             if (allowedSettings.includes(key)) {
                 filteredSettings[key] = settings[key];
-            }
-        });
-		
-		        // 🔧 添加状态检查设置的验证
-        if (filteredSettings.hasOwnProperty('sourceStatusCheckTimeout')) {
-            const timeout = Number(filteredSettings.sourceStatusCheckTimeout);
-            if (timeout < 1000 || timeout > 30000) {
-                return utils.errorResponse('状态检查超时时间必须在 1-30 秒之间');
-            }
-            filteredSettings.sourceStatusCheckTimeout = timeout;
-        }
-        
-        if (filteredSettings.hasOwnProperty('sourceStatusCacheDuration')) {
-            const cacheDuration = Number(filteredSettings.sourceStatusCacheDuration);
-            if (cacheDuration < 60000 || cacheDuration > 3600000) {
-                return utils.errorResponse('状态缓存时间必须在 60-3600 秒之间');
-            }
-            filteredSettings.sourceStatusCacheDuration = cacheDuration;
-        }
-        
-        // 确保布尔类型设置的正确转换
-        ['checkSourceStatus', 'skipUnavailableSources', 'showSourceStatus', 'retryFailedSources'].forEach(key => {
-            if (filteredSettings.hasOwnProperty(key)) {
-                filteredSettings[key] = Boolean(filteredSettings[key]);
             }
         });
 
@@ -831,13 +800,11 @@ router.put('/api/user/settings', async (request, env) => {
             UPDATE users SET settings = ?, updated_at = ? WHERE id = ?
         `).bind(JSON.stringify(updatedSettings), Date.now(), user.id).run();
 
-        // 记录设置更改行为
+        // 🔧 记录设置更改行为
         await utils.logUserAction(env, user.id, 'settings_update', {
             changedFields: Object.keys(filteredSettings),
             hasCustomSources: !!(filteredSettings.customSearchSources && filteredSettings.customSearchSources.length > 0),
-            hasCustomCategories: !!(filteredSettings.customSourceCategories && filteredSettings.customSourceCategories.length > 0),
-            // 🆕 记录状态检查设置变更
-            checkSourceStatusChanged: filteredSettings.hasOwnProperty('checkSourceStatus')
+            hasCustomCategories: !!(filteredSettings.customSourceCategories && filteredSettings.customSourceCategories.length > 0)
         }, request);
 
         return utils.successResponse({ 

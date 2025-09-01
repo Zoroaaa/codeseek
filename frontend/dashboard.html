@@ -4,31 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">用户面板 - 磁力快搜</title>
-	
-	    <!-- 核心样式 -->
-    <link rel="stylesheet" href="css/core/variables.css">
-    <link rel="stylesheet" href="css/core/base.css">
-    
-    <!-- 组件样式 -->
-    <link rel="stylesheet" href="css/components/navbar.css">
-    <link rel="stylesheet" href="css/components/buttons.css">
-    <link rel="stylesheet" href="css/components/modal.css">
-    <link rel="stylesheet" href="css/components/toast.css">
-    <link rel="stylesheet" href="css/components/loading.css">
-    <link rel="stylesheet" href="css/components/search.css">
-    <link rel="stylesheet" href="css/components/status.css">
-	<link rel="stylesheet" href="css/components/search-status.css">
-    
-    <!-- 仪表板专用样式 -->
-    <link rel="stylesheet" href="css/pages/dashboard.css">
-    
-    <!-- 工具样式 -->
-    <link rel="stylesheet" href="css/utils/animations.css">
-    <link rel="stylesheet" href="css/utils/responsive.css">
-    <link rel="stylesheet" href="css/utils/accessibility.css">
-    <link rel="stylesheet" href="css/utils/print.css">
-	
-
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
 </head>
 <body>
@@ -138,25 +115,27 @@
                 </div>
 
                 <!-- 快速操作 -->
-<!-- 快速操作区域 - 修复后版本 -->
-<div class="action-buttons">
-    <button class="action-btn" data-action="search">
-        <span class="btn-icon">🔍</span>
-        <span>开始搜索</span>
-    </button>
-    <button class="action-btn" data-action="favorites">
-        <span class="btn-icon">⭐</span>
-        <span>查看收藏</span>
-    </button>
-    <button class="action-btn" data-action="sources">
-        <span class="btn-icon">🔍</span>
-        <span>管理搜索源</span>
-    </button>
-    <button class="action-btn" data-action="export">
-        <span class="btn-icon">📤</span>
-        <span>导出数据</span>
-    </button>
-</div>
+                <div class="quick-actions">
+                    <h2>快速操作</h2>
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="window.location.href='index.html'">
+                            <span class="btn-icon">🔍</span>
+                            <span>开始搜索</span>
+                        </button>
+                        <button class="action-btn" onclick="app.switchTab('favorites')">
+                            <span class="btn-icon">⭐</span>
+                            <span>查看收藏</span>
+                        </button>
+                        <button class="action-btn" onclick="app.switchTab('sources')">
+                            <span class="btn-icon">🔍</span>
+                            <span>管理搜索源</span>
+                        </button>
+                        <button class="action-btn" onclick="app.exportData()">
+                            <span class="btn-icon">📤</span>
+                            <span>导出数据</span>
+                        </button>
+                    </div>
+                </div>
 
                 <!-- 最近活动 -->
                 <div class="recent-activity">
@@ -171,11 +150,10 @@
             <div id="favorites" class="tab-content">
                 <div class="tab-header">
                     <h1>我的收藏</h1>
-<!-- 收藏标签页操作按钮 - 修复后版本 -->
-<div class="header-actions">
-    <button class="btn-primary" id="syncFavoritesBtn">同步收藏</button>
-    <button class="btn-secondary" id="exportFavoritesBtn">导出收藏</button>
-</div>
+                    <div class="header-actions">
+                        <button class="btn-primary" onclick="app.syncFavorites()">同步收藏</button>
+                        <button class="btn-secondary" onclick="app.exportFavorites()">导出收藏</button>
+                    </div>
                 </div>
 
                 <!-- 收藏搜索和过滤 -->
@@ -204,11 +182,10 @@
             <div id="history" class="tab-content">
                 <div class="tab-header">
                     <h1>搜索历史</h1>
-<!-- 历史标签页操作按钮 - 修复后版本 -->
-<div class="header-actions">
-    <button class="btn-primary" id="syncHistoryBtn">同步历史</button>
-    <button class="btn-danger" id="clearAllHistoryBtn">清空历史</button>
-</div>
+                    <div class="header-actions">
+                        <button class="btn-primary" onclick="app.syncHistory()">同步历史</button>
+                        <button class="btn-danger" onclick="app.clearAllHistory()">清空历史</button>
+                    </div>
                 </div>
 
                 <!-- 历史搜索和统计 -->
@@ -295,12 +272,12 @@
                     </div>
                 </div>
 
-<!-- 搜索源管理批量操作 - 修复后版本 -->
-<div class="bulk-actions">
-    <button class="btn-secondary" id="enableAllSourcesBtn">全部启用</button>
-    <button class="btn-secondary" id="disableAllSourcesBtn">全部禁用</button>
-    <button class="btn-warning" id="resetToDefaultsBtn">重置为默认</button>
-</div>
+                <!-- 批量操作 -->
+                <div class="bulk-actions">
+                    <button class="btn-secondary" onclick="app.enableAllSources()">全部启用</button>
+                    <button class="btn-secondary" onclick="app.disableAllSources()">全部禁用</button>
+                    <button class="btn-warning" onclick="app.resetToDefaults()">重置为默认</button>
+                </div>
 
                 <!-- 搜索源列表 -->
                 <div id="sourcesList" class="sources-list">
@@ -385,158 +362,83 @@
                 </div>
             </div>
 
-<!-- Dashboard设置页面中的系统设置标签页 - 添加搜索源状态检查设置 -->
-<div id="settings" class="tab-content">
-    <div class="tab-header">
-        <h1>系统设置</h1>
-        <p>配置系统基本设置和个人偏好</p>
-    </div>
-
-    <div class="settings-sections">
-        <!-- 基本设置 -->
-        <div class="settings-section">
-            <h3>基本设置</h3>
-            <div class="setting-item">
-                <label>主题模式</label>
-                <div class="setting-control">
-                    <select id="themeMode">
-                        <option value="auto">跟随系统</option>
-                        <option value="light">浅色模式</option>
-                        <option value="dark">深色模式</option>
-                    </select>
+            <!-- 系统设置标签页（简化版） -->
+            <div id="settings" class="tab-content">
+                <div class="tab-header">
+                    <h1>系统设置</h1>
+                    <p>配置系统基本设置和个人偏好</p>
                 </div>
-            </div>
-            <div class="setting-item">
-                <label>搜索历史保留</label>
-                <div class="setting-control">
-                    <select id="historyRetention">
-                        <option value="30">30天</option>
-                        <option value="90" selected>90天</option>
-                        <option value="365">1年</option>
-                        <option value="-1">永久保留</option>
-                    </select>
-                </div>
-            </div>
-            <div class="setting-item">
-                <label>最大收藏数量</label>
-                <div class="setting-control">
-                    <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
-                    <span class="setting-desc">收藏夹最大容量限制</span>
-                </div>
-            </div>
-        </div>
 
-        <!-- 🆕 新增：搜索源状态检查设置 -->
-        <div class="settings-section status-check-settings">
-            <h4>🔍 搜索源状态检查</h4>
-            <p style="margin-bottom: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
-                启用此功能可在搜索前检查搜索源的可用性，提供更准确的搜索结果，但可能增加搜索时间。
-            </p>
+                <div class="settings-sections">
+                    <!-- 基本设置 -->
+                    <div class="settings-section">
+                        <h3>基本设置</h3>
+                        <div class="setting-item">
+                            <label>主题模式</label>
+                            <div class="setting-control">
+                                <select id="themeMode">
+                                    <option value="auto">跟随系统</option>
+                                    <option value="light">浅色模式</option>
+                                    <option value="dark">深色模式</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <label>搜索历史保留</label>
+                            <div class="setting-control">
+                                <select id="historyRetention">
+                                    <option value="30">30天</option>
+                                    <option value="90" selected>90天</option>
+                                    <option value="365">1年</option>
+                                    <option value="-1">永久保留</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <label>最大收藏数量</label>
+                            <div class="setting-control">
+                                <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
+                                <span class="setting-desc">收藏夹最大容量限制</span>
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="setting-group">
-                <h5>启用状态检查</h5>
-                <div class="setting-row">
-                    <label class="setting-label">启用搜索源状态检查</label>
-                    <div class="setting-input">
-                        <input type="checkbox" id="enableSourceStatusCheck">
-                        <span class="setting-help">开启后会在搜索前检查每个搜索源的可用性</span>
+                    <!-- 隐私设置 -->
+                    <div class="settings-section">
+                        <h3>隐私设置</h3>
+                        <div class="setting-item">
+                            <label>行为统计</label>
+                            <div class="setting-control">
+                                <input type="checkbox" id="allowAnalytics" checked>
+                                <span class="setting-desc">允许收集匿名使用统计，帮助改进产品</span>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <label>搜索建议</label>
+                            <div class="setting-control">
+                                <input type="checkbox" id="searchSuggestions" checked>
+                                <span class="setting-desc">基于历史记录提供搜索建议</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 账户操作 -->
+                    <div class="settings-section">
+                        <h3>账户操作</h3>
+                        <div class="dangerous-actions">
+                            <button class="btn-warning" onclick="app.changePassword()">修改密码</button>
+                            <button class="btn-danger" onclick="app.clearAllData()">清空所有数据</button>
+                            <button class="btn-danger" onclick="app.deleteAccount()">删除账户</button>
+                        </div>
+                    </div>
+
+                    <!-- 保存设置 -->
+                    <div class="settings-actions">
+                        <button class="btn-primary" onclick="app.saveSettings()">保存设置</button>
+                        <button class="btn-secondary" onclick="app.resetSettings()">重置默认</button>
                     </div>
                 </div>
             </div>
-
-            <div class="setting-group">
-                <h5>检查参数</h5>
-                <div class="setting-row">
-                    <label class="setting-label">检查超时时间</label>
-                    <div class="setting-input">
-                        <input type="number" id="sourceCheckTimeout" min="1000" max="30000" step="1000" value="8000">
-                        <span class="setting-help">单个搜索源状态检查的超时时间（毫秒）</span>
-                    </div>
-                </div>
-                <div class="setting-row">
-                    <label class="setting-label">状态缓存时间</label>
-                    <div class="setting-input">
-                        <input type="number" id="sourceStatusCacheDuration" min="6000" max="3600000" step="60000" value="300000">
-                        <span class="setting-help">搜索源状态缓存有效期（毫秒），避免频繁检查</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="setting-group">
-                <h5>搜索行为</h5>
-                <div class="setting-row">
-                    <label class="setting-label">跳过不可用搜索源</label>
-                    <div class="setting-input">
-                        <input type="checkbox" id="skipUnavailableSources" checked>
-                        <span class="setting-help">搜索结果中只显示可用的搜索源</span>
-                    </div>
-                </div>
-                <div class="setting-row">
-                    <label class="setting-label">显示搜索源状态</label>
-                    <div class="setting-input">
-                        <input type="checkbox" id="showSourceStatus" checked>
-                        <span class="setting-help">在搜索结果中显示搜索源的状态信息</span>
-                    </div>
-                </div>
-                <div class="setting-row">
-                    <label class="setting-label">重试失败的搜索源</label>
-                    <div class="setting-input">
-                        <input type="checkbox" id="retryFailedSources">
-                        <span class="setting-help">当搜索源检查失败时是否自动重试</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 测试按钮 -->
-            <button type="button" class="test-status-check-btn" onclick="app.getManager('settings').testSourceStatusCheck()">
-                <span>⚡</span>
-                <span>测试状态检查功能</span>
-            </button>
-
-            <!-- 状态检查进度指示器 -->
-            <div id="statusCheckProgress" class="status-check-progress">
-                <div class="progress-spinner"></div>
-                <div class="progress-text">正在检查搜索源状态...</div>
-                <div class="progress-stats">0/0</div>
-            </div>
-        </div>
-
-        <!-- 隐私设置 -->
-        <div class="settings-section">
-            <h3>隐私设置</h3>
-            <div class="setting-item">
-                <label>行为统计</label>
-                <div class="setting-control">
-                    <input type="checkbox" id="allowAnalytics" checked>
-                    <span class="setting-desc">允许收集匿名使用统计，帮助改进产品</span>
-                </div>
-            </div>
-            <div class="setting-item">
-                <label>搜索建议</label>
-                <div class="setting-control">
-                    <input type="checkbox" id="searchSuggestions" checked>
-                    <span class="setting-desc">基于历史记录提供搜索建议</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 账户操作区域 -->
-        <div class="settings-section">
-            <h3>账户操作</h3>
-            <div class="dangerous-actions">
-                <button class="btn-warning" id="changePasswordBtn">修改密码</button>
-                <button class="btn-danger" id="clearAllDataBtn">清空所有数据</button>
-                <button class="btn-danger" id="deleteAccountBtn">删除账户</button>
-            </div>
-        </div>
-
-        <!-- 保存设置区域 -->
-        <div class="settings-actions">
-            <button class="btn-primary" id="saveSettingsBtn">保存设置</button>
-            <button class="btn-secondary" id="resetSettingsBtn">重置默认</button>
-        </div>
-    </div>
-</div>
 
             <!-- 统计标签页 -->
             <div id="stats" class="tab-content">
@@ -631,113 +533,22 @@
     </div>
 
     <!-- 脚本文件 - ES6模块化 -->
-<script type="module">
-    import EnhancedDashboardApp from './src/pages/dashboard/dashboard-app.js';
+    <script type="module">
+        import EnhancedDashboardApp from './src/pages/dashboard/dashboard-app.js';
 
-    // 页面加载完成后初始化
-    document.addEventListener('DOMContentLoaded', () => {
-        // 更新页面标题和品牌名称
-        if (window.API_CONFIG) {
-            const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
-            document.getElementById('page-title').textContent = `用户面板 - ${appName}`;
-            document.getElementById('brand-text').textContent = appName;
-        }
-        
-        if (typeof EnhancedDashboardApp !== 'undefined') {
-            window.app = new EnhancedDashboardApp();
-            
-            // 修复：绑定所有按钮事件
-            bindButtonEvents();
-        }
-    });
-
-    // 绑定按钮事件的函数
-    function bindButtonEvents() {
-        // 等待app初始化完成
-        const waitForApp = () => {
-            if (!window.app || !window.app.isReady()) {
-                setTimeout(waitForApp, 100);
-                return;
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 更新页面标题和品牌名称
+            if (window.API_CONFIG) {
+                const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
+                document.getElementById('page-title').textContent = `用户面板 - ${appName}`;
+                document.getElementById('brand-text').textContent = appName;
             }
             
-            // 绑定设置相关按钮
-            const settingsButtons = {
-                'saveSettingsBtn': () => window.app.saveSettings(),
-                'resetSettingsBtn': () => window.app.resetSettings(),
-                'changePasswordBtn': () => window.app.changePassword(),
-                'clearAllDataBtn': () => window.app.clearAllData(),
-                'deleteAccountBtn': () => window.app.deleteAccount(),
-                
-                // 收藏相关
-                'syncFavoritesBtn': () => window.app.syncFavorites(),
-                'exportFavoritesBtn': () => window.app.exportFavorites(),
-                
-                // 历史相关
-                'syncHistoryBtn': () => window.app.syncHistory(),
-                'clearAllHistoryBtn': () => window.app.clearAllHistory(),
-                
-                // 搜索源相关
-                'enableAllSourcesBtn': () => window.app.enableAllSources(),
-                'disableAllSourcesBtn': () => window.app.disableAllSources(),
-                'resetToDefaultsBtn': () => window.app.resetToDefaults(),
-            };
-
-            // 绑定所有按钮事件
-            Object.entries(settingsButtons).forEach(([id, handler]) => {
-                const btn = document.getElementById(id);
-                if (btn) {
-                    btn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        try {
-                            handler();
-                        } catch (error) {
-                            console.error(`按钮 ${id} 执行失败:`, error);
-                            showToast('操作失败，请稍后重试', 'error');
-                        }
-                    });
-                } else {
-                    console.warn(`按钮 ${id} 未找到`);
-                }
-            });
-
-            // 绑定快速操作按钮
-            document.querySelectorAll('.action-btn[data-action]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const action = btn.dataset.action;
-                    
-                    switch (action) {
-                        case 'search':
-                            window.location.href = 'index.html';
-                            break;
-                        case 'favorites':
-                            window.app.switchTab('favorites');
-                            break;
-                        case 'sources':
-                            window.app.switchTab('sources');
-                            break;
-                        case 'export':
-                            window.app.exportData();
-                            break;
-                        default:
-                            console.warn('未知操作:', action);
-                    }
-                });
-            });
-
-            // 绑定搜索收藏按钮
-            const favoritesSearchBtn = document.querySelector('#favorites .search-box button');
-            if (favoritesSearchBtn) {
-                favoritesSearchBtn.addEventListener('click', () => {
-                    window.app.searchFavorites();
-                });
+            if (typeof EnhancedDashboardApp !== 'undefined') {
+                window.app = new EnhancedDashboardApp();
             }
-
-            console.log('✅ 所有按钮事件绑定完成');
-        };
-        
-        waitForApp();
-    }
-</script>
+        });
+    </script>
 </body>
 </html>
