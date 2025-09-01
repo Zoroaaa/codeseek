@@ -529,19 +529,31 @@ main[role="main"] {
   margin-top: 0.25rem;
 }
 
-/* 确保链接有足够的对比度 */
-a:not(.btn-primary):not(.btn-secondary):not(.action-btn) {
-  color: var(--accent-primary);
-  text-decoration: underline;
+/* 全局移除所有链接下划线 - 保留删除线 */
+a {
+  text-decoration: none !important;
+  color: inherit;
 }
 
-a:not(.btn-primary):not(.btn-secondary):not(.action-btn):hover {
-  color: var(--accent-hover);
+a:hover,
+a:focus,
+a:active,
+a:visited {
+  text-decoration: none !important;
 }
 
-a:not(.btn-primary):not(.btn-secondary):not(.action-btn):focus {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+/* 保留删除线效果 - 仅针对特定元素 */
+.site-item.disabled .site-header strong {
+  text-decoration: line-through !important;
+  color: var(--text-muted);
+}
+
+/* 导航链接样式 */
+.nav-brand,
+.nav-brand a,
+.nav-link,
+.dropdown-content a {
+  text-decoration: none !important;
 }
 
 /* 确保图标有描述性文本 */
