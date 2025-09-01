@@ -37,6 +37,7 @@ frontend-tree/
 │           ├── 📄 history-manager.js         # 🕒 历史页面管理器
 │           ├── 📄 sources-manager.js         # 🔍 搜索源管理器
 │           ├── 📄 categories-manager.js      # 📂 分类管理器
+│           └── 📄 community-manager.js       # 📈 搜索源社区管理器
 │           ├── 📄 settings-manager.js        # ⚙️ 设置管理器
 │           └── 📄 stats-manager.js           # 📈 统计管理器
 │

@@ -15,6 +15,8 @@ import SourcesManager from './sources-manager.js';
 import CategoriesManager from './categories-manager.js';
 import SettingsManager from './settings-manager.js';
 import StatsManager from './stats-manager.js';
+// 新增：导入社区管理器
+import { CommunityManager } from './community-manager.js';
 
 export class DashboardApp {
   constructor() {
@@ -22,13 +24,14 @@ export class DashboardApp {
     this.currentTab = 'overview';
     this.isInitialized = false;
     
-    // 初始化页面管理器
+    // 初始化页面管理器 - 添加社区管理器
     this.managers = {
       overview: new OverviewManager(this),
       favorites: new FavoritesManager(this),
       history: new HistoryManager(this),
       sources: new SourcesManager(this),
       categories: new CategoriesManager(this),
+      community: new CommunityManager(this), // 新增社区管理器
       settings: new SettingsManager(this),
       stats: new StatsManager(this)
     };
@@ -63,10 +66,10 @@ export class DashboardApp {
       themeManager.init();
       
       this.isInitialized = true;
-      console.log('✅ Dashboard初始化完成');
+      console.log('Dashboard初始化完成');
       
     } catch (error) {
-      console.error('❌ Dashboard初始化失败:', error);
+      console.error('Dashboard初始化失败:', error);
       showToast('初始化失败，请重新登录', 'error');
       
       setTimeout(() => {
@@ -235,8 +238,6 @@ export class DashboardApp {
     return this.managers[name];
   }
 
-  // ============ 修复：添加委托方法 ============
-  
   // 委托给设置管理器的方法
   async saveSettings() {
     const settingsManager = this.managers.settings;

@@ -390,107 +390,109 @@
             </div>
 
             <!-- 🆕 新增：搜索源共享社区标签页 -->
-            <div id="community" class="tab-content">
-                <div class="tab-header">
-                    <h1>搜索源社区</h1>
-                    <p>发现和分享优质搜索源，让搜索体验更丰富</p>
-                    <div class="header-actions">
-                        <button class="btn-primary" id="shareSourceBtn">
-                            <span>📤</span>
-                            <span>分享搜索源</span>
-                        </button>
-                        <button class="btn-secondary" id="mySharesBtn">
-                            <span>👤</span>
-                            <span>我的分享</span>
-                        </button>
-                    </div>
-                </div>
+<!-- 新增：搜索源共享社区标签页 -->
+<div id="community" class="tab-content">
+    <div class="tab-header">
+        <h1>搜索源社区</h1>
+        <p>发现和分享优质搜索源，让搜索体验更丰富</p>
+        <div class="header-actions">
+            <button class="btn-primary" id="shareSourceBtn">
+                <span>📤</span>
+                <span>分享搜索源</span>
+            </button>
+            <button class="btn-secondary" id="mySharesBtn">
+                <span>👤</span>
+                <span>我的分享</span>
+            </button>
+        </div>
+    </div>
 
-                <!-- 社区统计面板 -->
-                <div class="community-stats">
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-icon">🌟</span>
-                            <div class="stat-info">
-                                <span class="stat-value" id="userSharedCount">0</span>
-                                <span class="stat-desc">我的分享</span>
-                            </div>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-icon">📥</span>
-                            <div class="stat-info">
-                                <span class="stat-value" id="userDownloadsCount">0</span>
-                                <span class="stat-desc">已下载</span>
-                            </div>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-icon">👍</span>
-                            <div class="stat-info">
-                                <span class="stat-value" id="userLikesCount">0</span>
-                                <span class="stat-desc">获得点赞</span>
-                            </div>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-icon">⭐</span>
-                            <div class="stat-info">
-                                <span class="stat-value" id="userReputationScore">0</span>
-                                <span class="stat-desc">社区声誉</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 搜索和过滤控制 -->
-                <div class="community-controls">
-                    <div class="search-section">
-                        <div class="search-box">
-                            <input type="text" id="communitySearch" placeholder="搜索社区搜索源..." autocomplete="off">
-                            <button class="search-btn" onclick="app.getManager('community').searchCommunity()">
-                                <span>🔍</span>
-                            </button>
-                        </div>
-                        <div class="filter-toggle">
-                            <label class="toggle-label">
-                                <input type="checkbox" id="featuredOnly">
-                                <span>仅显示推荐</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="filter-section">
-                        <div class="filter-group">
-                            <label for="communityCategory">分类筛选：</label>
-                            <select id="communityCategory">
-                                <option value="all">全部分类</option>
-                                <!-- 分类选项将动态加载 -->
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label for="communitySort">排序方式：</label>
-                            <select id="communitySort">
-                                <option value="created_at-desc">最新发布</option>
-                                <option value="rating_score-desc">评分最高</option>
-                                <option value="download_count-desc">下载最多</option>
-                                <option value="like_count-desc">点赞最多</option>
-                                <option value="view_count-desc">浏览最多</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 热门标签 -->
-                <div class="popular-tags-section">
-                    <h3>🏷️ 热门标签</h3>
-                    <div id="popularTagsList" class="popular-tags-list">
-                        <!-- 热门标签将动态加载 -->
-                    </div>
-                </div>
-
-                <!-- 社区搜索源列表 -->
-                <div id="communitySourcesList" class="community-sources-container">
-                    <div class="loading-community">正在加载社区搜索源...</div>
+    <!-- 社区统计面板 -->
+    <div class="community-stats">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="stat-icon">🌟</span>
+                <div class="stat-info">
+                    <span class="stat-value" id="userSharedCount">0</span>
+                    <span class="stat-desc">我的分享</span>
                 </div>
             </div>
+            <div class="stat-item">
+                <span class="stat-icon">🔥</span>
+                <div class="stat-info">
+                    <span class="stat-value" id="userDownloadsCount">0</span>
+                    <span class="stat-desc">已下载</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-icon">👍</span>
+                <div class="stat-info">
+                    <span class="stat-value" id="userLikesCount">0</span>
+                    <span class="stat-desc">获得点赞</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-icon">⭐</span>
+                <div class="stat-info">
+                    <span class="stat-value" id="userReputationScore">0</span>
+                    <span class="stat-desc">社区声誉</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜索和过滤控制 -->
+    <div class="community-controls">
+        <div class="search-section">
+            <div class="search-box">
+                <input type="text" id="communitySearch" placeholder="搜索社区搜索源..." autocomplete="off">
+                <button class="search-btn" id="communitySearchBtn">
+                    <span>🔍</span>
+                </button>
+            </div>
+            <div class="filter-toggle">
+                <label class="toggle-label">
+                    <input type="checkbox" id="featuredOnly">
+                    <span>仅显示推荐</span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="filter-section">
+            <div class="filter-group">
+                <label for="communityCategory">分类筛选：</label>
+                <select id="communityCategory">
+                    <option value="all">全部分类</option>
+                    <!-- 分类选项将动态加载 -->
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="communitySort">排序方式：</label>
+                <select id="communitySort">
+                    <option value="created_at-desc">最新发布</option>
+                    <option value="rating_score-desc">评分最高</option>
+                    <option value="download_count-desc">下载最多</option>
+                    <option value="like_count-desc">点赞最多</option>
+                    <option value="view_count-desc">浏览最多</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- 热门标签 -->
+    <div class="popular-tags-section">
+        <h3>🏷️ 热门标签</h3>
+        <div id="popularTagsList" class="popular-tags-list">
+            <!-- 热门标签将动态加载 -->
+            <div class="loading-tags">正在加载热门标签...</div>
+        </div>
+    </div>
+
+    <!-- 社区搜索源列表 -->
+    <div id="communitySourcesList" class="community-sources-container">
+        <div class="loading-community">正在加载社区搜索源...</div>
+    </div>
+</div>
 
             <!-- Dashboard设置页面中的系统设置标签页 - 添加搜索源状态检查设置 -->
             <div id="settings" class="tab-content">
@@ -738,81 +740,112 @@
     </div>
 
     <!-- 脚本文件 - ES6模块化 -->
-    <script type="module">
-        import EnhancedDashboardApp from './src/pages/dashboard/dashboard-app.js';
+<script type="module">
+    // 修正导入路径
+    import DashboardApp from './src/pages/dashboard/dashboard-app.js';
 
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            // 更新页面标题和品牌名称
-            if (window.API_CONFIG) {
-                const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
-                document.getElementById('page-title').textContent = `用户面板 - ${appName}`;
-                document.getElementById('brand-text').textContent = appName;
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM加载完成，开始初始化Dashboard');
+        
+        // 更新页面标题和品牌名称
+        if (window.API_CONFIG) {
+            const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
+            const pageTitle = document.getElementById('page-title');
+            const brandText = document.getElementById('brand-text');
+            
+            if (pageTitle) pageTitle.textContent = `用户面板 - ${appName}`;
+            if (brandText) brandText.textContent = appName;
+        }
+        
+        try {
+            // 创建全局app实例
+            window.app = new DashboardApp();
+            console.log('DashboardApp实例已创建');
+            
+            // 绑定所有按钮事件
+            bindButtonEvents();
+            
+        } catch (error) {
+            console.error('初始化Dashboard失败:', error);
+            alert('系统初始化失败，请刷新页面重试');
+        }
+    });
+
+    // 绑定按钮事件的函数
+    function bindButtonEvents() {
+        console.log('开始绑定按钮事件');
+        
+        // 等待app初始化完成
+        const waitForApp = () => {
+            if (!window.app) {
+                console.log('等待app实例创建...');
+                setTimeout(waitForApp, 100);
+                return;
             }
             
-            if (typeof EnhancedDashboardApp !== 'undefined') {
-                window.app = new EnhancedDashboardApp();
-                
-                // 修复：绑定所有按钮事件
-                bindButtonEvents();
+            if (!window.app.isReady()) {
+                console.log('等待app初始化完成...');
+                setTimeout(waitForApp, 100);
+                return;
             }
-        });
-
-        // 绑定按钮事件的函数
-        function bindButtonEvents() {
-            // 等待app初始化完成
-            const waitForApp = () => {
-                if (!window.app || !window.app.isReady()) {
-                    setTimeout(waitForApp, 100);
-                    return;
-                }
+            
+            console.log('app已就绪，开始绑定事件');
+            
+            // 绑定设置相关按钮
+            const settingsButtons = {
+                'saveSettingsBtn': () => window.app.saveSettings(),
+                'resetSettingsBtn': () => window.app.resetSettings(),
+                'changePasswordBtn': () => window.app.changePassword(),
+                'clearAllDataBtn': () => window.app.clearAllData(),
+                'deleteAccountBtn': () => window.app.deleteAccount(),
                 
-                // 绑定设置相关按钮
-                const settingsButtons = {
-                    'saveSettingsBtn': () => window.app.saveSettings(),
-                    'resetSettingsBtn': () => window.app.resetSettings(),
-                    'changePasswordBtn': () => window.app.changePassword(),
-                    'clearAllDataBtn': () => window.app.clearAllData(),
-                    'deleteAccountBtn': () => window.app.deleteAccount(),
-                    
-                    // 收藏相关
-                    'syncFavoritesBtn': () => window.app.syncFavorites(),
-                    'exportFavoritesBtn': () => window.app.exportFavorites(),
-                    
-                    // 历史相关
-                    'syncHistoryBtn': () => window.app.syncHistory(),
-                    'clearAllHistoryBtn': () => window.app.clearAllHistory(),
-                    
-                    // 搜索源相关
-                    'enableAllSourcesBtn': () => window.app.enableAllSources(),
-                    'disableAllSourcesBtn': () => window.app.disableAllSources(),
-                    'resetToDefaultsBtn': () => window.app.resetToDefaults(),
-                };
+                // 收藏相关
+                'syncFavoritesBtn': () => window.app.syncFavorites(),
+                'exportFavoritesBtn': () => window.app.exportFavorites(),
+                
+                // 历史相关
+                'syncHistoryBtn': () => window.app.syncHistory(),
+                'clearAllHistoryBtn': () => window.app.clearAllHistory(),
+                
+                // 搜索源相关
+                'enableAllSourcesBtn': () => window.app.enableAllSources(),
+                'disableAllSourcesBtn': () => window.app.disableAllSources(),
+                'resetToDefaultsBtn': () => window.app.resetToDefaults(),
+            };
 
-                // 绑定所有按钮事件
-                Object.entries(settingsButtons).forEach(([id, handler]) => {
-                    const btn = document.getElementById(id);
-                    if (btn) {
-                        btn.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            try {
-                                handler();
-                            } catch (error) {
-                                console.error(`按钮 ${id} 执行失败:`, error);
-                                showToast('操作失败，请稍后重试', 'error');
-                            }
-                        });
-                    } else {
-                        console.warn(`按钮 ${id} 未找到`);
-                    }
-                });
-
-                // 绑定快速操作按钮
-                document.querySelectorAll('.action-btn[data-action]').forEach(btn => {
+            // 绑定所有按钮事件
+            let boundCount = 0;
+            Object.entries(settingsButtons).forEach(([id, handler]) => {
+                const btn = document.getElementById(id);
+                if (btn) {
                     btn.addEventListener('click', (e) => {
                         e.preventDefault();
-                        const action = btn.dataset.action;
-                        
+                        try {
+                            console.log(`执行按钮操作: ${id}`);
+                            handler();
+                        } catch (error) {
+                            console.error(`按钮 ${id} 执行失败:`, error);
+                            // 使用简单的错误提示，避免依赖showToast
+                            alert('操作失败，请稍后重试');
+                        }
+                    });
+                    boundCount++;
+                    console.log(`已绑定按钮: ${id}`);
+                } else {
+                    console.warn(`按钮 ${id} 未找到`);
+                }
+            });
+
+            // 绑定快速操作按钮
+            let actionButtonCount = 0;
+            document.querySelectorAll('.action-btn[data-action]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const action = btn.dataset.action;
+                    console.log(`执行快速操作: ${action}`);
+                    
+                    try {
                         switch (action) {
                             case 'search':
                                 window.location.href = 'index.html';
@@ -829,22 +862,57 @@
                             default:
                                 console.warn('未知操作:', action);
                         }
-                    });
+                    } catch (error) {
+                        console.error(`快速操作 ${action} 失败:`, error);
+                        alert('操作失败，请稍后重试');
+                    }
                 });
+                actionButtonCount++;
+            });
 
-                // 绑定搜索收藏按钮
-                const favoritesSearchBtn = document.querySelector('#favorites .search-box button');
-                if (favoritesSearchBtn) {
-                    favoritesSearchBtn.addEventListener('click', () => {
+            // 绑定搜索收藏按钮
+            const favoritesSearchBtn = document.querySelector('#favorites .search-box button');
+            if (favoritesSearchBtn) {
+                favoritesSearchBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    try {
+                        console.log('执行搜索收藏操作');
                         window.app.searchFavorites();
-                    });
-                }
+                    } catch (error) {
+                        console.error('搜索收藏失败:', error);
+                        alert('搜索失败，请稍后重试');
+                    }
+                });
+                console.log('已绑定收藏搜索按钮');
+            }
 
-                console.log('✅ 所有按钮事件绑定完成');
-            };
+            console.log(`事件绑定完成 - 设置按钮: ${boundCount}个, 快速操作按钮: ${actionButtonCount}个`);
             
-            waitForApp();
-        }
-    </script>
+            // 验证社区管理器是否存在
+            const communityManager = window.app.getManager('community');
+            if (communityManager) {
+                console.log('社区管理器已就绪');
+            } else {
+                console.error('社区管理器未找到');
+            }
+            
+            console.log('所有按钮事件绑定完成');
+        };
+        
+        // 开始等待
+        waitForApp();
+    }
+
+    // 全局错误处理
+    window.addEventListener('error', (event) => {
+        console.error('全局错误:', event.error);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error('未处理的Promise拒绝:', event.reason);
+    });
+    
+    console.log('脚本加载完成');
+</script>
 </body>
 </html>
