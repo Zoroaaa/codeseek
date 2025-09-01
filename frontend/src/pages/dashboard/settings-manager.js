@@ -4,6 +4,8 @@ import { showLoading, showToast } from '../../utils/dom.js';
 import apiService from '../../services/api.js';
 import themeManager from '../../services/theme.js';
 import searchService from '../../services/search.js';
+// ✅ 修复：导入搜索源检查服务
+import backendSourceChecker from '../../services/enhanced-source-checker.js';
 
 export class SettingsManager {
   constructor(dashboardApp) {
@@ -171,7 +173,7 @@ export class SettingsManager {
         allowAnalytics: !!ui.allowAnalytics,
         searchSuggestions: !!ui.searchSuggestions,
         
-// 🆕 搜索源状态检查设置（直接毫秒）
+        // 🆕 搜索源状态检查设置（直接毫秒）
         checkSourceStatus: !!ui.enableSourceStatusCheck,
         sourceStatusCheckTimeout: parseInt(ui.sourceCheckTimeout, 10) || 8000,
         sourceStatusCacheDuration: parseInt(ui.sourceStatusCacheDuration, 10) || 300000,
@@ -231,19 +233,16 @@ export class SettingsManager {
     if (elements.allowAnalytics) settings.allowAnalytics = elements.allowAnalytics.checked;
     if (elements.searchSuggestions) settings.searchSuggestions = elements.searchSuggestions.checked;
     
-    // 🆕 收集搜索源状态检查设置
+    // ✅ 修复：正确收集搜索源状态检查设置
     if (elements.enableSourceStatusCheck) {
       settings.enableSourceStatusCheck = elements.enableSourceStatusCheck.checked;
     }
-// 🆕🆕🆕 
-if (elements.sourceCheckTimeout) {
-    // 后端存储的是毫秒
-    elements.sourceCheckTimeout.value = settings.sourceStatusCheckTimeout || 8000;
-}
-if (elements.sourceStatusCacheDuration) {
-    // 后端存储的是毫秒
-    elements.sourceStatusCacheDuration.value = settings.sourceStatusCacheDuration || 300000;
-}
+    if (elements.sourceCheckTimeout) {
+      settings.sourceCheckTimeout = elements.sourceCheckTimeout.value;
+    }
+    if (elements.sourceStatusCacheDuration) {
+      settings.sourceStatusCacheDuration = elements.sourceStatusCacheDuration.value;
+    }
     if (elements.skipUnavailableSources) {
       settings.skipUnavailableSources = elements.skipUnavailableSources.checked;
     }
@@ -254,6 +253,7 @@ if (elements.sourceStatusCacheDuration) {
       settings.retryFailedSources = elements.retryFailedSources.checked;
     }
     
+    console.log('收集到的设置:', settings);
     return settings;
   }
 
@@ -270,8 +270,8 @@ if (elements.sourceStatusCacheDuration) {
       
       // 🆕 搜索源状态检查默认设置
       enableSourceStatusCheck: false,
-      sourceCheckTimeout: 8,
-      sourceStatusCacheDuration: 300,
+      sourceCheckTimeout: 8000,
+      sourceStatusCacheDuration: 300000,
       skipUnavailableSources: true,
       showSourceStatus: true,
       retryFailedSources: false
@@ -309,7 +309,7 @@ if (elements.sourceStatusCacheDuration) {
     }
   }
 
-  // 🆕 新增：测试搜索源状态检查功能
+  // ✅ 修复：完全重写测试搜索源状态检查功能
   async testSourceStatusCheck() {
     try {
       showLoading(true);
@@ -320,28 +320,128 @@ if (elements.sourceStatusCacheDuration) {
       if (progressElement) {
         progressElement.style.display = 'block';
       }
-      
-      // 这里可以调用搜索源状态检查服务进行测试
-      // 模拟测试过程
-      const testSources = ['javbus', 'javdb', 'javlibrary'];
+
+      // 获取当前用户设置
+      const currentSettings = this.collectSettings();
+      const userSettings = {
+        sourceStatusCheckTimeout: parseInt(currentSettings.sourceCheckTimeout, 10) || 8000,
+        sourceStatusCacheDuration: parseInt(currentSettings.sourceStatusCacheDuration, 10) || 300000,
+        checkSourceStatus: currentSettings.enableSourceStatusCheck || false
+      };
+
+      console.log('使用设置进行测试:', userSettings);
+
+      // 准备测试的搜索源
+      const testSources = [
+        { id: 'javbus', name: 'JavBus', urlTemplate: 'https://www.javbus.com/search/{keyword}' },
+        { id: 'javdb', name: 'JavDB', urlTemplate: 'https://javdb.com/search?q={keyword}' },
+        { id: 'javlibrary', name: 'JavLibrary', urlTemplate: 'http://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}' }
+      ];
+
+      // 更新进度显示
       let checkedCount = 0;
-      
-      for (const sourceId of testSources) {
-        // 更新进度
-        checkedCount++;
+      const updateProgress = (current, total) => {
         const progressStats = document.querySelector('.progress-stats');
         if (progressStats) {
-          progressStats.textContent = `${checkedCount}/${testSources.length}`;
+          progressStats.textContent = `${current}/${total}`;
         }
+      };
+
+      updateProgress(0, testSources.length);
+
+      // ✅ 使用真实的搜索源检查服务进行测试
+      const results = await backendSourceChecker.checkMultipleSources(testSources, userSettings, 'test-keyword');
+      
+      // 显示测试结果
+      let successCount = 0;
+      let failedCount = 0;
+      let availableResults = [];
+      let unavailableResults = [];
+
+      results.forEach(item => {
+        if (item.result) {
+          if (item.result.available) {
+            successCount++;
+            availableResults.push(item);
+          } else {
+            failedCount++;
+            unavailableResults.push(item);
+          }
+        }
+      });
+
+      // ✅ 在页面显示详细测试结果
+      const resultHtml = `
+        <div class="test-results">
+          <h4>测试结果</h4>
+          <div class="result-summary">
+            <span class="success-count">可用: ${successCount}</span>
+            <span class="failed-count">不可用: ${failedCount}</span>
+            <span class="total-count">总计: ${testSources.length}</span>
+          </div>
+          <div class="result-details">
+            ${availableResults.map(item => `
+              <div class="result-item available">
+                <span class="source-name">${item.source.name}</span>
+                <span class="status success">✅ 可用</span>
+                <span class="response-time">${item.result.responseTime || 0}ms</span>
+              </div>
+            `).join('')}
+            ${unavailableResults.map(item => `
+              <div class="result-item unavailable">
+                <span class="source-name">${item.source.name}</span>
+                <span class="status failed">❌ 不可用</span>
+                <span class="error">${item.result.error || '检查失败'}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      // 创建或更新结果显示区域
+      let resultsContainer = document.getElementById('testResultsContainer');
+      if (!resultsContainer) {
+        resultsContainer = document.createElement('div');
+        resultsContainer.id = 'testResultsContainer';
+        resultsContainer.className = 'test-results-container';
         
-        // 模拟检查延迟
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // 插入到测试按钮后面
+        const testBtn = document.querySelector('.test-status-check-btn');
+        if (testBtn && testBtn.parentNode) {
+          testBtn.parentNode.insertBefore(resultsContainer, testBtn.nextSibling);
+        }
       }
       
-      showToast('搜索源状态检查测试完成', 'success');
+      resultsContainer.innerHTML = resultHtml;
+
+      updateProgress(testSources.length, testSources.length);
+      
+      showToast(`搜索源状态检查测试完成: ${successCount}/${testSources.length} 可用`, 'success');
+      
     } catch (error) {
       console.error('测试搜索源状态检查失败:', error);
       showToast('测试失败: ' + error.message, 'error');
+      
+      // 显示错误信息
+      let resultsContainer = document.getElementById('testResultsContainer');
+      if (!resultsContainer) {
+        resultsContainer = document.createElement('div');
+        resultsContainer.id = 'testResultsContainer';
+        resultsContainer.className = 'test-results-container';
+        
+        const testBtn = document.querySelector('.test-status-check-btn');
+        if (testBtn && testBtn.parentNode) {
+          testBtn.parentNode.insertBefore(resultsContainer, testBtn.nextSibling);
+        }
+      }
+      
+      resultsContainer.innerHTML = `
+        <div class="test-results error">
+          <h4>测试失败</h4>
+          <p class="error-message">${error.message}</p>
+        </div>
+      `;
+      
     } finally {
       showLoading(false);
       

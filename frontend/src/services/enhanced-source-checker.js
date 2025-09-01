@@ -502,4 +502,5 @@ setInterval(() => {
 }, 60 * 60 * 1000); // 每小时清理一次
 
 // 兼容性导出
+export const backendSourceChecker = new BackendSourceChecker();
 export default backendSourceChecker;
