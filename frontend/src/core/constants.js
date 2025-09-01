@@ -1,8 +1,8 @@
-// 应用常量定义 - 优化版本，支持分类管理和更多搜索源
+// 应用常量定义 - 支持搜索源状态检查设置
 export const APP_CONSTANTS = {
   // 应用信息
   APP_NAME: '磁力快搜',
-  DEFAULT_VERSION: '1.3.0', // 🔧 版本升级，支持搜索源分类管理
+  DEFAULT_VERSION: '1.3.0', // 🔧 版本升级，支持搜索源分类管理和状态检查
   
   // 本地存储键名
   STORAGE_KEYS: {
@@ -12,22 +12,25 @@ export const APP_CONSTANTS = {
     APP_VERSION: 'app_version',
     API_CONFIG: 'api_config',
     CUSTOM_SOURCES: 'custom_search_sources',
-    CUSTOM_CATEGORIES: 'custom_source_categories' // 🔧 新增：自定义分类缓存
+    CUSTOM_CATEGORIES: 'custom_source_categories',
+    SOURCE_STATUS_CACHE: 'source_status_cache' // 🆕 搜索源状态缓存
   },
   
   // API配置
   API: {
     TIMEOUT: 10000,
     RETRY_ATTEMPTS: 3,
-    CACHE_DURATION: 1800000 // 30分钟
+    CACHE_DURATION: 1800000, // 30分钟
+    SOURCE_CHECK_TIMEOUT: 8000, // 🆕 搜索源状态检查超时时间（毫秒）
+    SOURCE_STATUS_CACHE_DURATION: 300000 // 🆕 搜索源状态缓存时间（5分钟）
   },
   
   // 用户限制
   LIMITS: {
     MAX_FAVORITES: 1000,
     MAX_HISTORY: 1000,
-    MAX_CUSTOM_SOURCES: 100, // 🔧 增加自定义搜索源限制
-    MAX_CUSTOM_CATEGORIES: 20, // 🔧 新增：最大自定义分类数量
+    MAX_CUSTOM_SOURCES: 100,
+    MAX_CUSTOM_CATEGORIES: 20,
     MIN_USERNAME_LENGTH: 3,
     MAX_USERNAME_LENGTH: 20,
     MIN_PASSWORD_LENGTH: 6,
@@ -35,8 +38,14 @@ export const APP_CONSTANTS = {
     MIN_SEARCH_KEYWORD_LENGTH: 2,
     MAX_SOURCE_NAME_LENGTH: 50,
     MAX_SOURCE_SUBTITLE_LENGTH: 100,
-    MAX_CATEGORY_NAME_LENGTH: 30, // 🔧 新增：分类名称最大长度
-    MAX_CATEGORY_DESC_LENGTH: 100 // 🔧 新增：分类描述最大长度
+    MAX_CATEGORY_NAME_LENGTH: 30,
+    MAX_CATEGORY_DESC_LENGTH: 100,
+    
+// 🆕 搜索源状态检查限制（毫秒）
+    MIN_SOURCE_CHECK_TIMEOUT: 1000, // 最小超时时间（毫秒）
+    MAX_SOURCE_CHECK_TIMEOUT: 30000, // 最大超时时间（毫秒）
+    MIN_STATUS_CACHE_DURATION: 60000, // 最小缓存时间（毫秒）
+    MAX_STATUS_CACHE_DURATION: 3600000 // 最大缓存时间（毫秒）
   },
   
   // 主题选项
@@ -54,7 +63,17 @@ export const APP_CONSTANTS = {
     ERROR: 'error'
   },
   
-  // 🔧 优化：搜索源分类定义 - 支持扩展和自定义
+  // 🆕 搜索源状态枚举
+  SOURCE_STATUS: {
+    UNKNOWN: 'unknown',       // 未知状态
+    CHECKING: 'checking',     // 正在检查
+    AVAILABLE: 'available',   // 可用
+    UNAVAILABLE: 'unavailable', // 不可用
+    TIMEOUT: 'timeout',       // 超时
+    ERROR: 'error'            // 错误
+  },
+  
+  // 搜索源分类定义
   SOURCE_CATEGORIES: {
     database: {
       id: 'database',
@@ -103,7 +122,7 @@ export const APP_CONSTANTS = {
     }
   },
   
-  // 🔧 增强版搜索来源 - 完整的内置搜索源配置
+  // 增强版搜索来源
   SEARCH_SOURCES: [
     // 番号资料站
     {
@@ -312,7 +331,7 @@ export const APP_CONSTANTS = {
     }
   ],
   
-  // 🔧 新增：搜索源和分类验证规则
+  // 搜索源和分类验证规则
   VALIDATION_RULES: {
     SOURCE: {
       REQUIRED_FIELDS: [ 'name', 'urlTemplate', 'category'],
@@ -333,14 +352,14 @@ export const APP_CONSTANTS = {
     }
   },
   
-  // 🔧 新增：默认颜色选项
+  // 默认颜色选项
   DEFAULT_COLORS: [
     '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
     '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
     '#f97316', '#6366f1', '#14b8a6', '#eab308'
   ],
   
-  // 🔧 新增：默认图标选项
+  // 默认图标选项
   DEFAULT_ICONS: [
     '📚', '🎥', '🧲', '💬', '🌟', '🔍', '📺', '🎬',
     '🎭', '🎪', '🎦', '📽️', '⚡', '💫', '🌙', '🔗',
@@ -354,12 +373,12 @@ export const APP_CONSTANTS = {
     HISTORY: 'history',
     SYNC: 'sync',
     CUSTOM_SOURCES: 'custom_sources',
-    CUSTOM_CATEGORIES: 'custom_categories', // 🔧 新增：自定义分类权限
+    CUSTOM_CATEGORIES: 'custom_categories',
     ADMIN: 'admin',
     PREMIUM: 'premium'
   },
   
-  // 🔧 新增：用户行为追踪事件
+  // 用户行为追踪事件
   ANALYTICS_EVENTS: {
     SEARCH_PERFORMED: 'search_performed',
     RESULT_CLICKED: 'result_clicked',
@@ -368,15 +387,20 @@ export const APP_CONSTANTS = {
     CUSTOM_SOURCE_ADDED: 'custom_source_added',
     CUSTOM_SOURCE_EDITED: 'custom_source_edited',
     CUSTOM_SOURCE_DELETED: 'custom_source_deleted',
-    CUSTOM_CATEGORY_ADDED: 'custom_category_added', // 🔧 新增
-    CUSTOM_CATEGORY_EDITED: 'custom_category_edited', // 🔧 新增
-    CUSTOM_CATEGORY_DELETED: 'custom_category_deleted', // 🔧 新增
+    CUSTOM_CATEGORY_ADDED: 'custom_category_added',
+    CUSTOM_CATEGORY_EDITED: 'custom_category_edited',
+    CUSTOM_CATEGORY_DELETED: 'custom_category_deleted',
     SETTINGS_UPDATED: 'settings_updated',
     DATA_EXPORTED: 'data_exported',
-    HISTORY_CLEARED: 'history_cleared'
+    HISTORY_CLEARED: 'history_cleared',
+    
+    // 🆕 搜索源状态检查相关事件
+    SOURCE_STATUS_CHECK_STARTED: 'source_status_check_started',
+    SOURCE_STATUS_CHECK_COMPLETED: 'source_status_check_completed',
+    SOURCE_STATUS_CHECK_FAILED: 'source_status_check_failed'
   },
   
-  // 🔧 新增：错误代码定义
+  // 错误代码定义
   ERROR_CODES: {
     INVALID_SEARCH_SOURCE: 'INVALID_SEARCH_SOURCE',
     INVALID_SOURCE_CATEGORY: 'INVALID_SOURCE_CATEGORY',
@@ -390,24 +414,37 @@ export const APP_CONSTANTS = {
     FORBIDDEN_DOMAIN: 'FORBIDDEN_DOMAIN',
     SOURCE_NOT_FOUND: 'SOURCE_NOT_FOUND',
     CATEGORY_NOT_FOUND: 'CATEGORY_NOT_FOUND',
-    CATEGORY_IN_USE: 'CATEGORY_IN_USE'
+    CATEGORY_IN_USE: 'CATEGORY_IN_USE',
+    
+    // 🆕 搜索源状态检查错误代码
+    SOURCE_STATUS_CHECK_TIMEOUT: 'SOURCE_STATUS_CHECK_TIMEOUT',
+    SOURCE_STATUS_CHECK_ERROR: 'SOURCE_STATUS_CHECK_ERROR',
+    SOURCE_STATUS_CACHE_EXPIRED: 'SOURCE_STATUS_CACHE_EXPIRED'
   },
   
-  // 🔧 增强：默认用户设置
+  // 🆕 增强：默认用户设置 - 添加搜索源状态检查设置
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
     searchSources: ['javbus', 'javdb', 'javlibrary'], // 默认启用的搜索源
     customSearchSources: [], // 用户自定义搜索源
-    customSourceCategories: [], // 🔧 新增：用户自定义分类
+    customSourceCategories: [], // 用户自定义分类
     maxFavoritesPerUser: 1000,
     maxHistoryPerUser: 1000,
     allowAnalytics: true,
     searchSuggestions: true,
     autoSync: true,
-    cacheResults: true
+    cacheResults: true,
+    
+// 🆕 搜索源状态检查默认设置（毫秒）
+    checkSourceStatus: false,              // 默认关闭状态检查
+    sourceStatusCheckTimeout: 8000,        // 检查超时时间（毫秒）
+    sourceStatusCacheDuration: 300000,     // 状态缓存时间（毫秒）
+    skipUnavailableSources: true,         // 跳过不可用搜索源
+    showSourceStatus: true,               // 显示搜索源状态
+    retryFailedSources: false             // 不重试失败的搜索源
   },
   
-  // 🔧 新增：搜索源管理相关常量
+  // 搜索源管理相关常量
   SOURCE_MANAGEMENT: {
     DEFAULT_CATEGORY: 'others',
     SORT_OPTIONS: {
@@ -415,14 +452,35 @@ export const APP_CONSTANTS = {
       NAME_DESC: 'name_desc',
       CATEGORY: 'category',
       PRIORITY: 'priority',
-      CREATED_DATE: 'created_date'
+      CREATED_DATE: 'created_date',
+      STATUS: 'status' // 🆕 按状态排序
     },
     FILTER_OPTIONS: {
       ALL: 'all',
       BUILTIN: 'builtin',
       CUSTOM: 'custom',
       ENABLED: 'enabled',
-      DISABLED: 'disabled'
+      DISABLED: 'disabled',
+      AVAILABLE: 'available',    // 🆕 按可用性过滤
+      UNAVAILABLE: 'unavailable' // 🆕 按不可用性过滤
     }
+  },
+
+  // 🆕 搜索源状态检查配置
+  SOURCE_STATUS_CHECK: {
+    DEFAULT_TIMEOUT: 8000,           // 默认超时时间（毫秒）
+    MIN_TIMEOUT: 1000,              // 最小超时时间（毫秒）
+    MAX_TIMEOUT: 30000,             // 最大超时时间（毫秒）
+    DEFAULT_CACHE_DURATION: 300000, // 默认缓存时间（毫秒）
+    MIN_CACHE_DURATION: 60000,      // 最小缓存时间（毫秒）
+    MAX_CACHE_DURATION: 3600000,    // 最大缓存时间（毫秒）
+    CONCURRENT_CHECKS: 3,           // 并发检查数量
+    RETRY_ATTEMPTS: 2,              // 重试次数
+    RETRY_DELAY: 1000,              // 重试延迟（毫秒）
+    
+    // 状态检查HTTP配置
+    HTTP_METHOD: 'HEAD',            // 使用HEAD方法减少带宽
+    FOLLOW_REDIRECTS: true,         // 跟随重定向
+    USER_AGENT: 'MagnetSearch/1.3.0 StatusChecker'
   }
 };

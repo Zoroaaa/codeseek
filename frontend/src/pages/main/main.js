@@ -150,73 +150,99 @@ class MagnetSearchApp {
     }
   }
 
-  // 🔧 优化：初始化站点导航
-  async initSiteNavigation() {
-    try {
-      // 使用当前启用的搜索源
-      this.renderSiteNavigation(this.enabledSources);
-    } catch (error) {
-      console.error('初始化站点导航失败:', error);
-      // 出错时使用默认配置
-      this.renderSiteNavigation(APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources);
-    }
+// 🔧 优化：初始化站点导航 - 显示所有搜索源
+async initSiteNavigation() {
+  try {
+    // 使用所有可用的搜索源（包括内置和自定义），而不是只使用启用的源
+    this.renderSiteNavigation(this.allSearchSources.map(source => source.id));
+  } catch (error) {
+    console.error('初始化站点导航失败:', error);
+    // 出错时使用默认配置中的所有内置源
+    const allBuiltinSourceIds = APP_CONSTANTS.SEARCH_SOURCES.map(source => source.id);
+    this.renderSiteNavigation(allBuiltinSourceIds);
+  }
+}
+
+// 🔧 优化：渲染站点导航 - 修改为显示所有搜索源
+renderSiteNavigation(sourceIds = null) {
+  const sitesSection = document.getElementById('sitesSection');
+  if (!sitesSection) return;
+
+  // 如果没有传入特定的源ID列表，则显示所有搜索源
+  let sourcesToDisplay;
+  if (sourceIds && Array.isArray(sourceIds)) {
+    sourcesToDisplay = this.allSearchSources.filter(source => 
+      sourceIds.includes(source.id)
+    );
+  } else {
+    // 显示所有搜索源（内置 + 自定义）
+    sourcesToDisplay = this.allSearchSources;
   }
 
-  // 🔧 优化：渲染站点导航
-  renderSiteNavigation(enabledSourceIds) {
-    const sitesSection = document.getElementById('sitesSection');
-    if (!sitesSection) return;
+  // 如果没有可显示的搜索源，显示提示
+  if (sourcesToDisplay.length === 0) {
+    sitesSection.innerHTML = `
+      <h2>🌐 资源站点导航</h2>
+      <div class="empty-state">
+        <p>暂无可用的搜索源</p>
+        <p>请在个人中心搜索源管理页面添加搜索源</p>
+        <button onclick="window.app && window.app.navigateToDashboard()" class="btn-primary">前往设置</button>
+      </div>
+    `;
+    return;
+  }
 
-    // 过滤出用户启用的搜索源
-    const enabledSources = this.allSearchSources.filter(source => 
-      enabledSourceIds.includes(source.id)
-    );
+  // 按分类组织搜索源
+  const sourcesByCategory = this.groupSourcesByCategory(sourcesToDisplay);
 
-    // 如果没有启用的搜索源，显示提示
-    if (enabledSources.length === 0) {
-      sitesSection.innerHTML = `
-        <h2>🌐 资源站点导航</h2>
-        <div class="empty-state">
-          <p>暂无可用的搜索源</p>
-          <p>请在个人中心搜索源管理页面启用搜索源</p>
-          <button onclick="window.app && window.app.navigateToDashboard()" class="btn-primary">前往设置</button>
+  // 生成HTML
+  let navigationHTML = '<h2>🌐 资源站点导航</h2><div class="sites-grid">';
+  
+  // 按分类顺序渲染
+  this.allCategories
+    .filter(category => sourcesByCategory[category.id] && sourcesByCategory[category.id].length > 0)
+    .sort((a, b) => (a.order || 999) - (b.order || 999))
+    .forEach(category => {
+      const sources = sourcesByCategory[category.id];
+      navigationHTML += `
+        <div class="site-category">
+          <h3 style="color: ${category.color || '#6b7280'}">${category.icon} ${category.name}</h3>
+          <div class="site-list">
+            ${sources.map(source => this.renderSiteItem(source)).join('')}
+          </div>
         </div>
       `;
-      return;
-    }
+    });
+  
+  navigationHTML += '</div>';
+  sitesSection.innerHTML = navigationHTML;
+}
 
-    // 按分类组织搜索源
-    const sourcesByCategory = this.groupSourcesByCategory(enabledSources);
-
-    // 生成HTML
-    let navigationHTML = '<h2>🌐 资源站点导航</h2><div class="sites-grid">';
-    
-    // 按分类顺序渲染
-    this.allCategories
-      .filter(category => sourcesByCategory[category.id] && sourcesByCategory[category.id].length > 0)
-      .sort((a, b) => (a.order || 999) - (b.order || 999))
-      .forEach(category => {
-        const sources = sourcesByCategory[category.id];
-        navigationHTML += `
-          <div class="site-category">
-            <h3 style="color: ${category.color || '#6b7280'}">${category.icon} ${category.name}</h3>
-            <div class="site-list">
-              ${sources.map(source => `
-                <a href="${source.urlTemplate.replace('{keyword}', 'search')}" target="_blank" class="site-item" rel="noopener noreferrer">
-                  <div class="site-info">
-                    <strong>${source.icon} ${source.name}</strong>
-                    <span>${source.subtitle}</span>
-                  </div>
-                </a>
-              `).join('')}
-            </div>
+// 🔧 新增：渲染单个站点项，包含启用状态标识
+renderSiteItem(source) {
+  const isEnabled = this.enabledSources.includes(source.id);
+  const statusClass = isEnabled ? 'enabled' : 'disabled';
+  const statusText = isEnabled ? '已启用' : '未启用';
+  
+  return `
+    <a href="${source.urlTemplate.replace('{keyword}', 'search')}" 
+       target="_blank" 
+       class="site-item ${statusClass}" 
+       rel="noopener noreferrer"
+       title="${source.subtitle || source.name} - ${statusText}">
+      <div class="site-info">
+        <div class="site-header">
+          <strong>${source.icon} ${source.name}</strong>
+          <div class="site-badges">
+            ${source.isCustom ? '<span class="custom-badge">自定义</span>' : ''}
+            <span class="status-badge ${statusClass}">${statusText}</span>
           </div>
-        `;
-      });
-    
-    navigationHTML += '</div>';
-    sitesSection.innerHTML = navigationHTML;
-  }
+        </div>
+        <span class="site-subtitle">${source.subtitle || ''}</span>
+      </div>
+    </a>
+  `;
+}
 
   // 🔧 新增：按分类组织搜索源
   groupSourcesByCategory(sources) {
@@ -348,22 +374,22 @@ class MagnetSearchApp {
     this.bindSearchSourcesChangeEvent();
   }
 
-  // 🔧 新增：绑定搜索源变更事件监听
-  bindSearchSourcesChangeEvent() {
-    window.addEventListener('searchSourcesChanged', async (event) => {
-      console.log('检测到搜索源设置变更，更新站点导航');
-      try {
-        // 更新启用的搜索源列表
-        this.enabledSources = event.detail.newSources;
-        
-        // 重新渲染站点导航
-        this.renderSiteNavigation(this.enabledSources);
-        showToast('站点导航已更新', 'success', 2000);
-      } catch (error) {
-        console.error('更新站点导航失败:', error);
-      }
-    });
-  }
+// 🔧 修改：绑定搜索源变更事件监听
+bindSearchSourcesChangeEvent() {
+  window.addEventListener('searchSourcesChanged', async (event) => {
+    console.log('检测到搜索源设置变更，更新站点导航');
+    try {
+      // 更新启用的搜索源列表
+      this.enabledSources = event.detail.newSources;
+      
+      // 重新渲染站点导航（显示所有源，但会标识启用状态）
+      this.renderSiteNavigation();
+      showToast('站点导航已更新', 'success', 2000);
+    } catch (error) {
+      console.error('更新站点导航失败:', error);
+    }
+  });
+}
 
   // 绑定模态框事件
   bindModalEvents() {
@@ -481,48 +507,48 @@ class MagnetSearchApp {
     if (registerModal) registerModal.style.display = 'none';
   }
 
-  // 🔧 修改：用户登录后更新站点导航
-  async handleLogin(event) {
-    event.preventDefault();
-    
-    const username = document.getElementById('loginUsername')?.value.trim();
-    const password = document.getElementById('loginPassword')?.value;
+// 🔧 修改：用户登录后更新站点导航
+async handleLogin(event) {
+  event.preventDefault();
+  
+  const username = document.getElementById('loginUsername')?.value.trim();
+  const password = document.getElementById('loginPassword')?.value;
 
-    if (!username || !password) {
-      showToast('请填写用户名和密码', 'error');
-      return;
-    }
-
-    try {
-      const result = await authManager.login(username, password);
-      
-      if (result.success) {
-        this.currentUser = result.user;
-        this.updateUserUI();
-        
-        // 显示主内容区域
-        document.querySelector('.main-content').style.display = 'block';
-        
-        // 关闭模态框
-        this.closeModals();
-        
-        // 登录后初始化组件
-        await this.initComponents();
-        
-        // 🔧 新增：重新加载用户搜索源设置并更新站点导航
-        await this.loadUserSearchSettings();
-        await this.initSiteNavigation();
-        
-        // 处理URL参数（如搜索查询）
-        this.handleURLParams();
-        
-        // 清空登录表单
-        document.getElementById('loginForm').reset();
-      }
-    } catch (error) {
-      console.error('登录失败:', error);
-    }
+  if (!username || !password) {
+    showToast('请填写用户名和密码', 'error');
+    return;
   }
+
+  try {
+    const result = await authManager.login(username, password);
+    
+    if (result.success) {
+      this.currentUser = result.user;
+      this.updateUserUI();
+      
+      // 显示主内容区域
+      document.querySelector('.main-content').style.display = 'block';
+      
+      // 关闭模态框
+      this.closeModals();
+      
+      // 登录后初始化组件
+      await this.initComponents();
+      
+      // 🔧 修改：重新加载用户搜索源设置并更新站点导航（显示所有源）
+      await this.loadUserSearchSettings();
+      await this.initSiteNavigation(); // 这里会显示所有搜索源
+      
+      // 处理URL参数（如搜索查询）
+      this.handleURLParams();
+      
+      // 清空登录表单
+      document.getElementById('loginForm').reset();
+    }
+  } catch (error) {
+    console.error('登录失败:', error);
+  }
+}
 
   // 处理注册
   async handleRegister(event) {
@@ -637,54 +663,56 @@ class MagnetSearchApp {
   }
 
   // 退出登录
-  async logout() {
-    try {
-      await authManager.logout();
-      this.currentUser = null;
-      
-      // 更新UI
-      this.updateUserUI();
-      
-      // 清空组件数据
-      if (searchManager.isInitialized) {
-        searchManager.searchHistory = [];
-        searchManager.currentResults = [];
-        searchManager.renderHistory();
-        searchManager.clearResults();
-      }
-      
-      if (favoritesManager.isInitialized) {
-        favoritesManager.favorites = [];
-        favoritesManager.renderFavorites();
-      }
-      
-      // 🔧 新增：重置为默认搜索源设置并更新站点导航
-      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
-      this.customSearchSources = [];
-      this.customCategories = [];
-      this.allSearchSources = APP_CONSTANTS.SEARCH_SOURCES.map(s => ({ 
-        ...s, 
-        isBuiltin: true, 
-        isCustom: false 
-      }));
-      this.allCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(c => ({ 
-        ...c, 
-        isBuiltin: true, 
-        isCustom: false 
-      }));
-      
-      await this.initSiteNavigation();
-      
-      // 显示登录模态框
-      this.showLoginModal();
-      
-      // 隐藏主界面
-      document.querySelector('.main-content').style.display = 'none';
-      
-    } catch (error) {
-      console.error('退出登录失败:', error);
+// 🔧 修改：退出登录时重置为默认显示
+async logout() {
+  try {
+    await authManager.logout();
+    this.currentUser = null;
+    
+    // 更新UI
+    this.updateUserUI();
+    
+    // 清空组件数据
+    if (searchManager.isInitialized) {
+      searchManager.searchHistory = [];
+      searchManager.currentResults = [];
+      searchManager.renderHistory();
+      searchManager.clearResults();
     }
+    
+    if (favoritesManager.isInitialized) {
+      favoritesManager.favorites = [];
+      favoritesManager.renderFavorites();
+    }
+    
+    // 🔧 修改：重置为默认内置搜索源，但站点导航仍显示所有源
+    this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+    this.customSearchSources = [];
+    this.customCategories = [];
+    this.allSearchSources = APP_CONSTANTS.SEARCH_SOURCES.map(s => ({ 
+      ...s, 
+      isBuiltin: true, 
+      isCustom: false 
+    }));
+    this.allCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(c => ({ 
+      ...c, 
+      isBuiltin: true, 
+      isCustom: false 
+    }));
+    
+    // 重新初始化站点导航（显示所有内置源）
+    await this.initSiteNavigation();
+    
+    // 显示登录模态框
+    this.showLoginModal();
+    
+    // 隐藏主界面
+    document.querySelector('.main-content').style.display = 'none';
+    
+  } catch (error) {
+    console.error('退出登录失败:', error);
   }
+}
 
   // 导航到Dashboard
   async navigateToDashboard() {

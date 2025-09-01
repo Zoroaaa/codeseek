@@ -1,0 +1,386 @@
+/* 搜索源状态检查相关样式 */
+
+/* 状态检查进度指示器 */
+.status-check-progress {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.status-check-progress.active {
+  display: flex;
+}
+
+.progress-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.progress-text {
+  flex: 1;
+}
+
+.progress-stats {
+  font-weight: 500;
+  color: var(--primary-color);
+}
+
+/* 搜索状态指示器 */
+#searchStatusIndicator {
+  display: none;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--background-secondary);
+  border-radius: var(--border-radius);
+  border-left: 4px solid var(--primary-color);
+}
+
+/* 结果项状态显示 */
+.result-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+.result-status .status-icon {
+  font-size: 0.875rem;
+}
+
+.result-status .status-text {
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* 状态颜色变体 */
+.result-status.status-available {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.result-status.status-unavailable {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.result-status.status-timeout {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.result-status.status-error {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.result-status.status-checking {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.result-status.status-checking .status-icon {
+  animation: spin 1s linear infinite;
+}
+
+.result-status.status-unknown {
+  background-color: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+/* 深色模式下的状态颜色 */
+[data-theme="dark"] .result-status.status-available {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+[data-theme="dark"] .result-status.status-unavailable,
+[data-theme="dark"] .result-status.status-error {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+[data-theme="dark"] .result-status.status-timeout {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+[data-theme="dark"] .result-status.status-checking {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+[data-theme="dark"] .result-status.status-unknown {
+  background-color: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+}
+
+/* 状态刷新按钮 */
+.action-btn.status-btn {
+  background: var(--background-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 0.375rem 0.5rem;
+  min-width: auto;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn.status-btn:hover {
+  background: var(--background-secondary);
+  transform: rotate(180deg);
+  transition: transform 0.3s ease;
+}
+
+/* 设置页面状态检查区域样式 */
+.status-check-settings {
+  border: 2px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  background: var(--background-secondary);
+}
+
+.status-check-settings h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.setting-group {
+  margin: 1.5rem 0;
+}
+
+.setting-group h5 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 1rem 0;
+  gap: 1rem;
+}
+
+.setting-label {
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.setting-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 200px;
+}
+
+.setting-input input[type="checkbox"] {
+  transform: scale(1.2);
+  margin-right: 0.5rem;
+}
+
+.setting-input input[type="number"] {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--background);
+  color: var(--text-primary);
+  width: 100px;
+}
+
+.setting-help {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+/* 测试按钮样式 */
+.test-status-check-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-color-dark));
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 1rem;
+}
+
+.test-status-check-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.test-status-check-btn:active {
+  transform: translateY(0);
+}
+
+/* 状态统计摘要 */
+.status-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--background-secondary);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+}
+
+.status-summary-item {
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.status-summary-number {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+}
+
+.status-summary-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.status-summary-item.available .status-summary-number {
+  color: #059669;
+}
+
+.status-summary-item.unavailable .status-summary-number {
+  color: #dc2626;
+}
+
+.status-summary-item.timeout .status-summary-number {
+  color: #d97706;
+}
+
+.status-summary-item.error .status-summary-number {
+  color: #dc2626;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .setting-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .setting-input {
+    width: 100%;
+    min-width: unset;
+  }
+  
+  .status-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .result-status {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
+  
+  .action-btn.status-btn {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* 动画关键帧 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 状态检查加载动画 */
+.status-checking-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.status-checking-overlay.active {
+  display: flex;
+}
+
+.status-checking-content {
+  background: var(--background);
+  padding: 2rem;
+  border-radius: var(--border-radius-lg);
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  min-width: 300px;
+}
+
+.status-checking-spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem auto;
+}
+
+.status-checking-text {
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.status-checking-progress {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}

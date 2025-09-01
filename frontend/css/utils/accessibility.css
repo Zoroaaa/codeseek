@@ -1,0 +1,667 @@
+/* 无障碍样式增强 */
+
+/* 跳转到主内容链接 */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--accent-primary);
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  z-index: 1000;
+  font-weight: 500;
+  transition: var(--transition-base);
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* 焦点管理 */
+.focus-visible,
+*:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* 移除默认焦点样式，仅在键盘导航时显示 */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 键盘导航增强 */
+.keyboard-navigation *:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* 按钮和链接的无障碍增强 */
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f0f0f0;
+    --bg-tertiary: #e0e0e0;
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --text-muted: #666666;
+    --border-color: #333333;
+    --accent-primary: #0066cc;
+    --accent-hover: #004499;
+    --success-color: #008000;
+    --warning-color: #cc6600;
+    --error-color: #cc0000;
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  }
+  
+  [data-theme="dark"] {
+    --bg-primary: #000000;
+    --bg-secondary: #1a1a1a;
+    --bg-tertiary: #333333;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --text-muted: #999999;
+    --border-color: #cccccc;
+    --accent-primary: #66aaff;
+    --accent-hover: #3388ff;
+  }
+  
+  /* 增强边框对比度 */
+  .source-item,
+  .category-item,
+  .result-item,
+  .favorite-item,
+  .history-item {
+    border-width: 2px;
+  }
+  
+  .source-item:hover,
+  .category-item:hover,
+  .result-item:hover,
+  .favorite-item:hover {
+    border-width: 3px;
+  }
+  
+  .action-btn,
+  .btn-primary,
+  .btn-secondary {
+    border-width: 2px;
+  }
+  
+  /* 增强文本对比度 */
+  .text-muted {
+    color: var(--text-secondary) !important;
+  }
+  
+  .result-url,
+  .source-meta,
+  .category-meta {
+    color: var(--text-secondary) !important;
+  }
+}
+
+/* 减少动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  /* 禁用变换动画 */
+  .source-item,
+  .category-item,
+  .action-btn,
+  .menu-item,
+  .history-item,
+  .favorite-item,
+  .stat-card,
+  .result-item {
+    transition: none;
+    animation: none;
+  }
+  
+  .source-item:hover,
+  .category-item:hover,
+  .action-btn:hover,
+  .result-item:hover,
+  .favorite-item:hover {
+    transform: none;
+  }
+  
+  /* 保留基本的颜色和透明度变化 */
+  .source-item:hover,
+  .category-item:hover,
+  .result-item:hover,
+  .favorite-item:hover {
+    background-color: var(--bg-tertiary);
+    border-color: var(--accent-primary);
+  }
+  
+  /* 禁用加载动画 */
+  .spinner {
+    animation: none;
+    border: 4px solid var(--accent-primary);
+  }
+  
+  .status-dot {
+    animation: none;
+  }
+  
+  /* 禁用脉搏和其他连续动画 */
+  .animate-pulse,
+  .animate-spin,
+  .animate-bounce {
+    animation: none;
+  }
+}
+
+/* 屏幕阅读器专用内容 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sr-only-focusable:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0.5rem;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  background: var(--bg-primary);
+  border: 2px solid var(--accent-primary);
+}
+
+/* ARIA状态指示 */
+[aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+[aria-expanded="false"] .expand-icon::before {
+  content: "▶";
+}
+
+[aria-expanded="true"] .expand-icon::before {
+  content: "▼";
+}
+
+[aria-selected="true"] {
+  background-color: var(--accent-light);
+  color: var(--accent-primary);
+}
+
+[aria-invalid="true"] {
+  border-color: var(--error-color) !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+/* 表单无障碍增强 */
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.form-group label[for] {
+  cursor: pointer;
+}
+
+.form-group input:required + label::after,
+.form-group select:required + label::after {
+  content: " *";
+  color: var(--error-color);
+}
+
+.form-error {
+  color: var(--error-color);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.form-error::before {
+  content: "⚠";
+  font-weight: bold;
+}
+
+.form-help {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* 确保足够的点击目标大小 (44px x 44px 最小) */
+.action-btn,
+.menu-item,
+button,
+a {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 小按钮的无障碍增强 */
+.mini-btn,
+.history-delete-btn {
+  min-height: 32px;
+  min-width: 32px;
+  position: relative;
+}
+
+/* 为小按钮添加更大的可点击区域 */
+.mini-btn::before,
+.history-delete-btn::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  z-index: -1;
+}
+
+/* 颜色对比度增强 */
+.text-contrast-high {
+  color: var(--text-primary) !important;
+}
+
+.bg-contrast-high {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* 状态指示的无障碍增强 */
+.status-online::before {
+  content: "在线";
+  position: absolute;
+  left: -9999px;
+}
+
+.status-offline::before {
+  content: "离线";
+  position: absolute;
+  left: -9999px;
+}
+
+.status-error::before {
+  content: "错误";
+  position: absolute;
+  left: -9999px;
+}
+
+.status-checking::before {
+  content: "检查中";
+  position: absolute;
+  left: -9999px;
+}
+
+/* 导航地标增强 */
+nav[role="navigation"] {
+  border-bottom: 1px solid var(--border-color);
+}
+
+main[role="main"] {
+  min-height: calc(100vh - 72px);
+}
+
+/* 跳过链接容器 */
+.skip-links {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+
+/* 键盘导航时的视觉指示 */
+.keyboard-navigation .menu-item:focus,
+.keyboard-navigation .action-btn:focus,
+.keyboard-navigation .result-item:focus {
+  box-shadow: 0 0 0 3px var(--accent-light);
+  z-index: 1;
+}
+
+/* 错误消息的无障碍增强 */
+.error-message {
+  color: var(--error-color);
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--error-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin: 1rem 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.error-message::before {
+  content: "⚠";
+  font-weight: bold;
+  color: var(--error-color);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+/* 成功消息的无障碍增强 */
+.success-message {
+  color: var(--success-color);
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--success-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin: 1rem 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.success-message::before {
+  content: "✓";
+  font-weight: bold;
+  color: var(--success-color);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+/* 信息消息的无障碍增强 */
+.info-message {
+  color: var(--info-color);
+  background-color: rgba(6, 182, 212, 0.1);
+  border: 1px solid var(--info-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin: 1rem 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.info-message::before {
+  content: "ℹ";
+  font-weight: bold;
+  color: var(--info-color);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+/* 表格无障碍增强 */
+.stats-table table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.stats-table th {
+  text-align: left;
+  border-bottom: 2px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+}
+
+.stats-table td {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 0.75rem;
+}
+
+/* 确保表格在小屏幕上可滚动 */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 加载状态的无障碍指示 */
+[aria-busy="true"]::after {
+  content: " (加载中...)";
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* 模态框无障碍增强 */
+.modal[aria-hidden="false"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal[aria-hidden="true"] {
+  display: none;
+}
+
+.modal-content {
+  position: relative;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* 确保焦点陷阱在模态框内 */
+.modal-content:focus {
+  outline: none;
+}
+
+/* 工具提示无障碍增强 */
+.tooltip {
+  position: relative;
+}
+
+.tooltip[aria-describedby] {
+  cursor: help;
+}
+
+.tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.tooltip:hover .tooltip-content,
+.tooltip:focus .tooltip-content {
+  opacity: 1;
+}
+
+/* 进度指示器的无障碍增强 */
+.progress-bar {
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  height: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--accent-primary);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+/* 确保链接有足够的对比度 */
+a:not(.btn-primary):not(.btn-secondary):not(.action-btn) {
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+
+a:not(.btn-primary):not(.btn-secondary):not(.action-btn):hover {
+  color: var(--accent-hover);
+}
+
+a:not(.btn-primary):not(.btn-secondary):not(.action-btn):focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* 确保图标有描述性文本 */
+.icon-only-btn::after {
+  content: attr(aria-label);
+  position: absolute;
+  left: -9999px;
+}
+
+/* 自定义滚动条的无障碍增强 */
+.scrollable::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.scrollable::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+}
+
+.scrollable::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 6px;
+}
+
+.scrollable::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Firefox滚动条 */
+.scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg-tertiary);
+}
+
+/* 确保自定义复选框和单选按钮的无障碍性 */
+.custom-checkbox,
+.custom-radio {
+  position: relative;
+  display: inline-block;
+}
+
+.custom-checkbox input,
+.custom-radio input {
+  opacity: 0;
+  position: absolute;
+}
+
+.custom-checkbox label,
+.custom-radio label {
+  cursor: pointer;
+  padding-left: 2rem;
+  position: relative;
+}
+
+.custom-checkbox label::before,
+.custom-radio label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+.custom-checkbox label::before {
+  border-radius: var(--radius-sm);
+}
+
+.custom-radio label::before {
+  border-radius: 50%;
+}
+
+.custom-checkbox input:checked + label::after,
+.custom-radio input:checked + label::after {
+  content: '✓';
+  position: absolute;
+  left: 0.125rem;
+  top: 0.125rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--accent-primary);
+  font-weight: bold;
+  text-align: center;
+  line-height: 1rem;
+}
+
+.custom-radio input:checked + label::after {
+  content: '';
+  width: 0.75rem;
+  height: 0.75rem;
+  background: var(--accent-primary);
+  border-radius: 50%;
+  left: 0.25rem;
+  top: 0.375rem;
+}
+
+.custom-checkbox input:focus + label::before,
+.custom-radio input:focus + label::before {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* 语言和方向支持 */
+[dir="rtl"] {
+  text-align: right;
+}
+
+[dir="rtl"] .menu-icon {
+  margin-left: 1rem;
+  margin-right: 0;
+}
+
+[dir="rtl"] .sidebar {
+  border-left: 1px solid var(--border-color);
+  border-right: none;
+}
+
+[dir="rtl"] .dropdown-content {
+  left: 0;
+  right: auto;
+}

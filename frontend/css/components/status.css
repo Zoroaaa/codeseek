@@ -1,0 +1,479 @@
+/* 连接状态指示器 */
+.connection-status {
+  position: fixed;
+  top: 90px;
+  right: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 2rem;
+  font-size: 0.9rem;
+  z-index: 1000;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(8px);
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-indicator.checking {
+  background: var(--warning-color);
+}
+
+.status-indicator.connected {
+  background: var(--success-color);
+}
+
+.status-indicator.warning {
+  background: var(--warning-color);
+}
+
+.status-indicator.error {
+  background: var(--error-color);
+}
+
+/* 搜索结果状态指示器 */
+.result-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: var(--transition-base);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+
+.status-text {
+  flex: 1;
+  font-size: 0.8rem;
+}
+
+.response-time {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  font-family: 'Courier New', monospace;
+}
+
+/* 状态类型样式 */
+.status-online {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-online .status-dot {
+  background: #10b981;
+}
+
+.status-offline {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.status-offline .status-dot {
+  background: #6b7280;
+}
+
+.status-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-error .status-dot {
+  background: #ef4444;
+}
+
+.status-timeout {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.status-timeout .status-dot {
+  background: #f59e0b;
+}
+
+.status-checking {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.status-checking .status-dot {
+  background: #3b82f6;
+  animation: pulse 1s infinite;
+}
+
+.status-unknown {
+  background: rgba(156, 163, 175, 0.1);
+  color: #9ca3af;
+  border: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+.status-unknown .status-dot {
+  background: #9ca3af;
+}
+
+/* 搜索源状态指示器 */
+.source-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.source-status-indicator.online {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.source-status-indicator.offline {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+}
+
+.source-status-indicator.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.source-status-indicator.checking {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+
+.source-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* 站点导航状态样式 */
+.site-item.disabled {
+  opacity: 0.6;
+  position: relative;
+}
+
+.site-item.disabled::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(239, 68, 68, 0.5);
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.site-item.disabled .site-header strong {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.status-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-badge.enabled {
+  background: var(--success-color);
+  color: white;
+}
+
+.status-badge.disabled {
+  background: var(--secondary-color);
+  color: var(--text-secondary);
+}
+
+/* 搜索源状态面板 */
+.source-status-panel {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin: 1rem 0;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.source-status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.source-status-item:last-child {
+  border-bottom: none;
+}
+
+.source-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.source-metrics {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* 增强版搜索结果样式 */
+.result-item.enhanced {
+  border-left: 3px solid transparent;
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.result-item.result-excellent {
+  border-left-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.result-item.result-poor {
+  border-left-color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.result-item.result-unavailable {
+  opacity: 0.6;
+  filter: grayscale(0.3);
+}
+
+/* 质量评分 */
+.result-quality {
+  margin: 8px 0;
+  font-size: 0.85rem;
+}
+
+.quality-score,
+.reliability-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.quality-bar,
+.reliability-bar {
+  flex: 1;
+  height: 4px;
+  background-color: var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.quality-fill,
+.reliability-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.quality-fill.excellent {
+  background-color: #10b981;
+}
+
+.quality-fill.good {
+  background-color: #3b82f6;
+}
+
+.quality-fill.fair {
+  background-color: #f59e0b;
+}
+
+.quality-fill.poor {
+  background-color: #ef4444;
+}
+
+/* 推荐标签 */
+.recommend-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.badge-excellent {
+  background-color: #10b981;
+  color: white;
+}
+
+.badge-good {
+  background-color: #3b82f6;
+  color: white;
+}
+
+/* 搜索结果统计 */
+.results-stats {
+  display: flex;
+  gap: 16px;
+  margin: 12px 0;
+  padding: 12px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+}
+
+.stats-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stats-value.all-available {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.stats-value.quality-excellent { color: #10b981; }
+.stats-value.quality-good { color: #3b82f6; }
+.stats-value.quality-fair { color: #f59e0b; }
+.stats-value.quality-poor { color: #ef4444; }
+
+/* 深色主题适配 */
+[data-theme="dark"] .result-status {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .status-online {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+[data-theme="dark"] .status-offline {
+  background: rgba(107, 114, 128, 0.15);
+  border-color: rgba(107, 114, 128, 0.3);
+}
+
+[data-theme="dark"] .status-error {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+[data-theme="dark"] .status-timeout {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="dark"] .status-checking {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .status-unknown {
+  background: rgba(156, 163, 175, 0.15);
+  border-color: rgba(156, 163, 175, 0.3);
+}
+
+[data-theme="dark"] .status-badge.disabled {
+  background: var(--border-color);
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .site-item.disabled {
+  background: var(--bg-tertiary);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .connection-status {
+    top: 72px;
+    right: 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .result-status {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  
+  .response-time {
+    order: 3;
+    flex-basis: 100%;
+    text-align: center;
+    margin-top: 0.25rem;
+  }
+  
+  .source-status-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .source-metrics {
+    align-self: stretch;
+  }
+  
+  .results-stats {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .result-status {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  
+  .status-dot {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
