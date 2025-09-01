@@ -1,11 +1,11 @@
-// 搜索服务模块 - 集成后端版搜索源状态检查功能
+// 搜索服务模块 - 集成后端版搜索源状态检查功能（修改版：支持不可用结果排序显示）
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
 import { showToast } from '../utils/dom.js';
 import apiService from './api.js';
 import authManager from './auth.js';
-import backendSourceChecker from './enhanced-source-checker.js'; // 🔧 使用后端版检查器
+import backendSourceChecker from './enhanced-source-checker.js';
 
 class SearchService {
   constructor() {
@@ -223,7 +223,7 @@ class SearchService {
     }
   }
 
-  // 🔧 重写处理状态检查结果方法，适配后端API返回格式
+  // 🔧 修改处理状态检查结果方法 - 不再过滤不可用源，而是保留所有源
   processStatusCheckResults(originalSources, checkResults, userSettings) {
     const sourcesMap = new Map(originalSources.map(s => [s.id, s]));
     const processedSources = [];
@@ -239,24 +239,20 @@ class SearchService {
         ...originalSource,
         status: result.status,
         statusText: this.getStatusText(result.status),
+        errorMessage: result.error || null, // 🔧 新增：保存错误信息
         lastChecked: result.lastChecked,
         responseTime: result.responseTime || 0,
         availabilityScore: result.availabilityScore || 0,
         verified: result.verified || result.contentMatch || false,
         contentMatch: result.contentMatch || false,
         qualityScore: result.qualityScore || 0,
-        fromCache: result.fromCache || false
+        fromCache: result.fromCache || false,
+        // 🔧 新增：添加不可用原因的详细信息
+        unavailableReason: this.getUnavailableReason(result)
       };
       
-      // 根据用户设置决定是否包含不可用的源
-      if (userSettings.skipUnavailableSources) {
-        if (result.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE || 
-            result.status === APP_CONSTANTS.SOURCE_STATUS.UNKNOWN) {
-          processedSources.push(processedSource);
-        }
-      } else {
-        processedSources.push(processedSource);
-      }
+      // 🔧 修改：不再根据skipUnavailableSources过滤，保留所有源
+      processedSources.push(processedSource);
     });
     
     const availableCount = processedSources.filter(s => 
@@ -265,23 +261,88 @@ class SearchService {
     
     console.log(`状态检查完成: ${availableCount}/${checkResults.length} 个搜索源可用`);
     
-    // 🔧 优化：如果所有源都不可用且设置了跳过不可用源，回退到包含所有源
-    if (availableCount === 0 && userSettings.skipUnavailableSources && checkResults.length > 0) {
-      console.warn('所有搜索源都不可用，回退到包含所有源');
-      return checkResults.map(({ source, result }) => {
-        const originalSource = sourcesMap.get(source.id);
-        return {
-          ...originalSource,
-          status: result.status,
-          statusText: this.getStatusText(result.status),
-          lastChecked: result.lastChecked,
-          responseTime: result.responseTime || 0,
-          contentMatch: result.contentMatch || false
-        };
-      });
+    // 🔧 新增：按状态排序 - 可用的源在前，不可用的在后
+    return this.sortSourcesByAvailability(processedSources);
+  }
+
+  // 🔧 新增：根据可用性排序搜索源
+  sortSourcesByAvailability(sources) {
+    return sources.sort((a, b) => {
+      // 优先级：可用 > 未知 > 超时 > 不可用 > 错误
+      const statusPriority = {
+        [APP_CONSTANTS.SOURCE_STATUS.AVAILABLE]: 0,
+        [APP_CONSTANTS.SOURCE_STATUS.UNKNOWN]: 1,
+        [APP_CONSTANTS.SOURCE_STATUS.TIMEOUT]: 2,
+        [APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE]: 3,
+        [APP_CONSTANTS.SOURCE_STATUS.ERROR]: 4,
+        [APP_CONSTANTS.SOURCE_STATUS.CHECKING]: 5
+      };
+
+      const priorityA = statusPriority[a.status] ?? 99;
+      const priorityB = statusPriority[b.status] ?? 99;
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+
+      // 同等状态下，按响应时间排序（响应快的在前）
+      if (a.responseTime && b.responseTime) {
+        return a.responseTime - b.responseTime;
+      }
+
+      // 最后按内容匹配度排序
+      if (a.contentMatch && !b.contentMatch) return -1;
+      if (!a.contentMatch && b.contentMatch) return 1;
+
+      return 0;
+    });
+  }
+
+  // 🔧 新增：获取不可用原因的详细描述
+  getUnavailableReason(result) {
+    if (result.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE) {
+      return null;
     }
+
+    const reasons = [];
     
-    return processedSources;
+    switch (result.status) {
+      case APP_CONSTANTS.SOURCE_STATUS.TIMEOUT:
+        reasons.push('连接超时');
+        if (result.responseTime > 10000) {
+          reasons.push(`响应时间过长 (${Math.round(result.responseTime/1000)}秒)`);
+        }
+        break;
+      
+      case APP_CONSTANTS.SOURCE_STATUS.ERROR:
+        if (result.httpStatus) {
+          reasons.push(`HTTP错误 ${result.httpStatus}`);
+        }
+        if (result.error) {
+          reasons.push(result.error);
+        } else {
+          reasons.push('服务器错误');
+        }
+        break;
+      
+      case APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE:
+        reasons.push('服务不可用');
+        if (result.httpStatus === 404) {
+          reasons.push('页面不存在');
+        } else if (result.httpStatus >= 500) {
+          reasons.push('服务器内部错误');
+        }
+        break;
+      
+      default:
+        if (result.error) {
+          reasons.push(result.error);
+        } else {
+          reasons.push('未知原因');
+        }
+    }
+
+    return reasons.length > 0 ? reasons.join('，') : '检查失败';
   }
 
   // 从搜索源构建结果
@@ -302,6 +363,8 @@ class SearchService {
       if (source.status) {
         result.status = source.status;
         result.statusText = source.statusText;
+        result.errorMessage = source.errorMessage; // 🔧 新增错误信息
+        result.unavailableReason = source.unavailableReason; // 🔧 新增不可用原因
         result.lastChecked = source.lastChecked;
         result.responseTime = source.responseTime;
         result.availabilityScore = source.availabilityScore;
@@ -396,6 +459,7 @@ class SearchService {
           name: source.name,
           status: result.status,
           statusText: this.getStatusText(result.status),
+          unavailableReason: this.getUnavailableReason(result), // 🔧 新增不可用原因
           lastChecked: result.lastChecked,
           responseTime: result.responseTime || 0,
           availabilityScore: result.availabilityScore || 0,
@@ -466,6 +530,7 @@ class SearchService {
         name: source.name,
         status: result.status,
         statusText: this.getStatusText(result.status),
+        unavailableReason: this.getUnavailableReason(result), // 🔧 新增不可用原因
         lastChecked: result.lastChecked,
         responseTime: result.responseTime || 0,
         availabilityScore: result.availabilityScore || 0,
@@ -607,7 +672,7 @@ class SearchService {
       checkStats: this.getStatusCheckStats(),
       userSettings: this.userSettings,
       timestamp: Date.now(),
-      version: '2.0.0'
+      version: '2.1.0' // 🔧 更新版本号
     };
   }
 }

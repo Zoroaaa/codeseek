@@ -1,4 +1,4 @@
-// 增强版搜索组件 - 支持后端搜索源状态检查和显示
+// 增强版搜索组件 - 支持后端搜索源状态检查和显示（修改版：支持显示不可用结果及原因）
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../utils/format.js';
@@ -14,8 +14,8 @@ export class SearchManager {
     this.currentResults = [];
     this.searchHistory = [];
     this.isInitialized = false;
-    this.statusCheckInProgress = false; // 状态检查进度标志
-    this.lastStatusCheckKeyword = null; // 最后检查的关键词
+    this.statusCheckInProgress = false;
+    this.lastStatusCheckKeyword = null;
   }
 
   async init() {
@@ -42,7 +42,6 @@ export class SearchManager {
       deleteHistoryItem: (historyId) => this.deleteHistoryItem(historyId),
       checkSourceStatus: (sourceId) => this.checkSingleSourceStatus(sourceId),
       refreshSourceStatus: () => this.refreshAllSourcesStatus(),
-      // 🔧 新增：状态检查相关方法
       toggleStatusCheck: () => this.toggleStatusCheck(),
       viewStatusHistory: () => this.viewStatusHistory()
     };
@@ -127,7 +126,7 @@ export class SearchManager {
     }
   }
 
-  // 🔧 执行搜索 - 增强版，支持后端状态检查
+  // 执行搜索 - 增强版，支持后端状态检查
   async performSearch() {
     const searchInput = document.getElementById('searchInput');
     const keyword = searchInput?.value.trim();
@@ -151,7 +150,7 @@ export class SearchManager {
       // 隐藏提示区域
       this.hideQuickTips();
 
-      // 🔧 显示搜索状态检查进度（如果启用）
+      // 显示搜索状态检查进度（如果启用）
       await this.showSearchStatusIfEnabled(keyword);
 
       // 获取搜索选项
@@ -181,7 +180,7 @@ export class SearchManager {
     }
   }
 
-  // 🔧 新增：显示搜索状态检查进度
+  // 显示搜索状态检查进度
   async showSearchStatusIfEnabled(keyword) {
     try {
       if (!authManager.isAuthenticated()) return;
@@ -214,7 +213,7 @@ export class SearchManager {
     }
   }
 
-  // 🔧 显示搜索结果 - 增强版，支持状态显示
+  // 🔧 显示搜索结果 - 增强版，支持状态显示和不可用结果处理
   displaySearchResults(keyword, results) {
     const resultsSection = document.getElementById('resultsSection');
     const searchInfo = document.getElementById('searchInfo');
@@ -224,18 +223,25 @@ export class SearchManager {
 
     if (resultsSection) resultsSection.style.display = 'block';
     
-    // 🔧 计算状态统计
+    // 🔧 计算状态统计（包含不可用结果统计）
     const statusStats = this.calculateStatusStats(results);
     
     if (searchInfo) {
       let statusInfo = '';
       if (statusStats.hasStatus) {
         const availableCount = statusStats.available;
+        const unavailableCount = statusStats.unavailable + statusStats.timeout + statusStats.error;
         const totalCount = results.length;
         const contentMatches = statusStats.contentMatches || 0;
+        
         statusInfo = ` | 可用: ${availableCount}/${totalCount}`;
         
-        // 🔧 添加内容匹配信息
+        // 🔧 显示不可用数量
+        if (unavailableCount > 0) {
+          statusInfo += ` | 不可用: ${unavailableCount}`;
+        }
+        
+        // 添加内容匹配信息
         if (contentMatches > 0) {
           statusInfo += ` | 内容匹配: ${contentMatches}`;
         }
@@ -252,6 +258,8 @@ export class SearchManager {
     if (exportResultsBtn) exportResultsBtn.style.display = 'inline-block';
 
     if (resultsContainer) {
+      // 🔧 修改：使用grid布局而不是简单的join，以支持不可用结果的特殊样式
+      resultsContainer.className = 'results-grid';
       resultsContainer.innerHTML = results.map(result => this.createResultHTML(result)).join('');
       
       // 绑定事件委托
@@ -272,7 +280,7 @@ export class SearchManager {
     }, 100);
   }
 
-  // 🔧 新增：计算状态统计（包含内容匹配统计）
+  // 🔧 计算状态统计（包括不可用结果统计）
   calculateStatusStats(results) {
     const stats = {
       hasStatus: false,
@@ -339,21 +347,22 @@ export class SearchManager {
         case 'copy':
           this.copyToClipboard(url);
           break;
-        case 'checkStatus': // 新增：单独检查搜索源状态
+        case 'checkStatus':
           this.checkSingleSourceStatus(source, resultId);
           break;
-        case 'viewDetails': // 🔧 新增：查看详细状态信息
+        case 'viewDetails':
           this.viewSourceStatusDetails(resultId);
           break;
       }
     });
   }
 
-  // 🔧 创建搜索结果HTML - 增强版，支持详细状态显示
+  // 🔧 创建搜索结果HTML - 支持不可用结果的特殊显示
   createResultHTML(result) {
     const isFavorited = favoritesManager.isFavorited(result.url);
+    const isUnavailable = this.isResultUnavailable(result);
     
-    // 🔧 状态指示器HTML（增强版）
+    // 🔧 状态指示器HTML（增强版，包含不可用原因）
     let statusIndicator = '';
     if (result.status) {
       const statusClass = this.getStatusClass(result.status);
@@ -378,18 +387,36 @@ export class SearchManager {
       
       const detailsText = statusDetails.length > 0 ? ` (${statusDetails.join(', ')})` : '';
       
+      // 🔧 不可用原因显示
+      let unavailableReasonHTML = '';
+      if (isUnavailable && result.unavailableReason) {
+        unavailableReasonHTML = `<div class="unavailable-reason">原因: ${escapeHtml(result.unavailableReason)}</div>`;
+      }
+      
       statusIndicator = `
         <div class="result-status ${statusClass}" title="${statusText}${detailsText} ${statusTime}">
           <span class="status-icon">${this.getStatusIcon(result.status)}</span>
           <span class="status-text">${statusText}</span>
           ${result.contentMatch ? '<span class="content-match-badge">✓</span>' : ''}
-          ${result.fromCache ? '<span class="cache-badge">📋</span>' : ''}
+          ${result.fromCache ? '<span class="cache-badge">💾</span>' : ''}
         </div>
+        ${unavailableReasonHTML}
       `;
     }
     
+    // 🔧 访问按钮状态（不可用时禁用）
+    const visitButtonHTML = isUnavailable ? `
+      <button class="action-btn visit-btn disabled" disabled title="该搜索源当前不可用">
+        <span>不可用</span>
+      </button>
+    ` : `
+      <button class="action-btn visit-btn" data-action="visit" data-url="${escapeHtml(result.url)}" data-source="${result.source}">
+        <span>访问</span>
+      </button>
+    `;
+    
     return `
-      <div class="result-item" data-id="${result.id}">
+      <div class="result-item ${isUnavailable ? 'result-unavailable' : ''}" data-id="${result.id}">
         <div class="result-image">
           <span style="font-size: 2rem;">${result.icon}</span>
         </div>
@@ -406,9 +433,7 @@ export class SearchManager {
           </div>
         </div>
         <div class="result-actions">
-          <button class="action-btn visit-btn" data-action="visit" data-url="${escapeHtml(result.url)}" data-source="${result.source}">
-            <span>访问</span>
-          </button>
+          ${visitButtonHTML}
           <button class="action-btn favorite-btn ${isFavorited ? 'favorited' : ''}" 
                   data-action="favorite" data-result-id="${result.id}">
             <span>${isFavorited ? '已收藏' : '收藏'}</span>
@@ -431,7 +456,16 @@ export class SearchManager {
     `;
   }
 
-  // 新增：获取状态样式类
+  // 🔧 新增：判断结果是否不可用
+  isResultUnavailable(result) {
+    if (!result.status) return false;
+    
+    return result.status === APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE ||
+           result.status === APP_CONSTANTS.SOURCE_STATUS.TIMEOUT ||
+           result.status === APP_CONSTANTS.SOURCE_STATUS.ERROR;
+  }
+
+  // 获取状态样式类
   getStatusClass(status) {
     const statusClasses = {
       [APP_CONSTANTS.SOURCE_STATUS.AVAILABLE]: 'status-available',
@@ -444,7 +478,7 @@ export class SearchManager {
     return statusClasses[status] || 'status-unknown';
   }
 
-  // 新增：获取状态文本
+  // 获取状态文本
   getStatusText(status) {
     const statusTexts = {
       [APP_CONSTANTS.SOURCE_STATUS.AVAILABLE]: '可用',
@@ -457,7 +491,7 @@ export class SearchManager {
     return statusTexts[status] || '未知';
   }
 
-  // 新增：获取状态图标
+  // 获取状态图标
   getStatusIcon(status) {
     const statusIcons = {
       [APP_CONSTANTS.SOURCE_STATUS.AVAILABLE]: '✅',
@@ -470,7 +504,7 @@ export class SearchManager {
     return statusIcons[status] || '❓';
   }
 
-  // 🔧 新增：检查单个搜索源状态
+  // 检查单个搜索源状态
   async checkSingleSourceStatus(sourceId, resultId) {
     try {
       showLoading(true);
@@ -487,6 +521,7 @@ export class SearchManager {
             ...this.currentResults[resultIndex],
             status: statusResult.status,
             statusText: statusResult.statusText,
+            unavailableReason: statusResult.unavailableReason, // 🔧 新增不可用原因
             lastChecked: statusResult.lastChecked,
             responseTime: statusResult.responseTime,
             availabilityScore: statusResult.availabilityScore,
@@ -504,8 +539,16 @@ export class SearchManager {
 
         const statusEmoji = statusResult.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ? '✅' : '❌';
         const contentInfo = statusResult.contentMatch ? '，内容匹配' : '';
-        showToast(`${sourceId} ${statusEmoji} ${statusResult.statusText}${contentInfo}`, 
-          statusResult.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ? 'success' : 'warning');
+        let reasonInfo = '';
+        
+        // 🔧 显示不可用原因
+        if (statusResult.unavailableReason && statusResult.status !== APP_CONSTANTS.SOURCE_STATUS.AVAILABLE) {
+          reasonInfo = `，原因：${statusResult.unavailableReason}`;
+        }
+        
+        showToast(`${sourceId} ${statusEmoji} ${statusResult.statusText}${contentInfo}${reasonInfo}`, 
+          statusResult.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ? 'success' : 'warning',
+          5000); // 延长显示时间以便用户看到详细信息
       }
     } catch (error) {
       console.error('检查搜索源状态失败:', error);
@@ -515,7 +558,7 @@ export class SearchManager {
     }
   }
 
-  // 🔧 新增：刷新所有搜索源状态
+  // 刷新所有搜索源状态
   async refreshAllSourcesStatus() {
     if (!this.currentResults || this.currentResults.length === 0) {
       showToast('没有搜索结果需要刷新状态', 'warning');
@@ -534,6 +577,7 @@ export class SearchManager {
         if (sourceStatus) {
           result.status = sourceStatus.status;
           result.statusText = sourceStatus.statusText;
+          result.unavailableReason = sourceStatus.unavailableReason; // 🔧 新增不可用原因
           result.lastChecked = sourceStatus.lastChecked;
           result.responseTime = sourceStatus.responseTime;
           result.availabilityScore = sourceStatus.availabilityScore;
@@ -548,8 +592,11 @@ export class SearchManager {
       this.displaySearchResults(keyword, this.currentResults);
 
       const contentMatches = statusSummary.sources.filter(s => s.contentMatch).length;
+      const unavailableCount = statusSummary.unavailable + statusSummary.timeout + statusSummary.error;
       const contentInfo = contentMatches > 0 ? `，${contentMatches} 个内容匹配` : '';
-      showToast(`状态刷新完成: ${statusSummary.available}/${statusSummary.total} 可用${contentInfo}`, 'success');
+      const unavailableInfo = unavailableCount > 0 ? `，${unavailableCount} 个不可用` : '';
+      
+      showToast(`状态刷新完成: ${statusSummary.available}/${statusSummary.total} 可用${contentInfo}${unavailableInfo}`, 'success');
     } catch (error) {
       console.error('刷新搜索源状态失败:', error);
       showToast('刷新状态失败: ' + error.message, 'error');
@@ -558,7 +605,7 @@ export class SearchManager {
     }
   }
 
-  // 🔧 新增：查看搜索源状态详情
+  // 🔧 查看搜索源状态详情（增强版，显示不可用原因）
   async viewSourceStatusDetails(resultId) {
     const result = this.currentResults.find(r => r.id === resultId);
     if (!result || !result.status) {
@@ -572,6 +619,11 @@ export class SearchManager {
       `状态: ${result.statusText || this.getStatusText(result.status)}`,
       `最后检查: ${result.lastChecked ? new Date(result.lastChecked).toLocaleString() : '未知'}`,
     ];
+
+    // 🔧 显示不可用原因
+    if (result.unavailableReason && this.isResultUnavailable(result)) {
+      details.push(`不可用原因: ${result.unavailableReason}`);
+    }
 
     if (result.responseTime > 0) {
       details.push(`响应时间: ${result.responseTime}ms`);
@@ -597,7 +649,7 @@ export class SearchManager {
     alert(details.join('\n'));
   }
 
-  // 🔧 新增：切换状态检查功能
+  // 切换状态检查功能
   async toggleStatusCheck() {
     if (!authManager.isAuthenticated()) {
       showToast('请先登录以使用状态检查功能', 'error');
@@ -624,7 +676,7 @@ export class SearchManager {
     }
   }
 
-  // 🔧 新增：查看状态检查历史
+  // 查看状态检查历史
   async viewStatusHistory() {
     if (!authManager.isAuthenticated()) {
       showToast('请先登录以查看状态历史', 'error');
@@ -761,7 +813,7 @@ export class SearchManager {
         await apiService.deleteSearchHistory(oldestId);
         this.searchHistory.pop();
     }
-	  
+      
     if (!authManager.isAuthenticated()) return;
 
     try {
