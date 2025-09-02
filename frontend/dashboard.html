@@ -394,8 +394,7 @@
                 </div>
             </div>
 
-            <!-- 🆕 新增：搜索源共享社区标签页 -->
-<!-- 新增：搜索源共享社区标签页 -->
+<!-- 完善的搜索源社区标签页 - 替换dashboard.html中的community部分 -->
 <div id="community" class="tab-content">
     <div class="tab-header">
         <h1>搜索源社区</h1>
@@ -408,6 +407,10 @@
             <button class="btn-secondary" id="mySharesBtn">
                 <span>👤</span>
                 <span>我的分享</span>
+            </button>
+            <button class="btn-secondary" id="refreshCommunityBtn" onclick="window.app.getManager('community').refreshCommunityData()">
+                <span>🔄</span>
+                <span>刷新</span>
             </button>
         </div>
     </div>
@@ -450,35 +453,45 @@
     <div class="community-controls">
         <div class="search-section">
             <div class="search-box">
-                <input type="text" id="communitySearch" placeholder="搜索社区搜索源..." autocomplete="off">
-                <button class="search-btn" id="communitySearchBtn">
+                <input type="text" id="communitySearch" placeholder="搜索社区搜索源..." autocomplete="off" aria-label="搜索社区搜索源">
+                <button class="search-btn" id="communitySearchBtn" title="搜索">
                     <span>🔍</span>
+                    <span>搜索</span>
                 </button>
             </div>
             <div class="filter-toggle">
                 <label class="toggle-label">
-                    <input type="checkbox" id="featuredOnly">
+                    <input type="checkbox" id="featuredOnly" aria-describedby="featured-help">
                     <span>仅显示推荐</span>
                 </label>
+                <small id="featured-help" style="display: none;">只显示经过验证的优质搜索源</small>
             </div>
         </div>
         
         <div class="filter-section">
             <div class="filter-group">
                 <label for="communityCategory">分类筛选：</label>
-                <select id="communityCategory">
+                <select id="communityCategory" aria-label="按分类筛选">
                     <option value="all">全部分类</option>
                     <!-- 分类选项将动态加载 -->
                 </select>
             </div>
             <div class="filter-group">
                 <label for="communitySort">排序方式：</label>
-                <select id="communitySort">
+                <select id="communitySort" aria-label="排序方式">
                     <option value="created_at-desc">最新发布</option>
                     <option value="rating_score-desc">评分最高</option>
                     <option value="download_count-desc">下载最多</option>
                     <option value="like_count-desc">点赞最多</option>
                     <option value="view_count-desc">浏览最多</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="communityLimit">每页显示：</label>
+                <select id="communityLimit" aria-label="每页显示数量" onchange="window.app.getManager('community').currentLimit = parseInt(this.value); window.app.getManager('community').loadCommunitySourcesList();">
+                    <option value="10">10个</option>
+                    <option value="20" selected>20个</option>
+                    <option value="50">50个</option>
                 </select>
             </div>
         </div>
@@ -493,9 +506,53 @@
         </div>
     </div>
 
+    <!-- 快速操作面板 -->
+    <div class="quick-actions" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; align-items: center; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('JAV')" title="搜索JAV相关源">
+                <span>🎬</span>
+                <span>JAV</span>
+            </button>
+            <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('电影')" title="搜索电影相关源">
+                <span>🎭</span>
+                <span>电影</span>
+            </button>
+            <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('磁力')" title="搜索磁力相关源">
+                <span>🧲</span>
+                <span>磁力</span>
+            </button>
+            <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('种子')" title="搜索种子相关源">
+                <span>🌱</span>
+                <span>种子</span>
+            </button>
+            <span style="color: var(--text-muted); font-size: 0.85rem;">快速搜索</span>
+        </div>
+    </div>
+
     <!-- 社区搜索源列表 -->
     <div id="communitySourcesList" class="community-sources-container">
-        <div class="loading-community">正在加载社区搜索源...</div>
+        <div class="loading-community">
+            <div class="spinner"></div>
+            <div>正在加载社区搜索源...</div>
+        </div>
+    </div>
+
+    <!-- 页面底部信息 -->
+    <div class="community-footer" style="margin-top: 2rem; padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; border-top: 1px solid var(--border-color);">
+        <p>🌟 社区由用户共同维护，分享优质搜索源让大家受益 🌟</p>
+        <p>
+            <a href="#" onclick="window.app.getManager('community').showShareSourceModal(); return false;" style="color: var(--accent-primary); text-decoration: none;">
+                立即分享您的搜索源
+            </a>
+            |
+            <a href="#" onclick="alert('举报请通过搜索源项目中的举报按钮'); return false;" style="color: var(--accent-primary); text-decoration: none;">
+                举报不当内容
+            </a>
+            |
+            <a href="#" onclick="alert('社区规则：\\n1. 分享的搜索源应该是合法的\\n2. 不得分享包含恶意内容的链接\\n3. 描述应该准确真实\\n4. 尊重他人的分享和评价'); return false;" style="color: var(--accent-primary); text-decoration: none;">
+                社区规则
+            </a>
+        </p>
     </div>
 </div>
 
