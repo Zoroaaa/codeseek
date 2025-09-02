@@ -833,7 +833,7 @@ export class CommunityManager {
     }
   }
 
-  // 显示分享搜索源模态框
+  // 显示分享搜索源模态框 - 修复版本
   showShareSourceModal() {
     if (!this.app.getCurrentUser()) {
       showToast('请先登录', 'error');
@@ -842,54 +842,73 @@ export class CommunityManager {
 
     console.log('显示分享搜索源模态框');
 
+    // 获取分类选项
+    const getCategoryOptions = () => {
+      if (APP_CONSTANTS.SOURCE_CATEGORIES) {
+        return Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(cat => 
+          `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
+        ).join('');
+      }
+      // 如果没有分类常量，提供默认分类
+      return `
+        <option value="jav">🎬 JAV资源</option>
+        <option value="movie">🎭 影视资源</option>
+        <option value="torrent">🧲 种子磁力</option>
+        <option value="other">🔍 其他搜索</option>
+      `;
+    };
+
     const modalHTML = `
       <div id="shareSourceModal" class="modal" style="display: block;">
         <div class="modal-content large">
           <span class="close" onclick="document.getElementById('shareSourceModal').remove()">&times;</span>
           <h2>分享搜索源到社区</h2>
-          <form id="shareSourceForm" onsubmit="window.app.getManager('community').submitShareSourceForm(event)">
+          <div id="shareFormError" style="display: none; color: red; margin-bottom: 1rem; padding: 0.5rem; background: #fee; border: 1px solid #fcc; border-radius: 4px;"></div>
+          <form id="shareSourceForm">
             <div class="form-grid">
               <div class="form-group">
-                <label for="shareName">搜索源名称 *:</label>
-                <input type="text" id="shareName" required placeholder="例如：JavBus" maxlength="50">
+                <label for="shareName">搜索源名称 <span style="color: red;">*</span>:</label>
+                <input type="text" id="shareName" name="shareName" required placeholder="例如：JavDB" maxlength="50">
+                <div class="field-error" id="shareNameError"></div>
               </div>
               
               <div class="form-group">
                 <label for="shareSubtitle">副标题:</label>
-                <input type="text" id="shareSubtitle" placeholder="简短描述" maxlength="100">
+                <input type="text" id="shareSubtitle" name="shareSubtitle" placeholder="简短描述" maxlength="100">
               </div>
               
               <div class="form-group">
                 <label for="shareIcon">图标 (emoji):</label>
-                <input type="text" id="shareIcon" placeholder="🔍" maxlength="2" value="🔍">
+                <input type="text" id="shareIcon" name="shareIcon" placeholder="🔍" maxlength="4" value="🔍">
               </div>
               
               <div class="form-group">
-                <label for="shareCategory">分类 *:</label>
-                <select id="shareCategory" required>
+                <label for="shareCategory">分类 <span style="color: red;">*</span>:</label>
+                <select id="shareCategory" name="shareCategory" required>
                   <option value="">请选择分类</option>
-                  ${APP_CONSTANTS.SOURCE_CATEGORIES ? 
-                    Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(cat => `
-                      <option value="${cat.id}">${cat.icon} ${cat.name}</option>
-                    `).join('') : ''}
+                  ${getCategoryOptions()}
                 </select>
+                <div class="field-error" id="shareCategoryError"></div>
               </div>
             </div>
             
             <div class="form-group">
-              <label for="shareUrl">URL模板 *:</label>
-              <input type="url" id="shareUrl" required placeholder="https://example.com/search?q={keyword}" pattern=".*\\{keyword\\}.*">
+              <label for="shareUrl">URL模板 <span style="color: red;">*</span>:</label>
+              <input type="text" id="shareUrl" name="shareUrl" required 
+                placeholder="https://example.com/search?q={keyword}" 
+                pattern=".*\\{keyword\\}.*">
               <small class="form-help">URL必须包含{keyword}占位符，例如：https://example.com/search?q={keyword}</small>
+              <div class="field-error" id="shareUrlError"></div>
             </div>
             
             <div class="form-group">
               <label for="shareDescription">详细描述:</label>
-              <textarea id="shareDescription" placeholder="介绍这个搜索源的特点和用法..." rows="4" maxlength="500"></textarea>
+              <textarea id="shareDescription" name="shareDescription" placeholder="介绍这个搜索源的特点和用法..." rows="4" maxlength="500"></textarea>
             </div>
             
             <div class="form-group">
               <label for="shareTags">标签 (用逗号分隔):</label>
-              <input type="text" id="shareTags" placeholder="JAV, 影片, 搜索" maxlength="200">
+              <input type="text" id="shareTags" name="shareTags" placeholder="JAV, 影片, 搜索" maxlength="200">
               <small class="form-help">最多10个标签，每个标签不超过20字符</small>
             </div>
             
@@ -907,52 +926,218 @@ export class CommunityManager {
       </div>
     `;
     
+    // 移除现有模态框
+    const existingModal = document.getElementById('shareSourceModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
     document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // 绑定表单提交事件 - 重要修复
+    const form = document.getElementById('shareSourceForm');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.submitShareSourceForm(e);
+      });
+      
+      // 实时验证
+      this.bindFormValidation();
+    } else {
+      console.error('表单元素未找到');
+    }
   }
 
-  // 提交分享表单
+  // 新增：绑定表单验证事件
+  bindFormValidation() {
+    const form = document.getElementById('shareSourceForm');
+    if (!form) return;
+
+    // 清除之前的错误显示
+    const clearError = (fieldId) => {
+      const errorDiv = document.getElementById(fieldId + 'Error');
+      if (errorDiv) {
+        errorDiv.textContent = '';
+        errorDiv.style.display = 'none';
+      }
+      const field = document.getElementById(fieldId);
+      if (field) {
+        field.style.borderColor = '';
+      }
+    };
+
+    // 显示错误信息
+    const showError = (fieldId, message) => {
+      const errorDiv = document.getElementById(fieldId + 'Error');
+      if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        errorDiv.style.color = 'red';
+        errorDiv.style.fontSize = '0.8rem';
+        errorDiv.style.marginTop = '0.25rem';
+      }
+      const field = document.getElementById(fieldId);
+      if (field) {
+        field.style.borderColor = 'red';
+      }
+    };
+
+    // 验证搜索源名称
+    const nameField = document.getElementById('shareName');
+    if (nameField) {
+      nameField.addEventListener('blur', () => {
+        const value = nameField.value.trim();
+        if (!value) {
+          showError('shareName', '搜索源名称不能为空');
+        } else if (value.length < 2) {
+          showError('shareName', '搜索源名称至少需要2个字符');
+        } else {
+          clearError('shareName');
+        }
+      });
+    }
+
+    // 验证URL模板
+    const urlField = document.getElementById('shareUrl');
+    if (urlField) {
+      urlField.addEventListener('blur', () => {
+        const value = urlField.value.trim();
+        if (!value) {
+          showError('shareUrl', 'URL模板不能为空');
+        } else if (!value.includes('{keyword}')) {
+          showError('shareUrl', 'URL模板必须包含{keyword}占位符');
+        } else {
+          // 简单的URL格式验证
+          try {
+            new URL(value.replace('{keyword}', 'test'));
+            clearError('shareUrl');
+          } catch (error) {
+            showError('shareUrl', 'URL格式不正确');
+          }
+        }
+      });
+    }
+
+    // 验证分类
+    const categoryField = document.getElementById('shareCategory');
+    if (categoryField) {
+      categoryField.addEventListener('change', () => {
+        const value = categoryField.value;
+        if (!value) {
+          showError('shareCategory', '请选择一个分类');
+        } else {
+          clearError('shareCategory');
+        }
+      });
+    }
+  }
+
+  // 修复版本：提交分享表单
   async submitShareSourceForm(event) {
     event.preventDefault();
     
-    const name = document.getElementById('shareName').value.trim();
-    const subtitle = document.getElementById('shareSubtitle').value.trim();
-    const icon = document.getElementById('shareIcon').value.trim();
-    const category = document.getElementById('shareCategory').value;
-    const urlTemplate = document.getElementById('shareUrl').value.trim();
-    const description = document.getElementById('shareDescription').value.trim();
-    const tagsString = document.getElementById('shareTags').value.trim();
+    console.log('开始提交分享表单');
     
-    // 基本验证
-    if (!name || !urlTemplate || !category) {
-      showToast('请填写所有必需字段', 'error');
+    // 获取表单数据 - 使用更可靠的方法
+    const form = document.getElementById('shareSourceForm');
+    if (!form) {
+      console.error('表单未找到');
       return;
     }
+
+    const formData = new FormData(form);
+    const data = {};
     
-    if (!urlTemplate.includes('{keyword}')) {
-      showToast('URL模板必须包含{keyword}占位符', 'error');
+    // 从FormData中提取数据
+    for (let [key, value] of formData.entries()) {
+      data[key] = value;
+    }
+    
+    // 手动获取表单字段（双重保险）
+    const name = (document.getElementById('shareName')?.value || '').trim();
+    const subtitle = (document.getElementById('shareSubtitle')?.value || '').trim();
+    const icon = (document.getElementById('shareIcon')?.value || '🔍').trim();
+    const category = (document.getElementById('shareCategory')?.value || '').trim();
+    const urlTemplate = (document.getElementById('shareUrl')?.value || '').trim();
+    const description = (document.getElementById('shareDescription')?.value || '').trim();
+    const tagsString = (document.getElementById('shareTags')?.value || '').trim();
+    
+    console.log('提取的表单数据:', {
+      name, subtitle, icon, category, urlTemplate, description, tagsString
+    });
+
+    // 清除之前的错误信息
+    const errorDiv = document.getElementById('shareFormError');
+    if (errorDiv) {
+      errorDiv.style.display = 'none';
+    }
+
+    const showFormError = (message) => {
+      if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+      } else {
+        showToast(message, 'error');
+      }
+    };
+
+    // 详细的验证逻辑
+    const errors = [];
+
+    if (!name || name.length < 2) {
+      errors.push('搜索源名称必须至少2个字符');
+    }
+
+    if (!urlTemplate) {
+      errors.push('URL模板不能为空');
+    } else if (!urlTemplate.includes('{keyword}')) {
+      errors.push('URL模板必须包含{keyword}占位符');
+    } else {
+      // 验证URL格式
+      try {
+        new URL(urlTemplate.replace('{keyword}', 'test'));
+      } catch (e) {
+        errors.push('URL模板格式不正确');
+      }
+    }
+
+    if (!category) {
+      errors.push('请选择一个分类');
+    }
+
+    if (errors.length > 0) {
+      console.log('验证失败，错误列表:', errors);
+      showFormError('请修复以下问题：\n' + errors.join('\n'));
       return;
     }
     
     // 处理标签
-    const tags = tagsString ? tagsString.split(',').map(tag => tag.trim()).filter(tag => tag).slice(0, 10) : [];
+    const tags = tagsString ? 
+      tagsString.split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag && tag.length > 0)
+        .slice(0, 10) : [];
     
     const sourceData = {
       name,
-      subtitle,
+      subtitle: subtitle || '',
       icon: icon || '🔍',
       urlTemplate,
       category,
-      description,
+      description: description || '',
       tags
     };
     
+    console.log('准备提交的数据:', sourceData);
+
     try {
       showLoading(true);
       
       const result = await apiService.shareSourceToCommunity(sourceData);
       
       if (result.success) {
-        showToast(result.message || '分享成功', 'success');
+        showToast(result.message || '分享成功！', 'success');
         document.getElementById('shareSourceModal').remove();
         
         // 刷新社区列表
@@ -961,12 +1146,12 @@ export class CommunityManager {
         // 刷新用户统计
         await this.loadUserCommunityStats();
       } else {
-        showToast(result.message || '分享失败', 'error');
+        showFormError(result.message || '分享失败，请重试');
       }
 
     } catch (error) {
       console.error('分享搜索源失败:', error);
-      showToast('分享失败，请稍后重试: ' + error.message, 'error');
+      showFormError('分享失败：' + error.message);
     } finally {
       showLoading(false);
     }

@@ -1040,6 +1040,119 @@
   background: var(--text-muted);
 }
 
+/*  CSS样式补充 - 添加到你的CSS文件中 */
+const additionalCSS = `
+.field-error {
+  color: #ef4444;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  display: none;
+}
+
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.form-group label span {
+  color: #ef4444;
+}
+
+#shareFormError {
+  white-space: pre-line;
+  line-height: 1.4;
+}
+
+.form-help {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* 添加到 css/pages/dashboard/community.css 文件末尾 */
+
+/* 表单验证样式 */
+.field-error {
+  color: #ef4444;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  display: none;
+  line-height: 1.4;
+}
+
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.form-group label span {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+#shareFormError {
+  white-space: pre-line;
+  line-height: 1.4;
+  padding: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  color: #dc2626;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.form-help {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  display: block;
+  line-height: 1.3;
+}
+
+/* 改善表单交互 */
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.form-group input:valid {
+  border-color: var(--success-color);
+}
+
+.form-group select:valid {
+  border-color: var(--success-color);
+}
+
+/* 模态框改进 */
+.modal-content.large {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* 响应式改进 */
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-content.large {
+    width: 98%;
+    margin: 1% auto;
+    max-height: 98vh;
+    padding: 1rem;
+  }
+}
+
 /* 无障碍支持 */
 .community-source-item:focus-within {
   outline: 2px solid var(--accent-primary);
