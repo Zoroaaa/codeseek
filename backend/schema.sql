@@ -408,6 +408,9 @@ CREATE TABLE IF NOT EXISTS community_user_stats (
     -- 参与统计
     reviews_given INTEGER DEFAULT 0,
     sources_downloaded INTEGER DEFAULT 0,
+	
+	-- 浏览量
+	total_views INTEGER DEFAULT 0,
     
     -- 声誉系统
     reputation_score INTEGER DEFAULT 0,
@@ -444,11 +447,11 @@ CREATE INDEX IF NOT EXISTS idx_downloads_created ON community_source_downloads(c
 
 CREATE INDEX IF NOT EXISTS idx_reports_shared_source ON community_source_reports(shared_source_id);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON community_source_reports(status);
-
 -- 6. 创建索引以提高查询性能
 CREATE INDEX IF NOT EXISTS idx_community_user_stats_total_views ON community_user_stats(total_views);
 CREATE INDEX IF NOT EXISTS idx_shared_sources_user_status ON community_shared_sources(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_shared_sources_view_count ON community_shared_sources(view_count DESC);
+
 -- 触发器：更新共享搜索源的统计信息
 CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_review
     AFTER INSERT ON community_source_reviews

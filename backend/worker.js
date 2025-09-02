@@ -1266,6 +1266,78 @@ router.get('/api/community/sources', async (request, env) => {
     }
 });
 
+// 🆕 删除我的分享搜索源API
+router.delete('/api/community/sources/:id', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const sourceId = request.params.id;
+        
+        if (!sourceId) {
+            return utils.errorResponse('搜索源ID不能为空', 400);
+        }
+        
+        // 检查搜索源是否存在且属于当前用户
+        const source = await env.DB.prepare(`
+            SELECT id, user_id, source_name FROM community_shared_sources 
+            WHERE id = ? AND user_id = ?
+        `).bind(sourceId, user.id).first();
+        
+        if (!source) {
+            return utils.errorResponse('搜索源不存在或您无权删除', 404);
+        }
+        
+        // 开始事务删除相关数据
+        try {
+            // 删除相关的评论
+            await env.DB.prepare(`
+                DELETE FROM community_source_reviews WHERE shared_source_id = ?
+            `).bind(sourceId).run();
+            
+            // 删除相关的点赞
+            await env.DB.prepare(`
+                DELETE FROM community_source_likes WHERE shared_source_id = ?
+            `).bind(sourceId).run();
+            
+            // 删除相关的下载记录
+            await env.DB.prepare(`
+                DELETE FROM community_source_downloads WHERE shared_source_id = ?
+            `).bind(sourceId).run();
+            
+            // 删除相关的举报
+            await env.DB.prepare(`
+                DELETE FROM community_source_reports WHERE shared_source_id = ?
+            `).bind(sourceId).run();
+            
+            // 最后删除搜索源本身
+            await env.DB.prepare(`
+                DELETE FROM community_shared_sources WHERE id = ?
+            `).bind(sourceId).run();
+            
+            // 记录用户行为
+            await utils.logUserAction(env, user.id, 'community_source_deleted', {
+                sourceId,
+                sourceName: source.source_name
+            }, request);
+            
+            return utils.successResponse({
+                message: '搜索源删除成功',
+                deletedId: sourceId
+            });
+            
+        } catch (dbError) {
+            console.error('删除搜索源数据库操作失败:', dbError);
+            return utils.errorResponse('删除搜索源失败: ' + dbError.message, 500);
+        }
+        
+    } catch (error) {
+        console.error('删除搜索源失败:', error);
+        return utils.errorResponse('删除搜索源失败: ' + error.message, 500);
+    }
+});
+
+
 // 获取单个搜索源详情
 router.get('/api/community/sources/:id', async (request, env) => {
     try {
@@ -1850,7 +1922,6 @@ router.get('/api/community/user/stats', async (request, env) => {
     }
 });
 
-// 获取热门标签
 // 🔧 修复热门标签API - 确保返回真实数据
 router.get('/api/community/tags', async (request, env) => {
     try {
@@ -2083,76 +2154,6 @@ router.get('/api/community/search', async (request, env) => {
     }
 });
 
-// 🆕 删除我的分享搜索源API
-router.delete('/api/community/sources/:id', async (request, env) => {
-    const user = await authenticate(request, env);
-    if (!user) return utils.errorResponse('认证失败', 401);
-    
-    try {
-        const sourceId = request.params.id;
-        
-        if (!sourceId) {
-            return utils.errorResponse('搜索源ID不能为空', 400);
-        }
-        
-        // 检查搜索源是否存在且属于当前用户
-        const source = await env.DB.prepare(`
-            SELECT id, user_id, source_name FROM community_shared_sources 
-            WHERE id = ? AND user_id = ?
-        `).bind(sourceId, user.id).first();
-        
-        if (!source) {
-            return utils.errorResponse('搜索源不存在或您无权删除', 404);
-        }
-        
-        // 开始事务删除相关数据
-        try {
-            // 删除相关的评论
-            await env.DB.prepare(`
-                DELETE FROM community_source_reviews WHERE shared_source_id = ?
-            `).bind(sourceId).run();
-            
-            // 删除相关的点赞
-            await env.DB.prepare(`
-                DELETE FROM community_source_likes WHERE shared_source_id = ?
-            `).bind(sourceId).run();
-            
-            // 删除相关的下载记录
-            await env.DB.prepare(`
-                DELETE FROM community_source_downloads WHERE shared_source_id = ?
-            `).bind(sourceId).run();
-            
-            // 删除相关的举报
-            await env.DB.prepare(`
-                DELETE FROM community_source_reports WHERE shared_source_id = ?
-            `).bind(sourceId).run();
-            
-            // 最后删除搜索源本身
-            await env.DB.prepare(`
-                DELETE FROM community_shared_sources WHERE id = ?
-            `).bind(sourceId).run();
-            
-            // 记录用户行为
-            await utils.logUserAction(env, user.id, 'community_source_deleted', {
-                sourceId,
-                sourceName: source.source_name
-            }, request);
-            
-            return utils.successResponse({
-                message: '搜索源删除成功',
-                deletedId: sourceId
-            });
-            
-        } catch (dbError) {
-            console.error('删除搜索源数据库操作失败:', dbError);
-            return utils.errorResponse('删除搜索源失败: ' + dbError.message, 500);
-        }
-        
-    } catch (error) {
-        console.error('删除搜索源失败:', error);
-        return utils.errorResponse('删除搜索源失败: ' + error.message, 500);
-    }
-});
 
 router.post('/api/auth/delete-account', async (request, env) => {
     const user = await authenticate(request, env);

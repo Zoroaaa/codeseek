@@ -1,4 +1,4 @@
-// API服务增强版本 - 完善社区功能相关API
+// 优化后的API服务 - 完整版本，增加社区删除功能等
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 
@@ -323,7 +323,7 @@ class APIService {
 
   // 社区搜索源API集合 - 完整版
   
-  // 修复：获取社区搜索源列表（支持高级筛选）
+  // 获取社区搜索源列表（支持高级筛选）
   async getCommunitySearchSources(options = {}) {
     try {
       const params = new URLSearchParams();
@@ -437,7 +437,7 @@ class APIService {
     const payload = {
       name: sourceData.name.trim(),
       subtitle: sourceData.subtitle?.trim() || '',
-      icon: sourceData.icon?.trim() || '🔍',
+      icon: sourceData.icon?.trim() || '📝',
       urlTemplate: sourceData.urlTemplate.trim(),
       category: sourceData.category,
       description: sourceData.description?.trim() || '',
@@ -463,6 +463,35 @@ class APIService {
       
     } catch (error) {
       console.error('分享搜索源失败:', error);
+      throw error;
+    }
+  }
+
+  // 新增：删除社区搜索源API
+  async deleteCommunitySource(sourceId) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    if (!sourceId) {
+      throw new Error('搜索源ID不能为空');
+    }
+    
+    try {
+      console.log('删除社区搜索源:', sourceId);
+      
+      const response = await this.request(`/api/community/sources/${sourceId}`, {
+        method: 'DELETE'
+      });
+      
+      return {
+        success: true,
+        message: response.message || '删除成功',
+        deletedId: response.deletedId || sourceId
+      };
+      
+    } catch (error) {
+      console.error('删除社区搜索源失败:', error);
       throw error;
     }
   }
@@ -613,7 +642,7 @@ class APIService {
     }
   }
 
-  // 修复：获取用户社区统计（完整版）
+  // 优化：获取用户社区统计（完整版，包含浏览量等）
   async getUserCommunityStats() {
     if (!this.token) {
       return {
@@ -637,6 +666,7 @@ class APIService {
           sourcesDownloaded: response.stats?.general?.sourcesDownloaded || response.stats?.sourcesDownloaded || 0,
           totalLikes: response.stats?.general?.totalLikes || response.stats?.totalLikes || 0,
           totalDownloads: response.stats?.general?.totalDownloads || response.stats?.totalDownloads || 0,
+          totalViews: response.stats?.general?.totalViews || response.stats?.totalViews || 0, // 新增浏览量统计
           reviewsGiven: response.stats?.general?.reviewsGiven || response.stats?.reviewsGiven || 0,
           reputationScore: response.stats?.general?.reputationScore || response.stats?.reputationScore || 0,
           contributionLevel: response.stats?.general?.contributionLevel || response.stats?.contributionLevel || 'beginner'
@@ -658,6 +688,7 @@ class APIService {
             sourcesDownloaded: 0,
             totalLikes: 0,
             totalDownloads: 0,
+            totalViews: 0,
             reviewsGiven: 0,
             reputationScore: 0,
             contributionLevel: 'beginner'
@@ -669,7 +700,7 @@ class APIService {
     }
   }
 
-  // 修复：获取热门标签（支持分类筛选）
+  // 优化：获取热门标签（仅真实数据，去掉预设标签）
   async getPopularTags(category = null) {
     try {
       const params = new URLSearchParams();
@@ -685,28 +716,36 @@ class APIService {
       
       console.log('热门标签响应:', response);
       
-      // 确保返回标准格式的标签数据
-      const tags = (response.tags || []).map(tag => {
-        if (typeof tag === 'string') {
+      // 只返回有真实使用数据的标签，过滤掉预设标签
+      const realTags = (response.tags || [])
+        .filter(tag => {
+          const usageCount = tag.usageCount || tag.count || tag.usage_count || 0;
+          return usageCount > 0; // 只保留真实使用过的标签
+        })
+        .map(tag => {
+          if (typeof tag === 'string') {
+            return {
+              name: tag,
+              usageCount: 1,
+              count: 1,
+              isOfficial: false
+            };
+          }
           return {
-            name: tag,
-            usageCount: 1,
-            count: 1,
-            isOfficial: false
+            name: tag.name || tag.tag || 'Unknown',
+            usageCount: tag.usageCount || tag.count || tag.usage_count || 0,
+            count: tag.count || tag.usageCount || tag.usage_count || 0,
+            isOfficial: tag.isOfficial || tag.is_official || false,
+            color: tag.color || null
           };
-        }
-        return {
-          name: tag.name || tag.tag || 'Unknown',
-          usageCount: tag.usageCount || tag.count || tag.usage_count || 0,
-          count: tag.count || tag.usageCount || tag.usage_count || 0,
-          isOfficial: tag.isOfficial || tag.is_official || false,
-          color: tag.color || null
-        };
-      });
+        })
+        .sort((a, b) => (b.usageCount || b.count) - (a.usageCount || a.count)); // 按使用次数排序
+      
+      console.log('过滤后的真实标签数量:', realTags.length);
       
       return {
         success: true,
-        tags: tags
+        tags: realTags
       };
     } catch (error) {
       console.error('获取热门标签失败:', error);
@@ -963,7 +1002,7 @@ class APIService {
       id: source.id,
       name: source.name.trim(),
       subtitle: source.subtitle?.trim() || '自定义搜索源',
-      icon: source.icon?.trim() || '🔍',
+      icon: source.icon?.trim() || '📝',
       urlTemplate: source.urlTemplate.trim(),
       category: source.category || 'other',
       isCustom: true,
