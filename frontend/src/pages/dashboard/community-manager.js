@@ -1,4 +1,4 @@
-// 完善的社区管理器 - 修复版本，完全匹配后端API
+// 完善的社区管理器 - 修复版本，解决所有问题
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast, createElement } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
@@ -64,7 +64,6 @@ export class CommunityManager {
   }
 
   async bindEvents() {
-    // 等待DOM就绪
     const waitForDOM = () => {
       return new Promise(resolve => {
         if (document.readyState === 'loading') {
@@ -97,7 +96,6 @@ export class CommunityManager {
         }, 500);
       });
       
-      // 支持回车搜索
       searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
           this.currentFilters.search = e.target.value;
@@ -105,7 +103,6 @@ export class CommunityManager {
           this.loadCommunitySourcesList();
         }
       });
-      console.log('搜索输入事件已绑定');
     }
 
     if (searchBtn) {
@@ -117,7 +114,6 @@ export class CommunityManager {
           this.loadCommunitySourcesList();
         }
       });
-      console.log('搜索按钮事件已绑定');
     }
 
     if (categoryFilter) {
@@ -126,7 +122,6 @@ export class CommunityManager {
         this.currentPage = 1;
         this.loadCommunitySourcesList();
       });
-      console.log('分类过滤器事件已绑定');
     }
 
     if (sortSelect) {
@@ -137,7 +132,6 @@ export class CommunityManager {
         this.currentPage = 1;
         this.loadCommunitySourcesList();
       });
-      console.log('排序选择器事件已绑定');
     }
 
     if (featuredToggle) {
@@ -146,21 +140,18 @@ export class CommunityManager {
         this.currentPage = 1;
         this.loadCommunitySourcesList();
       });
-      console.log('推荐过滤器事件已绑定');
     }
 
     // 绑定分享按钮事件
     const shareSourceBtn = document.getElementById('shareSourceBtn');
     if (shareSourceBtn) {
       shareSourceBtn.addEventListener('click', () => this.showShareSourceModal());
-      console.log('分享按钮事件已绑定');
     }
 
-    // 绑定我的分享按钮事件
+    // 绑定我的分享按钮事件 - 修复
     const mySharesBtn = document.getElementById('mySharesBtn');
     if (mySharesBtn) {
       mySharesBtn.addEventListener('click', () => this.showMyShares());
-      console.log('我的分享按钮事件已绑定');
     }
 
     console.log('社区管理器所有事件绑定完成');
@@ -169,7 +160,7 @@ export class CommunityManager {
   // 加载社区搜索源列表
   async loadCommunitySourcesList() {
     try {
-      console.log('开始加载社区搜索源列表，使用apiService');
+      console.log('开始加载社区搜索源列表');
       
       const options = {
         page: this.currentPage,
@@ -177,11 +168,7 @@ export class CommunityManager {
         ...this.currentFilters
       };
 
-      console.log('请求参数:', options);
-
       const result = await apiService.getCommunitySearchSources(options);
-      
-      console.log('社区数据加载结果:', result);
       
       if (result.success) {
         this.currentSources = result.sources;
@@ -195,7 +182,6 @@ export class CommunityManager {
       console.error('加载社区搜索源列表失败:', error);
       showToast('加载搜索源列表失败: ' + error.message, 'error');
       
-      // 显示错误状态
       const container = document.getElementById('communitySourcesList');
       if (container) {
         container.innerHTML = `
@@ -212,10 +198,19 @@ export class CommunityManager {
     }
   }
 
-  // 加载用户社区统计
+  // 修复：加载用户社区统计
   async loadUserCommunityStats() {
     if (!this.app.getCurrentUser()) {
-      console.log('用户未登录，跳过加载社区统计');
+      console.log('用户未登录，设置默认统计');
+      this.userStats = {
+        general: {
+          sharedSources: 0,
+          sourcesDownloaded: 0,
+          totalLikes: 0,
+          reputationScore: 0
+        }
+      };
+      this.updateCommunityStats();
       return;
     }
 
@@ -227,31 +222,104 @@ export class CommunityManager {
         console.log('用户社区统计加载成功:', this.userStats);
       } else {
         console.warn('加载用户社区统计失败:', result.error);
+        this.userStats = {
+          general: {
+            sharedSources: 0,
+            sourcesDownloaded: 0,
+            totalLikes: 0,
+            reputationScore: 0
+          }
+        };
       }
+      // 立即更新统计显示
+      this.updateCommunityStats();
     } catch (error) {
       console.warn('加载用户社区统计失败:', error);
+      this.userStats = {
+        general: {
+          sharedSources: 0,
+          sourcesDownloaded: 0,
+          totalLikes: 0,
+          reputationScore: 0
+        }
+      };
+      this.updateCommunityStats();
     }
   }
 
-  // 加载热门标签
+  // 修复：加载真实热门标签
   async loadPopularTags() {
     try {
       const result = await apiService.getPopularTags();
       
-      if (result.success) {
+      if (result.success && result.tags) {
         this.popularTags = result.tags;
         this.renderPopularTags();
         console.log('热门标签加载成功:', this.popularTags.length, '个标签');
       } else {
         console.warn('加载热门标签失败:', result.error);
+        this.popularTags = [];
+        this.renderEmptyTags();
       }
     } catch (error) {
       console.warn('加载热门标签失败:', error);
+      this.popularTags = [];
+      this.renderEmptyTags();
+    }
+  }
+
+  // 修复：渲染热门标签
+  renderPopularTags() {
+    const container = document.getElementById('popularTagsList');
+    if (!container) {
+      console.log('热门标签容器不存在');
+      return;
+    }
+
+    if (!this.popularTags || this.popularTags.length === 0) {
+      this.renderEmptyTags();
+      return;
+    }
+
+    const tagsHTML = this.popularTags.slice(0, 20).map(tag => {
+      const isOfficial = tag.isOfficial || false;
+      const usageCount = tag.usageCount || tag.count || 0;
+      const tagClass = isOfficial ? 'tag-item official' : 'tag-item';
+      
+      return `
+        <span class="${tagClass}" 
+              onclick="window.app.getManager('community').searchByTag('${escapeHtml(tag.name)}')"
+              title="使用次数: ${usageCount}">
+          ${escapeHtml(tag.name)} 
+          <span class="tag-count">(${usageCount})</span>
+        </span>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="tags-cloud">
+        ${tagsHTML}
+      </div>
+    `;
+    
+    console.log('热门标签渲染完成:', this.popularTags.length, '个标签');
+  }
+
+  // 渲染空标签状态
+  renderEmptyTags() {
+    const container = document.getElementById('popularTagsList');
+    if (container) {
+      container.innerHTML = `
+        <div class="empty-tags">
+          <span style="font-size: 2rem; opacity: 0.5;">🏷️</span>
+          <p style="color: var(--text-muted); margin: 0.5rem 0;">还没有热门标签</p>
+          <small style="color: var(--text-muted);">开始分享搜索源来创建标签吧</small>
+        </div>
+      `;
     }
   }
 
   renderCommunityControls() {
-    // 更新分类过滤器选项
     const categoryFilter = document.getElementById('communityCategory');
     if (categoryFilter && APP_CONSTANTS.SOURCE_CATEGORIES) {
       const categories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES);
@@ -263,7 +331,6 @@ export class CommunityManager {
           </option>
         `).join('')}
       `;
-      console.log('分类过滤器已更新');
     }
   }
 
@@ -273,8 +340,6 @@ export class CommunityManager {
       console.error('找不到社区搜索源容器');
       return;
     }
-
-    console.log('渲染社区搜索源列表:', sources.length, '个源');
 
     if (!sources || sources.length === 0) {
       container.innerHTML = `
@@ -300,7 +365,6 @@ export class CommunityManager {
       ${paginationHTML}
     `;
 
-    // 绑定源项目事件
     this.bindSourceItemEvents();
   }
 
@@ -308,7 +372,7 @@ export class CommunityManager {
     const category = APP_CONSTANTS.SOURCE_CATEGORIES ? 
       Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).find(cat => cat.id === source.category) : null;
     
-    const ratingStars = this.renderRatingStars(source.stats.rating || 0);
+    const ratingStars = this.renderRatingStars(source.stats?.rating || 0);
     const tags = source.tags ? source.tags.slice(0, 3) : [];
     
     return `
@@ -345,8 +409,8 @@ export class CommunityManager {
         ${tags.length > 0 ? `
           <div class="source-tags">
             ${tags.map(tag => `
-              <span class="tag ${tag.isOfficial ? 'official' : ''}" style="color: ${tag.color || '#666'}">
-                ${escapeHtml(tag.name)}
+              <span class="tag ${tag.isOfficial ? 'official' : ''}">
+                ${escapeHtml(tag.name || tag)}
               </span>
             `).join('')}
           </div>
@@ -355,24 +419,24 @@ export class CommunityManager {
         <div class="source-stats">
           <div class="stat-item">
             <span class="stat-icon">🔥</span>
-            <span class="stat-value">${this.formatNumber(source.stats.downloads || 0)}</span>
+            <span class="stat-value">${this.formatNumber(source.stats?.downloads || 0)}</span>
             <span class="stat-label">下载</span>
           </div>
           <div class="stat-item">
             <span class="stat-icon">👍</span>
-            <span class="stat-value">${this.formatNumber(source.stats.likes || 0)}</span>
+            <span class="stat-value">${this.formatNumber(source.stats?.likes || 0)}</span>
             <span class="stat-label">点赞</span>
           </div>
           <div class="stat-item">
             <span class="stat-icon">👁</span>
-            <span class="stat-value">${this.formatNumber(source.stats.views || 0)}</span>
+            <span class="stat-value">${this.formatNumber(source.stats?.views || 0)}</span>
             <span class="stat-label">浏览</span>
           </div>
           <div class="stat-item">
             <span class="stat-icon">⭐</span>
             <div class="rating-display">
               ${ratingStars}
-              <span class="rating-count">(${source.stats.reviewCount || 0})</span>
+              <span class="rating-count">(${source.stats?.reviewCount || 0})</span>
             </div>
           </div>
         </div>
@@ -445,40 +509,11 @@ export class CommunityManager {
     `;
   }
 
-  renderPopularTags() {
-    const container = document.getElementById('popularTagsList');
-    if (!container || !this.popularTags || this.popularTags.length === 0) {
-      console.log('跳过渲染热门标签 - 容器不存在或没有标签数据');
-      if (container) {
-        container.innerHTML = '<div class="loading-tags">暂无热门标签</div>';
-      }
-      return;
-    }
-
-    const tagsHTML = this.popularTags.slice(0, 20).map(tag => `
-      <span class="tag-item ${tag.isOfficial ? 'official' : ''}" 
-            style="color: ${tag.color || '#666'}" 
-            onclick="window.app.getManager('community').searchByTag('${escapeHtml(tag.name)}')">
-        ${escapeHtml(tag.name)} (${tag.usageCount || 0})
-      </span>
-    `).join('');
-
-    container.innerHTML = `
-      <div class="tags-cloud">
-        ${tagsHTML}
-      </div>
-    `;
-    
-    console.log('热门标签渲染完成:', this.popularTags.length, '个标签');
-  }
-
   bindSourceItemEvents() {
-    // 大部分事件通过onclick处理，这里可以绑定额外的事件
     console.log('绑定搜索源项目事件');
   }
 
   async goToPage(page) {
-    console.log('跳转到页面:', page);
     this.currentPage = page;
     await this.loadCommunitySourcesList();
   }
@@ -494,14 +529,489 @@ export class CommunityManager {
     await this.loadCommunitySourcesList();
   }
 
+  // 修复：显示我的分享
+  async showMyShares() {
+    console.log('显示我的分享');
+    
+    if (!this.app.getCurrentUser()) {
+      showToast('请先登录', 'error');
+      return;
+    }
+    
+    try {
+      showLoading(true);
+      
+      // 保存当前过滤条件
+      const originalFilters = { ...this.currentFilters };
+      
+      // 设置过滤条件为当前用户的分享
+      this.currentFilters = {
+        category: 'all',
+        sort: 'created_at',
+        order: 'desc',
+        search: '',
+        featured: false,
+        author: this.app.getCurrentUser().username // 按作者过滤
+      };
+      
+      this.currentPage = 1;
+      
+      // 加载我的分享
+      await this.loadCommunitySourcesList();
+      
+      showToast('已切换到我的分享', 'success', 2000);
+      
+      // 更新搜索框显示
+      const searchInput = document.getElementById('communitySearch');
+      if (searchInput) {
+        searchInput.value = '';
+      }
+      
+    } catch (error) {
+      console.error('显示我的分享失败:', error);
+      showToast('加载我的分享失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 新增：显示分享源模态框（支持选择现有搜索源）
+  showShareSourceModal() {
+    if (!this.app.getCurrentUser()) {
+      showToast('请先登录', 'error');
+      return;
+    }
+
+    console.log('显示分享搜索源模态框');
+
+    // 获取分类选项
+    const getCategoryOptions = () => {
+      if (APP_CONSTANTS.SOURCE_CATEGORIES) {
+        return Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(cat => 
+          `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
+        ).join('');
+      }
+      return `
+        <option value="jav">🎬 JAV资源</option>
+        <option value="movie">🎭 影视资源</option>
+        <option value="torrent">🧲 种子磁力</option>
+        <option value="other">🔍 其他搜索</option>
+      `;
+    };
+
+    // 获取我的搜索源选项
+    const getMySourcesOptions = () => {
+      const sourcesManager = this.app.getManager('sources');
+      if (!sourcesManager) return '';
+      
+      const allSources = sourcesManager.getAllSearchSources() || [];
+      const enabledSources = sourcesManager.enabledSources || [];
+      
+      const enabledSourcesData = allSources.filter(source => enabledSources.includes(source.id));
+      
+      if (enabledSourcesData.length === 0) {
+        return '<option value="">您还没有启用的搜索源</option>';
+      }
+      
+      return enabledSourcesData.map(source => `
+        <option value="${source.id}" 
+                data-name="${escapeHtml(source.name)}"
+                data-subtitle="${escapeHtml(source.subtitle || '')}"
+                data-icon="${escapeHtml(source.icon || '🔍')}"
+                data-url="${escapeHtml(source.urlTemplate)}"
+                data-category="${source.category || 'other'}">
+          ${source.icon || '🔍'} ${source.name} (${source.category || '其他'})
+        </option>
+      `).join('');
+    };
+
+    const modalHTML = `
+      <div id="shareSourceModal" class="modal" style="display: block;">
+        <div class="modal-content large">
+          <span class="close" onclick="document.getElementById('shareSourceModal').remove()">&times;</span>
+          <h2>分享搜索源到社区</h2>
+          
+          <!-- 分享方式选择 -->
+          <div class="share-method-selector" style="margin-bottom: 1.5rem;">
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="radio" name="shareMethod" value="existing" checked>
+                <span>从我的搜索源中选择</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="radio" name="shareMethod" value="manual">
+                <span>手动填写新搜索源</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="shareFormError" style="display: none; color: red; margin-bottom: 1rem; padding: 0.5rem; background: #fee; border: 1px solid #fcc; border-radius: 4px;"></div>
+          
+          <form id="shareSourceForm">
+            <!-- 选择现有搜索源区域 -->
+            <div id="existingSourceSection">
+              <div class="form-group">
+                <label for="existingSource">选择搜索源 <span style="color: red;">*</span>:</label>
+                <select id="existingSource" name="existingSource">
+                  <option value="">请选择一个搜索源</option>
+                  ${getMySourcesOptions()}
+                </select>
+                <small class="form-help">从您已启用的搜索源中选择一个进行分享</small>
+              </div>
+            </div>
+
+            <!-- 手动填写区域 -->
+            <div id="manualSourceSection" style="display: none;">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="shareName">搜索源名称 <span style="color: red;">*</span>:</label>
+                  <input type="text" id="shareName" name="shareName" required placeholder="例如：JavDB" maxlength="50">
+                  <div class="field-error" id="shareNameError"></div>
+                </div>
+                
+                <div class="form-group">
+                  <label for="shareSubtitle">副标题:</label>
+                  <input type="text" id="shareSubtitle" name="shareSubtitle" placeholder="简短描述" maxlength="100">
+                </div>
+                
+                <div class="form-group">
+                  <label for="shareIcon">图标 (emoji):</label>
+                  <input type="text" id="shareIcon" name="shareIcon" placeholder="🔍" maxlength="4" value="🔍">
+                </div>
+                
+                <div class="form-group">
+                  <label for="shareCategory">分类 <span style="color: red;">*</span>:</label>
+                  <select id="shareCategory" name="shareCategory" required>
+                    <option value="">请选择分类</option>
+                    ${getCategoryOptions()}
+                  </select>
+                  <div class="field-error" id="shareCategoryError"></div>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="shareUrl">URL模板 <span style="color: red;">*</span>:</label>
+                <input type="text" id="shareUrl" name="shareUrl" required 
+                  placeholder="https://example.com/search?q={keyword}" 
+                  pattern=".*\\{keyword\\}.*">
+                <small class="form-help">URL必须包含{keyword}占位符，例如：https://example.com/search?q={keyword}</small>
+                <div class="field-error" id="shareUrlError"></div>
+              </div>
+            </div>
+            
+            <!-- 公共字段 -->
+            <div class="form-group">
+              <label for="shareDescription">详细描述:</label>
+              <textarea id="shareDescription" name="shareDescription" placeholder="介绍这个搜索源的特点和用法..." rows="4" maxlength="500"></textarea>
+            </div>
+            
+            <div class="form-group">
+              <label for="shareTags">标签 (用逗号分隔):</label>
+              <input type="text" id="shareTags" name="shareTags" placeholder="JAV, 影片, 搜索" maxlength="200">
+              <small class="form-help">最多10个标签，每个标签不超过20字符</small>
+            </div>
+            
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">
+                <span>📤</span>
+                <span>分享到社区</span>
+              </button>
+              <button type="button" class="btn-secondary" onclick="document.getElementById('shareSourceModal').remove()">
+                取消
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    
+    // 移除现有模态框
+    const existingModal = document.getElementById('shareSourceModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // 绑定事件
+    this.bindShareModalEvents();
+  }
+
+  // 绑定分享模态框事件
+  bindShareModalEvents() {
+    const form = document.getElementById('shareSourceForm');
+    const existingSourceSelect = document.getElementById('existingSource');
+    const shareMethodRadios = document.querySelectorAll('input[name="shareMethod"]');
+    
+    if (!form) return;
+
+    // 分享方式切换
+    shareMethodRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        const existingSection = document.getElementById('existingSourceSection');
+        const manualSection = document.getElementById('manualSourceSection');
+        
+        if (radio.value === 'existing') {
+          existingSection.style.display = 'block';
+          manualSection.style.display = 'none';
+        } else {
+          existingSection.style.display = 'none';
+          manualSection.style.display = 'block';
+        }
+      });
+    });
+
+    // 现有搜索源选择
+    if (existingSourceSelect) {
+      existingSourceSelect.addEventListener('change', (e) => {
+        const option = e.target.selectedOptions[0];
+        if (option && option.value) {
+          // 填充描述字段
+          const descriptionField = document.getElementById('shareDescription');
+          if (descriptionField && !descriptionField.value) {
+            descriptionField.value = `来自我的搜索源库: ${option.dataset.name}`;
+          }
+        }
+      });
+    }
+
+    // 表单提交事件
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.submitShareSourceForm(e);
+    });
+    
+    // 绑定表单验证
+    this.bindFormValidation();
+  }
+
+  // 绑定表单验证事件
+  bindFormValidation() {
+    // 验证逻辑保持不变
+    const form = document.getElementById('shareSourceForm');
+    if (!form) return;
+
+    const clearError = (fieldId) => {
+      const errorDiv = document.getElementById(fieldId + 'Error');
+      if (errorDiv) {
+        errorDiv.textContent = '';
+        errorDiv.style.display = 'none';
+      }
+      const field = document.getElementById(fieldId);
+      if (field) {
+        field.style.borderColor = '';
+      }
+    };
+
+    const showError = (fieldId, message) => {
+      const errorDiv = document.getElementById(fieldId + 'Error');
+      if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        errorDiv.style.color = 'red';
+      }
+      const field = document.getElementById(fieldId);
+      if (field) {
+        field.style.borderColor = 'red';
+      }
+    };
+
+    // 验证搜索源名称
+    const nameField = document.getElementById('shareName');
+    if (nameField) {
+      nameField.addEventListener('blur', () => {
+        const value = nameField.value.trim();
+        if (!value) {
+          showError('shareName', '搜索源名称不能为空');
+        } else if (value.length < 2) {
+          showError('shareName', '搜索源名称至少需要2个字符');
+        } else {
+          clearError('shareName');
+        }
+      });
+    }
+
+    // 验证URL模板
+    const urlField = document.getElementById('shareUrl');
+    if (urlField) {
+      urlField.addEventListener('blur', () => {
+        const value = urlField.value.trim();
+        if (!value) {
+          showError('shareUrl', 'URL模板不能为空');
+        } else if (!value.includes('{keyword}')) {
+          showError('shareUrl', 'URL模板必须包含{keyword}占位符');
+        } else {
+          try {
+            new URL(value.replace('{keyword}', 'test'));
+            clearError('shareUrl');
+          } catch (error) {
+            showError('shareUrl', 'URL格式不正确');
+          }
+        }
+      });
+    }
+  }
+
+  // 修复版本：提交分享表单
+  async submitShareSourceForm(event) {
+    event.preventDefault();
+    
+    console.log('开始提交分享表单');
+    
+    const form = document.getElementById('shareSourceForm');
+    if (!form) {
+      console.error('表单未找到');
+      return;
+    }
+
+    // 清除之前的错误信息
+    const errorDiv = document.getElementById('shareFormError');
+    if (errorDiv) {
+      errorDiv.style.display = 'none';
+    }
+
+    const showFormError = (message) => {
+      if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+      } else {
+        showToast(message, 'error');
+      }
+    };
+
+    try {
+      const shareMethod = document.querySelector('input[name="shareMethod"]:checked')?.value;
+      let sourceData;
+
+      if (shareMethod === 'existing') {
+        // 从现有搜索源获取数据
+        const existingSourceSelect = document.getElementById('existingSource');
+        if (!existingSourceSelect || !existingSourceSelect.value) {
+          showFormError('请选择一个搜索源');
+          return;
+        }
+
+        const selectedOption = existingSourceSelect.selectedOptions[0];
+        sourceData = {
+          name: selectedOption.dataset.name,
+          subtitle: selectedOption.dataset.subtitle || '',
+          icon: selectedOption.dataset.icon || '🔍',
+          urlTemplate: selectedOption.dataset.url,
+          category: selectedOption.dataset.category || 'other',
+          description: document.getElementById('shareDescription')?.value.trim() || '',
+          tags: this.parseTags(document.getElementById('shareTags')?.value || '')
+        };
+      } else {
+        // 手动填写的数据
+        const name = document.getElementById('shareName')?.value.trim();
+        const subtitle = document.getElementById('shareSubtitle')?.value.trim();
+        const icon = document.getElementById('shareIcon')?.value.trim() || '🔍';
+        const category = document.getElementById('shareCategory')?.value.trim();
+        const urlTemplate = document.getElementById('shareUrl')?.value.trim();
+        const description = document.getElementById('shareDescription')?.value.trim() || '';
+        const tagsString = document.getElementById('shareTags')?.value || '';
+
+        // 验证必填字段
+        const errors = [];
+        if (!name || name.length < 2) {
+          errors.push('搜索源名称必须至少2个字符');
+        }
+        if (!urlTemplate) {
+          errors.push('URL模板不能为空');
+        } else if (!urlTemplate.includes('{keyword}')) {
+          errors.push('URL模板必须包含{keyword}占位符');
+        }
+        if (!category) {
+          errors.push('请选择一个分类');
+        }
+
+        if (errors.length > 0) {
+          showFormError('请修复以下问题：\n' + errors.join('\n'));
+          return;
+        }
+
+        sourceData = {
+          name,
+          subtitle: subtitle || '',
+          icon,
+          urlTemplate,
+          category,
+          description,
+          tags: this.parseTags(tagsString)
+        };
+      }
+      
+      console.log('准备提交的数据:', sourceData);
+
+      showLoading(true);
+      
+      const result = await apiService.shareSourceToCommunity(sourceData);
+      
+      if (result.success) {
+        showToast(result.message || '分享成功！', 'success');
+        document.getElementById('shareSourceModal').remove();
+        
+        // 刷新社区列表和统计
+        await this.loadCommunitySourcesList();
+        await this.loadUserCommunityStats();
+        
+      } else {
+        showFormError(result.message || '分享失败，请重试');
+      }
+
+    } catch (error) {
+      console.error('分享搜索源失败:', error);
+      showFormError('分享失败：' + error.message);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 解析标签字符串
+  parseTags(tagsString) {
+    if (!tagsString) return [];
+    return tagsString.split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag && tag.length > 0)
+      .slice(0, 10);
+  }
+
+  // 修复：正确更新社区统计显示
+  updateCommunityStats() {
+    console.log('更新社区统计显示');
+
+    const elements = {
+      userSharedCount: document.getElementById('userSharedCount'),
+      userDownloadsCount: document.getElementById('userDownloadsCount'),
+      userLikesCount: document.getElementById('userLikesCount'),
+      userReputationScore: document.getElementById('userReputationScore')
+    };
+
+    // 使用真实统计数据或默认值
+    const stats = this.userStats?.general || {};
+    
+    if (elements.userSharedCount) {
+      elements.userSharedCount.textContent = stats.sharedSources || 0;
+    }
+    if (elements.userDownloadsCount) {
+      elements.userDownloadsCount.textContent = stats.sourcesDownloaded || 0;
+    }
+    if (elements.userLikesCount) {
+      elements.userLikesCount.textContent = stats.totalLikes || 0;
+    }
+    if (elements.userReputationScore) {
+      elements.userReputationScore.textContent = stats.reputationScore || 0;
+    }
+
+    console.log('统计数据已更新:', stats);
+  }
+
   // 下载搜索源
   async downloadSource(sourceId) {
     if (!this.app.getCurrentUser()) {
       showToast('请先登录', 'error');
       return;
     }
-
-    console.log('下载搜索源:', sourceId);
 
     try {
       showLoading(true);
@@ -516,8 +1026,11 @@ export class CommunityManager {
           detail: { action: 'added', source: result.source }
         }));
         
-        // 更新下载计数（可选：重新加载当前页面）
-        setTimeout(() => this.loadCommunitySourcesList(), 1000);
+        // 更新下载计数
+        setTimeout(() => {
+          this.loadCommunitySourcesList();
+          this.loadUserCommunityStats();
+        }, 1000);
       } else {
         showToast(result.message || '下载失败', 'error');
       }
@@ -537,8 +1050,6 @@ export class CommunityManager {
       return;
     }
 
-    console.log('切换点赞状态:', sourceId);
-
     try {
       const result = await apiService.toggleSourceLike(sourceId, 'like');
       
@@ -557,8 +1068,11 @@ export class CommunityManager {
           }
         }
         
-        // 可选：更新点赞计数
-        setTimeout(() => this.loadCommunitySourcesList(), 1000);
+        // 更新点赞计数和用户统计
+        setTimeout(() => {
+          this.loadCommunitySourcesList();
+          this.loadUserCommunityStats();
+        }, 1000);
       } else {
         showToast(result.message || '操作失败', 'error');
       }
@@ -571,8 +1085,6 @@ export class CommunityManager {
 
   // 查看搜索源详情
   async viewSourceDetails(sourceId) {
-    console.log('查看搜索源详情:', sourceId);
-    
     try {
       showLoading(true);
       
@@ -624,20 +1136,20 @@ export class CommunityManager {
                 <h4>统计数据</h4>
                 <div class="stats-grid">
                   <div class="stat-item">
-                    <span class="stat-value">${this.formatNumber(source.stats.downloads || 0)}</span>
+                    <span class="stat-value">${this.formatNumber(source.stats?.downloads || 0)}</span>
                     <span class="stat-label">下载次数</span>
                   </div>
                   <div class="stat-item">
-                    <span class="stat-value">${this.formatNumber(source.stats.likes || 0)}</span>
+                    <span class="stat-value">${this.formatNumber(source.stats?.likes || 0)}</span>
                     <span class="stat-label">点赞数</span>
                   </div>
                   <div class="stat-item">
-                    <span class="stat-value">${this.formatNumber(source.stats.views || 0)}</span>
+                    <span class="stat-value">${this.formatNumber(source.stats?.views || 0)}</span>
                     <span class="stat-label">浏览量</span>
                   </div>
                   <div class="stat-item">
-                    <span class="stat-value">${(source.stats.rating || 0).toFixed(1)}/5.0</span>
-                    <span class="stat-label">评分 (${source.stats.reviewCount || 0}条评价)</span>
+                    <span class="stat-value">${(source.stats?.rating || 0).toFixed(1)}/5.0</span>
+                    <span class="stat-label">评分 (${source.stats?.reviewCount || 0}条评价)</span>
                   </div>
                 </div>
               </div>
@@ -833,330 +1345,6 @@ export class CommunityManager {
     }
   }
 
-  // 显示分享搜索源模态框 - 修复版本
-  showShareSourceModal() {
-    if (!this.app.getCurrentUser()) {
-      showToast('请先登录', 'error');
-      return;
-    }
-
-    console.log('显示分享搜索源模态框');
-
-    // 获取分类选项
-    const getCategoryOptions = () => {
-      if (APP_CONSTANTS.SOURCE_CATEGORIES) {
-        return Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(cat => 
-          `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
-        ).join('');
-      }
-      // 如果没有分类常量，提供默认分类
-      return `
-        <option value="jav">🎬 JAV资源</option>
-        <option value="movie">🎭 影视资源</option>
-        <option value="torrent">🧲 种子磁力</option>
-        <option value="other">🔍 其他搜索</option>
-      `;
-    };
-
-    const modalHTML = `
-      <div id="shareSourceModal" class="modal" style="display: block;">
-        <div class="modal-content large">
-          <span class="close" onclick="document.getElementById('shareSourceModal').remove()">&times;</span>
-          <h2>分享搜索源到社区</h2>
-          <div id="shareFormError" style="display: none; color: red; margin-bottom: 1rem; padding: 0.5rem; background: #fee; border: 1px solid #fcc; border-radius: 4px;"></div>
-          <form id="shareSourceForm">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="shareName">搜索源名称 <span style="color: red;">*</span>:</label>
-                <input type="text" id="shareName" name="shareName" required placeholder="例如：JavDB" maxlength="50">
-                <div class="field-error" id="shareNameError"></div>
-              </div>
-              
-              <div class="form-group">
-                <label for="shareSubtitle">副标题:</label>
-                <input type="text" id="shareSubtitle" name="shareSubtitle" placeholder="简短描述" maxlength="100">
-              </div>
-              
-              <div class="form-group">
-                <label for="shareIcon">图标 (emoji):</label>
-                <input type="text" id="shareIcon" name="shareIcon" placeholder="🔍" maxlength="4" value="🔍">
-              </div>
-              
-              <div class="form-group">
-                <label for="shareCategory">分类 <span style="color: red;">*</span>:</label>
-                <select id="shareCategory" name="shareCategory" required>
-                  <option value="">请选择分类</option>
-                  ${getCategoryOptions()}
-                </select>
-                <div class="field-error" id="shareCategoryError"></div>
-              </div>
-            </div>
-            
-            <div class="form-group">
-              <label for="shareUrl">URL模板 <span style="color: red;">*</span>:</label>
-              <input type="text" id="shareUrl" name="shareUrl" required 
-                placeholder="https://example.com/search?q={keyword}" 
-                pattern=".*\\{keyword\\}.*">
-              <small class="form-help">URL必须包含{keyword}占位符，例如：https://example.com/search?q={keyword}</small>
-              <div class="field-error" id="shareUrlError"></div>
-            </div>
-            
-            <div class="form-group">
-              <label for="shareDescription">详细描述:</label>
-              <textarea id="shareDescription" name="shareDescription" placeholder="介绍这个搜索源的特点和用法..." rows="4" maxlength="500"></textarea>
-            </div>
-            
-            <div class="form-group">
-              <label for="shareTags">标签 (用逗号分隔):</label>
-              <input type="text" id="shareTags" name="shareTags" placeholder="JAV, 影片, 搜索" maxlength="200">
-              <small class="form-help">最多10个标签，每个标签不超过20字符</small>
-            </div>
-            
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">
-                <span>📤</span>
-                <span>分享到社区</span>
-              </button>
-              <button type="button" class="btn-secondary" onclick="document.getElementById('shareSourceModal').remove()">
-                取消
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    `;
-    
-    // 移除现有模态框
-    const existingModal = document.getElementById('shareSourceModal');
-    if (existingModal) {
-      existingModal.remove();
-    }
-    
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
-    // 绑定表单提交事件 - 重要修复
-    const form = document.getElementById('shareSourceForm');
-    if (form) {
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        this.submitShareSourceForm(e);
-      });
-      
-      // 实时验证
-      this.bindFormValidation();
-    } else {
-      console.error('表单元素未找到');
-    }
-  }
-
-  // 新增：绑定表单验证事件
-  bindFormValidation() {
-    const form = document.getElementById('shareSourceForm');
-    if (!form) return;
-
-    // 清除之前的错误显示
-    const clearError = (fieldId) => {
-      const errorDiv = document.getElementById(fieldId + 'Error');
-      if (errorDiv) {
-        errorDiv.textContent = '';
-        errorDiv.style.display = 'none';
-      }
-      const field = document.getElementById(fieldId);
-      if (field) {
-        field.style.borderColor = '';
-      }
-    };
-
-    // 显示错误信息
-    const showError = (fieldId, message) => {
-      const errorDiv = document.getElementById(fieldId + 'Error');
-      if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-        errorDiv.style.color = 'red';
-        errorDiv.style.fontSize = '0.8rem';
-        errorDiv.style.marginTop = '0.25rem';
-      }
-      const field = document.getElementById(fieldId);
-      if (field) {
-        field.style.borderColor = 'red';
-      }
-    };
-
-    // 验证搜索源名称
-    const nameField = document.getElementById('shareName');
-    if (nameField) {
-      nameField.addEventListener('blur', () => {
-        const value = nameField.value.trim();
-        if (!value) {
-          showError('shareName', '搜索源名称不能为空');
-        } else if (value.length < 2) {
-          showError('shareName', '搜索源名称至少需要2个字符');
-        } else {
-          clearError('shareName');
-        }
-      });
-    }
-
-    // 验证URL模板
-    const urlField = document.getElementById('shareUrl');
-    if (urlField) {
-      urlField.addEventListener('blur', () => {
-        const value = urlField.value.trim();
-        if (!value) {
-          showError('shareUrl', 'URL模板不能为空');
-        } else if (!value.includes('{keyword}')) {
-          showError('shareUrl', 'URL模板必须包含{keyword}占位符');
-        } else {
-          // 简单的URL格式验证
-          try {
-            new URL(value.replace('{keyword}', 'test'));
-            clearError('shareUrl');
-          } catch (error) {
-            showError('shareUrl', 'URL格式不正确');
-          }
-        }
-      });
-    }
-
-    // 验证分类
-    const categoryField = document.getElementById('shareCategory');
-    if (categoryField) {
-      categoryField.addEventListener('change', () => {
-        const value = categoryField.value;
-        if (!value) {
-          showError('shareCategory', '请选择一个分类');
-        } else {
-          clearError('shareCategory');
-        }
-      });
-    }
-  }
-
-  // 修复版本：提交分享表单
-  async submitShareSourceForm(event) {
-    event.preventDefault();
-    
-    console.log('开始提交分享表单');
-    
-    // 获取表单数据 - 使用更可靠的方法
-    const form = document.getElementById('shareSourceForm');
-    if (!form) {
-      console.error('表单未找到');
-      return;
-    }
-
-    const formData = new FormData(form);
-    const data = {};
-    
-    // 从FormData中提取数据
-    for (let [key, value] of formData.entries()) {
-      data[key] = value;
-    }
-    
-    // 手动获取表单字段（双重保险）
-    const name = (document.getElementById('shareName')?.value || '').trim();
-    const subtitle = (document.getElementById('shareSubtitle')?.value || '').trim();
-    const icon = (document.getElementById('shareIcon')?.value || '🔍').trim();
-    const category = (document.getElementById('shareCategory')?.value || '').trim();
-    const urlTemplate = (document.getElementById('shareUrl')?.value || '').trim();
-    const description = (document.getElementById('shareDescription')?.value || '').trim();
-    const tagsString = (document.getElementById('shareTags')?.value || '').trim();
-    
-    console.log('提取的表单数据:', {
-      name, subtitle, icon, category, urlTemplate, description, tagsString
-    });
-
-    // 清除之前的错误信息
-    const errorDiv = document.getElementById('shareFormError');
-    if (errorDiv) {
-      errorDiv.style.display = 'none';
-    }
-
-    const showFormError = (message) => {
-      if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-      } else {
-        showToast(message, 'error');
-      }
-    };
-
-    // 详细的验证逻辑
-    const errors = [];
-
-    if (!name || name.length < 2) {
-      errors.push('搜索源名称必须至少2个字符');
-    }
-
-    if (!urlTemplate) {
-      errors.push('URL模板不能为空');
-    } else if (!urlTemplate.includes('{keyword}')) {
-      errors.push('URL模板必须包含{keyword}占位符');
-    } else {
-      // 验证URL格式
-      try {
-        new URL(urlTemplate.replace('{keyword}', 'test'));
-      } catch (e) {
-        errors.push('URL模板格式不正确');
-      }
-    }
-
-    if (!category) {
-      errors.push('请选择一个分类');
-    }
-
-    if (errors.length > 0) {
-      console.log('验证失败，错误列表:', errors);
-      showFormError('请修复以下问题：\n' + errors.join('\n'));
-      return;
-    }
-    
-    // 处理标签
-    const tags = tagsString ? 
-      tagsString.split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag && tag.length > 0)
-        .slice(0, 10) : [];
-    
-    const sourceData = {
-      name,
-      subtitle: subtitle || '',
-      icon: icon || '🔍',
-      urlTemplate,
-      category,
-      description: description || '',
-      tags
-    };
-    
-    console.log('准备提交的数据:', sourceData);
-
-    try {
-      showLoading(true);
-      
-      const result = await apiService.shareSourceToCommunity(sourceData);
-      
-      if (result.success) {
-        showToast(result.message || '分享成功！', 'success');
-        document.getElementById('shareSourceModal').remove();
-        
-        // 刷新社区列表
-        await this.loadCommunitySourcesList();
-        
-        // 刷新用户统计
-        await this.loadUserCommunityStats();
-      } else {
-        showFormError(result.message || '分享失败，请重试');
-      }
-
-    } catch (error) {
-      console.error('分享搜索源失败:', error);
-      showFormError('分享失败：' + error.message);
-    } finally {
-      showLoading(false);
-    }
-  }
-
   // 辅助方法
   formatNumber(num) {
     if (num >= 1000000) {
@@ -1178,54 +1366,6 @@ export class CommunityManager {
     } catch (error) {
       return '未知时间';
     }
-  }
-
-  updateCommunityStats() {
-    if (!this.userStats) {
-      console.log('没有用户统计数据，跳过更新');
-      return;
-    }
-
-    console.log('更新社区统计显示');
-
-    const elements = {
-      userSharedCount: document.getElementById('userSharedCount'),
-      userDownloadsCount: document.getElementById('userDownloadsCount'),
-      userLikesCount: document.getElementById('userLikesCount'),
-      userReputationScore: document.getElementById('userReputationScore')
-    };
-
-    const stats = this.userStats.general || {};
-    
-    if (elements.userSharedCount) elements.userSharedCount.textContent = stats.sharedSources || 0;
-    if (elements.userDownloadsCount) elements.userDownloadsCount.textContent = stats.sourcesDownloaded || 0;
-    if (elements.userLikesCount) elements.userLikesCount.textContent = stats.totalLikes || 0;
-    if (elements.userReputationScore) elements.userReputationScore.textContent = stats.reputationScore || 0;
-  }
-
-  // 显示我的分享
-  async showMyShares() {
-    console.log('显示我的分享');
-    
-    if (!this.app.getCurrentUser()) {
-      showToast('请先登录', 'error');
-      return;
-    }
-    
-    // 使用搜索功能来显示当前用户的分享
-    this.currentFilters = {
-      ...this.currentFilters,
-      search: '', // 清除搜索条件
-      userId: this.app.getCurrentUser()?.id // 添加用户ID过滤
-    };
-    
-    showToast('正在加载您的分享...', 'info', 2000);
-    await this.loadCommunitySourcesList();
-  }
-
-  // 公共方法供其他管理器调用
-  getTotalCommunityStats() {
-    return this.communityStats;
   }
 
   // 刷新社区数据
@@ -1257,6 +1397,11 @@ export class CommunityManager {
       showToast('搜索失败: ' + error.message, 'error');
       return [];
     }
+  }
+
+  // 公共方法供其他管理器调用
+  getTotalCommunityStats() {
+    return this.communityStats;
   }
 }
 

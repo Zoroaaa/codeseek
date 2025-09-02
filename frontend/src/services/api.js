@@ -323,7 +323,7 @@ class APIService {
 
   // 社区搜索源API集合 - 完整版
   
-  // 获取社区搜索源列表（支持高级筛选）
+  // 修复：获取社区搜索源列表（支持高级筛选）
   async getCommunitySearchSources(options = {}) {
     try {
       const params = new URLSearchParams();
@@ -363,6 +363,9 @@ class APIService {
       }
       
       const endpoint = `/api/community/sources${params.toString() ? `?${params.toString()}` : ''}`;
+      
+      console.log('请求社区搜索源:', endpoint);
+      
       const response = await this.request(endpoint);
       
       return {
@@ -444,6 +447,8 @@ class APIService {
     };
     
     try {
+      console.log('分享搜索源到社区:', payload);
+      
       const response = await this.request('/api/community/sources', {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -608,7 +613,7 @@ class APIService {
     }
   }
 
-  // 获取用户社区统计（完整版）
+  // 修复：获取用户社区统计（完整版）
   async getUserCommunityStats() {
     if (!this.token) {
       return {
@@ -619,10 +624,35 @@ class APIService {
     }
     
     try {
+      console.log('请求用户社区统计数据');
+      
       const response = await this.request('/api/community/user/stats');
+      
+      console.log('用户社区统计响应:', response);
+      
+      // 确保返回完整的统计结构
+      const stats = {
+        general: {
+          sharedSources: response.stats?.general?.sharedSources || response.stats?.sharedSources || 0,
+          sourcesDownloaded: response.stats?.general?.sourcesDownloaded || response.stats?.sourcesDownloaded || 0,
+          totalLikes: response.stats?.general?.totalLikes || response.stats?.totalLikes || 0,
+          totalDownloads: response.stats?.general?.totalDownloads || response.stats?.totalDownloads || 0,
+          reviewsGiven: response.stats?.general?.reviewsGiven || response.stats?.reviewsGiven || 0,
+          reputationScore: response.stats?.general?.reputationScore || response.stats?.reputationScore || 0,
+          contributionLevel: response.stats?.general?.contributionLevel || response.stats?.contributionLevel || 'beginner'
+        },
+        recentShares: response.stats?.recentShares || []
+      };
+      
       return {
         success: true,
-        stats: response.stats || {
+        stats: stats
+      };
+    } catch (error) {
+      console.error('获取用户社区统计失败:', error);
+      return {
+        success: false,
+        stats: {
           general: {
             sharedSources: 0,
             sourcesDownloaded: 0,
@@ -633,32 +663,50 @@ class APIService {
             contributionLevel: 'beginner'
           },
           recentShares: []
-        }
-      };
-    } catch (error) {
-      console.error('获取用户社区统计失败:', error);
-      return {
-        success: false,
-        stats: null,
+        },
         error: error.message
       };
     }
   }
 
-  // 获取热门标签（支持分类筛选）
+  // 修复：获取热门标签（支持分类筛选）
   async getPopularTags(category = null) {
     try {
       const params = new URLSearchParams();
-      if (category) {
+      if (category && category !== 'all') {
         params.append('category', category);
       }
       
       const endpoint = `/api/community/tags${params.toString() ? `?${params.toString()}` : ''}`;
+      
+      console.log('请求热门标签:', endpoint);
+      
       const response = await this.request(endpoint);
+      
+      console.log('热门标签响应:', response);
+      
+      // 确保返回标准格式的标签数据
+      const tags = (response.tags || []).map(tag => {
+        if (typeof tag === 'string') {
+          return {
+            name: tag,
+            usageCount: 1,
+            count: 1,
+            isOfficial: false
+          };
+        }
+        return {
+          name: tag.name || tag.tag || 'Unknown',
+          usageCount: tag.usageCount || tag.count || tag.usage_count || 0,
+          count: tag.count || tag.usageCount || tag.usage_count || 0,
+          isOfficial: tag.isOfficial || tag.is_official || false,
+          color: tag.color || null
+        };
+      });
       
       return {
         success: true,
-        tags: response.tags || []
+        tags: tags
       };
     } catch (error) {
       console.error('获取热门标签失败:', error);

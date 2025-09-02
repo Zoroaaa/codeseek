@@ -1,4 +1,4 @@
-/* 完善的搜索源社区样式 - css/pages/dashboard/community.css */
+/* 完善的搜索源社区样式 - 修复版本 */
 
 /* 社区统计面板 */
 .community-stats {
@@ -182,7 +182,7 @@
   min-width: 150px;
 }
 
-/* 热门标签区域 */
+/* 修复：热门标签区域样式 */
 .popular-tags-section {
   margin-bottom: 2rem;
   background: var(--bg-primary);
@@ -213,46 +213,89 @@
   font-style: italic;
 }
 
+/* 修复：热门标签样式 - 更美观的设计 */
 .tags-cloud {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .tag-item {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.375rem 0.75rem;
-  background: var(--bg-secondary);
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-full);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: var(--text-primary);
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s ease-in-out;
   text-decoration: none;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .tag-item:hover {
-  background: var(--accent-light);
+  background: var(--gradient-primary);
   border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .tag-item.official {
   background: var(--gradient-primary);
   color: white;
   border-color: var(--accent-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
 }
 
 .tag-item.official:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+}
+
+.tag-item .tag-count {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-left: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+/* 空标签状态 */
+.empty-tags {
+  text-align: center;
+  padding: 2rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 2px dashed var(--border-color);
+}
+
+.empty-tags span {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.empty-tags p {
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.empty-tags small {
+  color: var(--text-muted);
+  font-size: 0.8rem;
 }
 
 /* 社区搜索源容器 */
@@ -799,6 +842,50 @@
   margin-bottom: 1rem;
 }
 
+/* 新增：分享方式选择器样式 */
+.share-method-selector {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.share-method-selector label {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  transition: all 0.2s ease-in-out;
+  font-weight: 500;
+}
+
+.share-method-selector label:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-primary);
+}
+
+.share-method-selector input[type="radio"]:checked + span {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+/* 现有搜索源选择区域 */
+#existingSourceSection {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  margin-bottom: 1rem;
+}
+
+#manualSourceSection {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  margin-bottom: 1rem;
+}
+
 .form-group {
   margin-bottom: 1rem;
 }
@@ -837,6 +924,40 @@
   margin-top: 0.25rem;
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+/* 表单验证样式 */
+.field-error {
+  color: #ef4444;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  display: none;
+  line-height: 1.4;
+}
+
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.form-group label span {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+#shareFormError {
+  white-space: pre-line;
+  line-height: 1.4;
+  padding: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  color: #dc2626;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
 }
 
 .rating-input {
@@ -950,6 +1071,11 @@
   .form-grid {
     grid-template-columns: 1fr;
   }
+  
+  .share-method-selector div {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -966,12 +1092,12 @@
   }
   
   .tags-cloud {
-    gap: 0.25rem;
+    gap: 0.5rem;
   }
   
   .tag-item {
     font-size: 0.8rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.375rem 0.75rem;
   }
 }
 
@@ -1011,6 +1137,11 @@
   }
 }
 
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .skeleton-item {
   height: 300px;
   border-radius: var(--radius-lg);
@@ -1038,119 +1169,6 @@
 .reviews-list::-webkit-scrollbar-thumb:hover,
 .modal-content::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
-}
-
-/*  CSS样式补充 - 添加到你的CSS文件中 */
-const additionalCSS = `
-.field-error {
-  color: #ef4444;
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
-  display: none;
-}
-
-.form-group input.error,
-.form-group select.error,
-.form-group textarea.error {
-  border-color: #ef4444;
-  background-color: #fef2f2;
-}
-
-.form-group label span {
-  color: #ef4444;
-}
-
-#shareFormError {
-  white-space: pre-line;
-  line-height: 1.4;
-}
-
-.form-help {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
-  display: block;
-}
-
-/* 添加到 css/pages/dashboard/community.css 文件末尾 */
-
-/* 表单验证样式 */
-.field-error {
-  color: #ef4444;
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
-  display: none;
-  line-height: 1.4;
-}
-
-.form-group input.error,
-.form-group select.error,
-.form-group textarea.error {
-  border-color: #ef4444 !important;
-  background-color: #fef2f2;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
-}
-
-.form-group label span {
-  color: #ef4444;
-  font-weight: bold;
-}
-
-#shareFormError {
-  white-space: pre-line;
-  line-height: 1.4;
-  padding: 1rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: var(--radius-md);
-  color: #dc2626;
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
-}
-
-.form-help {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
-  display: block;
-  line-height: 1.3;
-}
-
-/* 改善表单交互 */
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px var(--accent-light);
-}
-
-.form-group input:valid {
-  border-color: var(--success-color);
-}
-
-.form-group select:valid {
-  border-color: var(--success-color);
-}
-
-/* 模态框改进 */
-.modal-content.large {
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-/* 响应式改进 */
-@media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .modal-content.large {
-    width: 98%;
-    margin: 1% auto;
-    max-height: 98vh;
-    padding: 1rem;
-  }
 }
 
 /* 无障碍支持 */
