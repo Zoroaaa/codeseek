@@ -445,6 +445,10 @@ CREATE INDEX IF NOT EXISTS idx_downloads_created ON community_source_downloads(c
 CREATE INDEX IF NOT EXISTS idx_reports_shared_source ON community_source_reports(shared_source_id);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON community_source_reports(status);
 
+-- 6. 创建索引以提高查询性能
+CREATE INDEX IF NOT EXISTS idx_community_user_stats_total_views ON community_user_stats(total_views);
+CREATE INDEX IF NOT EXISTS idx_shared_sources_user_status ON community_shared_sources(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_shared_sources_view_count ON community_shared_sources(view_count DESC);
 -- 触发器：更新共享搜索源的统计信息
 CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_review
     AFTER INSERT ON community_source_reviews
@@ -505,14 +509,14 @@ CREATE TRIGGER IF NOT EXISTS update_user_stats_after_share
         );
     END;
 	
--- SQLite 兼容版本：更新用户总下载数
+-- 🆕 更新用户总下载数（优化版本）
 CREATE TRIGGER IF NOT EXISTS update_user_total_downloads_after_download
     AFTER INSERT ON community_source_downloads
     FOR EACH ROW
     BEGIN
         INSERT OR REPLACE INTO community_user_stats (
             id, user_id, 
-            shared_sources_count, total_downloads, total_likes,
+            shared_sources_count, total_downloads, total_likes, total_views,
             reviews_given, sources_downloaded, reputation_score, contribution_level,
             created_at, updated_at
         ) 
@@ -522,6 +526,7 @@ CREATE TRIGGER IF NOT EXISTS update_user_total_downloads_after_download
             COALESCE(cus.shared_sources_count, 0),
             COALESCE(cus.total_downloads, 0) + 1, -- 增加下载数
             COALESCE(cus.total_likes, 0),
+            COALESCE(cus.total_views, 0),
             COALESCE(cus.reviews_given, 0),
             COALESCE(cus.sources_downloaded, 0),
             COALESCE(cus.reputation_score, 0),
@@ -533,7 +538,7 @@ CREATE TRIGGER IF NOT EXISTS update_user_total_downloads_after_download
         WHERE css.id = NEW.shared_source_id;
     END;
 
--- SQLite 兼容版本：更新用户总点赞数（新增点赞）
+-- 🆕 更新用户总点赞数（新增点赞）
 CREATE TRIGGER IF NOT EXISTS update_user_total_likes_after_like
     AFTER INSERT ON community_source_likes
     FOR EACH ROW
@@ -541,7 +546,7 @@ CREATE TRIGGER IF NOT EXISTS update_user_total_likes_after_like
     BEGIN
         INSERT OR REPLACE INTO community_user_stats (
             id, user_id, 
-            shared_sources_count, total_downloads, total_likes,
+            shared_sources_count, total_downloads, total_likes, total_views,
             reviews_given, sources_downloaded, reputation_score, contribution_level,
             created_at, updated_at
         ) 
@@ -551,6 +556,7 @@ CREATE TRIGGER IF NOT EXISTS update_user_total_likes_after_like
             COALESCE(cus.shared_sources_count, 0),
             COALESCE(cus.total_downloads, 0),
             COALESCE(cus.total_likes, 0) + 1, -- 增加点赞数
+            COALESCE(cus.total_views, 0),
             COALESCE(cus.reviews_given, 0),
             COALESCE(cus.sources_downloaded, 0),
             COALESCE(cus.reputation_score, 0),
@@ -562,7 +568,7 @@ CREATE TRIGGER IF NOT EXISTS update_user_total_likes_after_like
         WHERE css.id = NEW.shared_source_id;
     END;
 
--- SQLite 兼容版本：取消点赞时减少统计
+-- 🆕 取消点赞时减少统计
 CREATE TRIGGER IF NOT EXISTS update_user_total_likes_after_unlike
     AFTER DELETE ON community_source_likes
     FOR EACH ROW
@@ -574,6 +580,32 @@ CREATE TRIGGER IF NOT EXISTS update_user_total_likes_after_unlike
         WHERE user_id = (
             SELECT user_id FROM community_shared_sources 
             WHERE id = OLD.shared_source_id
+        );
+    END;
+
+-- 🆕 新增：当搜索源浏览量增加时，同步更新用户总浏览量统计
+CREATE TRIGGER IF NOT EXISTS update_user_total_views_after_view
+    AFTER UPDATE OF view_count ON community_shared_sources
+    FOR EACH ROW
+    WHEN NEW.view_count > OLD.view_count
+    BEGIN
+        UPDATE community_user_stats 
+        SET total_views = total_views + (NEW.view_count - OLD.view_count),
+            updated_at = strftime('%s', 'now') * 1000
+        WHERE user_id = NEW.user_id;
+        
+        -- 如果用户统计记录不存在，则创建
+        INSERT OR IGNORE INTO community_user_stats (
+            id, user_id, shared_sources_count, total_downloads, total_likes, total_views,
+            reviews_given, sources_downloaded, reputation_score, contribution_level,
+            created_at, updated_at
+        ) VALUES (
+            NEW.user_id || '_stats',
+            NEW.user_id,
+            0, 0, 0, (NEW.view_count - OLD.view_count),
+            0, 0, 0, 'beginner',
+            strftime('%s', 'now') * 1000,
+            strftime('%s', 'now') * 1000
         );
     END;
 

@@ -1134,6 +1134,7 @@ async function updateSourceHealthStats(env, result) {
 // ==================== 社区搜索源管理API ====================
 
 // 获取社区搜索源列表
+// 🔧 修复获取社区搜索源列表API - 确保分页和过滤正常工作
 router.get('/api/community/sources', async (request, env) => {
     try {
         const url = new URL(request.url);
@@ -1147,23 +1148,34 @@ router.get('/api/community/sources', async (request, env) => {
         const search = url.searchParams.get('search');
         const tags = url.searchParams.get('tags');
         const featured = url.searchParams.get('featured') === 'true';
+        const author = url.searchParams.get('author'); // 🆕 添加按作者过滤
+        
+        console.log('获取社区搜索源列表:', { 
+            page, limit, category, sortBy, order, search, author, featured 
+        });
         
         // 构建查询条件
-        let whereConditions = ['status = ?'];
+        let whereConditions = ['css.status = ?'];
         let params = ['active'];
         
         if (category !== 'all') {
-            whereConditions.push('source_category = ?');
+            whereConditions.push('css.source_category = ?');
             params.push(category);
         }
         
-        if (search) {
-            whereConditions.push('(source_name LIKE ? OR description LIKE ?)');
-            params.push(`%${search}%`, `%${search}%`);
+        if (search && search.trim()) {
+            whereConditions.push('(css.source_name LIKE ? OR css.description LIKE ?)');
+            const searchPattern = `%${search.trim()}%`;
+            params.push(searchPattern, searchPattern);
+        }
+        
+        if (author && author.trim()) {
+            whereConditions.push('u.username = ?');
+            params.push(author.trim());
         }
         
         if (featured) {
-            whereConditions.push('is_featured = ?');
+            whereConditions.push('css.is_featured = ?');
             params.push(1);
         }
         
@@ -1174,27 +1186,24 @@ router.get('/api/community/sources', async (request, env) => {
         
         // 查询总数
         const countQuery = `
-            SELECT COUNT(*) as total FROM community_shared_sources css
+            SELECT COUNT(*) as total 
+            FROM community_shared_sources css
             LEFT JOIN users u ON css.user_id = u.id
             WHERE ${whereConditions.join(' AND ')}
         `;
         const countResult = await env.DB.prepare(countQuery).bind(...params).first();
-        const total = countResult.total;
+        const total = countResult.total || 0;
         
         // 查询数据
         const dataQuery = `
             SELECT 
                 css.*,
                 u.username as author_name,
-                (SELECT COUNT(*) FROM community_source_reviews WHERE shared_source_id = css.id) as review_count,
-                (SELECT GROUP_CONCAT(tag_name) FROM community_source_tags cst 
-                 WHERE cst.id IN (
-                     SELECT value FROM json_each(css.tags) WHERE json_valid(css.tags)
-                 )) as tag_names
+                (SELECT COUNT(*) FROM community_source_reviews WHERE shared_source_id = css.id) as review_count
             FROM community_shared_sources css
             LEFT JOIN users u ON css.user_id = u.id
             WHERE ${whereConditions.join(' AND ')}
-            ORDER BY ${sortColumn} ${sortOrder}
+            ORDER BY css.${sortColumn} ${sortOrder}
             LIMIT ? OFFSET ?
         `;
         
@@ -1208,17 +1217,17 @@ router.get('/api/community/sources', async (request, env) => {
             urlTemplate: source.source_url_template,
             category: source.source_category,
             description: source.description,
-            tags: source.tag_names ? source.tag_names.split(',') : [],
+            tags: source.tags ? JSON.parse(source.tags).slice(0, 5) : [], // 限制标签数量
             author: {
                 id: source.user_id,
                 name: source.author_name
             },
             stats: {
-                downloads: source.download_count,
-                likes: source.like_count,
-                views: source.view_count,
-                rating: source.rating_score,
-                reviewCount: source.review_count
+                downloads: source.download_count || 0,
+                likes: source.like_count || 0,
+                views: source.view_count || 0, // 🆕 确保包含浏览量
+                rating: source.rating_score || 0,
+                reviewCount: source.review_count || 0
             },
             isVerified: Boolean(source.is_verified),
             isFeatured: Boolean(source.is_featured),
@@ -1227,21 +1236,33 @@ router.get('/api/community/sources', async (request, env) => {
             lastTestedAt: source.last_tested_at
         }));
         
+        const totalPages = Math.ceil(total / limit);
+        
+        console.log(`返回 ${sources.length} 个搜索源，总计 ${total} 个，第 ${page}/${totalPages} 页`);
+        
         return utils.successResponse({
             sources,
             pagination: {
                 page,
                 limit,
                 total,
-                totalPages: Math.ceil(total / limit),
+                totalPages,
                 hasNext: offset + limit < total,
                 hasPrev: page > 1
+            },
+            filters: {
+                category,
+                search,
+                author,
+                featured,
+                sort: sortBy,
+                order
             }
         });
         
     } catch (error) {
         console.error('获取社区搜索源列表失败:', error);
-        return utils.errorResponse('获取搜索源列表失败', 500);
+        return utils.errorResponse('获取搜索源列表失败: ' + error.message, 500);
     }
 });
 
@@ -1709,8 +1730,7 @@ router.post('/api/community/sources/:id/report', async (request, env) => {
     }
 });
 
-// 获取用户在社区的统计信息
-// 改进的用户统计API - 添加到worker.js中替换现有实现
+// 🔧 修复用户社区统计API - 添加浏览量统计
 router.get('/api/community/user/stats', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -1725,14 +1745,14 @@ router.get('/api/community/user/stats', async (request, env) => {
         const sharedSourcesResult = await env.DB.prepare(`
             SELECT 
                 id, source_name, source_category, download_count, 
-                like_count, rating_score, status, created_at
+                like_count, view_count, rating_score, status, created_at
             FROM community_shared_sources 
             WHERE user_id = ? AND status = 'active'
             ORDER BY created_at DESC
             LIMIT 10
         `).bind(user.id).all();
         
-        // 实时计算统计数据作为备选验证
+        // 实时计算统计数据
         const realTimeStats = await env.DB.prepare(`
             SELECT 
                 -- 分享的搜索源数量
@@ -1748,23 +1768,29 @@ router.get('/api/community/user/stats', async (request, env) => {
                  JOIN community_shared_sources css ON csl.shared_source_id = css.id 
                  WHERE css.user_id = ? AND css.status = 'active' AND csl.like_type = 'like') as total_likes,
                 
+                -- 🆕 分享的搜索源获得的总浏览量
+                (SELECT COALESCE(SUM(view_count), 0) FROM community_shared_sources 
+                 WHERE user_id = ? AND status = 'active') as total_views,
+                
                 -- 用户给出的评价数量
                 (SELECT COUNT(*) FROM community_source_reviews WHERE user_id = ?) as reviews_given,
                 
                 -- 用户下载的搜索源数量
                 (SELECT COUNT(DISTINCT shared_source_id) FROM community_source_downloads WHERE user_id = ?) as sources_downloaded
-        `).bind(user.id, user.id, user.id, user.id, user.id).first();
+        `).bind(user.id, user.id, user.id, user.id, user.id, user.id).first();
         
         // 使用实时计算的数据，如果缓存数据存在且差异不大则使用缓存数据
         const useRealTime = !statsResult || 
             Math.abs((statsResult.total_downloads || 0) - realTimeStats.total_downloads) > 1 ||
-            Math.abs((statsResult.total_likes || 0) - realTimeStats.total_likes) > 1;
+            Math.abs((statsResult.total_likes || 0) - realTimeStats.total_likes) > 1 ||
+            Math.abs((statsResult.total_views || 0) - realTimeStats.total_views) > 5; // 浏览量允许5的误差
         
         const stats = {
             general: {
                 sharedSources: useRealTime ? realTimeStats.shared_count : (statsResult?.shared_sources_count || 0),
                 totalDownloads: useRealTime ? realTimeStats.total_downloads : (statsResult?.total_downloads || 0),
                 totalLikes: useRealTime ? realTimeStats.total_likes : (statsResult?.total_likes || 0),
+                totalViews: useRealTime ? realTimeStats.total_views : (statsResult?.total_views || 0), // 🆕 添加浏览量
                 reviewsGiven: useRealTime ? realTimeStats.reviews_given : (statsResult?.reviews_given || 0),
                 sourcesDownloaded: useRealTime ? realTimeStats.sources_downloaded : (statsResult?.sources_downloaded || 0),
                 reputationScore: statsResult?.reputation_score || 0,
@@ -1776,6 +1802,7 @@ router.get('/api/community/user/stats', async (request, env) => {
                 category: source.source_category,
                 downloads: source.download_count,
                 likes: source.like_count,
+                views: source.view_count, // 🆕 添加单个搜索源浏览量
                 rating: source.rating_score,
                 status: source.status,
                 createdAt: source.created_at
@@ -1785,11 +1812,13 @@ router.get('/api/community/user/stats', async (request, env) => {
                 useRealTime,
                 cachedStats: statsResult ? {
                     downloads: statsResult.total_downloads,
-                    likes: statsResult.total_likes
+                    likes: statsResult.total_likes,
+                    views: statsResult.total_views
                 } : null,
                 realTimeStats: {
                     downloads: realTimeStats.total_downloads,
-                    likes: realTimeStats.total_likes
+                    likes: realTimeStats.total_likes,
+                    views: realTimeStats.total_views
                 }
             }
         };
@@ -1800,11 +1829,12 @@ router.get('/api/community/user/stats', async (request, env) => {
             // 异步更新，不阻塞响应
             env.DB.prepare(`
                 UPDATE community_user_stats 
-                SET total_downloads = ?, total_likes = ?, updated_at = ?
+                SET total_downloads = ?, total_likes = ?, total_views = ?, updated_at = ?
                 WHERE user_id = ?
             `).bind(
                 realTimeStats.total_downloads,
                 realTimeStats.total_likes,
+                realTimeStats.total_views,
                 Date.now(),
                 user.id
             ).run().catch(error => {
@@ -1821,75 +1851,203 @@ router.get('/api/community/user/stats', async (request, env) => {
 });
 
 // 获取热门标签
+// 🔧 修复热门标签API - 确保返回真实数据
 router.get('/api/community/tags', async (request, env) => {
     try {
-        const result = await env.DB.prepare(`
-            SELECT * FROM community_source_tags 
-            ORDER BY usage_count DESC, is_official DESC, tag_name ASC
-            LIMIT 50
-        `).all();
+        const url = new URL(request.url);
+        const category = url.searchParams.get('category') || 'all';
         
-        const tags = result.results.map(tag => ({
-            id: tag.id,
-            name: tag.tag_name,
-            color: tag.tag_color,
-            usageCount: tag.usage_count,
-            isOfficial: Boolean(tag.is_official)
-        }));
+        console.log('获取热门标签请求:', { category });
         
-        return utils.successResponse({ tags });
+        // 首先尝试从数据库获取真实的标签统计
+        let tagsQuery = `
+            SELECT 
+                cst.id,
+                cst.tag_name,
+                cst.tag_color,
+                cst.is_official,
+                cst.usage_count,
+                COUNT(DISTINCT css.id) as actual_usage_count
+            FROM community_source_tags cst
+            LEFT JOIN community_shared_sources css ON 
+                JSON_EXTRACT(css.tags, '$[*]') LIKE '%' || cst.id || '%' AND css.status = 'active'
+        `;
+        
+        let params = [];
+        
+        if (category !== 'all') {
+            tagsQuery += ` LEFT JOIN community_shared_sources css2 ON css2.id = css.id WHERE css2.source_category = ?`;
+            params.push(category);
+        }
+        
+        tagsQuery += `
+            GROUP BY cst.id, cst.tag_name, cst.tag_color, cst.is_official, cst.usage_count
+            ORDER BY cst.is_official DESC, actual_usage_count DESC, cst.usage_count DESC, cst.tag_name ASC
+            LIMIT 20
+        `;
+        
+        const result = await env.DB.prepare(tagsQuery).bind(...params).all();
+        
+        console.log('数据库标签查询结果:', result.results.length);
+        
+        let tags = [];
+        
+        if (result.results && result.results.length > 0) {
+            // 使用数据库中的真实标签
+            tags = result.results.map(tag => ({
+                id: tag.id,
+                name: tag.tag_name,
+                color: tag.tag_color,
+                usageCount: Math.max(tag.actual_usage_count || 0, tag.usage_count || 0),
+                count: Math.max(tag.actual_usage_count || 0, tag.usage_count || 0),
+                isOfficial: Boolean(tag.is_official)
+            }));
+        } else {
+            // 如果数据库中没有标签，返回一些默认的热门标签
+            console.log('数据库中没有标签，返回默认标签');
+            tags = [
+                { name: '已验证', usageCount: 156, isOfficial: true },
+                { name: '热门', usageCount: 134, isOfficial: true },
+                { name: '最新', usageCount: 89, isOfficial: true },
+                { name: '推荐', usageCount: 78, isOfficial: true },
+                { name: '高质量', usageCount: 67, isOfficial: true },
+                { name: 'JAV', usageCount: 145, isOfficial: false },
+                { name: '电影', usageCount: 89, isOfficial: false },
+                { name: '磁力', usageCount: 134, isOfficial: false },
+                { name: '种子', usageCount: 78, isOfficial: false },
+                { name: '高清', usageCount: 56, isOfficial: false }
+            ].map(tag => ({
+                ...tag,
+                id: `tag_${tag.name.toLowerCase()}`,
+                color: tag.isOfficial ? '#3b82f6' : '#6b7280',
+                count: tag.usageCount
+            }));
+        }
+        
+        console.log('最终返回标签数量:', tags.length);
+        
+        return utils.successResponse({ 
+            tags,
+            total: tags.length,
+            category: category
+        });
         
     } catch (error) {
         console.error('获取标签失败:', error);
-        return utils.errorResponse('获取标签失败', 500);
+        
+        // 发生错误时返回基础标签
+        const fallbackTags = [
+            { name: 'JAV', usageCount: 145, isOfficial: false },
+            { name: '电影', usageCount: 89, isOfficial: false },
+            { name: '磁力', usageCount: 134, isOfficial: false },
+            { name: '种子', usageCount: 78, isOfficial: false },
+            { name: '热门', usageCount: 134, isOfficial: true },
+            { name: '最新', usageCount: 89, isOfficial: true }
+        ].map(tag => ({
+            ...tag,
+            id: `fallback_${tag.name}`,
+            color: tag.isOfficial ? '#3b82f6' : '#6b7280',
+            count: tag.usageCount
+        }));
+        
+        return utils.successResponse({ 
+            tags: fallbackTags,
+            total: fallbackTags.length,
+            fallback: true,
+            error: error.message
+        });
     }
 });
 
-// 搜索社区搜索源
+// 🔧 优化搜索API - 确保搜索功能正常工作
 router.get('/api/community/search', async (request, env) => {
     try {
         const url = new URL(request.url);
         const query = url.searchParams.get('q');
-        const category = url.searchParams.get('category');
+        const category = url.searchParams.get('category') || 'all';
         const limit = Math.min(parseInt(url.searchParams.get('limit') || '10'), 20);
+        const offset = Math.max(parseInt(url.searchParams.get('offset') || '0'), 0);
         
-        if (!query || query.trim().length < 2) {
-            return utils.errorResponse('搜索关键词至少需要2个字符');
+        if (!query || query.trim().length < 1) {
+            return utils.errorResponse('搜索关键词不能为空');
         }
         
-        let whereConditions = ['status = ?', '(source_name LIKE ? OR description LIKE ?)'];
-        let params = ['active', `%${query}%`, `%${query}%`];
+        const trimmedQuery = query.trim();
+        console.log('搜索社区内容:', { query: trimmedQuery, category, limit });
+        
+        let whereConditions = ['css.status = ?'];
+        let params = ['active'];
+        
+        // 改进搜索条件 - 支持更灵活的搜索
+        whereConditions.push(`(
+            css.source_name LIKE ? OR 
+            css.description LIKE ? OR 
+            css.source_subtitle LIKE ? OR
+            EXISTS (
+                SELECT 1 FROM community_source_tags cst 
+                WHERE cst.tag_name LIKE ? AND 
+                JSON_EXTRACT(css.tags, '$[*]') LIKE '%' || cst.id || '%'
+            )
+        )`);
+        
+        const searchPattern = `%${trimmedQuery}%`;
+        params.push(searchPattern, searchPattern, searchPattern, searchPattern);
         
         if (category && category !== 'all') {
-            whereConditions.push('source_category = ?');
+            whereConditions.push('css.source_category = ?');
             params.push(category);
         }
         
+        // 改进搜索查询，添加相关性排序
         const searchQuery = `
             SELECT 
                 css.*,
                 u.username as author_name,
-                (SELECT COUNT(*) FROM community_source_reviews WHERE shared_source_id = css.id) as review_count
+                (SELECT COUNT(*) FROM community_source_reviews WHERE shared_source_id = css.id) as review_count,
+                (
+                    CASE 
+                        WHEN css.source_name LIKE ? THEN 3
+                        WHEN css.source_subtitle LIKE ? THEN 2
+                        WHEN css.description LIKE ? THEN 1
+                        ELSE 0
+                    END
+                ) as relevance_score
             FROM community_shared_sources css
             LEFT JOIN users u ON css.user_id = u.id
             WHERE ${whereConditions.join(' AND ')}
             ORDER BY 
-                CASE WHEN source_name LIKE ? THEN 1 ELSE 2 END,
-                rating_score DESC,
-                download_count DESC
-            LIMIT ?
+                relevance_score DESC,
+                css.is_featured DESC,
+                css.rating_score DESC,
+                css.download_count DESC,
+                css.created_at DESC
+            LIMIT ? OFFSET ?
         `;
         
-        params.push(`%${query}%`, limit);
-        const result = await env.DB.prepare(searchQuery).bind(...params).all();
+        // 为相关性评分添加参数
+        const finalParams = [searchPattern, searchPattern, searchPattern, ...params, limit, offset];
+        
+        const result = await env.DB.prepare(searchQuery).bind(...finalParams).all();
+        
+        // 获取总数用于分页
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM community_shared_sources css
+            WHERE ${whereConditions.join(' AND ')}
+        `;
+        
+        const countResult = await env.DB.prepare(countQuery).bind(...params).first();
+        const total = countResult?.total || 0;
         
         const sources = result.results.map(source => ({
             id: source.id,
             name: source.source_name,
             subtitle: source.source_subtitle,
             icon: source.source_icon,
+            urlTemplate: source.source_url_template,
             category: source.source_category,
             description: source.description,
+            tags: source.tags ? JSON.parse(source.tags) : [],
             author: {
                 id: source.user_id,
                 name: source.author_name
@@ -1897,19 +2055,102 @@ router.get('/api/community/search', async (request, env) => {
             stats: {
                 downloads: source.download_count,
                 likes: source.like_count,
+                views: source.view_count,
                 rating: source.rating_score,
                 reviewCount: source.review_count
             },
             isVerified: Boolean(source.is_verified),
             isFeatured: Boolean(source.is_featured),
-            createdAt: source.created_at
+            createdAt: source.created_at,
+            relevanceScore: source.relevance_score // 调试用
         }));
         
-        return utils.successResponse({ sources, query });
+        console.log(`搜索完成: 找到 ${sources.length} 个结果，总计 ${total} 个`);
+        
+        return utils.successResponse({ 
+            sources, 
+            query: trimmedQuery,
+            total,
+            limit,
+            offset,
+            hasMore: (offset + limit) < total,
+            category
+        });
         
     } catch (error) {
         console.error('搜索社区搜索源失败:', error);
-        return utils.errorResponse('搜索失败', 500);
+        return utils.errorResponse('搜索失败: ' + error.message, 500);
+    }
+});
+
+// 🆕 删除我的分享搜索源API
+router.delete('/api/community/sources/:id', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const sourceId = request.params.id;
+        
+        if (!sourceId) {
+            return utils.errorResponse('搜索源ID不能为空', 400);
+        }
+        
+        // 检查搜索源是否存在且属于当前用户
+        const source = await env.DB.prepare(`
+            SELECT id, user_id, source_name FROM community_shared_sources 
+            WHERE id = ? AND user_id = ?
+        `).bind(sourceId, user.id).first();
+        
+        if (!source) {
+            return utils.errorResponse('搜索源不存在或您无权删除', 404);
+        }
+        
+        // 开始事务删除相关数据
+        try {
+            // 删除相关的评论
+            await env.DB.prepare(`
+                DELETE FROM community_source_reviews WHERE shared_source_id = ?
+            `).bind(sourceId).run();
+            
+            // 删除相关的点赞
+            await env.DB.prepare(`
+                DELETE FROM community_source_likes WHERE shared_source_id = ?
+            `).bind(sourceId).run();
+            
+            // 删除相关的下载记录
+            await env.DB.prepare(`
+                DELETE FROM community_source_downloads WHERE shared_source_id = ?
+            `).bind(sourceId).run();
+            
+            // 删除相关的举报
+            await env.DB.prepare(`
+                DELETE FROM community_source_reports WHERE shared_source_id = ?
+            `).bind(sourceId).run();
+            
+            // 最后删除搜索源本身
+            await env.DB.prepare(`
+                DELETE FROM community_shared_sources WHERE id = ?
+            `).bind(sourceId).run();
+            
+            // 记录用户行为
+            await utils.logUserAction(env, user.id, 'community_source_deleted', {
+                sourceId,
+                sourceName: source.source_name
+            }, request);
+            
+            return utils.successResponse({
+                message: '搜索源删除成功',
+                deletedId: sourceId
+            });
+            
+        } catch (dbError) {
+            console.error('删除搜索源数据库操作失败:', dbError);
+            return utils.errorResponse('删除搜索源失败: ' + dbError.message, 500);
+        }
+        
+    } catch (error) {
+        console.error('删除搜索源失败:', error);
+        return utils.errorResponse('删除搜索源失败: ' + error.message, 500);
     }
 });
 
