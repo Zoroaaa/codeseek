@@ -504,6 +504,79 @@ CREATE TRIGGER IF NOT EXISTS update_user_stats_after_share
             strftime('%s', 'now') * 1000
         );
     END;
+	
+-- SQLite 兼容版本：更新用户总下载数
+CREATE TRIGGER IF NOT EXISTS update_user_total_downloads_after_download
+    AFTER INSERT ON community_source_downloads
+    FOR EACH ROW
+    BEGIN
+        INSERT OR REPLACE INTO community_user_stats (
+            id, user_id, 
+            shared_sources_count, total_downloads, total_likes,
+            reviews_given, sources_downloaded, reputation_score, contribution_level,
+            created_at, updated_at
+        ) 
+        SELECT 
+            COALESCE(cus.id, (css.user_id || '_stats')),
+            css.user_id,
+            COALESCE(cus.shared_sources_count, 0),
+            COALESCE(cus.total_downloads, 0) + 1, -- 增加下载数
+            COALESCE(cus.total_likes, 0),
+            COALESCE(cus.reviews_given, 0),
+            COALESCE(cus.sources_downloaded, 0),
+            COALESCE(cus.reputation_score, 0),
+            COALESCE(cus.contribution_level, 'beginner'),
+            COALESCE(cus.created_at, strftime('%s', 'now') * 1000),
+            strftime('%s', 'now') * 1000
+        FROM community_shared_sources css
+        LEFT JOIN community_user_stats cus ON css.user_id = cus.user_id
+        WHERE css.id = NEW.shared_source_id;
+    END;
+
+-- SQLite 兼容版本：更新用户总点赞数（新增点赞）
+CREATE TRIGGER IF NOT EXISTS update_user_total_likes_after_like
+    AFTER INSERT ON community_source_likes
+    FOR EACH ROW
+    WHEN NEW.like_type = 'like'
+    BEGIN
+        INSERT OR REPLACE INTO community_user_stats (
+            id, user_id, 
+            shared_sources_count, total_downloads, total_likes,
+            reviews_given, sources_downloaded, reputation_score, contribution_level,
+            created_at, updated_at
+        ) 
+        SELECT 
+            COALESCE(cus.id, (css.user_id || '_stats')),
+            css.user_id,
+            COALESCE(cus.shared_sources_count, 0),
+            COALESCE(cus.total_downloads, 0),
+            COALESCE(cus.total_likes, 0) + 1, -- 增加点赞数
+            COALESCE(cus.reviews_given, 0),
+            COALESCE(cus.sources_downloaded, 0),
+            COALESCE(cus.reputation_score, 0),
+            COALESCE(cus.contribution_level, 'beginner'),
+            COALESCE(cus.created_at, strftime('%s', 'now') * 1000),
+            strftime('%s', 'now') * 1000
+        FROM community_shared_sources css
+        LEFT JOIN community_user_stats cus ON css.user_id = cus.user_id
+        WHERE css.id = NEW.shared_source_id;
+    END;
+
+-- SQLite 兼容版本：取消点赞时减少统计
+CREATE TRIGGER IF NOT EXISTS update_user_total_likes_after_unlike
+    AFTER DELETE ON community_source_likes
+    FOR EACH ROW
+    WHEN OLD.like_type = 'like'
+    BEGIN
+        UPDATE community_user_stats 
+        SET total_likes = GREATEST(0, total_likes - 1),
+            updated_at = strftime('%s', 'now') * 1000
+        WHERE user_id = (
+            SELECT user_id FROM community_shared_sources 
+            WHERE id = OLD.shared_source_id
+        );
+    END;
+
 
 /* -- 初始化系统配置
 INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_public, created_at, updated_at) VALUES

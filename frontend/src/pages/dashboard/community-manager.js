@@ -1106,34 +1106,49 @@ createErrorDiv(fieldId, message) {
   }
 
   // 修复：正确更新社区统计显示
-  updateCommunityStats() {
-    console.log('更新社区统计显示');
+// 修复 community-manager.js 中的 updateCommunityStats 方法
+updateCommunityStats() {
+  console.log('更新社区统计显示');
 
-    const elements = {
-      userSharedCount: document.getElementById('userSharedCount'),
-      userDownloadsCount: document.getElementById('userDownloadsCount'),
-      userLikesCount: document.getElementById('userLikesCount'),
-      userReputationScore: document.getElementById('userReputationScore')
-    };
+  const elements = {
+    userSharedCount: document.getElementById('userSharedCount'),
+    userDownloadsCount: document.getElementById('userDownloadsCount'),
+    userLikesCount: document.getElementById('userLikesCount'),
+    userReputationScore: document.getElementById('userReputationScore')
+  };
 
-    // 使用真实统计数据或默认值
-    const stats = this.userStats?.general || {};
-    
-    if (elements.userSharedCount) {
-      elements.userSharedCount.textContent = stats.sharedSources || 0;
-    }
-    if (elements.userDownloadsCount) {
-      elements.userDownloadsCount.textContent = stats.sourcesDownloaded || 0;
-    }
-    if (elements.userLikesCount) {
-      elements.userLikesCount.textContent = stats.totalLikes || 0;
-    }
-    if (elements.userReputationScore) {
-      elements.userReputationScore.textContent = stats.reputationScore || 0;
-    }
-
-    console.log('统计数据已更新:', stats);
+  // 使用真实统计数据或默认值
+  const stats = this.userStats?.general || {};
+  
+  if (elements.userSharedCount) {
+    elements.userSharedCount.textContent = stats.sharedSources || 0;
   }
+  
+  // 修复：这里应该显示用户分享的搜索源被下载的总次数
+  if (elements.userDownloadsCount) {
+    elements.userDownloadsCount.textContent = stats.totalDownloads || 0; // 改为 totalDownloads
+  }
+  
+  // 修复：这里应该显示用户分享的搜索源获得的总点赞数
+  if (elements.userLikesCount) {
+    elements.userLikesCount.textContent = stats.totalLikes || 0;
+  }
+  
+  if (elements.userReputationScore) {
+    elements.userReputationScore.textContent = stats.reputationScore || 0;
+  }
+
+  console.log('统计数据已更新:', stats);
+  
+  // 添加调试信息
+  console.log('统计字段映射:', {
+    分享数量: stats.sharedSources,
+    总下载数: stats.totalDownloads,
+    总点赞数: stats.totalLikes,
+    声誉分数: stats.reputationScore,
+    用户下载数: stats.sourcesDownloaded // 这个字段用于其他地方
+  });
+}
 
   // 下载搜索源
   async downloadSource(sourceId) {

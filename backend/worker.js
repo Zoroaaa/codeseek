@@ -1710,12 +1710,13 @@ router.post('/api/community/sources/:id/report', async (request, env) => {
 });
 
 // 获取用户在社区的统计信息
+// 改进的用户统计API - 添加到worker.js中替换现有实现
 router.get('/api/community/user/stats', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
     
     try {
-        // 获取用户统计
+        // 获取缓存的统计数据
         const statsResult = await env.DB.prepare(`
             SELECT * FROM community_user_stats WHERE user_id = ?
         `).bind(user.id).first();
@@ -1726,18 +1727,46 @@ router.get('/api/community/user/stats', async (request, env) => {
                 id, source_name, source_category, download_count, 
                 like_count, rating_score, status, created_at
             FROM community_shared_sources 
-            WHERE user_id = ?
+            WHERE user_id = ? AND status = 'active'
             ORDER BY created_at DESC
             LIMIT 10
         `).bind(user.id).all();
         
+        // 实时计算统计数据作为备选验证
+        const realTimeStats = await env.DB.prepare(`
+            SELECT 
+                -- 分享的搜索源数量
+                (SELECT COUNT(*) FROM community_shared_sources WHERE user_id = ? AND status = 'active') as shared_count,
+                
+                -- 分享的搜索源被下载的总次数
+                (SELECT COUNT(*) FROM community_source_downloads csd 
+                 JOIN community_shared_sources css ON csd.shared_source_id = css.id 
+                 WHERE css.user_id = ? AND css.status = 'active') as total_downloads,
+                
+                -- 分享的搜索源获得的总点赞数
+                (SELECT COUNT(*) FROM community_source_likes csl 
+                 JOIN community_shared_sources css ON csl.shared_source_id = css.id 
+                 WHERE css.user_id = ? AND css.status = 'active' AND csl.like_type = 'like') as total_likes,
+                
+                -- 用户给出的评价数量
+                (SELECT COUNT(*) FROM community_source_reviews WHERE user_id = ?) as reviews_given,
+                
+                -- 用户下载的搜索源数量
+                (SELECT COUNT(DISTINCT shared_source_id) FROM community_source_downloads WHERE user_id = ?) as sources_downloaded
+        `).bind(user.id, user.id, user.id, user.id, user.id).first();
+        
+        // 使用实时计算的数据，如果缓存数据存在且差异不大则使用缓存数据
+        const useRealTime = !statsResult || 
+            Math.abs((statsResult.total_downloads || 0) - realTimeStats.total_downloads) > 1 ||
+            Math.abs((statsResult.total_likes || 0) - realTimeStats.total_likes) > 1;
+        
         const stats = {
             general: {
-                sharedSources: statsResult?.shared_sources_count || 0,
-                totalDownloads: statsResult?.total_downloads || 0,
-                totalLikes: statsResult?.total_likes || 0,
-                reviewsGiven: statsResult?.reviews_given || 0,
-                sourcesDownloaded: statsResult?.sources_downloaded || 0,
+                sharedSources: useRealTime ? realTimeStats.shared_count : (statsResult?.shared_sources_count || 0),
+                totalDownloads: useRealTime ? realTimeStats.total_downloads : (statsResult?.total_downloads || 0),
+                totalLikes: useRealTime ? realTimeStats.total_likes : (statsResult?.total_likes || 0),
+                reviewsGiven: useRealTime ? realTimeStats.reviews_given : (statsResult?.reviews_given || 0),
+                sourcesDownloaded: useRealTime ? realTimeStats.sources_downloaded : (statsResult?.sources_downloaded || 0),
                 reputationScore: statsResult?.reputation_score || 0,
                 contributionLevel: statsResult?.contribution_level || 'beginner'
             },
@@ -1750,8 +1779,38 @@ router.get('/api/community/user/stats', async (request, env) => {
                 rating: source.rating_score,
                 status: source.status,
                 createdAt: source.created_at
-            }))
+            })),
+            // 调试信息（生产环境可删除）
+            debug: {
+                useRealTime,
+                cachedStats: statsResult ? {
+                    downloads: statsResult.total_downloads,
+                    likes: statsResult.total_likes
+                } : null,
+                realTimeStats: {
+                    downloads: realTimeStats.total_downloads,
+                    likes: realTimeStats.total_likes
+                }
+            }
         };
+        
+        // 如果使用了实时计算，异步更新缓存
+        if (useRealTime && statsResult) {
+            console.log('检测到统计数据不一致，触发缓存更新');
+            // 异步更新，不阻塞响应
+            env.DB.prepare(`
+                UPDATE community_user_stats 
+                SET total_downloads = ?, total_likes = ?, updated_at = ?
+                WHERE user_id = ?
+            `).bind(
+                realTimeStats.total_downloads,
+                realTimeStats.total_likes,
+                Date.now(),
+                user.id
+            ).run().catch(error => {
+                console.error('更新用户统计缓存失败:', error);
+            });
+        }
         
         return utils.successResponse({ stats });
         
