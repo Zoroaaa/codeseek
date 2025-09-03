@@ -1236,6 +1236,8 @@ router.get('/api/source-status/history', async (request, env) => {
 // 社区搜索源相关API
 
 // 获取社区搜索源列表（支持高级筛选）
+// 在 worker.js 中修复 /api/community/sources 接口的标签过滤功能
+
 router.get('/api/community/sources', async (request, env) => {
     try {
         const url = new URL(request.url);
@@ -1247,12 +1249,12 @@ router.get('/api/community/sources', async (request, env) => {
         const sortBy = url.searchParams.get('sort') || 'created_at';
         const order = url.searchParams.get('order') || 'desc';
         const search = url.searchParams.get('search');
-        const tags = url.searchParams.get('tags');
+        const tags = url.searchParams.get('tags'); // 📧 获取标签参数
         const featured = url.searchParams.get('featured') === 'true';
         const author = url.searchParams.get('author');
         
         console.log('获取社区搜索源列表:', { 
-            page, limit, category, sortBy, order, search, author, featured 
+            page, limit, category, sortBy, order, search, author, featured, tags // 📧 添加 tags 到日志
         });
         
         // 构建查询条件
@@ -1280,6 +1282,33 @@ router.get('/api/community/sources', async (request, env) => {
             params.push(1);
         }
         
+        // 📧 修复：添加标签过滤逻辑
+        if (tags && tags.trim()) {
+            const tagIds = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+            
+            if (tagIds.length > 0) {
+                console.log('按标签过滤，标签IDs:', tagIds);
+                
+                // 方法1：使用 JSON_EXTRACT 和 LIKE 查询（适用于 SQLite）
+                const tagConditions = tagIds.map(() => 
+                    `JSON_EXTRACT(css.tags, '$') LIKE ?`
+                ).join(' OR ');
+                
+                whereConditions.push(`(${tagConditions})`);
+                
+                // 为每个标签ID添加 LIKE 参数
+                tagIds.forEach(tagId => {
+                    params.push(`%"${tagId}"%`);
+                });
+                
+                // 方法2：备用方案 - 如果 JSON_EXTRACT 不可用，使用简单的 LIKE 查询
+                // whereConditions.push(`(${tagIds.map(() => 'css.tags LIKE ?').join(' OR ')})`);
+                // tagIds.forEach(tagId => {
+                //     params.push(`%"${tagId}"%`);
+                // });
+            }
+        }
+        
         // 构建排序条件
         const validSortColumns = ['created_at', 'updated_at', 'rating_score', 'download_count', 'like_count', 'view_count'];
         const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'created_at';
@@ -1294,6 +1323,12 @@ router.get('/api/community/sources', async (request, env) => {
         `;
         const countResult = await env.DB.prepare(countQuery).bind(...params).first();
         const total = countResult.total || 0;
+        
+        console.log('标签过滤查询:', {
+            query: countQuery,
+            params: params.slice(0, 5), // 只显示前5个参数避免日志过长
+            totalResults: total
+        });
         
         // 查询数据
         const dataQuery = `
@@ -1310,7 +1345,7 @@ router.get('/api/community/sources', async (request, env) => {
         
         const result = await env.DB.prepare(dataQuery).bind(...params, limit, offset).all();
         
-        // 🔧 批量获取所有标签信息
+        // 📧 批量获取所有标签信息
         const allTagIds = [];
         result.results.forEach(source => {
             try {
@@ -1408,7 +1443,7 @@ router.get('/api/community/sources', async (request, env) => {
                 urlTemplate: source.source_url_template,
                 category: source.source_category,
                 description: source.description,
-                tags: sourceTags, // 🔧 现在包含完整的标签信息
+                tags: sourceTags, // 📧 现在包含完整的标签信息
                 author: {
                     id: source.user_id,
                     name: source.author_name
@@ -1430,12 +1465,10 @@ router.get('/api/community/sources', async (request, env) => {
         
         const totalPages = Math.ceil(total / limit);
         
-        console.log(`返回 ${sources.length} 个搜索源，总计 ${total} 个，第 ${page}/${totalPages} 页`);
-        console.log('标签映射情况:', {
-            totalUniqueTags: uniqueTagIds.length,
-            mappedTags: tagMap.size,
-            sampleMappings: Array.from(tagMap.entries()).slice(0, 3)
-        });
+        console.log(`标签过滤结果: 返回 ${sources.length} 个搜索源，总计 ${total} 个，第 ${page}/${totalPages} 页`);
+        if (tags) {
+            console.log('标签过滤参数:', tags, '解析后的标签IDs:', tags.split(','));
+        }
         
         return utils.successResponse({
             sources,
@@ -1452,6 +1485,7 @@ router.get('/api/community/sources', async (request, env) => {
                 search,
                 author,
                 featured,
+                tags, // 📧 返回标签过滤参数
                 sort: sortBy,
                 order
             }

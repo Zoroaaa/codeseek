@@ -3000,28 +3000,100 @@ renderMyTagItem(tag) {
     `;
 }
 
-  // 🆕 显示标签相关搜索源弹窗
+// 修复：显示标签相关搜索源弹窗 - 改进过滤逻辑和错误处理
 async showTagSourcesModal(tagId, tagName) {
     try {
         showLoading(true);
         
-        // 获取使用该标签的搜索源
-        const result = await apiService.getCommunitySearchSources({
+        console.log(`开始查找标签 "${tagName}" (ID: ${tagId}) 相关的搜索源`);
+        
+        // 方法1：通过标签ID直接过滤（主要方式）
+        let result = await apiService.getCommunitySearchSources({
             tags: [tagId],
-            limit: 100
+            limit: 100,
+            sort: 'created_at',
+            order: 'desc'
         });
         
+        // 📧 如果后端标签过滤返回空结果，尝试前端过滤作为降级方案
+        if (!result.success || !result.sources || result.sources.length === 0) {
+            console.log('后端标签过滤未返回结果，尝试获取所有源然后前端过滤...');
+            
+            // 获取所有搜索源
+            const allSourcesResult = await apiService.getCommunitySearchSources({
+                limit: 200, // 获取更多数据用于过滤
+                sort: 'created_at',
+                order: 'desc'
+            });
+            
+            if (allSourcesResult.success && allSourcesResult.sources) {
+                // 前端过滤包含该标签的搜索源
+                const filteredSources = allSourcesResult.sources.filter(source => {
+                    if (!source.tags || !Array.isArray(source.tags)) {
+                        return false;
+                    }
+                    
+                    // 检查标签数组中是否包含目标标签
+                    return source.tags.some(tag => {
+                        if (typeof tag === 'object' && tag.id) {
+                            return tag.id === tagId || tag.name === tagName;
+                        } else if (typeof tag === 'string') {
+                            return tag === tagId || tag === tagName;
+                        }
+                        return false;
+                    });
+                });
+                
+                console.log(`前端过滤结果：从 ${allSourcesResult.sources.length} 个搜索源中找到 ${filteredSources.length} 个包含标签 "${tagName}" 的搜索源`);
+                
+                result = {
+                    success: true,
+                    sources: filteredSources
+                };
+            }
+        }
+        
         if (result.success) {
-            this.renderTagSourcesModal(tagName, result.sources);
+            console.log(`找到 ${result.sources.length} 个使用标签 "${tagName}" 的搜索源`);
+            this.renderTagSourcesModal(tagName, result.sources, tagId);
         } else {
             throw new Error(result.error || '获取标签相关搜索源失败');
         }
         
     } catch (error) {
         console.error('获取标签搜索源失败:', error);
-        showToast('获取标签相关搜索源失败: ' + error.message, 'error');
+        
+        // 📧 降级方案：使用搜索功能
+        console.log('尝试降级方案：使用标签名称搜索...');
+        try {
+            const searchResult = await this.searchByTagName(tagName);
+            if (searchResult && searchResult.length > 0) {
+                console.log(`降级方案成功：通过搜索找到 ${searchResult.length} 个相关搜索源`);
+                this.renderTagSourcesModal(tagName, searchResult, tagId, true); // 第四个参数表示是搜索结果
+            } else {
+                this.renderTagSourcesModal(tagName, [], tagId);
+            }
+        } catch (searchError) {
+            console.error('降级搜索也失败:', searchError);
+            this.renderTagSourcesModal(tagName, [], tagId);
+        }
     } finally {
         showLoading(false);
+    }
+}
+
+// 📧 新增：通过标签名称搜索的降级方案
+async searchByTagName(tagName) {
+    try {
+        const result = await apiService.searchCommunityPosts(tagName, {
+            limit: 50,
+            category: 'all'
+        });
+        
+        return result.success ? result.sources : [];
+    } catch (error) {
+        console.error('标签名称搜索失败:', error);
+        return [];
     }
 }
 
