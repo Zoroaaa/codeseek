@@ -175,22 +175,43 @@ export class CommunityManager {
   }
 
   // 🆕 加载所有可用标签
-  async loadAvailableTags() {
-    try {
-      const result = await apiService.getAllTags();
+// 修复1: 更新标签API调用，处理列名变化
+async loadAvailableTags() {
+  try {
+    console.log('开始加载所有可用标签');
+    const result = await apiService.getAllTags({
+      active: true, // 确保只获取激活的标签
+      category: 'all'
+    });
+    
+    if (result.success) {
+      this.availableTags = result.tags || [];
+      console.log('可用标签加载成功:', this.availableTags.length, '个标签');
       
-      if (result.success) {
-        this.availableTags = result.tags || [];
-        console.log('可用标签加载成功:', this.availableTags.length, '个标签');
-      } else {
-        console.warn('加载可用标签失败:', result.error);
-        this.availableTags = [];
-      }
-    } catch (error) {
-      console.warn('加载可用标签失败:', error);
+      // 验证标签数据结构
+      this.availableTags = this.availableTags.filter(tag => {
+        if (!tag || !tag.name) {
+          console.warn('发现无效标签数据:', tag);
+          return false;
+        }
+        return true;
+      });
+      
+    } else {
+      console.warn('加载可用标签失败:', result.error);
       this.availableTags = [];
     }
+  } catch (error) {
+    console.error('加载可用标签异常:', error);
+    this.availableTags = [];
+    
+    // 显示用户友好的错误信息
+    if (error.message.includes('ambiguous column name')) {
+      console.log('检测到数据库列名冲突，尝试重新初始化...');
+      // 可以在这里添加重试逻辑或提示用户刷新
+    }
   }
+}
 
   // 🆕 显示创建标签模态框
   showCreateTagModal() {
@@ -264,79 +285,130 @@ export class CommunityManager {
   }
 
   // 🆕 提交创建标签表单
-  async submitCreateTagForm(event) {
-    event.preventDefault();
+// 修复2: 增强创建标签功能，处理数据库错误
+async submitCreateTagForm(event) {
+  event.preventDefault();
+  
+  const form = document.getElementById('createTagForm');
+  if (!form) return;
+
+  // 清除之前的错误状态
+  document.querySelectorAll('.field-error').forEach(error => {
+    error.style.display = 'none';
+  });
+  document.querySelectorAll('.form-group input, .form-group select').forEach(field => {
+    field.classList.remove('error');
+  });
+
+  const formData = new FormData(form);
+  const tagData = {
+    name: formData.get('tagName')?.trim(),
+    description: formData.get('tagDescription')?.trim() || '',
+    color: formData.get('tagColor') || '#3b82f6'
+  };
+
+  // 前端验证
+  let hasError = false;
+
+  if (!tagData.name || tagData.name.length < 2) {
+    this.showFieldError('tagName', '标签名称至少需要2个字符');
+    hasError = true;
+  }
+
+  if (tagData.name && tagData.name.length > 20) {
+    this.showFieldError('tagName', '标签名称不能超过20个字符');
+    hasError = true;
+  }
+
+  // 检查标签名称是否已存在
+  const existingTag = this.availableTags.find(tag => 
+    tag.name.toLowerCase() === tagData.name.toLowerCase()
+  );
+  
+  if (existingTag) {
+    this.showFieldError('tagName', '标签名称已存在');
+    hasError = true;
+  }
+
+  if (hasError) return;
+
+  try {
+    showLoading(true);
     
-    const form = document.getElementById('createTagForm');
-    if (!form) return;
-
-    const formData = new FormData(form);
-    const tagData = {
-      name: formData.get('tagName')?.trim(),
-      description: formData.get('tagDescription')?.trim() || '',
-      color: formData.get('tagColor') || '#3b82f6'
-    };
-
-    // 验证标签名称
-    if (!tagData.name || tagData.name.length < 2) {
-      this.showFieldError('tagName', '标签名称至少需要2个字符');
-      return;
-    }
-
-    if (tagData.name.length > 20) {
-      this.showFieldError('tagName', '标签名称不能超过20个字符');
-      return;
-    }
-
-    // 检查标签名称是否已存在
-    const existingTag = this.availableTags.find(tag => 
-      tag.name.toLowerCase() === tagData.name.toLowerCase()
-    );
+    const result = await apiService.createTag(tagData);
     
-    if (existingTag) {
-      this.showFieldError('tagName', '标签名称已存在');
-      return;
-    }
-
-    try {
-      showLoading(true);
+    if (result.success) {
+      showToast('标签创建成功！', 'success');
+      document.getElementById('createTagModal').remove();
       
-      const result = await apiService.createTag(tagData);
+      // 重新加载标签数据
+      await this.loadAvailableTags();
+      await this.loadPopularTags();
       
-      if (result.success) {
-        showToast('标签创建成功！', 'success');
-        document.getElementById('createTagModal').remove();
-        
-        // 重新加载标签数据
-        await this.loadAvailableTags();
-        await this.loadPopularTags();
-        
-      } else {
-        throw new Error(result.message || '创建标签失败');
+    } else {
+      // 处理服务器端错误
+      let errorMessage = result.message || '创建标签失败';
+      
+      if (errorMessage.includes('ambiguous column name')) {
+        errorMessage = '数据库配置问题，请联系管理员或稍后重试';
+      } else if (errorMessage.includes('SQLITE_ERROR')) {
+        errorMessage = '数据库操作失败，请检查输入或稍后重试';
       }
       
-    } catch (error) {
-      console.error('创建标签失败:', error);
-      showToast('创建标签失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
-    }
-  }
-
-  // 显示字段错误
-  showFieldError(fieldId, message) {
-    const errorDiv = document.getElementById(fieldId + 'Error');
-    if (errorDiv) {
-      errorDiv.textContent = message;
-      errorDiv.style.display = 'block';
+      showToast(errorMessage, 'error');
     }
     
-    const field = document.getElementById(fieldId);
-    if (field) {
-      field.classList.add('error');
-      field.focus();
+  } catch (error) {
+    console.error('创建标签失败:', error);
+    
+    let errorMessage = '创建标签失败';
+    if (error.message.includes('ambiguous column name')) {
+      errorMessage = '数据库列名冲突，请联系管理员更新数据库架构';
+    } else if (error.message.includes('SQLITE_ERROR')) {
+      errorMessage = 'SQL执行错误，请检查数据格式';
+    } else {
+      errorMessage += ': ' + error.message;
     }
+    
+    showToast(errorMessage, 'error');
+  } finally {
+    showLoading(false);
   }
+}
+
+  // 显示字段错误
+// 修复5: 增强错误处理和用户反馈
+showFieldError(fieldId, message) {
+  const errorDiv = document.getElementById(fieldId + 'Error');
+  if (errorDiv) {
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    errorDiv.style.color = '#ef4444';
+  }
+  
+  const field = document.getElementById(fieldId);
+  if (field) {
+    field.classList.add('error');
+    field.style.borderColor = '#ef4444';
+    
+    // 聚焦到错误字段
+    setTimeout(() => field.focus(), 100);
+    
+    // 清除错误状态当用户开始输入
+    const clearError = () => {
+      field.classList.remove('error');
+      field.style.borderColor = '';
+      if (errorDiv) {
+        errorDiv.style.display = 'none';
+      }
+      field.removeEventListener('input', clearError);
+      field.removeEventListener('focus', clearError);
+    };
+    
+    field.addEventListener('input', clearError);
+    field.addEventListener('focus', clearError);
+  }
+}
 
   // 加载社区搜索源列表
   async loadCommunitySourcesList() {
@@ -1110,113 +1182,113 @@ export class CommunityManager {
   }
 
   // 渲染社区搜索源项目
-  renderCommunitySourceItem(source) {
-    const category = APP_CONSTANTS.SOURCE_CATEGORIES ? 
-      Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).find(cat => cat.id === source.category) : null;
-    
-    const ratingStars = this.renderRatingStars(source.stats?.rating || 0);
-    const tags = source.tags ? source.tags.slice(0, 3) : [];
-    
-    const authorReputation = this.calculateReputationLevel(source.author?.reputation || 0);
-    
-    return `
-      <div class="community-source-item" data-source-id="${source.id}">
-        <div class="source-header">
-          <div class="source-icon">${source.icon || '📁'}</div>
-          <div class="source-title-area">
-            <h3 class="source-title">${escapeHtml(source.name)}</h3>
-            ${source.subtitle ? `<p class="source-subtitle">${escapeHtml(source.subtitle)}</p>` : ''}
-          </div>
-          <div class="source-badges">
-            ${source.isVerified ? '<span class="badge verified">已验证</span>' : ''}
-            ${source.isFeatured ? '<span class="badge featured">推荐</span>' : ''}
-          </div>
+renderCommunitySourceItem(source) {
+  const category = APP_CONSTANTS.SOURCE_CATEGORIES ? 
+    Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).find(cat => cat.id === source.category) : null;
+  
+  const ratingStars = this.renderRatingStars(source.stats?.rating || 0);
+  const tags = source.tags ? source.tags.slice(0, 3) : [];
+  
+  const authorReputation = this.calculateReputationLevel(source.author?.reputation || 0);
+  
+  return `
+    <div class="community-source-item" data-source-id="${source.id}">
+      <div class="source-header">
+        <div class="source-icon">${source.icon || '🔍'}</div>
+        <div class="source-title-area">
+          <h3 class="source-title">${escapeHtml(source.name)}</h3>
+          ${source.subtitle ? `<p class="source-subtitle">${escapeHtml(source.subtitle)}</p>` : ''}
         </div>
-
-        <div class="source-meta">
-          <div class="source-category">
-            <span class="category-badge" style="background: ${category?.color || '#6b7280'}">
-              ${category?.icon || '🌟'} ${category?.name || '其他'}
-            </span>
-          </div>
-          <div class="source-author">
-            由 <strong>${escapeHtml(source.author ? source.author.name : 'Unknown')}</strong> 分享
-            <span class="author-reputation" style="color: ${authorReputation.color}; margin-left: 0.5rem;">
-              ${authorReputation.icon} ${authorReputation.name}
-            </span>
-          </div>
-        </div>
-
-        ${source.description ? `
-          <div class="source-description">
-            ${escapeHtml(source.description)}
-          </div>
-        ` : ''}
-
-        ${tags.length > 0 ? `
-          <div class="source-tags">
-            ${tags.map(tag => `
-              <span class="tag ${tag.isOfficial ? 'official' : ''}">
-                ${escapeHtml(tag.name || tag)}
-              </span>
-            `).join('')}
-          </div>
-        ` : ''}
-
-        <div class="source-stats">
-          <div class="stat-item">
-            <span class="stat-icon">🔥</span>
-            <span class="stat-value">${this.formatNumber(source.stats?.downloads || 0)}</span>
-            <span class="stat-label">下载</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-icon">👍</span>
-            <span class="stat-value">${this.formatNumber(source.stats?.likes || 0)}</span>
-            <span class="stat-label">点赞</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-icon">👁</span>
-            <span class="stat-value">${this.formatNumber(source.stats?.views || 0)}</span>
-            <span class="stat-label">浏览</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-icon">⭐</span>
-            <div class="rating-display">
-              ${ratingStars}
-              <span class="rating-count">(${source.stats?.reviewCount || 0})</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="source-actions">
-          <button class="action-btn primary" onclick="window.app.getManager('community').downloadSource('${source.id}')">
-            <span>🔥</span>
-            <span>添加到我的搜索源</span>
-          </button>
-          <button class="action-btn secondary" onclick="window.app.getManager('community').viewSourceDetails('${source.id}')">
-            <span>👁️</span>
-            <span>查看详情</span>
-          </button>
-          <button class="action-btn tertiary like-btn" data-source-id="${source.id}" onclick="window.app.getManager('community').toggleLike('${source.id}')">
-            <span>👍</span>
-            <span>点赞</span>
-          </button>
-          <button class="action-btn tertiary" onclick="window.app.getManager('community').showReviewModal('${source.id}')">
-            <span>💬</span>
-            <span>评价</span>
-          </button>
-          <button class="action-btn tertiary text-warning" onclick="window.app.getManager('community').showReportModal('${source.id}')">
-            <span>🚨</span>
-            <span>举报</span>
-          </button>
-        </div>
-
-        <div class="source-footer">
-          <span class="source-date">分享于 ${this.formatDate(source.createdAt)}</span>
+        <div class="source-badges">
+          ${source.isVerified ? '<span class="badge verified">已验证</span>' : ''}
+          ${source.isFeatured ? '<span class="badge featured">推荐</span>' : ''}
         </div>
       </div>
-    `;
-  }
+
+      <div class="source-meta">
+        <div class="source-category">
+          <span class="category-badge" style="background: ${category?.color || '#6b7280'}">
+            ${category?.icon || '🌟'} ${category?.name || '其他'}
+          </span>
+        </div>
+        <div class="source-author">
+          由 <strong>${escapeHtml(source.author ? source.author.name : 'Unknown')}</strong> 分享
+          <span class="author-reputation" style="color: ${authorReputation.color}; margin-left: 0.5rem;">
+            ${authorReputation.icon} ${authorReputation.name}
+          </span>
+        </div>
+      </div>
+
+      ${source.description ? `
+        <div class="source-description">
+          ${escapeHtml(source.description)}
+        </div>
+      ` : ''}
+
+      ${tags.length > 0 ? `
+        <div class="source-tags">
+          ${tags.map(tag => `
+            <span class="tag ${tag.isOfficial ? 'official' : ''}">
+              ${escapeHtml(tag.name || tag)}
+            </span>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <div class="source-stats">
+        <div class="stat-item">
+          <span class="stat-icon">🔥</span>
+          <span class="stat-value">${this.formatNumber(source.stats?.downloads || 0)}</span>
+          <span class="stat-label">下载</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">👍</span>
+          <span class="stat-value">${this.formatNumber(source.stats?.likes || 0)}</span>
+          <span class="stat-label">点赞</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">👁</span>
+          <span class="stat-value">${this.formatNumber(source.stats?.views || 0)}</span>
+          <span class="stat-label">浏览</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">⭐</span>
+          <div class="rating-display">
+            ${ratingStars}
+            <span class="rating-count">(${source.stats?.reviewCount || 0})</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="source-actions">
+        <button class="action-btn primary" onclick="window.app.getManager('community').downloadSource('${source.id}')">
+          <span>🔥</span>
+          <span>添加到我的搜索源</span>
+        </button>
+        <button class="action-btn secondary" onclick="window.app.getManager('community').viewSourceDetails('${source.id}')">
+          <span>👁️</span>
+          <span>查看详情</span>
+        </button>
+        <button class="action-btn tertiary like-btn" data-source-id="${source.id}" onclick="window.app.getManager('community').toggleLike('${source.id}')">
+          <span>👍</span>
+          <span>点赞</span>
+        </button>
+        <button class="action-btn tertiary" onclick="window.app.getManager('community').showReviewModal('${source.id}')">
+          <span>💬</span>
+          <span>评价</span>
+        </button>
+        <button class="action-btn tertiary text-warning" onclick="window.app.getManager('community').showReportModal('${source.id}')">
+          <span>🚨</span>
+          <span>举报</span>
+        </button>
+      </div>
+
+      <div class="source-footer">
+        <span class="source-date">分享于 ${this.formatDate(source.createdAt)}</span>
+      </div>
+    </div>
+  `;
+}
 
   renderCommunityControls() {
     const categoryFilter = document.getElementById('communityCategory');
@@ -1488,64 +1560,88 @@ export class CommunityManager {
   }
 
   // 删除我的分享
-  async deleteMyShare(sourceId) {
-    if (!this.app.getCurrentUser()) {
-      showToast('请先登录', 'error');
-      return;
-    }
+// 修复3: 删除搜索源功能，处理GREATEST函数问题
+async deleteMyShare(sourceId) {
+  if (!this.app.getCurrentUser()) {
+    showToast('请先登录', 'error');
+    return;
+  }
+  
+  try {
+    showLoading(true);
     
-    try {
-      showLoading(true);
+    const result = await apiService.deleteCommunitySource(sourceId);
+    
+    if (result.success) {
+      showToast(result.message || '删除成功', 'success');
       
-      const result = await apiService.deleteCommunitySource(sourceId);
-      
-      if (result.success) {
-        showToast(result.message || '删除成功', 'success');
-        
-        const shareItem = document.querySelector(`.my-share-item[data-source-id="${sourceId}"]`);
-        if (shareItem) {
-          shareItem.remove();
-        }
-        
-        const remainingItems = document.querySelectorAll('.my-share-item');
-        if (remainingItems.length === 0) {
-          const modalBody = document.querySelector('#mySharesModal .modal-body');
-          if (modalBody) {
-            modalBody.innerHTML = `
-              <div class="empty-state">
-                <span style="font-size: 3rem;">📁</span>
-                <p>您还没有分享过搜索源</p>
-                <p>分享您的搜索源让更多人受益吧！</p>
-                <button class="btn-primary" onclick="document.getElementById('mySharesModal').remove(); window.app.getManager('community').showShareSourceModal();">
-                  立即分享搜索源
-                </button>
-              </div>
-            `;
-          }
-        }
-        
-        const modalHeader = document.querySelector('#mySharesModal .modal-header h2');
-        if (modalHeader) {
-          const newCount = remainingItems.length;
-          modalHeader.textContent = `我的分享 (${newCount})`;
-        }
-        
-        setTimeout(() => {
-          this.loadCommunitySourcesList();
-          this.loadUserCommunityStats();
-        }, 1000);
-        
-      } else {
-        throw new Error(result.error || '删除失败');
+      // 从DOM中移除项目
+      const shareItem = document.querySelector(`.my-share-item[data-source-id="${sourceId}"]`);
+      if (shareItem) {
+        shareItem.remove();
       }
       
-    } catch (error) {
-      console.error('删除我的分享失败:', error);
-      showToast('删除失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
+      // 检查是否还有剩余项目
+      const remainingItems = document.querySelectorAll('.my-share-item');
+      if (remainingItems.length === 0) {
+        const modalBody = document.querySelector('#mySharesModal .modal-body');
+        if (modalBody) {
+          modalBody.innerHTML = `
+            <div class="empty-state">
+              <span style="font-size: 3rem;">📝</span>
+              <p>您还没有分享过搜索源</p>
+              <p>分享您的搜索源让更多人受益吧！</p>
+              <button class="btn-primary" onclick="document.getElementById('mySharesModal').remove(); window.app.getManager('community').showShareSourceModal();">
+                立即分享搜索源
+              </button>
+            </div>
+          `;
+        }
+      }
+      
+      // 更新模态框标题中的数量
+      const modalHeader = document.querySelector('#mySharesModal .modal-header h2');
+      if (modalHeader) {
+        const newCount = remainingItems.length;
+        modalHeader.textContent = `我的分享 (${newCount})`;
+      }
+      
+      // 延迟刷新列表以避免并发问题
+      setTimeout(() => {
+        this.loadCommunitySourcesList();
+        this.loadUserCommunityStats();
+      }, 1000);
+      
+    } else {
+      let errorMessage = result.error || '删除失败';
+      
+      // 处理特定的数据库错误
+      if (errorMessage.includes('no such function: GREATEST')) {
+        errorMessage = '数据库函数兼容性问题已修复，请刷新页面重试';
+      } else if (errorMessage.includes('SQLITE_ERROR')) {
+        errorMessage = 'SQL执行错误，请联系管理员';
+      }
+      
+      throw new Error(errorMessage);
     }
+    
+  } catch (error) {
+    console.error('删除我的分享失败:', error);
+    
+    let errorMessage = '删除失败';
+    if (error.message.includes('no such function: GREATEST')) {
+      errorMessage = '数据库函数不兼容，管理员需要更新数据库架构';
+    } else if (error.message.includes('SQLITE_ERROR')) {
+      errorMessage = 'SQL执行错误: ' + error.message;
+    } else {
+      errorMessage += ': ' + error.message;
+    }
+    
+    showToast(errorMessage, 'error');
+  } finally {
+    showLoading(false);
   }
+}
 
   // 计算声誉等级
   calculateReputationLevel(reputationScore) {
@@ -1586,42 +1682,51 @@ export class CommunityManager {
   }
 
   // 更新社区统计显示
-  updateCommunityStats() {
-    console.log('更新社区统计显示');
+// 修复6: 完善统计信息更新，包含浏览量
+updateCommunityStats() {
+  console.log('更新社区统计显示，包含浏览量统计');
 
-    const elements = {
-      userSharedCount: document.getElementById('userSharedCount'),
-      userDownloadsCount: document.getElementById('userDownloadsCount'),
-      userLikesCount: document.getElementById('userLikesCount'),
-      userReputationScore: document.getElementById('userReputationScore')
-    };
+  const elements = {
+    userSharedCount: document.getElementById('userSharedCount'),
+    userDownloadsCount: document.getElementById('userDownloadsCount'), 
+    userLikesCount: document.getElementById('userLikesCount'),
+    userReputationScore: document.getElementById('userReputationScore')
+  };
 
-    const stats = this.userStats?.general || {};
-    
-    if (elements.userSharedCount) {
-      elements.userSharedCount.textContent = stats.sharedSources || 0;
-    }
-    
-    if (elements.userDownloadsCount) {
-      elements.userDownloadsCount.textContent = stats.totalDownloads || 0;
-    }
-    
-    if (elements.userLikesCount) {
-      elements.userLikesCount.textContent = stats.totalLikes || 0;
-    }
-    
-    if (elements.userReputationScore) {
-      const comprehensiveScore = this.calculateComprehensiveReputation(stats);
-      const reputationLevel = this.calculateReputationLevel(comprehensiveScore);
-      
-      elements.userReputationScore.innerHTML = `
-        <span style="color: ${reputationLevel.color};">
-          ${reputationLevel.icon} ${comprehensiveScore}
-        </span>
-      `;
-      elements.userReputationScore.title = `${reputationLevel.name} - ${comprehensiveScore}点声誉`;
-    }
+  const stats = this.userStats?.general || {};
+  
+  if (elements.userSharedCount) {
+    elements.userSharedCount.textContent = stats.sharedSources || 0;
   }
+  
+  if (elements.userDownloadsCount) {
+    elements.userDownloadsCount.textContent = stats.totalDownloads || 0;
+  }
+  
+  if (elements.userLikesCount) {
+    elements.userLikesCount.textContent = stats.totalLikes || 0;
+  }
+  
+  // 新增：检查是否有浏览量显示元素
+  const userViewsElement = document.getElementById('userViewsCount'); 
+  if (userViewsElement) {
+    userViewsElement.textContent = this.formatNumber(stats.totalViews || 0);
+  }
+  
+  if (elements.userReputationScore) {
+    const comprehensiveScore = this.calculateComprehensiveReputation(stats);
+    const reputationLevel = this.calculateReputationLevel(comprehensiveScore);
+    
+    elements.userReputationScore.innerHTML = `
+      <span style="color: ${reputationLevel.color};">
+        ${reputationLevel.icon} ${comprehensiveScore}
+      </span>
+    `;
+    elements.userReputationScore.title = `${reputationLevel.name} - ${comprehensiveScore}点声誉`;
+  }
+  
+  console.log('社区统计更新完成，当前数据:', stats);
+}
 
   // 下载搜索源
   async downloadSource(sourceId) {

@@ -102,38 +102,6 @@ CREATE TABLE IF NOT EXISTS analytics_events (
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
 );
 
--- 创建相关索引
-CREATE INDEX IF NOT EXISTS idx_analytics_user_created ON analytics_events(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);
-CREATE INDEX IF NOT EXISTS idx_analytics_session ON analytics_events(session_id);
-
--- 创建索引
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-
-CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
-CREATE INDEX IF NOT EXISTS idx_sessions_user_active ON user_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions(expires_at);
-
-CREATE INDEX IF NOT EXISTS idx_favorites_user_created ON user_favorites(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_favorites_keyword ON user_favorites(keyword);
-
-CREATE INDEX IF NOT EXISTS idx_history_user_created ON user_search_history(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_history_query ON user_search_history(query);
-CREATE INDEX IF NOT EXISTS idx_history_source ON user_search_history(source);
-
-CREATE INDEX IF NOT EXISTS idx_cache_keyword_hash ON search_cache(keyword_hash);
-CREATE INDEX IF NOT EXISTS idx_cache_expires ON search_cache(expires_at);
-
-CREATE INDEX IF NOT EXISTS idx_actions_user_created ON user_actions(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_actions_action ON user_actions(action);
-
-CREATE INDEX IF NOT EXISTS idx_config_public ON system_config(is_public);
-
--- 在文档1中增加索引
-CREATE INDEX IF NOT EXISTS idx_history_user_keyword ON user_search_history(user_id, query);
-CREATE INDEX IF NOT EXISTS idx_favorites_user_url ON user_favorites(user_id, url);
-
 -- 搜索源状态检查缓存表
 CREATE TABLE IF NOT EXISTS source_status_cache (
     id TEXT PRIMARY KEY,
@@ -187,6 +155,25 @@ CREATE TABLE IF NOT EXISTS status_check_jobs (
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
+-- 🆕 标签管理表 - 新增功能
+CREATE TABLE IF NOT EXISTS community_source_tags (
+    id TEXT PRIMARY KEY,
+    tag_name TEXT UNIQUE NOT NULL,
+    tag_description TEXT,
+    tag_color TEXT DEFAULT '#3b82f6',
+    usage_count INTEGER DEFAULT 0,
+    is_official INTEGER DEFAULT 0, -- 是否为官方标签
+    tag_active INTEGER DEFAULT 1, -- 改名避免冲突：is_active -> tag_active
+    created_by TEXT NOT NULL, -- 创建者
+    
+    -- 时间戳
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    
+    -- 外键约束
+    FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+);
+
 -- 共享搜索源表
 CREATE TABLE IF NOT EXISTS community_shared_sources (
     id TEXT PRIMARY KEY,
@@ -197,7 +184,7 @@ CREATE TABLE IF NOT EXISTS community_shared_sources (
     source_url_template TEXT NOT NULL,
     source_category TEXT NOT NULL,
     description TEXT,
-    tags TEXT DEFAULT '[]', -- JSON array of tag IDs (changed from tag names)
+    tags TEXT DEFAULT '[]', -- JSON array of tag IDs
     
     -- 统计信息
     download_count INTEGER DEFAULT 0,
@@ -276,25 +263,6 @@ CREATE TABLE IF NOT EXISTS community_source_downloads (
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
 );
 
--- 🆕 标签管理表 - 新增功能
-CREATE TABLE IF NOT EXISTS community_source_tags (
-    id TEXT PRIMARY KEY,
-    tag_name TEXT UNIQUE NOT NULL,
-    tag_description TEXT,
-    tag_color TEXT DEFAULT '#3b82f6',
-    usage_count INTEGER DEFAULT 0,
-    is_official INTEGER DEFAULT 0, -- 是否为官方标签
-    is_active INTEGER DEFAULT 1, -- 是否启用
-    created_by TEXT NOT NULL, -- 创建者
-    
-    -- 时间戳
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    
-    -- 外键约束
-    FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
-);
-
 -- 搜索源举报表
 CREATE TABLE IF NOT EXISTS community_source_reports (
     id TEXT PRIMARY KEY,
@@ -350,6 +318,35 @@ CREATE TABLE IF NOT EXISTS community_user_stats (
 );
 
 -- 创建索引
+CREATE INDEX IF NOT EXISTS idx_analytics_user_created ON analytics_events(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_analytics_session ON analytics_events(session_id);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_active ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions(expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_favorites_user_created ON user_favorites(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_favorites_keyword ON user_favorites(keyword);
+
+CREATE INDEX IF NOT EXISTS idx_history_user_created ON user_search_history(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_history_query ON user_search_history(query);
+CREATE INDEX IF NOT EXISTS idx_history_source ON user_search_history(source);
+
+CREATE INDEX IF NOT EXISTS idx_cache_keyword_hash ON search_cache(keyword_hash);
+CREATE INDEX IF NOT EXISTS idx_cache_expires ON search_cache(expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_actions_user_created ON user_actions(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_actions_action ON user_actions(action);
+
+CREATE INDEX IF NOT EXISTS idx_config_public ON system_config(is_public);
+
+CREATE INDEX IF NOT EXISTS idx_history_user_keyword ON user_search_history(user_id, query);
+CREATE INDEX IF NOT EXISTS idx_favorites_user_url ON user_favorites(user_id, url);
+
 CREATE INDEX IF NOT EXISTS idx_status_cache_source_keyword ON source_status_cache(source_id, keyword_hash);
 CREATE INDEX IF NOT EXISTS idx_status_cache_expires ON source_status_cache(expires_at);
 CREATE INDEX IF NOT EXISTS idx_health_stats_source ON source_health_stats(source_id);
@@ -376,18 +373,18 @@ CREATE INDEX IF NOT EXISTS idx_likes_type ON community_source_likes(like_type);
 CREATE INDEX IF NOT EXISTS idx_downloads_shared_source ON community_source_downloads(shared_source_id);
 CREATE INDEX IF NOT EXISTS idx_downloads_created ON community_source_downloads(created_at DESC);
 
--- 🆕 标签表索引
+-- 🆕 标签表索引 - 修复列名冲突
 CREATE INDEX IF NOT EXISTS idx_tags_name ON community_source_tags(tag_name);
 CREATE INDEX IF NOT EXISTS idx_tags_creator ON community_source_tags(created_by);
 CREATE INDEX IF NOT EXISTS idx_tags_usage ON community_source_tags(usage_count DESC);
-CREATE INDEX IF NOT EXISTS idx_tags_active ON community_source_tags(is_active);
+CREATE INDEX IF NOT EXISTS idx_tags_active ON community_source_tags(tag_active); -- 使用新列名
 
 CREATE INDEX IF NOT EXISTS idx_reports_shared_source ON community_source_reports(shared_source_id);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON community_source_reports(status);
 CREATE INDEX IF NOT EXISTS idx_community_user_stats_total_views ON community_user_stats(total_views);
 CREATE INDEX IF NOT EXISTS idx_shared_sources_user_status ON community_shared_sources(user_id, status);
 
--- 🆕 更新触发器 - 修复GREATEST函数兼容性问题
+-- 🆕 修复触发器 - 移除GREATEST函数，使用CASE语句替代
 CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_review
     AFTER INSERT ON community_source_reviews
     FOR EACH ROW
@@ -549,7 +546,7 @@ INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_pu
 ('community_min_rating_to_feature', '4.0', '推荐搜索源的最低评分', 'float', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- 🆕 初始化官方标签
-INSERT OR IGNORE INTO community_source_tags (id, tag_name, tag_description, tag_color, is_official, is_active, created_by, created_at, updated_at) VALUES
+INSERT OR IGNORE INTO community_source_tags (id, tag_name, tag_description, tag_color, is_official, tag_active, created_by, created_at, updated_at) VALUES
 ('tag_verified', '已验证', '经过验证的可靠搜索源', '#10b981', 1, 1, 'system', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('tag_popular', '热门', '下载量较高的热门搜索源', '#f59e0b', 1, 1, 'system', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('tag_new', '最新', '新近添加的搜索源', '#3b82f6', 1, 1, 'system', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
