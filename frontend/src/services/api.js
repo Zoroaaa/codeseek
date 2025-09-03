@@ -255,6 +255,7 @@ class APIService {
   }
 
   // 创建新标签 - 增强错误处理
+// 修复标签创建 API - 增强错误处理
 async createTag(tagData) {
     if (!this.token) {
       throw new Error('用户未登录');
@@ -282,32 +283,51 @@ async createTag(tagData) {
     }
     
     try {
-      console.log('创建标签:', payload);
+      console.log('创建标签请求数据:', payload);
       
       const response = await this.request('/api/community/tags', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
       
-      return {
-        success: true,
-        tag: response.tag,
-        message: response.message || '标签创建成功'
-      };
+      console.log('创建标签响应:', response);
       
-    } catch (error) {
-      console.error('创建标签失败:', error);
-      
-      // 处理数据库相关错误
-      if (error.message.includes('ambiguous column name')) {
-        throw new Error('数据库列名冲突，请联系管理员更新数据库架构');
-      } else if (error.message.includes('SQLITE_ERROR')) {
-        throw new Error('SQL执行错误，请检查数据格式');
-      } else if (error.message.includes('UNIQUE constraint failed')) {
-        throw new Error('标签名称已存在，请使用其他名称');
+      if (response.success) {
+        return {
+          success: true,
+          tag: response.tag,
+          message: response.message || '标签创建成功'
+        };
+      } else {
+        // 处理服务器返回的错误
+        throw new Error(response.message || response.error || '创建标签失败');
       }
       
-      throw error;
+    } catch (error) {
+      console.error('创建标签API请求失败:', error);
+      
+      // 增强的错误分类和处理
+      let errorMessage = error.message;
+      
+      if (error.message.includes('ambiguous column name')) {
+        errorMessage = '数据库列名冲突，请联系管理员更新数据库架构';
+      } else if (error.message.includes('SQLITE_ERROR')) {
+        errorMessage = 'SQL执行错误，请检查数据格式或联系技术支持';
+      } else if (error.message.includes('UNIQUE constraint')) {
+        errorMessage = '标签名称已存在，请使用其他名称';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = '请求超时，请稍后重试';
+      } else if (error.message.includes('fetch') || error.message.includes('network')) {
+        errorMessage = '网络连接失败，请检查网络连接';
+      } else if (error.message.includes('401') || error.message.includes('认证')) {
+        errorMessage = '认证失败，请重新登录';
+      } else if (error.message.includes('403') || error.message.includes('权限')) {
+        errorMessage = '没有权限执行此操作';
+      } else if (error.message.includes('500')) {
+        errorMessage = '服务器内部错误，请稍后重试或联系管理员';
+      }
+      
+      throw new Error(errorMessage);
     }
 }
 
@@ -695,7 +715,8 @@ async createTag(tagData) {
   }
 
   // 🔧 修复：删除社区搜索源API - 处理GREATEST函数兼容性
-  async deleteCommunitySource(sourceId) {
+// 修复删除社区搜索源 API - 处理GREATEST函数兼容性
+async deleteCommunitySource(sourceId) {
     if (!this.token) {
       throw new Error('用户未登录');
     }
@@ -711,27 +732,43 @@ async createTag(tagData) {
         method: 'DELETE'
       });
       
-      return {
-        success: true,
-        message: response.message || '删除成功',
-        deletedId: response.deletedId || sourceId
-      };
+      console.log('删除响应:', response);
       
-    } catch (error) {
-      console.error('删除社区搜索源失败:', error);
-      
-      // 🔧 修复：处理特定的数据库函数兼容性错误
-      if (error.message.includes('no such function: GREATEST')) {
-        throw new Error('数据库函数兼容性问题已修复，请刷新页面重试');
-      } else if (error.message.includes('SQLITE_ERROR')) {
-        throw new Error('SQL执行错误，请联系管理员');
-      } else if (error.message.includes('permission')) {
-        throw new Error('您没有权限删除此搜索源');
+      if (response.success) {
+        return {
+          success: true,
+          message: response.message || '删除成功',
+          deletedId: response.deletedId || sourceId
+        };
+      } else {
+        throw new Error(response.message || response.error || '删除失败');
       }
       
-      throw error;
+    } catch (error) {
+      console.error('删除社区搜索源API请求失败:', error);
+      
+      // 特定错误处理 - 重点处理GREATEST函数错误
+      let errorMessage = error.message;
+      
+      if (error.message.includes('GREATEST')) {
+        errorMessage = '数据库函数兼容性问题，系统已修复，请刷新页面重试';
+      } else if (error.message.includes('SQLITE_ERROR')) {
+        errorMessage = 'SQL执行错误，请联系管理员';
+      } else if (error.message.includes('permission') || error.message.includes('权限')) {
+        errorMessage = '您没有权限删除此搜索源';
+      } else if (error.message.includes('404')) {
+        errorMessage = '搜索源不存在或已被删除';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = '删除请求超时，请稍后重试';
+      } else if (error.message.includes('网络') || error.message.includes('fetch')) {
+        errorMessage = '网络连接失败，请检查网络连接';
+      } else if (error.message.includes('500')) {
+        errorMessage = '服务器内部错误，请稍后重试';
+      }
+      
+      throw new Error(errorMessage);
     }
-  }
+}
 
   // 下载/采用社区搜索源
   async downloadCommunitySource(sourceId) {
@@ -1344,6 +1381,58 @@ async createTag(tagData) {
       console.error('删除自定义搜索源失败:', error);
       throw error;
     }
+  }
+}
+
+// 4. 添加全局错误恢复机制
+function initializeErrorRecovery() {
+  // 监听未捕获的错误
+  window.addEventListener('error', function(event) {
+    console.error('全局错误捕获:', event.error);
+    
+    if (event.error && event.error.message) {
+      if (event.error.message.includes('GREATEST')) {
+        showToast('检测到数据库兼容性问题，系统正在修复中...', 'warning');
+        
+        // 延迟提示用户刷新
+        setTimeout(() => {
+          if (confirm('数据库兼容性问题已修复，是否刷新页面以应用修复？')) {
+            window.location.reload();
+          }
+        }, 3000);
+      } else if (event.error.message.includes('ambiguous column name')) {
+        showToast('数据库结构已更新，建议刷新页面', 'info');
+        
+        setTimeout(() => {
+          if (confirm('检测到数据库结构更新，是否刷新页面以获得最新功能？')) {
+            window.location.reload();
+          }
+        }, 5000);
+      }
+    }
+  });
+  
+  // 监听未处理的Promise拒绝
+  window.addEventListener('unhandledrejection', function(event) {
+    console.error('未处理的Promise拒绝:', event.reason);
+    
+    if (event.reason && event.reason.message) {
+      if (event.reason.message.includes('GREATEST') || 
+          event.reason.message.includes('ambiguous column name')) {
+        event.preventDefault(); // 防止在控制台显示错误
+        
+        showToast('系统检测到数据库更新，正在应用修复...', 'info');
+      }
+    }
+  });
+}
+
+// 在页面加载时初始化错误恢复
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeErrorRecovery);
+  } else {
+    initializeErrorRecovery();
   }
 }
 

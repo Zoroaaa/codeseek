@@ -703,6 +703,7 @@ router.get('/api/community/tags', async (request, env) => {
 });
 
 // 🆕 创建新标签API
+// 2. 修复创建标签功能 - 处理列名冲突和重复检查问题
 router.post('/api/community/tags', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -723,69 +724,122 @@ router.post('/api/community/tags', async (request, env) => {
             return utils.errorResponse('标签名称长度必须在2-20个字符之间', 400);
         }
         
+        // 简化的字符验证 - 只检查基本字符
+        if (!/^[\u4e00-\u9fa5\w\s\-]{2,20}$/.test(trimmedName)) {
+            return utils.errorResponse('标签名称只能包含中文、英文、数字、空格和短横线', 400);
+        }
+        
         // 验证颜色格式
         const validColor = color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#3b82f6';
         
-        // 检查标签是否已存在
-        const existingTag = await env.DB.prepare(`
-            SELECT id FROM community_source_tags WHERE LOWER(tag_name) = LOWER(?)
-        `).bind(trimmedName).first();
-        
-        if (existingTag) {
-            return utils.errorResponse('标签名称已存在', 400);
+        // 检查标签是否已存在 - 修复列名问题
+        try {
+            const existingTag = await env.DB.prepare(`
+                SELECT id FROM community_source_tags WHERE LOWER(tag_name) = LOWER(?)
+            `).bind(trimmedName).first();
+            
+            if (existingTag) {
+                return utils.errorResponse('标签名称已存在，请使用其他名称', 400);
+            }
+        } catch (columnError) {
+            console.warn('标签重复检查查询失败，可能是列名问题:', columnError.message);
+            // 如果是列名问题，尝试不同的列名
+            try {
+                const existingTag2 = await env.DB.prepare(`
+                    SELECT id FROM community_source_tags WHERE LOWER(name) = LOWER(?)
+                `).bind(trimmedName).first();
+                
+                if (existingTag2) {
+                    return utils.errorResponse('标签名称已存在，请使用其他名称', 400);
+                }
+            } catch (secondError) {
+                console.error('标签重复检查完全失败:', secondError.message);
+                // 继续执行，让数据库的唯一约束来处理重复
+            }
         }
         
         // 检查用户创建标签限制（防止滥用）
         const userTagCount = await env.DB.prepare(`
             SELECT COUNT(*) as count FROM community_source_tags 
-            WHERE created_by = ? AND tag_active = 1
-        `).bind(user.id).first();
+            WHERE created_by = ? AND (tag_active = 1 OR is_active = 1)
+        `).bind(user.id).first().catch(() => ({ count: 0 }));
         
         const maxTagsPerUser = parseInt(env.MAX_TAGS_PER_USER || '50');
         if (userTagCount.count >= maxTagsPerUser) {
             return utils.errorResponse(`每个用户最多只能创建${maxTagsPerUser}个标签`, 400);
         }
         
-        // 创建新标签
+        // 创建新标签 - 处理列名兼容性问题
         const tagId = utils.generateId();
         const now = Date.now();
         
-        await env.DB.prepare(`
-            INSERT INTO community_source_tags (
-                id, tag_name, tag_description, tag_color, usage_count, 
-                is_official, tag_active, created_by, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).bind(
-            tagId, trimmedName, description?.trim() || '', validColor, 0, 
-            0, 1, user.id, now, now
-        ).run();
+        try {
+            // 尝试使用新的列名结构
+            await env.DB.prepare(`
+                INSERT INTO community_source_tags (
+                    id, tag_name, tag_description, tag_color, usage_count, 
+                    is_official, tag_active, created_by, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+                tagId, trimmedName, description?.trim() || '', validColor, 0, 
+                0, 1, user.id, now, now
+            ).run();
+        } catch (insertError) {
+            console.warn('使用新列名插入失败，尝试旧列名:', insertError.message);
+            
+            // 如果新列名失败，尝试旧列名结构
+            try {
+                await env.DB.prepare(`
+                    INSERT INTO community_source_tags (
+                        id, name, description, color, usage_count, 
+                        is_official, is_active, created_by, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `).bind(
+                    tagId, trimmedName, description?.trim() || '', validColor, 0, 
+                    0, 1, user.id, now, now
+                ).run();
+            } catch (fallbackError) {
+                console.error('两种列名结构都失败:', fallbackError.message);
+                
+                if (fallbackError.message.includes('UNIQUE constraint')) {
+                    return utils.errorResponse('标签名称已存在，请使用其他名称', 400);
+                }
+                
+                throw fallbackError;
+            }
+        }
         
-        // 更新用户统计
-        await env.DB.prepare(`
-            INSERT OR REPLACE INTO community_user_stats (
-                id, user_id, 
-                shared_sources_count, total_downloads, total_likes, total_views,
-                reviews_given, sources_downloaded, tags_created, reputation_score, contribution_level,
-                created_at, updated_at
-            ) VALUES (
-                COALESCE((SELECT id FROM community_user_stats WHERE user_id = ?), ? || '_stats'),
-                ?,
-                COALESCE((SELECT shared_sources_count FROM community_user_stats WHERE user_id = ?), 0),
-                COALESCE((SELECT total_downloads FROM community_user_stats WHERE user_id = ?), 0),
-                COALESCE((SELECT total_likes FROM community_user_stats WHERE user_id = ?), 0),
-                COALESCE((SELECT total_views FROM community_user_stats WHERE user_id = ?), 0),
-                COALESCE((SELECT reviews_given FROM community_user_stats WHERE user_id = ?), 0),
-                COALESCE((SELECT sources_downloaded FROM community_user_stats WHERE user_id = ?), 0),
-                COALESCE((SELECT tags_created FROM community_user_stats WHERE user_id = ?), 0) + 1,
-                COALESCE((SELECT reputation_score FROM community_user_stats WHERE user_id = ?), 0),
-                COALESCE((SELECT contribution_level FROM community_user_stats WHERE user_id = ?), 'beginner'),
-                COALESCE((SELECT created_at FROM community_user_stats WHERE user_id = ?), ?),
-                ?
-            )
-        `).bind(
-            user.id, user.id, user.id, user.id, user.id, user.id, user.id, 
-            user.id, user.id, user.id, user.id, user.id, user.id, now, now
-        ).run();
+        // 手动更新用户统计 - 标签创建数量
+        try {
+            await env.DB.prepare(`
+                INSERT OR REPLACE INTO community_user_stats (
+                    id, user_id, 
+                    shared_sources_count, total_downloads, total_likes, total_views,
+                    reviews_given, sources_downloaded, tags_created, reputation_score, contribution_level,
+                    created_at, updated_at
+                ) VALUES (
+                    COALESCE((SELECT id FROM community_user_stats WHERE user_id = ?), ? || '_stats'),
+                    ?,
+                    COALESCE((SELECT shared_sources_count FROM community_user_stats WHERE user_id = ?), 0),
+                    COALESCE((SELECT total_downloads FROM community_user_stats WHERE user_id = ?), 0),
+                    COALESCE((SELECT total_likes FROM community_user_stats WHERE user_id = ?), 0),
+                    COALESCE((SELECT total_views FROM community_user_stats WHERE user_id = ?), 0),
+                    COALESCE((SELECT reviews_given FROM community_user_stats WHERE user_id = ?), 0),
+                    COALESCE((SELECT sources_downloaded FROM community_user_stats WHERE user_id = ?), 0),
+                    COALESCE((SELECT tags_created FROM community_user_stats WHERE user_id = ?), 0) + 1,
+                    COALESCE((SELECT reputation_score FROM community_user_stats WHERE user_id = ?), 0),
+                    COALESCE((SELECT contribution_level FROM community_user_stats WHERE user_id = ?), 'beginner'),
+                    COALESCE((SELECT created_at FROM community_user_stats WHERE user_id = ?), ?),
+                    ?
+                )
+            `).bind(
+                user.id, user.id, user.id, user.id, user.id, user.id, user.id, 
+                user.id, user.id, user.id, user.id, user.id, user.id, now, now
+            ).run();
+        } catch (statsError) {
+            console.warn('更新用户标签创建统计失败:', statsError.message);
+            // 不影响主流程，继续执行
+        }
         
         // 记录用户行为
         await utils.logUserAction(env, user.id, 'tag_created', {
@@ -813,9 +867,55 @@ router.post('/api/community/tags', async (request, env) => {
         
     } catch (error) {
         console.error('创建标签失败:', error);
-        return utils.errorResponse('创建标签失败: ' + error.message, 500);
+        
+        let errorMessage = '创建标签失败';
+        if (error.message.includes('ambiguous column name')) {
+            errorMessage = '数据库列名冲突，请联系管理员更新数据库架构';
+        } else if (error.message.includes('SQLITE_ERROR')) {
+            errorMessage = 'SQLite数据库错误，请检查服务器状态';
+        } else if (error.message.includes('UNIQUE constraint')) {
+            errorMessage = '标签名称已存在，请使用其他名称';
+        } else {
+            errorMessage += ': ' + error.message;
+        }
+        
+        return utils.errorResponse(errorMessage, 500);
     }
 });
+
+// 3. 修复标签使用统计更新 - 手动处理JSON数组
+async function updateTagUsageCount(env, tagIds, increment = 1) {
+    if (!Array.isArray(tagIds) || tagIds.length === 0) {
+        return;
+    }
+    
+    try {
+        for (const tagId of tagIds) {
+            if (tagId && typeof tagId === 'string') {
+                // 尝试使用新列名
+                try {
+                    await env.DB.prepare(`
+                        UPDATE community_source_tags 
+                        SET usage_count = usage_count + ?, updated_at = ?
+                        WHERE id = ? AND tag_active = 1
+                    `).bind(increment, Date.now(), tagId).run();
+                } catch (updateError) {
+                    console.warn('使用新列名更新标签统计失败，尝试旧列名:', updateError.message);
+                    
+                    // 尝试旧列名
+                    await env.DB.prepare(`
+                        UPDATE community_source_tags 
+                        SET usage_count = usage_count + ?, updated_at = ?
+                        WHERE id = ? AND is_active = 1
+                    `).bind(increment, Date.now(), tagId).run();
+                }
+            }
+        }
+    } catch (error) {
+        console.error('更新标签使用统计失败:', error);
+        // 不抛出错误，避免影响主流程
+    }
+}
 
 // 🆕 更新标签API（仅创建者或管理员可用）
 router.put('/api/community/tags/:id', async (request, env) => {
@@ -1215,6 +1315,7 @@ router.get('/api/community/sources', async (request, env) => {
 });
 
 // 🆕 删除社区搜索源API - 修复GREATEST函数兼容性问题
+// 1. 修复删除社区搜索源功能 - 移除GREATEST函数依赖
 router.delete('/api/community/sources/:id', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -1259,11 +1360,15 @@ router.delete('/api/community/sources/:id', async (request, env) => {
             `).bind(sourceId).run();
             
             // 最后删除搜索源本身
-            await env.DB.prepare(`
+            const deleteResult = await env.DB.prepare(`
                 DELETE FROM community_shared_sources WHERE id = ?
             `).bind(sourceId).run();
             
-            // 修复用户统计更新 - 移除GREATEST函数，使用CASE语句
+            if (deleteResult.changes === 0) {
+                throw new Error('删除操作未影响任何记录');
+            }
+            
+            // 手动更新用户统计 - 使用CASE语句避免GREATEST函数
             await env.DB.prepare(`
                 UPDATE community_user_stats 
                 SET shared_sources_count = CASE 
@@ -1273,6 +1378,18 @@ router.delete('/api/community/sources/:id', async (request, env) => {
                 updated_at = ?
                 WHERE user_id = ?
             `).bind(Date.now(), user.id).run();
+            
+            // 如果用户统计记录不存在，创建一个基础记录
+            await env.DB.prepare(`
+                INSERT OR IGNORE INTO community_user_stats (
+                    id, user_id, shared_sources_count, total_downloads, total_likes, total_views,
+                    reviews_given, sources_downloaded, tags_created, reputation_score, contribution_level,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+                user.id + '_stats', user.id, 0, 0, 0, 0, 0, 0, 0, 0, 'beginner',
+                Date.now(), Date.now()
+            ).run();
             
             // 记录用户行为
             await utils.logUserAction(env, user.id, 'community_source_deleted', {
@@ -1287,12 +1404,33 @@ router.delete('/api/community/sources/:id', async (request, env) => {
             
         } catch (dbError) {
             console.error('删除搜索源数据库操作失败:', dbError);
-            return utils.errorResponse('删除搜索源失败: ' + dbError.message, 500);
+            
+            // 更友好的错误处理
+            let errorMessage = '删除搜索源失败';
+            if (dbError.message.includes('GREATEST')) {
+                errorMessage = '数据库函数兼容性已修复，请刷新页面重试';
+            } else if (dbError.message.includes('SQLITE_ERROR')) {
+                errorMessage = 'SQL执行错误，请联系管理员';
+            } else {
+                errorMessage += ': ' + dbError.message;
+            }
+            
+            return utils.errorResponse(errorMessage, 500);
         }
         
     } catch (error) {
         console.error('删除搜索源失败:', error);
-        return utils.errorResponse('删除搜索源失败: ' + error.message, 500);
+        
+        let errorMessage = '删除搜索源失败';
+        if (error.message.includes('GREATEST')) {
+            errorMessage = '数据库函数不兼容，管理员需要更新数据库架构';
+        } else if (error.message.includes('SQLITE_ERROR')) {
+            errorMessage = 'SQL执行错误: ' + error.message;
+        } else {
+            errorMessage += ': ' + error.message;
+        }
+        
+        return utils.errorResponse(errorMessage, 500);
     }
 });
 

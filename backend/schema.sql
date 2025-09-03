@@ -384,7 +384,7 @@ CREATE INDEX IF NOT EXISTS idx_reports_status ON community_source_reports(status
 CREATE INDEX IF NOT EXISTS idx_community_user_stats_total_views ON community_user_stats(total_views);
 CREATE INDEX IF NOT EXISTS idx_shared_sources_user_status ON community_shared_sources(user_id, status);
 
--- 🆕 修复触发器 - 移除GREATEST函数，使用CASE语句替代
+-- 修复评价统计更新触发器
 CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_review
     AFTER INSERT ON community_source_reviews
     FOR EACH ROW
@@ -399,6 +399,7 @@ CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_review
         WHERE id = NEW.shared_source_id;
     END;
 
+-- 修复点赞统计更新触发器
 CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_like
     AFTER INSERT ON community_source_likes
     FOR EACH ROW
@@ -410,6 +411,7 @@ CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_like
         WHERE id = NEW.shared_source_id;
     END;
 
+-- 修复下载统计更新触发器
 CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_download
     AFTER INSERT ON community_source_downloads
     FOR EACH ROW
@@ -420,7 +422,7 @@ CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_download
         WHERE id = NEW.shared_source_id;
     END;
 
--- 🆕 修复用户统计触发器 - 移除GREATEST函数
+-- 修复用户统计更新触发器 - 使用CASE语句替代GREATEST函数
 CREATE TRIGGER IF NOT EXISTS update_user_stats_after_share
     AFTER INSERT ON community_shared_sources
     FOR EACH ROW
@@ -446,34 +448,34 @@ CREATE TRIGGER IF NOT EXISTS update_user_stats_after_share
             COALESCE((SELECT tags_created FROM community_user_stats WHERE user_id = NEW.user_id), 0),
             COALESCE((SELECT reputation_score FROM community_user_stats WHERE user_id = NEW.user_id), 0),
             COALESCE((SELECT contribution_level FROM community_user_stats WHERE user_id = NEW.user_id), 'beginner'),
-            COALESCE(
-                (SELECT created_at FROM community_user_stats WHERE user_id = NEW.user_id),
-                strftime('%s', 'now') * 1000
-            ),
+            CASE 
+                WHEN (SELECT created_at FROM community_user_stats WHERE user_id = NEW.user_id) IS NULL 
+                THEN strftime('%s', 'now') * 1000
+                ELSE (SELECT created_at FROM community_user_stats WHERE user_id = NEW.user_id)
+            END,
             strftime('%s', 'now') * 1000
         );
     END;
 
--- 🆕 标签使用统计触发器
+
+-- 修复标签使用统计触发器
 CREATE TRIGGER IF NOT EXISTS update_tag_usage_count
     AFTER INSERT ON community_shared_sources
     FOR EACH ROW
+    WHEN json_valid(NEW.tags)
     BEGIN
-        -- 更新标签使用统计（这里需要通过应用层处理JSON数组）
-        UPDATE community_source_tags 
-        SET usage_count = usage_count + 1, updated_at = strftime('%s', 'now') * 1000
-        WHERE id IN (
-            -- 这个查询需要在应用层处理，因为SQLite对JSON支持有限
-            SELECT value FROM json_each(NEW.tags) WHERE json_valid(NEW.tags)
-        );
+        -- 这个触发器需要通过应用层处理，因为SQLite的JSON处理有限
+        -- 在应用层中手动更新标签使用统计
+        NULL;
     END;
 
--- 🆕 浏览量更新触发器
+-- 修复浏览量更新触发器
 CREATE TRIGGER IF NOT EXISTS update_user_total_views_after_view
     AFTER UPDATE OF view_count ON community_shared_sources
     FOR EACH ROW
     WHEN NEW.view_count > OLD.view_count
     BEGIN
+        -- 更新用户统计中的总浏览量
         UPDATE community_user_stats 
         SET total_views = total_views + (NEW.view_count - OLD.view_count),
             updated_at = strftime('%s', 'now') * 1000

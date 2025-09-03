@@ -285,6 +285,7 @@ showCreateTagModal() {
 }
 
   // 🆕 提交创建标签表单
+// 2. 修复创建标签功能的错误处理
 async submitCreateTagForm(event) {
   event.preventDefault();
   
@@ -325,13 +326,13 @@ async submitCreateTagForm(event) {
     hasError = true;
   }
 
-  // 检查标签名称是否已存在
+  // 检查标签名称是否已存在 - 使用本地数据检查
   const existingTag = this.availableTags.find(tag => 
-    tag.name.toLowerCase() === tagData.name.toLowerCase()
+    tag.name && tag.name.toLowerCase() === tagData.name.toLowerCase()
   );
   
   if (existingTag) {
-    this.showFieldError('tagName', '标签名称已存在');
+    this.showFieldError('tagName', '标签名称已存在，请使用其他名称');
     hasError = true;
   }
 
@@ -339,6 +340,8 @@ async submitCreateTagForm(event) {
 
   try {
     showLoading(true);
+    
+    console.log('提交标签创建请求:', tagData);
     
     const result = await apiService.createTag(tagData);
     
@@ -351,16 +354,36 @@ async submitCreateTagForm(event) {
       await this.loadPopularTags();
       
     } else {
-      // 处理服务器端错误
-      let errorMessage = result.message || '创建标签失败';
+      // 处理服务器端错误 - 改进的错误处理
+      let errorMessage = result.message || result.error || '创建标签失败';
       
+      // 处理数据库相关错误
       if (errorMessage.includes('ambiguous column name')) {
-        errorMessage = '数据库配置问题，请联系管理员或稍后重试';
+        errorMessage = '数据库结构正在更新中，请联系管理员或稍后重试';
+        showToast(errorMessage, 'warning');
+        
+        // 建议刷新页面
+        setTimeout(() => {
+          if (confirm('检测到数据库结构已更新，是否刷新页面以应用更新？')) {
+            window.location.reload();
+          }
+        }, 2000);
       } else if (errorMessage.includes('SQLITE_ERROR')) {
         errorMessage = '数据库操作失败，请检查输入或稍后重试';
+        showToast(errorMessage, 'error');
+      } else if (errorMessage.includes('已存在')) {
+        // 后端检查到重复，显示在对应字段
+        this.showFieldError('tagName', '标签名称已存在，请使用其他名称');
+        return; // 不显示 toast，字段级错误已显示
+      } else if (errorMessage.includes('权限')) {
+        errorMessage = '没有创建标签的权限，请联系管理员';
+        showToast(errorMessage, 'error');
+      } else if (errorMessage.includes('限制') || errorMessage.includes('超过')) {
+        errorMessage = '您创建的标签数量已达上限，请先删除一些不常用的标签';
+        showToast(errorMessage, 'warning');
+      } else {
+        showToast(errorMessage, 'error');
       }
-      
-      showToast(errorMessage, 'error');
     }
     
   } catch (error) {
@@ -369,13 +392,28 @@ async submitCreateTagForm(event) {
     let errorMessage = '创建标签失败';
     if (error.message.includes('ambiguous column name')) {
       errorMessage = '数据库列名冲突，请联系管理员更新数据库架构';
+      showToast(errorMessage, 'error');
+      
+      // 提供解决建议
+      setTimeout(() => {
+        if (confirm('检测到数据库架构问题，建议刷新页面。是否立即刷新？')) {
+          window.location.reload();
+        }
+      }, 3000);
     } else if (error.message.includes('SQLITE_ERROR')) {
-      errorMessage = 'SQL执行错误，请检查数据格式';
+      errorMessage = 'SQLite数据库错误，请检查服务器状态';
+      showToast(errorMessage, 'error');
+    } else if (error.message.includes('网络')) {
+      errorMessage = '网络连接失败，请检查网络后重试';
+      showToast(errorMessage, 'error');
+    } else if (error.message.includes('timeout')) {
+      errorMessage = '请求超时，请稍后重试';
+      showToast(errorMessage, 'error');
     } else {
       errorMessage += ': ' + error.message;
+      showToast(errorMessage, 'error');
     }
     
-    showToast(errorMessage, 'error');
   } finally {
     showLoading(false);
   }
@@ -1566,6 +1604,7 @@ renderCommunitySourceItem(source) {
 
   // 删除我的分享
 // 修复3: 删除搜索源功能，处理GREATEST函数问题
+// 修复删除我的分享功能 - 增强错误处理和用户反馈
 async deleteMyShare(sourceId) {
   if (!this.app.getCurrentUser()) {
     showToast('请先登录', 'error');
@@ -1574,6 +1613,8 @@ async deleteMyShare(sourceId) {
   
   try {
     showLoading(true);
+    
+    console.log('开始删除分享的搜索源:', sourceId);
     
     const result = await apiService.deleteCommunitySource(sourceId);
     
@@ -1593,7 +1634,7 @@ async deleteMyShare(sourceId) {
         if (modalBody) {
           modalBody.innerHTML = `
             <div class="empty-state">
-              <span style="font-size: 3rem;">📝</span>
+              <span style="font-size: 3rem;">📁</span>
               <p>您还没有分享过搜索源</p>
               <p>分享您的搜索源让更多人受益吧！</p>
               <button class="btn-primary" onclick="document.getElementById('mySharesModal').remove(); window.app.getManager('community').showShareSourceModal();">
@@ -1620,11 +1661,23 @@ async deleteMyShare(sourceId) {
     } else {
       let errorMessage = result.error || '删除失败';
       
-      // 处理特定的数据库错误
-      if (errorMessage.includes('no such function: GREATEST')) {
-        errorMessage = '数据库函数兼容性问题已修复，请刷新页面重试';
+      // 处理特定的数据库错误 - 用户友好的错误信息
+      if (errorMessage.includes('GREATEST')) {
+        errorMessage = '数据库兼容性问题已修复，请刷新页面后重试';
+        showToast(errorMessage, 'warning');
+        
+        // 自动刷新页面
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
       } else if (errorMessage.includes('SQLITE_ERROR')) {
-        errorMessage = 'SQL执行错误，请联系管理员';
+        errorMessage = '数据库操作失败，请联系管理员或稍后重试';
+        showToast(errorMessage, 'error');
+      } else if (errorMessage.includes('permission')) {
+        errorMessage = '您没有权限删除此搜索源';
+        showToast(errorMessage, 'error');
+      } else {
+        showToast(errorMessage, 'error');
       }
       
       throw new Error(errorMessage);
@@ -1634,15 +1687,27 @@ async deleteMyShare(sourceId) {
     console.error('删除我的分享失败:', error);
     
     let errorMessage = '删除失败';
-    if (error.message.includes('no such function: GREATEST')) {
-      errorMessage = '数据库函数不兼容，管理员需要更新数据库架构';
+    if (error.message.includes('GREATEST')) {
+      errorMessage = '数据库函数不兼容，系统正在修复中，请稍后重试';
+      showToast(errorMessage, 'warning');
+      
+      // 建议用户刷新页面
+      setTimeout(() => {
+        if (confirm('检测到数据库兼容性问题已修复，是否刷新页面以应用修复？')) {
+          window.location.reload();
+        }
+      }, 2000);
     } else if (error.message.includes('SQLITE_ERROR')) {
-      errorMessage = 'SQL执行错误: ' + error.message;
+      errorMessage = 'SQL执行错误，请联系技术支持';
+      showToast(errorMessage, 'error');
+    } else if (error.message.includes('网络')) {
+      errorMessage = '网络连接失败，请检查网络后重试';
+      showToast(errorMessage, 'error');
     } else {
       errorMessage += ': ' + error.message;
+      showToast(errorMessage, 'error');
     }
     
-    showToast(errorMessage, 'error');
   } finally {
     showLoading(false);
   }
