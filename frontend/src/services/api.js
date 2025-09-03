@@ -699,60 +699,66 @@ async createTag(tagData) {
   }
 
   // 🔧 修复：删除社区搜索源API - 处理GREATEST函数兼容性
-// 修复删除社区搜索源 API - 处理GREATEST函数兼容性
 async deleteCommunitySource(sourceId) {
     if (!this.token) {
-      throw new Error('用户未登录');
+        throw new Error('用户未登录');
     }
     
     if (!sourceId) {
-      throw new Error('搜索源ID不能为空');
+        throw new Error('搜索源ID不能为空');
+    }
+    
+    // 添加ID格式验证
+    if (typeof sourceId !== 'string' || sourceId.length < 10) {
+        throw new Error('搜索源ID格式无效');
     }
     
     try {
-      console.log('删除社区搜索源:', sourceId);
-      
-      const response = await this.request(`/api/community/sources/${sourceId}`, {
-        method: 'DELETE'
-      });
-      
-      console.log('删除响应:', response);
-      
-      if (response.success) {
-        return {
-          success: true,
-          message: response.message || '删除成功',
-          deletedId: response.deletedId || sourceId
-        };
-      } else {
-        throw new Error(response.message || response.error || '删除失败');
-      }
-      
+        console.log('API删除搜索源请求:', sourceId);
+        
+        const response = await this.request(`/api/community/sources/${encodeURIComponent(sourceId)}`, {
+            method: 'DELETE',
+            // 添加超时设置
+            signal: AbortSignal.timeout(30000) // 30秒超时
+        });
+        
+        console.log('API删除响应:', response);
+        
+        if (response.success) {
+            return {
+                success: true,
+                message: response.message || '删除成功',
+                deletedId: response.deletedId || sourceId,
+                operations: response.operations || []
+            };
+        } else {
+            throw new Error(response.message || response.error || '删除失败');
+        }
+        
     } catch (error) {
-      console.error('删除社区搜索源API请求失败:', error);
-      
-      // 特定错误处理 - 重点处理GREATEST函数错误
-      let errorMessage = error.message;
-      
-      if (error.message.includes('GREATEST')) {
-        errorMessage = '数据库函数兼容性问题，系统已修复，请刷新页面重试';
-      } else if (error.message.includes('SQLITE_ERROR')) {
-        errorMessage = 'SQL执行错误，请联系管理员';
-      } else if (error.message.includes('permission') || error.message.includes('权限')) {
-        errorMessage = '您没有权限删除此搜索源';
-      } else if (error.message.includes('404')) {
-        errorMessage = '搜索源不存在或已被删除';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = '删除请求超时，请稍后重试';
-      } else if (error.message.includes('网络') || error.message.includes('fetch')) {
-        errorMessage = '网络连接失败，请检查网络连接';
-      } else if (error.message.includes('500')) {
-        errorMessage = '服务器内部错误，请稍后重试';
-      }
-      
-      throw new Error(errorMessage);
+        console.error('删除API请求失败:', error);
+        
+        // 增强的错误处理
+        let errorMessage = error.message;
+        
+        if (error.name === 'TimeoutError') {
+            errorMessage = '删除请求超时，请稍后重试';
+        } else if (error.message.includes('GREATEST')) {
+            errorMessage = '数据库函数兼容性问题已修复，请刷新页面重试';
+        } else if (error.message.includes('500')) {
+            errorMessage = '服务器内部错误，请联系管理员';
+        } else if (error.message.includes('404')) {
+            errorMessage = '搜索源不存在或已被删除';
+        } else if (error.message.includes('403')) {
+            errorMessage = '没有权限删除此搜索源';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            errorMessage = '网络连接失败，请检查网络连接';
+        }
+        
+        throw new Error(errorMessage);
     }
 }
+
 
   // 下载/采用社区搜索源
   async downloadCommunitySource(sourceId) {

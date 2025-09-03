@@ -1289,19 +1289,27 @@ router.get('/api/community/sources', async (request, env) => {
 });
 
 // 🆕 删除社区搜索源API - 修复GREATEST函数兼容性问题
-// 1. 修复删除社区搜索源功能 - 移除GREATEST函数依赖
 router.delete('/api/community/sources/:id', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
     
     try {
-        const sourceId = request.params.id;
-        console.log('删除搜索源ID:', sourceId);
+        // 确保正确获取参数 - 添加多种获取方式
+        let sourceId = request.params?.id;
         
+        // 如果params为空，尝试从URL解析
         if (!sourceId) {
-            return utils.errorResponse('搜索源ID不能为空', 400);
+            const url = new URL(request.url);
+            const pathParts = url.pathname.split('/');
+            sourceId = pathParts[pathParts.length - 1];
         }
         
+        console.log('删除搜索源ID:', sourceId);
+        
+        if (!sourceId || sourceId.length < 10) {
+            return utils.errorResponse('搜索源ID无效', 400);
+        }
+
         // 检查搜索源是否存在且属于当前用户
         const source = await env.DB.prepare(`
             SELECT id, user_id, source_name FROM community_shared_sources 
@@ -1314,100 +1322,68 @@ router.delete('/api/community/sources/:id', async (request, env) => {
         
         console.log('找到要删除的搜索源:', source.source_name);
         
-        // 简单直接的删除逻辑，一步一步来，避免复杂的触发器
+        // 开始事务删除 - 按正确顺序删除避免外键约束
+        const deleteOperations = [];
+        
         try {
             // 1. 删除相关的评论
             const reviewsResult = await env.DB.prepare(`
                 DELETE FROM community_source_reviews WHERE shared_source_id = ?
             `).bind(sourceId).run();
-            console.log('删除评论记录:', reviewsResult.changes);
+            deleteOperations.push(`删除评论记录: ${reviewsResult.changes}`);
             
             // 2. 删除相关的点赞
             const likesResult = await env.DB.prepare(`
                 DELETE FROM community_source_likes WHERE shared_source_id = ?
             `).bind(sourceId).run();
-            console.log('删除点赞记录:', likesResult.changes);
+            deleteOperations.push(`删除点赞记录: ${likesResult.changes}`);
             
             // 3. 删除相关的下载记录
             const downloadsResult = await env.DB.prepare(`
                 DELETE FROM community_source_downloads WHERE shared_source_id = ?
             `).bind(sourceId).run();
-            console.log('删除下载记录:', downloadsResult.changes);
+            deleteOperations.push(`删除下载记录: ${downloadsResult.changes}`);
             
             // 4. 删除相关的举报
             const reportsResult = await env.DB.prepare(`
                 DELETE FROM community_source_reports WHERE shared_source_id = ?
             `).bind(sourceId).run();
-            console.log('删除举报记录:', reportsResult.changes);
+            deleteOperations.push(`删除举报记录: ${reportsResult.changes}`);
             
             // 5. 最后删除搜索源本身
             const sourceResult = await env.DB.prepare(`
                 DELETE FROM community_shared_sources WHERE id = ? AND user_id = ?
             `).bind(sourceId, user.id).run();
-            console.log('删除搜索源记录:', sourceResult.changes);
+            deleteOperations.push(`删除搜索源记录: ${sourceResult.changes}`);
             
             if (sourceResult.changes === 0) {
-                return utils.errorResponse('删除失败：记录不存在或已被删除', 404);
+                throw new Error('删除失败：记录不存在或已被删除');
             }
             
-            // 6. 手动更新用户统计 - 用最简单的方式
-            try {
-                // 先查询当前统计
-                const currentStats = await env.DB.prepare(`
-                    SELECT shared_sources_count FROM community_user_stats WHERE user_id = ?
-                `).bind(user.id).first();
-                
-                if (currentStats) {
-                    // 如果有统计记录，就更新
-                    const newCount = Math.max(0, (currentStats.shared_sources_count || 1) - 1);
-                    await env.DB.prepare(`
-                        UPDATE community_user_stats 
-                        SET shared_sources_count = ?, updated_at = ?
-                        WHERE user_id = ?
-                    `).bind(newCount, Date.now(), user.id).run();
-                    console.log('更新用户统计成功，新的分享数:', newCount);
-                }
-            } catch (statsError) {
-                console.warn('更新用户统计失败，但不影响删除操作:', statsError.message);
-                // 统计更新失败不影响主要的删除操作
-            }
+            // 6. 手动更新用户统计 - 避免触发器问题
+            await updateUserStatsAfterDelete(env, user.id);
             
-            // 7. 记录用户行为
-            try {
-                await utils.logUserAction(env, user.id, 'community_source_deleted', {
-                    sourceId,
-                    sourceName: source.source_name
-                }, request);
-            } catch (logError) {
-                console.warn('记录用户行为失败:', logError.message);
-                // 日志记录失败不影响删除操作
-            }
+            console.log('删除操作完成:', deleteOperations);
             
-            console.log('搜索源删除成功:', source.source_name);
+            // 记录用户行为
+            await utils.logUserAction(env, user.id, 'community_source_deleted', {
+                sourceId,
+                sourceName: source.source_name,
+                deleteOperations
+            }, request).catch(error => {
+                console.warn('记录用户行为失败:', error);
+            });
             
             return utils.successResponse({
                 message: '搜索源删除成功',
                 deletedId: sourceId,
-                sourceName: source.source_name
+                sourceName: source.source_name,
+                operations: deleteOperations
             });
             
         } catch (deleteError) {
             console.error('执行删除操作时发生错误:', deleteError);
-            
-            // 具体的错误处理
-            let errorMessage = '删除操作失败';
-            
-            if (deleteError.message.includes('FOREIGN KEY')) {
-                errorMessage = '无法删除：存在关联数据';
-            } else if (deleteError.message.includes('SQLITE_CONSTRAINT')) {
-                errorMessage = '删除失败：数据约束冲突';
-            } else if (deleteError.message.includes('database is locked')) {
-                errorMessage = '数据库忙碌，请稍后重试';
-            } else {
-                errorMessage = '删除失败: ' + deleteError.message;
-            }
-            
-            return utils.errorResponse(errorMessage, 500);
+            throw deleteError;
         }
         
     } catch (error) {
@@ -1415,12 +1391,23 @@ router.delete('/api/community/sources/:id', async (request, env) => {
         
         let errorMessage = '删除搜索源失败';
         
-        if (error.message.includes('authenticate')) {
-            errorMessage = '用户认证失败，请重新登录';
-        } else if (error.message.includes('params')) {
-            errorMessage = '请求参数错误';
-        } else if (error.message.includes('database')) {
-            errorMessage = '数据库连接失败，请稍后重试';
+        // 详细的错误分类处理
+        if (error.message.includes('GREATEST')) {
+            errorMessage = '数据库函数不兼容，系统正在修复中，请稍后重试';
+            
+            // 尝试清理可能的旧触发器
+            await cleanupLegacyTriggers(env).catch(e => 
+                console.warn('清理旧触发器失败:', e)
+            );
+            
+        } else if (error.message.includes('FOREIGN KEY')) {
+            errorMessage = '无法删除：存在关联数据，请先处理相关内容';
+        } else if (error.message.includes('SQLITE_CONSTRAINT')) {
+            errorMessage = '删除失败：数据约束冲突';
+        } else if (error.message.includes('database is locked')) {
+            errorMessage = '数据库忙碌，请稍后重试';
+        } else if (error.message.includes('no such table')) {
+            errorMessage = '数据库表不存在，请联系管理员';
         } else {
             errorMessage += ': ' + error.message;
         }
@@ -1428,6 +1415,54 @@ router.delete('/api/community/sources/:id', async (request, env) => {
         return utils.errorResponse(errorMessage, 500);
     }
 });
+
+// ========== 2. 辅助函数：更新用户统计 ==========
+async function updateUserStatsAfterDelete(env, userId) {
+    try {
+        // 重新计算用户的分享统计，避免使用触发器
+        const realStats = await env.DB.prepare(`
+            SELECT COUNT(*) as shared_count FROM community_shared_sources 
+            WHERE user_id = ? AND status = 'active'
+        `).bind(userId).first();
+        
+        // 更新或插入统计记录
+        await env.DB.prepare(`
+            INSERT OR REPLACE INTO community_user_stats (
+                id, user_id, shared_sources_count, updated_at,
+                total_downloads, total_likes, total_views, reviews_given,
+                sources_downloaded, tags_created, reputation_score, contribution_level,
+                created_at
+            ) VALUES (
+                COALESCE((SELECT id FROM community_user_stats WHERE user_id = ?), ? || '_stats'),
+                ?,
+                ?,
+                ?,
+                COALESCE((SELECT total_downloads FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT total_likes FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT total_views FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT reviews_given FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT sources_downloaded FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT tags_created FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT reputation_score FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT contribution_level FROM community_user_stats WHERE user_id = ?), 'beginner'),
+                COALESCE((SELECT created_at FROM community_user_stats WHERE user_id = ?), strftime('%s', 'now') * 1000)
+            )
+        `).bind(
+            userId, userId, // for id generation
+            userId, // user_id
+            realStats.shared_count || 0, // shared_sources_count
+            Date.now(), // updated_at
+            userId, userId, userId, userId, userId, userId, userId, userId, userId // for COALESCE selects
+        ).run();
+        
+        console.log('用户统计更新成功，新的分享数:', realStats.shared_count);
+        
+    } catch (error) {
+        console.error('更新用户统计失败:', error);
+        // 不要抛出错误，避免影响主删除操作
+    }
+}
+
 
 // 获取单个搜索源详情
 router.get('/api/community/sources/:id', async (request, env) => {

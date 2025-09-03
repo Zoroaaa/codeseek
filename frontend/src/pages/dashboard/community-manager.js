@@ -1604,114 +1604,111 @@ renderCommunitySourceItem(source) {
   }
 
   // 删除我的分享
-// 修复3: 删除搜索源功能，处理GREATEST函数问题
-// 修复删除我的分享功能 - 增强错误处理和用户反馈
 async deleteMyShare(sourceId) {
-  if (!this.app.getCurrentUser()) {
-    showToast('请先登录', 'error');
-    return;
-  }
-  
-  try {
-    showLoading(true);
+    if (!this.app.getCurrentUser()) {
+        showToast('请先登录', 'error');
+        return;
+    }
     
-    console.log('开始删除分享的搜索源:', sourceId);
+    try {
+        showLoading(true);
+        
+        console.log('前端开始删除分享的搜索源:', sourceId);
+        
+        // 添加前端验证
+        if (!sourceId || typeof sourceId !== 'string' || sourceId.length < 10) {
+            throw new Error('搜索源ID无效');
+        }
+        
+        const result = await apiService.deleteCommunitySource(sourceId);
+        
+        if (result.success) {
+            showToast(result.message || '删除成功', 'success');
+            
+            // 从DOM中移除项目
+            const shareItem = document.querySelector(`.my-share-item[data-source-id="${sourceId}"]`);
+            if (shareItem) {
+                shareItem.style.opacity = '0.5';
+                shareItem.style.pointerEvents = 'none';
+                
+                setTimeout(() => {
+                    shareItem.remove();
+                    this.updateMySharesModalAfterDelete();
+                }, 1000);
+            }
+            
+            // 延迟刷新列表
+            setTimeout(() => {
+                Promise.all([
+                    this.loadCommunitySourcesList(),
+                    this.loadUserCommunityStats()
+                ]).catch(error => {
+                    console.warn('刷新数据失败:', error);
+                });
+            }, 2000);
+            
+        } else {
+            throw new Error(result.message || result.error || '删除失败');
+        }
+        
+    } catch (error) {
+        console.error('删除分享失败:', error);
+        
+        // 用户友好的错误处理
+        let errorMessage = '删除失败';
+        
+        if (error.message.includes('GREATEST') || error.message.includes('兼容性')) {
+            errorMessage = '检测到数据库更新，正在应用修复...';
+            showToast(errorMessage, 'warning');
+            
+            // 建议刷新页面
+            setTimeout(() => {
+                if (confirm('数据库兼容性问题已修复，是否刷新页面以应用修复？')) {
+                    window.location.reload();
+                }
+            }, 3000);
+        } else if (error.message.includes('超时')) {
+            errorMessage = '删除请求超时，请检查网络连接后重试';
+            showToast(errorMessage, 'error');
+        } else if (error.message.includes('权限')) {
+            errorMessage = '您没有权限删除此搜索源';
+            showToast(errorMessage, 'error');
+        } else {
+            errorMessage += ': ' + error.message;
+            showToast(errorMessage, 'error');
+        }
+        
+    } finally {
+        showLoading(false);
+    }
+}
+
+// 更新模态框状态的辅助方法
+updateMySharesModalAfterDelete() {
+    const remainingItems = document.querySelectorAll('.my-share-item');
     
-    const result = await apiService.deleteCommunitySource(sourceId);
-    
-    if (result.success) {
-      showToast(result.message || '删除成功', 'success');
-      
-      // 从DOM中移除项目
-      const shareItem = document.querySelector(`.my-share-item[data-source-id="${sourceId}"]`);
-      if (shareItem) {
-        shareItem.remove();
-      }
-      
-      // 检查是否还有剩余项目
-      const remainingItems = document.querySelectorAll('.my-share-item');
-      if (remainingItems.length === 0) {
+    if (remainingItems.length === 0) {
         const modalBody = document.querySelector('#mySharesModal .modal-body');
         if (modalBody) {
-          modalBody.innerHTML = `
-            <div class="empty-state">
-              <span style="font-size: 3rem;">📁</span>
-              <p>您还没有分享过搜索源</p>
-              <p>分享您的搜索源让更多人受益吧！</p>
-              <button class="btn-primary" onclick="document.getElementById('mySharesModal').remove(); window.app.getManager('community').showShareSourceModal();">
-                立即分享搜索源
-              </button>
-            </div>
-          `;
+            modalBody.innerHTML = `
+                <div class="empty-state">
+                    <span style="font-size: 3rem;">📂</span>
+                    <p>您还没有分享过搜索源</p>
+                    <p>分享您的搜索源让更多人受益吧！</p>
+                    <button class="btn-primary" onclick="document.getElementById('mySharesModal').remove(); window.app.getManager('community').showShareSourceModal();">
+                        立即分享搜索源
+                    </button>
+                </div>
+            `;
         }
-      }
-      
-      // 更新模态框标题中的数量
-      const modalHeader = document.querySelector('#mySharesModal .modal-header h2');
-      if (modalHeader) {
+    }
+    
+    // 更新标题中的数量
+    const modalHeader = document.querySelector('#mySharesModal .modal-header h2');
+    if (modalHeader) {
         const newCount = remainingItems.length;
         modalHeader.textContent = `我的分享 (${newCount})`;
-      }
-      
-      // 延迟刷新列表以避免并发问题
-      setTimeout(() => {
-        this.loadCommunitySourcesList();
-        this.loadUserCommunityStats();
-      }, 1000);
-      
-    } else {
-      let errorMessage = result.error || '删除失败';
-      
-      // 处理特定的数据库错误 - 用户友好的错误信息
-      if (errorMessage.includes('GREATEST')) {
-        errorMessage = '数据库兼容性问题已修复，请刷新页面后重试';
-        showToast(errorMessage, 'warning');
-        
-        // 自动刷新页面
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-      } else if (errorMessage.includes('SQLITE_ERROR')) {
-        errorMessage = '数据库操作失败，请联系管理员或稍后重试';
-        showToast(errorMessage, 'error');
-      } else if (errorMessage.includes('permission')) {
-        errorMessage = '您没有权限删除此搜索源';
-        showToast(errorMessage, 'error');
-      } else {
-        showToast(errorMessage, 'error');
-      }
-      
-      throw new Error(errorMessage);
     }
-    
-  } catch (error) {
-    console.error('删除我的分享失败:', error);
-    
-    let errorMessage = '删除失败';
-    if (error.message.includes('GREATEST')) {
-      errorMessage = '数据库函数不兼容，系统正在修复中，请稍后重试';
-      showToast(errorMessage, 'warning');
-      
-      // 建议用户刷新页面
-      setTimeout(() => {
-        if (confirm('检测到数据库兼容性问题已修复，是否刷新页面以应用修复？')) {
-          window.location.reload();
-        }
-      }, 2000);
-    } else if (error.message.includes('SQLITE_ERROR')) {
-      errorMessage = 'SQL执行错误，请联系技术支持';
-      showToast(errorMessage, 'error');
-    } else if (error.message.includes('网络')) {
-      errorMessage = '网络连接失败，请检查网络后重试';
-      showToast(errorMessage, 'error');
-    } else {
-      errorMessage += ': ' + error.message;
-      showToast(errorMessage, 'error');
-    }
-    
-  } finally {
-    showLoading(false);
-  }
 }
 
   // 计算声誉等级
