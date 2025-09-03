@@ -1640,6 +1640,265 @@
   background: var(--text-muted);
 }
 
+/* 优化搜索源分享者信息区域样式 */
+
+/* 搜索源项目主体布局优化 */
+.community-source-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem; /* 稍微减少内边距 */
+  transition: all 0.2s ease-in-out;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 搜索源头部布局优化 */
+.community-source-item .source-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.community-source-item .source-icon {
+  font-size: 1.8rem; /* 稍微减小图标尺寸 */
+  flex-shrink: 0;
+  margin-top: 0.15rem; /* 微调图标位置 */
+}
+
+.source-title-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.community-source-item .source-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 1.15rem; /* 稍微减小标题字体 */
+  margin-bottom: 0.4rem; /* 减少间距 */
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.community-source-item .source-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.3;
+  margin: 0;
+  word-break: break-word;
+}
+
+/* 优化右侧徽章区域 */
+.source-badges {
+  display: flex;
+  gap: 0.4rem;
+  flex-direction: row; /* 改为横向排列 */
+  align-items: flex-start;
+  flex-shrink: 0;
+  flex-wrap: wrap; /* 允许换行 */
+}
+
+/* 优化分享者信息区域布局 - 这是重点优化区域 */
+.community-source-item .source-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start; /* 改为顶部对齐 */
+  margin-bottom: 1rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem; /* 增加内边距 */
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(var(--accent-primary-rgb), 0.03) 100%); /* 添加subtle背景 */
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(var(--border-color-rgb, 0, 0, 0), 0.5); /* 添加边框 */
+}
+
+/* 优化分类徽章 */
+.source-category {
+  flex-shrink: 0;
+  order: 1; /* 确保分类在左侧 */
+}
+
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.75rem; /* 增加内边距 */
+  border-radius: var(--radius-md); /* 使用更大的圆角 */
+  font-size: 0.75rem;
+  font-weight: 600; /* 增加字重 */
+  color: white;
+  box-shadow: var(--shadow-sm); /* 添加阴影 */
+  letter-spacing: 0.3px; /* 增加字间距 */
+}
+
+/* 优化作者信息布局 */
+.source-author {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  flex: 1;
+  text-align: center; /* 改为居中对齐 */
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* 居中对齐 */
+  gap: 0.4rem;
+  order: 2; /* 确保在中间 */
+  min-width: 120px; /* 设置最小宽度 */
+}
+
+/* 优化分享者名称显示 */
+.source-author .author-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* 优化分享时间显示 */
+.source-author .share-date {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+/* 优化作者声誉等级显示 */
+.author-reputation {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem; /* 增加内边距 */
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(var(--accent-primary-rgb), 0.12); /* 增加透明度 */
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.25);
+  color: var(--accent-primary);
+  order: 3; /* 确保在右侧 */
+  align-self: flex-start; /* 顶部对齐 */
+  white-space: nowrap; /* 防止换行 */
+  box-shadow: var(--shadow-sm); /* 添加轻微阴影 */
+}
+
+/* 添加"由"字标签 */
+.source-author::before {
+  content: "由";
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-right: 0.2rem;
+  font-weight: normal;
+}
+
+/* 添加"分享"字标签 */
+.source-author::after {
+  content: "分享";
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-left: 0.2rem;
+  font-weight: normal;
+}
+
+/* 优化搜索源描述区域 */
+.community-source-item .source-description {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.5; /* 增加行高 */
+  margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  padding: 0.5rem; /* 添加内边距 */
+  background: rgba(var(--bg-primary-rgb), 0.5); /* 添加背景色 */
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent-primary); /* 添加左边框 */
+}
+
+/* 优化标签区域 */
+.community-source-item .source-tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background: rgba(var(--bg-tertiary-rgb), 0.3);
+  border-radius: var(--radius-sm);
+}
+
+/* 响应式优化 - 针对移动端 */
+@media (max-width: 768px) {
+  .community-source-item .source-meta {
+    flex-direction: column;
+    align-items: center; /* 垂直布局时居中对齐 */
+    text-align: center;
+    gap: 0.75rem;
+  }
+  
+  .source-author {
+    text-align: center !important;
+    align-items: center !important;
+    order: 2;
+  }
+  
+  .source-category {
+    order: 1;
+    align-self: center;
+  }
+  
+  .author-reputation {
+    order: 3;
+    align-self: center;
+  }
+  
+  .source-badges {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .community-source-item {
+    padding: 1rem;
+  }
+  
+  .community-source-item .source-meta {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .source-author {
+    min-width: auto;
+  }
+}
+
+/* 添加微动画效果 */
+.community-source-item .source-meta {
+  transition: all 0.2s ease-in-out;
+}
+
+.community-source-item:hover .source-meta {
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(var(--accent-primary-rgb), 0.05) 100%);
+  border-color: rgba(var(--accent-primary-rgb), 0.2);
+}
+
+.category-badge,
+.author-reputation {
+  transition: all 0.2s ease-in-out;
+}
+
+.community-source-item:hover .category-badge {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.community-source-item:hover .author-reputation {
+  background: rgba(var(--accent-primary-rgb), 0.15);
+  border-color: rgba(var(--accent-primary-rgb), 0.3);
+  transform: translateY(-1px);
+}
+
 /* 无障碍支持 */
 .community-source-item:focus-within {
   outline: 2px solid var(--accent-primary);
