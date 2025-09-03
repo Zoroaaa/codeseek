@@ -673,11 +673,11 @@
   color: white;
 }
 
-/* 搜索源元信息 - 增加声誉系统显示 */
+/* 搜索源元信息 - 修复竖向排列问题 */
 .community-source-item .source-meta {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 1rem;
   gap: 1rem;
   flex-wrap: wrap;
@@ -706,9 +706,20 @@
   flex: 1;
   text-align: right;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.3rem;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* 修复作者信息的子元素排列 */
+.source-author span,
+.source-author .author-name,
+.source-author .author-action,
+.source-author .author-level {
+  display: inline;
+  white-space: nowrap;
 }
 
 /* 🆕 新增：作者声誉等级显示 */
