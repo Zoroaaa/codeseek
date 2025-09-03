@@ -1,10 +1,9 @@
 // 社区标签管理API服务 - 从api.js拆分出来的标签相关功能
 import { generateId } from '../utils/helpers.js';
+import apiService from '../services/api.js';
 
 class CommunityTagsService {
-  constructor(baseAPIService) {
-    this.api = baseAPIService;
-  }
+
 
   // 🆕 修复：标签管理API集合 - 处理列名冲突和数据库错误
   
@@ -25,7 +24,7 @@ class CommunityTagsService {
         
         const endpoint = `/api/community/tags${params.toString() ? `?${params.toString()}` : ''}`;
         
-        const response = await this.api.request(endpoint);
+        const response = await apiService.request(endpoint);
         
         return {
             success: true,
@@ -56,7 +55,7 @@ class CommunityTagsService {
 
   // 创建新标签 - 增强错误处理
   async createTag(tagData) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -84,7 +83,7 @@ class CommunityTagsService {
     try {
       console.log('创建标签请求数据:', payload);
       
-      const response = await this.api.request('/api/community/tags', {
+      const response = await apiService.request('/api/community/tags', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
@@ -132,7 +131,7 @@ class CommunityTagsService {
 
   // 更新标签 - 处理列名变更
   async updateTag(tagId, updates) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -165,7 +164,7 @@ class CommunityTagsService {
     try {
       console.log('更新标签:', tagId, payload);
       
-      const response = await this.api.request(`/api/community/tags/${tagId}`, {
+      const response = await apiService.request(`/api/community/tags/${tagId}`, {
         method: 'PUT',
         body: JSON.stringify(payload)
       });
@@ -189,7 +188,7 @@ class CommunityTagsService {
 
   // 删除标签 - 处理用户权限验证
   async deleteTag(tagId) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -200,7 +199,7 @@ class CommunityTagsService {
     try {
       console.log('删除标签:', tagId);
       
-      const response = await this.api.request(`/api/community/tags/${tagId}`, {
+      const response = await apiService.request(`/api/community/tags/${tagId}`, {
         method: 'DELETE'
       });
       
@@ -236,7 +235,7 @@ class CommunityTagsService {
       
       console.log('请求热门标签:', endpoint);
       
-      const response = await this.api.request(endpoint);
+      const response = await apiService.request(endpoint);
       
       console.log('热门标签响应:', response);
       
@@ -296,7 +295,7 @@ class CommunityTagsService {
 
   // 🆕 编辑标签 - 增强现有方法
   async editTag(tagId, updates) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -337,7 +336,7 @@ class CommunityTagsService {
     try {
       console.log('编辑标签:', tagId, payload);
       
-      const response = await this.api.request(`/api/community/tags/${tagId}`, {
+      const response = await apiService.request(`/api/community/tags/${tagId}`, {
         method: 'PUT',
         body: JSON.stringify(payload)
       });
@@ -376,7 +375,7 @@ class CommunityTagsService {
         throw new Error('标签ID不能为空');
       }
       
-      const response = await this.api.request(`/api/community/tags/${tagId}`);
+      const response = await apiService.request(`/api/community/tags/${tagId}`);
       
       return {
         success: true,
@@ -394,7 +393,7 @@ class CommunityTagsService {
 
   // 🆕 批量操作标签状态
   async batchUpdateTagsStatus(tagIds, isActive) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     

@@ -1,10 +1,9 @@
 // 社区搜索源分享API服务 - 从api.js拆分出来的搜索源分享相关功能
 import { generateId } from '../utils/helpers.js';
+import apiService from '../services/api.js';
 
 class CommunitySourcesService {
-  constructor(baseAPIService) {
-    this.api = baseAPIService;
-  }
+
 
   // 社区搜索源API集合 - 完整版
   
@@ -51,7 +50,7 @@ class CommunitySourcesService {
       
       console.log('请求社区搜索源:', endpoint);
       
-      const response = await this.api.request(endpoint);
+      const response = await apiService.request(endpoint);
       
       return {
         success: true,
@@ -80,7 +79,7 @@ class CommunitySourcesService {
         throw new Error('搜索源ID不能为空');
       }
       
-      const response = await this.api.request(`/api/community/sources/${sourceId}`);
+      const response = await apiService.request(`/api/community/sources/${sourceId}`);
       
       // 🔧 修复：确保浏览量统计在详情中正确显示
       if (response.source && response.source.stats) {
@@ -103,7 +102,7 @@ class CommunitySourcesService {
 
   // 分享搜索源到社区（支持完整参数）- 修复标签系统集成
   async shareSourceToCommunity(sourceData) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -140,7 +139,7 @@ class CommunitySourcesService {
     try {
       console.log('分享搜索源到社区:', payload);
       
-      const response = await this.api.request('/api/community/sources', {
+      const response = await apiService.request('/api/community/sources', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
@@ -166,7 +165,7 @@ class CommunitySourcesService {
 
   // 🔧 修复：删除社区搜索源API - 处理GREATEST函数兼容性
   async deleteCommunitySource(sourceId) {
-    if (!this.api.token) {
+    if (!apiService.token) {
         throw new Error('用户未登录');
     }
     
@@ -182,7 +181,7 @@ class CommunitySourcesService {
     try {
         console.log('API删除搜索源请求:', sourceId);
         
-        const response = await this.api.request(`/api/community/sources/${encodeURIComponent(sourceId)}`, {
+        const response = await apiService.request(`/api/community/sources/${encodeURIComponent(sourceId)}`, {
             method: 'DELETE',
             // 添加超时设置
             signal: AbortSignal.timeout(30000) // 30秒超时
@@ -227,7 +226,7 @@ class CommunitySourcesService {
 
   // 下载/采用社区搜索源
   async downloadCommunitySource(sourceId) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -236,7 +235,7 @@ class CommunitySourcesService {
     }
     
     try {
-      const response = await this.api.request(`/api/community/sources/${sourceId}/download`, {
+      const response = await apiService.request(`/api/community/sources/${sourceId}/download`, {
         method: 'POST'
       });
       
@@ -255,7 +254,7 @@ class CommunitySourcesService {
 
   // 点赞/收藏搜索源（支持多种类型）
   async toggleSourceLike(sourceId, likeType = 'like') {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -269,7 +268,7 @@ class CommunitySourcesService {
     }
     
     try {
-      const response = await this.api.request(`/api/community/sources/${sourceId}/like`, {
+      const response = await apiService.request(`/api/community/sources/${sourceId}/like`, {
         method: 'POST',
         body: JSON.stringify({ type: likeType })
       });
@@ -289,7 +288,7 @@ class CommunitySourcesService {
 
   // 评价搜索源（支持匿名和完整评价）
   async reviewCommunitySource(sourceId, reviewData) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -310,7 +309,7 @@ class CommunitySourcesService {
     };
     
     try {
-      const response = await this.api.request(`/api/community/sources/${sourceId}/review`, {
+      const response = await apiService.request(`/api/community/sources/${sourceId}/review`, {
         method: 'POST',
         body: JSON.stringify(payload)
       });
@@ -329,7 +328,7 @@ class CommunitySourcesService {
 
   // 举报搜索源（支持多种举报类型）
   async reportCommunitySource(sourceId, reportData) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -354,7 +353,7 @@ class CommunitySourcesService {
     };
     
     try {
-      const response = await this.api.request(`/api/community/sources/${sourceId}/report`, {
+      const response = await apiService.request(`/api/community/sources/${sourceId}/report`, {
         method: 'POST',
         body: JSON.stringify(payload)
       });
@@ -373,7 +372,7 @@ class CommunitySourcesService {
 
   // 🔧 修复：获取用户社区统计（完整版，包含浏览量等）
   async getUserCommunityStats() {
-    if (!this.api.token) {
+    if (!apiService.token) {
       return {
         success: false,
         stats: null,
@@ -384,7 +383,7 @@ class CommunitySourcesService {
     try {
       console.log('请求用户社区统计数据');
       
-      const response = await this.api.request('/api/community/user/stats');
+      const response = await apiService.request('/api/community/user/stats');
       
       console.log('用户社区统计响应:', response);
       
@@ -460,7 +459,7 @@ class CommunitySourcesService {
       }
       
       const endpoint = `/api/community/search?${params.toString()}`;
-      const response = await this.api.request(endpoint);
+      const response = await apiService.request(endpoint);
       
       return {
         success: true,
@@ -484,7 +483,7 @@ class CommunitySourcesService {
   // 获取社区统计概览
   async getCommunityStats() {
     try {
-      const response = await this.api.request('/api/community/stats');
+      const response = await apiService.request('/api/community/stats');
       
       return {
         success: true,
@@ -511,7 +510,7 @@ class CommunitySourcesService {
 
   // 🆕 编辑社区分享的搜索源
   async editCommunitySource(sourceId, updates) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -556,7 +555,7 @@ class CommunitySourcesService {
     try {
       console.log('编辑搜索源:', sourceId, payload);
       
-      const response = await this.api.request(`/api/community/sources/${sourceId}`, {
+      const response = await apiService.request(`/api/community/sources/${sourceId}`, {
         method: 'PUT',
         body: JSON.stringify(payload)
       });
@@ -592,7 +591,7 @@ class CommunitySourcesService {
 
   // 🆕 获取用户的搜索源分享详情（用于编辑）
   async getMySharedSourceDetails(sourceId) {
-    if (!this.api.token) {
+    if (!apiService.token) {
       throw new Error('用户未登录');
     }
     
@@ -602,7 +601,7 @@ class CommunitySourcesService {
       }
       
       // 获取详细信息
-      const response = await this.api.request(`/api/community/sources/${sourceId}`);
+      const response = await apiService.request(`/api/community/sources/${sourceId}`);
       
       if (response.success && response.source) {
         return {
