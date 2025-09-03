@@ -44,7 +44,7 @@ export class CommunityManager {
     }
   }
 
-  async loadTabData() {
+async loadTabData() {
     if (!this.isInitialized) {
       await this.init();
     }
@@ -55,13 +55,15 @@ export class CommunityManager {
       // 先绑定事件
       await this.bindEvents();
       
-      // 并行加载多个数据
+      // 🔧 修复：调整加载顺序，确保标签数据优先加载
       await Promise.all([
-        this.loadCommunitySourcesList(),
+        this.loadAvailableTags(), // 首先加载标签数据
         this.loadUserCommunityStats(),
-        this.loadAvailableTags(), // 🆕 加载所有可用标签
         this.loadPopularTags()
       ]);
+      
+      // 标签数据加载完成后再加载搜索源列表
+      await this.loadCommunitySourcesList();
       
       this.renderCommunityControls();
       this.updateCommunityStats();
@@ -72,7 +74,7 @@ export class CommunityManager {
     } finally {
       showLoading(false);
     }
-  }
+}
 
   async bindEvents() {
     const waitForDOM = () => {
@@ -180,7 +182,7 @@ async loadAvailableTags() {
   try {
     console.log('开始加载所有可用标签');
     const result = await apiService.getAllTags({
-      active: true, // 确保只获取激活的标签
+      active: true,
       category: 'all'
     });
     
@@ -197,6 +199,12 @@ async loadAvailableTags() {
         return true;
       });
       
+      // 🔧 新增：标签加载完成后，如果已经有社区搜索源数据，重新渲染以显示正确的标签名称
+      if (this.currentSources && this.currentSources.length > 0) {
+        console.log('标签数据加载完成，重新渲染搜索源列表以显示正确的标签名称');
+        this.renderCommunitySourcesList(this.currentSources, this.currentPagination);
+      }
+      
     } else {
       console.warn('加载可用标签失败:', result.error);
       this.availableTags = [];
@@ -208,7 +216,6 @@ async loadAvailableTags() {
     // 显示用户友好的错误信息
     if (error.message.includes('ambiguous column name')) {
       console.log('检测到数据库列名冲突，尝试重新初始化...');
-      // 可以在这里添加重试逻辑或提示用户刷新
     }
   }
 }
@@ -454,7 +461,7 @@ showFieldError(fieldId, message) {
 }
 
   // 加载社区搜索源列表
-  async loadCommunitySourcesList() {
+async loadCommunitySourcesList() {
     try {
       console.log('开始加载社区搜索源列表');
       
@@ -467,9 +474,66 @@ showFieldError(fieldId, message) {
       const result = await apiService.getCommunitySearchSources(options);
       
       if (result.success) {
-        this.currentSources = result.sources;
+        // 🔧 修复：确保标签数据正确处理
+        const processedSources = result.sources.map(source => {
+          // 如果标签还是ID格式，尝试从availableTags中映射
+          if (source.tags && Array.isArray(source.tags)) {
+            source.tags = source.tags.map(tag => {
+              // 如果tag已经是对象且有name，直接返回
+              if (typeof tag === 'object' && tag.name) {
+                return tag;
+              }
+              
+              // 如果tag是字符串ID，尝试映射到名称
+              if (typeof tag === 'string') {
+                const knownTag = this.availableTags.find(availableTag => 
+                  availableTag.id === tag || availableTag.name === tag
+                );
+                
+                if (knownTag) {
+                  return {
+                    id: knownTag.id,
+                    name: knownTag.name,
+                    color: knownTag.color || '#3b82f6',
+                    isOfficial: Boolean(knownTag.isOfficial)
+                  };
+                } else {
+                  // 如果是UUID格式，显示简化ID
+                  if (tag.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i)) {
+                    return {
+                      id: tag,
+                      name: `标签-${tag.slice(0, 8)}`,
+                      color: '#6b7280',
+                      isOfficial: false
+                    };
+                  } else {
+                    // 否则直接作为名称使用
+                    return {
+                      id: tag,
+                      name: tag,
+                      color: '#3b82f6',
+                      isOfficial: false
+                    };
+                  }
+                }
+              }
+              
+              // 兜底处理
+              return {
+                id: 'unknown',
+                name: '未知标签',
+                color: '#6b7280',
+                isOfficial: false
+              };
+            });
+          }
+          
+          return source;
+        });
+        
+        this.currentSources = processedSources;
         this.currentPagination = result.pagination;
-        this.renderCommunitySourcesList(result.sources, result.pagination);
+        this.renderCommunitySourcesList(processedSources, result.pagination);
       } else {
         throw new Error(result.error || '加载社区搜索源失败');
       }
@@ -492,7 +556,7 @@ showFieldError(fieldId, message) {
         `;
       }
     }
-  }
+}
 
   // 加载用户社区统计
   async loadUserCommunityStats() {
@@ -1231,7 +1295,63 @@ renderCommunitySourceItem(source) {
     Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).find(cat => cat.id === source.category) : null;
   
   const ratingStars = this.renderRatingStars(source.stats?.rating || 0);
-  const tags = source.tags ? source.tags.slice(0, 3) : [];
+  
+  // 🔧 修复：处理标签数据，确保显示名称而不是ID
+  let tags = [];
+  if (source.tags && Array.isArray(source.tags)) {
+    tags = source.tags.slice(0, 3).map(tag => {
+      // 如果tag是对象且有name属性，直接使用
+      if (typeof tag === 'object' && tag.name) {
+        return {
+          id: tag.id,
+          name: tag.name,
+          color: tag.color || '#3b82f6',
+          isOfficial: Boolean(tag.isOfficial)
+        };
+      }
+      // 如果tag是字符串，检查是否是ID格式
+      else if (typeof tag === 'string') {
+        // 如果是UUID格式的ID，尝试从已知标签中查找
+        if (tag.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i)) {
+          // 尝试从available tags中查找对应的名称
+          const knownTag = this.availableTags.find(availableTag => availableTag.id === tag);
+          if (knownTag) {
+            return {
+              id: knownTag.id,
+              name: knownTag.name,
+              color: knownTag.color || '#3b82f6',
+              isOfficial: Boolean(knownTag.isOfficial)
+            };
+          } else {
+            // 如果找不到对应的标签名称，显示简化的ID
+            return {
+              id: tag,
+              name: `标签-${tag.slice(0, 8)}`,
+              color: '#6b7280',
+              isOfficial: false
+            };
+          }
+        } else {
+          // 如果是普通字符串，直接作为名称使用
+          return {
+            id: tag,
+            name: tag,
+            color: '#3b82f6',
+            isOfficial: false
+          };
+        }
+      }
+      // 兜底处理
+      else {
+        return {
+          id: 'unknown',
+          name: '未知标签',
+          color: '#6b7280',
+          isOfficial: false
+        };
+      }
+    });
+  }
   
   const authorReputation = this.calculateReputationLevel(source.author?.reputation || 0);
   
@@ -1272,8 +1392,11 @@ renderCommunitySourceItem(source) {
       ${tags.length > 0 ? `
         <div class="source-tags">
           ${tags.map(tag => `
-            <span class="tag ${tag.isOfficial ? 'official' : ''}">
-              ${escapeHtml(tag.name || tag)}
+            <span class="tag ${tag.isOfficial ? 'official' : ''}" 
+                  style="background-color: ${tag.color}15; border-color: ${tag.color}; color: ${tag.color};"
+                  onclick="window.app.getManager('community').searchByTag('${escapeHtml(tag.name)}')"
+                  title="点击搜索包含此标签的搜索源">
+              ${escapeHtml(tag.name)}
             </span>
           `).join('')}
         </div>
@@ -1332,6 +1455,18 @@ renderCommunitySourceItem(source) {
       </div>
     </div>
   `;
+}
+
+// 🔧 新增：处理标签点击搜索功能
+async searchByTag(tagName) {
+    console.log('按标签搜索:', tagName);
+    const searchInput = document.getElementById('communitySearch');
+    if (searchInput) {
+        searchInput.value = tagName;
+    }
+    this.currentFilters.search = tagName;
+    this.currentPage = 1;
+    await this.loadCommunitySourcesList();
 }
 
   renderCommunityControls() {
@@ -1523,14 +1658,28 @@ renderCommunitySourceItem(source) {
   }
 
   // 渲染我的分享项目
-  renderMyShareItem(source) {
+renderMyShareItem(source) {
     const category = APP_CONSTANTS.SOURCE_CATEGORIES ? 
       Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).find(cat => cat.id === source.category) : null;
+    
+    // 🔧 修复：处理我的分享中的标签显示
+    let tags = [];
+    if (source.tags && Array.isArray(source.tags)) {
+      tags = source.tags.slice(0, 3).map(tag => {
+        if (typeof tag === 'object' && tag.name) {
+          return tag;
+        } else if (typeof tag === 'string') {
+          const knownTag = this.availableTags.find(availableTag => availableTag.id === tag);
+          return knownTag || { id: tag, name: tag.includes('-') ? `标签-${tag.slice(0, 8)}` : tag, isOfficial: false };
+        }
+        return { id: 'unknown', name: '未知标签', isOfficial: false };
+      });
+    }
     
     return `
       <div class="my-share-item" data-source-id="${source.id}">
         <div class="share-item-header">
-          <div class="share-item-icon">${source.icon || '📁'}</div>
+          <div class="share-item-icon">${source.icon || '🔍'}</div>
           <div class="share-item-info">
             <h4 class="share-item-title">${escapeHtml(source.name)}</h4>
             ${source.subtitle ? `<p class="share-item-subtitle">${escapeHtml(source.subtitle)}</p>` : ''}
@@ -1546,6 +1695,17 @@ renderCommunitySourceItem(source) {
             ${source.isFeatured ? '<span class="badge featured">推荐</span>' : ''}
           </div>
         </div>
+
+        ${tags.length > 0 ? `
+          <div class="share-item-tags" style="margin-bottom: 1rem;">
+            ${tags.map(tag => `
+              <span class="tag ${tag.isOfficial ? 'official' : ''}" 
+                    style="background-color: ${tag.color || '#3b82f6'}15; border-color: ${tag.color || '#3b82f6'}; color: ${tag.color || '#3b82f6'};">
+                ${escapeHtml(tag.name)}
+              </span>
+            `).join('')}
+          </div>
+        ` : ''}
 
         <div class="share-item-stats">
           <div class="stat-item">
@@ -1592,7 +1752,7 @@ renderCommunitySourceItem(source) {
         </div>
       </div>
     `;
-  }
+}
 
   // 确认删除分享的搜索源
   confirmDeleteShare(sourceId, sourceName) {

@@ -1170,7 +1170,7 @@ router.get('/api/community/sources', async (request, env) => {
         const search = url.searchParams.get('search');
         const tags = url.searchParams.get('tags');
         const featured = url.searchParams.get('featured') === 'true';
-        const author = url.searchParams.get('author'); // 🆕 添加按作者过滤
+        const author = url.searchParams.get('author');
         
         console.log('获取社区搜索源列表:', { 
             page, limit, category, sortBy, order, search, author, featured 
@@ -1231,36 +1231,132 @@ router.get('/api/community/sources', async (request, env) => {
         
         const result = await env.DB.prepare(dataQuery).bind(...params, limit, offset).all();
         
-        const sources = result.results.map(source => ({
-            id: source.id,
-            name: source.source_name,
-            subtitle: source.source_subtitle,
-            icon: source.source_icon,
-            urlTemplate: source.source_url_template,
-            category: source.source_category,
-            description: source.description,
-            tags: source.tags ? JSON.parse(source.tags).slice(0, 5) : [], // 限制标签数量
-            author: {
-                id: source.user_id,
-                name: source.author_name
-            },
-            stats: {
-                downloads: source.download_count || 0,
-                likes: source.like_count || 0,
-                views: source.view_count || 0, // 🆕 确保包含浏览量
-                rating: source.rating_score || 0,
-                reviewCount: source.review_count || 0
-            },
-            isVerified: Boolean(source.is_verified),
-            isFeatured: Boolean(source.is_featured),
-            createdAt: source.created_at,
-            updatedAt: source.updated_at,
-            lastTestedAt: source.last_tested_at
-        }));
+        // 🔧 批量获取所有标签信息
+        const allTagIds = [];
+        result.results.forEach(source => {
+            try {
+                const tagIds = source.tags ? JSON.parse(source.tags) : [];
+                allTagIds.push(...tagIds);
+            } catch (e) {
+                console.warn('解析标签ID失败:', e);
+            }
+        });
+        
+        // 去重并获取标签信息
+        const uniqueTagIds = [...new Set(allTagIds)];
+        let tagMap = new Map();
+        
+        if (uniqueTagIds.length > 0) {
+            try {
+                // 尝试使用新的列名
+                const tagQuery = `
+                    SELECT id, tag_name as name, tag_color as color, is_official 
+                    FROM community_source_tags 
+                    WHERE id IN (${uniqueTagIds.map(() => '?').join(',')}) AND tag_active = 1
+                `;
+                const tagResult = await env.DB.prepare(tagQuery).bind(...uniqueTagIds).all();
+                
+                tagResult.results.forEach(tag => {
+                    tagMap.set(tag.id, {
+                        id: tag.id,
+                        name: tag.name,
+                        color: tag.color,
+                        isOfficial: Boolean(tag.is_official)
+                    });
+                });
+                
+            } catch (columnError) {
+                console.warn('使用新列名查询标签失败，尝试旧列名:', columnError.message);
+                
+                try {
+                    // 回退到旧的列名
+                    const tagQueryOld = `
+                        SELECT id, name, color, is_official 
+                        FROM community_source_tags 
+                        WHERE id IN (${uniqueTagIds.map(() => '?').join(',')}) AND is_active = 1
+                    `;
+                    const tagResultOld = await env.DB.prepare(tagQueryOld).bind(...uniqueTagIds).all();
+                    
+                    tagResultOld.results.forEach(tag => {
+                        tagMap.set(tag.id, {
+                            id: tag.id,
+                            name: tag.name,
+                            color: tag.color,
+                            isOfficial: Boolean(tag.is_official)
+                        });
+                    });
+                    
+                } catch (fallbackError) {
+                    console.error('标签查询完全失败:', fallbackError.message);
+                    // 如果查询失败，创建默认标签显示
+                    uniqueTagIds.forEach(tagId => {
+                        tagMap.set(tagId, {
+                            id: tagId,
+                            name: `标签-${tagId.slice(0, 8)}`,
+                            color: '#3b82f6',
+                            isOfficial: false
+                        });
+                    });
+                }
+            }
+        }
+        
+        // 处理搜索源数据并映射标签
+        const sources = result.results.map(source => {
+            let sourceTags = [];
+            
+            try {
+                const tagIds = source.tags ? JSON.parse(source.tags) : [];
+                sourceTags = tagIds.map(tagId => {
+                    const tagInfo = tagMap.get(tagId);
+                    return tagInfo || {
+                        id: tagId,
+                        name: `未知标签-${tagId.slice(0, 8)}`,
+                        color: '#6b7280',
+                        isOfficial: false
+                    };
+                }).slice(0, 5); // 限制标签数量
+            } catch (e) {
+                console.warn('处理源标签时出错:', e);
+                sourceTags = [];
+            }
+            
+            return {
+                id: source.id,
+                name: source.source_name,
+                subtitle: source.source_subtitle,
+                icon: source.source_icon,
+                urlTemplate: source.source_url_template,
+                category: source.source_category,
+                description: source.description,
+                tags: sourceTags, // 🔧 现在包含完整的标签信息
+                author: {
+                    id: source.user_id,
+                    name: source.author_name
+                },
+                stats: {
+                    downloads: source.download_count || 0,
+                    likes: source.like_count || 0,
+                    views: source.view_count || 0,
+                    rating: source.rating_score || 0,
+                    reviewCount: source.review_count || 0
+                },
+                isVerified: Boolean(source.is_verified),
+                isFeatured: Boolean(source.is_featured),
+                createdAt: source.created_at,
+                updatedAt: source.updated_at,
+                lastTestedAt: source.last_tested_at
+            };
+        });
         
         const totalPages = Math.ceil(total / limit);
         
         console.log(`返回 ${sources.length} 个搜索源，总计 ${total} 个，第 ${page}/${totalPages} 页`);
+        console.log('标签映射情况:', {
+            totalUniqueTags: uniqueTagIds.length,
+            mappedTags: tagMap.size,
+            sampleMappings: Array.from(tagMap.entries()).slice(0, 3)
+        });
         
         return utils.successResponse({
             sources,
@@ -1515,19 +1611,64 @@ router.get('/api/community/sources/:id', async (request, env) => {
             createdAt: review.created_at
         }));
         
-        // 获取标签信息 - 🆕 支持新的标签系统
+        // 🔧 修复：获取标签信息 - 确保返回完整的标签数据
+        let tagDetails = [];
         const tagIds = sourceResult.tags ? JSON.parse(sourceResult.tags) : [];
-        const tagDetails = [];
         
         if (tagIds.length > 0) {
-            const tagQuery = `SELECT * FROM community_source_tags WHERE id IN (${tagIds.map(() => '?').join(',')}) AND tag_active = 1`;
-            const tagResult = await env.DB.prepare(tagQuery).bind(...tagIds).all();
-            tagDetails.push(...tagResult.results.map(tag => ({
-                id: tag.id,
-                name: tag.tag_name,
-                color: tag.tag_color,
-                isOfficial: Boolean(tag.is_official)
-            })));
+            try {
+                // 尝试使用新的列名
+                const tagQuery = `
+                    SELECT id, tag_name as name, tag_description as description, 
+                           tag_color as color, is_official, usage_count 
+                    FROM community_source_tags 
+                    WHERE id IN (${tagIds.map(() => '?').join(',')}) AND tag_active = 1
+                `;
+                const tagResult = await env.DB.prepare(tagQuery).bind(...tagIds).all();
+                
+                tagDetails = tagResult.results.map(tag => ({
+                    id: tag.id,
+                    name: tag.name,
+                    description: tag.description,
+                    color: tag.color,
+                    isOfficial: Boolean(tag.is_official),
+                    usageCount: tag.usage_count || 0
+                }));
+                
+            } catch (columnError) {
+                console.warn('标签查询使用新列名失败，尝试旧列名:', columnError.message);
+                
+                try {
+                    // 回退到旧的列名
+                    const tagQueryOld = `
+                        SELECT id, name, description, color, is_official, usage_count 
+                        FROM community_source_tags 
+                        WHERE id IN (${tagIds.map(() => '?').join(',')}) AND is_active = 1
+                    `;
+                    const tagResultOld = await env.DB.prepare(tagQueryOld).bind(...tagIds).all();
+                    
+                    tagDetails = tagResultOld.results.map(tag => ({
+                        id: tag.id,
+                        name: tag.name,
+                        description: tag.description,
+                        color: tag.color,
+                        isOfficial: Boolean(tag.is_official),
+                        usageCount: tag.usage_count || 0
+                    }));
+                    
+                } catch (fallbackError) {
+                    console.error('标签查询完全失败:', fallbackError.message);
+                    // 如果标签查询失败，使用标签ID作为名称显示
+                    tagDetails = tagIds.map(tagId => ({
+                        id: tagId,
+                        name: `标签-${tagId.slice(0, 8)}`, // 显示ID的前8位作为临时标识
+                        description: '',
+                        color: '#3b82f6',
+                        isOfficial: false,
+                        usageCount: 0
+                    }));
+                }
+            }
         }
         
         const source = {
@@ -1538,7 +1679,7 @@ router.get('/api/community/sources/:id', async (request, env) => {
             urlTemplate: sourceResult.source_url_template,
             category: sourceResult.source_category,
             description: sourceResult.description,
-            tags: tagDetails, // 🆕 返回完整的标签信息
+            tags: tagDetails, // 🔧 返回完整的标签信息而不是ID
             author: {
                 id: sourceResult.author_id,
                 name: sourceResult.author_name,
