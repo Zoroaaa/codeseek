@@ -635,47 +635,50 @@ async loadCommunitySourcesList() {
 
   // 渲染热门标签
   renderPopularTags() {
-    const container = document.getElementById('popularTagsList');
-    if (!container) {
-      console.log('热门标签容器不存在');
-      return;
-    }
+    if (this.app.getCurrentUser()) {
+      // 登录用户显示带编辑功能的版本
+      this.renderPopularTagsWithEdit();
+    } else {
+      // 原有的只读版本
+      const container = document.getElementById('popularTagsList');
+      if (!container) return;
 
-    if (!this.popularTags || this.popularTags.length === 0) {
-      this.renderEmptyTags();
-      return;
-    }
+      if (!this.popularTags || this.popularTags.length === 0) {
+        this.renderEmptyTags();
+        return;
+      }
 
-    const validTags = this.popularTags
-      .filter(tag => (tag.usageCount || tag.count) > 0)
-      .sort((a, b) => (b.usageCount || b.count) - (a.usageCount || a.count))
-      .slice(0, 15);
+      const validTags = this.popularTags
+        .filter(tag => (tag.usageCount || tag.count) > 0)
+        .sort((a, b) => (b.usageCount || b.count) - (a.usageCount || a.count))
+        .slice(0, 15);
 
-    if (validTags.length === 0) {
-      this.renderEmptyTags();
-      return;
-    }
+      if (validTags.length === 0) {
+        this.renderEmptyTags();
+        return;
+      }
 
-    const tagsHTML = validTags.map(tag => {
-      const isOfficial = tag.isOfficial || false;
-      const usageCount = tag.usageCount || tag.count || 0;
-      const tagClass = isOfficial ? 'tag-item official' : 'tag-item';
-      
-      return `
-        <span class="${tagClass}" 
-              onclick="window.app.getManager('community').searchByTag('${escapeHtml(tag.name)}')"
-              title="使用次数: ${usageCount}">
-          ${escapeHtml(tag.name)} 
-          <span class="tag-count">(${usageCount})</span>
-        </span>
+      const tagsHTML = validTags.map(tag => {
+        const isOfficial = tag.isOfficial || false;
+        const usageCount = tag.usageCount || tag.count || 0;
+        const tagClass = isOfficial ? 'tag-item official' : 'tag-item';
+        
+        return `
+          <span class="${tagClass}" 
+                onclick="window.app.getManager('community').searchByTag('${escapeHtml(tag.name)}')"
+                title="使用次数: ${usageCount}">
+            ${escapeHtml(tag.name)} 
+            <span class="tag-count">(${usageCount})</span>
+          </span>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="tags-cloud">
+          ${tagsHTML}
+        </div>
       `;
-    }).join('');
-
-    container.innerHTML = `
-      <div class="tags-cloud">
-        ${tagsHTML}
-      </div>
-    `;
+    }
   }
 
   // 渲染空标签状态
@@ -2341,6 +2344,574 @@ updateCommunityStats() {
       console.error('搜索社区内容失败:', error);
       showToast('搜索失败: ' + error.message, 'error');
       return [];
+    }
+  }
+  
+    // 🆕 显示编辑标签模态框
+  showEditTagModal(tagId) {
+    if (!this.app.getCurrentUser()) {
+      showToast('请先登录', 'error');
+      return;
+    }
+
+    console.log('显示编辑标签模态框:', tagId);
+
+    // 查找标签数据
+    const tag = this.availableTags.find(t => t.id === tagId);
+    if (!tag) {
+      showToast('标签不存在', 'error');
+      return;
+    }
+
+    const modalHTML = `
+      <div id="editTagModal" class="modal tag-modal" style="display: block;">
+        <div class="modal-content">
+          <span class="close" onclick="document.getElementById('editTagModal').remove()">&times;</span>
+          <h2>✏️ 编辑标签</h2>
+          
+          <form id="editTagForm">
+            <div class="form-group">
+              <label for="editTagName">标签名称 <span style="color: red;">*</span>:</label>
+              <input type="text" id="editTagName" name="tagName" required 
+                value="${escapeHtml(tag.name)}" 
+                placeholder="例如：高质量、热门推荐" 
+                maxlength="20">
+              <small class="form-help">2-20个字符，支持中文、英文、数字</small>
+              <div class="field-error" id="editTagNameError"></div>
+            </div>
+            
+            <div class="form-group">
+              <label for="editTagDescription">标签描述:</label>
+              <input type="text" id="editTagDescription" name="tagDescription" 
+                value="${escapeHtml(tag.description || '')}"
+                placeholder="简要描述这个标签的用途" maxlength="100">
+            </div>
+            
+            <div class="form-group">
+              <label for="editTagColor">标签颜色:</label>
+              <input type="color" id="editTagColor" name="tagColor" value="${tag.color || '#3b82f6'}">
+              <div class="tag-color-preview">
+                <span>预览:</span>
+                <span class="color-sample" style="background-color: ${tag.color || '#3b82f6'};"></span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="editTagActive" ${tag.isActive ? 'checked' : ''}>
+                启用此标签
+              </label>
+              <small class="form-help">禁用后，此标签将不会在标签列表中显示</small>
+            </div>
+            
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">
+                <span>💾</span>
+                <span>保存更改</span>
+              </button>
+              <button type="button" class="btn-secondary" onclick="document.getElementById('editTagModal').remove()">
+                取消
+              </button>
+              ${!tag.isOfficial ? `
+              <button type="button" class="btn-danger" onclick="window.app.getManager('community').confirmDeleteTag('${tag.id}', '${escapeHtml(tag.name)}')">
+                <span>🗑️</span>
+                <span>删除标签</span>
+              </button>` : ''}
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // 绑定颜色预览事件
+    const colorInput = document.getElementById('editTagColor');
+    const colorSample = document.querySelector('#editTagModal .color-sample');
+    if (colorInput && colorSample) {
+      colorInput.addEventListener('input', (e) => {
+        colorSample.style.backgroundColor = e.target.value;
+      });
+    }
+    
+    // 绑定表单提交事件
+    const form = document.getElementById('editTagForm');
+    if (form) {
+      form.addEventListener('submit', (e) => this.submitEditTagForm(e, tagId));
+    }
+  }
+
+  // 🆕 提交编辑标签表单
+  async submitEditTagForm(event, tagId) {
+    event.preventDefault();
+    
+    const form = document.getElementById('editTagForm');
+    if (!form) return;
+
+    // 清除之前的错误状态
+    this.clearFormErrors('editTagModal');
+
+    const formData = new FormData(form);
+    const updates = {
+      name: formData.get('tagName')?.trim(),
+      description: formData.get('tagDescription')?.trim() || '',
+      color: formData.get('tagColor') || '#3b82f6',
+      isActive: document.getElementById('editTagActive')?.checked
+    };
+
+    // 前端验证
+    if (!updates.name || updates.name.length < 2) {
+      this.showFieldError('editTagName', '标签名称至少需要2个字符');
+      return;
+    }
+
+    if (updates.name.length > 20) {
+      this.showFieldError('editTagName', '标签名称不能超过20个字符');
+      return;
+    }
+
+    try {
+      showLoading(true);
+      
+      console.log('提交标签编辑:', tagId, updates);
+      
+      const result = await apiService.editTag(tagId, updates);
+      
+      if (result.success) {
+        showToast('标签更新成功！', 'success');
+        document.getElementById('editTagModal').remove();
+        
+        // 重新加载标签数据
+        await Promise.all([
+          this.loadAvailableTags(),
+          this.loadPopularTags()
+        ]);
+        
+      } else {
+        showToast(result.message || '更新失败', 'error');
+      }
+      
+    } catch (error) {
+      console.error('编辑标签失败:', error);
+      showToast('编辑失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🆕 确认删除标签
+  confirmDeleteTag(tagId, tagName) {
+    const confirmed = confirm(`确定要删除标签"${tagName}"吗？\n\n删除后不可恢复，且所有使用此标签的搜索源将失去此标签。`);
+    
+    if (confirmed) {
+      this.deleteTag(tagId);
+    }
+  }
+
+  // 🆕 删除标签
+  async deleteTag(tagId) {
+    if (!this.app.getCurrentUser()) {
+      showToast('请先登录', 'error');
+      return;
+    }
+    
+    try {
+      showLoading(true);
+      
+      console.log('删除标签:', tagId);
+      
+      const result = await apiService.deleteTag(tagId);
+      
+      if (result.success) {
+        showToast('标签删除成功', 'success');
+        
+        // 关闭模态框
+        const modal = document.getElementById('editTagModal');
+        if (modal) modal.remove();
+        
+        // 重新加载标签数据
+        await Promise.all([
+          this.loadAvailableTags(),
+          this.loadPopularTags()
+        ]);
+        
+      } else {
+        showToast(result.message || '删除失败', 'error');
+      }
+      
+    } catch (error) {
+      console.error('删除标签失败:', error);
+      showToast('删除失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🆕 显示编辑我的分享模态框
+  showEditMyShareModal(sourceId) {
+    if (!this.app.getCurrentUser()) {
+      showToast('请先登录', 'error');
+      return;
+    }
+
+    console.log('显示编辑分享模态框:', sourceId);
+    this.loadAndShowEditShareModal(sourceId);
+  }
+
+  // 🆕 加载并显示编辑分享模态框
+  async loadAndShowEditShareModal(sourceId) {
+    try {
+      showLoading(true);
+      
+      // 获取搜索源详情
+      const result = await apiService.getMySharedSourceDetails(sourceId);
+      
+      if (!result.success || !result.source) {
+        throw new Error(result.error || '获取搜索源详情失败');
+      }
+      
+      const source = result.source;
+      
+      // 获取分类选项
+      const getCategoryOptions = () => {
+        if (APP_CONSTANTS.SOURCE_CATEGORIES) {
+          return Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(cat => 
+            `<option value="${cat.id}" ${source.category === cat.id ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`
+          ).join('');
+        }
+        return `
+          <option value="jav" ${source.category === 'jav' ? 'selected' : ''}>🎬 JAV资源</option>
+          <option value="movie" ${source.category === 'movie' ? 'selected' : ''}>🎭 影视资源</option>
+          <option value="torrent" ${source.category === 'torrent' ? 'selected' : ''}>🧲 种子磁力</option>
+          <option value="other" ${source.category === 'other' ? 'selected' : ''}>📁 其他搜索</option>
+        `;
+      };
+
+      const modalHTML = `
+        <div id="editShareModal" class="modal" style="display: block;">
+          <div class="modal-content large">
+            <span class="close" onclick="document.getElementById('editShareModal').remove()">&times;</span>
+            <h2>✏️ 编辑分享的搜索源</h2>
+            
+            <div id="editShareFormError" style="display: none;"></div>
+            
+            <form id="editShareForm">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="editShareName">搜索源名称 <span style="color: red;">*</span>:</label>
+                  <input type="text" id="editShareName" name="name" required 
+                    value="${escapeHtml(source.name)}" 
+                    placeholder="例如：JavDB" maxlength="50">
+                  <div class="field-error" id="editShareNameError"></div>
+                </div>
+                
+                <div class="form-group">
+                  <label for="editShareSubtitle">副标题:</label>
+                  <input type="text" id="editShareSubtitle" name="subtitle" 
+                    value="${escapeHtml(source.subtitle || '')}"
+                    placeholder="简短描述" maxlength="100">
+                </div>
+                
+                <div class="form-group">
+                  <label for="editShareIcon">图标 (emoji):</label>
+                  <input type="text" id="editShareIcon" name="icon" 
+                    value="${escapeHtml(source.icon || '📁')}"
+                    placeholder="📁" maxlength="4">
+                </div>
+                
+                <div class="form-group">
+                  <label for="editShareCategory">分类 <span style="color: red;">*</span>:</label>
+                  <select id="editShareCategory" name="category" required>
+                    ${getCategoryOptions()}
+                  </select>
+                  <div class="field-error" id="editShareCategoryError"></div>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="editShareDescription">详细描述:</label>
+                <textarea id="editShareDescription" name="description" 
+                  placeholder="介绍这个搜索源的特点和用法..." 
+                  rows="4" maxlength="500">${escapeHtml(source.description || '')}</textarea>
+              </div>
+              
+              <!-- 标签选择器 -->
+              <div class="form-group">
+                <label>选择标签:</label>
+                ${this.renderEditTagSelector(source.tags || [])}
+              </div>
+              
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">
+                  <span>💾</span>
+                  <span>保存更改</span>
+                </button>
+                <button type="button" class="btn-secondary" onclick="document.getElementById('editShareModal').remove()">
+                  取消
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHTML);
+      
+      // 绑定表单提交事件
+      const form = document.getElementById('editShareForm');
+      if (form) {
+        form.addEventListener('submit', (e) => this.submitEditShareForm(e, sourceId));
+      }
+      
+    } catch (error) {
+      console.error('加载编辑分享模态框失败:', error);
+      showToast('加载失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🆕 渲染编辑时的标签选择器（预选已有标签）
+  renderEditTagSelector(selectedTags = []) {
+    if (!this.availableTags || this.availableTags.length === 0) {
+      return `
+        <div class="tag-selector">
+          <div class="empty-tags">
+            <p>暂无可用标签</p>
+            <button type="button" class="btn-secondary btn-sm" onclick="window.app.getManager('community').showCreateTagModal()">
+              创建标签
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // 获取已选中标签的ID列表
+    const selectedTagIds = Array.isArray(selectedTags) ? 
+      selectedTags.map(tag => typeof tag === 'object' ? tag.id : tag) : [];
+
+    const tagsHTML = this.availableTags.map(tag => {
+      const isSelected = selectedTagIds.includes(tag.id);
+      return `
+        <div class="tag-selector-item ${isSelected ? 'selected' : ''}" 
+             data-tag-id="${tag.id}" 
+             onclick="this.classList.toggle('selected'); this.querySelector('input[type=checkbox]').checked = this.classList.contains('selected'); window.app.getManager('community').updateSelectedTags()">
+          <input type="checkbox" value="${tag.id}" name="selectedTags" ${isSelected ? 'checked' : ''} style="display: none;">
+          <span class="tag-name" style="color: ${tag.color || '#3b82f6'}">${escapeHtml(tag.name)}</span>
+          ${tag.isOfficial ? '<span class="official-badge">官方</span>' : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="tag-selector">
+        <div class="tag-selector-header">
+          <input type="text" class="tag-selector-search" placeholder="搜索标签..." onkeyup="window.app.getManager('community').filterTags(this.value)">
+          <button type="button" class="btn-secondary btn-sm" onclick="window.app.getManager('community').showCreateTagModal()">
+            + 创建标签
+          </button>
+        </div>
+        <div class="tag-selector-list" id="tagSelectorList">
+          ${tagsHTML}
+        </div>
+        <div class="selected-tags-display" id="selectedTagsDisplay">
+          ${this.renderSelectedTagsDisplay(selectedTags)}
+        </div>
+      </div>
+    `;
+  }
+
+  // 🆕 渲染已选中标签显示
+  renderSelectedTagsDisplay(selectedTags) {
+    if (!selectedTags || selectedTags.length === 0) {
+      return '<span class="placeholder">未选择标签</span>';
+    }
+
+    return selectedTags.map(tag => {
+      const tagData = typeof tag === 'object' ? tag : 
+        this.availableTags.find(t => t.id === tag) || { id: tag, name: tag };
+      
+      return `
+        <span class="selected-tag-item">
+          ${escapeHtml(tagData.name)}
+          <button type="button" class="selected-tag-remove" onclick="window.app.getManager('community').removeSelectedTag('${tagData.id}')">×</button>
+        </span>
+      `;
+    }).join('');
+  }
+
+  // 🆕 提交编辑分享表单
+  async submitEditShareForm(event, sourceId) {
+    event.preventDefault();
+    
+    const form = document.getElementById('editShareForm');
+    if (!form) return;
+
+    this.clearFormErrors('editShareModal');
+
+    const formData = new FormData(form);
+    
+    // 获取选中的标签ID
+    const selectedTags = Array.from(document.querySelectorAll('#editShareModal .tag-selector-item.selected input[type="checkbox"]'))
+      .map(checkbox => checkbox.value);
+
+    const updates = {
+      name: formData.get('name')?.trim(),
+      subtitle: formData.get('subtitle')?.trim() || '',
+      icon: formData.get('icon')?.trim() || '📁',
+      category: formData.get('category'),
+      description: formData.get('description')?.trim() || '',
+      tags: selectedTags
+    };
+
+    // 前端验证
+    let hasError = false;
+
+    if (!updates.name || updates.name.length < 2) {
+      this.showFieldError('editShareName', '搜索源名称至少需要2个字符');
+      hasError = true;
+    }
+
+    if (!updates.category) {
+      this.showFieldError('editShareCategory', '请选择一个分类');
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    try {
+      showLoading(true);
+      
+      console.log('提交编辑分享:', sourceId, updates);
+      
+      const result = await apiService.editCommunitySource(sourceId, updates);
+      
+      if (result.success) {
+        showToast('搜索源更新成功！', 'success');
+        document.getElementById('editShareModal').remove();
+        
+        // 刷新我的分享列表和社区列表
+        await Promise.all([
+          this.loadCommunitySourcesList(),
+          this.loadUserCommunityStats()
+        ]);
+        
+        // 如果我的分享模态框是打开的，也刷新它
+        const mySharesModal = document.getElementById('mySharesModal');
+        if (mySharesModal) {
+          this.showMySharesModal();
+        }
+        
+      } else {
+        this.showFormError('editShareFormError', result.message || '更新失败');
+      }
+      
+    } catch (error) {
+      console.error('编辑分享失败:', error);
+      this.showFormError('editShareFormError', '编辑失败: ' + error.message);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // 🆕 真实实现编辑我的分享功能（替换假的editMyShare方法）
+  editMyShare(sourceId) {
+    console.log('编辑我的分享:', sourceId);
+    this.showEditMyShareModal(sourceId);
+  }
+
+  // 🆕 在热门标签中添加编辑按钮
+  renderPopularTagsWithEdit() {
+    const container = document.getElementById('popularTagsList');
+    if (!container) {
+      console.log('热门标签容器不存在');
+      return;
+    }
+
+    if (!this.popularTags || this.popularTags.length === 0) {
+      this.renderEmptyTags();
+      return;
+    }
+
+    const currentUser = this.app.getCurrentUser();
+    const validTags = this.popularTags
+      .filter(tag => (tag.usageCount || tag.count) > 0)
+      .sort((a, b) => (b.usageCount || b.count) - (a.usageCount || a.count))
+      .slice(0, 15);
+
+    if (validTags.length === 0) {
+      this.renderEmptyTags();
+      return;
+    }
+
+    const tagsHTML = validTags.map(tag => {
+      const isOfficial = tag.isOfficial || false;
+      const usageCount = tag.usageCount || tag.count || 0;
+      const tagClass = isOfficial ? 'tag-item official' : 'tag-item';
+      
+      // 检查是否可以编辑（创建者或管理员）
+      const canEdit = currentUser && (
+        tag.createdBy === currentUser.id || 
+        !tag.isOfficial
+      );
+      
+      return `
+        <div class="tag-item-wrapper">
+          <span class="${tagClass}" 
+                onclick="window.app.getManager('community').searchByTag('${escapeHtml(tag.name)}')"
+                title="使用次数: ${usageCount}">
+            ${escapeHtml(tag.name)} 
+            <span class="tag-count">(${usageCount})</span>
+          </span>
+          ${canEdit ? `
+            <button class="tag-edit-btn" 
+                    onclick="event.stopPropagation(); window.app.getManager('community').showEditTagModal('${tag.id}')"
+                    title="编辑标签">
+              ✏️
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="tags-cloud">
+        ${tagsHTML}
+      </div>
+    `;
+  }
+
+  // 🆕 辅助方法：清除表单错误
+  clearFormErrors(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    modal.querySelectorAll('.field-error').forEach(error => {
+      error.style.display = 'none';
+      error.textContent = '';
+    });
+    
+    modal.querySelectorAll('.form-group input, .form-group select, .form-group textarea').forEach(field => {
+      field.classList.remove('error');
+      field.style.borderColor = '';
+    });
+    
+    const formError = modal.querySelector('[id$="FormError"]');
+    if (formError) {
+      formError.style.display = 'none';
+      formError.textContent = '';
+    }
+  }
+  
+    // 🆕 辅助方法：显示表单错误
+  showFormError(errorId, message) {
+    const errorDiv = document.getElementById(errorId);
+    if (errorDiv) {
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+      errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      showToast(message, 'error');
     }
   }
 

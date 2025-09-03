@@ -1723,6 +1723,360 @@
   margin-bottom: 1rem;
 }
 
+/* 在 community.css 中增加以下样式 */
+
+/* 标签编辑按钮样式 */
+.tag-item-wrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  margin: 0.25rem;
+}
+
+.tag-edit-btn {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: rgba(59, 130, 246, 0.9);
+  color: white;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+  z-index: 2;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.tag-item-wrapper:hover .tag-edit-btn {
+  display: flex;
+}
+
+.tag-edit-btn:hover {
+  background: rgba(59, 130, 246, 1);
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* 编辑模态框样式增强 */
+.modal.tag-modal .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.modal.tag-modal .form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.modal.tag-modal .form-actions .btn-danger {
+  margin-left: auto;
+}
+
+/* 表单错误状态增强 */
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+  border-color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.05);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.field-error {
+  color: #ef4444;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+  display: none;
+}
+
+.field-error.show {
+  display: block;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 编辑分享源表单样式 */
+.edit-share-form {
+  max-width: 100%;
+}
+
+.edit-share-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.edit-share-form .form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* 标签选择器在编辑模式下的样式 */
+.tag-selector.edit-mode {
+  border: 2px solid var(--accent-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+}
+
+.tag-selector.edit-mode .tag-selector-header {
+  background: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* 已选中标签的编辑状态样式 */
+.selected-tags-display.edit-mode {
+  min-height: 60px;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border: 2px dashed var(--accent-light);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.selected-tags-display.edit-mode:empty::after {
+  content: "拖拽标签到这里或点击上方标签进行选择";
+  color: var(--text-muted);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* 我的分享编辑按钮增强 */
+.share-item-actions .action-btn.edit {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border-color: #f59e0b;
+}
+
+.share-item-actions .action-btn.edit:hover {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+}
+
+/* 加载状态指示器 */
+.edit-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.edit-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 1000;
+}
+
+/* 成功状态指示器 */
+.edit-success {
+  border: 2px solid var(--success-color) !important;
+  background-color: rgba(16, 185, 129, 0.05);
+  transition: all 0.3s ease-in-out;
+}
+
+.edit-success::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  color: var(--success-color);
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .tag-edit-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    top: -8px;
+    right: -8px;
+  }
+  
+  .tag-item-wrapper .tag-edit-btn {
+    display: flex; /* 在移动端始终显示编辑按钮 */
+  }
+  
+  .modal.tag-modal .form-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .modal.tag-modal .form-actions .btn-danger {
+    margin-left: 0;
+    order: 3;
+  }
+  
+  .edit-share-form .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .selected-tags-display.edit-mode {
+    min-height: 80px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .tag-item-wrapper {
+    margin: 0.125rem;
+  }
+  
+  .tag-edit-btn {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+    top: -6px;
+    right: -6px;
+  }
+  
+  .modal.tag-modal .modal-content {
+    margin: 0.5rem;
+    padding: 1rem;
+  }
+  
+  .modal.tag-modal .form-actions {
+    margin-top: 1.5rem;
+  }
+}
+
+/* 动画效果 */
+@keyframes editHighlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.1);
+  }
+  100% {
+    box-shadow: 0 0 0 20px rgba(59, 130, 246, 0);
+  }
+}
+
+.edit-highlight {
+  animation: editHighlight 1.5s ease-out;
+}
+
+/* 编辑模式下的特殊提示样式 */
+.edit-mode-tip {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  color: #1e40af;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.edit-mode-tip::before {
+  content: '💡';
+  font-size: 1.1rem;
+}
+
+/* 批量操作按钮组 */
+.bulk-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.bulk-edit-actions button {
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
+/* 编辑历史指示器 */
+.edit-timestamp {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 0.25rem;
+}
+
+.edit-timestamp::before {
+  content: '最后编辑：';
+}
+
+/* 无障碍支持 */
+.tag-edit-btn:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  display: flex;
+}
+
+.edit-mode .form-group label[aria-required="true"]::after {
+  content: ' *';
+  color: #ef4444;
+}
+
+/* 深色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .tag-edit-btn {
+    background: rgba(59, 130, 246, 0.8);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  }
+  
+  .edit-mode-tip {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    border-color: #3b82f6;
+    color: #dbeafe;
+  }
+  
+  .field-error {
+    color: #fca5a5;
+  }
+  
+  .form-group input.error,
+  .form-group select.error,
+  .form-group textarea.error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: #f87171;
+  }
+}
+
 /* 滚动条优化 */
 .reviews-list::-webkit-scrollbar,
 .modal-content::-webkit-scrollbar,

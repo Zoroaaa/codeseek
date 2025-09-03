@@ -902,58 +902,137 @@ async function updateTagUsageCount(env, tagIds, increment = 1) {
 
 // 🆕 更新标签API（仅创建者或管理员可用）
 router.put('/api/community/tags/:id', async (request, env) => {
-    const user = await authenticate(request, env);
-    if (!user) return utils.errorResponse('认证失败', 401);
+  const user = await authenticate(request, env);
+  if (!user) return utils.errorResponse('认证失败', 401);
+  
+  try {
+    const tagId = request.params?.id;
     
-    try {
-        const tagId = request.params.id;
-        
-        if (!tagId) {
-            return utils.errorResponse('标签ID不能为空', 400);
-        }
-        
-        const existingTag = await env.DB.prepare(`
-            SELECT * FROM community_source_tags WHERE id = ?
-        `).bind(tagId).first();
-        
-        if (!existingTag) {
-            return utils.errorResponse('标签不存在', 404);
-        }
-        
-        if (existingTag.created_by !== user.id && !existingTag.is_official) {
-            return utils.errorResponse('无权修改此标签', 403);
-        }
-        
-        const body = await request.json().catch(() => ({}));
-        const { description, color, isActive } = body;
-        
-        let validColor = existingTag.tag_color;
-        if (color && /^#[0-9a-fA-F]{6}$/.test(color)) {
-            validColor = color;
-        }
-        
-        // 使用 tag_active 列
-        await env.DB.prepare(`
-            UPDATE community_source_tags 
-            SET tag_description = ?, tag_color = ?, tag_active = ?, updated_at = ?
-            WHERE id = ?
-        `).bind(
-            description !== undefined ? (description?.trim() || '') : existingTag.tag_description,
-            validColor,
-            isActive !== undefined ? (isActive ? 1 : 0) : existingTag.tag_active,
-            Date.now(),
-            tagId
-        ).run();
-        
-        return utils.successResponse({
-            message: '标签更新成功',
-            tagId
-        });
-        
-    } catch (error) {
-        console.error('更新标签失败:', error);
-        return utils.errorResponse('更新标签失败: ' + error.message, 500);
+    if (!tagId) {
+      return utils.errorResponse('标签ID不能为空', 400);
     }
+    
+    const existingTag = await env.DB.prepare(`
+      SELECT * FROM community_source_tags WHERE id = ?
+    `).bind(tagId).first();
+    
+    if (!existingTag) {
+      return utils.errorResponse('标签不存在', 404);
+    }
+    
+    // 检查权限 - 只有创建者可以编辑，或者是管理员
+    if (existingTag.created_by !== user.id && !existingTag.is_official) {
+      // 检查用户是否有管理员权限
+      const userPermissions = JSON.parse(user.permissions || '[]');
+      if (!userPermissions.includes('admin') && !userPermissions.includes('tag_manage')) {
+        return utils.errorResponse('无权修改此标签', 403);
+      }
+    }
+    
+    const body = await request.json().catch(() => ({}));
+    const { name, description, color, isActive } = body;
+    
+    // 验证标签名称
+    if (name !== undefined) {
+      const trimmedName = name.trim();
+      if (trimmedName.length < 2 || trimmedName.length > 20) {
+        return utils.errorResponse('标签名称长度必须在2-20个字符之间', 400);
+      }
+      
+      // 检查名称是否与其他标签重复（排除自己）
+      const duplicateTag = await env.DB.prepare(`
+        SELECT id FROM community_source_tags 
+        WHERE LOWER(tag_name) = LOWER(?) AND id != ?
+      `).bind(trimmedName, tagId).first();
+      
+      if (duplicateTag) {
+        return utils.errorResponse('标签名称已存在，请使用其他名称', 400);
+      }
+    }
+    
+    // 验证颜色格式
+    let validColor = existingTag.tag_color;
+    if (color && /^#[0-9a-fA-F]{6}$/.test(color)) {
+      validColor = color;
+    } else if (color) {
+      return utils.errorResponse('颜色格式不正确', 400);
+    }
+    
+    const now = Date.now();
+    
+    // 构建更新字段
+    const updates = [];
+    const params = [];
+    
+    if (name !== undefined && name.trim() !== existingTag.tag_name) {
+      updates.push('tag_name = ?');
+      params.push(name.trim());
+    }
+    
+    if (description !== undefined && description.trim() !== (existingTag.tag_description || '')) {
+      updates.push('tag_description = ?');
+      params.push(description.trim());
+    }
+    
+    if (color !== undefined && color !== existingTag.tag_color) {
+      updates.push('tag_color = ?');
+      params.push(validColor);
+    }
+    
+    if (isActive !== undefined && Boolean(isActive) !== Boolean(existingTag.tag_active)) {
+      updates.push('tag_active = ?');
+      params.push(isActive ? 1 : 0);
+    }
+    
+    if (updates.length === 0) {
+      return utils.errorResponse('没有需要更新的内容', 400);
+    }
+    
+    updates.push('updated_at = ?');
+    params.push(now);
+    params.push(tagId);
+    
+    // 执行更新
+    const updateQuery = `
+      UPDATE community_source_tags 
+      SET ${updates.join(', ')}
+      WHERE id = ?
+    `;
+    
+    await env.DB.prepare(updateQuery).bind(...params).run();
+    
+    // 记录用户行为
+    await utils.logUserAction(env, user.id, 'tag_updated', {
+      tagId,
+      tagName: name || existingTag.tag_name,
+      changes: {
+        name: name !== undefined && name.trim() !== existingTag.tag_name,
+        description: description !== undefined,
+        color: color !== undefined,
+        isActive: isActive !== undefined
+      }
+    }, request);
+    
+    return utils.successResponse({
+      message: '标签更新成功',
+      tagId,
+      updatedFields: Object.keys(body).filter(key => ['name', 'description', 'color', 'isActive'].includes(key))
+    });
+    
+  } catch (error) {
+    console.error('更新标签失败:', error);
+    
+    let errorMessage = '更新标签失败';
+    if (error.message.includes('UNIQUE constraint')) {
+      errorMessage = '标签名称已存在，请使用其他名称';
+    } else if (error.message.includes('ambiguous column name')) {
+      errorMessage = '数据库结构正在更新中，请稍后重试';
+    } else {
+      errorMessage += ': ' + error.message;
+    }
+    
+    return utils.errorResponse(errorMessage, 500);
+  }
 });
 
 // 🆕 删除标签API（仅创建者可用，且仅在未被使用时）
@@ -2343,6 +2422,117 @@ router.get('/api/community/search', async (request, env) => {
         return utils.errorResponse('搜索失败: ' + error.message, 500);
     }
 });
+
+// 📝 编辑分享的搜索源 - 新增接口
+router.put('/api/community/sources/:id', async (request, env) => {
+  const user = await authenticate(request, env);
+  if (!user) return utils.errorResponse('认证失败', 401);
+  
+  try {
+    const sourceId = request.params?.id;
+    
+    if (!sourceId || sourceId.length < 10) {
+      return utils.errorResponse('搜索源ID无效', 400);
+    }
+
+    // 检查搜索源是否存在且属于当前用户
+    const existingSource = await env.DB.prepare(`
+      SELECT * FROM community_shared_sources 
+      WHERE id = ? AND user_id = ?
+    `).bind(sourceId, user.id).first();
+    
+    if (!existingSource) {
+      return utils.errorResponse('搜索源不存在或您无权编辑', 404);
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const { name, subtitle, icon, description, tags, category } = body;
+
+    // 验证必填字段
+    if (!name || name.trim().length < 2) {
+      return utils.errorResponse('搜索源名称至少需要2个字符', 400);
+    }
+
+    if (category && !['jav', 'movie', 'torrent', 'other'].includes(category)) {
+      return utils.errorResponse('无效的分类', 400);
+    }
+
+    // 处理标签 - 验证标签ID是否存在
+    let processedTagIds = [];
+    if (Array.isArray(tags)) {
+      const validTags = tags.slice(0, 10).filter(tagId => tagId && typeof tagId === 'string');
+      
+      if (validTags.length > 0) {
+        const tagQuery = `
+          SELECT id FROM community_source_tags 
+          WHERE id IN (${validTags.map(() => '?').join(',')}) 
+          AND tag_active = 1
+        `;
+        const tagResult = await env.DB.prepare(tagQuery).bind(...validTags).all();
+        processedTagIds = tagResult.results.map(tag => tag.id);
+      }
+    }
+
+    const now = Date.now();
+    
+    // 更新搜索源信息
+    await env.DB.prepare(`
+      UPDATE community_shared_sources SET
+        source_name = ?,
+        source_subtitle = ?,
+        source_icon = ?,
+        description = ?,
+        tags = ?,
+        source_category = ?,
+        updated_at = ?
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      name.trim(),
+      subtitle?.trim() || existingSource.source_subtitle,
+      icon?.trim() || existingSource.source_icon,
+      description?.trim() || existingSource.description,
+      JSON.stringify(processedTagIds),
+      category || existingSource.source_category,
+      now,
+      sourceId,
+      user.id
+    ).run();
+
+    // 记录用户行为
+    await utils.logUserAction(env, user.id, 'community_source_edited', {
+      sourceId,
+      sourceName: name,
+      changes: {
+        name: name !== existingSource.source_name,
+        subtitle: subtitle !== existingSource.source_subtitle,
+        description: description !== existingSource.description,
+        tags: JSON.stringify(processedTagIds) !== existingSource.tags,
+        category: category !== existingSource.source_category
+      }
+    }, request);
+
+    return utils.successResponse({
+      message: '搜索源更新成功',
+      sourceId,
+      updatedFields: Object.keys(body).filter(key => ['name', 'subtitle', 'icon', 'description', 'tags', 'category'].includes(key))
+    });
+
+  } catch (error) {
+    console.error('编辑搜索源失败:', error);
+    
+    let errorMessage = '编辑搜索源失败';
+    if (error.message.includes('UNIQUE constraint')) {
+      errorMessage = '搜索源名称已存在，请使用其他名称';
+    } else if (error.message.includes('FOREIGN KEY')) {
+      errorMessage = '所选标签不存在，请重新选择';
+    } else {
+      errorMessage += ': ' + error.message;
+    }
+    
+    return utils.errorResponse(errorMessage, 500);
+  }
+});
+
 
 router.post('/api/auth/delete-account', async (request, env) => {
     const user = await authenticate(request, env);

@@ -1372,7 +1372,256 @@ async deleteCommunitySource(sourceId) {
       throw error;
     }
   }
+  
+    // 🆕 编辑社区分享的搜索源
+  async editCommunitySource(sourceId, updates) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    if (!sourceId) {
+      throw new Error('搜索源ID不能为空');
+    }
+    
+    if (!updates || typeof updates !== 'object') {
+      throw new Error('更新数据不能为空');
+    }
+    
+    // 验证更新字段
+    const allowedFields = ['name', 'subtitle', 'icon', 'description', 'tags', 'category'];
+    const payload = {};
+    
+    Object.keys(updates).forEach(key => {
+      if (allowedFields.includes(key) && updates[key] !== undefined) {
+        payload[key] = updates[key];
+      }
+    });
+    
+    if (Object.keys(payload).length === 0) {
+      throw new Error('没有有效的更新字段');
+    }
+    
+    // 验证必填字段
+    if (payload.name && payload.name.trim().length < 2) {
+      throw new Error('搜索源名称至少需要2个字符');
+    }
+    
+    if (payload.category && !['jav', 'movie', 'torrent', 'other'].includes(payload.category)) {
+      throw new Error('无效的分类');
+    }
+    
+    // 处理标签数组
+    if (payload.tags && Array.isArray(payload.tags)) {
+      payload.tags = payload.tags.slice(0, 10).filter(tagId => 
+        tagId && typeof tagId === 'string'
+      );
+    }
+    
+    try {
+      console.log('编辑搜索源:', sourceId, payload);
+      
+      const response = await this.request(`/api/community/sources/${sourceId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.success) {
+        return {
+          success: true,
+          message: response.message || '更新成功',
+          sourceId: response.sourceId || sourceId,
+          updatedFields: response.updatedFields || Object.keys(payload)
+        };
+      } else {
+        throw new Error(response.message || response.error || '更新失败');
+      }
+      
+    } catch (error) {
+      console.error('编辑搜索源失败:', error);
+      
+      let errorMessage = error.message;
+      if (error.message.includes('不存在') || error.message.includes('404')) {
+        errorMessage = '搜索源不存在或您无权编辑';
+      } else if (error.message.includes('权限')) {
+        errorMessage = '您没有权限编辑此搜索源';
+      } else if (error.message.includes('已存在')) {
+        errorMessage = '搜索源名称已存在，请使用其他名称';
+      } else if (error.message.includes('标签')) {
+        errorMessage = '所选标签无效，请重新选择';
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+  
+    // 🆕 编辑标签 - 增强现有方法
+  async editTag(tagId, updates) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    if (!tagId) {
+      throw new Error('标签ID不能为空');
+    }
+    
+    if (!updates || typeof updates !== 'object') {
+      throw new Error('更新数据不能为空');
+    }
+    
+    const allowedFields = ['name', 'description', 'color', 'isActive'];
+    const payload = {};
+    
+    Object.keys(updates).forEach(key => {
+      if (allowedFields.includes(key) && updates[key] !== undefined) {
+        payload[key] = updates[key];
+      }
+    });
+    
+    if (Object.keys(payload).length === 0) {
+      throw new Error('没有有效的更新字段');
+    }
+    
+    // 验证字段
+    if (payload.name) {
+      const trimmedName = payload.name.trim();
+      if (trimmedName.length < 2 || trimmedName.length > 20) {
+        throw new Error('标签名称长度必须在2-20个字符之间');
+      }
+      payload.name = trimmedName;
+    }
+    
+    if (payload.color && !/^#[0-9a-fA-F]{6}$/.test(payload.color)) {
+      throw new Error('颜色格式不正确，请使用#RRGGBB格式');
+    }
+    
+    try {
+      console.log('编辑标签:', tagId, payload);
+      
+      const response = await this.request(`/api/community/tags/${tagId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.success) {
+        return {
+          success: true,
+          message: response.message || '标签更新成功',
+          tagId: response.tagId || tagId,
+          updatedFields: response.updatedFields || Object.keys(payload)
+        };
+      } else {
+        throw new Error(response.message || response.error || '更新失败');
+      }
+      
+    } catch (error) {
+      console.error('编辑标签失败:', error);
+      
+      let errorMessage = error.message;
+      if (error.message.includes('权限')) {
+        errorMessage = '您没有权限编辑此标签';
+      } else if (error.message.includes('已存在')) {
+        errorMessage = '标签名称已存在，请使用其他名称';  
+      } else if (error.message.includes('ambiguous column name')) {
+        errorMessage = '数据库结构正在更新中，请稍后重试';
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+  
+    // 🆕 获取单个标签详情
+  async getTagDetails(tagId) {
+    try {
+      if (!tagId) {
+        throw new Error('标签ID不能为空');
+      }
+      
+      const response = await this.request(`/api/community/tags/${tagId}`);
+      
+      return {
+        success: true,
+        tag: response.tag
+      };
+    } catch (error) {
+      console.error('获取标签详情失败:', error);
+      return {
+        success: false,
+        tag: null,
+        error: error.message
+      };
+    }
+  }
+
+  // 🆕 获取用户的搜索源分享详情（用于编辑）
+  async getMySharedSourceDetails(sourceId) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    try {
+      if (!sourceId) {
+        throw new Error('搜索源ID不能为空');
+      }
+      
+      // 获取详细信息
+      const response = await this.request(`/api/community/sources/${sourceId}`);
+      
+      if (response.success && response.source) {
+        return {
+          success: true,
+          source: response.source
+        };
+      } else {
+        throw new Error('获取搜索源详情失败');
+      }
+    } catch (error) {
+      console.error('获取我的分享搜索源详情失败:', error);
+      return {
+        success: false,
+        source: null,
+        error: error.message
+      };
+    }
+  }
+  
+    // 🆕 批量操作标签状态
+  async batchUpdateTagsStatus(tagIds, isActive) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    if (!Array.isArray(tagIds) || tagIds.length === 0) {
+      throw new Error('标签ID列表不能为空');
+    }
+    
+    try {
+      const promises = tagIds.map(tagId => 
+        this.editTag(tagId, { isActive })
+      );
+      
+      const results = await Promise.allSettled(promises);
+      
+      const successes = results.filter(r => r.status === 'fulfilled').length;
+      const failures = results.filter(r => r.status === 'rejected').length;
+      
+      return {
+        success: successes > 0,
+        message: `成功更新 ${successes} 个标签，失败 ${failures} 个`,
+        successes,
+        failures,
+        details: results
+      };
+      
+    } catch (error) {
+      console.error('批量更新标签状态失败:', error);
+      throw error;
+    }
+  }
+
+
 }
+
+
 
 // 4. 添加全局错误恢复机制
 function initializeErrorRecovery() {
