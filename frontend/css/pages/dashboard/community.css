@@ -1,4 +1,4 @@
-/* 优化后的搜索源社区样式 - 完整版本，增加声誉系统、我的分享弹窗、浏览量等功能样式 */
+/* 优化后的搜索源社区样式 - 完整版本，增加标签管理、浏览量等功能样式 */
 
 /* 社区统计面板 */
 .community-stats {
@@ -84,6 +84,108 @@
   color: var(--text-secondary);
   font-size: 0.85rem;
   margin: 0;
+}
+
+/* 🆕 标签管理区域样式 */
+.tag-management-section {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.tag-management-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.tag-management-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tag-create-btn {
+  padding: 0.5rem 1rem;
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: var(--transition-base);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tag-create-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 🆕 新增标签模态框样式 */
+.tag-modal .form-group {
+  margin-bottom: 1rem;
+}
+
+.tag-modal label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.tag-modal input[type="text"] {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: var(--transition-base);
+  box-sizing: border-box;
+}
+
+.tag-modal input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.tag-modal input[type="color"] {
+  width: 60px;
+  height: 40px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: none;
+}
+
+.tag-color-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.color-sample {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
 }
 
 /* 社区控制面板 */
@@ -199,6 +301,116 @@
   font-size: 0.9rem;
   cursor: pointer;
   min-width: 150px;
+}
+
+/* 🆕 标签选择器样式 - 用于分享表单 */
+.tag-selector {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tag-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.tag-selector-search {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.tag-selector-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.tag-selector-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  user-select: none;
+}
+
+.tag-selector-item:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-primary);
+}
+
+.tag-selector-item.selected {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.tag-selector-item input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--accent-primary);
+}
+
+.selected-tags-display {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-color);
+  min-height: 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.selected-tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.selected-tag-remove {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+}
+
+.selected-tag-remove:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* 优化：热门标签区域样式 */
@@ -355,7 +567,7 @@
   margin-bottom: 2rem;
 }
 
-/* 社区搜索源项目 - 增加声誉系统和浏览量显示 */
+/* 🆕 社区搜索源项目 - 增加浏览量显示 */
 .community-source-item {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -487,7 +699,7 @@
   gap: 0.25rem;
 }
 
-/* 新增：作者声誉等级显示 */
+/* 🆕 新增：作者声誉等级显示 */
 .author-reputation {
   display: inline-flex;
   align-items: center;
@@ -537,7 +749,7 @@
   color: var(--accent-primary);
 }
 
-/* 统计信息 - 增加浏览量统计 */
+/* 🆕 统计信息 - 增加浏览量统计 */
 .community-source-item .source-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
@@ -700,7 +912,7 @@
   font-style: italic;
 }
 
-/* 新增：我的分享弹窗样式 */
+/* 🆕 新增：我的分享弹窗样式 */
 .my-shares-list {
   max-height: 60vh;
   overflow-y: auto;
@@ -1282,6 +1494,19 @@
     align-items: flex-start;
     gap: 0.5rem;
   }
+
+  .tag-management-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tag-selector {
+    max-height: 150px;
+  }
+
+  .tags-cloud {
+    gap: 0.5rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1315,6 +1540,10 @@
   .share-item-stats {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .tag-selector-list {
+    max-height: 80px;
+  }
 }
 
 /* 动画效果 */
@@ -1339,6 +1568,14 @@
 
 .my-share-item {
   animation: fadeInUp 0.2s ease-out;
+}
+
+.tag-item {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+.tag-item:nth-child(odd) {
+  animation-delay: 0.05s;
 }
 
 /* 加载状态 */
@@ -1371,27 +1608,35 @@
 /* 滚动条优化 */
 .reviews-list::-webkit-scrollbar,
 .modal-content::-webkit-scrollbar,
-.my-shares-list::-webkit-scrollbar {
+.my-shares-list::-webkit-scrollbar,
+.tag-selector::-webkit-scrollbar,
+.tag-selector-list::-webkit-scrollbar {
   width: 6px;
 }
 
 .reviews-list::-webkit-scrollbar-track,
 .modal-content::-webkit-scrollbar-track,
-.my-shares-list::-webkit-scrollbar-track {
+.my-shares-list::-webkit-scrollbar-track,
+.tag-selector::-webkit-scrollbar-track,
+.tag-selector-list::-webkit-scrollbar-track {
   background: var(--bg-tertiary);
   border-radius: 3px;
 }
 
 .reviews-list::-webkit-scrollbar-thumb,
 .modal-content::-webkit-scrollbar-thumb,
-.my-shares-list::-webkit-scrollbar-thumb {
+.my-shares-list::-webkit-scrollbar-thumb,
+.tag-selector::-webkit-scrollbar-thumb,
+.tag-selector-list::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 3px;
 }
 
 .reviews-list::-webkit-scrollbar-thumb:hover,
 .modal-content::-webkit-scrollbar-thumb:hover,
-.my-shares-list::-webkit-scrollbar-thumb:hover {
+.my-shares-list::-webkit-scrollbar-thumb:hover,
+.tag-selector::-webkit-scrollbar-thumb:hover,
+.tag-selector-list::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
 
@@ -1406,12 +1651,18 @@
   outline-offset: 2px;
 }
 
+.tag-item:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 /* 打印样式 */
 @media print {
   .community-controls,
   .pagination,
   .source-actions,
-  .modal {
+  .modal,
+  .tag-management-section {
     display: none !important;
   }
   

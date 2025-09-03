@@ -1,4 +1,4 @@
-// 优化后的API服务 - 完整版本，增加社区删除功能等
+// 完整优化的API服务 - 支持标签管理、社区删除功能等
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 
@@ -186,6 +186,172 @@ class APIService {
       return response;
     } catch (error) {
       console.error('删除账户失败:', error);
+      throw error;
+    }
+  }
+
+  // 🆕 标签管理API集合
+  
+  // 获取所有可用标签
+  async getAllTags(options = {}) {
+    try {
+      const params = new URLSearchParams();
+      
+      if (options.category && options.category !== 'all') {
+        params.append('category', options.category);
+      }
+      if (options.official !== undefined) {
+        params.append('official', options.official.toString());
+      }
+      if (options.active !== undefined) {
+        params.append('active', options.active.toString());
+      }
+      
+      const endpoint = `/api/community/tags${params.toString() ? `?${params.toString()}` : ''}`;
+      
+      console.log('请求所有标签:', endpoint);
+      
+      const response = await this.request(endpoint);
+      
+      return {
+        success: true,
+        tags: response.tags || [],
+        total: response.total || 0
+      };
+      
+    } catch (error) {
+      console.error('获取所有标签失败:', error);
+      return {
+        success: false,
+        tags: [],
+        total: 0,
+        error: error.message
+      };
+    }
+  }
+
+  // 创建新标签
+  async createTag(tagData) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    if (!tagData || !tagData.name) {
+      throw new Error('标签名称不能为空');
+    }
+    
+    // 验证标签名称
+    if (tagData.name.length < 2 || tagData.name.length > 20) {
+      throw new Error('标签名称长度必须在2-20个字符之间');
+    }
+    
+    const payload = {
+      name: tagData.name.trim(),
+      description: tagData.description?.trim() || '',
+      color: tagData.color || '#3b82f6'
+    };
+    
+    // 验证颜色格式
+    if (!/^#[0-9a-fA-F]{6}$/.test(payload.color)) {
+      throw new Error('颜色格式不正确');
+    }
+    
+    try {
+      console.log('创建标签:', payload);
+      
+      const response = await this.request('/api/community/tags', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      
+      return {
+        success: true,
+        tag: response.tag,
+        message: response.message || '标签创建成功'
+      };
+      
+    } catch (error) {
+      console.error('创建标签失败:', error);
+      throw error;
+    }
+  }
+
+  // 更新标签
+  async updateTag(tagId, updates) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    if (!tagId) {
+      throw new Error('标签ID不能为空');
+    }
+    
+    if (!updates || typeof updates !== 'object') {
+      throw new Error('更新数据不能为空');
+    }
+    
+    const allowedFields = ['description', 'color', 'isActive'];
+    const payload = {};
+    
+    Object.keys(updates).forEach(key => {
+      if (allowedFields.includes(key)) {
+        payload[key] = updates[key];
+      }
+    });
+    
+    if (Object.keys(payload).length === 0) {
+      throw new Error('没有有效的更新字段');
+    }
+    
+    // 验证颜色格式
+    if (payload.color && !/^#[0-9a-fA-F]{6}$/.test(payload.color)) {
+      throw new Error('颜色格式不正确');
+    }
+    
+    try {
+      console.log('更新标签:', tagId, payload);
+      
+      const response = await this.request(`/api/community/tags/${tagId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      
+      return {
+        success: true,
+        message: response.message || '标签更新成功'
+      };
+      
+    } catch (error) {
+      console.error('更新标签失败:', error);
+      throw error;
+    }
+  }
+
+  // 删除标签
+  async deleteTag(tagId) {
+    if (!this.token) {
+      throw new Error('用户未登录');
+    }
+    
+    if (!tagId) {
+      throw new Error('标签ID不能为空');
+    }
+    
+    try {
+      console.log('删除标签:', tagId);
+      
+      const response = await this.request(`/api/community/tags/${tagId}`, {
+        method: 'DELETE'
+      });
+      
+      return {
+        success: true,
+        message: response.message || '标签删除成功',
+        deletedId: response.deletedId || tagId
+      };
+      
+    } catch (error) {
+      console.error('删除标签失败:', error);
       throw error;
     }
   }
@@ -429,19 +595,19 @@ class APIService {
       throw new Error('URL模板必须包含{keyword}占位符');
     }
     
-    // 处理标签
+    // 🆕 处理标签 - 现在使用标签ID而不是名称
     const processedTags = Array.isArray(sourceData.tags) 
-      ? sourceData.tags.slice(0, 10).filter(tag => tag && tag.trim())
+      ? sourceData.tags.slice(0, 10).filter(tagId => tagId && typeof tagId === 'string')
       : [];
     
     const payload = {
       name: sourceData.name.trim(),
       subtitle: sourceData.subtitle?.trim() || '',
-      icon: sourceData.icon?.trim() || '📝',
+      icon: sourceData.icon?.trim() || '📁',
       urlTemplate: sourceData.urlTemplate.trim(),
       category: sourceData.category,
       description: sourceData.description?.trim() || '',
-      tags: processedTags,
+      tags: processedTags, // 🆕 发送标签ID数组
       isPublic: sourceData.isPublic !== false,
       allowComments: sourceData.allowComments !== false
     };
@@ -467,7 +633,7 @@ class APIService {
     }
   }
 
-  // 新增：删除社区搜索源API
+  // 删除社区搜索源API
   async deleteCommunitySource(sourceId) {
     if (!this.token) {
       throw new Error('用户未登录');
@@ -666,8 +832,9 @@ class APIService {
           sourcesDownloaded: response.stats?.general?.sourcesDownloaded || response.stats?.sourcesDownloaded || 0,
           totalLikes: response.stats?.general?.totalLikes || response.stats?.totalLikes || 0,
           totalDownloads: response.stats?.general?.totalDownloads || response.stats?.totalDownloads || 0,
-          totalViews: response.stats?.general?.totalViews || response.stats?.totalViews || 0, // 新增浏览量统计
+          totalViews: response.stats?.general?.totalViews || response.stats?.totalViews || 0, // 浏览量统计
           reviewsGiven: response.stats?.general?.reviewsGiven || response.stats?.reviewsGiven || 0,
+          tagsCreated: response.stats?.general?.tagsCreated || response.stats?.tagsCreated || 0, // 🆕 标签创建统计
           reputationScore: response.stats?.general?.reputationScore || response.stats?.reputationScore || 0,
           contributionLevel: response.stats?.general?.contributionLevel || response.stats?.contributionLevel || 'beginner'
         },
@@ -690,6 +857,7 @@ class APIService {
             totalDownloads: 0,
             totalViews: 0,
             reviewsGiven: 0,
+            tagsCreated: 0,
             reputationScore: 0,
             contributionLevel: 'beginner'
           },
@@ -732,11 +900,12 @@ class APIService {
             };
           }
           return {
+            id: tag.id,
             name: tag.name || tag.tag || 'Unknown',
             usageCount: tag.usageCount || tag.count || tag.usage_count || 0,
             count: tag.count || tag.usageCount || tag.usage_count || 0,
             isOfficial: tag.isOfficial || tag.is_official || false,
-            color: tag.color || null
+            color: tag.color || tag.tag_color || null
           };
         })
         .sort((a, b) => (b.usageCount || b.count) - (a.usageCount || a.count)); // 按使用次数排序
@@ -1002,7 +1171,7 @@ class APIService {
       id: source.id,
       name: source.name.trim(),
       subtitle: source.subtitle?.trim() || '自定义搜索源',
-      icon: source.icon?.trim() || '📝',
+      icon: source.icon?.trim() || '📁',
       urlTemplate: source.urlTemplate.trim(),
       category: source.category || 'other',
       isCustom: true,

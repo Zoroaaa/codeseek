@@ -631,9 +631,326 @@ router.post('/api/auth/logout', async (request, env) => {
     return utils.successResponse({ message: '退出成功' });
 });
 
-// 在现有 worker.js 文件末尾，删除账户API之前添加以下搜索源状态检查API
+// 🆕 标签管理API - 新增功能
+router.get('/api/community/tags', async (request, env) => {
+    try {
+        const url = new URL(request.url);
+        const category = url.searchParams.get('category') || 'all';
+        const includeOfficial = url.searchParams.get('official') !== 'false';
+        const onlyActive = url.searchParams.get('active') !== 'false';
+        
+        let whereConditions = [];
+        let params = [];
+        
+        if (onlyActive) {
+            whereConditions.push('is_active = ?');
+            params.push(1);
+        }
+        
+        // 构建查询
+        let query = `
+            SELECT 
+                cst.id,
+                cst.tag_name,
+                cst.tag_description,
+                cst.tag_color,
+                cst.usage_count,
+                cst.is_official,
+                cst.is_active,
+                cst.created_by,
+                u.username as creator_name,
+                cst.created_at,
+                cst.updated_at
+            FROM community_source_tags cst
+            LEFT JOIN users u ON cst.created_by = u.id
+        `;
+        
+        if (whereConditions.length > 0) {
+            query += ` WHERE ${whereConditions.join(' AND ')}`;
+        }
+        
+        query += ` ORDER BY cst.is_official DESC, cst.usage_count DESC, cst.created_at DESC`;
+        
+        const result = await env.DB.prepare(query).bind(...params).all();
+        
+        const tags = result.results.map(tag => ({
+            id: tag.id,
+            name: tag.tag_name,
+            description: tag.tag_description,
+            color: tag.tag_color,
+            usageCount: tag.usage_count || 0,
+            count: tag.usage_count || 0,
+            isOfficial: Boolean(tag.is_official),
+            isActive: Boolean(tag.is_active),
+            creator: {
+                id: tag.created_by,
+                name: tag.creator_name || 'System'
+            },
+            createdAt: tag.created_at,
+            updatedAt: tag.updated_at
+        }));
+        
+        return utils.successResponse({ 
+            tags,
+            total: tags.length,
+            category: category
+        });
+        
+    } catch (error) {
+        console.error('获取标签失败:', error);
+        return utils.errorResponse('获取标签失败: ' + error.message, 500);
+    }
+});
 
-// 🆕 搜索源状态检查相关API
+// 🆕 创建新标签API
+router.post('/api/community/tags', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { name, description, color } = body;
+        
+        // 验证必填字段
+        if (!name || typeof name !== 'string' || name.trim().length === 0) {
+            return utils.errorResponse('标签名称不能为空', 400);
+        }
+        
+        const trimmedName = name.trim();
+        
+        // 验证标签名长度
+        if (trimmedName.length < 2 || trimmedName.length > 20) {
+            return utils.errorResponse('标签名称长度必须在2-20个字符之间', 400);
+        }
+        
+        // 验证颜色格式
+        const validColor = color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#3b82f6';
+        
+        // 检查标签是否已存在
+        const existingTag = await env.DB.prepare(`
+            SELECT id FROM community_source_tags WHERE LOWER(tag_name) = LOWER(?)
+        `).bind(trimmedName).first();
+        
+        if (existingTag) {
+            return utils.errorResponse('标签名称已存在', 400);
+        }
+        
+        // 检查用户创建标签限制（防止滥用）
+        const userTagCount = await env.DB.prepare(`
+            SELECT COUNT(*) as count FROM community_source_tags 
+            WHERE created_by = ? AND is_active = 1
+        `).bind(user.id).first();
+        
+        const maxTagsPerUser = parseInt(env.MAX_TAGS_PER_USER || '50');
+        if (userTagCount.count >= maxTagsPerUser) {
+            return utils.errorResponse(`每个用户最多只能创建${maxTagsPerUser}个标签`, 400);
+        }
+        
+        // 创建新标签
+        const tagId = utils.generateId();
+        const now = Date.now();
+        
+        await env.DB.prepare(`
+            INSERT INTO community_source_tags (
+                id, tag_name, tag_description, tag_color, usage_count, 
+                is_official, is_active, created_by, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+            tagId, trimmedName, description?.trim() || '', validColor, 0, 
+            0, 1, user.id, now, now
+        ).run();
+        
+        // 更新用户统计
+        await env.DB.prepare(`
+            INSERT OR REPLACE INTO community_user_stats (
+                id, user_id, 
+                shared_sources_count, total_downloads, total_likes, total_views,
+                reviews_given, sources_downloaded, tags_created, reputation_score, contribution_level,
+                created_at, updated_at
+            ) VALUES (
+                COALESCE((SELECT id FROM community_user_stats WHERE user_id = ?), ? || '_stats'),
+                ?,
+                COALESCE((SELECT shared_sources_count FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT total_downloads FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT total_likes FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT total_views FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT reviews_given FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT sources_downloaded FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT tags_created FROM community_user_stats WHERE user_id = ?), 0) + 1,
+                COALESCE((SELECT reputation_score FROM community_user_stats WHERE user_id = ?), 0),
+                COALESCE((SELECT contribution_level FROM community_user_stats WHERE user_id = ?), 'beginner'),
+                COALESCE((SELECT created_at FROM community_user_stats WHERE user_id = ?), ?),
+                ?
+            )
+        `).bind(
+            user.id, user.id, user.id, user.id, user.id, user.id, user.id, 
+            user.id, user.id, user.id, user.id, user.id, user.id, now, now
+        ).run();
+        
+        // 记录用户行为
+        await utils.logUserAction(env, user.id, 'tag_created', {
+            tagId,
+            tagName: trimmedName
+        }, request);
+        
+        return utils.successResponse({
+            message: '标签创建成功',
+            tag: {
+                id: tagId,
+                name: trimmedName,
+                description: description?.trim() || '',
+                color: validColor,
+                usageCount: 0,
+                isOfficial: false,
+                isActive: true,
+                creator: {
+                    id: user.id,
+                    name: user.username
+                },
+                createdAt: now
+            }
+        });
+        
+    } catch (error) {
+        console.error('创建标签失败:', error);
+        return utils.errorResponse('创建标签失败: ' + error.message, 500);
+    }
+});
+
+// 🆕 更新标签API（仅创建者或管理员可用）
+router.put('/api/community/tags/:id', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const tagId = request.params.id;
+        
+        if (!tagId) {
+            return utils.errorResponse('标签ID不能为空', 400);
+        }
+        
+        // 检查标签是否存在
+        const existingTag = await env.DB.prepare(`
+            SELECT * FROM community_source_tags WHERE id = ?
+        `).bind(tagId).first();
+        
+        if (!existingTag) {
+            return utils.errorResponse('标签不存在', 404);
+        }
+        
+        // 检查权限（仅创建者或官方标签可以修改）
+        if (existingTag.created_by !== user.id && !existingTag.is_official) {
+            return utils.errorResponse('无权修改此标签', 403);
+        }
+        
+        const body = await request.json().catch(() => ({}));
+        const { description, color, isActive } = body;
+        
+        // 验证颜色格式
+        let validColor = existingTag.tag_color;
+        if (color && /^#[0-9a-fA-F]{6}$/.test(color)) {
+            validColor = color;
+        }
+        
+        // 更新标签
+        await env.DB.prepare(`
+            UPDATE community_source_tags 
+            SET tag_description = ?, tag_color = ?, is_active = ?, updated_at = ?
+            WHERE id = ?
+        `).bind(
+            description !== undefined ? (description?.trim() || '') : existingTag.tag_description,
+            validColor,
+            isActive !== undefined ? (isActive ? 1 : 0) : existingTag.is_active,
+            Date.now(),
+            tagId
+        ).run();
+        
+        // 记录用户行为
+        await utils.logUserAction(env, user.id, 'tag_updated', {
+            tagId,
+            tagName: existingTag.tag_name
+        }, request);
+        
+        return utils.successResponse({
+            message: '标签更新成功',
+            tagId
+        });
+        
+    } catch (error) {
+        console.error('更新标签失败:', error);
+        return utils.errorResponse('更新标签失败: ' + error.message, 500);
+    }
+});
+
+// 🆕 删除标签API（仅创建者可用，且仅在未被使用时）
+router.delete('/api/community/tags/:id', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) return utils.errorResponse('认证失败', 401);
+    
+    try {
+        const tagId = request.params.id;
+        
+        if (!tagId) {
+            return utils.errorResponse('标签ID不能为空', 400);
+        }
+        
+        // 检查标签是否存在
+        const existingTag = await env.DB.prepare(`
+            SELECT * FROM community_source_tags WHERE id = ?
+        `).bind(tagId).first();
+        
+        if (!existingTag) {
+            return utils.errorResponse('标签不存在', 404);
+        }
+        
+        // 检查权限（仅创建者可以删除，官方标签不能删除）
+        if (existingTag.created_by !== user.id) {
+            return utils.errorResponse('无权删除此标签', 403);
+        }
+        
+        if (existingTag.is_official) {
+            return utils.errorResponse('不能删除官方标签', 403);
+        }
+        
+        // 检查标签是否正在被使用
+        if (existingTag.usage_count > 0) {
+            return utils.errorResponse('不能删除正在使用的标签', 400);
+        }
+        
+        // 删除标签
+        await env.DB.prepare(`
+            DELETE FROM community_source_tags WHERE id = ?
+        `).bind(tagId).run();
+        
+        // 更新用户统计
+        await env.DB.prepare(`
+            UPDATE community_user_stats 
+            SET tags_created = CASE 
+                WHEN tags_created > 0 THEN tags_created - 1 
+                ELSE 0 
+            END,
+            updated_at = ?
+            WHERE user_id = ?
+        `).bind(Date.now(), user.id).run();
+        
+        // 记录用户行为
+        await utils.logUserAction(env, user.id, 'tag_deleted', {
+            tagId,
+            tagName: existingTag.tag_name
+        }, request);
+        
+        return utils.successResponse({
+            message: '标签删除成功',
+            deletedId: tagId
+        });
+        
+    } catch (error) {
+        console.error('删除标签失败:', error);
+        return utils.errorResponse('删除标签失败: ' + error.message, 500);
+    }
+});
+
+// 搜索源状态检查相关API
 router.post('/api/source-status/check', async (request, env) => {
     try {
         const body = await request.json().catch(() => ({}));
@@ -763,378 +1080,9 @@ router.get('/api/source-status/history', async (request, env) => {
     }
 });
 
-// 单个搜索源状态检查函数
-async function checkSingleSourceStatus(source, keyword, keywordHash, options = {}) {
-    const { timeout, checkContentMatch, env } = options;
-    const sourceId = source.id || source.name;
-    const startTime = Date.now();
-    
-    try {
-        // 检查缓存
-        const cached = await getCachedSourceStatus(env, sourceId, keywordHash);
-        if (cached && isCacheValid(cached)) {
-            console.log(`使用缓存结果: ${sourceId}`);
-            return {
-                sourceId,
-                sourceName: source.name,
-                status: cached.status,
-                available: cached.available,
-                contentMatch: cached.content_match,
-                responseTime: cached.response_time,
-                lastChecked: cached.created_at,
-                fromCache: true
-            };
-        }
-        
-        // 构建检查URL
-        const checkUrl = source.urlTemplate.replace('{keyword}', encodeURIComponent(keyword));
-        console.log(`检查URL: ${checkUrl}`);
-        
-        // 执行HTTP检查
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-        
-        const response = await fetch(checkUrl, {
-            method: 'GET',
-            signal: controller.signal,
-            headers: {
-                'User-Agent': 'MagnetSearch-StatusChecker/1.3.0',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6',
-                'Cache-Control': 'no-cache'
-            },
-            // 在Cloudflare Workers中不需要设置CORS相关选项
-        });
-        
-        clearTimeout(timeoutId);
-        const responseTime = Date.now() - startTime;
-        
-        // 基础可用性检查
-        const isAvailable = response.ok && response.status < 400;
-        let contentMatch = false;
-        let qualityScore = 0;
-        let matchDetails = {};
-        
-        // 内容匹配检查
-        if (isAvailable && checkContentMatch) {
-            try {
-                const content = await response.text();
-                const matchResult = analyzePageContent(content, keyword, source);
-                contentMatch = matchResult.hasMatch;
-                qualityScore = matchResult.qualityScore;
-                matchDetails = matchResult.details;
-                
-                console.log(`内容匹配检查 ${sourceId}: ${contentMatch ? '匹配' : '不匹配'}, 质量分数: ${qualityScore}`);
-            } catch (contentError) {
-                console.warn(`内容检查失败 ${sourceId}:`, contentError.message);
-            }
-        }
-        
-        // 确定最终状态
-        let finalStatus = 'error';
-        if (isAvailable) {
-            if (checkContentMatch) {
-                finalStatus = contentMatch ? 'available' : 'unavailable';
-            } else {
-                finalStatus = 'available';
-            }
-        } else if (response.status === 404) {
-            finalStatus = 'unavailable';
-        } else if (responseTime >= timeout * 0.9) {
-            finalStatus = 'timeout';
-        } else {
-            finalStatus = 'unavailable';
-        }
-        
-        const result = {
-            sourceId,
-            sourceName: source.name,
-            status: finalStatus,
-            available: finalStatus === 'available',
-            contentMatch,
-            responseTime,
-            qualityScore,
-            httpStatus: response.status,
-            lastChecked: Date.now(),
-            matchDetails,
-            fromCache: false
-        };
-        
-        // 异步保存到缓存
-        saveSingleStatusToCache(env, sourceId, keyword, keywordHash, result).catch(console.error);
-        
-        return result;
-        
-    } catch (error) {
-        clearTimeout(timeoutId);
-        const responseTime = Date.now() - startTime;
-        
-        console.error(`检查源失败 ${sourceId}:`, error.message);
-        
-        let status = 'error';
-        if (error.name === 'AbortError' || error.message.includes('timeout')) {
-            status = 'timeout';
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-            status = 'unavailable';
-        }
-        
-        const result = {
-            sourceId,
-            sourceName: source.name,
-            status,
-            available: false,
-            contentMatch: false,
-            responseTime,
-            qualityScore: 0,
-            lastChecked: Date.now(),
-            error: error.message,
-            fromCache: false
-        };
-        
-        // 异步保存错误结果到缓存
-        saveSingleStatusToCache(env, sourceId, keyword, keywordHash, result).catch(console.error);
-        
-        return result;
-    }
-}
+// 社区搜索源相关API
 
-// 分析页面内容
-function analyzePageContent(content, keyword, source) {
-    const lowerContent = content.toLowerCase();
-    const lowerKeyword = keyword.toLowerCase();
-    
-    let qualityScore = 0;
-    const details = {
-        titleMatch: false,
-        bodyMatch: false,
-        exactMatch: false,
-        partialMatch: false,
-        resultCount: 0,
-        keywordPositions: []
-    };
-    
-    // 检查精确匹配
-    if (lowerContent.includes(lowerKeyword)) {
-        details.exactMatch = true;
-        qualityScore += 50;
-        
-        // 找到所有关键词位置
-        let position = 0;
-        while ((position = lowerContent.indexOf(lowerKeyword, position)) !== -1) {
-            details.keywordPositions.push(position);
-            position += lowerKeyword.length;
-        }
-    }
-    
-    // 检查标题匹配
-    const titleMatch = content.match(/<title[^>]*>([^<]*)</i);
-    if (titleMatch && titleMatch[1].toLowerCase().includes(lowerKeyword)) {
-        details.titleMatch = true;
-        qualityScore += 30;
-    }
-    
-    // 检查番号格式（如果是番号搜索）
-    if (/^[A-Za-z]+-?\d+$/i.test(keyword)) {
-        const numberPattern = keyword.replace('-', '-?');
-        const regex = new RegExp(numberPattern, 'gi');
-        const matches = content.match(regex);
-        if (matches) {
-            details.exactMatch = true;
-            qualityScore += 40;
-            details.resultCount = matches.length;
-        }
-    }
-    
-    // 检查部分匹配（关键词的各部分）
-    if (!details.exactMatch && keyword.length > 3) {
-        const parts = keyword.split(/[-_\s]+/);
-        let partialMatches = 0;
-        
-        parts.forEach(part => {
-            if (part.length > 2 && lowerContent.includes(part.toLowerCase())) {
-                partialMatches++;
-            }
-        });
-        
-        if (partialMatches > 0) {
-            details.partialMatch = true;
-            qualityScore += Math.min(partialMatches * 10, 30);
-        }
-    }
-    
-    // 检查是否有搜索结果列表
-    const resultIndicators = [
-        /result/gi,
-        /search.*result/gi,
-        /找到.*结果/gi,
-        /共.*条/gi,
-        /<div[^>]*class[^>]*result/gi
-    ];
-    
-    let resultCount = 0;
-    resultIndicators.forEach(indicator => {
-        const matches = content.match(indicator);
-        if (matches) resultCount += matches.length;
-    });
-    
-    if (resultCount > 0) {
-        details.resultCount = resultCount;
-        qualityScore += Math.min(resultCount * 5, 20);
-    }
-    
-    // 检查是否是"无结果"页面
-    const noResultIndicators = [
-        /no.*result/gi,
-        /not.*found/gi,
-        /没有.*结果/gi,
-        /未找到/gi,
-        /暂无.*内容/gi
-    ];
-    
-    const hasNoResultIndicator = noResultIndicators.some(indicator => 
-        content.match(indicator)
-    );
-    
-    if (hasNoResultIndicator) {
-        qualityScore = Math.max(0, qualityScore - 30);
-    }
-    
-    // 最终质量评分
-    qualityScore = Math.min(100, Math.max(0, qualityScore));
-    
-    const hasMatch = details.exactMatch || (details.partialMatch && qualityScore > 20);
-    
-    return {
-        hasMatch,
-        qualityScore,
-        details
-    };
-}
-
-// 缓存相关函数
-async function getCachedSourceStatus(env, sourceId, keywordHash) {
-    try {
-        return await env.DB.prepare(`
-            SELECT * FROM source_status_cache 
-            WHERE source_id = ? AND keyword_hash = ? 
-            ORDER BY created_at DESC 
-            LIMIT 1
-        `).bind(sourceId, keywordHash).first();
-    } catch (error) {
-        console.error('获取缓存状态失败:', error);
-        return null;
-    }
-}
-
-function isCacheValid(cached, maxAge = 300000) { // 5分钟默认缓存
-    if (!cached) return false;
-    return Date.now() - cached.created_at < maxAge;
-}
-
-async function saveSingleStatusToCache(env, sourceId, keyword, keywordHash, result) {
-    try {
-        const cacheId = utils.generateId();
-        await env.DB.prepare(`
-            INSERT INTO source_status_cache (
-                id, source_id, keyword, keyword_hash, status, available, content_match,
-                response_time, quality_score, match_details, page_info, check_error,
-                expires_at, created_at, last_accessed, access_count
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).bind(
-            cacheId, sourceId, keyword, keywordHash, result.status,
-            result.available ? 1 : 0, result.contentMatch ? 1 : 0,
-            result.responseTime, result.qualityScore || 0,
-            JSON.stringify(result.matchDetails || {}),
-            JSON.stringify({ httpStatus: result.httpStatus }),
-            result.error || null,
-            Date.now() + 300000, // 5分钟后过期
-            Date.now(), Date.now(), 1
-        ).run();
-    } catch (error) {
-        console.error('保存缓存状态失败:', error);
-    }
-}
-
-async function saveStatusCheckResults(env, results, keyword) {
-    try {
-        // 更新健康度统计
-        for (const result of results) {
-            await updateSourceHealthStats(env, result);
-        }
-        
-        console.log(`已保存 ${results.length} 个搜索源的状态检查结果`);
-    } catch (error) {
-        console.error('保存状态检查结果失败:', error);
-    }
-}
-
-async function updateSourceHealthStats(env, result) {
-    try {
-        const sourceId = result.sourceId;
-        
-        // 获取当前统计
-        const currentStats = await env.DB.prepare(`
-            SELECT * FROM source_health_stats WHERE source_id = ?
-        `).bind(sourceId).first();
-        
-        if (currentStats) {
-            // 更新现有统计
-            const newTotalChecks = currentStats.total_checks + 1;
-            const newSuccessfulChecks = currentStats.successful_checks + (result.available ? 1 : 0);
-            const newContentMatches = currentStats.content_matches + (result.contentMatch ? 1 : 0);
-            const newSuccessRate = newSuccessfulChecks / newTotalChecks;
-            
-            // 更新平均响应时间
-            const newAvgResponseTime = Math.round(
-                (currentStats.average_response_time * currentStats.total_checks + result.responseTime) / newTotalChecks
-            );
-            
-            // 计算健康度分数
-            const healthScore = Math.round(newSuccessRate * 100);
-            
-            await env.DB.prepare(`
-                UPDATE source_health_stats SET
-                    total_checks = ?, successful_checks = ?, content_matches = ?,
-                    average_response_time = ?, success_rate = ?, health_score = ?,
-                    last_success = ?, last_failure = ?, updated_at = ?
-                WHERE source_id = ?
-            `).bind(
-                newTotalChecks, newSuccessfulChecks, newContentMatches,
-                newAvgResponseTime, newSuccessRate, healthScore,
-                result.available ? Date.now() : currentStats.last_success,
-                result.available ? currentStats.last_failure : Date.now(),
-                Date.now(), sourceId
-            ).run();
-        } else {
-            // 创建新统计
-            const statsId = utils.generateId();
-            await env.DB.prepare(`
-                INSERT INTO source_health_stats (
-                    id, source_id, total_checks, successful_checks, content_matches,
-                    average_response_time, last_success, last_failure, success_rate,
-                    health_score, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).bind(
-                statsId, sourceId, 1, result.available ? 1 : 0, result.contentMatch ? 1 : 0,
-                result.responseTime,
-                result.available ? Date.now() : null,
-                result.available ? null : Date.now(),
-                result.available ? 1.0 : 0.0,
-                result.available ? 100 : 0,
-                Date.now()
-            ).run();
-        }
-    } catch (error) {
-        console.error('更新源健康度统计失败:', error);
-    }
-}
-
-// 社区功能后端API扩展 - 添加到现有 worker.js 文件中
-
-// ==================== 社区搜索源管理API ====================
-
-// 获取社区搜索源列表
-// 🔧 修复获取社区搜索源列表API - 确保分页和过滤正常工作
+// 获取社区搜索源列表（支持高级筛选）
 router.get('/api/community/sources', async (request, env) => {
     try {
         const url = new URL(request.url);
@@ -1266,7 +1214,7 @@ router.get('/api/community/sources', async (request, env) => {
     }
 });
 
-// 🆕 删除我的分享搜索源API
+// 🆕 删除社区搜索源API - 修复GREATEST函数兼容性问题
 router.delete('/api/community/sources/:id', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -1288,7 +1236,7 @@ router.delete('/api/community/sources/:id', async (request, env) => {
             return utils.errorResponse('搜索源不存在或您无权删除', 404);
         }
         
-        // 开始事务删除相关数据
+        // 开始事务删除相关数据 - 🔧 修复GREATEST函数问题
         try {
             // 删除相关的评论
             await env.DB.prepare(`
@@ -1315,6 +1263,17 @@ router.delete('/api/community/sources/:id', async (request, env) => {
                 DELETE FROM community_shared_sources WHERE id = ?
             `).bind(sourceId).run();
             
+            // 🔧 修复用户统计更新 - 移除GREATEST函数，使用CASE语句
+            await env.DB.prepare(`
+                UPDATE community_user_stats 
+                SET shared_sources_count = CASE 
+                    WHEN shared_sources_count > 0 THEN shared_sources_count - 1 
+                    ELSE 0 
+                END,
+                updated_at = ?
+                WHERE user_id = ?
+            `).bind(Date.now(), user.id).run();
+            
             // 记录用户行为
             await utils.logUserAction(env, user.id, 'community_source_deleted', {
                 sourceId,
@@ -1336,7 +1295,6 @@ router.delete('/api/community/sources/:id', async (request, env) => {
         return utils.errorResponse('删除搜索源失败: ' + error.message, 500);
     }
 });
-
 
 // 获取单个搜索源详情
 router.get('/api/community/sources/:id', async (request, env) => {
@@ -1389,13 +1347,13 @@ router.get('/api/community/sources/:id', async (request, env) => {
             createdAt: review.created_at
         }));
         
-        // 获取标签信息
-        const tags = sourceResult.tags ? JSON.parse(sourceResult.tags) : [];
+        // 获取标签信息 - 🆕 支持新的标签系统
+        const tagIds = sourceResult.tags ? JSON.parse(sourceResult.tags) : [];
         const tagDetails = [];
         
-        if (tags.length > 0) {
-            const tagQuery = `SELECT * FROM community_source_tags WHERE id IN (${tags.map(() => '?').join(',')})`;
-            const tagResult = await env.DB.prepare(tagQuery).bind(...tags).all();
+        if (tagIds.length > 0) {
+            const tagQuery = `SELECT * FROM community_source_tags WHERE id IN (${tagIds.map(() => '?').join(',')}) AND is_active = 1`;
+            const tagResult = await env.DB.prepare(tagQuery).bind(...tagIds).all();
             tagDetails.push(...tagResult.results.map(tag => ({
                 id: tag.id,
                 name: tag.tag_name,
@@ -1412,7 +1370,7 @@ router.get('/api/community/sources/:id', async (request, env) => {
             urlTemplate: sourceResult.source_url_template,
             category: sourceResult.source_category,
             description: sourceResult.description,
-            tags: tagDetails,
+            tags: tagDetails, // 🆕 返回完整的标签信息
             author: {
                 id: sourceResult.author_id,
                 name: sourceResult.author_name,
@@ -1442,7 +1400,7 @@ router.get('/api/community/sources/:id', async (request, env) => {
     }
 });
 
-// 分享搜索源到社区
+// 🆕 分享搜索源到社区 - 支持新的标签系统
 router.post('/api/community/sources', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -1491,12 +1449,26 @@ router.post('/api/community/sources', async (request, env) => {
             return utils.errorResponse('相同名称或URL的搜索源已存在');
         }
         
+        // 🆕 处理标签 - 验证标签ID是否存在且有效
+        let processedTagIds = [];
+        if (Array.isArray(tags) && tags.length > 0) {
+            const validTags = tags.slice(0, 10); // 限制最多10个标签
+            
+            // 验证标签ID是否存在
+            if (validTags.length > 0) {
+                const tagQuery = `
+                    SELECT id FROM community_source_tags 
+                    WHERE id IN (${validTags.map(() => '?').join(',')}) 
+                    AND is_active = 1
+                `;
+                const tagResult = await env.DB.prepare(tagQuery).bind(...validTags).all();
+                processedTagIds = tagResult.results.map(tag => tag.id);
+            }
+        }
+        
         // 创建新的分享搜索源
         const sourceId = utils.generateId();
         const now = Date.now();
-        
-        // 处理标签
-        const processedTags = Array.isArray(tags) ? tags.slice(0, 10) : [];
         
         await env.DB.prepare(`
             INSERT INTO community_shared_sources (
@@ -1507,16 +1479,28 @@ router.post('/api/community/sources', async (request, env) => {
         `).bind(
             sourceId, user.id, name.trim(), subtitle?.trim() || null, 
             icon?.trim() || '🔍', urlTemplate.trim(), category, 
-            description?.trim() || null, JSON.stringify(processedTags),
+            description?.trim() || null, JSON.stringify(processedTagIds), // 🆕 保存标签ID数组
             env.COMMUNITY_REQUIRE_APPROVAL === 'true' ? 'pending' : 'active',
             now, now
         ).run();
+        
+        // 🆕 更新标签使用统计
+        if (processedTagIds.length > 0) {
+            for (const tagId of processedTagIds) {
+                await env.DB.prepare(`
+                    UPDATE community_source_tags 
+                    SET usage_count = usage_count + 1, updated_at = ?
+                    WHERE id = ?
+                `).bind(now, tagId).run();
+            }
+        }
         
         // 记录用户行为
         await utils.logUserAction(env, user.id, 'community_source_shared', {
             sourceId,
             sourceName: name,
-            category
+            category,
+            tagsCount: processedTagIds.length
         }, request);
         
         const status = env.COMMUNITY_REQUIRE_APPROVAL === 'true' ? 'pending' : 'active';
@@ -1592,7 +1576,7 @@ router.post('/api/community/sources/:id/download', async (request, env) => {
         
         customSources.push(newCustomSource);
         
-        // 添加到启用的搜索源列表
+        // 添加到可用的搜索源列表
         const enabledSources = settings.searchSources || [];
         if (!enabledSources.includes(newSourceId)) {
             enabledSources.push(newSourceId);
@@ -1802,7 +1786,7 @@ router.post('/api/community/sources/:id/report', async (request, env) => {
     }
 });
 
-// 🔧 修复用户社区统计API - 添加浏览量统计
+// 🔧 修复：获取用户社区统计，包括浏览量统计
 router.get('/api/community/user/stats', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -1848,10 +1832,13 @@ router.get('/api/community/user/stats', async (request, env) => {
                 (SELECT COUNT(*) FROM community_source_reviews WHERE user_id = ?) as reviews_given,
                 
                 -- 用户下载的搜索源数量
-                (SELECT COUNT(DISTINCT shared_source_id) FROM community_source_downloads WHERE user_id = ?) as sources_downloaded
-        `).bind(user.id, user.id, user.id, user.id, user.id, user.id).first();
+                (SELECT COUNT(DISTINCT shared_source_id) FROM community_source_downloads WHERE user_id = ?) as sources_downloaded,
+                
+                -- 🆕 用户创建的标签数量
+                (SELECT COUNT(*) FROM community_source_tags WHERE created_by = ? AND is_active = 1) as tags_created
+        `).bind(user.id, user.id, user.id, user.id, user.id, user.id, user.id).first();
         
-        // 使用实时计算的数据，如果缓存数据存在且差异不大则使用缓存数据
+        // 使用实时计算的数据或缓存数据，如果缓存数据存在且差异不大则使用缓存数据
         const useRealTime = !statsResult || 
             Math.abs((statsResult.total_downloads || 0) - realTimeStats.total_downloads) > 1 ||
             Math.abs((statsResult.total_likes || 0) - realTimeStats.total_likes) > 1 ||
@@ -1865,6 +1852,7 @@ router.get('/api/community/user/stats', async (request, env) => {
                 totalViews: useRealTime ? realTimeStats.total_views : (statsResult?.total_views || 0), // 🆕 添加浏览量
                 reviewsGiven: useRealTime ? realTimeStats.reviews_given : (statsResult?.reviews_given || 0),
                 sourcesDownloaded: useRealTime ? realTimeStats.sources_downloaded : (statsResult?.sources_downloaded || 0),
+                tagsCreated: useRealTime ? realTimeStats.tags_created : (statsResult?.tags_created || 0), // 🆕 添加标签创建统计
                 reputationScore: statsResult?.reputation_score || 0,
                 contributionLevel: statsResult?.contribution_level || 'beginner'
             },
@@ -1901,12 +1889,13 @@ router.get('/api/community/user/stats', async (request, env) => {
             // 异步更新，不阻塞响应
             env.DB.prepare(`
                 UPDATE community_user_stats 
-                SET total_downloads = ?, total_likes = ?, total_views = ?, updated_at = ?
+                SET total_downloads = ?, total_likes = ?, total_views = ?, tags_created = ?, updated_at = ?
                 WHERE user_id = ?
             `).bind(
                 realTimeStats.total_downloads,
                 realTimeStats.total_likes,
                 realTimeStats.total_views,
+                realTimeStats.tags_created,
                 Date.now(),
                 user.id
             ).run().catch(error => {
@@ -1922,115 +1911,7 @@ router.get('/api/community/user/stats', async (request, env) => {
     }
 });
 
-// 🔧 修复热门标签API - 确保返回真实数据
-router.get('/api/community/tags', async (request, env) => {
-    try {
-        const url = new URL(request.url);
-        const category = url.searchParams.get('category') || 'all';
-        
-        console.log('获取热门标签请求:', { category });
-        
-        // 首先尝试从数据库获取真实的标签统计
-        let tagsQuery = `
-            SELECT 
-                cst.id,
-                cst.tag_name,
-                cst.tag_color,
-                cst.is_official,
-                cst.usage_count,
-                COUNT(DISTINCT css.id) as actual_usage_count
-            FROM community_source_tags cst
-            LEFT JOIN community_shared_sources css ON 
-                JSON_EXTRACT(css.tags, '$[*]') LIKE '%' || cst.id || '%' AND css.status = 'active'
-        `;
-        
-        let params = [];
-        
-        if (category !== 'all') {
-            tagsQuery += ` LEFT JOIN community_shared_sources css2 ON css2.id = css.id WHERE css2.source_category = ?`;
-            params.push(category);
-        }
-        
-        tagsQuery += `
-            GROUP BY cst.id, cst.tag_name, cst.tag_color, cst.is_official, cst.usage_count
-            ORDER BY cst.is_official DESC, actual_usage_count DESC, cst.usage_count DESC, cst.tag_name ASC
-            LIMIT 20
-        `;
-        
-        const result = await env.DB.prepare(tagsQuery).bind(...params).all();
-        
-        console.log('数据库标签查询结果:', result.results.length);
-        
-        let tags = [];
-        
-        if (result.results && result.results.length > 0) {
-            // 使用数据库中的真实标签
-            tags = result.results.map(tag => ({
-                id: tag.id,
-                name: tag.tag_name,
-                color: tag.tag_color,
-                usageCount: Math.max(tag.actual_usage_count || 0, tag.usage_count || 0),
-                count: Math.max(tag.actual_usage_count || 0, tag.usage_count || 0),
-                isOfficial: Boolean(tag.is_official)
-            }));
-        } else {
-            // 如果数据库中没有标签，返回一些默认的热门标签
-            console.log('数据库中没有标签，返回默认标签');
-            tags = [
-                { name: '已验证', usageCount: 156, isOfficial: true },
-                { name: '热门', usageCount: 134, isOfficial: true },
-                { name: '最新', usageCount: 89, isOfficial: true },
-                { name: '推荐', usageCount: 78, isOfficial: true },
-                { name: '高质量', usageCount: 67, isOfficial: true },
-                { name: 'JAV', usageCount: 145, isOfficial: false },
-                { name: '电影', usageCount: 89, isOfficial: false },
-                { name: '磁力', usageCount: 134, isOfficial: false },
-                { name: '种子', usageCount: 78, isOfficial: false },
-                { name: '高清', usageCount: 56, isOfficial: false }
-            ].map(tag => ({
-                ...tag,
-                id: `tag_${tag.name.toLowerCase()}`,
-                color: tag.isOfficial ? '#3b82f6' : '#6b7280',
-                count: tag.usageCount
-            }));
-        }
-        
-        console.log('最终返回标签数量:', tags.length);
-        
-        return utils.successResponse({ 
-            tags,
-            total: tags.length,
-            category: category
-        });
-        
-    } catch (error) {
-        console.error('获取标签失败:', error);
-        
-        // 发生错误时返回基础标签
-        const fallbackTags = [
-            { name: 'JAV', usageCount: 145, isOfficial: false },
-            { name: '电影', usageCount: 89, isOfficial: false },
-            { name: '磁力', usageCount: 134, isOfficial: false },
-            { name: '种子', usageCount: 78, isOfficial: false },
-            { name: '热门', usageCount: 134, isOfficial: true },
-            { name: '最新', usageCount: 89, isOfficial: true }
-        ].map(tag => ({
-            ...tag,
-            id: `fallback_${tag.name}`,
-            color: tag.isOfficial ? '#3b82f6' : '#6b7280',
-            count: tag.usageCount
-        }));
-        
-        return utils.successResponse({ 
-            tags: fallbackTags,
-            total: fallbackTags.length,
-            fallback: true,
-            error: error.message
-        });
-    }
-});
-
-// 🔧 优化搜索API - 确保搜索功能正常工作
+// 搜索社区搜索源（高级搜索）
 router.get('/api/community/search', async (request, env) => {
     try {
         const url = new URL(request.url);
@@ -2154,7 +2035,6 @@ router.get('/api/community/search', async (request, env) => {
     }
 });
 
-
 router.post('/api/auth/delete-account', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -2227,7 +2107,7 @@ router.put('/api/user/settings', async (request, env) => {
             'maxFavoritesPerUser',
             'allowAnalytics',
             'searchSuggestions',
-            'searchSources',            // 启用的搜索源列表
+            'searchSources',            // 可用的搜索源列表
             'customSearchSources',      // 自定义搜索源列表
             'customSourceCategories',    // 🔧 新增：自定义分类列表
 			// 🆕 添加搜索源状态检查相关设置
@@ -2749,7 +2629,8 @@ router.post('/api/actions/record', async (request, env) => {
             'favorite_add', 'favorite_remove', 'settings_update', 'export_data',
             'sync_data', 'page_view', 'session_start', 'session_end',
             'custom_source_add', 'custom_source_edit', 'custom_source_delete',
-            'custom_category_add', 'custom_category_edit', 'custom_category_delete'
+            'custom_category_add', 'custom_category_edit', 'custom_category_delete',
+            'tag_created', 'tag_updated', 'tag_deleted' // 🆕 添加标签相关行为
         ];
 
         if (!allowedActions.includes(actionType)) {
@@ -2788,9 +2669,377 @@ router.get('/api/config', async (request, env) => {
         minPasswordLength: parseInt(env.MIN_PASSWORD_LENGTH || '6'),
         maxFavoritesPerUser: parseInt(env.MAX_FAVORITES_PER_USER || '1000'),
         maxHistoryPerUser: parseInt(env.MAX_HISTORY_PER_USER || '1000'),
+        maxTagsPerUser: parseInt(env.MAX_TAGS_PER_USER || '50'), // 🆕 添加标签限制配置
         version: env.APP_VERSION || '1.3.0'
     });
 });
+
+// 辅助函数实现
+
+// 单个搜索源状态检查函数
+async function checkSingleSourceStatus(source, keyword, keywordHash, options = {}) {
+    const { timeout, checkContentMatch, env } = options;
+    const sourceId = source.id || source.name;
+    const startTime = Date.now();
+    
+    try {
+        // 检查缓存
+        const cached = await getCachedSourceStatus(env, sourceId, keywordHash);
+        if (cached && isCacheValid(cached)) {
+            console.log(`使用缓存结果: ${sourceId}`);
+            return {
+                sourceId,
+                sourceName: source.name,
+                status: cached.status,
+                available: cached.available,
+                contentMatch: cached.content_match,
+                responseTime: cached.response_time,
+                lastChecked: cached.created_at,
+                fromCache: true
+            };
+        }
+        
+        // 构建检查URL
+        const checkUrl = source.urlTemplate.replace('{keyword}', encodeURIComponent(keyword));
+        console.log(`检查URL: ${checkUrl}`);
+        
+        // 执行HTTP检查
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        
+        const response = await fetch(checkUrl, {
+            method: 'GET',
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'MagnetSearch-StatusChecker/1.3.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6',
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
+        clearTimeout(timeoutId);
+        const responseTime = Date.now() - startTime;
+        
+        // 基础可用性检查
+        const isAvailable = response.ok && response.status < 400;
+        let contentMatch = false;
+        let qualityScore = 0;
+        let matchDetails = {};
+        
+        // 内容匹配检查
+        if (isAvailable && checkContentMatch) {
+            try {
+                const content = await response.text();
+                const matchResult = analyzePageContent(content, keyword, source);
+                contentMatch = matchResult.hasMatch;
+                qualityScore = matchResult.qualityScore;
+                matchDetails = matchResult.details;
+                
+                console.log(`内容匹配检查 ${sourceId}: ${contentMatch ? '匹配' : '不匹配'}, 质量分数: ${qualityScore}`);
+            } catch (contentError) {
+                console.warn(`内容检查失败 ${sourceId}:`, contentError.message);
+            }
+        }
+        
+        // 确定最终状态
+        let finalStatus = 'error';
+        if (isAvailable) {
+            if (checkContentMatch) {
+                finalStatus = contentMatch ? 'available' : 'unavailable';
+            } else {
+                finalStatus = 'available';
+            }
+        } else if (response.status === 404) {
+            finalStatus = 'unavailable';
+        } else if (responseTime >= timeout * 0.9) {
+            finalStatus = 'timeout';
+        } else {
+            finalStatus = 'unavailable';
+        }
+        
+        const result = {
+            sourceId,
+            sourceName: source.name,
+            status: finalStatus,
+            available: finalStatus === 'available',
+            contentMatch,
+            responseTime,
+            qualityScore,
+            httpStatus: response.status,
+            lastChecked: Date.now(),
+            matchDetails,
+            fromCache: false
+        };
+        
+        // 异步保存到缓存
+        saveSingleStatusToCache(env, sourceId, keyword, keywordHash, result).catch(console.error);
+        
+        return result;
+        
+    } catch (error) {
+        clearTimeout(timeoutId);
+        const responseTime = Date.now() - startTime;
+        
+        console.error(`检查源失败 ${sourceId}:`, error.message);
+        
+        let status = 'error';
+        if (error.name === 'AbortError' || error.message.includes('timeout')) {
+            status = 'timeout';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            status = 'unavailable';
+        }
+        
+        const result = {
+            sourceId,
+            sourceName: source.name,
+            status,
+            available: false,
+            contentMatch: false,
+            responseTime,
+            qualityScore: 0,
+            lastChecked: Date.now(),
+            error: error.message,
+            fromCache: false
+        };
+        
+        // 异步保存错误结果到缓存
+        saveSingleStatusToCache(env, sourceId, keyword, keywordHash, result).catch(console.error);
+        
+        return result;
+    }
+}
+
+// 分析页面内容
+function analyzePageContent(content, keyword, source) {
+    const lowerContent = content.toLowerCase();
+    const lowerKeyword = keyword.toLowerCase();
+    
+    let qualityScore = 0;
+    const details = {
+        titleMatch: false,
+        bodyMatch: false,
+        exactMatch: false,
+        partialMatch: false,
+        resultCount: 0,
+        keywordPositions: []
+    };
+    
+    // 检查精确匹配
+    if (lowerContent.includes(lowerKeyword)) {
+        details.exactMatch = true;
+        qualityScore += 50;
+        
+        // 找到所有关键词位置
+        let position = 0;
+        while ((position = lowerContent.indexOf(lowerKeyword, position)) !== -1) {
+            details.keywordPositions.push(position);
+            position += lowerKeyword.length;
+        }
+    }
+    
+    // 检查标题匹配
+    const titleMatch = content.match(/<title[^>]*>([^<]*)</i);
+    if (titleMatch && titleMatch[1].toLowerCase().includes(lowerKeyword)) {
+        details.titleMatch = true;
+        qualityScore += 30;
+    }
+    
+    // 检查番号格式（如果是番号搜索）
+    if (/^[A-Za-z]+-?\d+$/i.test(keyword)) {
+        const numberPattern = keyword.replace('-', '-?');
+        const regex = new RegExp(numberPattern, 'gi');
+        const matches = content.match(regex);
+        if (matches) {
+            details.exactMatch = true;
+            qualityScore += 40;
+            details.resultCount = matches.length;
+        }
+    }
+    
+    // 检查部分匹配（关键词的各部分）
+    if (!details.exactMatch && keyword.length > 3) {
+        const parts = keyword.split(/[-_\s]+/);
+        let partialMatches = 0;
+        
+        parts.forEach(part => {
+            if (part.length > 2 && lowerContent.includes(part.toLowerCase())) {
+                partialMatches++;
+            }
+        });
+        
+        if (partialMatches > 0) {
+            details.partialMatch = true;
+            qualityScore += Math.min(partialMatches * 10, 30);
+        }
+    }
+    
+    // 检查是否有搜索结果列表
+    const resultIndicators = [
+        /result/gi,
+        /search.*result/gi,
+        /找到.*结果/gi,
+        /共.*条/gi,
+        /<div[^>]*class[^>]*result/gi
+    ];
+    
+    let resultCount = 0;
+    resultIndicators.forEach(indicator => {
+        const matches = content.match(indicator);
+        if (matches) resultCount += matches.length;
+    });
+    
+    if (resultCount > 0) {
+        details.resultCount = resultCount;
+        qualityScore += Math.min(resultCount * 5, 20);
+    }
+    
+    // 检查是否是"无结果"页面
+    const noResultIndicators = [
+        /no.*result/gi,
+        /not.*found/gi,
+        /没有.*结果/gi,
+        /未找到/gi,
+        /暂无.*内容/gi
+    ];
+    
+    const hasNoResultIndicator = noResultIndicators.some(indicator => 
+        content.match(indicator)
+    );
+    
+    if (hasNoResultIndicator) {
+        qualityScore = Math.max(0, qualityScore - 30);
+    }
+    
+    // 最终质量评分
+    qualityScore = Math.min(100, Math.max(0, qualityScore));
+    
+    const hasMatch = details.exactMatch || (details.partialMatch && qualityScore > 20);
+    
+    return {
+        hasMatch,
+        qualityScore,
+        details
+    };
+}
+
+// 缓存相关函数
+async function getCachedSourceStatus(env, sourceId, keywordHash) {
+    try {
+        return await env.DB.prepare(`
+            SELECT * FROM source_status_cache 
+            WHERE source_id = ? AND keyword_hash = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        `).bind(sourceId, keywordHash).first();
+    } catch (error) {
+        console.error('获取缓存状态失败:', error);
+        return null;
+    }
+}
+
+function isCacheValid(cached, maxAge = 300000) { // 5分钟默认缓存
+    if (!cached) return false;
+    return Date.now() - cached.created_at < maxAge;
+}
+
+async function saveSingleStatusToCache(env, sourceId, keyword, keywordHash, result) {
+    try {
+        const cacheId = utils.generateId();
+        await env.DB.prepare(`
+            INSERT INTO source_status_cache (
+                id, source_id, keyword, keyword_hash, status, available, content_match,
+                response_time, quality_score, match_details, page_info, check_error,
+                expires_at, created_at, last_accessed, access_count
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+            cacheId, sourceId, keyword, keywordHash, result.status,
+            result.available ? 1 : 0, result.contentMatch ? 1 : 0,
+            result.responseTime, result.qualityScore || 0,
+            JSON.stringify(result.matchDetails || {}),
+            JSON.stringify({ httpStatus: result.httpStatus }),
+            result.error || null,
+            Date.now() + 300000, // 5分钟后过期
+            Date.now(), Date.now(), 1
+        ).run();
+    } catch (error) {
+        console.error('保存缓存状态失败:', error);
+    }
+}
+
+async function saveStatusCheckResults(env, results, keyword) {
+    try {
+        // 更新健康度统计
+        for (const result of results) {
+            await updateSourceHealthStats(env, result);
+        }
+        
+        console.log(`已保存 ${results.length} 个搜索源的状态检查结果`);
+    } catch (error) {
+        console.error('保存状态检查结果失败:', error);
+    }
+}
+
+async function updateSourceHealthStats(env, result) {
+    try {
+        const sourceId = result.sourceId;
+        
+        // 获取当前统计
+        const currentStats = await env.DB.prepare(`
+            SELECT * FROM source_health_stats WHERE source_id = ?
+        `).bind(sourceId).first();
+        
+        if (currentStats) {
+            // 更新现有统计
+            const newTotalChecks = currentStats.total_checks + 1;
+            const newSuccessfulChecks = currentStats.successful_checks + (result.available ? 1 : 0);
+            const newContentMatches = currentStats.content_matches + (result.contentMatch ? 1 : 0);
+            const newSuccessRate = newSuccessfulChecks / newTotalChecks;
+            
+            // 更新平均响应时间
+            const newAvgResponseTime = Math.round(
+                (currentStats.average_response_time * currentStats.total_checks + result.responseTime) / newTotalChecks
+            );
+            
+            // 计算健康度分数
+            const healthScore = Math.round(newSuccessRate * 100);
+            
+            await env.DB.prepare(`
+                UPDATE source_health_stats SET
+                    total_checks = ?, successful_checks = ?, content_matches = ?,
+                    average_response_time = ?, success_rate = ?, health_score = ?,
+                    last_success = ?, last_failure = ?, updated_at = ?
+                WHERE source_id = ?
+            `).bind(
+                newTotalChecks, newSuccessfulChecks, newContentMatches,
+                newAvgResponseTime, newSuccessRate, healthScore,
+                result.available ? Date.now() : currentStats.last_success,
+                result.available ? currentStats.last_failure : Date.now(),
+                Date.now(), sourceId
+            ).run();
+        } else {
+            // 创建新统计
+            const statsId = utils.generateId();
+            await env.DB.prepare(`
+                INSERT INTO source_health_stats (
+                    id, source_id, total_checks, successful_checks, content_matches,
+                    average_response_time, last_success, last_failure, success_rate,
+                    health_score, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+                statsId, sourceId, 1, result.available ? 1 : 0, result.contentMatch ? 1 : 0,
+                result.responseTime,
+                result.available ? Date.now() : null,
+                result.available ? null : Date.now(),
+                result.available ? 1.0 : 0.0,
+                result.available ? 100 : 0,
+                Date.now()
+            ).run();
+        }
+    } catch (error) {
+        console.error('更新源健康度统计失败:', error);
+    }
+}
 
 // 默认处理器
 router.get('/*', (request) => {
