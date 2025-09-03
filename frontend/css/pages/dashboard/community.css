@@ -2077,6 +2077,270 @@
   }
 }
 
+/* 在 community.css 中添加以下样式 */
+
+/* 标签管理操作区域 */
+.tag-management-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* 管理标签按钮样式 */
+.tag-manage-btn {
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: var(--transition-base);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.tag-manage-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+}
+
+/* 标签管理弹窗样式 */
+.tag-management-modal .modal-content {
+  max-width: 800px;
+  width: 95%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.tag-management-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.user-tag-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  transition: all 0.2s ease-in-out;
+}
+
+.user-tag-item:last-child {
+  border-bottom: none;
+}
+
+.user-tag-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.user-tag-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.user-tag-sample {
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: white;
+  min-width: 80px;
+  text-align: center;
+}
+
+.user-tag-details h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.user-tag-meta {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.user-tag-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.user-tag-actions .btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+/* 按标签筛选弹窗样式 */
+.tag-filter-modal .modal-content {
+  max-width: 900px;
+  width: 95%;
+}
+
+.tag-sources-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.tag-source-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.tag-source-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent-primary);
+}
+
+.tag-source-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.tag-source-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.tag-source-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.tag-source-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.tag-source-stats {
+  display: flex;
+  justify-content: space-around;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.tag-source-stats .stat-item {
+  text-align: center;
+  flex: 1;
+}
+
+.tag-source-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+/* 移除热门标签编辑按钮 */
+.tag-item .tag-edit-btn {
+  display: none !important;
+}
+
+/* 热门标签点击效果增强 */
+.tag-item {
+  position: relative;
+  cursor: pointer;
+}
+
+.tag-item:hover {
+  background: var(--gradient-primary);
+  border-color: var(--accent-primary);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.tag-item::after {
+  content: '点击查看相关搜索源';
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s ease-in-out;
+  z-index: 10;
+}
+
+.tag-item:hover::after {
+  opacity: 1;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+  .tag-management-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  
+  .tag-manage-btn,
+  .tag-create-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .user-tag-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .user-tag-actions {
+    align-self: stretch;
+    justify-content: flex-end;
+  }
+  
+  .tag-sources-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .tag-management-list {
+    max-height: 40vh;
+  }
+  
+  .user-tag-item {
+    padding: 0.75rem 1rem;
+  }
+  
+  .user-tag-actions {
+    justify-content: space-between;
+  }
+}
+
 /* 滚动条优化 */
 .reviews-list::-webkit-scrollbar,
 .modal-content::-webkit-scrollbar,

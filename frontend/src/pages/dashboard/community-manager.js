@@ -166,6 +166,12 @@ async loadTabData() {
     if (mySharesBtn) {
       mySharesBtn.addEventListener('click', () => this.showMySharesModal());
     }
+	
+	// 🆕 管理标签按钮事件 - 添加到现有按钮绑定的最后面
+    const tagManageBtn = document.getElementById('tagManageBtn');
+    if (tagManageBtn) {
+        tagManageBtn.addEventListener('click', () => this.showManageMyTagsModal());
+    }
 
     // 🆕 标签管理按钮事件
     const tagCreateBtn = document.getElementById('tagCreateBtn');
@@ -634,52 +640,46 @@ async loadCommunitySourcesList() {
   }
 
   // 渲染热门标签
-  renderPopularTags() {
-    if (this.app.getCurrentUser()) {
-      // 登录用户显示带编辑功能的版本
-      this.renderPopularTagsWithEdit();
-    } else {
-      // 原有的只读版本
-      const container = document.getElementById('popularTagsList');
-      if (!container) return;
+renderPopularTags() {
+    const container = document.getElementById('popularTagsList');
+    if (!container) return;
 
-      if (!this.popularTags || this.popularTags.length === 0) {
+    if (!this.popularTags || this.popularTags.length === 0) {
         this.renderEmptyTags();
         return;
-      }
+    }
 
-      const validTags = this.popularTags
+    const validTags = this.popularTags
         .filter(tag => (tag.usageCount || tag.count) > 0)
         .sort((a, b) => (b.usageCount || b.count) - (a.usageCount || a.count))
         .slice(0, 15);
 
-      if (validTags.length === 0) {
+    if (validTags.length === 0) {
         this.renderEmptyTags();
         return;
-      }
+    }
 
-      const tagsHTML = validTags.map(tag => {
+    const tagsHTML = validTags.map(tag => {
         const isOfficial = tag.isOfficial || false;
         const usageCount = tag.usageCount || tag.count || 0;
         const tagClass = isOfficial ? 'tag-item official' : 'tag-item';
         
         return `
-          <span class="${tagClass}" 
-                onclick="window.app.getManager('community').searchByTag('${escapeHtml(tag.name)}')"
-                title="使用次数: ${usageCount}">
-            ${escapeHtml(tag.name)} 
-            <span class="tag-count">(${usageCount})</span>
-          </span>
+            <span class="${tagClass}" 
+                  onclick="window.app.getManager('community').showTagSourcesModal('${tag.id}', '${escapeHtml(tag.name)}')"
+                  title="点击查看标签相关的搜索源 (使用次数: ${usageCount})">
+                ${escapeHtml(tag.name)} 
+                <span class="tag-count">(${usageCount})</span>
+            </span>
         `;
-      }).join('');
+    }).join('');
 
-      container.innerHTML = `
+    container.innerHTML = `
         <div class="tags-cloud">
-          ${tagsHTML}
+            ${tagsHTML}
         </div>
-      `;
-    }
-  }
+    `;
+}
 
   // 渲染空标签状态
   renderEmptyTags() {
@@ -1392,18 +1392,18 @@ renderCommunitySourceItem(source) {
         </div>
       ` : ''}
 
-      ${tags.length > 0 ? `
-        <div class="source-tags">
-          ${tags.map(tag => `
+${tags.length > 0 ? `
+    <div class="source-tags">
+        ${tags.map(tag => `
             <span class="tag ${tag.isOfficial ? 'official' : ''}" 
                   style="background-color: ${tag.color}15; border-color: ${tag.color}; color: ${tag.color};"
-                  onclick="window.app.getManager('community').searchByTag('${escapeHtml(tag.name)}')"
-                  title="点击搜索包含此标签的搜索源">
-              ${escapeHtml(tag.name)}
+                  onclick="window.app.getManager('community').showTagSourcesModal('${tag.id}', '${escapeHtml(tag.name)}')"
+                  title="点击查看使用此标签的所有搜索源">
+                ${escapeHtml(tag.name)}
             </span>
-          `).join('')}
-        </div>
-      ` : ''}
+        `).join('')}
+    </div>
+` : ''}
 
       <div class="source-stats">
         <div class="stat-item">
@@ -1460,17 +1460,7 @@ renderCommunitySourceItem(source) {
   `;
 }
 
-// 🔧 新增：处理标签点击搜索功能
-async searchByTag(tagName) {
-    console.log('按标签搜索:', tagName);
-    const searchInput = document.getElementById('communitySearch');
-    if (searchInput) {
-        searchInput.value = tagName;
-    }
-    this.currentFilters.search = tagName;
-    this.currentPage = 1;
-    await this.loadCommunitySourcesList();
-}
+
 
   renderCommunityControls() {
     const categoryFilter = document.getElementById('communityCategory');
@@ -2914,6 +2904,208 @@ updateCommunityStats() {
       showToast(message, 'error');
     }
   }
+  
+  // 🆕 显示管理我的标签弹窗
+showManageMyTagsModal() {
+    if (!this.app.getCurrentUser()) {
+        showToast('请先登录', 'error');
+        return;
+    }
+
+    // 获取我创建的标签
+    const myTags = this.availableTags.filter(tag => 
+        tag.creator && tag.creator.id === this.app.getCurrentUser().id
+    );
+
+    const modalHTML = `
+        <div id="manageMyTagsModal" class="modal" style="display: block;">
+            <div class="modal-content large">
+                <span class="close" onclick="document.getElementById('manageMyTagsModal').remove()">&times;</span>
+                <div class="modal-header">
+                    <h2>⚙️ 管理我的标签</h2>
+                    <p>管理您创建的标签，已被使用的标签不能删除</p>
+                </div>
+                
+                <div class="modal-body">
+                    ${myTags.length > 0 ? `
+                        <div class="my-tags-list">
+                            ${myTags.map(tag => this.renderMyTagItem(tag)).join('')}
+                        </div>
+                    ` : `
+                        <div class="empty-state">
+                            <span style="font-size: 3rem;">🏷️</span>
+                            <p>您还没有创建过标签</p>
+                            <button class="btn-primary" onclick="document.getElementById('manageMyTagsModal').remove(); window.app.getManager('community').showCreateTagModal();">
+                                立即创建标签
+                            </button>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="document.getElementById('manageMyTagsModal').remove()">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+  // 🆕 渲染我的标签项目
+renderMyTagItem(tag) {
+    const canDelete = (tag.usageCount || 0) === 0;
+    
+    return `
+        <div class="my-tag-item" data-tag-id="${tag.id}">
+            <div class="tag-item-header">
+                <div class="tag-item-info">
+                    <span class="tag-name" style="color: ${tag.color || '#3b82f6'}">${escapeHtml(tag.name)}</span>
+                    ${tag.isOfficial ? '<span class="badge official">官方</span>' : ''}
+                </div>
+                <div class="tag-item-stats">
+                    <span class="usage-count">使用次数: ${tag.usageCount || 0}</span>
+                </div>
+            </div>
+            
+            ${tag.description ? `
+                <div class="tag-item-description">
+                    ${escapeHtml(tag.description)}
+                </div>
+            ` : ''}
+            
+            <div class="tag-item-actions">
+                <button class="action-btn secondary" onclick="window.app.getManager('community').showTagSourcesModal('${tag.id}', '${escapeHtml(tag.name)}')">
+                    <span>👁️</span>
+                    <span>查看使用的搜索源</span>
+                </button>
+                <button class="action-btn tertiary" onclick="window.app.getManager('community').showEditTagModal('${tag.id}')">
+                    <span>✏️</span>
+                    <span>编辑</span>
+                </button>
+                ${canDelete ? `
+                    <button class="action-btn danger" onclick="window.app.getManager('community').confirmDeleteTag('${tag.id}', '${escapeHtml(tag.name)}')">
+                        <span>🗑️</span>
+                        <span>删除</span>
+                    </button>
+                ` : `
+                    <span class="disabled-action" title="标签正在被使用中，无法删除">
+                        🚫 无法删除
+                    </span>
+                `}
+            </div>
+        </div>
+    `;
+}
+
+  // 🆕 显示标签相关搜索源弹窗
+async showTagSourcesModal(tagId, tagName) {
+    try {
+        showLoading(true);
+        
+        // 获取使用该标签的搜索源
+        const result = await apiService.getCommunitySearchSources({
+            tags: [tagId],
+            limit: 100
+        });
+        
+        if (result.success) {
+            this.renderTagSourcesModal(tagName, result.sources);
+        } else {
+            throw new Error(result.error || '获取标签相关搜索源失败');
+        }
+        
+    } catch (error) {
+        console.error('获取标签搜索源失败:', error);
+        showToast('获取标签相关搜索源失败: ' + error.message, 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// 🆕 渲染标签搜索源弹窗
+renderTagSourcesModal(tagName, sources) {
+    const modalHTML = `
+        <div id="tagSourcesModal" class="modal" style="display: block;">
+            <div class="modal-content large">
+                <span class="close" onclick="document.getElementById('tagSourcesModal').remove()">&times;</span>
+                <div class="modal-header">
+                    <h2>🏷️ 标签: ${escapeHtml(tagName)}</h2>
+                    <p>共找到 ${sources.length} 个相关搜索源</p>
+                </div>
+                
+                <div class="modal-body">
+                    ${sources.length > 0 ? `
+                        <div class="tag-sources-grid">
+                            ${sources.map(source => this.renderTagSourceItem(source)).join('')}
+                        </div>
+                    ` : `
+                        <div class="empty-state">
+                            <span style="font-size: 3rem;">📂</span>
+                            <p>暂无使用此标签的搜索源</p>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="document.getElementById('tagSourcesModal').remove()">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// 🆕 渲染标签搜索源项目（简化版）
+renderTagSourceItem(source) {
+    const category = APP_CONSTANTS.SOURCE_CATEGORIES ? 
+        Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).find(cat => cat.id === source.category) : null;
+    
+    return `
+        <div class="tag-source-item" data-source-id="${source.id}">
+            <div class="source-header">
+                <div class="source-icon">${source.icon || '🔍'}</div>
+                <div class="source-info">
+                    <h4 class="source-title">${escapeHtml(source.name)}</h4>
+                    ${source.subtitle ? `<p class="source-subtitle">${escapeHtml(source.subtitle)}</p>` : ''}
+                </div>
+                <div class="source-badges">
+                    ${source.isVerified ? '<span class="badge verified">已验证</span>' : ''}
+                    ${source.isFeatured ? '<span class="badge featured">推荐</span>' : ''}
+                </div>
+            </div>
+            
+            <div class="source-meta">
+                <span class="category-badge" style="background: ${category?.color || '#6b7280'}">
+                    ${category?.icon || '🌟'} ${category?.name || '其他'}
+                </span>
+                <span class="source-author">
+                    由 ${escapeHtml(source.author?.name || 'Unknown')} 分享
+                </span>
+            </div>
+            
+            <div class="source-stats-mini">
+                <span class="stat">⭐ ${(source.stats?.rating || 0).toFixed(1)}</span>
+                <span class="stat">📥 ${this.formatNumber(source.stats?.downloads || 0)}</span>
+                <span class="stat">👍 ${this.formatNumber(source.stats?.likes || 0)}</span>
+            </div>
+            
+            <div class="source-actions-mini">
+                <button class="btn-primary btn-sm" onclick="window.app.getManager('community').downloadSource('${source.id}')">
+                    添加到我的搜索源
+                </button>
+                <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').viewSourceDetails('${source.id}')">
+                    查看详情
+                </button>
+            </div>
+        </div>
+    `;
+}
 
   // 公共方法供其他管理器调用
   getTotalCommunityStats() {
