@@ -1,7 +1,7 @@
 // 社区搜索源分享API服务 - 从api.js拆分出来的搜索源分享相关功能
 import { generateId } from '../utils/helpers.js';
 
-class CommunitySourcesAPI {
+class CommunitySourcesService {
   constructor(baseAPIService) {
     this.api = baseAPIService;
   }
@@ -623,4 +623,6 @@ class CommunitySourcesAPI {
   }
 }
 
-export default CommunitySourcesAPI;
+
+export const communitySourcesService = new CommunitySourcesService();
+export default communitySourcesService;

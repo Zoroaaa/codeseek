@@ -1,7 +1,7 @@
 // 社区标签管理API服务 - 从api.js拆分出来的标签相关功能
 import { generateId } from '../utils/helpers.js';
 
-class CommunityTagsAPI {
+class CommunityTagsService {
   constructor(baseAPIService) {
     this.api = baseAPIService;
   }
@@ -427,4 +427,5 @@ class CommunityTagsAPI {
   }
 }
 
-export default CommunityTagsAPI;
+export const communityTagsService = new CommunityTagsService();
+export default communityTagsService;

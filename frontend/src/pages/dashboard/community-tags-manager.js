@@ -2,13 +2,11 @@
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast, createElement } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
-import CommunityTagsAPI from '../../services/community-tags-api.js';
+import communityTagsService from '../../services/community-tags-api.js';
 
 export class CommunityTagsManager {
   constructor(dashboardApp) {
     this.app = dashboardApp;
-	    // 修复：创建 CommunityTagsAPI 实例，传入 baseAPIService
-    this.api = new CommunityTagsAPI(dashboardApp.api || window.apiService);
     this.availableTags = []; // 存储所有可用标签
     this.popularTags = [];
     this.isInitialized = false;
@@ -28,7 +26,7 @@ export class CommunityTagsManager {
   async loadAvailableTags() {
     try {
       console.log('开始加载所有可用标签');
-      const result = await this.api.getAllTags({
+      const result = await communityTagsService.getAllTags({
         active: true,
         category: 'all'
       });
@@ -189,7 +187,7 @@ export class CommunityTagsManager {
       
       console.log('提交标签创建请求:', tagData);
       
-      const result = await this.api.createTag(tagData);
+      const result = await communityTagsService.createTag(tagData);
       
       if (result.success) {
         showToast('标签创建成功！', 'success');
@@ -301,7 +299,7 @@ export class CommunityTagsManager {
   // 加载真实热门标签
   async loadPopularTags() {
     try {
-      const result = await this.api.getPopularTags();
+      const result = await communityTagsService.getPopularTags();
       
       if (result.success && result.tags && result.tags.length > 0) {
         this.popularTags = result.tags.filter(tag => 
@@ -505,7 +503,7 @@ export class CommunityTagsManager {
       
       console.log('提交标签编辑:', tagId, updates);
       
-      const result = await this.api.editTag(tagId, updates);
+      const result = await communityTagsService.editTag(tagId, updates);
       
       if (result.success) {
         showToast('标签更新成功！', 'success');
@@ -550,7 +548,7 @@ export class CommunityTagsManager {
       
       console.log('删除标签:', tagId);
       
-      const result = await this.api.deleteTag(tagId);
+      const result = await communityTagsService.deleteTag(tagId);
       
       if (result.success) {
         showToast('标签删除成功', 'success');

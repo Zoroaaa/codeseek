@@ -2,12 +2,11 @@
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast, createElement } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
-import CommunitySourcesAPI from '../../services/community-sources-api.js';
+import communitySourcesService from '../../services/community-sources-api.js';
 
 export class CommunitySourcesManager {
   constructor(dashboardApp) {
     this.app = dashboardApp;
-    this.api = new CommunitySourcesAPI(dashboardApp.api || window.apiService);
     this.currentPage = 1;
     this.currentLimit = 20;
     this.currentFilters = {
@@ -177,7 +176,7 @@ export class CommunitySourcesManager {
         ...this.currentFilters
       };
 
-      const result = await this.api.getCommunitySearchSources(options);
+      const result = await communitySourcesService.getCommunitySearchSources(options);
       
       if (result.success) {
         this.currentSources = result.sources;
@@ -225,7 +224,7 @@ export class CommunitySourcesManager {
     }
 
     try {
-      const result = await this.api.getUserCommunityStats();
+      const result = await communitySourcesService.getUserCommunityStats();
       
       if (result.success) {
         this.userStats = result.stats;
@@ -790,7 +789,7 @@ export class CommunitySourcesManager {
 
       showLoading(true);
       
-      const result = await this.api.shareSourceToCommunity(sourceData);
+      const result = await communitySourcesService.shareSourceToCommunity(sourceData);
       
       if (result.success) {
         showToast(result.message || '分享成功！', 'success');
@@ -1121,7 +1120,7 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      const result = await this.api.downloadCommunitySource(sourceId);
+      const result = await communitySourcesService.downloadCommunitySource(sourceId);
       
       if (result.success) {
         showToast(result.message || '下载成功', 'success');
@@ -1154,7 +1153,7 @@ export class CommunitySourcesManager {
     }
 
     try {
-      const result = await this.api.toggleSourceLike(sourceId, 'like');
+      const result = await communitySourcesService.toggleSourceLike(sourceId, 'like');
       
       if (result.success) {
         showToast(result.message || '操作成功', 'success', 2000);
@@ -1189,7 +1188,7 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      const result = await this.api.getCommunitySourceDetails(sourceId);
+      const result = await communitySourcesService.getCommunitySourceDetails(sourceId);
       
       if (result.success) {
         this.showSourceDetailsModal(result.source);
@@ -1346,7 +1345,7 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      const result = await this.api.reviewCommunitySource(sourceId, {
+      const result = await communitySourcesService.reviewCommunitySource(sourceId, {
         rating,
         comment,
         isAnonymous
@@ -1425,7 +1424,7 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      const result = await this.api.reportCommunitySource(sourceId, {
+      const result = await communitySourcesService.reportCommunitySource(sourceId, {
         reason,
         details
       });
@@ -1541,7 +1540,7 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      const result = await this.api.getCommunitySearchSources({
+      const result = await communitySourcesService.getCommunitySearchSources({
         author: this.app.getCurrentUser().username,
         limit: 50,
         sort: 'created_at',
@@ -1736,7 +1735,7 @@ export class CommunitySourcesManager {
             throw new Error('搜索源ID无效');
         }
         
-        const result = await this.api.deleteCommunitySource(sourceId);
+        const result = await communitySourcesService.deleteCommunitySource(sourceId);
         
         if (result.success) {
             showToast(result.message || '删除成功', 'success');
@@ -1850,7 +1849,7 @@ export class CommunitySourcesManager {
       showLoading(true);
       
       // 获取搜索源详情
-      const result = await this.api.getMySharedSourceDetails(sourceId);
+      const result = await communitySourcesService.getMySharedSourceDetails(sourceId);
       
       if (!result.success || !result.source) {
         throw new Error(result.error || '获取搜索源详情失败');
@@ -2017,7 +2016,7 @@ export class CommunitySourcesManager {
       
       console.log('提交编辑分享:', sourceId, updates);
       
-      const result = await this.api.editCommunitySource(sourceId, updates);
+      const result = await communitySourcesService.editCommunitySource(sourceId, updates);
       
       if (result.success) {
         showToast('搜索源更新成功！', 'success');
@@ -2055,7 +2054,7 @@ export class CommunitySourcesManager {
       console.log(`开始查找标签 "${tagName}" (ID: ${tagId}) 相关的搜索源`);
       
       // 方法1：通过标签ID直接过滤（主要方式）
-      let result = await this.api.getCommunitySearchSources({
+      let result = await communitySourcesService.getCommunitySearchSources({
         tags: [tagId],
         limit: 100,
         sort: 'created_at',
@@ -2067,7 +2066,7 @@ export class CommunitySourcesManager {
         console.log('后端标签过滤未返回结果，尝试获取所有源然后前端过滤...');
         
         // 获取所有搜索源
-        const allSourcesResult = await this.api.getCommunitySearchSources({
+        const allSourcesResult = await communitySourcesService.getCommunitySearchSources({
           limit: 200, // 获取更多数据用于过滤
           sort: 'created_at',
           order: 'desc'
@@ -2132,7 +2131,7 @@ export class CommunitySourcesManager {
   // 🔧 新增：通过标签名称搜索的降级方案
   async searchByTagName(tagName) {
     try {
-      const result = await this.api.searchCommunityPosts(tagName, {
+      const result = await communitySourcesService.searchCommunityPosts(tagName, {
         limit: 50,
         category: 'all'
       });
@@ -2327,7 +2326,7 @@ export class CommunitySourcesManager {
     console.log('搜索社区内容:', query);
     
     try {
-      const result = await this.api.searchCommunityPosts(query, {
+      const result = await communitySourcesService.searchCommunityPosts(query, {
         category: this.currentFilters.category,
         limit: this.currentLimit
       });
