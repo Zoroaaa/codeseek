@@ -214,7 +214,8 @@ async loadAvailableTags() {
 }
 
   // 🆕 显示创建标签模态框
-  showCreateTagModal() {
+// 在community-manager.js的showCreateTagModal方法中修改
+showCreateTagModal() {
     if (!this.app.getCurrentUser()) {
       showToast('请先登录', 'error');
       return;
@@ -231,8 +232,7 @@ async loadAvailableTags() {
               <label for="tagName">标签名称 <span style="color: red;">*</span>:</label>
               <input type="text" id="tagName" name="tagName" required 
                 placeholder="例如：高质量、热门推荐" 
-                maxlength="20" 
-                pattern="^[\\u4e00-\\u9fa5\\w\\s-]{2,20}$">
+                maxlength="20">
               <small class="form-help">2-20个字符，支持中文、英文、数字</small>
               <div class="field-error" id="tagNameError"></div>
             </div>
@@ -282,10 +282,9 @@ async loadAvailableTags() {
     if (form) {
       form.addEventListener('submit', (e) => this.submitCreateTagForm(e));
     }
-  }
+}
 
   // 🆕 提交创建标签表单
-// 修复2: 增强创建标签功能，处理数据库错误
 async submitCreateTagForm(event) {
   event.preventDefault();
   
@@ -307,7 +306,7 @@ async submitCreateTagForm(event) {
     color: formData.get('tagColor') || '#3b82f6'
   };
 
-  // 前端验证
+  // 前端验证 - 移除复杂的正则表达式
   let hasError = false;
 
   if (!tagData.name || tagData.name.length < 2) {
@@ -317,6 +316,12 @@ async submitCreateTagForm(event) {
 
   if (tagData.name && tagData.name.length > 20) {
     this.showFieldError('tagName', '标签名称不能超过20个字符');
+    hasError = true;
+  }
+
+  // 简化的字符验证 - 只检查长度和基本字符
+  if (tagData.name && !/^[\u4e00-\u9fa5\w\s\-]{2,20}$/.test(tagData.name)) {
+    this.showFieldError('tagName', '标签名称只能包含中文、英文、数字、空格和短横线');
     hasError = true;
   }
 

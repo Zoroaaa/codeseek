@@ -255,7 +255,7 @@ class APIService {
   }
 
   // 创建新标签 - 增强错误处理
-  async createTag(tagData) {
+async createTag(tagData) {
     if (!this.token) {
       throw new Error('用户未登录');
     }
@@ -264,13 +264,14 @@ class APIService {
       throw new Error('标签名称不能为空');
     }
     
-    // 验证标签名称
-    if (tagData.name.length < 2 || tagData.name.length > 20) {
+    // 验证标签名称 - 简化验证逻辑
+    const name = tagData.name.trim();
+    if (name.length < 2 || name.length > 20) {
       throw new Error('标签名称长度必须在2-20个字符之间');
     }
     
     const payload = {
-      name: tagData.name.trim(),
+      name: name,
       description: tagData.description?.trim() || '',
       color: tagData.color || '#3b82f6'
     };
@@ -297,7 +298,7 @@ class APIService {
     } catch (error) {
       console.error('创建标签失败:', error);
       
-      // 🔧 修复：处理数据库相关错误
+      // 处理数据库相关错误
       if (error.message.includes('ambiguous column name')) {
         throw new Error('数据库列名冲突，请联系管理员更新数据库架构');
       } else if (error.message.includes('SQLITE_ERROR')) {
@@ -308,7 +309,7 @@ class APIService {
       
       throw error;
     }
-  }
+}
 
   // 更新标签 - 处理列名变更
   async updateTag(tagId, updates) {

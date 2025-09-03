@@ -1,5 +1,4 @@
-
-// Cloudflare Worker 后端主文件 - 优化版本，修复SQL错误
+// Cloudflare Worker 后端主文件 - 优化版本，移除内置搜索源定义
 
 // 🔧 简化的路由器实现 - 专门修复参数路由问题
 class Router {
@@ -632,7 +631,7 @@ router.post('/api/auth/logout', async (request, env) => {
     return utils.successResponse({ message: '退出成功' });
 });
 
-// 🆕 标签管理API - 修复SQL列名冲突问题
+// 🆕 标签管理API - 新增功能
 router.get('/api/community/tags', async (request, env) => {
     try {
         const url = new URL(request.url);
@@ -644,11 +643,11 @@ router.get('/api/community/tags', async (request, env) => {
         let params = [];
         
         if (onlyActive) {
-            whereConditions.push('cst.tag_active = ?'); // 🔧 修复：使用明确的列名前缀
+            whereConditions.push('tag_active = ?');
             params.push(1);
         }
         
-        // 构建查询 - 🔧 修复：使用表别名避免列名冲突
+        // 构建查询
         let query = `
             SELECT 
                 cst.id,
@@ -682,7 +681,7 @@ router.get('/api/community/tags', async (request, env) => {
             usageCount: tag.usage_count || 0,
             count: tag.usage_count || 0,
             isOfficial: Boolean(tag.is_official),
-            isActive: Boolean(tag.tag_active), // 🔧 修复：使用正确的列名
+            isActive: Boolean(tag.tag_active),
             creator: {
                 id: tag.created_by,
                 name: tag.creator_name || 'System'
@@ -703,7 +702,7 @@ router.get('/api/community/tags', async (request, env) => {
     }
 });
 
-// 🆕 创建新标签API - 修复SQL错误
+// 🆕 创建新标签API
 router.post('/api/community/tags', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -747,7 +746,7 @@ router.post('/api/community/tags', async (request, env) => {
             return utils.errorResponse(`每个用户最多只能创建${maxTagsPerUser}个标签`, 400);
         }
         
-        // 创建新标签 - 🔧 修复：使用正确的列名
+        // 创建新标签
         const tagId = utils.generateId();
         const now = Date.now();
         
@@ -818,7 +817,7 @@ router.post('/api/community/tags', async (request, env) => {
     }
 });
 
-// 🆕 更新标签API（仅创建者或管理员可用） - 修复SQL错误
+// 🆕 更新标签API（仅创建者或管理员可用）
 router.put('/api/community/tags/:id', async (request, env) => {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -853,7 +852,7 @@ router.put('/api/community/tags/:id', async (request, env) => {
             validColor = color;
         }
         
-        // 更新标签 - 🔧 修复：使用正确的列名
+        // 更新标签
         await env.DB.prepare(`
             UPDATE community_source_tags 
             SET tag_description = ?, tag_color = ?, tag_active = ?, updated_at = ?
@@ -923,7 +922,7 @@ router.delete('/api/community/tags/:id', async (request, env) => {
             DELETE FROM community_source_tags WHERE id = ?
         `).bind(tagId).run();
         
-        // 更新用户统计 - 🔧 修复：使用CASE语句替代GREATEST函数
+        // 更新用户统计
         await env.DB.prepare(`
             UPDATE community_user_stats 
             SET tags_created = CASE 
@@ -951,6 +950,138 @@ router.delete('/api/community/tags/:id', async (request, env) => {
     }
 });
 
+// 搜索源状态检查相关API
+router.post('/api/source-status/check', async (request, env) => {
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { sources, keyword, options = {} } = body;
+        
+        if (!sources || !Array.isArray(sources) || sources.length === 0) {
+            return utils.errorResponse('搜索源列表不能为空', 400);
+        }
+        
+        if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
+            return utils.errorResponse('搜索关键词不能为空', 400);
+        }
+        
+        const trimmedKeyword = keyword.trim();
+        const keywordHash = await utils.hashPassword(`${trimmedKeyword}${Date.now()}`);
+        const timeout = Math.min(Math.max(options.timeout || 10000, 3000), 30000);
+        const checkContentMatch = options.checkContentMatch !== false;
+        
+        console.log(`开始检查 ${sources.length} 个搜索源，关键词: ${trimmedKeyword}`);
+        
+        const results = [];
+        const concurrency = Math.min(sources.length, 3); // 限制并发数
+        
+        // 分批并发处理
+        for (let i = 0; i < sources.length; i += concurrency) {
+            const batch = sources.slice(i, i + concurrency);
+            const batchPromises = batch.map(source => 
+                checkSingleSourceStatus(source, trimmedKeyword, keywordHash, {
+                    timeout,
+                    checkContentMatch,
+                    env
+                })
+            );
+            
+            const batchResults = await Promise.all(batchPromises);
+            results.push(...batchResults);
+            
+            // 添加批次间延迟
+            if (i + concurrency < sources.length) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+        
+        // 保存检查结果到数据库（异步）
+        saveStatusCheckResults(env, results, trimmedKeyword).catch(console.error);
+        
+        // 统计结果
+        const summary = {
+            total: results.length,
+            available: results.filter(r => r.status === 'available').length,
+            unavailable: results.filter(r => r.status === 'unavailable').length,
+            timeout: results.filter(r => r.status === 'timeout').length,
+            error: results.filter(r => r.status === 'error').length,
+            averageResponseTime: Math.round(
+                results.filter(r => r.responseTime > 0)
+                    .reduce((sum, r) => sum + r.responseTime, 0) / 
+                Math.max(results.filter(r => r.responseTime > 0).length, 1)
+            ),
+            keyword: trimmedKeyword,
+            timestamp: Date.now()
+        };
+        
+        return utils.successResponse({
+            summary,
+            results,
+            message: `搜索源状态检查完成: ${summary.available}/${summary.total} 可用`
+        });
+        
+    } catch (error) {
+        console.error('搜索源状态检查失败:', error);
+        return utils.errorResponse('搜索源状态检查失败: ' + error.message, 500);
+    }
+});
+
+// 获取搜索源状态检查历史
+router.get('/api/source-status/history', async (request, env) => {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+    
+    try {
+        const url = new URL(request.url);
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50);
+        const offset = Math.max(parseInt(url.searchParams.get('offset') || '0'), 0);
+        const keyword = url.searchParams.get('keyword');
+        
+        let query = `
+            SELECT * FROM source_status_cache 
+            WHERE 1=1
+        `;
+        const params = [];
+        
+        if (keyword) {
+            query += ` AND keyword LIKE ?`;
+            params.push(`%${keyword}%`);
+        }
+        
+        query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+        params.push(limit, offset);
+        
+        const result = await env.DB.prepare(query).bind(...params).all();
+        
+        const history = result.results.map(item => ({
+            id: item.id,
+            sourceId: item.source_id,
+            keyword: item.keyword,
+            status: item.status,
+            available: Boolean(item.available),
+            contentMatch: Boolean(item.content_match),
+            responseTime: item.response_time,
+            qualityScore: item.quality_score,
+            lastChecked: item.created_at,
+            checkError: item.check_error
+        }));
+        
+        return utils.successResponse({
+            history,
+            total: result.results.length,
+            limit,
+            offset
+        });
+        
+    } catch (error) {
+        console.error('获取状态检查历史失败:', error);
+        return utils.errorResponse('获取历史失败', 500);
+    }
+});
+
+// 社区搜索源相关API
+
 // 获取社区搜索源列表（支持高级筛选）
 router.get('/api/community/sources', async (request, env) => {
     try {
@@ -965,7 +1096,7 @@ router.get('/api/community/sources', async (request, env) => {
         const search = url.searchParams.get('search');
         const tags = url.searchParams.get('tags');
         const featured = url.searchParams.get('featured') === 'true';
-        const author = url.searchParams.get('author');
+        const author = url.searchParams.get('author'); // 🆕 添加按作者过滤
         
         console.log('获取社区搜索源列表:', { 
             page, limit, category, sortBy, order, search, author, featured 
@@ -1105,7 +1236,7 @@ router.delete('/api/community/sources/:id', async (request, env) => {
             return utils.errorResponse('搜索源不存在或您无权删除', 404);
         }
         
-        // 开始事务删除相关数据 - 🔧 修复GREATEST函数问题
+        // 开始事务删除相关数据 - 修复GREATEST函数问题
         try {
             // 删除相关的评论
             await env.DB.prepare(`
@@ -1132,7 +1263,7 @@ router.delete('/api/community/sources/:id', async (request, env) => {
                 DELETE FROM community_shared_sources WHERE id = ?
             `).bind(sourceId).run();
             
-            // 🔧 修复用户统计更新 - 移除GREATEST函数，使用CASE语句
+            // 修复用户统计更新 - 移除GREATEST函数，使用CASE语句
             await env.DB.prepare(`
                 UPDATE community_user_stats 
                 SET shared_sources_count = CASE 
@@ -1164,7 +1295,6 @@ router.delete('/api/community/sources/:id', async (request, env) => {
         return utils.errorResponse('删除搜索源失败: ' + error.message, 500);
     }
 });
-
 
 // 获取单个搜索源详情
 router.get('/api/community/sources/:id', async (request, env) => {
@@ -1222,7 +1352,7 @@ router.get('/api/community/sources/:id', async (request, env) => {
         const tagDetails = [];
         
         if (tagIds.length > 0) {
-            const tagQuery = `SELECT * FROM community_source_tags WHERE id IN (${tagIds.map(() => '?').join(',')}) AND is_active = 1`;
+            const tagQuery = `SELECT * FROM community_source_tags WHERE id IN (${tagIds.map(() => '?').join(',')}) AND tag_active = 1`;
             const tagResult = await env.DB.prepare(tagQuery).bind(...tagIds).all();
             tagDetails.push(...tagResult.results.map(tag => ({
                 id: tag.id,
@@ -1329,7 +1459,7 @@ router.post('/api/community/sources', async (request, env) => {
                 const tagQuery = `
                     SELECT id FROM community_source_tags 
                     WHERE id IN (${validTags.map(() => '?').join(',')}) 
-                    AND is_active = 1
+                    AND tag_active = 1
                 `;
                 const tagResult = await env.DB.prepare(tagQuery).bind(...validTags).all();
                 processedTagIds = tagResult.results.map(tag => tag.id);
@@ -1705,7 +1835,7 @@ router.get('/api/community/user/stats', async (request, env) => {
                 (SELECT COUNT(DISTINCT shared_source_id) FROM community_source_downloads WHERE user_id = ?) as sources_downloaded,
                 
                 -- 🆕 用户创建的标签数量
-                (SELECT COUNT(*) FROM community_source_tags WHERE created_by = ? AND is_active = 1) as tags_created
+                (SELECT COUNT(*) FROM community_source_tags WHERE created_by = ? AND tag_active = 1) as tags_created
         `).bind(user.id, user.id, user.id, user.id, user.id, user.id, user.id).first();
         
         // 使用实时计算的数据或缓存数据，如果缓存数据存在且差异不大则使用缓存数据
