@@ -2499,7 +2499,7 @@ updateCommunityStats() {
   }
 
   // 🆕 删除标签
-  async deleteTag(tagId) {
+async deleteTag(tagId) {
     if (!this.app.getCurrentUser()) {
       showToast('请先登录', 'error');
       return;
@@ -2515,15 +2515,28 @@ updateCommunityStats() {
       if (result.success) {
         showToast('标签删除成功', 'success');
         
+        // 🔧 立即从本地数据中移除已删除的标签
+        this.availableTags = this.availableTags.filter(tag => tag.id !== tagId);
+        this.popularTags = this.popularTags.filter(tag => tag.id !== tagId);
+        
         // 关闭模态框
         const modal = document.getElementById('editTagModal');
         if (modal) modal.remove();
         
-        // 重新加载标签数据
-        await Promise.all([
+        // 🔧 立即更新所有相关的UI组件
+        this.updateAllTagRelatedUI(tagId);
+        
+        // 🔧 异步重新加载最新数据（确保与服务器同步）
+        Promise.all([
           this.loadAvailableTags(),
           this.loadPopularTags()
-        ]);
+        ]).then(() => {
+          console.log('标签数据重新加载完成');
+          // 再次更新UI，确保完全同步
+          this.updateAllTagRelatedUI();
+        }).catch(error => {
+          console.warn('重新加载标签数据失败:', error);
+        });
         
       } else {
         showToast(result.message || '删除失败', 'error');
@@ -2534,6 +2547,158 @@ updateCommunityStats() {
       showToast('删除失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
+    }
+  }
+
+// 🆕 新增方法：更新所有标签相关的UI组件
+updateAllTagRelatedUI(deletedTagId = null) {
+    console.log('更新所有标签相关的UI组件', deletedTagId ? `删除的标签ID: ${deletedTagId}` : '');
+    
+    try {
+      // 1. 更新热门标签显示
+      this.renderPopularTags();
+      
+      // 2. 更新我的标签管理模态框（如果打开）
+      const myTagsModal = document.getElementById('manageMyTagsModal');
+      if (myTagsModal) {
+        console.log('更新我的标签管理模态框');
+        this.updateMyTagsModalContent(deletedTagId);
+      }
+      
+      // 3. 更新标签选择器（如果存在）
+      const tagSelectorList = document.getElementById('tagSelectorList');
+      if (tagSelectorList) {
+        console.log('更新标签选择器');
+        this.updateTagSelectorContent(deletedTagId);
+      }
+      
+      // 4. 更新社区搜索源列表中的标签显示
+      if (this.currentSources && this.currentSources.length > 0) {
+        console.log('更新搜索源列表中的标签显示');
+        this.renderCommunitySourcesList(this.currentSources, this.currentPagination);
+      }
+      
+      // 5. 如果有标签源模态框打开，也需要更新
+      const tagSourcesModal = document.getElementById('tagSourcesModal');
+      if (tagSourcesModal && deletedTagId) {
+        console.log('关闭已删除标签的源模态框');
+        tagSourcesModal.remove();
+      }
+      
+      console.log('所有标签相关UI组件更新完成');
+      
+    } catch (error) {
+      console.error('更新标签UI时出错:', error);
+    }
+  }
+
+// 🆕 新增方法：更新我的标签管理模态框内容
+updateMyTagsModalContent(deletedTagId) {
+    const modalBody = document.querySelector('#manageMyTagsModal .modal-body');
+    if (!modalBody) return;
+    
+    if (deletedTagId) {
+      // 立即移除已删除的标签项
+      const deletedTagItem = document.querySelector(`#manageMyTagsModal .my-tag-item[data-tag-id="${deletedTagId}"]`);
+      if (deletedTagItem) {
+        deletedTagItem.style.opacity = '0.5';
+        deletedTagItem.style.pointerEvents = 'none';
+        setTimeout(() => {
+          deletedTagItem.remove();
+          this.checkEmptyTagsState();
+        }, 500);
+      }
+    }
+    
+    // 重新生成我的标签列表
+    const myTags = this.availableTags.filter(tag => 
+        tag.creator && tag.creator.id === this.app.getCurrentUser().id
+    );
+    
+    if (myTags.length === 0) {
+      modalBody.innerHTML = `
+        <div class="empty-state">
+          <span style="font-size: 3rem;">🏷️</span>
+          <p>您还没有创建过标签</p>
+          <button class="btn-primary" onclick="document.getElementById('manageMyTagsModal').remove(); window.app.getManager('community').showCreateTagModal();">
+            立即创建标签
+          </button>
+        </div>
+      `;
+    } else {
+      modalBody.innerHTML = `
+        <div class="my-tags-list">
+          ${myTags.map(tag => this.renderMyTagItem(tag)).join('')}
+        </div>
+      `;
+    }
+    
+    // 更新标题中的数量
+    const modalHeader = document.querySelector('#manageMyTagsModal .modal-header h2');
+    if (modalHeader) {
+      modalHeader.textContent = `⚙️ 管理我的标签 (${myTags.length})`;
+    }
+  }
+
+// 🆕 新增方法：更新标签选择器内容
+updateTagSelectorContent(deletedTagId) {
+    const tagSelectorList = document.getElementById('tagSelectorList');
+    if (!tagSelectorList) return;
+    
+    if (deletedTagId) {
+      // 立即移除已删除的标签选择项
+      const deletedSelectorItem = tagSelectorList.querySelector(`[data-tag-id="${deletedTagId}"]`);
+      if (deletedSelectorItem) {
+        deletedSelectorItem.style.opacity = '0.5';
+        setTimeout(() => {
+          deletedSelectorItem.remove();
+        }, 300);
+      }
+    }
+    
+    // 重新生成标签选择器内容
+    if (this.availableTags && this.availableTags.length > 0) {
+      const tagsHTML = this.availableTags.map(tag => `
+        <div class="tag-selector-item" data-tag-id="${tag.id}" 
+             onclick="this.classList.toggle('selected'); this.querySelector('input[type=checkbox]').checked = this.classList.contains('selected'); window.app.getManager('community').updateSelectedTags()">
+          <input type="checkbox" value="${tag.id}" name="selectedTags" style="display: none;">
+          <span class="tag-name" style="color: ${tag.color || '#3b82f6'}">${escapeHtml(tag.name)}</span>
+          ${tag.isOfficial ? '<span class="official-badge">官方</span>' : ''}
+        </div>
+      `).join('');
+      
+      tagSelectorList.innerHTML = tagsHTML;
+    } else {
+      const tagSelector = document.querySelector('.tag-selector');
+      if (tagSelector) {
+        tagSelector.innerHTML = `
+          <div class="empty-tags">
+            <p>暂无可用标签</p>
+            <button type="button" class="btn-secondary btn-sm" onclick="window.app.getManager('community').showCreateTagModal()">
+              创建标签
+            </button>
+          </div>
+        `;
+      }
+    }
+  }
+
+// 🆕 新增方法：检查空标签状态
+checkEmptyTagsState() {
+    const myTagsList = document.querySelector('#manageMyTagsModal .my-tags-list');
+    if (myTagsList && myTagsList.children.length === 0) {
+      const modalBody = document.querySelector('#manageMyTagsModal .modal-body');
+      if (modalBody) {
+        modalBody.innerHTML = `
+          <div class="empty-state">
+            <span style="font-size: 3rem;">📂</span>
+            <p>您还没有创建过标签</p>
+            <button class="btn-primary" onclick="document.getElementById('manageMyTagsModal').remove(); window.app.getManager('community').showCreateTagModal();">
+              立即创建标签
+            </button>
+          </div>
+        `;
+      }
     }
   }
 
