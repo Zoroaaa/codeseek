@@ -1,8 +1,8 @@
 // API服务主文件 - 已拆分社区功能到专门的服务文件
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
-import CommunityTagsAPI from './community-tags-api.js';
-import CommunitySourcesAPI from './community-sources-api.js';
+import communityTagsService from './community-tags-api.js';
+import communitySourcesService from './community-sources-api.js';
 
 class APIService {
   constructor() {
@@ -12,8 +12,8 @@ class APIService {
     this.retryDelay = 1000;
     
     // 初始化社区功能API服务
-    this.communityTags = new CommunityTagsAPI(this);
-    this.communitySources = new CommunitySourcesAPI(this);
+    this.communityTags = new communityTagsService(this);
+    this.communitySources = new communitySourcesService(this);
   }
 
   // 从环境变量或配置获取API基础URL
