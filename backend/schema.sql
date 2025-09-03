@@ -423,7 +423,7 @@ CREATE TRIGGER IF NOT EXISTS update_shared_source_stats_after_download
     END;
 
 -- 修复用户统计更新触发器 - 使用CASE语句替代GREATEST函数
-CREATE TRIGGER IF NOT EXISTS update_user_stats_after_share
+CREATE TRIGGER update_user_stats_after_share
     AFTER INSERT ON community_shared_sources
     FOR EACH ROW
     BEGIN
@@ -437,9 +437,7 @@ CREATE TRIGGER IF NOT EXISTS update_user_stats_after_share
                 NEW.user_id || '_stats'
             ),
             NEW.user_id,
-            COALESCE(
-                (SELECT shared_sources_count FROM community_user_stats WHERE user_id = NEW.user_id), 0
-            ) + 1,
+            COALESCE((SELECT shared_sources_count FROM community_user_stats WHERE user_id = NEW.user_id), 0) + 1,
             COALESCE((SELECT total_downloads FROM community_user_stats WHERE user_id = NEW.user_id), 0),
             COALESCE((SELECT total_likes FROM community_user_stats WHERE user_id = NEW.user_id), 0),
             COALESCE((SELECT total_views FROM community_user_stats WHERE user_id = NEW.user_id), 0),
@@ -448,6 +446,7 @@ CREATE TRIGGER IF NOT EXISTS update_user_stats_after_share
             COALESCE((SELECT tags_created FROM community_user_stats WHERE user_id = NEW.user_id), 0),
             COALESCE((SELECT reputation_score FROM community_user_stats WHERE user_id = NEW.user_id), 0),
             COALESCE((SELECT contribution_level FROM community_user_stats WHERE user_id = NEW.user_id), 'beginner'),
+            -- 使用CASE替代GREATEST
             CASE 
                 WHEN (SELECT created_at FROM community_user_stats WHERE user_id = NEW.user_id) IS NULL 
                 THEN strftime('%s', 'now') * 1000

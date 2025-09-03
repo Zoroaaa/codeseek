@@ -792,45 +792,46 @@ showFieldError(fieldId, message) {
   }
 
   // 🆕 渲染标签选择器
-  renderTagSelector() {
+// 🔧 修复：标签选择器渲染方法
+renderTagSelector() {
     if (!this.availableTags || this.availableTags.length === 0) {
-      return `
-        <div class="tag-selector">
-          <div class="empty-tags">
-            <p>暂无可用标签</p>
-            <button type="button" class="btn-secondary btn-sm" onclick="window.app.getManager('community').showCreateTagModal()">
-              创建标签
-            </button>
-          </div>
-        </div>
-      `;
+        return `
+            <div class="tag-selector">
+                <div class="empty-tags">
+                    <p>暂无可用标签</p>
+                    <button type="button" class="btn-secondary btn-sm" onclick="window.app.getManager('community').showCreateTagModal()">
+                        创建标签
+                    </button>
+                </div>
+            </div>
+        `;
     }
 
     const tagsHTML = this.availableTags.map(tag => `
-      <div class="tag-selector-item" onclick="this.classList.toggle('selected'); window.app.getManager('community').updateSelectedTags()">
-        <input type="checkbox" value="${tag.id}" style="display: none;">
-        <span style="color: ${tag.color || '#3b82f6'}">${escapeHtml(tag.name)}</span>
-        ${tag.isOfficial ? '<span class="official-badge">官方</span>' : ''}
-      </div>
+        <div class="tag-selector-item" data-tag-id="${tag.id}" onclick="this.classList.toggle('selected'); this.querySelector('input[type=checkbox]').checked = this.classList.contains('selected'); window.app.getManager('community').updateSelectedTags()">
+            <input type="checkbox" value="${tag.id}" name="selectedTags" style="display: none;">
+            <span class="tag-name" style="color: ${tag.color || '#3b82f6'}">${escapeHtml(tag.name)}</span>
+            ${tag.isOfficial ? '<span class="official-badge">官方</span>' : ''}
+        </div>
     `).join('');
 
     return `
-      <div class="tag-selector">
-        <div class="tag-selector-header">
-          <input type="text" class="tag-selector-search" placeholder="搜索标签..." onkeyup="window.app.getManager('community').filterTags(this.value)">
-          <button type="button" class="btn-secondary btn-sm" onclick="window.app.getManager('community').showCreateTagModal()">
-            + 创建标签
-          </button>
+        <div class="tag-selector">
+            <div class="tag-selector-header">
+                <input type="text" class="tag-selector-search" placeholder="搜索标签..." onkeyup="window.app.getManager('community').filterTags(this.value)">
+                <button type="button" class="btn-secondary btn-sm" onclick="window.app.getManager('community').showCreateTagModal()">
+                    + 创建标签
+                </button>
+            </div>
+            <div class="tag-selector-list" id="tagSelectorList">
+                ${tagsHTML}
+            </div>
+            <div class="selected-tags-display" id="selectedTagsDisplay">
+                <span class="placeholder">未选择标签</span>
+            </div>
         </div>
-        <div class="tag-selector-list" id="tagSelectorList">
-          ${tagsHTML}
-        </div>
-        <div class="selected-tags-display" id="selectedTagsDisplay">
-          <span class="placeholder">未选择标签</span>
-        </div>
-      </div>
     `;
-  }
+}
 
   // 🆕 过滤标签
   filterTags(searchTerm) {

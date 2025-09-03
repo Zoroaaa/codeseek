@@ -635,19 +635,17 @@ router.post('/api/auth/logout', async (request, env) => {
 router.get('/api/community/tags', async (request, env) => {
     try {
         const url = new URL(request.url);
-        const category = url.searchParams.get('category') || 'all';
-        const includeOfficial = url.searchParams.get('official') !== 'false';
         const onlyActive = url.searchParams.get('active') !== 'false';
         
         let whereConditions = [];
         let params = [];
         
         if (onlyActive) {
-            whereConditions.push('tag_active = ?');
+            // 使用表别名避免列名歧义
+            whereConditions.push('cst.tag_active = ?');
             params.push(1);
         }
         
-        // 构建查询
         let query = `
             SELECT 
                 cst.id,
@@ -679,9 +677,8 @@ router.get('/api/community/tags', async (request, env) => {
             description: tag.tag_description,
             color: tag.tag_color,
             usageCount: tag.usage_count || 0,
-            count: tag.usage_count || 0,
             isOfficial: Boolean(tag.is_official),
-            isActive: Boolean(tag.tag_active),
+            isActive: Boolean(tag.tag_active), // 使用 tag_active
             creator: {
                 id: tag.created_by,
                 name: tag.creator_name || 'System'
@@ -692,8 +689,7 @@ router.get('/api/community/tags', async (request, env) => {
         
         return utils.successResponse({ 
             tags,
-            total: tags.length,
-            category: category
+            total: tags.length
         });
         
     } catch (error) {
@@ -883,7 +879,7 @@ router.post('/api/community/tags', async (request, env) => {
     }
 });
 
-// 3. 修复标签使用统计更新 - 手动处理JSON数组
+// 在 worker.js 中修复标签使用统计更新 - 使用 tag_active
 async function updateTagUsageCount(env, tagIds, increment = 1) {
     if (!Array.isArray(tagIds) || tagIds.length === 0) {
         return;
@@ -892,28 +888,15 @@ async function updateTagUsageCount(env, tagIds, increment = 1) {
     try {
         for (const tagId of tagIds) {
             if (tagId && typeof tagId === 'string') {
-                // 尝试使用新列名
-                try {
-                    await env.DB.prepare(`
-                        UPDATE community_source_tags 
-                        SET usage_count = usage_count + ?, updated_at = ?
-                        WHERE id = ? AND tag_active = 1
-                    `).bind(increment, Date.now(), tagId).run();
-                } catch (updateError) {
-                    console.warn('使用新列名更新标签统计失败，尝试旧列名:', updateError.message);
-                    
-                    // 尝试旧列名
-                    await env.DB.prepare(`
-                        UPDATE community_source_tags 
-                        SET usage_count = usage_count + ?, updated_at = ?
-                        WHERE id = ? AND is_active = 1
-                    `).bind(increment, Date.now(), tagId).run();
-                }
+                await env.DB.prepare(`
+                    UPDATE community_source_tags 
+                    SET usage_count = usage_count + ?, updated_at = ?
+                    WHERE id = ? AND tag_active = 1
+                `).bind(increment, Date.now(), tagId).run();
             }
         }
     } catch (error) {
         console.error('更新标签使用统计失败:', error);
-        // 不抛出错误，避免影响主流程
     }
 }
 
@@ -929,7 +912,6 @@ router.put('/api/community/tags/:id', async (request, env) => {
             return utils.errorResponse('标签ID不能为空', 400);
         }
         
-        // 检查标签是否存在
         const existingTag = await env.DB.prepare(`
             SELECT * FROM community_source_tags WHERE id = ?
         `).bind(tagId).first();
@@ -938,7 +920,6 @@ router.put('/api/community/tags/:id', async (request, env) => {
             return utils.errorResponse('标签不存在', 404);
         }
         
-        // 检查权限（仅创建者或官方标签可以修改）
         if (existingTag.created_by !== user.id && !existingTag.is_official) {
             return utils.errorResponse('无权修改此标签', 403);
         }
@@ -946,13 +927,12 @@ router.put('/api/community/tags/:id', async (request, env) => {
         const body = await request.json().catch(() => ({}));
         const { description, color, isActive } = body;
         
-        // 验证颜色格式
         let validColor = existingTag.tag_color;
         if (color && /^#[0-9a-fA-F]{6}$/.test(color)) {
             validColor = color;
         }
         
-        // 更新标签
+        // 使用 tag_active 列
         await env.DB.prepare(`
             UPDATE community_source_tags 
             SET tag_description = ?, tag_color = ?, tag_active = ?, updated_at = ?
@@ -964,12 +944,6 @@ router.put('/api/community/tags/:id', async (request, env) => {
             Date.now(),
             tagId
         ).run();
-        
-        // 记录用户行为
-        await utils.logUserAction(env, user.id, 'tag_updated', {
-            tagId,
-            tagName: existingTag.tag_name
-        }, request);
         
         return utils.successResponse({
             message: '标签更新成功',
@@ -1322,6 +1296,7 @@ router.delete('/api/community/sources/:id', async (request, env) => {
     
     try {
         const sourceId = request.params.id;
+        console.log('删除搜索源ID:', sourceId);
         
         if (!sourceId) {
             return utils.errorResponse('搜索源ID不能为空', 400);
@@ -1337,95 +1312,115 @@ router.delete('/api/community/sources/:id', async (request, env) => {
             return utils.errorResponse('搜索源不存在或您无权删除', 404);
         }
         
-        // 开始事务删除相关数据 - 修复GREATEST函数问题
+        console.log('找到要删除的搜索源:', source.source_name);
+        
+        // 简单直接的删除逻辑，一步一步来，避免复杂的触发器
         try {
-            // 删除相关的评论
-            await env.DB.prepare(`
+            // 1. 删除相关的评论
+            const reviewsResult = await env.DB.prepare(`
                 DELETE FROM community_source_reviews WHERE shared_source_id = ?
             `).bind(sourceId).run();
+            console.log('删除评论记录:', reviewsResult.changes);
             
-            // 删除相关的点赞
-            await env.DB.prepare(`
+            // 2. 删除相关的点赞
+            const likesResult = await env.DB.prepare(`
                 DELETE FROM community_source_likes WHERE shared_source_id = ?
             `).bind(sourceId).run();
+            console.log('删除点赞记录:', likesResult.changes);
             
-            // 删除相关的下载记录
-            await env.DB.prepare(`
+            // 3. 删除相关的下载记录
+            const downloadsResult = await env.DB.prepare(`
                 DELETE FROM community_source_downloads WHERE shared_source_id = ?
             `).bind(sourceId).run();
+            console.log('删除下载记录:', downloadsResult.changes);
             
-            // 删除相关的举报
-            await env.DB.prepare(`
+            // 4. 删除相关的举报
+            const reportsResult = await env.DB.prepare(`
                 DELETE FROM community_source_reports WHERE shared_source_id = ?
             `).bind(sourceId).run();
+            console.log('删除举报记录:', reportsResult.changes);
             
-            // 最后删除搜索源本身
-            const deleteResult = await env.DB.prepare(`
-                DELETE FROM community_shared_sources WHERE id = ?
-            `).bind(sourceId).run();
+            // 5. 最后删除搜索源本身
+            const sourceResult = await env.DB.prepare(`
+                DELETE FROM community_shared_sources WHERE id = ? AND user_id = ?
+            `).bind(sourceId, user.id).run();
+            console.log('删除搜索源记录:', sourceResult.changes);
             
-            if (deleteResult.changes === 0) {
-                throw new Error('删除操作未影响任何记录');
+            if (sourceResult.changes === 0) {
+                return utils.errorResponse('删除失败：记录不存在或已被删除', 404);
             }
             
-            // 手动更新用户统计 - 使用CASE语句避免GREATEST函数
-            await env.DB.prepare(`
-                UPDATE community_user_stats 
-                SET shared_sources_count = CASE 
-                    WHEN shared_sources_count > 0 THEN shared_sources_count - 1 
-                    ELSE 0 
-                END,
-                updated_at = ?
-                WHERE user_id = ?
-            `).bind(Date.now(), user.id).run();
+            // 6. 手动更新用户统计 - 用最简单的方式
+            try {
+                // 先查询当前统计
+                const currentStats = await env.DB.prepare(`
+                    SELECT shared_sources_count FROM community_user_stats WHERE user_id = ?
+                `).bind(user.id).first();
+                
+                if (currentStats) {
+                    // 如果有统计记录，就更新
+                    const newCount = Math.max(0, (currentStats.shared_sources_count || 1) - 1);
+                    await env.DB.prepare(`
+                        UPDATE community_user_stats 
+                        SET shared_sources_count = ?, updated_at = ?
+                        WHERE user_id = ?
+                    `).bind(newCount, Date.now(), user.id).run();
+                    console.log('更新用户统计成功，新的分享数:', newCount);
+                }
+            } catch (statsError) {
+                console.warn('更新用户统计失败，但不影响删除操作:', statsError.message);
+                // 统计更新失败不影响主要的删除操作
+            }
             
-            // 如果用户统计记录不存在，创建一个基础记录
-            await env.DB.prepare(`
-                INSERT OR IGNORE INTO community_user_stats (
-                    id, user_id, shared_sources_count, total_downloads, total_likes, total_views,
-                    reviews_given, sources_downloaded, tags_created, reputation_score, contribution_level,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).bind(
-                user.id + '_stats', user.id, 0, 0, 0, 0, 0, 0, 0, 0, 'beginner',
-                Date.now(), Date.now()
-            ).run();
+            // 7. 记录用户行为
+            try {
+                await utils.logUserAction(env, user.id, 'community_source_deleted', {
+                    sourceId,
+                    sourceName: source.source_name
+                }, request);
+            } catch (logError) {
+                console.warn('记录用户行为失败:', logError.message);
+                // 日志记录失败不影响删除操作
+            }
             
-            // 记录用户行为
-            await utils.logUserAction(env, user.id, 'community_source_deleted', {
-                sourceId,
-                sourceName: source.source_name
-            }, request);
+            console.log('搜索源删除成功:', source.source_name);
             
             return utils.successResponse({
                 message: '搜索源删除成功',
-                deletedId: sourceId
+                deletedId: sourceId,
+                sourceName: source.source_name
             });
             
-        } catch (dbError) {
-            console.error('删除搜索源数据库操作失败:', dbError);
+        } catch (deleteError) {
+            console.error('执行删除操作时发生错误:', deleteError);
             
-            // 更友好的错误处理
-            let errorMessage = '删除搜索源失败';
-            if (dbError.message.includes('GREATEST')) {
-                errorMessage = '数据库函数兼容性已修复，请刷新页面重试';
-            } else if (dbError.message.includes('SQLITE_ERROR')) {
-                errorMessage = 'SQL执行错误，请联系管理员';
+            // 具体的错误处理
+            let errorMessage = '删除操作失败';
+            
+            if (deleteError.message.includes('FOREIGN KEY')) {
+                errorMessage = '无法删除：存在关联数据';
+            } else if (deleteError.message.includes('SQLITE_CONSTRAINT')) {
+                errorMessage = '删除失败：数据约束冲突';
+            } else if (deleteError.message.includes('database is locked')) {
+                errorMessage = '数据库忙碌，请稍后重试';
             } else {
-                errorMessage += ': ' + dbError.message;
+                errorMessage = '删除失败: ' + deleteError.message;
             }
             
             return utils.errorResponse(errorMessage, 500);
         }
         
     } catch (error) {
-        console.error('删除搜索源失败:', error);
+        console.error('删除搜索源总体失败:', error);
         
         let errorMessage = '删除搜索源失败';
-        if (error.message.includes('GREATEST')) {
-            errorMessage = '数据库函数不兼容，管理员需要更新数据库架构';
-        } else if (error.message.includes('SQLITE_ERROR')) {
-            errorMessage = 'SQL执行错误: ' + error.message;
+        
+        if (error.message.includes('authenticate')) {
+            errorMessage = '用户认证失败，请重新登录';
+        } else if (error.message.includes('params')) {
+            errorMessage = '请求参数错误';
+        } else if (error.message.includes('database')) {
+            errorMessage = '数据库连接失败，请稍后重试';
         } else {
             errorMessage += ': ' + error.message;
         }

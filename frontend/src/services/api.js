@@ -193,66 +193,50 @@ class APIService {
   // 🆕 修复：标签管理API集合 - 处理列名冲突和数据库错误
   
   // 获取所有可用标签 - 修复列名冲突处理
-  async getAllTags(options = {}) {
+async getAllTags(options = {}) {
     try {
-      const params = new URLSearchParams();
-      
-      if (options.category && options.category !== 'all') {
-        params.append('category', options.category);
-      }
-      if (options.official !== undefined) {
-        params.append('official', options.official.toString());
-      }
-      if (options.active !== undefined) {
-        params.append('active', options.active.toString());
-      }
-      
-      const endpoint = `/api/community/tags${params.toString() ? `?${params.toString()}` : ''}`;
-      
-      console.log('请求所有标签:', endpoint);
-      
-      const response = await this.request(endpoint);
-      
-      // 🔧 修复：处理后端列名冲突错误
-      if (!response.success && response.error) {
-        if (response.error.includes('ambiguous column name') || 
-            response.error.includes('is_active')) {
-          console.warn('检测到数据库列名冲突，尝试使用备用方法');
-          // 返回空标签列表而不是报错，让用户界面能正常加载
-          return {
+        const params = new URLSearchParams();
+        
+        if (options.category && options.category !== 'all') {
+            params.append('category', options.category);
+        }
+        if (options.official !== undefined) {
+            params.append('official', options.official.toString());
+        }
+        if (options.active !== undefined) {
+            params.append('active', options.active.toString());
+        }
+        
+        const endpoint = `/api/community/tags${params.toString() ? `?${params.toString()}` : ''}`;
+        
+        const response = await this.request(endpoint);
+        
+        return {
+            success: true,
+            tags: response.tags || [],
+            total: response.total || 0
+        };
+        
+    } catch (error) {
+        console.error('获取所有标签失败:', error);
+        
+        if (error.message.includes('no such column: tags_created')) {
+            return {
+                success: false,
+                tags: [],
+                total: 0,
+                error: '数据库需要添加 tags_created 列，请执行: ALTER TABLE community_user_stats ADD COLUMN tags_created INTEGER DEFAULT 0;'
+            };
+        }
+        
+        return {
             success: false,
             tags: [],
             total: 0,
-            error: '标签系统正在更新中，请稍后重试'
-          };
-        }
-      }
-      
-      return {
-        success: true,
-        tags: response.tags || [],
-        total: response.total || 0
-      };
-      
-    } catch (error) {
-      console.error('获取所有标签失败:', error);
-      
-      // 🔧 修复：友好的错误处理
-      let errorMessage = error.message;
-      if (error.message.includes('ambiguous column name')) {
-        errorMessage = '数据库结构更新中，请联系管理员或稍后重试';
-      } else if (error.message.includes('SQLITE_ERROR')) {
-        errorMessage = 'SQLite数据库错误，请检查服务器状态';
-      }
-      
-      return {
-        success: false,
-        tags: [],
-        total: 0,
-        error: errorMessage
-      };
+            error: error.message
+        };
     }
-  }
+}
 
   // 创建新标签 - 增强错误处理
 // 修复标签创建 API - 增强错误处理
