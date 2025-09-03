@@ -23,6 +23,9 @@ export class DashboardApp {
     this.currentUser = null;
     this.currentTab = 'overview';
     this.isInitialized = false;
+	
+	    // 🔧 修复：先设置 API 引用
+    this.api = apiService;
     
     // 初始化页面管理器 - 添加社区管理器
     this.managers = {
