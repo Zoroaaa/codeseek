@@ -40,6 +40,7 @@ export class ServicesBootstrap {
     this.isInitialized = false;
     this.initializationOrder = [];
     this.serviceInstances = new Map();
+    this.initializationErrors = [];
   }
 
   /**
@@ -48,47 +49,53 @@ export class ServicesBootstrap {
   registerServices() {
     console.log('开始注册服务...');
 
-    // 1. Core Services (最基础的服务，无依赖)
-    serviceRegistry.register('apiClient', APIClient, []);
-    serviceRegistry.register('errorHandler', ErrorHandler, []);
-    serviceRegistry.register('cacheService', CacheService, []);
-    serviceRegistry.register('notificationService', NotificationService, []);
+    try {
+      // 1. Core Services (最基础的服务，无依赖)
+      serviceRegistry.register('apiClient', APIClient, []);
+      serviceRegistry.register('errorHandler', ErrorHandler, []);
+      serviceRegistry.register('cacheService', CacheService, []);
+      serviceRegistry.register('notificationService', NotificationService, []);
 
-    // 2. System Services (依赖核心服务)
-    serviceRegistry.register('themeService', ThemeService, ['notificationService']);
+      // 2. System Services (依赖核心服务)
+      serviceRegistry.register('themeService', ThemeService, ['notificationService']);
 
-    // 3. Auth Services (依赖核心服务)
-    serviceRegistry.register('authService', AuthService, ['apiClient', 'notificationService']);
-    serviceRegistry.register('permissionService', PermissionService, ['authService']);
+      // 3. Auth Services (依赖核心服务)
+      serviceRegistry.register('authService', AuthService, ['apiClient', 'notificationService']);
+      serviceRegistry.register('permissionService', PermissionService, ['authService']);
 
-    // 4. User Services (依赖认证和核心服务)
-    serviceRegistry.register('userService', UserService, ['apiClient', 'authService']);
-    serviceRegistry.register('userSettingsService', UserSettingsService, ['apiClient', 'authService']);
-    serviceRegistry.register('userFavoritesService', UserFavoritesService, ['apiClient', 'authService']);
-    serviceRegistry.register('userHistoryService', UserHistoryService, ['apiClient', 'authService']);
+      // 4. User Services (依赖认证和核心服务)
+      serviceRegistry.register('userService', UserService, ['apiClient', 'authService']);
+      serviceRegistry.register('userSettingsService', UserSettingsService, ['apiClient', 'authService']);
+      serviceRegistry.register('userFavoritesService', UserFavoritesService, ['apiClient', 'authService']);
+      serviceRegistry.register('userHistoryService', UserHistoryService, ['apiClient', 'authService']);
 
-    // 5. Search Services (依赖多个服务)
-    serviceRegistry.register('sourceCheckerService', SourceCheckerService, ['apiClient', 'notificationService']);
-    serviceRegistry.register('searchSourcesService', SearchSourcesService, [
-      'apiClient', 'authService', 'userSettingsService', 'notificationService'
-    ]);
-    serviceRegistry.register('searchService', SearchService, [
-      'apiClient', 'authService', 'userSettingsService', 'userHistoryService', 
-      'sourceCheckerService', 'searchSourcesService', 'notificationService'
-    ]);
+      // 5. Search Services (依赖多个服务)
+      serviceRegistry.register('sourceCheckerService', SourceCheckerService, ['apiClient', 'notificationService']);
+      serviceRegistry.register('searchSourcesService', SearchSourcesService, [
+        'apiClient', 'authService', 'userSettingsService', 'notificationService'
+      ]);
+      serviceRegistry.register('searchService', SearchService, [
+        'apiClient', 'authService', 'userSettingsService', 'userHistoryService', 
+        'sourceCheckerService', 'searchSourcesService', 'notificationService'
+      ]);
 
-    // 6. Community Services (依赖认证和核心服务)
-    serviceRegistry.register('communityService', CommunityService, [
-      'apiClient', 'authService', 'notificationService'
-    ]);
-    serviceRegistry.register('communitySourcesService', CommunitySourcesService, [
-      'apiClient', 'authService', 'notificationService'
-    ]);
-    serviceRegistry.register('communityTagsService', CommunityTagsService, [
-      'apiClient', 'authService', 'notificationService'
-    ]);
+      // 6. Community Services (依赖认证和核心服务)
+      serviceRegistry.register('communityService', CommunityService, [
+        'apiClient', 'authService', 'notificationService'
+      ]);
+      serviceRegistry.register('communitySourcesService', CommunitySourcesService, [
+        'apiClient', 'authService', 'notificationService'
+      ]);
+      serviceRegistry.register('communityTagsService', CommunityTagsService, [
+        'apiClient', 'authService', 'notificationService'
+      ]);
 
-    console.log('服务注册完成');
+      console.log('服务注册完成');
+      return true;
+    } catch (error) {
+      console.error('服务注册失败:', error);
+      throw error;
+    }
   }
 
   /**
@@ -116,13 +123,26 @@ export class ServicesBootstrap {
 
       for (const serviceName of serviceNames) {
         try {
+          console.log(`正在初始化服务: ${serviceName}`);
           const service = serviceRegistry.get(serviceName);
           this.serviceInstances.set(serviceName, service);
           this.initializationOrder.push(serviceName);
-          console.log(`✓ ${serviceName} 初始化成功`);
+          console.log(`服务 ${serviceName} 初始化成功`);
         } catch (error) {
-          console.error(`✗ ${serviceName} 初始化失败:`, error);
-          throw error;
+          console.error(`服务 ${serviceName} 初始化失败:`, error);
+          this.initializationErrors.push({
+            serviceName,
+            error: error.message,
+            timestamp: Date.now()
+          });
+          
+          // 对于关键服务，抛出错误停止初始化
+          if (['apiClient', 'authService', 'notificationService'].includes(serviceName)) {
+            throw new Error(`关键服务 ${serviceName} 初始化失败: ${error.message}`);
+          }
+          
+          // 对于非关键服务，继续初始化其他服务
+          console.warn(`非关键服务 ${serviceName} 初始化失败，继续初始化其他服务`);
         }
       }
 
@@ -132,9 +152,15 @@ export class ServicesBootstrap {
       // 进行健康检查
       await this.performHealthCheck();
 
+      // 如果有错误但不是致命的，记录警告
+      if (this.initializationErrors.length > 0) {
+        console.warn('服务初始化过程中发现问题:', this.initializationErrors);
+      }
+
       return true;
     } catch (error) {
       console.error('服务初始化失败:', error);
+      this.isInitialized = false;
       throw error;
     }
   }
@@ -147,7 +173,12 @@ export class ServicesBootstrap {
       throw new Error('服务尚未初始化，请先调用 initializeServices()');
     }
 
-    return serviceRegistry.get(serviceName);
+    try {
+      return serviceRegistry.get(serviceName);
+    } catch (error) {
+      console.error(`获取服务 ${serviceName} 失败:`, error);
+      return null;
+    }
   }
 
   /**
@@ -160,7 +191,14 @@ export class ServicesBootstrap {
 
     const services = {};
     for (const serviceName of this.initializationOrder) {
-      services[serviceName] = this.serviceInstances.get(serviceName);
+      try {
+        const service = this.serviceInstances.get(serviceName);
+        if (service) {
+          services[serviceName] = service;
+        }
+      } catch (error) {
+        console.warn(`获取服务 ${serviceName} 时出错:`, error);
+      }
     }
     return services;
   }
@@ -196,13 +234,14 @@ export class ServicesBootstrap {
       totalServices,
       healthyServices,
       issues,
+      initializationErrors: this.initializationErrors,
       timestamp: Date.now()
     };
 
     if (issues.length > 0) {
       console.warn('发现服务健康问题:', issues);
     } else {
-      console.log(`✓ 所有 ${totalServices} 个服务健康状态良好`);
+      console.log(`所有 ${totalServices} 个服务健康状态良好`);
     }
 
     return overallHealth;
@@ -218,10 +257,10 @@ export class ServicesBootstrap {
       const reloadedService = serviceRegistry.reload(serviceName);
       this.serviceInstances.set(serviceName, reloadedService);
       
-      console.log(`✓ ${serviceName} 重新加载成功`);
+      console.log(`服务 ${serviceName} 重新加载成功`);
       return reloadedService;
     } catch (error) {
-      console.error(`✗ ${serviceName} 重新加载失败:`, error);
+      console.error(`服务 ${serviceName} 重新加载失败:`, error);
       throw error;
     }
   }
@@ -234,6 +273,7 @@ export class ServicesBootstrap {
       isInitialized: this.isInitialized,
       initializationOrder: this.initializationOrder,
       serviceCount: this.serviceInstances.size,
+      initializationErrors: this.initializationErrors,
       registryStatus: serviceRegistry.getServiceStatus(),
       timestamp: Date.now()
     };
@@ -255,9 +295,9 @@ export class ServicesBootstrap {
           if (service && typeof service.destroy === 'function') {
             service.destroy();
           }
-          console.log(`✓ ${serviceName} 销毁成功`);
+          console.log(`服务 ${serviceName} 销毁成功`);
         } catch (error) {
-          console.error(`✗ ${serviceName} 销毁失败:`, error);
+          console.error(`服务 ${serviceName} 销毁失败:`, error);
         }
       }
 
@@ -267,6 +307,7 @@ export class ServicesBootstrap {
       // 清理状态
       this.serviceInstances.clear();
       this.initializationOrder = [];
+      this.initializationErrors = [];
       this.isInitialized = false;
 
       console.log('所有服务已销毁');
@@ -314,7 +355,12 @@ export function getService(serviceName) {
 export function getServices(...serviceNames) {
   const services = {};
   for (const serviceName of serviceNames) {
-    services[serviceName] = servicesManager.getService(serviceName);
+    try {
+      services[serviceName] = servicesManager.getService(serviceName);
+    } catch (error) {
+      console.warn(`获取服务 ${serviceName} 失败:`, error);
+      services[serviceName] = null;
+    }
   }
   return services;
 }
@@ -332,37 +378,5 @@ if (typeof window !== 'undefined') {
     shutdownApp();
   });
 }
-
-/**
- * 使用示例:
- * 
- * // 在应用启动时
- * import { initializeApp, getService, getServices } from './services/services-bootstrap.js';
- * 
- * async function startApp() {
- *   try {
- *     // 初始化所有服务
- *     const servicesManager = await initializeApp();
- *     
- *     // 获取单个服务
- *     const authService = getService('authService');
- *     const searchService = getService('searchService');
- *     
- *     // 获取多个服务
- *     const { userService, themeService } = getServices('userService', 'themeService');
- *     
- *     // 使用服务
- *     await authService.login('username', 'password');
- *     const results = await searchService.performSearch('MIMK-186');
- *     
- *     console.log('应用启动成功');
- *   } catch (error) {
- *     console.error('应用启动失败:', error);
- *   }
- * }
- * 
- * // 启动应用
- * startApp();
- */
 
 export default servicesManager;

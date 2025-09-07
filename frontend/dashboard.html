@@ -836,15 +836,23 @@
     </div>
 
     <!-- 脚本文件 - ES6模块化 -->
-    <script type="module">
-        // 🔧 修正导入路径
-        import DashboardApp from './src/pages/dashboard/dashboard-app.js';
 
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', async () => {
-            console.log('DOM加载完成，开始初始化Dashboard');
+<script type="module">
+    // 修正导入路径
+    import DashboardApp from './src/pages/dashboard/dashboard-app.js';
+    import { configManager } from './src/core/config.js';
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', async () => {
+        console.log('DOM加载完成，开始初始化Dashboard');
+        
+        // 更新页面标题和品牌名称
+        try {
+            // 先初始化配置
+            console.log('开始初始化配置管理器...');
+            await configManager.init();
+            console.log('配置管理器初始化完成');
             
-            // 更新页面标题和品牌名称
             if (window.API_CONFIG) {
                 const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
                 const pageTitle = document.getElementById('page-title');
@@ -853,181 +861,207 @@
                 if (pageTitle) pageTitle.textContent = `用户面板 - ${appName}`;
                 if (brandText) brandText.textContent = appName;
             }
+        } catch (error) {
+            console.error('配置初始化失败:', error);
+            // 继续执行，使用默认配置
+        }
+        
+        try {
+            // 关键修改：使用新架构创建app实例
+            console.log('正在创建DashboardApp实例...');
+            window.app = new DashboardApp();
+            console.log('DashboardApp实例已创建');
             
-            try {
-                // 🔧 关键修改：使用新架构创建app实例
-                console.log('正在创建DashboardApp实例...');
-                window.app = new DashboardApp();
-                console.log('DashboardApp实例已创建');
-                
-                // 🔧 等待app完全初始化
-                console.log('等待app初始化完成...');
-                await window.app.waitForInitialization();
+            // 关键修改：等待app完全初始化
+            console.log('等待app初始化完成...');
+            const initSuccess = await window.app.waitForInitialization();
+            
+            if (initSuccess) {
                 console.log('DashboardApp初始化完成');
                 
                 // 绑定所有按钮事件
                 bindButtonEvents();
                 
                 console.log('✅ Dashboard初始化成功');
-                
-            } catch (error) {
-                console.error('❌ 初始化Dashboard失败:', error);
-                
-                // 🔧 友好的错误提示
-                const errorMessage = error.message.includes('服务') ? 
-                    '服务初始化失败，请检查网络连接后刷新页面重试' : 
-                    '系统初始化失败，请刷新页面重试';
-                    
-                alert(errorMessage);
+            } else {
+                throw new Error('Dashboard初始化返回失败状态');
+            }
+            
+        } catch (error) {
+            console.error('❌ 初始化Dashboard失败:', error);
+            
+            // 友好的错误提示
+            const errorMessage = getErrorMessage(error);
+            alert(errorMessage);
+            
+            // 记录详细错误信息供调试
+            console.error('详细错误信息:', {
+                message: error.message,
+                stack: error.stack,
+                timestamp: Date.now()
+            });
+        }
+    });
+
+    // 改进的错误消息处理
+    function getErrorMessage(error) {
+        if (error.message.includes('服务')) {
+            return '服务初始化失败，请检查网络连接后刷新页面重试';
+        } else if (error.message.includes('认证')) {
+            return '登录状态已过期，即将跳转到登录页面';
+        } else if (error.message.includes('配置')) {
+            return '系统配置加载失败，请刷新页面重试';
+        } else {
+            return '系统初始化失败，请刷新页面重试';
+        }
+    }
+
+    // 改进的按钮事件绑定函数
+    function bindButtonEvents() {
+        console.log('开始绑定按钮事件');
+        
+        // 验证app状态
+        if (!window.app || !window.app.isReady()) {
+            console.error('App未准备就绪，无法绑定事件');
+            return;
+        }
+        
+        // 验证服务可用性
+        const communityManager = window.app.getManager('community');
+        if (communityManager) {
+            console.log('✅ 社区管理器已就绪');
+            
+            // 验证社区管理器的子管理器
+            if (communityManager.communityTags && communityManager.communitySources) {
+                console.log('✅ 社区标签和源管理器已就绪');
+            } else {
+                console.warn('⚠️ 社区子管理器未完全初始化');
+            }
+        } else {
+            console.error('❌ 社区管理器未找到');
+        }
+        
+        // 绑定设置相关按钮
+        const settingsButtons = {
+            'saveSettingsBtn': () => window.app.saveSettings(),
+            'resetSettingsBtn': () => window.app.resetSettings(),
+            'changePasswordBtn': () => window.app.changePassword(),
+            'clearAllDataBtn': () => window.app.clearAllData(),
+            'deleteAccountBtn': () => window.app.deleteAccount(),
+            
+            // 收藏相关
+            'syncFavoritesBtn': () => window.app.syncFavorites(),
+            'exportFavoritesBtn': () => window.app.exportFavorites(),
+            
+            // 历史相关
+            'syncHistoryBtn': () => window.app.syncHistory(),
+            'clearAllHistoryBtn': () => window.app.clearAllHistory(),
+            
+            // 搜索源相关
+            'enableAllSourcesBtn': () => window.app.enableAllSources(),
+            'disableAllSourcesBtn': () => window.app.disableAllSources(),
+            'resetToDefaultsBtn': () => window.app.resetToDefaults(),
+        };
+
+        // 绑定所有按钮事件
+        let boundCount = 0;
+        Object.entries(settingsButtons).forEach(([id, handler]) => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    try {
+                        console.log(`执行按钮操作: ${id}`);
+                        await handler();
+                    } catch (error) {
+                        console.error(`按钮 ${id} 执行失败:`, error);
+                        
+                        // 改进的错误提示
+                        const friendlyMessage = error.message.includes('服务') ? 
+                            '服务暂时不可用，请稍后重试' : 
+                            '操作失败，请稍后重试';
+                        alert(friendlyMessage);
+                    }
+                });
+                boundCount++;
+                console.log(`✅ 已绑定按钮: ${id}`);
+            } else {
+                console.warn(`⚠️ 按钮 ${id} 未找到`);
             }
         });
 
-        // 🔧 改进的按钮事件绑定函数
-        function bindButtonEvents() {
-            console.log('开始绑定按钮事件');
-            
-            // 🔧 验证app状态
-            if (!window.app || !window.app.isReady()) {
-                console.error('App未准备就绪，无法绑定事件');
-                return;
-            }
-            
-            // 🔧 验证服务可用性
-            const communityManager = window.app.getManager('community');
-            if (communityManager) {
-                console.log('✅ 社区管理器已就绪');
+        // 绑定快速操作按钮
+        let actionButtonCount = 0;
+        document.querySelectorAll('.action-btn[data-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const action = btn.dataset.action;
+                console.log(`执行快速操作: ${action}`);
                 
-                // 验证社区管理器的子管理器
-                if (communityManager.communityTags && communityManager.communitySources) {
-                    console.log('✅ 社区标签和源管理器已就绪');
-                } else {
-                    console.warn('⚠️ 社区子管理器未完全初始化');
-                }
-            } else {
-                console.error('❌ 社区管理器未找到');
-            }
-            
-            // 绑定设置相关按钮
-            const settingsButtons = {
-                'saveSettingsBtn': () => window.app.saveSettings(),
-                'resetSettingsBtn': () => window.app.resetSettings(),
-                'changePasswordBtn': () => window.app.changePassword(),
-                'clearAllDataBtn': () => window.app.clearAllData(),
-                'deleteAccountBtn': () => window.app.deleteAccount(),
-                
-                // 收藏相关
-                'syncFavoritesBtn': () => window.app.syncFavorites(),
-                'exportFavoritesBtn': () => window.app.exportFavorites(),
-                
-                // 历史相关
-                'syncHistoryBtn': () => window.app.syncHistory(),
-                'clearAllHistoryBtn': () => window.app.clearAllHistory(),
-                
-                // 搜索源相关
-                'enableAllSourcesBtn': () => window.app.enableAllSources(),
-                'disableAllSourcesBtn': () => window.app.disableAllSources(),
-                'resetToDefaultsBtn': () => window.app.resetToDefaults(),
-            };
-
-            // 绑定所有按钮事件
-            let boundCount = 0;
-            Object.entries(settingsButtons).forEach(([id, handler]) => {
-                const btn = document.getElementById(id);
-                if (btn) {
-                    btn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        try {
-                            console.log(`执行按钮操作: ${id}`);
-                            handler();
-                        } catch (error) {
-                            console.error(`按钮 ${id} 执行失败:`, error);
-                            
-                            // 🔧 改进的错误提示
-                            const friendlyMessage = error.message.includes('服务') ? 
-                                '服务暂时不可用，请稍后重试' : 
-                                '操作失败，请稍后重试';
-                            alert(friendlyMessage);
-                        }
-                    });
-                    boundCount++;
-                    console.log(`✅ 已绑定按钮: ${id}`);
-                } else {
-                    console.warn(`⚠️ 按钮 ${id} 未找到`);
+                try {
+                    switch (action) {
+                        case 'search':
+                            window.location.href = 'index.html';
+                            break;
+                        case 'favorites':
+                            window.app.switchTab('favorites');
+                            break;
+                        case 'sources':
+                            window.app.switchTab('sources');
+                            break;
+                        case 'export':
+                            window.app.exportData();
+                            break;
+                        default:
+                            console.warn('未知操作:', action);
+                    }
+                } catch (error) {
+                    console.error(`快速操作 ${action} 失败:`, error);
+                    alert('操作失败，请稍后重试');
                 }
             });
+            actionButtonCount++;
+        });
 
-            // 绑定快速操作按钮
-            let actionButtonCount = 0;
-            document.querySelectorAll('.action-btn[data-action]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const action = btn.dataset.action;
-                    console.log(`执行快速操作: ${action}`);
-                    
-                    try {
-                        switch (action) {
-                            case 'search':
-                                window.location.href = 'index.html';
-                                break;
-                            case 'favorites':
-                                window.app.switchTab('favorites');
-                                break;
-                            case 'sources':
-                                window.app.switchTab('sources');
-                                break;
-                            case 'export':
-                                window.app.exportData();
-                                break;
-                            default:
-                                console.warn('未知操作:', action);
-                        }
-                    } catch (error) {
-                        console.error(`快速操作 ${action} 失败:`, error);
-                        alert('操作失败，请稍后重试');
-                    }
-                });
-                actionButtonCount++;
+        // 修复收藏搜索按钮绑定
+        const favoritesSearchBtn = document.querySelector('#favorites .search-box button');
+        if (favoritesSearchBtn) {
+            favoritesSearchBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                try {
+                    console.log('执行搜索收藏操作');
+                    window.app.searchFavorites();
+                } catch (error) {
+                    console.error('搜索收藏失败:', error);
+                    alert('搜索失败，请稍后重试');
+                }
             });
-
-            // 🔧 修复收藏搜索按钮绑定
-            const favoritesSearchBtn = document.querySelector('#favorites .search-box button');
-            if (favoritesSearchBtn) {
-                favoritesSearchBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    try {
-                        console.log('执行搜索收藏操作');
-                        window.app.searchFavorites();
-                    } catch (error) {
-                        console.error('搜索收藏失败:', error);
-                        alert('搜索失败，请稍后重试');
-                    }
-                });
-                console.log('✅ 已绑定收藏搜索按钮');
-            }
-
-            console.log(`🎉 事件绑定完成 - 设置按钮: ${boundCount}个, 快速操作按钮: ${actionButtonCount}个`);
+            console.log('✅ 已绑定收藏搜索按钮');
         }
 
-        // 🔧 改进的全局错误处理
-        window.addEventListener('error', (event) => {
-            console.error('🚨 全局错误:', event.error);
-            
-            // 🔧 检查是否是服务相关错误
-            if (event.error?.message?.includes('服务') || event.error?.message?.includes('Service')) {
-                console.error('检测到服务相关错误，可能需要重新初始化');
-            }
-        });
+        console.log(`🎉 事件绑定完成 - 设置按钮: ${boundCount}个, 快速操作按钮: ${actionButtonCount}个`);
+    }
 
-        window.addEventListener('unhandledrejection', (event) => {
-            console.error('🚨 未处理的Promise拒绝:', event.reason);
-            
-            // 🔧 检查是否是服务初始化失败
-            if (event.reason?.message?.includes('初始化') || event.reason?.message?.includes('initialization')) {
-                console.error('检测到初始化相关的Promise拒绝');
-            }
-        });
+    // 改进的全局错误处理
+    window.addEventListener('error', (event) => {
+        console.error('🚨 全局错误:', event.error);
         
-        console.log('📜 脚本加载完成');
-    </script>
+        // 检查是否是服务相关错误
+        if (event.error?.message?.includes('服务') || event.error?.message?.includes('Service')) {
+            console.error('检测到服务相关错误，可能需要重新初始化');
+        }
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error('🚨 未处理的Promise拒绝:', event.reason);
+        
+        // 检查是否是初始化失败
+        if (event.reason?.message?.includes('初始化') || event.reason?.message?.includes('initialization')) {
+            console.error('检测到初始化相关的Promise拒绝');
+        }
+    });
+    
+    console.log('📜 脚本加载完成');
+</script>
 </body>
 </html>
