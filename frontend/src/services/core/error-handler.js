@@ -351,7 +351,8 @@ class ErrorHandler {
   }
 }
 
-// 创建全局错误处理器实例
+// 导出类和实例
+export { ErrorHandler };
 export const errorHandler = new ErrorHandler();
 
 // 初始化错误恢复机制
