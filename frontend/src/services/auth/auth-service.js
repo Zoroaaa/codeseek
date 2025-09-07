@@ -1,5 +1,5 @@
 // src/services/auth/auth-service.js
-// 修复版认证核心服务
+// 修复版认证核心服务 - 匹配后端接口
 
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { validateUsername, validateEmail, validatePassword } from '../../utils/validation.js';
@@ -138,7 +138,7 @@ export class AuthService {
       });
       
       if (response.success) {
-        this.showNotification('注册成功！请登录您的账户', 'success');
+        this.showNotification('注册成功，请登录您的账户', 'success');
         return { success: true };
       } else {
         throw new Error(response.message || '注册失败');
@@ -166,21 +166,20 @@ export class AuthService {
     }
   }
 
-  // 🔧 修复：验证token方法 - 匹配后端实现
+  // 🔧 修复：验证token方法 - 匹配后端POST接口
   async verifyToken() {
     console.log('开始验证token...');
     
-    const token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-    if (!token) {
+    if (!this.token) {
       console.log('没有token需要验证');
       return { success: false, error: '没有token' };
     }
 
     try {
-      // 🔧 关键修复：使用POST请求，token通过请求体发送
+      // 🔧 关键修复：使用POST请求，token在请求体中发送
       console.log('向服务器验证token...');
-      const response = await this.apiClient.post('/api/auth/verify-token', {
-        token: token
+      const response = await this.apiClient.post('/api/auth/verify', {
+        token: this.token  // 🔧 在请求体中发送token
       });
       
       console.log('token验证响应:', response);
@@ -197,7 +196,7 @@ export class AuthService {
           user: response.user
         };
       } else {
-        console.warn('Token验证失败，响应:', response);
+        console.warn('Token验证失败，清除认证信息');
         this.clearAuth();
         return {
           success: false,
@@ -294,7 +293,7 @@ export class AuthService {
     }
   }
 
-  // 基本验证方法（后备）
+  // 基本验证方法（备用）
   basicValidateRegistration(username, email, password) {
     const usernameResult = this.basicValidateUsername(username);
     if (!usernameResult.valid) return usernameResult;

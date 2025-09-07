@@ -1,10 +1,13 @@
 // src/services/core/api-client.js
-// HTTP客户端封装 - 从api.js拆分出的核心HTTP功能
+// HTTP客户端封装 - 修复版，统一localStorage key
+
+import { APP_CONSTANTS } from '../../core/constants.js';
 
 export class APIClient {
   constructor() {
     this.baseURL = this.getAPIBaseURL();
-    this.token = localStorage.getItem('auth_token');
+    // 🔧 修复：使用统一的localStorage key
+    this.token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
     this.maxRetries = 3;
     this.retryDelay = 1000;
   }
@@ -25,22 +28,29 @@ export class APIClient {
     return window.API_CONFIG?.PROD_URL || 'https://backend.codeseek.pp.ua';
   }
 
-  // Token管理
+  // 🔧 修复：Token管理 - 使用统一的localStorage key
   setToken(token) {
     this.token = token;
     if (token) {
-      localStorage.setItem('auth_token', token);
+      localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN, token);
+      console.log('✅ Token已设置到localStorage:', APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
     } else {
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+      console.log('🗑️ Token已从localStorage移除');
     }
   }
 
   clearToken() {
     this.token = null;
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+    console.log('🗑️ Token已清除');
   }
 
   getToken() {
+    // 🔧 实时从localStorage读取，确保同步
+    if (!this.token) {
+      this.token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+    }
     return this.token;
   }
 
@@ -52,8 +62,10 @@ export class APIClient {
       ...options.headers
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    // 🔧 修复：确保使用最新的token
+    const currentToken = this.getToken();
+    if (currentToken) {
+      headers['Authorization'] = `Bearer ${currentToken}`;
     }
 
     const config = {
@@ -70,22 +82,33 @@ export class APIClient {
           throw new Error('网络连接不可用');
         }
         
+        console.log(`📡 API请求: ${config.method} ${url}`, {
+          hasAuth: !!currentToken,
+          attempt: attempt + 1
+        });
+        
         const response = await fetch(url, config);
         
         if (response.ok) {
           const contentType = response.headers.get('content-type');
           if (contentType && contentType.includes('application/json')) {
-            return await response.json();
+            const data = await response.json();
+            console.log(`✅ API响应成功: ${endpoint}`, data);
+            return data;
           }
-          return await response.text();
+          const text = await response.text();
+          console.log(`✅ API响应成功 (text): ${endpoint}`, text);
+          return text;
         }
         
         if (response.status === 401) {
+          console.warn('🔑 收到401响应，清除token');
           this.clearToken();
           throw new Error('认证失败，请重新登录');
         }
         
         if (response.status >= 500 && attempt < this.maxRetries - 1) {
+          console.warn(`⚠️ 服务器错误 ${response.status}，重试中... (${attempt + 1}/${this.maxRetries})`);
           await this.delay(this.retryDelay * (attempt + 1));
           continue;
         }
@@ -100,6 +123,11 @@ export class APIClient {
           if (errorText) errorMessage += `: ${errorText}`;
         }
         
+        console.error(`❌ API请求失败: ${endpoint}`, {
+          status: response.status,
+          message: errorMessage
+        });
+        
         throw new Error(errorMessage);
         
       } catch (error) {
@@ -107,6 +135,7 @@ export class APIClient {
         
         if ((error.name === 'TypeError' || error.message.includes('fetch')) && 
             attempt < this.maxRetries - 1) {
+          console.warn(`🔄 网络错误，重试中... (${attempt + 1}/${this.maxRetries}): ${error.message}`);
           await this.delay(this.retryDelay * (attempt + 1));
           continue;
         }
@@ -114,7 +143,7 @@ export class APIClient {
       }
     }
     
-    console.error(`API请求失败 (${endpoint}):`, lastError);
+    console.error(`💥 API请求最终失败 (${endpoint}):`, lastError);
     throw lastError;
   }
 
@@ -145,15 +174,26 @@ export class APIClient {
     });
   }
 
+  // 🔧 新增：初始化方法，确保依赖注入后正确设置token
+  initialize() {
+    // 重新从localStorage加载token，确保使用正确的key
+    this.token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+    if (this.token) {
+      console.log('🔄 APIClient初始化：从localStorage恢复token');
+    } else {
+      console.log('🔄 APIClient初始化：没有找到有效token');
+    }
+  }
+
   // 请求拦截和重试机制
   setupInterceptors() {
     // 请求拦截器逻辑
-    console.log('API拦截器已设置');
+    console.log('🔧 API拦截器已设置');
   }
 
   setupRetryMechanism() {
     // 重试机制配置
-    console.log('重试机制已配置');
+    console.log('🔧 重试机制已配置');
   }
 
   // 工具方法
@@ -171,7 +211,7 @@ export class APIClient {
     }
   }
 
-  // 🔧 新增：测试连接方法
+  // 测试连接方法
   async testConnection() {
     try {
       const healthResult = await this.healthCheck();
@@ -187,6 +227,26 @@ export class APIClient {
         error: error.message 
       };
     }
+  }
+
+  // 🔧 新增：调试方法
+  debugTokenStatus() {
+    const tokenInMemory = this.token;
+    const tokenInStorage = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+    
+    console.log('🔍 Token调试信息:', {
+      storageKey: APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN,
+      tokenInMemory: tokenInMemory ? `存在 (长度: ${tokenInMemory.length})` : '不存在',
+      tokenInStorage: tokenInStorage ? `存在 (长度: ${tokenInStorage.length})` : '不存在',
+      tokensMatch: tokenInMemory === tokenInStorage,
+      allLocalStorageKeys: Object.keys(localStorage)
+    });
+    
+    return {
+      tokenInMemory,
+      tokenInStorage,
+      tokensMatch: tokenInMemory === tokenInStorage
+    };
   }
 }
 
