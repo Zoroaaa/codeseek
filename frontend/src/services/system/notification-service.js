@@ -1,5 +1,5 @@
 // src/services/system/notification-service.js
-// 通知服务 - 新增系统服务
+// 通知服务 - 修复版，添加show方法别名
 
 export class NotificationService {
   constructor() {
@@ -45,6 +45,12 @@ export class NotificationService {
     console.log('通知服务已初始化');
   }
 
+  // 🔧 新增：show方法 - auth-service的兼容接口
+  show(message, type = 'info', duration = null) {
+    console.log(`📢 NotificationService.show 被调用: ${message} (${type})`);
+    return this.showToast(message, type, duration);
+  }
+
   // 创建通知容器
   createNotificationContainer() {
     if (this.container) {
@@ -83,7 +89,10 @@ export class NotificationService {
 
   // 显示Toast通知
   showToast(message, type = 'info', duration = null, options = {}) {
+    console.log(`📱 showToast: ${message} (${type})`);
+    
     if (!this.isInitialized) {
+      console.log('📱 通知服务未初始化，正在初始化...');
       this.initialize();
     }
 
@@ -129,6 +138,7 @@ export class NotificationService {
       this.playNotificationSound(notificationData.type);
     }
 
+    console.log(`✅ 通知显示成功: ID ${notificationData.id}`);
     return notificationData.id;
   }
 
@@ -208,6 +218,7 @@ export class NotificationService {
       cursor: pointer;
       max-width: 400px;
       word-wrap: break-word;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     `;
 
     // 创建内容
@@ -250,6 +261,11 @@ export class NotificationService {
       margin-left: 8px;
       color: #999;
       line-height: 1;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     `;
     closeBtn.innerHTML = '×';
     closeBtn.onclick = (e) => {
@@ -311,6 +327,7 @@ export class NotificationService {
       overflow: hidden;
       transform: scale(0.9);
       transition: transform 0.3s ease;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     `;
 
     // 标题
