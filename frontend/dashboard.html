@@ -835,8 +835,7 @@
         <div class="spinner"></div>
     </div>
 
-    <!-- 脚本文件 - ES6模块化 -->
-
+<!-- 脚本文件 - ES6模块化 -->
 <script type="module">
     // 修正导入路径
     import DashboardApp from './src/pages/dashboard/dashboard-app.js';
@@ -877,22 +876,23 @@
             const initSuccess = await window.app.waitForInitialization();
             
             if (initSuccess) {
-                console.log('DashboardApp初始化完成');
+                console.log('✅ DashboardApp初始化成功');
                 
                 // 绑定所有按钮事件
                 bindButtonEvents();
                 
-                console.log('✅ Dashboard初始化成功');
+                console.log('✅ Dashboard完全就绪');
             } else {
-                throw new Error('Dashboard初始化返回失败状态');
+                console.log('❌ DashboardApp初始化失败，但没有抛出异常');
+                // 不显示错误提示，因为init方法已经处理了错误显示和跳转
             }
             
         } catch (error) {
-            console.error('❌ 初始化Dashboard失败:', error);
+            console.error('❌ 初始化Dashboard过程中捕获到异常:', error);
             
             // 友好的错误提示
             const errorMessage = getErrorMessage(error);
-            alert(errorMessage);
+            console.log('显示错误消息:', errorMessage);
             
             // 记录详细错误信息供调试
             console.error('详细错误信息:', {
@@ -900,6 +900,9 @@
                 stack: error.stack,
                 timestamp: Date.now()
             });
+            
+            // 只有在捕获到真正的异常时才显示alert
+            alert(errorMessage);
         }
     });
 

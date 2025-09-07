@@ -182,29 +182,53 @@ export class DashboardApp {
 
   // 🔧 改进：检查认证状态 - 使用新的认证服务
   async checkAuth() {
+    console.log('步骤4: 开始认证检查...');
+    
     const token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
     if (!token) {
-      throw new Error('未找到认证token');
+      console.error('认证失败: 未找到认证token');
+      throw new Error('未找到认证token，请重新登录');
     }
+    console.log('✅ 找到认证token');
 
     try {
       // 🔧 增加服务可用性检查
+      console.log('获取认证服务...');
       const authService = getService('authService');
       if (!authService) {
-        throw new Error('认证服务不可用');
+        console.error('认证服务不可用');
+        throw new Error('认证服务不可用，请刷新页面重试');
       }
+      console.log('✅ 认证服务已获取');
       
+      console.log('验证token...');
       const result = await authService.verifyToken();
+      console.log('Token验证结果:', result);
       
-      if (!result.success || !result.user) {
-        throw new Error('Token验证失败');
+      if (!result || !result.success || !result.user) {
+        console.error('Token验证失败:', result);
+        throw new Error('Token验证失败，请重新登录');
       }
       
       this.currentUser = result.user;
+      console.log('✅ 认证成功，用户:', this.currentUser.username);
       this.updateUserUI();
+      console.log('✅ 用户界面更新完成');
+      
     } catch (error) {
+      console.error('认证过程出错:', error);
+      
+      // 清除无效token
       localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-      throw new Error(`认证失败: ${error.message}`);
+      
+      // 根据错误类型提供不同的错误信息
+      if (error.message.includes('网络') || error.message.includes('fetch')) {
+        throw new Error(`网络连接失败: ${error.message}`);
+      } else if (error.message.includes('服务')) {
+        throw new Error(`服务不可用: ${error.message}`);
+      } else {
+        throw new Error(`认证失败: ${error.message}`);
+      }
     }
   }
 
