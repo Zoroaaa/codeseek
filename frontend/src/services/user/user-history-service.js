@@ -640,5 +640,5 @@ export class UserHistoryService {
     this.clearHistoryCache();
   }
 }
-
+export { UserHistoryService };
 export default UserHistoryService;

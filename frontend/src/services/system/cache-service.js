@@ -715,5 +715,5 @@ export class CacheService {
     console.log('缓存服务已销毁');
   }
 }
-
+export { CacheService };
 export default CacheService;

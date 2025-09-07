@@ -396,5 +396,5 @@ export class PermissionService {
     this.clearPermissionCache();
   }
 }
-
+export { PermissionService };
 export default PermissionService;

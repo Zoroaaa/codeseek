@@ -389,5 +389,5 @@ export class AuthService {
     this.clearAuth();
   }
 }
-
+export { AuthService };
 export default AuthService;

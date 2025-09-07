@@ -243,5 +243,5 @@ export const registerService = (name, serviceClass, dependencies) => {
 export const getService = (name) => {
   return serviceRegistry.get(name);
 };
-
+export { ServiceRegistry };
 export default serviceRegistry;

@@ -620,5 +620,5 @@ export class UserFavoritesService {
     this.syncInProgress = false;
   }
 }
-
+export { UserFavoritesService };
 export default UserFavoritesService;

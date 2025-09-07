@@ -605,5 +605,5 @@ export class CommunityService {
     this.clearStatsCache();
   }
 }
-
+export { CommunityService };
 export default CommunityService;

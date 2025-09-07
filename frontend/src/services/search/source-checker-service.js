@@ -638,5 +638,5 @@ export const destroySourceCheckerService = () => {
     cleanupInterval = null;
   }
 };
-
+export { SourceCheckerService };
 export default SourceCheckerService;

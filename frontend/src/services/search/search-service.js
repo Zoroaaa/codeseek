@@ -593,5 +593,5 @@ export class SearchService {
     };
   }
 }
-
+export { SearchService };
 export default SearchService;
