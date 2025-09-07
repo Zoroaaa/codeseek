@@ -166,19 +166,22 @@ export class AuthService {
     }
   }
 
-  // 🔧 修复：验证token方法
+  // 🔧 修复：验证token方法 - 匹配后端实现
   async verifyToken() {
     console.log('开始验证token...');
     
-    if (!this.token) {
+    const token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
       console.log('没有token需要验证');
       return { success: false, error: '没有token' };
     }
 
     try {
-      // 🔧 关键修复：使用GET请求，token通过Authorization header发送
+      // 🔧 关键修复：使用POST请求，token通过请求体发送
       console.log('向服务器验证token...');
-      const response = await this.apiClient.get('/api/auth/verify');
+      const response = await this.apiClient.post('/api/auth/verify-token', {
+        token: token
+      });
       
       console.log('token验证响应:', response);
       
@@ -194,7 +197,7 @@ export class AuthService {
           user: response.user
         };
       } else {
-        console.warn('Token验证失败，清除认证信息');
+        console.warn('Token验证失败，响应:', response);
         this.clearAuth();
         return {
           success: false,
