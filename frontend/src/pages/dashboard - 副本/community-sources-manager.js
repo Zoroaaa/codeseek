@@ -1,7 +1,8 @@
-// 社区搜索源管理器 - 已适配新服务架构
+// 社区搜索源管理器 - 从community-manager.js拆分出来的搜索源分享相关功能
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast, createElement } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
+import communitySourcesService from '../../services/community-sources-api.js';
 
 export class CommunitySourcesManager {
   constructor(dashboardApp) {
@@ -175,12 +176,6 @@ export class CommunitySourcesManager {
         ...this.currentFilters
       };
 
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.getCommunitySearchSources(options);
       
       if (result.success) {
@@ -229,24 +224,6 @@ export class CommunitySourcesManager {
     }
 
     try {
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        console.warn('社区搜索源服务未找到');
-        this.userStats = {
-          general: {
-            sharedSources: 0,
-            sourcesDownloaded: 0,
-            totalLikes: 0,
-            totalDownloads: 0,
-            totalViews: 0,
-            reputationScore: 0
-          }
-        };
-        this.updateCommunityStats();
-        return;
-      }
-
       const result = await communitySourcesService.getUserCommunityStats();
       
       if (result.success) {
@@ -281,7 +258,7 @@ export class CommunitySourcesManager {
     }
   }
 
-  // 显示分享搜索源模态框
+  // 🆕 显示分享搜索源模态框 - 支持标签选择器
   showShareSourceModal() {
     if (!this.app.getCurrentUser()) {
       showToast('请先登录', 'error');
@@ -301,7 +278,7 @@ export class CommunitySourcesManager {
         <option value="jav">🎬 JAV资源</option>
         <option value="movie">🎭 影视资源</option>
         <option value="torrent">🧲 种子磁力</option>
-        <option value="other">📁 其他搜索</option>
+        <option value="other">🔍 其他搜索</option>
       `;
     };
 
@@ -316,17 +293,17 @@ export class CommunitySourcesManager {
       const enabledSourcesData = allSources.filter(source => enabledSources.includes(source.id));
       
       if (enabledSourcesData.length === 0) {
-        return '<option value="">您还没有启用的搜索源</option>';
+        return '<option value="">您还没有可用的搜索源</option>';
       }
       
       return enabledSourcesData.map(source => `
         <option value="${source.id}" 
                 data-name="${escapeHtml(source.name)}"
                 data-subtitle="${escapeHtml(source.subtitle || '')}"
-                data-icon="${escapeHtml(source.icon || '📁')}"
+                data-icon="${escapeHtml(source.icon || '🔍')}"
                 data-url="${escapeHtml(source.urlTemplate)}"
                 data-category="${source.category || 'other'}">
-          ${source.icon || '📁'} ${source.name} (${source.category || '其他'})
+          ${source.icon || '🔍'} ${source.name} (${source.category || '其他'})
         </option>
       `).join('');
     };
@@ -383,7 +360,7 @@ export class CommunitySourcesManager {
                 
                 <div class="form-group">
                   <label for="shareIcon">图标 (emoji):</label>
-                  <input type="text" id="shareIcon" name="shareIcon" placeholder="📁" maxlength="4" value="📁">
+                  <input type="text" id="shareIcon" name="shareIcon" placeholder="🔍" maxlength="4" value="🔍">
                 </div>
                 
                 <div class="form-group">
@@ -444,7 +421,7 @@ export class CommunitySourcesManager {
     this.bindShareModalEvents();
   }
 
-  // 渲染标签选择器
+  // 🆕 渲染标签选择器
   renderTagSelector() {
     // 从标签管理器获取可用标签
     const communityTags = this.app.getManager('community').communityTags;
@@ -461,7 +438,7 @@ export class CommunitySourcesManager {
     return communityTags.renderTagSelector();
   }
 
-  // 过滤标签
+  // 🆕 过滤标签
   filterTags(searchTerm) {
     const items = document.querySelectorAll('.tag-selector-item');
     const term = searchTerm.toLowerCase().trim();
@@ -476,7 +453,7 @@ export class CommunitySourcesManager {
     });
   }
 
-  // 更新已选择的标签显示
+  // 🆕 更新已选择的标签显示
   updateSelectedTags() {
     const selectedItems = document.querySelectorAll('.tag-selector-item.selected');
     const display = document.getElementById('selectedTagsDisplay');
@@ -504,7 +481,7 @@ export class CommunitySourcesManager {
     display.innerHTML = tagsHTML;
   }
 
-  // 移除已选择的标签
+  // 🆕 移除已选择的标签
   removeSelectedTag(tagId) {
     const item = document.querySelector(`.tag-selector-item input[value="${tagId}"]`);
     if (item) {
@@ -704,7 +681,7 @@ export class CommunitySourcesManager {
     try {
       const shareMethod = document.querySelector('input[name="shareMethod"]:checked')?.value;
       
-      // 获取选中的标签ID
+      // 🆕 获取选中的标签ID
       const selectedTags = Array.from(document.querySelectorAll('.tag-selector-item.selected input[type="checkbox"]'))
         .map(checkbox => checkbox.value);
 
@@ -733,19 +710,19 @@ export class CommunitySourcesManager {
         sourceData = {
           name: selectedOption.dataset.name,
           subtitle: selectedOption.dataset.subtitle || '',
-          icon: selectedOption.dataset.icon || '📁',
+          icon: selectedOption.dataset.icon || '🔍',
           urlTemplate: selectedOption.dataset.url,
           category: selectedOption.dataset.category || 'other',
           description: document.getElementById('shareDescription')?.value.trim() || 
             `来自我的搜索源库: ${selectedOption.dataset.name}`,
-          tags: selectedTags // 使用选中的标签ID
+          tags: selectedTags // 🆕 使用选中的标签ID
         };
 
       } else {
         // 手动填写的数据
         const name = document.getElementById('shareName')?.value.trim();
         const subtitle = document.getElementById('shareSubtitle')?.value.trim();
-        const icon = document.getElementById('shareIcon')?.value.trim() || '📁';
+        const icon = document.getElementById('shareIcon')?.value.trim() || '🔍';
         const category = document.getElementById('shareCategory')?.value.trim();
         const urlTemplate = document.getElementById('shareUrl')?.value.trim();
         const description = document.getElementById('shareDescription')?.value.trim() || '';
@@ -804,7 +781,7 @@ export class CommunitySourcesManager {
           urlTemplate,
           category,
           description,
-          tags: selectedTags // 使用选中的标签ID
+          tags: selectedTags // 🆕 使用选中的标签ID
         };
       }
       
@@ -812,12 +789,6 @@ export class CommunitySourcesManager {
 
       showLoading(true);
       
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.shareSourceToCommunity(sourceData);
       
       if (result.success) {
@@ -865,7 +836,7 @@ export class CommunitySourcesManager {
     
     const ratingStars = this.renderRatingStars(source.stats?.rating || 0);
     
-    // 处理标签数据，确保显示名称而不是ID
+    // 🔧 修复：处理标签数据，确保显示名称而不是ID
     let tags = [];
     if (source.tags && Array.isArray(source.tags)) {
       const communityTags = this.app.getManager('community').communityTags;
@@ -930,7 +901,7 @@ export class CommunitySourcesManager {
     return `
       <div class="community-source-item" data-source-id="${source.id}">
         <div class="source-header">
-          <div class="source-icon">${source.icon || '📁'}</div>
+          <div class="source-icon">${source.icon || '🔍'}</div>
           <div class="source-title-area">
             <h3 class="source-title">${escapeHtml(source.name)}</h3>
             ${source.subtitle ? `<p class="source-subtitle">${escapeHtml(source.subtitle)}</p>` : ''}
@@ -961,18 +932,18 @@ export class CommunitySourcesManager {
           </div>
         ` : ''}
 
-        ${tags.length > 0 ? `
-          <div class="source-tags">
-              ${tags.map(tag => `
-                  <span class="tag ${tag.isOfficial ? 'official' : ''}" 
-                        style="background-color: ${tag.color}15; border-color: ${tag.color}; color: ${tag.color};"
-                        onclick="window.app.getManager('community').communitySources.showTagSourcesModal('${tag.id}', '${escapeHtml(tag.name)}')"
-                        title="点击查看使用此标签的所有搜索源">
-                    ${escapeHtml(tag.name)}
-                  </span>
-              `).join('')}
-          </div>
-        ` : ''}
+  ${tags.length > 0 ? `
+      <div class="source-tags">
+          ${tags.map(tag => `
+              <span class="tag ${tag.isOfficial ? 'official' : ''}" 
+                    style="background-color: ${tag.color}15; border-color: ${tag.color}; color: ${tag.color};"
+                    onclick="window.app.getManager('community').communitySources.showTagSourcesModal('${tag.id}', '${escapeHtml(tag.name)}')"
+                    title="点击查看使用此标签的所有搜索源">
+                  ${escapeHtml(tag.name)}
+              </span>
+          `).join('')}
+      </div>
+  ` : ''}
 
         <div class="source-stats">
           <div class="stat-item">
@@ -986,7 +957,7 @@ export class CommunitySourcesManager {
             <span class="stat-label">点赞</span>
           </div>
           <div class="stat-item">
-            <span class="stat-icon">👀</span>
+            <span class="stat-icon">👁</span>
             <span class="stat-value">${this.formatNumber(source.stats?.views || 0)}</span>
             <span class="stat-label">浏览</span>
           </div>
@@ -1149,12 +1120,6 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.downloadCommunitySource(sourceId);
       
       if (result.success) {
@@ -1188,12 +1153,6 @@ export class CommunitySourcesManager {
     }
 
     try {
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.toggleSourceLike(sourceId, 'like');
       
       if (result.success) {
@@ -1229,12 +1188,6 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.getCommunitySourceDetails(sourceId);
       
       if (result.success) {
@@ -1258,7 +1211,7 @@ export class CommunitySourcesManager {
         <div class="modal-content large">
           <span class="close" onclick="document.getElementById('sourceDetailsModal').remove()">&times;</span>
           <div class="modal-header">
-            <div class="source-icon-large">${source.icon || '📁'}</div>
+            <div class="source-icon-large">${source.icon || '🔍'}</div>
             <div>
               <h2>${escapeHtml(source.name)}</h2>
               ${source.subtitle ? `<p class="subtitle">${escapeHtml(source.subtitle)}</p>` : ''}
@@ -1392,12 +1345,6 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.reviewCommunitySource(sourceId, {
         rating,
         comment,
@@ -1477,12 +1424,6 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.reportCommunitySource(sourceId, {
         reason,
         details
@@ -1503,7 +1444,7 @@ export class CommunitySourcesManager {
     }
   }
 
-  // 更新社区统计显示，包含浏览量统计
+  // 🔧 修复：更新社区统计显示，包含浏览量统计
   updateCommunityStats() {
     console.log('更新社区统计显示，包含浏览量统计');
 
@@ -1528,7 +1469,7 @@ export class CommunitySourcesManager {
       elements.userLikesCount.textContent = stats.totalLikes || 0;
     }
     
-    // 新增：检查是否有浏览量显示元素  
+    // 新增：检查是否有浏览量显示元素 
     const userViewsElement = document.getElementById('userViewsCount'); 
     if (userViewsElement) {
       userViewsElement.textContent = this.formatNumber(stats.totalViews || 0);
@@ -1599,12 +1540,6 @@ export class CommunitySourcesManager {
     try {
       showLoading(true);
       
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.getCommunitySearchSources({
         author: this.app.getCurrentUser().username,
         limit: 50,
@@ -1679,7 +1614,7 @@ export class CommunitySourcesManager {
     const category = APP_CONSTANTS.SOURCE_CATEGORIES ? 
       Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).find(cat => cat.id === source.category) : null;
     
-    // 处理我的分享中的标签显示
+    // 🔧 修复：处理我的分享中的标签显示
     let tags = [];
     if (source.tags && Array.isArray(source.tags)) {
       const communityTags = this.app.getManager('community').communityTags;
@@ -1699,7 +1634,7 @@ export class CommunitySourcesManager {
     return `
       <div class="my-share-item" data-source-id="${source.id}">
         <div class="share-item-header">
-          <div class="share-item-icon">${source.icon || '📁'}</div>
+          <div class="share-item-icon">${source.icon || '🔍'}</div>
           <div class="share-item-info">
             <h4 class="share-item-title">${escapeHtml(source.name)}</h4>
             ${source.subtitle ? `<p class="share-item-subtitle">${escapeHtml(source.subtitle)}</p>` : ''}
@@ -1739,7 +1674,7 @@ export class CommunitySourcesManager {
             <span class="stat-label">点赞</span>
           </div>
           <div class="stat-item">
-            <span class="stat-icon">👀</span>
+            <span class="stat-icon">👁</span>
             <span class="stat-value">${this.formatNumber(source.stats?.views || 0)}</span>
             <span class="stat-label">浏览</span>
           </div>
@@ -1800,12 +1735,6 @@ export class CommunitySourcesManager {
             throw new Error('搜索源ID无效');
         }
         
-        // 🆕 使用新的社区搜索源服务
-        const communitySourcesService = this.app.getService('communitySourcesService');
-        if (!communitySourcesService) {
-          throw new Error('社区搜索源服务未找到');
-        }
-
         const result = await communitySourcesService.deleteCommunitySource(sourceId);
         
         if (result.success) {
@@ -1859,9 +1788,6 @@ export class CommunitySourcesManager {
         } else if (error.message.includes('权限')) {
             errorMessage = '您没有权限删除此搜索源';
             showToast(errorMessage, 'error');
-        } else if (error.message.includes('限制') || error.message.includes('超过')) {
-            errorMessage = '您创建的标签数量已达上限，请先删除一些不常用的标签';
-            showToast(errorMessage, 'warning');
         } else {
             errorMessage += ': ' + error.message;
             showToast(errorMessage, 'error');
@@ -1906,7 +1832,7 @@ export class CommunitySourcesManager {
     this.showEditMyShareModal(sourceId);
   }
 
-  // 显示编辑我的分享模态框
+  // 🆕 显示编辑我的分享模态框
   showEditMyShareModal(sourceId) {
     if (!this.app.getCurrentUser()) {
       showToast('请先登录', 'error');
@@ -1917,17 +1843,12 @@ export class CommunitySourcesManager {
     this.loadAndShowEditShareModal(sourceId);
   }
 
-  // 加载并显示编辑分享模态框
+  // 🆕 加载并显示编辑分享模态框
   async loadAndShowEditShareModal(sourceId) {
     try {
       showLoading(true);
       
-      // 🆕 使用新的社区搜索源服务获取详情
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
+      // 获取搜索源详情
       const result = await communitySourcesService.getMySharedSourceDetails(sourceId);
       
       if (!result.success || !result.source) {
@@ -1947,7 +1868,7 @@ export class CommunitySourcesManager {
           <option value="jav" ${source.category === 'jav' ? 'selected' : ''}>🎬 JAV资源</option>
           <option value="movie" ${source.category === 'movie' ? 'selected' : ''}>🎭 影视资源</option>
           <option value="torrent" ${source.category === 'torrent' ? 'selected' : ''}>🧲 种子磁力</option>
-          <option value="other" ${source.category === 'other' ? 'selected' : ''}>📁 其他搜索</option>
+          <option value="other" ${source.category === 'other' ? 'selected' : ''}>🔍 其他搜索</option>
         `;
       };
 
@@ -1979,8 +1900,8 @@ export class CommunitySourcesManager {
                 <div class="form-group">
                   <label for="editShareIcon">图标 (emoji):</label>
                   <input type="text" id="editShareIcon" name="icon" 
-                    value="${escapeHtml(source.icon || '📁')}"
-                    placeholder="📁" maxlength="4">
+                    value="${escapeHtml(source.icon || '🔍')}"
+                    placeholder="🔍" maxlength="4">
                 </div>
                 
                 <div class="form-group">
@@ -2035,7 +1956,7 @@ export class CommunitySourcesManager {
     }
   }
 
-  // 渲染编辑时的标签选择器（预选已有标签）
+  // 🆕 渲染编辑时的标签选择器（预选已有标签）
   renderEditTagSelector(selectedTags = []) {
     const communityTags = this.app.getManager('community').communityTags;
     if (!communityTags) {
@@ -2051,7 +1972,7 @@ export class CommunitySourcesManager {
     return communityTags.renderEditTagSelector(selectedTags);
   }
 
-  // 提交编辑分享表单
+  // 🆕 提交编辑分享表单
   async submitEditShareForm(event, sourceId) {
     event.preventDefault();
     
@@ -2069,7 +1990,7 @@ export class CommunitySourcesManager {
     const updates = {
       name: formData.get('name')?.trim(),
       subtitle: formData.get('subtitle')?.trim() || '',
-      icon: formData.get('icon')?.trim() || '📁',
+      icon: formData.get('icon')?.trim() || '🔍',
       category: formData.get('category'),
       description: formData.get('description')?.trim() || '',
       tags: selectedTags
@@ -2095,12 +2016,6 @@ export class CommunitySourcesManager {
       
       console.log('提交编辑分享:', sourceId, updates);
       
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.editCommunitySource(sourceId, updates);
       
       if (result.success) {
@@ -2138,12 +2053,6 @@ export class CommunitySourcesManager {
       
       console.log(`开始查找标签 "${tagName}" (ID: ${tagId}) 相关的搜索源`);
       
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       // 方法1：通过标签ID直接过滤（主要方式）
       let result = await communitySourcesService.getCommunitySearchSources({
         tags: [tagId],
@@ -2152,7 +2061,7 @@ export class CommunitySourcesManager {
         order: 'desc'
       });
       
-      // 如果后端标签过滤返回空结果，尝试前端过滤作为降级方案
+      // 🔧 如果后端标签过滤返回空结果，尝试前端过滤作为降级方案
       if (!result.success || !result.sources || result.sources.length === 0) {
         console.log('后端标签过滤未返回结果，尝试获取所有源然后前端过滤...');
         
@@ -2200,7 +2109,7 @@ export class CommunitySourcesManager {
     } catch (error) {
       console.error('获取标签搜索源失败:', error);
       
-      // 降级方案：使用搜索功能
+      // 🔧 降级方案：使用搜索功能
       console.log('尝试降级方案：使用标签名称搜索...');
       try {
         const searchResult = await this.searchByTagName(tagName);
@@ -2219,15 +2128,9 @@ export class CommunitySourcesManager {
     }
   }
 
-  // 通过标签名称搜索的降级方案
+  // 🔧 新增：通过标签名称搜索的降级方案
   async searchByTagName(tagName) {
     try {
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.searchCommunityPosts(tagName, {
         limit: 50,
         category: 'all'
@@ -2240,7 +2143,7 @@ export class CommunitySourcesManager {
     }
   }
 
-  // 渲染标签搜索源弹窗
+  // 🆕 渲染标签搜索源弹窗
   renderTagSourcesModal(tagName, sources) {
     const modalHTML = `
       <div id="tagSourcesModal" class="modal" style="display: block;">
@@ -2276,7 +2179,7 @@ export class CommunitySourcesManager {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
   }
 
-  // 渲染标签搜索源项目（简化版）
+  // 🆕 渲染标签搜索源项目（简化版）
   renderTagSourceItem(source) {
     const category = APP_CONSTANTS.SOURCE_CATEGORIES ? 
         Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).find(cat => cat.id === source.category) : null;
@@ -2284,7 +2187,7 @@ export class CommunitySourcesManager {
     return `
       <div class="tag-source-item" data-source-id="${source.id}">
         <div class="source-header">
-          <div class="source-icon">${source.icon || '📁'}</div>
+          <div class="source-icon">${source.icon || '🔍'}</div>
           <div class="source-info">
             <h4 class="source-title">${escapeHtml(source.name)}</h4>
             ${source.subtitle ? `<p class="source-subtitle">${escapeHtml(source.subtitle)}</p>` : ''}
@@ -2423,12 +2326,6 @@ export class CommunitySourcesManager {
     console.log('搜索社区内容:', query);
     
     try {
-      // 🆕 使用新的社区搜索源服务
-      const communitySourcesService = this.app.getService('communitySourcesService');
-      if (!communitySourcesService) {
-        throw new Error('社区搜索源服务未找到');
-      }
-
       const result = await communitySourcesService.searchCommunityPosts(query, {
         category: this.currentFilters.category,
         limit: this.currentLimit

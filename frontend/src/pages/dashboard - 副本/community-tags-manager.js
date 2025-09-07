@@ -2,6 +2,7 @@
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast, createElement } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
+import communityTagsService from '../../services/community-tags-api.js';
 
 export class CommunityTagsManager {
   constructor(dashboardApp) {
@@ -9,28 +10,15 @@ export class CommunityTagsManager {
     this.availableTags = []; // 存储所有可用标签
     this.popularTags = [];
     this.isInitialized = false;
-    
-    // 🔧 新架构：通过服务管理器获取服务
-    this.communityTagsService = null;
-    this.notificationService = null;
   }
 
   async init() {
     console.log('初始化社区标签管理器');
     try {
-      // 🔧 新架构：获取所需的服务实例
-      this.communityTagsService = this.app.getService('communityTagsService');
-      this.notificationService = this.app.getService('notificationService');
-      
-      if (!this.communityTagsService) {
-        throw new Error('社区标签服务未找到');
-      }
-      
       this.isInitialized = true;
       console.log('社区标签管理器初始化完成');
     } catch (error) {
       console.error('社区标签管理器初始化失败:', error);
-      throw error;
     }
   }
 
@@ -38,7 +26,7 @@ export class CommunityTagsManager {
   async loadAvailableTags() {
     try {
       console.log('开始加载所有可用标签');
-      const result = await this.communityTagsService.getAllTags({
+      const result = await communityTagsService.getAllTags({
         active: true,
         category: 'all'
       });
@@ -74,7 +62,7 @@ export class CommunityTagsManager {
   // 🆕 显示创建标签模态框
   showCreateTagModal() {
     if (!this.app.getCurrentUser()) {
-      this.notificationService.showToast('请先登录', 'error');
+      showToast('请先登录', 'error');
       return;
     }
 
@@ -199,10 +187,10 @@ export class CommunityTagsManager {
       
       console.log('提交标签创建请求:', tagData);
       
-      const result = await this.communityTagsService.createTag(tagData);
+      const result = await communityTagsService.createTag(tagData);
       
       if (result.success) {
-        this.notificationService.showToast('标签创建成功！', 'success');
+        showToast('标签创建成功！', 'success');
         document.getElementById('createTagModal').remove();
         
         // 重新加载标签数据
@@ -210,69 +198,68 @@ export class CommunityTagsManager {
         await this.loadPopularTags();
         
       } else {
-        this._handleCreateTagError(result);
+        // 处理服务器端错误 - 改进的错误处理
+        let errorMessage = result.message || result.error || '创建标签失败';
+        
+        // 处理数据库相关错误
+        if (errorMessage.includes('ambiguous column name')) {
+          errorMessage = '数据库结构正在更新中，请联系管理员或稍后重试';
+          showToast(errorMessage, 'warning');
+          
+          // 建议刷新页面
+          setTimeout(() => {
+            if (confirm('检测到数据库结构已更新，是否刷新页面以应用更新？')) {
+              window.location.reload();
+            }
+          }, 2000);
+        } else if (errorMessage.includes('SQLITE_ERROR')) {
+          errorMessage = '数据库操作失败，请检查输入或稍后重试';
+          showToast(errorMessage, 'error');
+        } else if (errorMessage.includes('已存在')) {
+          // 后端检查到重复，显示在对应字段
+          this.showFieldError('tagName', '标签名称已存在，请使用其他名称');
+          return; // 不显示toast，字段级错误已显示
+        } else if (errorMessage.includes('权限')) {
+          errorMessage = '没有创建标签的权限，请联系管理员';
+          showToast(errorMessage, 'error');
+        } else if (errorMessage.includes('限制') || errorMessage.includes('超过')) {
+          errorMessage = '您创建的标签数量已达上限，请先删除一些不常用的标签';
+          showToast(errorMessage, 'warning');
+        } else {
+          showToast(errorMessage, 'error');
+        }
       }
       
     } catch (error) {
       console.error('创建标签失败:', error);
-      this._handleCreateTagException(error);
+      
+      let errorMessage = '创建标签失败';
+      if (error.message.includes('ambiguous column name')) {
+        errorMessage = '数据库列名冲突，请联系管理员更新数据库架构';
+        showToast(errorMessage, 'error');
+        
+        // 提供解决建议
+        setTimeout(() => {
+          if (confirm('检测到数据库架构问题，建议刷新页面。是否立即刷新？')) {
+            window.location.reload();
+          }
+        }, 3000);
+      } else if (error.message.includes('SQLITE_ERROR')) {
+        errorMessage = 'SQLite数据库错误，请检查服务器状态';
+        showToast(errorMessage, 'error');
+      } else if (error.message.includes('网络')) {
+        errorMessage = '网络连接失败，请检查网络后重试';
+        showToast(errorMessage, 'error');
+      } else if (error.message.includes('timeout')) {
+        errorMessage = '请求超时，请稍后重试';
+        showToast(errorMessage, 'error');
+      } else {
+        errorMessage += ': ' + error.message;
+        showToast(errorMessage, 'error');
+      }
+      
     } finally {
       showLoading(false);
-    }
-  }
-
-  // 🔧 私有方法：处理创建标签的服务端错误
-  _handleCreateTagError(result) {
-    let errorMessage = result.message || result.error || '创建标签失败';
-    
-    if (errorMessage.includes('ambiguous column name')) {
-      errorMessage = '数据库结构正在更新中，请联系管理员或稍后重试';
-      this.notificationService.showToast(errorMessage, 'warning');
-      
-      setTimeout(() => {
-        if (confirm('检测到数据库结构已更新，是否刷新页面以应用更新？')) {
-          window.location.reload();
-        }
-      }, 2000);
-    } else if (errorMessage.includes('已存在')) {
-      this.showFieldError('tagName', '标签名称已存在，请使用其他名称');
-      return;
-    } else if (errorMessage.includes('权限')) {
-      errorMessage = '没有创建标签的权限，请联系管理员';
-      this.notificationService.showToast(errorMessage, 'error');
-    } else if (errorMessage.includes('限制') || errorMessage.includes('超过')) {
-      errorMessage = '您创建的标签数量已达上限，请先删除一些不常用的标签';
-      this.notificationService.showToast(errorMessage, 'warning');
-    } else {
-      this.notificationService.showToast(errorMessage, 'error');
-    }
-  }
-
-  // 🔧 私有方法：处理创建标签的异常错误
-  _handleCreateTagException(error) {
-    let errorMessage = '创建标签失败';
-    
-    if (error.message.includes('ambiguous column name')) {
-      errorMessage = '数据库列名冲突，请联系管理员更新数据库架构';
-      this.notificationService.showToast(errorMessage, 'error');
-      
-      setTimeout(() => {
-        if (confirm('检测到数据库架构问题，建议刷新页面。是否立即刷新？')) {
-          window.location.reload();
-        }
-      }, 3000);
-    } else if (error.message.includes('SQLITE_ERROR')) {
-      errorMessage = 'SQLite数据库错误，请检查服务器状态';
-      this.notificationService.showToast(errorMessage, 'error');
-    } else if (error.message.includes('网络')) {
-      errorMessage = '网络连接失败，请检查网络后重试';
-      this.notificationService.showToast(errorMessage, 'error');
-    } else if (error.message.includes('timeout')) {
-      errorMessage = '请求超时，请稍后重试';
-      this.notificationService.showToast(errorMessage, 'error');
-    } else {
-      errorMessage += ': ' + error.message;
-      this.notificationService.showToast(errorMessage, 'error');
     }
   }
 
@@ -312,7 +299,7 @@ export class CommunityTagsManager {
   // 加载真实热门标签
   async loadPopularTags() {
     try {
-      const result = await this.communityTagsService.getPopularTags();
+      const result = await communityTagsService.getPopularTags();
       
       if (result.success && result.tags && result.tags.length > 0) {
         this.popularTags = result.tags.filter(tag => 
@@ -391,7 +378,7 @@ export class CommunityTagsManager {
   // 🆕 显示编辑标签模态框
   showEditTagModal(tagId) {
     if (!this.app.getCurrentUser()) {
-      this.notificationService.showToast('请先登录', 'error');
+      showToast('请先登录', 'error');
       return;
     }
 
@@ -400,7 +387,7 @@ export class CommunityTagsManager {
     // 查找标签数据
     const tag = this.availableTags.find(t => t.id === tagId);
     if (!tag) {
-      this.notificationService.showToast('标签不存在', 'error');
+      showToast('标签不存在', 'error');
       return;
     }
 
@@ -516,10 +503,10 @@ export class CommunityTagsManager {
       
       console.log('提交标签编辑:', tagId, updates);
       
-      const result = await this.communityTagsService.updateTag(tagId, updates);
+      const result = await communityTagsService.editTag(tagId, updates);
       
       if (result.success) {
-        this.notificationService.showToast('标签更新成功！', 'success');
+        showToast('标签更新成功！', 'success');
         document.getElementById('editTagModal').remove();
         
         // 重新加载标签数据
@@ -529,12 +516,12 @@ export class CommunityTagsManager {
         ]);
         
       } else {
-        this.notificationService.showToast(result.message || '更新失败', 'error');
+        showToast(result.message || '更新失败', 'error');
       }
       
     } catch (error) {
       console.error('编辑标签失败:', error);
-      this.notificationService.showToast('编辑失败: ' + error.message, 'error');
+      showToast('编辑失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
@@ -552,7 +539,7 @@ export class CommunityTagsManager {
   // 🆕 删除标签
   async deleteTag(tagId) {
     if (!this.app.getCurrentUser()) {
-      this.notificationService.showToast('请先登录', 'error');
+      showToast('请先登录', 'error');
       return;
     }
     
@@ -561,10 +548,10 @@ export class CommunityTagsManager {
       
       console.log('删除标签:', tagId);
       
-      const result = await this.communityTagsService.deleteTag(tagId);
+      const result = await communityTagsService.deleteTag(tagId);
       
       if (result.success) {
-        this.notificationService.showToast('标签删除成功', 'success');
+        showToast('标签删除成功', 'success');
         
         // 🔧 立即从本地数据中移除已删除的标签
         this.availableTags = this.availableTags.filter(tag => tag.id !== tagId);
@@ -595,7 +582,7 @@ export class CommunityTagsManager {
       
     } catch (error) {
       console.error('删除标签失败:', error);
-      this.notificationService.showToast('删除失败: ' + error.message, 'error');
+      showToast('删除失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
@@ -757,7 +744,7 @@ export class CommunityTagsManager {
   // 🆕 显示管理我的标签弹窗
   showManageMyTagsModal() {
     if (!this.app.getCurrentUser()) {
-        this.notificationService.showToast('请先登录', 'error');
+        showToast('请先登录', 'error');
         return;
     }
 
@@ -989,7 +976,7 @@ export class CommunityTagsManager {
       errorDiv.style.display = 'block';
       errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
-      this.notificationService.showToast(message, 'error');
+      showToast(message, 'error');
     }
   }
 

@@ -1,10 +1,11 @@
-// Dashboard主应用 - 重构版本，使用新的服务架构
+// Dashboard主应用 - 重构版本，负责总体协调
 import { APP_CONSTANTS } from '../../core/constants.js';
+import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { isDevEnv } from '../../utils/helpers.js';
-
-// 🆕 导入服务引导器
-import { initializeApp, getService, getServices } from '../../services/services-bootstrap.js';
+import authManager from '../../services/auth.js';
+import themeManager from '../../services/theme.js';
+import apiService from '../../services/api.js';
 
 // 导入页面管理器
 import OverviewManager from './overview-manager.js';
@@ -14,6 +15,7 @@ import SourcesManager from './sources-manager.js';
 import CategoriesManager from './categories-manager.js';
 import SettingsManager from './settings-manager.js';
 import StatsManager from './stats-manager.js';
+// 新增：导入社区管理器
 import { CommunityManager } from './community-manager.js';
 
 export class DashboardApp {
@@ -21,16 +23,16 @@ export class DashboardApp {
     this.currentUser = null;
     this.currentTab = 'overview';
     this.isInitialized = false;
-    this.servicesReady = false;
+	
     
-    // 初始化页面管理器
+    // 初始化页面管理器 - 添加社区管理器
     this.managers = {
       overview: new OverviewManager(this),
       favorites: new FavoritesManager(this),
       history: new HistoryManager(this),
       sources: new SourcesManager(this),
       categories: new CategoriesManager(this),
-      community: new CommunityManager(this),
+      community: new CommunityManager(this), // 新增社区管理器
       settings: new SettingsManager(this),
       stats: new StatsManager(this)
     };
@@ -49,16 +51,9 @@ export class DashboardApp {
       
       showLoading(true);
       
-      // 🆕 初始化服务架构
-      console.log('开始初始化服务架构...');
-      await initializeApp();
-      this.servicesReady = true;
-      console.log('服务架构初始化完成');
-      
-      // 🆕 获取核心服务
-      const { authService, themeService } = getServices('authService', 'themeService');
-      
+      await configManager.init();
       await this.checkAuth();
+      
       this.bindEvents();
       await this.loadCloudData();
       
@@ -69,8 +64,7 @@ export class DashboardApp {
         }
       }
       
-      // 🆕 初始化主题服务
-      themeService.init();
+      themeManager.init();
       
       this.isInitialized = true;
       console.log('Dashboard初始化完成');
@@ -87,7 +81,7 @@ export class DashboardApp {
     }
   }
 
-  // 🆕 检查认证状态 - 使用新的认证服务
+  // 检查认证状态
   async checkAuth() {
     const token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
     if (!token) {
@@ -95,9 +89,7 @@ export class DashboardApp {
     }
 
     try {
-      const authService = getService('authService');
-      const result = await authService.verifyToken();
-      
+      const result = await apiService.verifyToken(token);
       if (!result.success || !result.user) {
         throw new Error('Token验证失败');
       }
@@ -110,7 +102,7 @@ export class DashboardApp {
     }
   }
 
-  // 🆕 加载云端数据 - 使用新的用户服务
+  // 加载云端数据
   async loadCloudData() {
     if (!this.currentUser) {
       console.log('用户未登录，无法加载数据');
@@ -146,15 +138,17 @@ export class DashboardApp {
       });
     });
 
-    // 🆕 退出登录 - 使用新的认证服务
+    // 退出登录
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => this.logout());
     }
 
+    // 模态框事件
     this.bindModalEvents();
   }
 
+  // 绑定模态框事件
   bindModalEvents() {
     const closeBtns = document.querySelectorAll('.close');
     closeBtns.forEach(btn => {
@@ -168,6 +162,7 @@ export class DashboardApp {
     });
   }
 
+  // 切换标签
   switchTab(tabName) {
     document.querySelectorAll('.menu-item').forEach(item => {
       item.classList.toggle('active', item.dataset.tab === tabName);
@@ -181,6 +176,7 @@ export class DashboardApp {
     this.loadTabData(tabName);
   }
 
+  // 加载标签数据
   async loadTabData(tabName) {
     const manager = this.managers[tabName];
     if (manager && manager.loadTabData) {
@@ -188,6 +184,7 @@ export class DashboardApp {
     }
   }
 
+  // 更新用户UI
   updateUserUI() {
     const username = document.getElementById('username');
     if (username && this.currentUser) {
@@ -195,11 +192,13 @@ export class DashboardApp {
     }
   }
 
+  // 关闭模态框
   closeModals() {
     document.querySelectorAll('.modal').forEach(modal => {
       modal.style.display = 'none';
     });
     
+    // 通知所有管理器重置编辑状态
     Object.values(this.managers).forEach(manager => {
       if (manager.resetEditingState) {
         manager.resetEditingState();
@@ -207,12 +206,12 @@ export class DashboardApp {
     });
   }
 
-  // 🆕 退出登录 - 使用新的认证服务
+  // 退出登录
   async logout() {
     if (confirm('确定要退出登录吗？')) {
       try {
-        const authService = getService('authService');
-        await authService.logout();
+        await apiService.logout();
+        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
         showToast('已退出登录', 'success');
         setTimeout(() => {
           window.location.href = 'index.html';
@@ -225,25 +224,19 @@ export class DashboardApp {
     }
   }
 
+  // 获取当前用户
   getCurrentUser() {
     return this.currentUser;
   }
 
+  // 检查是否已初始化
   isReady() {
-    return this.isInitialized && this.servicesReady;
+    return this.isInitialized;
   }
 
+  // 获取指定管理器
   getManager(name) {
     return this.managers[name];
-  }
-
-  // 🆕 获取服务的便捷方法
-  getService(serviceName) {
-    if (!this.servicesReady) {
-      console.warn('服务尚未就绪，请等待初始化完成');
-      return null;
-    }
-    return getService(serviceName);
   }
 
   // 委托给设置管理器的方法
@@ -396,6 +389,7 @@ export class DashboardApp {
     }
   }
 
+  // 重置设置
   async resetSettings() {
     const settingsManager = this.managers.settings;
     if (settingsManager && settingsManager.resetSettings) {

@@ -70,7 +70,7 @@ export const utils = {
     },
 
     getCorsHeaders(origin = '*') {
-        const allowedOrigins = ['http://localhost:3000', 'https://*.pages.dev', 'https://*.codeseek.pp.ua'];
+        const allowedOrigins = ['http://localhost:3000', 'https://codeseek.pp.ua'];
         const isAllowedOrigin = origin === '*' || allowedOrigins.some(allowed => {
             if (allowed.includes('*')) {
                 const pattern = allowed.replace('*', '.*');

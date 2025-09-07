@@ -12,11 +12,23 @@ export class CommunityManager {
     // 初始化专门的管理器
     this.communityTags = new CommunityTagsManager(dashboardApp);
     this.communitySources = new CommunitySourcesManager(dashboardApp);
+    
+    // 🔧 新架构：服务实例引用
+    this.communityService = null;
+    this.notificationService = null;
   }
 
   async init() {
     console.log('初始化社区管理器');
     try {
+      // 🔧 新架构：获取所需的服务实例
+      this.communityService = this.app.getService('communityService');
+      this.notificationService = this.app.getService('notificationService');
+      
+      if (!this.communityService) {
+        console.warn('社区服务未找到，某些功能可能受限');
+      }
+      
       // 初始化子管理器
       await Promise.all([
         this.communityTags.init(),
@@ -57,7 +69,13 @@ export class CommunityManager {
       
     } catch (error) {
       console.error('加载社区数据失败:', error);
-      showToast('加载社区数据失败: ' + error.message, 'error');
+      
+      // 🔧 新架构：使用通知服务
+      if (this.notificationService) {
+        this.notificationService.showToast('加载社区数据失败: ' + error.message, 'error');
+      } else {
+        showToast('加载社区数据失败: ' + error.message, 'error');
+      }
     } finally {
       showLoading(false);
     }
@@ -234,9 +252,35 @@ export class CommunityManager {
     await this.loadTabData();
   }
 
-  // 搜索社区内容
+  // 搜索社区内容 - 🔧 使用新的服务架构
   async searchCommunity(query) {
-    return await this.communitySources.searchCommunity(query);
+    try {
+      // 如果有社区服务，优先使用服务层搜索
+      if (this.communityService && typeof this.communityService.searchCommunityContent === 'function') {
+        const result = await this.communityService.searchCommunityContent(query, {
+          includeInactive: false,
+          limit: 20
+        });
+        
+        if (result.success) {
+          // 更新搜索源管理器的数据
+          this.communitySources.handleSearchResults(result.data, query);
+          return result;
+        }
+      }
+      
+      // 降级到搜索源管理器的搜索功能
+      return await this.communitySources.searchCommunity(query);
+      
+    } catch (error) {
+      console.error('搜索社区内容失败:', error);
+      
+      if (this.notificationService) {
+        this.notificationService.showToast('搜索失败: ' + error.message, 'error');
+      }
+      
+      throw error;
+    }
   }
 
   // ==============================================
@@ -267,6 +311,147 @@ export class CommunityManager {
   }
 
   // ==============================================
+  // 🔧 新架构：社区统计和概览功能
+  // ==============================================
+
+  // 🆕 获取社区统计概览
+  async getCommunityOverview() {
+    try {
+      if (this.communityService && typeof this.communityService.getCommunityStats === 'function') {
+        const stats = await this.communityService.getCommunityStats();
+        return stats;
+      }
+      
+      // 降级方案：从各个管理器收集统计信息
+      const [userStats, tagsStats] = await Promise.all([
+        this.communitySources.getUserStats() || {},
+        this.getCommunityTagsStats()
+      ]);
+      
+      return {
+        success: true,
+        data: {
+          userStats,
+          tagsStats,
+          timestamp: Date.now()
+        }
+      };
+      
+    } catch (error) {
+      console.error('获取社区概览失败:', error);
+      return {
+        success: false,
+        error: error.message,
+        data: null
+      };
+    }
+  }
+
+  // 🆕 获取社区标签统计
+  async getCommunityTagsStats() {
+    try {
+      const availableTags = this.communityTags.getAvailableTags() || [];
+      const popularTags = this.communityTags.getPopularTags() || [];
+      
+      return {
+        totalTags: availableTags.length,
+        popularTagsCount: popularTags.length,
+        officialTagsCount: availableTags.filter(tag => tag.isOfficial).length,
+        userTagsCount: availableTags.filter(tag => !tag.isOfficial).length,
+        averageUsage: availableTags.length > 0 ? 
+          availableTags.reduce((sum, tag) => sum + (tag.usageCount || 0), 0) / availableTags.length : 0
+      };
+    } catch (error) {
+      console.error('获取标签统计失败:', error);
+      return {
+        totalTags: 0,
+        popularTagsCount: 0,
+        officialTagsCount: 0,
+        userTagsCount: 0,
+        averageUsage: 0
+      };
+    }
+  }
+
+  // 🆕 获取最近社区活动
+  async getRecentActivity() {
+    try {
+      if (this.communityService && typeof this.communityService.getRecentActivity === 'function') {
+        return await this.communityService.getRecentActivity();
+      }
+      
+      // 降级方案：从本地数据构建活动列表
+      const recentSources = this.communitySources.getCurrentSources()?.slice(0, 5) || [];
+      const recentTags = this.communityTags.getPopularTags()?.slice(0, 3) || [];
+      
+      const activities = [
+        ...recentSources.map(source => ({
+          type: 'source_shared',
+          data: source,
+          timestamp: source.created_at || Date.now()
+        })),
+        ...recentTags.map(tag => ({
+          type: 'tag_popular',
+          data: tag,
+          timestamp: Date.now()
+        }))
+      ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10);
+      
+      return {
+        success: true,
+        activities
+      };
+      
+    } catch (error) {
+      console.error('获取最近活动失败:', error);
+      return {
+        success: false,
+        activities: []
+      };
+    }
+  }
+
+  // 🆕 获取趋势内容
+  async getTrendingContent() {
+    try {
+      if (this.communityService && typeof this.communityService.getTrendingContent === 'function') {
+        return await this.communityService.getTrendingContent();
+      }
+      
+      // 降级方案：基于本地数据分析趋势
+      const sources = this.communitySources.getCurrentSources() || [];
+      const tags = this.communityTags.getPopularTags() || [];
+      
+      // 按下载量和点赞数排序找出热门内容
+      const trendingSources = sources
+        .sort((a, b) => (b.download_count + b.like_count) - (a.download_count + a.like_count))
+        .slice(0, 5);
+      
+      const trendingTags = tags
+        .sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0))
+        .slice(0, 5);
+      
+      return {
+        success: true,
+        trending: {
+          sources: trendingSources,
+          tags: trendingTags
+        }
+      };
+      
+    } catch (error) {
+      console.error('获取趋势内容失败:', error);
+      return {
+        success: false,
+        trending: {
+          sources: [],
+          tags: []
+        }
+      };
+    }
+  }
+
+  // ==============================================
   // 状态管理
   // ==============================================
 
@@ -281,7 +466,11 @@ export class CommunityManager {
       main: this.isInitialized,
       tags: this.communityTags.isInitialized,
       sources: this.communitySources.isInitialized,
-      ready: this.isReady()
+      ready: this.isReady(),
+      services: {
+        communityService: !!this.communityService,
+        notificationService: !!this.notificationService
+      }
     };
   }
 
@@ -297,7 +486,12 @@ export class CommunityManager {
         error.message.includes('GREATEST')) {
       console.log('检测到数据库兼容性问题，尝试恢复...');
       
-      showToast('检测到数据库更新，正在应用修复...', 'info');
+      const message = '检测到数据库更新，正在应用修复...';
+      if (this.notificationService) {
+        this.notificationService.showToast(message, 'info');
+      } else {
+        showToast(message, 'info');
+      }
       
       // 延迟提示用户刷新
       setTimeout(() => {
@@ -310,7 +504,49 @@ export class CommunityManager {
     }
     
     // 其他错误的处理
-    showToast(`操作失败: ${error.message}`, 'error');
+    const message = `操作失败: ${error.message}`;
+    if (this.notificationService) {
+      this.notificationService.showToast(message, 'error');
+    } else {
+      showToast(message, 'error');
+    }
+  }
+
+  // ==============================================
+  // 🔧 新架构：服务健康检查
+  // ==============================================
+
+  async performHealthCheck() {
+    const healthStatus = {
+      communityManager: {
+        status: this.isInitialized ? 'healthy' : 'unhealthy',
+        initialized: this.isInitialized
+      },
+      communityTags: {
+        status: this.communityTags.isInitialized ? 'healthy' : 'unhealthy',
+        initialized: this.communityTags.isInitialized,
+        tagsCount: this.communityTags.getAvailableTags()?.length || 0
+      },
+      communitySources: {
+        status: this.communitySources.isInitialized ? 'healthy' : 'unhealthy',
+        initialized: this.communitySources.isInitialized,
+        sourcesCount: this.communitySources.getCurrentSources()?.length || 0
+      },
+      services: {
+        communityService: this.communityService ? 'available' : 'unavailable',
+        notificationService: this.notificationService ? 'available' : 'unavailable'
+      }
+    };
+
+    const overallHealth = Object.values(healthStatus).every(status => 
+      typeof status === 'object' ? status.status !== 'unhealthy' : true
+    );
+
+    return {
+      status: overallHealth ? 'healthy' : 'degraded',
+      details: healthStatus,
+      timestamp: Date.now()
+    };
   }
 
   // ==============================================
@@ -326,12 +562,95 @@ export class CommunityManager {
       sourcesCount: this.communitySources.getCurrentSources()?.length || 0,
       userStats: this.communitySources.getUserStats(),
       currentFilters: this.communitySources.currentFilters,
-      currentPage: this.communitySources.currentPage
+      currentPage: this.communitySources.currentPage,
+      servicesAvailable: {
+        communityService: !!this.communityService,
+        notificationService: !!this.notificationService
+      }
     };
   }
 
   logDebugInfo() {
     console.log('社区管理器调试信息:', this.getDebugInfo());
+  }
+
+  // ==============================================
+  // 🔧 新架构：服务层集成测试
+  // ==============================================
+
+  async testServicesIntegration() {
+    console.log('开始测试社区管理器服务集成...');
+    
+    const tests = [
+      {
+        name: '标签服务测试',
+        test: async () => {
+          const tagsService = this.app.getService('communityTagsService');
+          if (!tagsService) throw new Error('标签服务未找到');
+          
+          const result = await tagsService.getAllTags({ active: true });
+          return result.success;
+        }
+      },
+      {
+        name: '社区源服务测试',
+        test: async () => {
+          const sourcesService = this.app.getService('communitySourcesService');
+          if (!sourcesService) throw new Error('社区源服务未找到');
+          
+          const result = await sourcesService.getCommunitySearchSources({ limit: 1 });
+          return result.success;
+        }
+      },
+      {
+        name: '通知服务测试',
+        test: async () => {
+          if (!this.notificationService) throw new Error('通知服务未找到');
+          
+          this.notificationService.showToast('服务测试成功', 'success');
+          return true;
+        }
+      }
+    ];
+
+    const results = [];
+    
+    for (const test of tests) {
+      try {
+        const result = await test.test();
+        results.push({
+          name: test.name,
+          status: result ? 'passed' : 'failed',
+          error: null
+        });
+        console.log(`✅ ${test.name}: 通过`);
+      } catch (error) {
+        results.push({
+          name: test.name,
+          status: 'failed',
+          error: error.message
+        });
+        console.error(`❌ ${test.name}: ${error.message}`);
+      }
+    }
+
+    const passedCount = results.filter(r => r.status === 'passed').length;
+    const totalCount = results.length;
+    
+    console.log(`服务集成测试完成: ${passedCount}/${totalCount} 通过`);
+    
+    if (this.notificationService) {
+      this.notificationService.showToast(
+        `服务测试完成: ${passedCount}/${totalCount} 通过`, 
+        passedCount === totalCount ? 'success' : 'warning'
+      );
+    }
+    
+    return {
+      passed: passedCount,
+      total: totalCount,
+      results
+    };
   }
 }
 

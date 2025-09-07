@@ -6,7 +6,7 @@
     <title id="page-title">磁力快搜 - 专业版</title>
     <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索">
 	
-	    <!-- 核心样式 - 必须最先引入 -->
+    <!-- 核心样式 - 必须最先引入 -->
     <link rel="stylesheet" href="css/core/variables.css">
     <link rel="stylesheet" href="css/core/base.css">
     
@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="css/components/loading.css">
     <link rel="stylesheet" href="css/components/search.css">
     <link rel="stylesheet" href="css/components/status.css">
-	<link rel="stylesheet" href="css/components/search-status.css">
+    <link rel="stylesheet" href="css/components/search-status.css">
     
     <!-- 主页专用样式 -->
     <link rel="stylesheet" href="css/pages/main.css">
@@ -86,7 +86,6 @@
                         <span>搜索</span>
                     </button>
                 </div>
-                <!-- 🔧 移除了缓存设置选项 -->
             </div>
         </section>
 
@@ -100,6 +99,11 @@
                     <li>登录后可享受云端同步服务</li>
                 </ul>
             </div>
+        </section>
+
+        <!-- 🔧 新增：搜索状态指示器 -->
+        <section id="searchStatusIndicator" class="search-status-indicator" style="display:none;">
+            <!-- 内容将通过JavaScript动态更新 -->
         </section>
 
         <!-- 搜索历史 -->
@@ -133,10 +137,19 @@
                     <button id="importFavoritesBtn" class="action-btn" style="display:none;">导入收藏</button>
                 </div>
             </div>
+            <div class="favorites-controls" style="display:none;">
+                <input type="text" id="favoritesSearch" placeholder="搜索收藏..." class="search-input">
+                <select id="favoritesSort" class="sort-select">
+                    <option value="date-desc">按时间降序</option>
+                    <option value="date-asc">按时间升序</option>
+                    <option value="name-asc">按名称升序</option>
+                    <option value="name-desc">按名称降序</option>
+                </select>
+            </div>
             <div id="favorites" class="favorites-grid"></div>
         </section>
 
-        <!-- 🔧 修改：站点导航 - 现在是动态加载的 -->
+        <!-- 站点导航 -->
         <section id="sitesSection" class="sites-section">
             <!-- 内容将通过JavaScript动态加载 -->
             <div class="loading-sites">
@@ -246,11 +259,12 @@
         <span class="status-text">检查连接...</span>
     </div>
 
-    <!-- 脚本文件 - ES6模块化 -->
+    <!-- 🔧 核心变更：使用新服务架构的脚本加载 -->
     <script type="module">
+        // 🔧 重要：现在使用新的服务架构初始化应用
         import MagnetSearchApp from './src/pages/main/main.js';
         
-        // 全局导航函数
+        // 全局导航函数（保持向后兼容）
         window.navigateToDashboard = function() {
             if (window.app && window.app.navigateToDashboard) {
                 window.app.navigateToDashboard();
@@ -258,19 +272,41 @@
         };
 
         // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('🚀 初始化应用...');
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 开始初始化应用...');
 
-            // 更新页面标题与品牌名称
-            if (window.API_CONFIG) {
-                const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
-                document.getElementById('page-title').textContent = `${appName} - 专业版`;
-                document.getElementById('brand-text').textContent = appName;
-                document.getElementById('hero-title').textContent = `${appName} - 专业版`;
+            try {
+                // 更新页面标题与品牌名称
+                if (window.API_CONFIG) {
+                    const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
+                    document.getElementById('page-title').textContent = `${appName} - 专业版`;
+                    document.getElementById('brand-text').textContent = appName;
+                    document.getElementById('hero-title').textContent = `${appName} - 专业版`;
+                }
+                
+                // 🔧 核心变更：创建使用新服务架构的应用实例
+                window.app = new MagnetSearchApp();
+                
+                console.log('✅ 应用初始化完成');
+                
+            } catch (error) {
+                console.error('❌ 应用初始化失败:', error);
+                
+                // 显示错误信息给用户
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'init-error';
+                errorDiv.innerHTML = `
+                    <div style="background: #fee; border: 1px solid #f00; padding: 1rem; margin: 1rem; border-radius: 4px;">
+                        <h3>⚠️ 应用初始化失败</h3>
+                        <p>错误信息：${error.message}</p>
+                        <p>请刷新页面重试，或联系技术支持。</p>
+                        <button onclick="window.location.reload()" style="padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            刷新页面
+                        </button>
+                    </div>
+                `;
+                document.body.insertBefore(errorDiv, document.body.firstChild);
             }
-            
-            // 创建应用实例
-            window.app = new MagnetSearchApp();
         });
 
         // 处理页面可见性变化
@@ -283,6 +319,19 @@
                 }, 100);
             }
         });
+
+        // 🔧 新增：服务架构健康检查（开发环境）
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    if (window.servicesManager) {
+                        window.servicesManager.performHealthCheck().then(status => {
+                            console.log('🏥 服务健康检查结果:', status);
+                        }).catch(console.error);
+                    }
+                }, 2000);
+            });
+        }
     </script>
 </body>
 </html>

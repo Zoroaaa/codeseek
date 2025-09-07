@@ -1,7 +1,8 @@
-// 收藏页面管理器 - 重构版本，使用新的服务架构
+// 收藏页面管理器
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml, formatRelativeTime } from '../../utils/format.js';
 import { debounce } from '../../utils/helpers.js';
+import apiService from '../../services/api.js';
 
 export class FavoritesManager {
   constructor(dashboardApp) {
@@ -21,14 +22,7 @@ export class FavoritesManager {
     }
 
     try {
-      // 🆕 使用新的用户收藏服务
-      const userFavoritesService = this.app.getService('userFavoritesService');
-      if (!userFavoritesService) {
-        console.error('用户收藏服务未就绪');
-        return;
-      }
-
-      const favoritesResult = await userFavoritesService.getFavorites();
+      const favoritesResult = await apiService.getFavorites();
       this.favorites = favoritesResult || [];
       console.log(`加载了 ${this.favorites.length} 个收藏`);
     } catch (error) {
@@ -176,7 +170,7 @@ export class FavoritesManager {
     `).join('');
   }
 
-  // 🆕 同步收藏 - 使用新的用户收藏服务
+  // 同步收藏 - 直接与API交互
   async syncFavorites() {
     if (!this.app.getCurrentUser()) {
       showToast('用户未登录', 'error');
@@ -185,12 +179,7 @@ export class FavoritesManager {
 
     try {
       showLoading(true);
-      const userFavoritesService = this.app.getService('userFavoritesService');
-      if (!userFavoritesService) {
-        throw new Error('用户收藏服务未就绪');
-      }
-
-      await userFavoritesService.syncFavorites();
+      await apiService.syncFavorites(this.favorites);
       showToast('收藏夹同步成功', 'success');
     } catch (error) {
       console.error('同步收藏失败:', error);
@@ -200,7 +189,7 @@ export class FavoritesManager {
     }
   }
 
-  // 🆕 移除收藏 - 使用新的用户收藏服务
+  // 移除收藏
   async removeFavorite(favoriteId) {
     if (!this.app.getCurrentUser()) {
       showToast('用户未登录', 'error');
@@ -214,16 +203,11 @@ export class FavoritesManager {
       try {
         showLoading(true);
         
-        const userFavoritesService = this.app.getService('userFavoritesService');
-        if (!userFavoritesService) {
-          throw new Error('用户收藏服务未就绪');
-        }
-
-        // 使用新的收藏服务删除
-        await userFavoritesService.removeFavorite(favoriteId);
-        
-        // 从本地数组中移除
+        // 从数组中移除
         this.favorites.splice(index, 1);
+        
+        // 同步到云端
+        await apiService.syncFavorites(this.favorites);
         
         // 重新加载数据以确保一致性
         await this.loadFavoritesData();
@@ -241,7 +225,7 @@ export class FavoritesManager {
     }
   }
 
-  // 🆕 收藏夹导出 - 使用新的用户收藏服务
+  // 收藏夹导出
   async exportFavorites() {
     if (!this.app.getCurrentUser()) {
       showToast('用户未登录', 'error');
@@ -249,13 +233,8 @@ export class FavoritesManager {
     }
 
     try {
-      const userFavoritesService = this.app.getService('userFavoritesService');
-      if (!userFavoritesService) {
-        throw new Error('用户收藏服务未就绪');
-      }
-
-      // 从收藏服务获取最新数据
-      const favorites = await userFavoritesService.getFavorites();
+      // 从云端获取最新收藏数据
+      const favorites = await apiService.getFavorites();
       
       const data = {
         favorites: favorites || this.favorites,

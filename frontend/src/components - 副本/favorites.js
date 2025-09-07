@@ -1,35 +1,25 @@
-// 收藏管理组件 - 重构版本：使用新服务架构
-import { getService } from '../services/services-bootstrap.js';
+// 收藏管理组件
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml, formatRelativeTime } from '../utils/format.js';
+import apiService from '../services/api.js';
+import authManager from '../services/auth.js';
 
 export class FavoritesManager {
   constructor() {
     this.favorites = [];
     this.isInitialized = false;
-    
-    // 服务实例将在init时获取
-    this.userFavoritesService = null;
-    this.authService = null;
-    this.notificationService = null;
   }
 
   async init() {
     if (this.isInitialized) return;
 
     try {
-      // 获取服务实例
-      this.userFavoritesService = getService('userFavoritesService');
-      this.authService = getService('authService');
-      this.notificationService = getService('notificationService');
-
       await this.loadFavorites();
       this.bindEvents();
-      this.exposeGlobalMethods();
+      this.exposeGlobalMethods(); // 🔧 新增
       this.isInitialized = true;
     } catch (error) {
       console.error('收藏管理器初始化失败:', error);
-      this.notificationService?.showToast('收藏管理器初始化失败', 'error');
     }
   }
 
@@ -70,20 +60,20 @@ export class FavoritesManager {
 
   // 加载收藏
   async loadFavorites() {
-    if (!this.authService.isAuthenticated()) {
+    if (!authManager.isAuthenticated()) {
       this.favorites = [];
       this.renderFavorites();
       return;
     }
 
     try {
-      this.favorites = await this.userFavoritesService.getFavorites();
+      const cloudFavorites = await apiService.getFavorites();
+      this.favorites = cloudFavorites || [];
       this.renderFavorites();
     } catch (error) {
       console.error('加载收藏失败:', error);
       this.favorites = [];
       this.renderFavorites();
-      this.notificationService?.showToast('加载收藏失败: ' + error.message, 'error');
     }
   }
 
@@ -101,11 +91,11 @@ export class FavoritesManager {
 
     container.innerHTML = renderList.map(fav => this.createFavoriteHTML(fav)).join('');
     
-    // 绑定事件委托
+    // 🔧 绑定事件委托
     this.bindFavoritesEvents(container);
   }
 
-  // 绑定收藏夹事件
+  // 🔧 新增：绑定收藏夹事件
   bindFavoritesEvents(container) {
     // 移除旧的事件监听器
     const newContainer = container.cloneNode(true);
@@ -175,7 +165,7 @@ export class FavoritesManager {
 
   // 创建空状态
   createEmptyState() {
-    const isAuthenticated = this.authService.isAuthenticated();
+    const isAuthenticated = authManager.isAuthenticated();
     return `
       <div class="empty-state">
         <span style="font-size: 3rem;">📌</span>
@@ -187,44 +177,59 @@ export class FavoritesManager {
 
   // 添加收藏
   async addFavorite(item) {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('请先登录后再收藏', 'error');
-      return false;
-    }
-
-    // 检查收藏数量限制
-    const settings = await this.userFavoritesService.getSettings();
-    const maxFavorites = settings?.maxFavoritesPerUser || 500;
+	  
+	      // 检查收藏数量限制
+    const settings = await apiService.getUserSettings();
+    const maxFavorites = settings.maxFavoritesPerUser || 500;
     
     if (this.favorites.length >= maxFavorites) {
-      this.notificationService.showToast(`收藏已达上限（${maxFavorites}个）`, 'error');
+        showToast(`收藏已达上限（${maxFavorites}个）`, 'error');
+        return false;
+    }
+	  
+    if (!authManager.isAuthenticated()) {
+      showToast('请先登录后再收藏', 'error');
       return false;
     }
 
     // 检查是否已收藏
     const existingIndex = this.favorites.findIndex(fav => fav.url === item.url);
     if (existingIndex >= 0) {
-      this.notificationService.showToast('已经收藏过了', 'info');
+      showToast('已经收藏过了', 'info');
       return false;
     }
 
+    const favorite = {
+      id: `fav_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: item.title,
+      subtitle: item.subtitle,
+      url: item.url,
+      icon: item.icon,
+      keyword: item.keyword,
+      addedAt: new Date().toISOString()
+    };
+
     try {
       showLoading(true);
-      
-      // 使用服务添加收藏
-      const favorite = await this.userFavoritesService.addFavorite(item);
       
       // 添加到本地
       this.favorites.unshift(favorite);
       this.renderFavorites();
 
-      this.notificationService.showToast('已添加收藏', 'success');
+      // 同步到云端
+      await apiService.syncFavorites(this.favorites);
+      showToast('已添加收藏', 'success');
       return true;
 
     } catch (error) {
       console.error('添加收藏失败:', error);
-      this.notificationService.showToast('添加收藏失败: ' + error.message, 'error');
+      showToast('添加收藏失败: ' + error.message, 'error');
+      
+      // 回滚本地操作
+      this.favorites.shift();
+      this.renderFavorites();
       return false;
+
     } finally {
       showLoading(false);
     }
@@ -232,8 +237,8 @@ export class FavoritesManager {
 
   // 移除收藏
   async removeFavorite(favoriteId) {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('用户未登录', 'error');
+    if (!authManager.isAuthenticated()) {
+      showToast('用户未登录', 'error');
       return;
     }
 
@@ -248,13 +253,13 @@ export class FavoritesManager {
         const removedFavorite = this.favorites.splice(index, 1)[0];
         this.renderFavorites();
         
-        // 使用服务同步到云端
-        await this.userFavoritesService.removeFavorite(favoriteId);
-        this.notificationService.showToast('已移除收藏', 'success');
+        // 同步到云端
+        await apiService.syncFavorites(this.favorites);
+        showToast('已移除收藏', 'success');
         
       } catch (error) {
         console.error('移除收藏失败:', error);
-        this.notificationService.showToast('移除收藏失败: ' + error.message, 'error');
+        showToast('移除收藏失败: ' + error.message, 'error');
         
         // 回滚本地操作
         this.favorites.splice(index, 0, removedFavorite);
@@ -268,21 +273,18 @@ export class FavoritesManager {
 
   // 同步收藏
   async syncFavorites() {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('请先登录', 'error');
+    if (!authManager.isAuthenticated()) {
+      showToast('请先登录', 'error');
       return;
     }
 
     try {
       showLoading(true);
-      await this.userFavoritesService.syncFavorites();
-      
-      // 重新加载收藏
-      await this.loadFavorites();
-      this.notificationService.showToast('收藏夹同步成功', 'success');
+      await apiService.syncFavorites(this.favorites);
+      showToast('收藏夹同步成功', 'success');
     } catch (error) {
       console.error('收藏夹同步失败:', error);
-      this.notificationService.showToast(`收藏夹同步失败: ${error.message}`, 'error');
+      showToast(`收藏夹同步失败: ${error.message}`, 'error');
     } finally {
       showLoading(false);
     }
@@ -308,21 +310,23 @@ export class FavoritesManager {
           const newFavorites = data.favorites.filter(fav => !existingUrls.has(fav.url));
           
           if (newFavorites.length > 0) {
-            // 使用服务批量导入
-            await this.userFavoritesService.importFavorites(newFavorites);
+            this.favorites.push(...newFavorites);
+            this.renderFavorites();
+            showToast(`成功导入${newFavorites.length}个收藏`, 'success');
             
-            // 重新加载收藏
-            await this.loadFavorites();
-            this.notificationService.showToast(`成功导入${newFavorites.length}个收藏`, 'success');
+            // 同步到云端
+            if (authManager.isAuthenticated()) {
+              await this.syncFavorites();
+            }
           } else {
-            this.notificationService.showToast('没有新的收藏需要导入', 'info');
+            showToast('没有新的收藏需要导入', 'info');
           }
         } else {
           throw new Error('文件格式不正确');
         }
       } catch (error) {
         console.error('导入收藏失败:', error);
-        this.notificationService.showToast('导入失败: ' + error.message, 'error');
+        showToast('导入失败: ' + error.message, 'error');
       }
     };
     
@@ -371,15 +375,15 @@ export class FavoritesManager {
   openFavorite(url) {
     try {
       window.open(url, '_blank', 'noopener,noreferrer');
-      this.notificationService.showToast('已在新标签页打开', 'success');
+      showToast('已在新标签页打开', 'success');
       
       // 记录访问行为
-      if (this.authService.isAuthenticated()) {
-        this.userFavoritesService.recordAction('visit_site', { url, source: 'favorites' }).catch(console.error);
+      if (authManager.isAuthenticated()) {
+        apiService.recordAction('visit_site', { url, source: 'favorites' }).catch(console.error);
       }
     } catch (error) {
       console.error('打开链接失败:', error);
-      this.notificationService.showToast('无法打开链接', 'error');
+      showToast('无法打开链接', 'error');
     }
   }
 
@@ -387,11 +391,11 @@ export class FavoritesManager {
   async copyFavoriteUrl(url) {
     try {
       await navigator.clipboard.writeText(url);
-      this.notificationService.showToast('已复制到剪贴板', 'success');
+      showToast('已复制到剪贴板', 'success');
       
       // 记录复制行为
-      if (this.authService.isAuthenticated()) {
-        this.userFavoritesService.recordAction('copy_url', { url, source: 'favorites' }).catch(console.error);
+      if (authManager.isAuthenticated()) {
+        apiService.recordAction('copy_url', { url, source: 'favorites' }).catch(console.error);
       }
     } catch (error) {
       // 降级到旧方法
@@ -401,9 +405,9 @@ export class FavoritesManager {
       textArea.select();
       try {
         document.execCommand('copy');
-        this.notificationService.showToast('已复制到剪贴板', 'success');
+        showToast('已复制到剪贴板', 'success');
       } catch (err) {
-        this.notificationService.showToast('复制失败', 'error');
+        showToast('复制失败', 'error');
       }
       document.body.removeChild(textArea);
     }

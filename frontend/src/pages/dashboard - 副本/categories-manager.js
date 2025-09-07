@@ -1,7 +1,8 @@
-// 分类管理器 - 已适配新服务架构
+// 分类管理器
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
+import apiService from '../../services/api.js';
 
 export class CategoriesManager {
   constructor(dashboardApp) {
@@ -13,7 +14,7 @@ export class CategoriesManager {
   }
 
   async init() {
-    console.log('📂 初始化分类管理器');
+    console.log('📁 初始化分类管理器');
     this.loadBuiltinData();
     this.bindEvents();
   }
@@ -56,16 +57,7 @@ export class CategoriesManager {
     if (!this.app.getCurrentUser()) return;
     
     try {
-      // 🆕 使用新的用户设置服务
-      const userSettingsService = this.app.getService('userSettingsService');
-      if (!userSettingsService) {
-        console.warn('用户设置服务未找到');
-        this.customCategories = [];
-        this.allCategories = [...this.builtinCategories];
-        return;
-      }
-
-      const userSettings = await userSettingsService.getSettings();
+      const userSettings = await apiService.getUserSettings();
       this.customCategories = userSettings.customSourceCategories || [];
       
       // 合并内置和自定义数据
@@ -484,13 +476,7 @@ export class CategoriesManager {
       searchSources: enabledSources
     };
     
-    // 🆕 使用新的用户设置服务
-    const userSettingsService = this.app.getService('userSettingsService');
-    if (!userSettingsService) {
-      throw new Error('用户设置服务未找到');
-    }
-    
-    await userSettingsService.updateSettings(settings);
+    await apiService.updateUserSettings(settings);
   }
 
   async exportCategories() {

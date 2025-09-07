@@ -1,11 +1,13 @@
-// 增强版搜索组件 - 重构版本：使用新服务架构
+// 增强版搜索组件 - 支持后端搜索源状态检查和显示（修改版：支持显示不可用结果及原因）
 import { APP_CONSTANTS } from '../core/constants.js';
-import { getService } from '../services/services-bootstrap.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../utils/format.js';
 import { validateSearchKeyword } from '../utils/validation.js';
 import { debounce } from '../utils/helpers.js';
+import searchService, { searchHistoryManager } from '../services/search.js';
+import authManager from '../services/auth.js';
 import favoritesManager from './favorites.js';
+import apiService from '../services/api.js';
 
 export class SearchManager {
   constructor() {
@@ -14,28 +16,12 @@ export class SearchManager {
     this.isInitialized = false;
     this.statusCheckInProgress = false;
     this.lastStatusCheckKeyword = null;
-    
-    // 服务实例将在init时获取
-    this.searchService = null;
-    this.userHistoryService = null;
-    this.authService = null;
-    this.userSettingsService = null;
-    this.sourceCheckerService = null;
-    this.notificationService = null;
   }
 
   async init() {
     if (this.isInitialized) return;
 
     try {
-      // 获取服务实例
-      this.searchService = getService('searchService');
-      this.userHistoryService = getService('userHistoryService');
-      this.authService = getService('authService');
-      this.userSettingsService = getService('userSettingsService');
-      this.sourceCheckerService = getService('sourceCheckerService');
-      this.notificationService = getService('notificationService');
-
       await this.loadSearchHistory();
       this.bindEvents();
       this.handleURLParams();
@@ -43,7 +29,6 @@ export class SearchManager {
       this.isInitialized = true;
     } catch (error) {
       console.error('搜索管理器初始化失败:', error);
-      this.notificationService?.showToast('搜索管理器初始化失败', 'error');
     }
   }
   
@@ -147,7 +132,7 @@ export class SearchManager {
     const keyword = searchInput?.value.trim();
     
     if (!keyword) {
-      this.notificationService.showToast('请输入搜索关键词', 'error');
+      showToast('请输入搜索关键词', 'error');
       searchInput?.focus();
       return;
     }
@@ -155,7 +140,7 @@ export class SearchManager {
     // 验证关键词
     const validation = validateSearchKeyword(keyword);
     if (!validation.valid) {
-      this.notificationService.showToast(validation.errors[0], 'error');
+      showToast(validation.errors[0], 'error');
       return;
     }
 
@@ -170,10 +155,10 @@ export class SearchManager {
 
       // 获取搜索选项
       const useCache = true; // 默认启用缓存
-      const saveToHistory = this.authService.isAuthenticated();
+      const saveToHistory = authManager.isAuthenticated();
 
       // 执行搜索
-      const results = await this.searchService.performSearch(keyword, {
+      const results = await searchService.performSearch(keyword, {
         useCache,
         saveToHistory
       });
@@ -188,7 +173,7 @@ export class SearchManager {
 
     } catch (error) {
       console.error('搜索失败:', error);
-      this.notificationService.showToast(`搜索失败: ${error.message}`, 'error');
+      showToast(`搜索失败: ${error.message}`, 'error');
     } finally {
       showLoading(false);
       this.statusCheckInProgress = false;
@@ -198,9 +183,9 @@ export class SearchManager {
   // 显示搜索状态检查进度
   async showSearchStatusIfEnabled(keyword) {
     try {
-      if (!this.authService.isAuthenticated()) return;
+      if (!authManager.isAuthenticated()) return;
 
-      const userSettings = await this.userSettingsService.getSettings();
+      const userSettings = await apiService.getUserSettings();
       const checkTimeout = userSettings.sourceStatusCheckTimeout || 8000;
       
       if (!userSettings.checkSourceStatus) return;
@@ -209,7 +194,7 @@ export class SearchManager {
       this.lastStatusCheckKeyword = keyword;
 
       // 显示状态检查提示
-      this.notificationService.showToast('正在检查搜索源状态并进行内容匹配...', 'info', checkTimeout);
+      showToast('正在检查搜索源状态并进行内容匹配...', 'info', checkTimeout);
 
       // 如果页面有状态指示器，显示它
       const statusIndicator = document.getElementById('searchStatusIndicator');
@@ -228,7 +213,7 @@ export class SearchManager {
     }
   }
 
-  // 显示搜索结果 - 增强版，支持状态显示和不可用结果处理
+  // 🔧 显示搜索结果 - 增强版，支持状态显示和不可用结果处理
   displaySearchResults(keyword, results) {
     const resultsSection = document.getElementById('resultsSection');
     const searchInfo = document.getElementById('searchInfo');
@@ -238,7 +223,7 @@ export class SearchManager {
 
     if (resultsSection) resultsSection.style.display = 'block';
     
-    // 计算状态统计（包括不可用结果统计）
+    // 🔧 计算状态统计（包含不可用结果统计）
     const statusStats = this.calculateStatusStats(results);
     
     if (searchInfo) {
@@ -251,7 +236,7 @@ export class SearchManager {
         
         statusInfo = ` | 可用: ${availableCount}/${totalCount}`;
         
-        // 显示不可用数量
+        // 🔧 显示不可用数量
         if (unavailableCount > 0) {
           statusInfo += ` | 不可用: ${unavailableCount}`;
         }
@@ -273,7 +258,7 @@ export class SearchManager {
     if (exportResultsBtn) exportResultsBtn.style.display = 'inline-block';
 
     if (resultsContainer) {
-      // 使用grid布局而不是简单的join，以支持不可用结果的特殊样式
+      // 🔧 修改：使用grid布局而不是简单的join，以支持不可用结果的特殊样式
       resultsContainer.className = 'results-grid';
       resultsContainer.innerHTML = results.map(result => this.createResultHTML(result)).join('');
       
@@ -295,7 +280,7 @@ export class SearchManager {
     }, 100);
   }
 
-  // 计算状态统计（包括不可用结果统计）
+  // 🔧 计算状态统计（包括不可用结果统计）
   calculateStatusStats(results) {
     const stats = {
       hasStatus: false,
@@ -372,12 +357,12 @@ export class SearchManager {
     });
   }
 
-  // 创建搜索结果HTML - 支持不可用结果的特殊显示
+  // 🔧 创建搜索结果HTML - 支持不可用结果的特殊显示
   createResultHTML(result) {
     const isFavorited = favoritesManager.isFavorited(result.url);
     const isUnavailable = this.isResultUnavailable(result);
     
-    // 状态指示器HTML（增强版，包含不可用原因）
+    // 🔧 状态指示器HTML（增强版，包含不可用原因）
     let statusIndicator = '';
     if (result.status) {
       const statusClass = this.getStatusClass(result.status);
@@ -385,7 +370,7 @@ export class SearchManager {
       const statusTime = result.lastChecked ? 
         `检查时间: ${formatRelativeTime(result.lastChecked)}` : '';
       
-      // 详细状态信息
+      // 🔧 详细状态信息
       let statusDetails = [];
       if (result.responseTime > 0) {
         statusDetails.push(`响应: ${result.responseTime}ms`);
@@ -402,7 +387,7 @@ export class SearchManager {
       
       const detailsText = statusDetails.length > 0 ? ` (${statusDetails.join(', ')})` : '';
       
-      // 不可用原因显示
+      // 🔧 不可用原因显示
       let unavailableReasonHTML = '';
       if (isUnavailable && result.unavailableReason) {
         unavailableReasonHTML = `<div class="unavailable-reason">原因: ${escapeHtml(result.unavailableReason)}</div>`;
@@ -419,7 +404,7 @@ export class SearchManager {
       `;
     }
     
-    // 访问按钮状态（不可用时禁用）
+    // 🔧 访问按钮状态（不可用时禁用）
     const visitButtonHTML = isUnavailable ? `
       <button class="action-btn visit-btn disabled" disabled title="该搜索源当前不可用">
         <span>不可用</span>
@@ -471,7 +456,7 @@ export class SearchManager {
     `;
   }
 
-  // 判断结果是否不可用
+  // 🔧 新增：判断结果是否不可用
   isResultUnavailable(result) {
     if (!result.status) return false;
     
@@ -523,10 +508,10 @@ export class SearchManager {
   async checkSingleSourceStatus(sourceId, resultId) {
     try {
       showLoading(true);
-      this.notificationService.showToast(`正在检查 ${sourceId} 状态...`, 'info');
+      showToast(`正在检查 ${sourceId} 状态...`, 'info');
 
-      // 调用源检查服务
-      const statusResult = await this.sourceCheckerService.checkSourceStatus(sourceId);
+      // 调用搜索服务检查状态
+      const statusResult = await searchService.checkSingleSourceStatus(sourceId);
 
       if (statusResult) {
         // 更新结果中的状态
@@ -536,7 +521,7 @@ export class SearchManager {
             ...this.currentResults[resultIndex],
             status: statusResult.status,
             statusText: statusResult.statusText,
-            unavailableReason: statusResult.unavailableReason,
+            unavailableReason: statusResult.unavailableReason, // 🔧 新增不可用原因
             lastChecked: statusResult.lastChecked,
             responseTime: statusResult.responseTime,
             availabilityScore: statusResult.availabilityScore,
@@ -556,20 +541,18 @@ export class SearchManager {
         const contentInfo = statusResult.contentMatch ? '，内容匹配' : '';
         let reasonInfo = '';
         
-        // 显示不可用原因
+        // 🔧 显示不可用原因
         if (statusResult.unavailableReason && statusResult.status !== APP_CONSTANTS.SOURCE_STATUS.AVAILABLE) {
           reasonInfo = `，原因：${statusResult.unavailableReason}`;
         }
         
-        this.notificationService.showToast(
-          `${sourceId} ${statusEmoji} ${statusResult.statusText}${contentInfo}${reasonInfo}`, 
+        showToast(`${sourceId} ${statusEmoji} ${statusResult.statusText}${contentInfo}${reasonInfo}`, 
           statusResult.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ? 'success' : 'warning',
-          5000
-        );
+          5000); // 延长显示时间以便用户看到详细信息
       }
     } catch (error) {
       console.error('检查搜索源状态失败:', error);
-      this.notificationService.showToast('状态检查失败: ' + error.message, 'error');
+      showToast('状态检查失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
@@ -578,15 +561,15 @@ export class SearchManager {
   // 刷新所有搜索源状态
   async refreshAllSourcesStatus() {
     if (!this.currentResults || this.currentResults.length === 0) {
-      this.notificationService.showToast('没有搜索结果需要刷新状态', 'warning');
+      showToast('没有搜索结果需要刷新状态', 'warning');
       return;
     }
 
     try {
       showLoading(true);
-      this.notificationService.showToast('正在刷新所有搜索源状态...', 'info');
+      showToast('正在刷新所有搜索源状态...', 'info');
 
-      const statusSummary = await this.sourceCheckerService.checkAllSourcesStatus();
+      const statusSummary = await searchService.checkAllSourcesStatus();
       
       // 更新所有结果的状态
       this.currentResults.forEach(result => {
@@ -594,7 +577,7 @@ export class SearchManager {
         if (sourceStatus) {
           result.status = sourceStatus.status;
           result.statusText = sourceStatus.statusText;
-          result.unavailableReason = sourceStatus.unavailableReason;
+          result.unavailableReason = sourceStatus.unavailableReason; // 🔧 新增不可用原因
           result.lastChecked = sourceStatus.lastChecked;
           result.responseTime = sourceStatus.responseTime;
           result.availabilityScore = sourceStatus.availabilityScore;
@@ -613,23 +596,20 @@ export class SearchManager {
       const contentInfo = contentMatches > 0 ? `，${contentMatches} 个内容匹配` : '';
       const unavailableInfo = unavailableCount > 0 ? `，${unavailableCount} 个不可用` : '';
       
-      this.notificationService.showToast(
-        `状态刷新完成: ${statusSummary.available}/${statusSummary.total} 可用${contentInfo}${unavailableInfo}`, 
-        'success'
-      );
+      showToast(`状态刷新完成: ${statusSummary.available}/${statusSummary.total} 可用${contentInfo}${unavailableInfo}`, 'success');
     } catch (error) {
       console.error('刷新搜索源状态失败:', error);
-      this.notificationService.showToast('刷新状态失败: ' + error.message, 'error');
+      showToast('刷新状态失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
   }
 
-  // 查看搜索源状态详情（增强版，显示不可用原因）
+  // 🔧 查看搜索源状态详情（增强版，显示不可用原因）
   async viewSourceStatusDetails(resultId) {
     const result = this.currentResults.find(r => r.id === resultId);
     if (!result || !result.status) {
-      this.notificationService.showToast('无状态详情可查看', 'warning');
+      showToast('无状态详情可查看', 'warning');
       return;
     }
 
@@ -640,7 +620,7 @@ export class SearchManager {
       `最后检查: ${result.lastChecked ? new Date(result.lastChecked).toLocaleString() : '未知'}`,
     ];
 
-    // 显示不可用原因
+    // 🔧 显示不可用原因
     if (result.unavailableReason && this.isResultUnavailable(result)) {
       details.push(`不可用原因: ${result.unavailableReason}`);
     }
@@ -671,38 +651,41 @@ export class SearchManager {
 
   // 切换状态检查功能
   async toggleStatusCheck() {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('请先登录以使用状态检查功能', 'error');
+    if (!authManager.isAuthenticated()) {
+      showToast('请先登录以使用状态检查功能', 'error');
       return;
     }
 
     try {
-      const userSettings = await this.userSettingsService.getSettings();
+      const userSettings = await apiService.getUserSettings();
       const newStatus = !userSettings.checkSourceStatus;
       
-      await this.userSettingsService.updateSettings({
+      await apiService.updateUserSettings({
         ...userSettings,
         checkSourceStatus: newStatus
       });
       
-      this.notificationService.showToast(`搜索源状态检查已${newStatus ? '启用' : '禁用'}`, 'success');
+      showToast(`搜索源状态检查已${newStatus ? '启用' : '禁用'}`, 'success');
+      
+      // 清除搜索服务的用户设置缓存，强制重新获取
+      searchService.clearUserSettingsCache();
       
     } catch (error) {
       console.error('切换状态检查失败:', error);
-      this.notificationService.showToast('设置更新失败: ' + error.message, 'error');
+      showToast('设置更新失败: ' + error.message, 'error');
     }
   }
 
   // 查看状态检查历史
   async viewStatusHistory() {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('请先登录以查看状态历史', 'error');
+    if (!authManager.isAuthenticated()) {
+      showToast('请先登录以查看状态历史', 'error');
       return;
     }
 
     try {
       showLoading(true);
-      const historyData = await this.sourceCheckerService.getStatusHistory({ limit: 20 });
+      const historyData = await apiService.getSourceStatusHistory({ limit: 20 });
       
       if (historyData.success && historyData.history.length > 0) {
         // 简单显示历史（实际项目中可以用更好的UI）
@@ -712,11 +695,11 @@ export class SearchManager {
         
         alert(`状态检查历史:\n\n${historyText}`);
       } else {
-        this.notificationService.showToast('暂无状态检查历史', 'info');
+        showToast('暂无状态检查历史', 'info');
       }
     } catch (error) {
       console.error('获取状态历史失败:', error);
-      this.notificationService.showToast('获取历史失败: ' + error.message, 'error');
+      showToast('获取历史失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
@@ -726,14 +709,14 @@ export class SearchManager {
   openResult(url, source) {
     try {
       window.open(url, '_blank', 'noopener,noreferrer');
-      this.notificationService.showToast('已在新标签页打开', 'success');
+      showToast('已在新标签页打开', 'success');
       
-      if (this.authService.isAuthenticated()) {
-        this.userHistoryService.recordAction('visit_site', { url, source }).catch(console.error);
+      if (authManager.isAuthenticated()) {
+        apiService.recordAction('visit_site', { url, source }).catch(console.error);
       }
     } catch (error) {
       console.error('打开链接失败:', error);
-      this.notificationService.showToast('无法打开链接', 'error');
+      showToast('无法打开链接', 'error');
     }
   }
 
@@ -741,10 +724,10 @@ export class SearchManager {
   async copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
-      this.notificationService.showToast('已复制到剪贴板', 'success');
+      showToast('已复制到剪贴板', 'success');
       
-      if (this.authService.isAuthenticated()) {
-        this.userHistoryService.recordAction('copy_url', { url: text }).catch(console.error);
+      if (authManager.isAuthenticated()) {
+        apiService.recordAction('copy_url', { url: text }).catch(console.error);
       }
     } catch (error) {
       const textArea = document.createElement('textarea');
@@ -753,9 +736,9 @@ export class SearchManager {
       textArea.select();
       try {
         document.execCommand('copy');
-        this.notificationService.showToast('已复制到剪贴板', 'success');
+        showToast('已复制到剪贴板', 'success');
       } catch (err) {
-        this.notificationService.showToast('复制失败', 'error');
+        showToast('复制失败', 'error');
       }
       document.body.removeChild(textArea);
     }
@@ -763,8 +746,8 @@ export class SearchManager {
 
   // 切换收藏状态
   async toggleFavorite(resultId) {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('请先登录后再收藏', 'error');
+    if (!authManager.isAuthenticated()) {
+      showToast('请先登录后再收藏', 'error');
       return;
     }
 
@@ -803,14 +786,14 @@ export class SearchManager {
 
   // 加载搜索历史
   async loadSearchHistory() {
-    if (!this.authService.isAuthenticated()) {
+    if (!authManager.isAuthenticated()) {
       this.searchHistory = [];
       this.renderHistory();
       return;
     }
 
     try {
-      this.searchHistory = await this.userHistoryService.getHistory();
+      this.searchHistory = await searchHistoryManager.getHistory();
       this.renderHistory();
     } catch (error) {
       console.error('加载搜索历史失败:', error);
@@ -821,12 +804,21 @@ export class SearchManager {
 
   // 添加到历史记录
   async addToHistory(keyword) {
-    if (!this.authService.isAuthenticated()) return;
+    const settings = await apiService.getUserSettings();
+    const maxHistory = settings.maxHistoryPerUser || 100;
+    
+    // 如果超出限制，删除最旧的记录
+    if (this.searchHistory.length >= maxHistory) {
+        const oldestId = this.searchHistory[this.searchHistory.length - 1].id;
+        await apiService.deleteSearchHistory(oldestId);
+        this.searchHistory.pop();
+    }
+      
+    if (!authManager.isAuthenticated()) return;
 
     try {
-      await this.userHistoryService.addToHistory(keyword, 'manual');
+      await searchHistoryManager.addToHistory(keyword, 'manual');
       
-      // 更新本地历史
       this.searchHistory = this.searchHistory.filter(item => 
         item.keyword !== keyword
       );
@@ -849,14 +841,14 @@ export class SearchManager {
       
     } catch (error) {
       console.error('保存搜索历史失败:', error);
-      this.notificationService.showToast('保存搜索历史失败', 'warning');
+      showToast('保存搜索历史失败', 'warning');
     }
   }
 
   // 删除单条历史记录
   async deleteHistoryItem(historyId) {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('用户未登录', 'error');
+    if (!authManager.isAuthenticated()) {
+      showToast('用户未登录', 'error');
       return;
     }
 
@@ -865,8 +857,8 @@ export class SearchManager {
     try {
       showLoading(true);
       
-      // 调用服务删除
-      await this.userHistoryService.deleteHistoryItem(historyId);
+      // 调用API删除
+      await apiService.deleteSearchHistory(historyId);
       
       // 从本地数组中移除
       this.searchHistory = this.searchHistory.filter(item => item.id !== historyId);
@@ -874,10 +866,10 @@ export class SearchManager {
       // 重新渲染历史列表
       this.renderHistory();
       
-      this.notificationService.showToast('搜索记录已删除', 'success');
+      showToast('搜索记录已删除', 'success');
     } catch (error) {
       console.error('删除搜索历史失败:', error);
-      this.notificationService.showToast('删除失败: ' + error.message, 'error');
+      showToast('删除失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
@@ -935,8 +927,8 @@ export class SearchManager {
 
   // 清空搜索历史
   async clearAllHistory() {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('用户未登录', 'error');
+    if (!authManager.isAuthenticated()) {
+      showToast('用户未登录', 'error');
       return;
     }
 
@@ -945,14 +937,14 @@ export class SearchManager {
     try {
       showLoading(true);
       
-      await this.userHistoryService.clearAllHistory();
+      await searchHistoryManager.clearAllHistory();
       this.searchHistory = [];
       this.renderHistory();
       
-      this.notificationService.showToast('搜索历史已清空', 'success');
+      showToast('搜索历史已清空', 'success');
     } catch (error) {
       console.error('清空搜索历史失败:', error);
-      this.notificationService.showToast('清空失败: ' + error.message, 'error');
+      showToast('清空失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
@@ -971,13 +963,13 @@ export class SearchManager {
     if (clearResultsBtn) clearResultsBtn.style.display = 'none';
 
     this.currentResults = [];
-    this.notificationService.showToast('搜索结果已清除', 'success');
+    showToast('搜索结果已清除', 'success');
   }
 
   // 导出搜索结果
   async exportResults() {
     if (this.currentResults.length === 0) {
-      this.notificationService.showToast('没有搜索结果可以导出', 'error');
+      showToast('没有搜索结果可以导出', 'error');
       return;
     }
 
@@ -1003,10 +995,10 @@ export class SearchManager {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      this.notificationService.showToast('搜索结果导出成功', 'success');
+      showToast('搜索结果导出成功', 'success');
     } catch (error) {
       console.error('导出搜索结果失败:', error);
-      this.notificationService.showToast('导出失败: ' + error.message, 'error');
+      showToast('导出失败: ' + error.message, 'error');
     }
   }
 
@@ -1023,7 +1015,7 @@ export class SearchManager {
   showSearchSuggestions(query) {
     if (!query || typeof query !== 'string') return;
     
-    const suggestions = this.searchService.getSearchSuggestions(query, this.searchHistory);
+    const suggestions = searchService.getSearchSuggestions(query, this.searchHistory);
     this.renderSearchSuggestions(suggestions);
   }
 
