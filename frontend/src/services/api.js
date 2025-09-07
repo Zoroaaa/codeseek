@@ -26,7 +26,7 @@ class APIService {
       return window.API_CONFIG?.DEV_URL || 'http://localhost:8787';
     }
     
-    return window.API_CONFIG?.PROD_URL || 'https://codeseek-backend.tvhub.pp.ua';
+    return window.API_CONFIG?.PROD_URL || 'https://backend.codeseek.pp.ua';
   }
 
   setToken(token) {

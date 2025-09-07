@@ -102,7 +102,7 @@ class ConfigManager {
   // 获取默认生产环境URL
   getDefaultProdURL() {
     if (window.location.protocol === 'https:') {
-      return 'https://codeseek-backend.tvhub.pp.ua';
+      return 'https://backend.codeseek.pp.ua';
     } else {
       return '/api';
     }
