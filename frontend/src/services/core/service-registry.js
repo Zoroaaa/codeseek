@@ -1,7 +1,7 @@
 // src/services/core/service-registry.js
 // 服务注册和依赖管理
 
-class ServiceRegistry {
+export class ServiceRegistry {
   constructor() {
     this.services = new Map();
     this.dependencies = new Map();
@@ -243,5 +243,5 @@ export const registerService = (name, serviceClass, dependencies) => {
 export const getService = (name) => {
   return serviceRegistry.get(name);
 };
-export { ServiceRegistry };
+
 export default serviceRegistry;

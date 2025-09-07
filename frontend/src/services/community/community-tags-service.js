@@ -749,5 +749,5 @@ export class CommunityTagsService {
     this.clearAllCache();
   }
 }
-export { CommunityTagsService };
+
 export default CommunityTagsService;

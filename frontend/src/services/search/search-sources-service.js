@@ -683,5 +683,5 @@ export class SearchSourcesService {
     this.clearSourcesCache();
   }
 }
-export { SearchSourcesService };
+
 export default SearchSourcesService;

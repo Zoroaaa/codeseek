@@ -486,5 +486,5 @@ export class UserService {
     this.clearUserCache();
   }
 }
-export { UserService };
+
 export default UserService;

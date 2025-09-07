@@ -721,5 +721,5 @@ export class NotificationService {
     this.notificationQueue = [];
   }
 }
-export { NotificationService };
+
 export default NotificationService;

@@ -1,7 +1,7 @@
 // src/services/core/error-handler.js
 // 全局错误处理服务
 
-class ErrorHandler {
+export class ErrorHandler {
   constructor() {
     this.errorLog = [];
     this.retryQueue = new Map();
@@ -351,8 +351,8 @@ class ErrorHandler {
   }
 }
 
-// 导出类和实例
-export { ErrorHandler };
+// 导出实例
+
 export const errorHandler = new ErrorHandler();
 
 // 初始化错误恢复机制

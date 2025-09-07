@@ -174,5 +174,4 @@ export class APIClient {
 
 // 创建单例实例
 export const apiClient = new APIClient();
-export { APIClient };
 export default apiClient;

@@ -493,5 +493,5 @@ export class UserSettingsService {
     this.clearSettingsCache();
   }
 }
-export { UserService };
+
 export default UserService;

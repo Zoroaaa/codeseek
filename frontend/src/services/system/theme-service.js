@@ -413,5 +413,5 @@ export class ThemeService {
     this.initialize();
   }
 }
-export { ThemeService };
+
 export default ThemeService;

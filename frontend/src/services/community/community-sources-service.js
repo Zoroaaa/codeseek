@@ -813,5 +813,5 @@ export class CommunitySourcesService {
     this.clearAllCache();
   }
 }
-export { CommunitySourcesService };
+
 export default CommunitySourcesService;
