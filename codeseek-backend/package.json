@@ -1,0 +1,31 @@
+{
+  "name": "codeseek-backend",
+  "version": "2.1.0",
+  "description": "Cloudflare Workers backend for codeseek application",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "d1:migrate": "wrangler d1 migrations apply magnet-search-db",
+    "d1:migrate:staging": "wrangler d1 migrations apply magnet-search-db --env staging",
+    "d1:migrate:production": "wrangler d1 migrations apply magnet-search-db --env production"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "api",
+    "backend",
+    "magnet",
+    "search"
+  ],
+  "author": "zoro",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {}
+}

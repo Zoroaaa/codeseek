@@ -1,4 +1,4 @@
-frontend-tree/
+codeseek/frontend/
 ├── 📄 index.html                              # 主页面
 ├── 📄 dashboard.html                          # 仪表板页面
 │
@@ -19,7 +19,9 @@ frontend-tree/
 │   │   ├── 📄 api.js                         # API服务模块
 │   │   ├── 📄 auth.js                        # 认证服务模块
 │   │   ├── 📄 theme.js                       # 主题管理服务
-│   │   └── 📄 search.js                      # 搜索服务模块
+│   │   ├── 📄 search.js                      # 搜索服务模块
+│   │   ├── 📄 community-sources-api.js       # 搜索源社区-搜索源服务模块
+│   │   ├── 📄 community-tags-api.js          # 搜索源社区-标签服务模块
 │   │   └── 📄 enhanced-source-checker.js     # 搜索源可用性检查服务
 │   │
 │   ├── 📁 components/                        # 🧩 组件层
@@ -37,7 +39,9 @@ frontend-tree/
 │           ├── 📄 history-manager.js         # 🕒 历史页面管理器
 │           ├── 📄 sources-manager.js         # 🔍 搜索源管理器
 │           ├── 📄 categories-manager.js      # 📂 分类管理器
-│           └── 📄 community-manager.js       # 📈 搜索源社区管理器
+│           ├── 📄 community-manager.js       # 📈 搜索源社区管理器
+│           ├── 📄 community-sources-manager.js # 📈 搜索源社区-搜索源管理器
+│           ├── 📄 community-tags-manager.js  # 📈 搜索源社区-标签管理器
 │           ├── 📄 settings-manager.js        # ⚙️ 设置管理器
 │           └── 📄 stats-manager.js           # 📈 统计管理器
 │
@@ -78,9 +82,21 @@ frontend-tree/
 前端部署在cloudflare pages
 	
 	
-backend-tree/
+
+codeseek/codeseek-backend/
+├── src/
+│   ├── index.js          # 入口文件
+│   ├── router.js         # 路由器 + 所有路由处理
+│   ├── middleware.js     # 认证等中间件
+│   ├── utils.js          # 工具函数集合
+│   ├── services.js       # 业务服务（状态检查、数据库操作等）
+│   └── constants.js      # 常量配置
+├── wrangler.toml         # Cloudflare Workers 配置
+├── package.json          # 项目配置
+├── .github/workflows/
+│   └── deploy.yml        # 自动部署配置
 ├── 📄 schema.sql                             # 数据库结构
-├── 📄 worker.js                              # 后端主逻辑
+└── README.md
 
 后端部署在cloudflare workers
 数据库部署在cloudflare D1
