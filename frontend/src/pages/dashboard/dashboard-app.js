@@ -24,20 +24,61 @@ export class DashboardApp {
     this.servicesReady = false;
     this.initializationPromise = null; // 🔧 添加初始化Promise追踪
     
-    // 初始化页面管理器
-    this.managers = {
-      overview: new OverviewManager(this),
-      favorites: new FavoritesManager(this),
-      history: new HistoryManager(this),
-      sources: new SourcesManager(this),
-      categories: new CategoriesManager(this),
-      community: new CommunityManager(this),
-      settings: new SettingsManager(this),
-      stats: new StatsManager(this)
-    };
+    // 🔧 安全地初始化页面管理器
+    this.managers = {};
+    this.initializeManagers();
     
     // 🔧 自动启动初始化，但不阻塞构造函数
     this.initializationPromise = this.init();
+  }
+
+  // 🔧 新增：安全地初始化管理器
+  initializeManagers() {
+    const managerConfigs = [
+      { name: 'overview', class: OverviewManager },
+      { name: 'favorites', class: FavoritesManager },
+      { name: 'history', class: HistoryManager },
+      { name: 'sources', class: SourcesManager },
+      { name: 'categories', class: CategoriesManager },
+      { name: 'community', class: CommunityManager },
+      { name: 'settings', class: SettingsManager },
+      { name: 'stats', class: StatsManager }
+    ];
+
+    for (const config of managerConfigs) {
+      try {
+        if (config.class && typeof config.class === 'function') {
+          this.managers[config.name] = new config.class(this);
+          console.log(`✅ ${config.name} 管理器创建成功`);
+        } else {
+          console.warn(`⚠️ ${config.name} 管理器类不存在，创建占位符`);
+          this.managers[config.name] = this.createPlaceholderManager(config.name);
+        }
+      } catch (error) {
+        console.error(`❌ 创建 ${config.name} 管理器失败:`, error);
+        this.managers[config.name] = this.createPlaceholderManager(config.name);
+      }
+    }
+  }
+
+  // 🔧 新增：创建占位符管理器
+  createPlaceholderManager(name) {
+    return {
+      name: name,
+      isPlaceholder: true,
+      init: async () => {
+        console.log(`占位符管理器 ${name} 初始化（无操作）`);
+        return true;
+      },
+      loadData: async () => {
+        console.log(`占位符管理器 ${name} 加载数据（无操作）`);
+        return true;
+      },
+      loadTabData: async () => {
+        console.log(`占位符管理器 ${name} 加载标签数据（无操作）`);
+        return true;
+      }
+    };
   }
 
   async init() {
