@@ -165,7 +165,7 @@ export class SearchManager {
       // 隐藏提示区域
       this.hideQuickTips();
 
-      // 显示搜索状态检查进度（如果可用）
+      // 显示搜索状态检查进度（如果启用）
       await this.showSearchStatusIfEnabled(keyword);
 
       // 获取搜索选项
@@ -238,15 +238,6 @@ export class SearchManager {
 
     if (resultsSection) resultsSection.style.display = 'block';
     
-    // 添加数据类型检查
-    if (!Array.isArray(results)) {
-      console.warn('搜索结果不是数组:', results);
-      if (resultsContainer) {
-        resultsContainer.innerHTML = '<div class="empty-state"><p>搜索结果格式异常</p></div>';
-      }
-      return;
-    }
-    
     // 计算状态统计（包括不可用结果统计）
     const statusStats = this.calculateStatusStats(results);
     
@@ -282,17 +273,12 @@ export class SearchManager {
     if (exportResultsBtn) exportResultsBtn.style.display = 'inline-block';
 
     if (resultsContainer) {
-      try {
-        // 使用grid布局而不是简单的join，以支持不可用结果的特殊样式
-        resultsContainer.className = 'results-grid';
-        resultsContainer.innerHTML = results.map(result => this.createResultHTML(result)).join('');
-        
-        // 绑定事件委托
-        this.bindResultsEvents(resultsContainer);
-      } catch (error) {
-        console.error('渲染搜索结果失败:', error);
-        resultsContainer.innerHTML = '<div class="empty-state"><p>渲染结果失败</p></div>';
-      }
+      // 使用grid布局而不是简单的join，以支持不可用结果的特殊样式
+      resultsContainer.className = 'results-grid';
+      resultsContainer.innerHTML = results.map(result => this.createResultHTML(result)).join('');
+      
+      // 绑定事件委托
+      this.bindResultsEvents(resultsContainer);
     }
 
     this.currentResults = results;
@@ -322,13 +308,8 @@ export class SearchManager {
       fromCache: 0
     };
 
-    // 添加数据类型检查
-    if (!Array.isArray(results)) {
-      return stats;
-    }
-
     results.forEach(result => {
-      if (result && result.status) {
+      if (result.status) {
         stats.hasStatus = true;
         switch (result.status) {
           case APP_CONSTANTS.SOURCE_STATUS.AVAILABLE:
@@ -393,12 +374,6 @@ export class SearchManager {
 
   // 创建搜索结果HTML - 支持不可用结果的特殊显示
   createResultHTML(result) {
-    // 添加数据验证
-    if (!result || typeof result !== 'object') {
-      console.warn('搜索结果项数据无效:', result);
-      return '';
-    }
-
     const isFavorited = favoritesManager.isFavorited(result.url);
     const isUnavailable = this.isResultUnavailable(result);
     
@@ -450,43 +425,43 @@ export class SearchManager {
         <span>不可用</span>
       </button>
     ` : `
-      <button class="action-btn visit-btn" data-action="visit" data-url="${escapeHtml(result.url || '')}" data-source="${escapeHtml(result.source || '')}">
+      <button class="action-btn visit-btn" data-action="visit" data-url="${escapeHtml(result.url)}" data-source="${result.source}">
         <span>访问</span>
       </button>
     `;
     
     return `
-      <div class="result-item ${isUnavailable ? 'result-unavailable' : ''}" data-id="${result.id || ''}">
+      <div class="result-item ${isUnavailable ? 'result-unavailable' : ''}" data-id="${result.id}">
         <div class="result-image">
-          <span style="font-size: 2rem;">${result.icon || '🔗'}</span>
+          <span style="font-size: 2rem;">${result.icon}</span>
         </div>
         <div class="result-content">
-          <div class="result-title">${escapeHtml(result.title || '未知标题')}</div>
-          <div class="result-subtitle">${escapeHtml(result.subtitle || '')}</div>
-          <div class="result-url" title="${escapeHtml(result.url || '')}">
-            ${truncateUrl(result.url || '')}
+          <div class="result-title">${escapeHtml(result.title)}</div>
+          <div class="result-subtitle">${escapeHtml(result.subtitle)}</div>
+          <div class="result-url" title="${escapeHtml(result.url)}">
+            ${truncateUrl(result.url)}
           </div>
           <div class="result-meta">
-            <span class="result-source">${escapeHtml(result.source || '')}</span>
-            <span class="result-time">${formatRelativeTime(result.timestamp || Date.now())}</span>
+            <span class="result-source">${result.source}</span>
+            <span class="result-time">${formatRelativeTime(result.timestamp)}</span>
             ${statusIndicator}
           </div>
         </div>
         <div class="result-actions">
           ${visitButtonHTML}
           <button class="action-btn favorite-btn ${isFavorited ? 'favorited' : ''}" 
-                  data-action="favorite" data-result-id="${result.id || ''}">
+                  data-action="favorite" data-result-id="${result.id}">
             <span>${isFavorited ? '已收藏' : '收藏'}</span>
           </button>
-          <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(result.url || '')}">
+          <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(result.url)}">
             <span>复制</span>
           </button>
           ${result.status ? `
-            <button class="action-btn status-btn" data-action="checkStatus" data-source="${escapeHtml(result.source || '')}" data-result-id="${result.id || ''}" title="重新检查状态">
+            <button class="action-btn status-btn" data-action="checkStatus" data-source="${result.source}" data-result-id="${result.id}" title="重新检查状态">
               <span>🔄</span>
             </button>
             ${result.status !== APP_CONSTANTS.SOURCE_STATUS.UNKNOWN ? `
-              <button class="action-btn details-btn" data-action="viewDetails" data-result-id="${result.id || ''}" title="查看详细状态">
+              <button class="action-btn details-btn" data-action="viewDetails" data-result-id="${result.id}" title="查看详细状态">
                 <span>ℹ️</span>
               </button>
             ` : ''}
@@ -498,7 +473,7 @@ export class SearchManager {
 
   // 判断结果是否不可用
   isResultUnavailable(result) {
-    if (!result || !result.status) return false;
+    if (!result.status) return false;
     
     return result.status === APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE ||
            result.status === APP_CONSTANTS.SOURCE_STATUS.TIMEOUT ||
@@ -748,43 +723,53 @@ export class SearchManager {
   }
 
   // 打开搜索结果
-  openResult(url, source) {
-    try {
-      window.open(url, '_blank', 'noopener,noreferrer');
-      this.notificationService.showToast('已在新标签页打开', 'success');
-      
-      if (this.authService.isAuthenticated()) {
+openResult(url, source) {
+  try {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    this.notificationService?.showToast('已在新标签页打开', 'success');
+    
+    if (this.authService?.isAuthenticated()) {
+      // 🔧 添加安全检查：确保服务和方法存在
+      if (this.userHistoryService && typeof this.userHistoryService.recordAction === 'function') {
         this.userHistoryService.recordAction('visit_site', { url, source }).catch(console.error);
+      } else {
+        console.log('recordAction 方法不可用，跳过记录');
       }
-    } catch (error) {
-      console.error('打开链接失败:', error);
-      this.notificationService.showToast('无法打开链接', 'error');
     }
+  } catch (error) {
+    console.error('打开链接失败:', error);
+    this.notificationService?.showToast('无法打开链接', 'error');
   }
+}
 
   // 复制到剪贴板
-  async copyToClipboard(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      this.notificationService.showToast('已复制到剪贴板', 'success');
-      
-      if (this.authService.isAuthenticated()) {
+async copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    this.notificationService?.showToast('已复制到剪贴板', 'success');
+    
+    if (this.authService?.isAuthenticated()) {
+      // 🔧 添加安全检查
+      if (this.userHistoryService && typeof this.userHistoryService.recordAction === 'function') {
         this.userHistoryService.recordAction('copy_url', { url: text }).catch(console.error);
+      } else {
+        console.log('recordAction 方法不可用，跳过记录');
       }
-    } catch (error) {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        this.notificationService.showToast('已复制到剪贴板', 'success');
-      } catch (err) {
-        this.notificationService.showToast('复制失败', 'error');
-      }
-      document.body.removeChild(textArea);
     }
+  } catch (error) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      this.notificationService?.showToast('已复制到剪贴板', 'success');
+    } catch (err) {
+      this.notificationService?.showToast('复制失败', 'error');
+    }
+    document.body.removeChild(textArea);
   }
+}
 
   // 切换收藏状态
   async toggleFavorite(resultId) {
@@ -835,20 +820,7 @@ export class SearchManager {
     }
 
     try {
-      const result = await this.userHistoryService.getHistory();
-      
-      // 添加数据类型检查
-      if (Array.isArray(result)) {
-        this.searchHistory = result;
-      } else if (result && Array.isArray(result.history)) {
-        this.searchHistory = result.history;
-      } else if (result && result.success && Array.isArray(result.data)) {
-        this.searchHistory = result.data;
-      } else {
-        console.warn('搜索历史数据格式异常:', result);
-        this.searchHistory = [];
-      }
-      
+      this.searchHistory = await this.userHistoryService.getSearchHistory();
       this.renderHistory();
     } catch (error) {
       console.error('加载搜索历史失败:', error);
@@ -858,15 +830,18 @@ export class SearchManager {
   }
 
   // 添加到历史记录
-  async addToHistory(keyword) {
-    if (!this.authService.isAuthenticated()) return;
+async addToHistory(keyword) {
+  if (!this.authService?.isAuthenticated()) return;
 
-    try {
-      await this.userHistoryService.addToHistory(keyword, 'manual');
-      
+  try {
+    // 🔧 修改：确保调用正确的方法
+    const result = await this.userHistoryService.addToHistory(keyword, 'manual');
+    
+    // 🔧 处理返回结果
+    if (result && result.success) {
       // 更新本地历史
       this.searchHistory = this.searchHistory.filter(item => 
-        item.keyword !== keyword
+        (item.keyword || item.query) !== keyword
       );
       
       this.searchHistory.unshift({
@@ -878,56 +853,60 @@ export class SearchManager {
         source: 'manual'
       });
 
-      const maxHistory = APP_CONSTANTS.LIMITS.MAX_HISTORY;
+      const maxHistory = APP_CONSTANTS.LIMITS?.MAX_HISTORY || 50;
       if (this.searchHistory.length > maxHistory) {
         this.searchHistory = this.searchHistory.slice(0, maxHistory);
       }
 
       this.renderHistory();
-      
-    } catch (error) {
-      console.error('保存搜索历史失败:', error);
-      this.notificationService.showToast('保存搜索历史失败', 'warning');
     }
+    
+  } catch (error) {
+    console.error('保存搜索历史失败:', error);
+    this.notificationService?.showToast('保存搜索历史失败', 'warning');
   }
+}
 
   // 删除单条历史记录
-  async deleteHistoryItem(historyId) {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('用户未登录', 'error');
-      return;
-    }
+async deleteHistoryItem(historyId) {
+  if (!this.authService?.isAuthenticated()) {
+    this.notificationService?.showToast('用户未登录', 'error');
+    return;
+  }
 
-    if (!confirm('确定要删除这条搜索记录吗？')) return;
+  if (!confirm('确定要删除这条搜索记录吗？')) return;
 
-    try {
-      showLoading(true);
-      
-      // 调用服务删除
-      await this.userHistoryService.deleteHistoryItem(historyId);
-      
+  try {
+    showLoading(true);
+    
+    // 🔧 修改：确保调用正确的方法
+    const result = await this.userHistoryService.deleteHistoryItem(historyId);
+    
+    if (result && result.success) {
       // 从本地数组中移除
       this.searchHistory = this.searchHistory.filter(item => item.id !== historyId);
       
       // 重新渲染历史列表
       this.renderHistory();
       
-      this.notificationService.showToast('搜索记录已删除', 'success');
-    } catch (error) {
-      console.error('删除搜索历史失败:', error);
-      this.notificationService.showToast('删除失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
+      this.notificationService?.showToast('搜索记录已删除', 'success');
+    } else {
+      throw new Error(result?.error || '删除失败');
     }
+  } catch (error) {
+    console.error('删除搜索历史失败:', error);
+    this.notificationService?.showToast('删除失败: ' + error.message, 'error');
+  } finally {
+    showLoading(false);
   }
+}
 
   // 渲染搜索历史
   renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyList = document.getElementById('historyList');
 
-    // 添加数据类型检查
-    if (!Array.isArray(this.searchHistory) || this.searchHistory.length === 0) {
+    if (this.searchHistory.length === 0) {
       if (historySection) historySection.style.display = 'none';
       return;
     }
@@ -935,41 +914,31 @@ export class SearchManager {
     if (historySection) historySection.style.display = 'block';
     
     if (historyList) {
-      try {
-        historyList.innerHTML = this.searchHistory.slice(0, 10).map(item => {
-          if (!item || typeof item !== 'object') return '';
-          
-          const keyword = escapeHtml(item.keyword || item.query || '');
-          const id = item.id || '';
-          
-          return `<div class="history-item-container">
-            <span class="history-item" data-keyword="${keyword}">
-              ${keyword}
-            </span>
-            <button class="history-delete-btn" data-history-id="${id}" title="删除这条记录">
-              ×
-            </button>
-          </div>`;
-        }).join('');
+      historyList.innerHTML = this.searchHistory.slice(0, 10).map(item => 
+        `<div class="history-item-container">
+          <span class="history-item" data-keyword="${escapeHtml(item.keyword)}">
+            ${escapeHtml(item.keyword)}
+          </span>
+          <button class="history-delete-btn" data-history-id="${item.id}" title="删除这条记录">
+            ×
+          </button>
+        </div>`
+      ).join('');
 
-        // 绑定历史项点击事件
-        historyList.addEventListener('click', (e) => {
-          const historyItem = e.target.closest('.history-item');
-          const deleteBtn = e.target.closest('.history-delete-btn');
-          
-          if (deleteBtn) {
-            e.stopPropagation();
-            const historyId = deleteBtn.dataset.historyId;
-            this.deleteHistoryItem(historyId);
-          } else if (historyItem) {
-            const keyword = historyItem.dataset.keyword;
-            this.searchFromHistory(keyword);
-          }
-        });
-      } catch (error) {
-        console.error('渲染搜索历史失败:', error);
-        historyList.innerHTML = '<div class="empty-state"><p>渲染历史失败</p></div>';
-      }
+      // 绑定历史项点击事件
+      historyList.addEventListener('click', (e) => {
+        const historyItem = e.target.closest('.history-item');
+        const deleteBtn = e.target.closest('.history-delete-btn');
+        
+        if (deleteBtn) {
+          e.stopPropagation();
+          const historyId = deleteBtn.dataset.historyId;
+          this.deleteHistoryItem(historyId);
+        } else if (historyItem) {
+          const keyword = historyItem.dataset.keyword;
+          this.searchFromHistory(keyword);
+        }
+      });
     }
   }
 
@@ -983,30 +952,35 @@ export class SearchManager {
   }
 
   // 清空搜索历史
-  async clearAllHistory() {
-    if (!this.authService.isAuthenticated()) {
-      this.notificationService.showToast('用户未登录', 'error');
-      return;
-    }
+async clearAllHistory() {
+  if (!this.authService?.isAuthenticated()) {
+    this.notificationService?.showToast('用户未登录', 'error');
+    return;
+  }
 
-    if (!confirm('确定要清空所有搜索历史吗？')) return;
+  if (!confirm('确定要清空所有搜索历史吗？')) return;
+  
+  try {
+    showLoading(true);
     
-    try {
-      showLoading(true);
-      
-      await this.userHistoryService.clearAllHistory();
+    // 🔧 修改：确保调用正确的方法
+    const result = await this.userHistoryService.clearAllHistory();
+    
+    if (result && result.success) {
       this.searchHistory = [];
       this.renderHistory();
       
-      this.notificationService.showToast('搜索历史已清空', 'success');
-    } catch (error) {
-      console.error('清空搜索历史失败:', error);
-      this.notificationService.showToast('清空失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
+      this.notificationService?.showToast('搜索历史已清空', 'success');
+    } else {
+      throw new Error(result?.error || '清空失败');
     }
+  } catch (error) {
+    console.error('清空搜索历史失败:', error);
+    this.notificationService?.showToast('清空失败: ' + error.message, 'error');
+  } finally {
+    showLoading(false);
   }
-
+}
   // 清空搜索结果
   clearResults() {
     const resultsSection = document.getElementById('resultsSection');
@@ -1061,7 +1035,7 @@ export class SearchManager {
 
   // 处理搜索输入
   handleSearchInput(value) {
-    if (value && value.length > 0) {
+    if (value.length > 0) {
       this.showSearchSuggestions(value);
     } else {
       this.hideSearchSuggestions();
@@ -1069,16 +1043,30 @@ export class SearchManager {
   }
 
   // 显示搜索建议
-  showSearchSuggestions(query) {
-    if (!query || typeof query !== 'string') return;
-    
-    try {
-      const suggestions = this.searchService.getSearchSuggestions(query, this.searchHistory);
-      this.renderSearchSuggestions(suggestions);
-    } catch (error) {
-      console.error('获取搜索建议失败:', error);
+showSearchSuggestions(query) {
+  if (!query || typeof query !== 'string') return;
+  
+  try {
+    // 🔧 添加安全检查：确保服务和方法存在
+    let suggestions = [];
+    if (this.searchService && typeof this.searchService.getSearchSuggestions === 'function') {
+      suggestions = this.searchService.getSearchSuggestions(query, this.searchHistory);
+    } else {
+      // 🔧 降级处理：如果服务不可用，使用本地历史搜索
+      suggestions = this.searchHistory
+        .filter(item => {
+          const searchTerm = item.keyword || item.query || '';
+          return searchTerm.toLowerCase().includes(query.toLowerCase());
+        })
+        .slice(0, 5);
     }
+    
+    this.renderSearchSuggestions(suggestions);
+  } catch (error) {
+    console.error('获取搜索建议失败:', error);
+    this.renderSearchSuggestions([]);
   }
+}
 
   // 渲染搜索建议
   renderSearchSuggestions(suggestions) {
@@ -1095,36 +1083,31 @@ export class SearchManager {
       }
     }
     
-    if (!Array.isArray(suggestions) || suggestions.length === 0) {
+    if (suggestions.length === 0) {
       suggestionsContainer.style.display = 'none';
       return;
     }
     
-    try {
-      suggestionsContainer.innerHTML = suggestions.map(item => {
-        const displayText = item.keyword || item.query || '';
-        return `
-          <div class="suggestion-item" data-keyword="${escapeHtml(displayText)}">
-            <span class="suggestion-icon">🕒</span>
-            <span class="suggestion-text">${escapeHtml(displayText)}</span>
-          </div>
-        `;
-      }).join('');
-      
-      // 绑定建议点击事件
-      suggestionsContainer.addEventListener('click', (e) => {
-        const suggestionItem = e.target.closest('.suggestion-item');
-        if (suggestionItem) {
-          const keyword = suggestionItem.dataset.keyword;
-          this.searchFromHistory(keyword);
-        }
-      });
-      
-      suggestionsContainer.style.display = 'block';
-    } catch (error) {
-      console.error('渲染搜索建议失败:', error);
-      suggestionsContainer.style.display = 'none';
-    }
+    suggestionsContainer.innerHTML = suggestions.map(item => {
+      const displayText = item.keyword || item.query;
+      return `
+        <div class="suggestion-item" data-keyword="${escapeHtml(displayText)}">
+          <span class="suggestion-icon">🕒</span>
+          <span class="suggestion-text">${escapeHtml(displayText)}</span>
+        </div>
+      `;
+    }).join('');
+    
+    // 绑定建议点击事件
+    suggestionsContainer.addEventListener('click', (e) => {
+      const suggestionItem = e.target.closest('.suggestion-item');
+      if (suggestionItem) {
+        const keyword = suggestionItem.dataset.keyword;
+        this.searchFromHistory(keyword);
+      }
+    });
+    
+    suggestionsContainer.style.display = 'block';
   }
 
   // 隐藏搜索建议

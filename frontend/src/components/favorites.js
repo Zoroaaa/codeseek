@@ -77,20 +77,7 @@ export class FavoritesManager {
     }
 
     try {
-      const result = await this.userFavoritesService.getFavorites();
-      
-      // 🔧 添加数据类型检查和验证
-      if (Array.isArray(result)) {
-        this.favorites = result;
-      } else if (result && Array.isArray(result.favorites)) {
-        this.favorites = result.favorites;
-      } else if (result && result.success && Array.isArray(result.data)) {
-        this.favorites = result.data;
-      } else {
-        console.warn('收藏数据格式异常:', result);
-        this.favorites = [];
-      }
-      
+      this.favorites = await this.userFavoritesService.getFavorites();
       this.renderFavorites();
     } catch (error) {
       console.error('加载收藏失败:', error);
@@ -100,35 +87,22 @@ export class FavoritesManager {
     }
   }
 
-  // 渲染收藏 (添加事件委托和数据类型检查)
+  // 渲染收藏 (添加事件委托)
   renderFavorites(favoritesToRender = null) {
     const container = document.getElementById('favorites');
     if (!container) return;
 
     const renderList = favoritesToRender || this.favorites;
 
-    // 🔧 添加数据类型检查
-    if (!Array.isArray(renderList)) {
-      console.warn('renderList 不是数组:', renderList);
-      container.innerHTML = this.createEmptyState();
-      return;
-    }
-
     if (renderList.length === 0) {
       container.innerHTML = this.createEmptyState();
       return;
     }
 
-    try {
-      container.innerHTML = renderList.map(fav => this.createFavoriteHTML(fav)).join('');
-      
-      // 绑定事件委托
-      this.bindFavoritesEvents(container);
-    } catch (error) {
-      console.error('渲染收藏失败:', error);
-      container.innerHTML = this.createEmptyState();
-      this.notificationService?.showToast('渲染收藏失败', 'error');
-    }
+    container.innerHTML = renderList.map(fav => this.createFavoriteHTML(fav)).join('');
+    
+    // 绑定事件委托
+    this.bindFavoritesEvents(container);
   }
 
   // 绑定收藏夹事件
@@ -170,40 +144,28 @@ export class FavoritesManager {
 
   // 创建收藏HTML (移除内联事件)
   createFavoriteHTML(favorite) {
-    // 🔧 添加数据验证
-    if (!favorite || typeof favorite !== 'object') {
-      console.warn('收藏项数据无效:', favorite);
-      return '';
-    }
-
-    const safeTitle = escapeHtml(favorite.title || '未知标题');
-    const safeSubtitle = escapeHtml(favorite.subtitle || '');
-    const safeUrl = escapeHtml(favorite.url || '');
-    const safeKeyword = escapeHtml(favorite.keyword || '');
-    const addedAt = favorite.addedAt ? formatRelativeTime(favorite.addedAt) : '未知时间';
-
     return `
-      <div class="favorite-item" data-id="${favorite.id || ''}">
+      <div class="favorite-item" data-id="${favorite.id}">
         <div class="favorite-content">
           <div class="favorite-title">
-            <span class="favorite-icon">${favorite.icon || '🔗'}</span>
-            <span class="favorite-name">${safeTitle}</span>
+            <span class="favorite-icon">${favorite.icon}</span>
+            <span class="favorite-name">${escapeHtml(favorite.title)}</span>
           </div>
-          <div class="favorite-subtitle">${safeSubtitle}</div>
-          <div class="favorite-url">${safeUrl}</div>
+          <div class="favorite-subtitle">${escapeHtml(favorite.subtitle)}</div>
+          <div class="favorite-url">${escapeHtml(favorite.url)}</div>
           <div class="favorite-meta">
-            <span>关键词: ${safeKeyword}</span>
-            <span>添加时间: ${addedAt}</span>
+            <span>关键词: ${escapeHtml(favorite.keyword)}</span>
+            <span>添加时间: ${formatRelativeTime(favorite.addedAt)}</span>
           </div>
         </div>
         <div class="favorite-actions">
-          <button class="action-btn visit-btn" data-action="visit" data-url="${safeUrl}">
+          <button class="action-btn visit-btn" data-action="visit" data-url="${escapeHtml(favorite.url)}">
             访问
           </button>
-          <button class="action-btn copy-btn" data-action="copy" data-url="${safeUrl}">
+          <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(favorite.url)}">
             复制
           </button>
-          <button class="action-btn remove-btn" data-action="remove" data-id="${favorite.id || ''}">
+          <button class="action-btn remove-btn" data-action="remove" data-id="${favorite.id}">
             删除
           </button>
         </div>
@@ -213,7 +175,7 @@ export class FavoritesManager {
 
   // 创建空状态
   createEmptyState() {
-    const isAuthenticated = this.authService?.isAuthenticated() || false;
+    const isAuthenticated = this.authService.isAuthenticated();
     return `
       <div class="empty-state">
         <span style="font-size: 3rem;">📌</span>
@@ -230,23 +192,23 @@ export class FavoritesManager {
       return false;
     }
 
+    // 检查收藏数量限制
+    const settings = await this.userFavoritesService.getSettings();
+    const maxFavorites = settings?.maxFavoritesPerUser || 500;
+    
+    if (this.favorites.length >= maxFavorites) {
+      this.notificationService.showToast(`收藏已达上限（${maxFavorites}个）`, 'error');
+      return false;
+    }
+
+    // 检查是否已收藏
+    const existingIndex = this.favorites.findIndex(fav => fav.url === item.url);
+    if (existingIndex >= 0) {
+      this.notificationService.showToast('已经收藏过了', 'info');
+      return false;
+    }
+
     try {
-      // 检查收藏数量限制
-      const settings = await this.userFavoritesService.getSettings();
-      const maxFavorites = settings?.maxFavoritesPerUser || 500;
-      
-      if (this.favorites.length >= maxFavorites) {
-        this.notificationService.showToast(`收藏已达上限（${maxFavorites}个）`, 'error');
-        return false;
-      }
-
-      // 检查是否已收藏
-      const existingIndex = this.favorites.findIndex(fav => fav.url === item.url);
-      if (existingIndex >= 0) {
-        this.notificationService.showToast('已经收藏过了', 'info');
-        return false;
-      }
-
       showLoading(true);
       
       // 使用服务添加收藏
@@ -374,51 +336,31 @@ export class FavoritesManager {
       return;
     }
 
-    // 🔧 确保在搜索前验证数据类型
-    if (!Array.isArray(this.favorites)) {
-      console.warn('收藏数据不是数组:', this.favorites);
-      this.renderFavorites([]);
-      return;
-    }
-
-    const filteredFavorites = this.favorites.filter(fav => {
-      if (!fav || typeof fav !== 'object') return false;
-      
-      const title = (fav.title || '').toLowerCase();
-      const subtitle = (fav.subtitle || '').toLowerCase();
-      const keyword = (fav.keyword || '').toLowerCase();
-      const searchQuery = query.toLowerCase();
-      
-      return title.includes(searchQuery) || 
-             subtitle.includes(searchQuery) || 
-             keyword.includes(searchQuery);
-    });
+    const filteredFavorites = this.favorites.filter(fav => 
+      fav.title.toLowerCase().includes(query.toLowerCase()) ||
+      fav.subtitle.toLowerCase().includes(query.toLowerCase()) ||
+      fav.keyword.toLowerCase().includes(query.toLowerCase())
+    );
 
     this.renderFavorites(filteredFavorites);
   }
 
   // 排序收藏
   sortFavorites(sortBy) {
-    // 🔧 确保在排序前验证数据类型
-    if (!Array.isArray(this.favorites)) {
-      console.warn('收藏数据不是数组:', this.favorites);
-      return;
-    }
-
     let sortedFavorites = [...this.favorites];
 
     switch (sortBy) {
       case 'date-desc':
-        sortedFavorites.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0));
+        sortedFavorites.sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
         break;
       case 'date-asc':
-        sortedFavorites.sort((a, b) => new Date(a.addedAt || 0) - new Date(b.addedAt || 0));
+        sortedFavorites.sort((a, b) => new Date(a.addedAt) - new Date(b.addedAt));
         break;
       case 'name-asc':
-        sortedFavorites.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+        sortedFavorites.sort((a, b) => a.title.localeCompare(b.title));
         break;
       case 'name-desc':
-        sortedFavorites.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+        sortedFavorites.sort((a, b) => b.title.localeCompare(a.title));
         break;
     }
 
@@ -469,25 +411,11 @@ export class FavoritesManager {
 
   // 检查是否已收藏
   isFavorited(url) {
-    // 🔧 添加数据类型检查
-    if (!Array.isArray(this.favorites)) {
-      return false;
-    }
-    return this.favorites.some(fav => fav && fav.url === url);
+    return this.favorites.some(fav => fav.url === url);
   }
 
   // 获取收藏统计
   getStats() {
-    // 🔧 添加数据类型检查
-    if (!Array.isArray(this.favorites)) {
-      return {
-        total: 0,
-        byKeyword: {},
-        recentCount: 0,
-        topKeywords: []
-      };
-    }
-
     return {
       total: this.favorites.length,
       byKeyword: this.groupByKeyword(),
@@ -499,25 +427,17 @@ export class FavoritesManager {
   // 按关键词分组
   groupByKeyword() {
     const groups = {};
-    if (Array.isArray(this.favorites)) {
-      this.favorites.forEach(fav => {
-        if (fav && typeof fav === 'object') {
-          const keyword = fav.keyword || 'unknown';
-          groups[keyword] = (groups[keyword] || 0) + 1;
-        }
-      });
-    }
+    this.favorites.forEach(fav => {
+      const keyword = fav.keyword || 'unknown';
+      groups[keyword] = (groups[keyword] || 0) + 1;
+    });
     return groups;
   }
 
   // 获取最近添加数量（7天内）
   getRecentCount() {
-    if (!Array.isArray(this.favorites)) return 0;
-    
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    return this.favorites.filter(fav => 
-      fav && fav.addedAt && new Date(fav.addedAt) > weekAgo
-    ).length;
+    return this.favorites.filter(fav => new Date(fav.addedAt) > weekAgo).length;
   }
 
   // 获取热门关键词
