@@ -1,5 +1,6 @@
-// 概览页面管理器 - 已适配新服务架构
+// 概览页面管理器
 import { escapeHtml, formatRelativeTime } from '../../utils/format.js';
+import apiService from '../../services/api.js';
 
 export class OverviewManager {
   constructor(dashboardApp) {
@@ -33,28 +34,19 @@ export class OverviewManager {
 
   async loadOverviewData() {
     try {
-      // 🆕 使用新的用户历史服务获取搜索统计
-      const userHistoryService = this.app.getService('userHistoryService');
-      let searchStats = {
+      const [searchStats] = await Promise.allSettled([
+        apiService.getSearchStats()
+      ]);
+      
+      const stats = searchStats.status === 'fulfilled' ? searchStats.value : {
         total: this.getSearchHistoryCount(),
         today: 0,
         thisWeek: 0,
         topQueries: []
       };
-
-      if (userHistoryService) {
-        try {
-          const serverStats = await userHistoryService.getSearchStats();
-          if (serverStats) {
-            searchStats = { ...searchStats, ...serverStats };
-          }
-        } catch (error) {
-          console.warn('获取服务器搜索统计失败:', error);
-        }
-      }
       
       // 更新UI
-      this.updateStatsUI(searchStats);
+      this.updateStatsUI(stats);
       
     } catch (error) {
       console.error('加载概览数据失败:', error);

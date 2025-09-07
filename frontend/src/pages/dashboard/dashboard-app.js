@@ -1,10 +1,11 @@
-// Dashboard主应用 - 重构版本，使用新的服务架构
+// Dashboard主应用 - 重构版本，负责总体协调
 import { APP_CONSTANTS } from '../../core/constants.js';
+import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { isDevEnv } from '../../utils/helpers.js';
-
-// 🆕 导入服务引导器
-import { initializeApp, getService, getServices } from '../../services/services-bootstrap.js';
+import authManager from '../../services/auth.js';
+import themeManager from '../../services/theme.js';
+import apiService from '../../services/api.js';
 
 // 导入页面管理器
 import OverviewManager from './overview-manager.js';
@@ -14,6 +15,7 @@ import SourcesManager from './sources-manager.js';
 import CategoriesManager from './categories-manager.js';
 import SettingsManager from './settings-manager.js';
 import StatsManager from './stats-manager.js';
+// 新增：导入社区管理器
 import { CommunityManager } from './community-manager.js';
 
 export class DashboardApp {
@@ -21,64 +23,21 @@ export class DashboardApp {
     this.currentUser = null;
     this.currentTab = 'overview';
     this.isInitialized = false;
-    this.servicesReady = false;
-    this.initializationPromise = null; // 🔧 添加初始化Promise追踪
+	
     
-    // 🔧 安全地初始化页面管理器
-    this.managers = {};
-    this.initializeManagers();
-    
-    // 🔧 自动启动初始化，但不阻塞构造函数
-    this.initializationPromise = this.init();
-  }
-
-  // 🔧 新增：安全地初始化管理器
-  initializeManagers() {
-    const managerConfigs = [
-      { name: 'overview', class: OverviewManager },
-      { name: 'favorites', class: FavoritesManager },
-      { name: 'history', class: HistoryManager },
-      { name: 'sources', class: SourcesManager },
-      { name: 'categories', class: CategoriesManager },
-      { name: 'community', class: CommunityManager },
-      { name: 'settings', class: SettingsManager },
-      { name: 'stats', class: StatsManager }
-    ];
-
-    for (const config of managerConfigs) {
-      try {
-        if (config.class && typeof config.class === 'function') {
-          this.managers[config.name] = new config.class(this);
-          console.log(`✅ ${config.name} 管理器创建成功`);
-        } else {
-          console.warn(`⚠️ ${config.name} 管理器类不存在，创建占位符`);
-          this.managers[config.name] = this.createPlaceholderManager(config.name);
-        }
-      } catch (error) {
-        console.error(`❌ 创建 ${config.name} 管理器失败:`, error);
-        this.managers[config.name] = this.createPlaceholderManager(config.name);
-      }
-    }
-  }
-
-  // 🔧 新增：创建占位符管理器
-  createPlaceholderManager(name) {
-    return {
-      name: name,
-      isPlaceholder: true,
-      init: async () => {
-        console.log(`占位符管理器 ${name} 初始化（无操作）`);
-        return true;
-      },
-      loadData: async () => {
-        console.log(`占位符管理器 ${name} 加载数据（无操作）`);
-        return true;
-      },
-      loadTabData: async () => {
-        console.log(`占位符管理器 ${name} 加载标签数据（无操作）`);
-        return true;
-      }
+    // 初始化页面管理器 - 添加社区管理器
+    this.managers = {
+      overview: new OverviewManager(this),
+      favorites: new FavoritesManager(this),
+      history: new HistoryManager(this),
+      sources: new SourcesManager(this),
+      categories: new CategoriesManager(this),
+      community: new CommunityManager(this), // 新增社区管理器
+      settings: new SettingsManager(this),
+      stats: new StatsManager(this)
     };
+    
+    this.init();
   }
 
   async init() {
@@ -92,192 +51,58 @@ export class DashboardApp {
       
       showLoading(true);
       
-      // 🔧 先初始化配置
-      console.log('开始初始化配置...');
-      if (window.configManager) {
-        await window.configManager.init();
-        console.log('配置初始化完成');
-      }
-      
-      // 🆕 初始化服务架构
-      console.log('开始初始化服务架构...');
-      await initializeApp();
-      this.servicesReady = true;
-      console.log('服务架构初始化完成');
-      
-      // 🆕 获取核心服务
-      const { authService, themeService } = getServices('authService', 'themeService');
-      
-      // 🔧 验证关键服务是否可用
-      if (!authService) {
-        throw new Error('认证服务未正确初始化');
-      }
-      
+      await configManager.init();
       await this.checkAuth();
+      
       this.bindEvents();
       await this.loadCloudData();
       
       // 初始化所有页面管理器
-      for (const [name, manager] of Object.entries(this.managers)) {
+      for (const manager of Object.values(this.managers)) {
         if (manager.init) {
-          try {
-            await manager.init();
-            console.log(`✅ ${name} 管理器初始化成功`);
-          } catch (error) {
-            console.error(`❌ ${name} 管理器初始化失败:`, error);
-            // 不抛出错误，允许其他管理器继续初始化
-          }
+          await manager.init();
         }
       }
       
-      // 🆕 初始化主题服务
-      if (themeService) {
-        themeService.init();
-      }
+      themeManager.init();
       
       this.isInitialized = true;
       console.log('Dashboard初始化完成');
       
-      return true;
-      
     } catch (error) {
       console.error('Dashboard初始化失败:', error);
+      showToast('初始化失败，请重新登录', 'error');
       
-      // 🔧 更友好的错误处理
-      let errorMessage = '初始化失败，请重新登录';
-      
-      if (error.message.includes('服务')) {
-        errorMessage = '服务连接失败，请检查网络后重试';
-      } else if (error.message.includes('认证')) {
-        errorMessage = '登录状态已过期，请重新登录';
-      }
-      
-      showToast(errorMessage, 'error');
-      
-      // 🔧 延迟跳转，给用户看到错误信息的时间
       setTimeout(() => {
         window.location.replace('./index.html');
       }, 2000);
-      
-      throw error; // 重新抛出错误以便调用者处理
-      
     } finally {
       showLoading(false);
     }
   }
 
-  // 🔧 新增：等待初始化完成的方法
-  async waitForInitialization() {
-    if (this.initializationPromise) {
-      try {
-        await this.initializationPromise;
-        return true;
-      } catch (error) {
-        console.error('等待初始化完成时发生错误:', error);
-        return false;
-      }
-    }
-    return this.isInitialized;
-  }
-
-  // 🔧 改进：检查认证状态 - 调试token问题
+  // 检查认证状态
   async checkAuth() {
-    console.log('步骤4: 开始认证检查...');
-    
-    // 🔧 详细检查localStorage中的认证信息
-    console.log('检查localStorage中的认证信息...');
-    const authToken = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-    const currentUser = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.CURRENT_USER);
-    
-    console.log('auth_token:', authToken ? `存在 (长度: ${authToken.length})` : '不存在');
-    console.log('current_user:', currentUser ? '存在' : '不存在');
-    
-    // 🔧 也检查其他可能的key
-    console.log('检查其他可能的认证key...');
-    const allKeys = Object.keys(localStorage);
-    const authRelatedKeys = allKeys.filter(key => 
-      key.includes('auth') || key.includes('token') || key.includes('user')
-    );
-    console.log('localStorage中与认证相关的keys:', authRelatedKeys);
-    authRelatedKeys.forEach(key => {
-      console.log(`${key}: ${localStorage.getItem(key)?.substring(0, 50)}...`);
-    });
-
-    if (!authToken) {
-      console.error('认证失败: 未找到认证token');
-      throw new Error('未找到认证token，请重新登录');
+    const token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('未找到认证token');
     }
-    console.log('✅ 找到认证token');
 
     try {
-      console.log('获取认证服务...');
-      const authService = getService('authService');
-      if (!authService) {
-        console.error('认证服务不可用');
-        throw new Error('认证服务不可用，请刷新页面重试');
-      }
-      console.log('✅ 认证服务已获取');
-      
-      console.log('验证token...');
-      const result = await authService.verifyToken();
-      console.log('Token验证结果:', result);
-      
-      if (!result || !result.success) {
-        console.error('Token验证失败:', result);
-        
-        // 🔧 如果有存储的用户信息，尝试使用它
-        if (currentUser) {
-          try {
-            const userData = JSON.parse(currentUser);
-            console.log('尝试使用存储的用户信息:', userData);
-            this.currentUser = userData;
-            this.updateUserUI();
-            console.log('✅ 使用存储的用户信息完成认证');
-            return;
-          } catch (e) {
-            console.error('解析存储的用户信息失败:', e);
-          }
-        }
-        
-        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.CURRENT_USER);
-        throw new Error('Token验证失败，请重新登录');
-      }
-      
-      if (!result.user) {
-        console.error('Token验证成功但未返回用户信息:', result);
-        throw new Error('认证服务返回的用户信息无效');
+      const result = await apiService.verifyToken(token);
+      if (!result.success || !result.user) {
+        throw new Error('Token验证失败');
       }
       
       this.currentUser = result.user;
-      console.log('✅ 认证成功，用户:', this.currentUser.username);
-      
-      // 🔧 保存用户信息到localStorage
-      localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.CURRENT_USER, JSON.stringify(this.currentUser));
-      
       this.updateUserUI();
-      console.log('✅ 用户界面更新完成');
-      
     } catch (error) {
-      console.error('认证过程出错:', error);
-      console.error('错误详情:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-      
-      // 根据错误类型提供不同的错误信息
-      if (error.message.includes('网络') || error.message.includes('fetch')) {
-        throw new Error(`网络连接失败: ${error.message}`);
-      } else if (error.message.includes('服务')) {
-        throw new Error(`服务不可用: ${error.message}`);
-      } else {
-        throw new Error(`认证失败: ${error.message}`);
-      }
+      localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+      throw new Error('认证失败');
     }
   }
 
-  // 🔧 改进：加载云端数据 - 使用新的用户服务
+  // 加载云端数据
   async loadCloudData() {
     if (!this.currentUser) {
       console.log('用户未登录，无法加载数据');
@@ -286,11 +111,10 @@ export class DashboardApp {
 
     try {
       // 让各个管理器自己加载数据
-      const loadPromises = Object.entries(this.managers).map(([name, manager]) => {
+      const loadPromises = Object.values(this.managers).map(manager => {
         if (manager.loadData) {
           return manager.loadData().catch(error => {
-            console.error(`${name} 管理器加载数据失败:`, error);
-            // 不抛出错误，允许其他管理器继续加载
+            console.error(`${manager.constructor.name} 加载数据失败:`, error);
           });
         }
         return Promise.resolve();
@@ -314,15 +138,17 @@ export class DashboardApp {
       });
     });
 
-    // 🆕 退出登录 - 使用新的认证服务
+    // 退出登录
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => this.logout());
     }
 
+    // 模态框事件
     this.bindModalEvents();
   }
 
+  // 绑定模态框事件
   bindModalEvents() {
     const closeBtns = document.querySelectorAll('.close');
     closeBtns.forEach(btn => {
@@ -336,6 +162,7 @@ export class DashboardApp {
     });
   }
 
+  // 切换标签
   switchTab(tabName) {
     document.querySelectorAll('.menu-item').forEach(item => {
       item.classList.toggle('active', item.dataset.tab === tabName);
@@ -349,18 +176,15 @@ export class DashboardApp {
     this.loadTabData(tabName);
   }
 
+  // 加载标签数据
   async loadTabData(tabName) {
     const manager = this.managers[tabName];
     if (manager && manager.loadTabData) {
-      try {
-        await manager.loadTabData();
-      } catch (error) {
-        console.error(`加载 ${tabName} 页面数据失败:`, error);
-        showToast(`加载 ${tabName} 数据失败`, 'error');
-      }
+      await manager.loadTabData();
     }
   }
 
+  // 更新用户UI
   updateUserUI() {
     const username = document.getElementById('username');
     if (username && this.currentUser) {
@@ -368,11 +192,13 @@ export class DashboardApp {
     }
   }
 
+  // 关闭模态框
   closeModals() {
     document.querySelectorAll('.modal').forEach(modal => {
       modal.style.display = 'none';
     });
     
+    // 通知所有管理器重置编辑状态
     Object.values(this.managers).forEach(manager => {
       if (manager.resetEditingState) {
         manager.resetEditingState();
@@ -380,14 +206,12 @@ export class DashboardApp {
     });
   }
 
-  // 🔧 改进：退出登录 - 使用新的认证服务
+  // 退出登录
   async logout() {
     if (confirm('确定要退出登录吗？')) {
       try {
-        const authService = getService('authService');
-        if (authService) {
-          await authService.logout();
-        }
+        await apiService.logout();
+        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
         showToast('已退出登录', 'success');
         setTimeout(() => {
           window.location.href = 'index.html';
@@ -400,114 +224,179 @@ export class DashboardApp {
     }
   }
 
+  // 获取当前用户
   getCurrentUser() {
     return this.currentUser;
   }
 
-  // 🔧 改进：状态检查方法
+  // 检查是否已初始化
   isReady() {
-    return this.isInitialized && this.servicesReady;
+    return this.isInitialized;
   }
 
+  // 获取指定管理器
   getManager(name) {
     return this.managers[name];
   }
 
-  // 🆕 获取服务的便捷方法
-  getService(serviceName) {
-    if (!this.servicesReady) {
-      console.warn('服务尚未就绪，请等待初始化完成');
-      return null;
-    }
-    try {
-      return getService(serviceName);
-    } catch (error) {
-      console.error(`获取服务 ${serviceName} 失败:`, error);
-      return null;
-    }
-  }
-
   // 委托给设置管理器的方法
   async saveSettings() {
-    return this.delegateToManager('settings', 'saveSettings');
+    const settingsManager = this.managers.settings;
+    if (settingsManager && settingsManager.saveSettings) {
+      return await settingsManager.saveSettings();
+    } else {
+      console.error('设置管理器未找到或saveSettings方法不存在');
+      showToast('设置管理器未初始化', 'error');
+    }
   }
 
   async changePassword() {
-    return this.delegateToManager('settings', 'changePassword');
+    const settingsManager = this.managers.settings;
+    if (settingsManager && settingsManager.changePassword) {
+      return settingsManager.changePassword();
+    } else {
+      console.error('设置管理器未找到或changePassword方法不存在');
+      showToast('设置管理器未初始化', 'error');
+    }
   }
 
   async clearAllData() {
-    return this.delegateToManager('settings', 'clearAllData');
+    const settingsManager = this.managers.settings;
+    if (settingsManager && settingsManager.clearAllData) {
+      return await settingsManager.clearAllData();
+    } else {
+      console.error('设置管理器未找到或clearAllData方法不存在');
+      showToast('设置管理器未初始化', 'error');
+    }
   }
 
   async deleteAccount() {
-    return this.delegateToManager('settings', 'deleteAccount');
+    const settingsManager = this.managers.settings;
+    if (settingsManager && settingsManager.deleteAccount) {
+      return await settingsManager.deleteAccount();
+    } else {
+      console.error('设置管理器未找到或deleteAccount方法不存在');
+      showToast('设置管理器未初始化', 'error');
+    }
   }
 
   async exportData() {
-    return this.delegateToManager('settings', 'exportData');
+    const settingsManager = this.managers.settings;
+    if (settingsManager && settingsManager.exportData) {
+      return await settingsManager.exportData();
+    } else {
+      console.error('设置管理器未找到或exportData方法不存在');
+      showToast('设置管理器未初始化', 'error');
+    }
   }
 
   async syncFavorites() {
-    return this.delegateToManager('favorites', 'syncFavorites');
+    const favoritesManager = this.managers.favorites;
+    if (favoritesManager && favoritesManager.syncFavorites) {
+      return await favoritesManager.syncFavorites();
+    } else {
+      console.error('收藏管理器未找到或syncFavorites方法不存在');
+      showToast('收藏管理器未初始化', 'error');
+    }
   }
 
   async exportFavorites() {
-    return this.delegateToManager('favorites', 'exportFavorites');
+    const favoritesManager = this.managers.favorites;
+    if (favoritesManager && favoritesManager.exportFavorites) {
+      return await favoritesManager.exportFavorites();
+    } else {
+      console.error('收藏管理器未找到或exportFavorites方法不存在');
+      showToast('收藏管理器未初始化', 'error');
+    }
   }
 
   async searchFavorites() {
     const favoritesManager = this.managers.favorites;
     if (favoritesManager && favoritesManager.searchFavorites) {
       return favoritesManager.searchFavorites();
+    } else {
+      console.error('收藏管理器未找到或searchFavorites方法不存在');
     }
   }
 
   async syncHistory() {
-    return this.delegateToManager('history', 'syncHistory');
+    const historyManager = this.managers.history;
+    if (historyManager && historyManager.syncHistory) {
+      return await historyManager.syncHistory();
+    } else {
+      console.error('历史管理器未找到或syncHistory方法不存在');
+      showToast('历史管理器未初始化', 'error');
+    }
   }
 
   async clearAllHistory() {
-    return this.delegateToManager('history', 'clearAllHistory');
+    const historyManager = this.managers.history;
+    if (historyManager && historyManager.clearAllHistory) {
+      return await historyManager.clearAllHistory();
+    } else {
+      console.error('历史管理器未找到或clearAllHistory方法不存在');
+      showToast('历史管理器未初始化', 'error');
+    }
   }
 
   async exportSources() {
-    return this.delegateToManager('sources', 'exportSources');
+    const sourcesManager = this.managers.sources;
+    if (sourcesManager && sourcesManager.exportSources) {
+      return await sourcesManager.exportSources();
+    } else {
+      console.error('搜索源管理器未找到或exportSources方法不存在');
+      showToast('搜索源管理器未初始化', 'error');
+    }
   }
 
   async enableAllSources() {
-    return this.delegateToManager('sources', 'enableAllSources');
+    const sourcesManager = this.managers.sources;
+    if (sourcesManager && sourcesManager.enableAllSources) {
+      return sourcesManager.enableAllSources();
+    } else {
+      console.error('搜索源管理器未找到或enableAllSources方法不存在');
+      showToast('搜索源管理器未初始化', 'error');
+    }
   }
 
   async disableAllSources() {
-    return this.delegateToManager('sources', 'disableAllSources');
+    const sourcesManager = this.managers.sources;
+    if (sourcesManager && sourcesManager.disableAllSources) {
+      return sourcesManager.disableAllSources();
+    } else {
+      console.error('搜索源管理器未找到或disableAllSources方法不存在');
+      showToast('搜索源管理器未初始化', 'error');
+    }
   }
 
   async resetToDefaults() {
-    return this.delegateToManager('sources', 'resetToDefaults');
+    const sourcesManager = this.managers.sources;
+    if (sourcesManager && sourcesManager.resetToDefaults) {
+      return sourcesManager.resetToDefaults();
+    } else {
+      console.error('搜索源管理器未找到或resetToDefaults方法不存在');
+      showToast('搜索源管理器未初始化', 'error');
+    }
   }
 
   async exportCategories() {
-    return this.delegateToManager('categories', 'exportCategories');
-  }
-
-  async resetSettings() {
-    return this.delegateToManager('settings', 'resetSettings');
-  }
-
-  // 🔧 新增：统一的管理器方法委托
-  async delegateToManager(managerName, methodName, ...args) {
-    const manager = this.managers[managerName];
-    if (manager && manager[methodName]) {
-      try {
-        return await manager[methodName](...args);
-      } catch (error) {
-        console.error(`${managerName} 管理器的 ${methodName} 方法执行失败:`, error);
-        showToast(`操作失败: ${error.message}`, 'error');
-      }
+    const categoriesManager = this.managers.categories;
+    if (categoriesManager && categoriesManager.exportCategories) {
+      return await categoriesManager.exportCategories();
     } else {
-      console.error(`${managerName} 管理器未找到或 ${methodName} 方法不存在`);
-      showToast(`${managerName} 管理器未初始化`, 'error');
+      console.error('分类管理器未找到或exportCategories方法不存在');
+      showToast('分类管理器未初始化', 'error');
+    }
+  }
+
+  // 重置设置
+  async resetSettings() {
+    const settingsManager = this.managers.settings;
+    if (settingsManager && settingsManager.resetSettings) {
+      return settingsManager.resetSettings();
+    } else {
+      console.error('设置管理器未找到或resetSettings方法不存在');
+      showToast('设置管理器未初始化', 'error');
     }
   }
 }

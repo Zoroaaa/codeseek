@@ -1,6 +1,7 @@
-// 历史页面管理器 - 已适配新服务架构
+// 历史页面管理器
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml, formatRelativeTime } from '../../utils/format.js';
+import apiService from '../../services/api.js';
 
 export class HistoryManager {
   constructor(dashboardApp) {
@@ -19,15 +20,7 @@ export class HistoryManager {
     }
 
     try {
-      // 🆕 使用新的用户历史服务
-      const userHistoryService = this.app.getService('userHistoryService');
-      if (!userHistoryService) {
-        console.warn('用户历史服务未找到');
-        this.searchHistory = [];
-        return;
-      }
-
-      const historyResult = await userHistoryService.getSearchHistory();
+      const historyResult = await apiService.getSearchHistory();
       
       if (historyResult) {
         this.searchHistory = historyResult.map(item => ({
@@ -121,14 +114,8 @@ export class HistoryManager {
     try {
       showLoading(true);
       
-      // 🆕 使用新的用户历史服务
-      const userHistoryService = this.app.getService('userHistoryService');
-      if (!userHistoryService) {
-        throw new Error('用户历史服务未找到');
-      }
-      
       // 调用API删除
-      await userHistoryService.deleteSearchHistory(historyId);
+      await apiService.deleteSearchHistory(historyId);
       
       // 从本地数组中移除
       this.searchHistory = this.searchHistory.filter(item => item.id !== historyId);
@@ -160,14 +147,8 @@ export class HistoryManager {
     try {
       showLoading(true);
       
-      // 🆕 使用新的用户历史服务
-      const userHistoryService = this.app.getService('userHistoryService');
-      if (!userHistoryService) {
-        throw new Error('用户历史服务未找到');
-      }
-      
       // 使用API清空
-      await userHistoryService.clearAllSearchHistory();
+      await apiService.clearAllSearchHistory();
       
       // 清空本地数据
       this.searchHistory = [];

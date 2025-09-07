@@ -1,6 +1,7 @@
-// 统计页面管理器 - 已适配新服务架构
+// 统计页面管理器
 import { escapeHtml, formatRelativeTime } from '../../utils/format.js';
 import { showToast } from '../../utils/dom.js';
+import apiService from '../../services/api.js';
 
 export class StatsManager {
   constructor(dashboardApp) {
@@ -209,15 +210,8 @@ export class StatsManager {
 
   async loadServerStats() {
     try {
-      // 🆕 使用新的用户历史服务获取统计数据
-      const userHistoryService = this.app.getService('userHistoryService');
-      if (userHistoryService) {
-        const serverStats = await userHistoryService.getSearchStats();
-        this.statsData.serverStats = serverStats;
-      } else {
-        console.warn('用户历史服务未找到');
-        this.statsData.serverStats = {};
-      }
+      const serverStats = await apiService.getSearchStats();
+      this.statsData.serverStats = serverStats;
     } catch (error) {
       console.warn('获取服务器统计数据失败:', error);
       this.statsData.serverStats = {};

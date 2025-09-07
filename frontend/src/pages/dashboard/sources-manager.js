@@ -1,7 +1,8 @@
-// 搜索源管理器 - 重构版本，使用新的服务架构
+// 搜索源管理器
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
+import apiService from '../../services/api.js';
 
 export class SourcesManager {
   constructor(dashboardApp) {
@@ -14,7 +15,7 @@ export class SourcesManager {
   }
 
   async init() {
-    console.log('初始化搜索源管理器');
+    console.log('🔍 初始化搜索源管理器');
     this.loadBuiltinData();
     this.bindEvents();
   }
@@ -57,17 +58,10 @@ export class SourcesManager {
     if (!this.app.getCurrentUser()) return;
     
     try {
-      // 使用新的搜索源服务
-      const searchSourcesService = this.app.getService('searchSourcesService');
-      if (!searchSourcesService) {
-        console.error('搜索源服务未就绪');
-        return;
-      }
-
-      const userSettings = await searchSourcesService.getUserSearchSources();
+      const userSettings = await apiService.getUserSettings();
       
       this.customSearchSources = userSettings.customSearchSources || [];
-      this.enabledSources = userSettings.enabledSources || APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+      this.enabledSources = userSettings.searchSources || APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
       
       // 合并内置和自定义数据
       this.allSearchSources = [
@@ -75,7 +69,7 @@ export class SourcesManager {
         ...this.customSearchSources.map(s => ({ ...s, isBuiltin: false, isCustom: true }))
       ];
       
-      console.log(`用户设置：可用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源`);
+      console.log(`用户设置：启用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源`);
       
     } catch (error) {
       console.warn('加载用户搜索源设置失败，使用默认设置:', error);
@@ -86,11 +80,13 @@ export class SourcesManager {
   }
 
   bindEvents() {
+    // 添加自定义搜索源按钮
     const addCustomSourceBtn = document.getElementById('addCustomSourceBtn');
     if (addCustomSourceBtn) {
       addCustomSourceBtn.addEventListener('click', () => this.showCustomSourceModal());
     }
 
+    // 搜索源筛选和排序
     const sourcesFilter = document.getElementById('sourcesFilter');
     const categoryFilter = document.getElementById('categoryFilter');
     const sourcesSort = document.getElementById('sourcesSort');
@@ -105,6 +101,7 @@ export class SourcesManager {
       sourcesSort.addEventListener('change', () => this.filterAndSortSources());
     }
 
+    // 批量操作按钮
     this.bindBulkActionEvents();
   }
 
@@ -147,10 +144,12 @@ export class SourcesManager {
     const sourcesList = document.getElementById('sourcesList');
     if (!sourcesList) return;
 
+    // 获取当前筛选和排序设置
     const filter = document.getElementById('sourcesFilter')?.value || 'all';
     const categoryFilter = document.getElementById('categoryFilter')?.value || 'all';
     const sort = document.getElementById('sourcesSort')?.value || 'priority';
 
+    // 应用筛选
     let filteredSources = this.allSearchSources;
 
     if (filter !== 'all') {
@@ -174,12 +173,13 @@ export class SourcesManager {
       filteredSources = filteredSources.filter(source => source.category === categoryFilter);
     }
 
+    // 应用排序
     this.sortSources(filteredSources, sort);
 
     if (filteredSources.length === 0) {
       sourcesList.innerHTML = `
         <div class="empty-state">
-          <span style="font-size: 3rem;">📁</span>
+          <span style="font-size: 3rem;">🔍</span>
           <p>没有找到匹配的搜索源</p>
           <button class="btn-primary" onclick="app.getManager('sources').showCustomSourceModal()">添加自定义搜索源</button>
         </div>
@@ -460,6 +460,7 @@ export class SourcesManager {
     if (!form) return;
 
     if (source) {
+      // 编辑模式
       form.sourceId.value = source.id;
       form.sourceName.value = source.name;
       form.sourceSubtitle.value = source.subtitle || '';
@@ -469,6 +470,7 @@ export class SourcesManager {
       modal.querySelector('h2').textContent = '编辑自定义搜索源';
       modal.querySelector('[type="submit"]').textContent = '更新搜索源';
     } else {
+      // 新增模式
       form.reset();
       form.sourceIcon.value = '🔍';
       form.sourceCategory.value = 'others';
@@ -658,33 +660,23 @@ export class SourcesManager {
   }
 
   async saveCustomSearchSources() {
-    const searchSourcesService = this.app.getService('searchSourcesService');
-    if (!searchSourcesService) {
-      throw new Error('搜索源服务未就绪');
-    }
-
     const settings = {
       customSearchSources: this.customSearchSources,
-      enabledSources: this.enabledSources,
+      searchSources: this.enabledSources,
       customSourceCategories: this.getCustomCategories()
     };
     
-    await searchSourcesService.saveSearchSourcesSettings(settings);
+    await apiService.updateUserSettings(settings);
   }
 
   async saveSearchSourcesSettings() {
-    const searchSourcesService = this.app.getService('searchSourcesService');
-    if (!searchSourcesService) {
-      throw new Error('搜索源服务未就绪');
-    }
-
     const settings = {
-      enabledSources: this.enabledSources,
+      searchSources: this.enabledSources,
       customSearchSources: this.customSearchSources,
       customSourceCategories: this.getCustomCategories()
     };
     
-    await searchSourcesService.saveSearchSourcesSettings(settings);
+    await apiService.updateUserSettings(settings);
     
     // 通知主页面更新站点导航
     window.dispatchEvent(new CustomEvent('searchSourcesChanged', {

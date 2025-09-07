@@ -1,6 +1,11 @@
-// 设置管理器 - 重构版本，使用新的服务架构
+// 设置管理器 - 支持搜索源状态检查设置
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
+import apiService from '../../services/api.js';
+import themeManager from '../../services/theme.js';
+import searchService from '../../services/search.js';
+// ✅ 修复：导入搜索源检查服务
+import backendSourceChecker from '../../services/enhanced-source-checker.js';
 
 export class SettingsManager {
   constructor(dashboardApp) {
@@ -9,7 +14,7 @@ export class SettingsManager {
   }
 
   async init() {
-    console.log('初始化设置管理器');
+    console.log('⚙️ 初始化设置管理器');
     this.bindEvents();
   }
 
@@ -22,8 +27,13 @@ export class SettingsManager {
   }
 
   bindEvents() {
+    // 绑定设置表单事件
     this.bindSettingsEvents();
+    
+    // 绑定数据操作按钮
     this.bindDataActionButtons();
+    
+    // 绑定密码修改事件
     this.bindPasswordEvents();
   }
 
@@ -35,7 +45,7 @@ export class SettingsManager {
       });
     });
 
-    // 绑定搜索源状态检查相关设置
+    // 特别绑定搜索源状态检查相关设置
     const statusCheckSettings = [
       'enableSourceStatusCheck',
       'sourceCheckTimeout', 
@@ -75,7 +85,7 @@ export class SettingsManager {
       if (btn) btn.addEventListener('click', handler);
     });
 
-    // 绑定测试状态检查按钮
+    // ✅ 修复：绑定测试状态检查按钮
     const testStatusBtn = document.querySelector('.test-status-check-btn');
     if (testStatusBtn) {
       testStatusBtn.addEventListener('click', () => this.testSourceStatusCheck());
@@ -83,12 +93,14 @@ export class SettingsManager {
   }
 
   bindPasswordEvents() {
+    // 修改密码按钮
     const changePasswordBtn = document.querySelector('[onclick*="changePassword"]');
     if (changePasswordBtn) {
       changePasswordBtn.removeAttribute('onclick');
       changePasswordBtn.addEventListener('click', () => this.changePassword());
     }
 
+    // 密码表单提交
     const passwordForm = document.getElementById('passwordForm');
     if (passwordForm) {
       passwordForm.addEventListener('submit', (e) => this.handlePasswordChange(e));
@@ -97,14 +109,7 @@ export class SettingsManager {
 
   async loadSettingsData() {
     try {
-      // 使用新的用户设置服务
-      const userSettingsService = this.app.getService('userSettingsService');
-      if (!userSettingsService) {
-        console.error('用户设置服务未就绪');
-        return;
-      }
-
-      const settings = await userSettingsService.getSettings();
+      const settings = await apiService.getUserSettings();
       this.currentSettings = settings;
       
       // 基础设置
@@ -114,7 +119,7 @@ export class SettingsManager {
         allowAnalytics: document.getElementById('allowAnalytics'),
         searchSuggestions: document.getElementById('searchSuggestions'),
         
-        // 搜索源状态检查设置
+        // 🆕 搜索源状态检查设置
         enableSourceStatusCheck: document.getElementById('enableSourceStatusCheck'),
         sourceCheckTimeout: document.getElementById('sourceCheckTimeout'),
         sourceStatusCacheDuration: document.getElementById('sourceStatusCacheDuration'),
@@ -129,7 +134,7 @@ export class SettingsManager {
       if (elements.allowAnalytics) elements.allowAnalytics.checked = settings.allowAnalytics !== false;
       if (elements.searchSuggestions) elements.searchSuggestions.checked = settings.searchSuggestions !== false;
 
-      // 加载搜索源状态检查设置
+      // 🆕 加载搜索源状态检查设置
       if (elements.enableSourceStatusCheck) {
         elements.enableSourceStatusCheck.checked = settings.checkSourceStatus === true;
       }
@@ -174,7 +179,7 @@ export class SettingsManager {
         allowAnalytics: !!ui.allowAnalytics,
         searchSuggestions: !!ui.searchSuggestions,
         
-        // 搜索源状态检查设置
+        // 🆕 搜索源状态检查设置（直接毫秒）
         checkSourceStatus: !!ui.enableSourceStatusCheck,
         sourceStatusCheckTimeout: parseInt(ui.sourceCheckTimeout, 10) || 8000,
         sourceStatusCacheDuration: parseInt(ui.sourceStatusCacheDuration, 10) || 300000,
@@ -185,24 +190,14 @@ export class SettingsManager {
       
       console.log('保存设置payload:', payload);
       
-      // 使用新的用户设置服务
-      const userSettingsService = this.app.getService('userSettingsService');
-      if (!userSettingsService) {
-        throw new Error('用户设置服务未就绪');
-      }
-
-      await userSettingsService.updateSettings(payload);
+      await apiService.updateUserSettings(payload);
       
       // 立即应用主题设置
       if (payload.theme) {
-        const themeService = this.app.getService('themeService');
-        if (themeService) {
-          themeService.setTheme(payload.theme);
-        }
+        themeManager.setTheme(payload.theme);
       }
       
-      // 清除搜索服务的用户设置缓存
-      const searchService = this.app.getService('searchService');
+      // 清除搜索服务的用户设置缓存，确保下次搜索使用新设置
       if (searchService && searchService.clearUserSettingsCache) {
         searchService.clearUserSettingsCache();
       }
@@ -220,6 +215,7 @@ export class SettingsManager {
   collectSettings() {
     const settings = {};
     
+    // 基础设置
     const elements = {
       themeMode: document.getElementById('themeMode'),
       maxFavorites: document.getElementById('maxFavorites'),
@@ -227,7 +223,7 @@ export class SettingsManager {
       allowAnalytics: document.getElementById('allowAnalytics'),
       searchSuggestions: document.getElementById('searchSuggestions'),
       
-      // 搜索源状态检查设置
+      // 🆕 搜索源状态检查设置
       enableSourceStatusCheck: document.getElementById('enableSourceStatusCheck'),
       sourceCheckTimeout: document.getElementById('sourceCheckTimeout'),
       sourceStatusCacheDuration: document.getElementById('sourceStatusCacheDuration'),
@@ -243,7 +239,7 @@ export class SettingsManager {
     if (elements.allowAnalytics) settings.allowAnalytics = elements.allowAnalytics.checked;
     if (elements.searchSuggestions) settings.searchSuggestions = elements.searchSuggestions.checked;
     
-    // 收集搜索源状态检查设置
+    // ✅ 修复：正确收集搜索源状态检查设置
     if (elements.enableSourceStatusCheck) {
       settings.enableSourceStatusCheck = elements.enableSourceStatusCheck.checked;
     }
@@ -270,6 +266,7 @@ export class SettingsManager {
   resetSettings() {
     if (!confirm('确定要重置所有设置为默认值吗？')) return;
 
+    // 重置为默认设置
     const defaultSettings = {
       themeMode: 'auto',
       historyRetention: '90',
@@ -277,7 +274,7 @@ export class SettingsManager {
       allowAnalytics: true,
       searchSuggestions: true,
       
-      // 搜索源状态检查默认设置
+      // 🆕 搜索源状态检查默认设置
       enableSourceStatusCheck: false,
       sourceCheckTimeout: 8000,
       sourceStatusCacheDuration: 300000,
@@ -286,6 +283,7 @@ export class SettingsManager {
       retryFailedSources: false
     };
 
+    // 重置基础设置
     Object.entries(defaultSettings).forEach(([key, value]) => {
       const element = document.getElementById(key);
       if (element) {
@@ -301,213 +299,215 @@ export class SettingsManager {
     showToast('设置已重置为默认值，请点击保存', 'success');
   }
 
-  // 测试搜索源状态检查功能
-  async testSourceStatusCheck() {
-    try {
-      showLoading(true);
-      showToast('开始测试搜索源状态检查...', 'info');
-      
-      const progressElement = document.getElementById('statusCheckProgress');
-      if (progressElement) {
-        progressElement.style.display = 'block';
-      }
+  // ✅ 完全重写搜索源状态检查测试功能
+// 完全重写搜索源状态检查测试功能 - 使用固定测试番号MIMK-186
+async testSourceStatusCheck() {
+  try {
+    showLoading(true);
+    showToast('开始测试搜索源状态检查...', 'info');
+    
+    // 显示进度指示器
+    const progressElement = document.getElementById('statusCheckProgress');
+    if (progressElement) {
+      progressElement.style.display = 'block';
+    }
 
-      const testKeyword = 'MIMK-186';
-      console.log(`使用固定测试番号: ${testKeyword}`);
+    // 固定使用测试番号 MIMK-186
+    const testKeyword = 'MIMK-186';
+    console.log(`使用固定测试番号: ${testKeyword}`);
 
-      // 获取用户实际可用的搜索源
-      const sourcesManager = this.app.getManager('sources');
-      let testSources = [];
-      
-      if (sourcesManager && typeof sourcesManager.getEnabledSources === 'function') {
-        const enabledSources = sourcesManager.getAllSearchSources()
-          .filter(source => sourcesManager.enabledSources.includes(source.id));
-        testSources = enabledSources;
-        console.log(`获取到用户可用的 ${testSources.length} 个搜索源:`, testSources.map(s => s.name));
-      } else {
-        try {
-          const userSettingsService = this.app.getService('userSettingsService');
-          if (!userSettingsService) {
-            throw new Error('用户设置服务未就绪');
-          }
-
-          const userSettings = await userSettingsService.getSettings();
-          const enabledSourceIds = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary'];
-          
-          testSources = APP_CONSTANTS.SEARCH_SOURCES.filter(source => 
-            enabledSourceIds.includes(source.id)
-          );
-          
-          console.log(`从用户设置获取 ${testSources.length} 个搜索源:`, testSources.map(s => s.name));
-        } catch (apiError) {
-          console.error('无法获取用户搜索源设置:', apiError);
-          throw new Error('无法获取用户可用的搜索源配置');
-        }
-      }
-
-      if (testSources.length === 0) {
-        throw new Error('没有可用的搜索源可以测试');
-      }
-
-      // 获取当前用户设置
-      const currentSettings = this.collectSettings();
-      const userSettings = {
-        sourceStatusCheckTimeout: parseInt(currentSettings.sourceCheckTimeout, 10) || 8000,
-        sourceStatusCacheDuration: parseInt(currentSettings.sourceStatusCacheDuration, 10) || 300000,
-        checkSourceStatus: currentSettings.enableSourceStatusCheck || false
-      };
-
-      console.log('使用设置进行测试:', userSettings);
-
-      // 更新进度显示
-      let checkedCount = 0;
-      const updateProgress = (current, total) => {
-        const progressStats = document.querySelector('.progress-stats');
-        if (progressStats) {
-          progressStats.textContent = `${current}/${total}`;
-        }
-      };
-
-      updateProgress(0, testSources.length);
-
-      // 使用搜索源检查服务进行测试
-      const sourceCheckerService = this.app.getService('sourceCheckerService');
-      if (!sourceCheckerService) {
-        throw new Error('搜索源状态检查服务未就绪');
-      }
-
-      const results = await sourceCheckerService.checkMultipleSources(testSources, userSettings);
-      
-      // 处理测试结果
-      let successCount = 0;
-      let failedCount = 0;
-      let availableResults = [];
-      let unavailableResults = [];
-
-      results.forEach(item => {
-        if (item.result) {
-          if (item.result.available) {
-            successCount++;
-            availableResults.push({
-              ...item,
-              searchUrl: item.source.urlTemplate.replace('{keyword}', encodeURIComponent(testKeyword))
-            });
-          } else {
-            failedCount++;
-            unavailableResults.push({
-              ...item,
-              searchUrl: item.source.urlTemplate.replace('{keyword}', encodeURIComponent(testKeyword))
-            });
-          }
-        }
-      });
-
-      // 在页面显示详细测试结果
-      const contentMatches = availableResults.filter(item => item.result.contentMatch).length;
-      const resultHtml = `
-        <div class="test-results">
-          <h4>测试结果 - 番号: ${testKeyword}</h4>
-          <div class="result-summary">
-            <span class="success-count">可用: ${successCount}</span>
-            <span class="failed-count">不可用: ${failedCount}</span>
-            <span class="total-count">总计: ${testSources.length}</span>
-            ${contentMatches > 0 ? `<span class="content-match">内容匹配: ${contentMatches}</span>` : ''}
-          </div>
-          <div class="result-details">
-            ${availableResults.map(item => `
-              <div class="result-item available">
-                <div class="source-info">
-                  <span class="source-name">${item.source.name}</span>
-                  <span class="status success">可用</span>
-                  ${item.result.responseTime ? `<span class="response-time">${item.result.responseTime}ms</span>` : ''}
-                  ${item.result.contentMatch ? '<span class="content-match">内容匹配</span>' : ''}
-                </div>
-                <div class="source-actions">
-                  <button class="btn-primary" onclick="window.open('${item.searchUrl}', '_blank')" 
-                          title="打开搜索页面验证结果">
-                    验证搜索结果
-                  </button>
-                </div>
-              </div>
-            `).join('')}
-            ${unavailableResults.map(item => `
-              <div class="result-item unavailable">
-                <div class="source-info">
-                  <span class="source-name">${item.source.name}</span>
-                  <span class="status failed">不可用</span>
-                  <span class="error">${item.result.error || '检查失败'}</span>
-                </div>
-                <div class="source-actions">
-                  <button class="btn-secondary" onclick="window.open('${item.searchUrl}', '_blank')" 
-                          title="手动访问验证">
-                    手动验证
-                  </button>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-          <div class="test-info">
-            <p><small>点击"验证搜索结果"按钮可以直接访问对应搜索源搜索 ${testKeyword} 的页面</small></p>
-            <p><small>如果测试结果与实际访问不符，请检查搜索源状态检查设置</small></p>
-          </div>
-        </div>
-      `;
-
-      // 创建或更新结果显示区域
-      let resultsContainer = document.getElementById('testResultsContainer');
-      if (!resultsContainer) {
-        resultsContainer = document.createElement('div');
-        resultsContainer.id = 'testResultsContainer';
-        resultsContainer.className = 'test-results-container';
+    // 获取用户实际启用的搜索源
+    const sourcesManager = this.app.getManager('sources');
+    let testSources = [];
+    
+    if (sourcesManager && typeof sourcesManager.getEnabledSources === 'function') {
+      // 从搜索源管理器获取用户启用的搜索源
+      const enabledSources = sourcesManager.getAllSearchSources()
+        .filter(source => sourcesManager.enabledSources.includes(source.id));
+      testSources = enabledSources;
+      console.log(`获取到用户启用的 ${testSources.length} 个搜索源:`, testSources.map(s => s.name));
+    } else {
+      // 降级：从用户设置获取启用的搜索源
+      try {
+        const userSettings = await apiService.getUserSettings();
+        const enabledSourceIds = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary'];
         
-        const testBtn = document.querySelector('.test-status-check-btn');
-        if (testBtn && testBtn.parentNode) {
-          testBtn.parentNode.insertBefore(resultsContainer, testBtn.nextSibling);
-        }
-      }
-      
-      resultsContainer.innerHTML = resultHtml;
-
-      updateProgress(testSources.length, testSources.length);
-      
-      const contentInfo = contentMatches > 0 ? `，${contentMatches} 个内容匹配` : '';
-      showToast(`搜索源状态检查测试完成: ${successCount}/${testSources.length} 可用${contentInfo}`, 'success');
-      
-      console.log(`测试完成 - 番号: ${testKeyword}, 成功: ${successCount}/${testSources.length}`);
-      
-    } catch (error) {
-      console.error('测试搜索源状态检查失败:', error);
-      showToast('测试失败: ' + error.message, 'error');
-      
-      let resultsContainer = document.getElementById('testResultsContainer');
-      if (!resultsContainer) {
-        resultsContainer = document.createElement('div');
-        resultsContainer.id = 'testResultsContainer';
-        resultsContainer.className = 'test-results-container';
+        // 从常量中获取对应的搜索源配置
+        testSources = APP_CONSTANTS.SEARCH_SOURCES.filter(source => 
+          enabledSourceIds.includes(source.id)
+        );
         
-        const testBtn = document.querySelector('.test-status-check-btn');
-        if (testBtn && testBtn.parentNode) {
-          testBtn.parentNode.insertBefore(resultsContainer, testBtn.nextSibling);
-        }
-      }
-      
-      resultsContainer.innerHTML = `
-        <div class="test-results error">
-          <h4>测试失败</h4>
-          <p class="error-message">${error.message}</p>
-          <p><small>请检查网络连接和搜索源状态检查设置</small></p>
-        </div>
-      `;
-      
-    } finally {
-      showLoading(false);
-      
-      const progressElement = document.getElementById('statusCheckProgress');
-      if (progressElement) {
-        progressElement.style.display = 'none';
+        console.log(`从用户设置获取 ${testSources.length} 个搜索源:`, testSources.map(s => s.name));
+      } catch (apiError) {
+        console.error('无法获取用户搜索源设置:', apiError);
+        throw new Error('无法获取用户启用的搜索源配置');
       }
     }
+
+    if (testSources.length === 0) {
+      throw new Error('没有启用的搜索源可以测试');
+    }
+
+    // 获取当前用户设置
+    const currentSettings = this.collectSettings();
+    const userSettings = {
+      sourceStatusCheckTimeout: parseInt(currentSettings.sourceCheckTimeout, 10) || 8000,
+      sourceStatusCacheDuration: parseInt(currentSettings.sourceStatusCacheDuration, 10) || 300000,
+      checkSourceStatus: currentSettings.enableSourceStatusCheck || false
+    };
+
+    console.log('使用设置进行测试:', userSettings);
+
+    // 更新进度显示
+    let checkedCount = 0;
+    const updateProgress = (current, total) => {
+      const progressStats = document.querySelector('.progress-stats');
+      if (progressStats) {
+        progressStats.textContent = `${current}/${total}`;
+      }
+    };
+
+    updateProgress(0, testSources.length);
+
+    // 使用真实的搜索源检查服务进行测试，传入固定测试番号
+    const results = await backendSourceChecker.checkMultipleSources(testSources, userSettings, testKeyword);
+    
+    // 处理测试结果
+    let successCount = 0;
+    let failedCount = 0;
+    let availableResults = [];
+    let unavailableResults = [];
+
+    results.forEach(item => {
+      if (item.result) {
+        if (item.result.available) {
+          successCount++;
+          availableResults.push({
+            ...item,
+            // 构建可访问的搜索链接
+            searchUrl: item.source.urlTemplate.replace('{keyword}', encodeURIComponent(testKeyword))
+          });
+        } else {
+          failedCount++;
+          unavailableResults.push({
+            ...item,
+            // 即使不可用也提供链接，方便验证
+            searchUrl: item.source.urlTemplate.replace('{keyword}', encodeURIComponent(testKeyword))
+          });
+        }
+      }
+    });
+
+    // 在页面显示详细测试结果
+    const contentMatches = availableResults.filter(item => item.result.contentMatch).length;
+    const resultHtml = `
+      <div class="test-results">
+        <h4>测试结果 - 番号: ${testKeyword}</h4>
+        <div class="result-summary">
+          <span class="success-count">✅ 可用: ${successCount}</span>
+          <span class="failed-count">❌ 不可用: ${failedCount}</span>
+          <span class="total-count">📊 总计: ${testSources.length}</span>
+          ${contentMatches > 0 ? `<span class="content-match">🎯 内容匹配: ${contentMatches}</span>` : ''}
+        </div>
+        <div class="result-details">
+          ${availableResults.map(item => `
+            <div class="result-item available">
+              <div class="source-info">
+                <span class="source-name">${item.source.name}</span>
+                <span class="status success">✅ 可用</span>
+                ${item.result.responseTime ? `<span class="response-time">${item.result.responseTime}ms</span>` : ''}
+                ${item.result.contentMatch ? '<span class="content-match">✓ 内容匹配</span>' : ''}
+              </div>
+              <div class="source-actions">
+                <button class="btn-primary" onclick="window.open('${item.searchUrl}', '_blank')" 
+                        title="打开搜索页面验证结果">
+                  🔗 验证搜索结果
+                </button>
+              </div>
+            </div>
+          `).join('')}
+          ${unavailableResults.map(item => `
+            <div class="result-item unavailable">
+              <div class="source-info">
+                <span class="source-name">${item.source.name}</span>
+                <span class="status failed">❌ 不可用</span>
+                <span class="error">${item.result.error || '检查失败'}</span>
+              </div>
+              <div class="source-actions">
+                <button class="btn-secondary" onclick="window.open('${item.searchUrl}', '_blank')" 
+                        title="手动访问验证">
+                  🔗 手动验证
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="test-info">
+          <p><small>💡 点击"验证搜索结果"按钮可以直接访问对应搜索源搜索 ${testKeyword} 的页面</small></p>
+          <p><small>⚙️ 如果测试结果与实际访问不符，请检查搜索源状态检查设置</small></p>
+        </div>
+      </div>
+    `;
+
+    // 创建或更新结果显示区域
+    let resultsContainer = document.getElementById('testResultsContainer');
+    if (!resultsContainer) {
+      resultsContainer = document.createElement('div');
+      resultsContainer.id = 'testResultsContainer';
+      resultsContainer.className = 'test-results-container';
+      
+      // 插入到测试按钮后面
+      const testBtn = document.querySelector('.test-status-check-btn');
+      if (testBtn && testBtn.parentNode) {
+        testBtn.parentNode.insertBefore(resultsContainer, testBtn.nextSibling);
+      }
+    }
+    
+    resultsContainer.innerHTML = resultHtml;
+
+    updateProgress(testSources.length, testSources.length);
+    
+    // 显示成功消息，包含内容匹配信息
+    const contentInfo = contentMatches > 0 ? `，${contentMatches} 个内容匹配` : '';
+    showToast(`搜索源状态检查测试完成: ${successCount}/${testSources.length} 可用${contentInfo}`, 'success');
+    
+    console.log(`测试完成 - 番号: ${testKeyword}, 成功: ${successCount}/${testSources.length}`);
+    
+  } catch (error) {
+    console.error('测试搜索源状态检查失败:', error);
+    showToast('测试失败: ' + error.message, 'error');
+    
+    // 显示错误信息
+    let resultsContainer = document.getElementById('testResultsContainer');
+    if (!resultsContainer) {
+      resultsContainer = document.createElement('div');
+      resultsContainer.id = 'testResultsContainer';
+      resultsContainer.className = 'test-results-container';
+      
+      const testBtn = document.querySelector('.test-status-check-btn');
+      if (testBtn && testBtn.parentNode) {
+        testBtn.parentNode.insertBefore(resultsContainer, testBtn.nextSibling);
+      }
+    }
+    
+    resultsContainer.innerHTML = `
+      <div class="test-results error">
+        <h4>测试失败</h4>
+        <p class="error-message">${error.message}</p>
+        <p><small>请检查网络连接和搜索源状态检查设置</small></p>
+      </div>
+    `;
+    
+  } finally {
+    showLoading(false);
+    
+    // 隐藏进度指示器
+    const progressElement = document.getElementById('statusCheckProgress');
+    if (progressElement) {
+      progressElement.style.display = 'none';
+    }
   }
+}
 
   markSettingsChanged() {
     const saveBtn = document.querySelector('#settings .btn-primary');
@@ -562,12 +562,7 @@ export class SettingsManager {
     try {
       showLoading(true);
       
-      const authService = this.app.getService('authService');
-      if (!authService) {
-        throw new Error('认证服务未就绪');
-      }
-
-      const response = await authService.changePassword(currentPassword, newPassword);
+      const response = await apiService.changePassword(currentPassword, newPassword);
       
       if (response.success) {
         showToast('密码修改成功', 'success');
@@ -597,12 +592,9 @@ export class SettingsManager {
       const favoritesManager = this.app.getManager('favorites');
       const historyManager = this.app.getManager('history');
       
-      // 使用新的服务同步数据
-      const userFavoritesService = this.app.getService('userFavoritesService');
-      const userHistoryService = this.app.getService('userHistoryService');
-
-      if (userFavoritesService && favoritesManager) {
-        await userFavoritesService.syncFavorites();
+      // 同步收藏夹到云端
+      if (favoritesManager) {
+        await apiService.syncFavorites(favoritesManager.getFavorites());
       }
       
       // 重新从云端加载数据以确保一致性
@@ -629,15 +621,11 @@ export class SettingsManager {
     }
 
     try {
-      // 使用新的服务获取数据
-      const userFavoritesService = this.app.getService('userFavoritesService');
-      const userHistoryService = this.app.getService('userHistoryService');
-      const userSettingsService = this.app.getService('userSettingsService');
-
+      // 从云端重新获取最新数据
       const [favorites, history, settings] = await Promise.all([
-        userFavoritesService ? userFavoritesService.getFavorites() : Promise.resolve([]),
-        userHistoryService ? userHistoryService.getHistory() : Promise.resolve([]),
-        userSettingsService ? userSettingsService.getSettings() : Promise.resolve({})
+        apiService.getFavorites(),
+        apiService.getSearchHistory(),
+        apiService.getUserSettings()
       ]);
 
       const sourcesManager = this.app.getManager('sources');
@@ -673,7 +661,7 @@ export class SettingsManager {
     }
   }
 
-  // 其他导出方法
+  // 导出收藏
   async exportFavorites() {
     const favoritesManager = this.app.getManager('favorites');
     if (favoritesManager) {
@@ -683,6 +671,7 @@ export class SettingsManager {
     }
   }
 
+  // 导出搜索源
   async exportSources() {
     const sourcesManager = this.app.getManager('sources');
     if (sourcesManager) {
@@ -692,6 +681,7 @@ export class SettingsManager {
     }
   }
 
+  // 导出分类
   async exportCategories() {
     const categoriesManager = this.app.getManager('categories');
     if (categoriesManager) {
@@ -724,13 +714,10 @@ export class SettingsManager {
     try {
       showLoading(true);
       
-      // 使用新的服务清空数据
-      const userHistoryService = this.app.getService('userHistoryService');
-      const userFavoritesService = this.app.getService('userFavoritesService');
-
+      // 清空云端数据
       await Promise.all([
-        userHistoryService ? userHistoryService.clearAllHistory() : Promise.resolve(),
-        userFavoritesService ? userFavoritesService.syncFavorites([]) : Promise.resolve()
+        apiService.clearAllSearchHistory(),
+        apiService.syncFavorites([]) // 传空数组清空收藏
       ]);
       
       // 重新加载各管理器数据
@@ -764,12 +751,7 @@ export class SettingsManager {
     try {
       showLoading(true);
       
-      const authService = this.app.getService('authService');
-      if (!authService) {
-        throw new Error('认证服务未就绪');
-      }
-
-      const response = await authService.deleteAccount();
+      const response = await apiService.deleteAccount();
       
       if (response.success) {
         showToast('账户已删除', 'success');

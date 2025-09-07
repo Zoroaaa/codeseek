@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="css/pages/dashboard/categories-management.css">
     <link rel="stylesheet" href="css/pages/dashboard/community.css">
     
-    <!-- 仪表盘专用样式 -->
+    <!-- 仪表板专用样式 -->
     <link rel="stylesheet" href="css/pages/dashboard/dashboard.css">
     
     <!-- 工具样式 -->
@@ -131,7 +131,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">🔍</div>
+                        <div class="stat-icon">📁</div>
                         <div class="stat-info">
                             <div class="stat-number" id="totalSources">0</div>
                             <div class="stat-label">搜索源数量</div>
@@ -157,7 +157,7 @@
                         <span>查看收藏</span>
                     </button>
                     <button class="action-btn" data-action="sources">
-                        <span class="btn-icon">🔍</span>
+                        <span class="btn-icon">📁</span>
                         <span>管理搜索源</span>
                     </button>
                     <button class="action-btn" data-action="export">
@@ -189,7 +189,7 @@
                 <div class="favorites-controls">
                     <div class="search-box">
                         <input type="text" id="favoritesSearch" placeholder="搜索收藏..." autocomplete="off">
-                        <button onclick="window.app.searchFavorites()" title="搜索">🔍</button>
+                        <button onclick="app.searchFavorites()" title="搜索">🔍</button>
                     </div>
                     <div class="filter-options">
                         <select id="favoritesSort">
@@ -267,7 +267,7 @@
                             <span>➕</span>
                             <span>添加自定义搜索源</span>
                         </button>
-                        <button class="btn-secondary" onclick="window.app.exportSources()">导出搜索源</button>
+                        <button class="btn-secondary" onclick="app.exportSources()">导出搜索源</button>
                     </div>
                 </div>
 
@@ -346,7 +346,7 @@
                             <span>➕</span>
                             <span>添加自定义分类</span>
                         </button>
-                        <button class="btn-secondary" onclick="window.app.exportCategories()">导出分类</button>
+                        <button class="btn-secondary" onclick="app.exportCategories()">导出分类</button>
                     </div>
                 </div>
 
@@ -412,188 +412,188 @@
                     </div>
                 </div>
 
-                <!-- 社区统计面板 - 修复浏览量显示 -->
-                <div class="community-stats">
-                  <div class="stats-grid">
-                    <div class="stat-item">
-                      <span class="stat-icon">🌟</span>
-                      <div class="stat-info">
-                        <span class="stat-value" id="userSharedCount">0</span>
-                        <span class="stat-desc">我的分享</span>
-                      </div>
-                    </div>
-                    <div class="stat-item">
-                      <span class="stat-icon">🔥</span>
-                      <div class="stat-info">
-                        <span class="stat-value" id="userDownloadsCount">0</span>
-                        <span class="stat-desc">已下载</span>
-                      </div>
-                    </div>
-                    <div class="stat-item">
-                      <span class="stat-icon">👍</span>
-                      <div class="stat-info">
-                        <span class="stat-value" id="userLikesCount">0</span>
-                        <span class="stat-desc">获得点赞</span>
-                      </div>
-                    </div>
-                    <!-- 🆕 新增浏览量统计栏目 -->
-                    <div class="stat-item">
-                      <span class="stat-icon">👁</span>
-                      <div class="stat-info">
-                        <span class="stat-value" id="userViewsCount">0</span>
-                        <span class="stat-desc">总浏览量</span>
-                      </div>
-                    </div>
-                    <div class="stat-item">
-                      <span class="stat-icon">⭐</span>
-                      <div class="stat-info">
-                        <span class="stat-value" id="userReputationScore">0</span>
-                        <span class="stat-desc">社区声誉</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+<!-- 社区统计面板 - 修复浏览量显示 -->
+<div class="community-stats">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <span class="stat-icon">🌟</span>
+      <div class="stat-info">
+        <span class="stat-value" id="userSharedCount">0</span>
+        <span class="stat-desc">我的分享</span>
+      </div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-icon">🔥</span>
+      <div class="stat-info">
+        <span class="stat-value" id="userDownloadsCount">0</span>
+        <span class="stat-desc">已下载</span>
+      </div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-icon">👍</span>
+      <div class="stat-info">
+        <span class="stat-value" id="userLikesCount">0</span>
+        <span class="stat-desc">获得点赞</span>
+      </div>
+    </div>
+    <!-- 🆕 新增浏览量统计栏目 -->
+    <div class="stat-item">
+      <span class="stat-icon">👁</span>
+      <div class="stat-info">
+        <span class="stat-value" id="userViewsCount">0</span>
+        <span class="stat-desc">总浏览量</span>
+      </div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-icon">⭐</span>
+      <div class="stat-info">
+        <span class="stat-value" id="userReputationScore">0</span>
+        <span class="stat-desc">社区声誉</span>
+      </div>
+    </div>
+  </div>
+</div>
 
-                <!-- 🆕 标签管理区域 -->
-                <div class="tag-management-section">
-                  <div class="tag-management-header">
-                    <h3>🏷️ 标签管理</h3>
-                    <div class="tag-management-actions">
-                      <!-- 🆕 新增管理标签按钮 -->
-                      <button class="tag-manage-btn" id="tagManageBtn">
-                        <span>⚙️</span>
-                        <span>管理标签</span>
-                      </button>
-                      <button class="tag-create-btn" id="tagCreateBtn">
-                        <span>✨</span>
-                        <span>创建标签</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="popular-tags-list" id="popularTagsList">
-                    <div class="loading-tags">正在加载热门标签...</div>
-                  </div>
-                </div>
+<!-- 🆕 标签管理区域 -->
+<div class="tag-management-section">
+  <div class="tag-management-header">
+    <h3>🏷️ 标签管理</h3>
+    <div class="tag-management-actions">
+      <!-- 🆕 新增管理标签按钮 -->
+      <button class="tag-manage-btn" id="tagManageBtn">
+        <span>⚙️</span>
+        <span>管理标签</span>
+      </button>
+      <button class="tag-create-btn" id="tagCreateBtn">
+        <span>✨</span>
+        <span>创建标签</span>
+      </button>
+    </div>
+  </div>
+  <div class="popular-tags-list" id="popularTagsList">
+    <div class="loading-tags">正在加载热门标签...</div>
+  </div>
+</div>
 
-                <!-- 搜索和过滤控制 -->
-                <div class="community-controls">
-                  <div class="search-section">
-                    <div class="search-box">
-                      <input type="text" id="communitySearch" placeholder="搜索社区搜索源..." autocomplete="off" aria-label="搜索社区搜索源">
-                      <button class="search-btn" id="communitySearchBtn" title="搜索">
-                        <span>🔍</span>
-                        <span>搜索</span>
-                      </button>
-                    </div>
-                    <div class="filter-toggle">
-                      <label class="toggle-label">
-                        <input type="checkbox" id="featuredOnly" aria-describedby="featured-help">
-                        <span>仅显示推荐</span>
-                      </label>
-                      <small id="featured-help" style="display: none;">只显示经过验证的优质搜索源</small>
-                    </div>
-                  </div>
-                  
-                  <div class="filter-section">
-                    <div class="filter-group">
-                      <label for="communityCategory">分类筛选：</label>
-                      <select id="communityCategory" aria-label="按分类筛选">
-                        <option value="all">全部分类</option>
-                        <!-- 分类选项将动态加载 -->
-                      </select>
-                    </div>
-                    <div class="filter-group">
-                      <label for="communitySort">排序方式：</label>
-                      <select id="communitySort" aria-label="排序方式">
-                        <option value="created_at-desc">最新发布</option>
-                        <option value="rating_score-desc">评分最高</option>
-                        <option value="download_count-desc">下载最多</option>
-                        <option value="like_count-desc">点赞最多</option>
-                        <option value="view_count-desc">浏览最多</option> <!-- 🆕 新增按浏览量排序 -->
-                      </select>
-                    </div>
-                    <div class="filter-group">
-                      <label for="communityLimit">每页显示：</label>
-                      <select id="communityLimit" aria-label="每页显示数量" onchange="window.app.getManager('community').currentLimit = parseInt(this.value); window.app.getManager('community').loadCommunitySourcesList();">
-                        <option value="10">10个</option>
-                        <option value="20" selected>20个</option>
-                        <option value="50">50个</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
+<!-- 搜索和过滤控制 -->
+<div class="community-controls">
+  <div class="search-section">
+    <div class="search-box">
+      <input type="text" id="communitySearch" placeholder="搜索社区搜索源..." autocomplete="off" aria-label="搜索社区搜索源">
+      <button class="search-btn" id="communitySearchBtn" title="搜索">
+        <span>🔍</span>
+        <span>搜索</span>
+      </button>
+    </div>
+    <div class="filter-toggle">
+      <label class="toggle-label">
+        <input type="checkbox" id="featuredOnly" aria-describedby="featured-help">
+        <span>仅显示推荐</span>
+      </label>
+      <small id="featured-help" style="display: none;">只显示经过验证的优质搜索源</small>
+    </div>
+  </div>
+  
+  <div class="filter-section">
+    <div class="filter-group">
+      <label for="communityCategory">分类筛选：</label>
+      <select id="communityCategory" aria-label="按分类筛选">
+        <option value="all">全部分类</option>
+        <!-- 分类选项将动态加载 -->
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="communitySort">排序方式：</label>
+      <select id="communitySort" aria-label="排序方式">
+        <option value="created_at-desc">最新发布</option>
+        <option value="rating_score-desc">评分最高</option>
+        <option value="download_count-desc">下载最多</option>
+        <option value="like_count-desc">点赞最多</option>
+        <option value="view_count-desc">浏览最多</option> <!-- 🆕 新增按浏览量排序 -->
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="communityLimit">每页显示：</label>
+      <select id="communityLimit" aria-label="每页显示数量" onchange="window.app.getManager('community').currentLimit = parseInt(this.value); window.app.getManager('community').loadCommunitySourcesList();">
+        <option value="10">10个</option>
+        <option value="20" selected>20个</option>
+        <option value="50">50个</option>
+      </select>
+    </div>
+  </div>
+</div>
 
-                <!-- 快速操作面板 -->
-                <div class="quick-actions" style="margin-bottom: 1.5rem;">
-                  <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; align-items: center; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                    <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('JAV')" title="搜索JAV相关源">
-                      <span>🎬</span>
-                      <span>JAV</span>
-                    </button>
-                    <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('电影')" title="搜索电影相关源">
-                      <span>🎭</span>
-                      <span>电影</span>
-                    </button>
-                    <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('磁力')" title="搜索磁力相关源">
-                      <span>🧲</span>
-                      <span>磁力</span>
-                    </button>
-                    <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('种子')" title="搜索种子相关源">
-                      <span>🌱</span>
-                      <span>种子</span>
-                    </button>
-                    <span style="color: var(--text-muted); font-size: 0.85rem;">快速搜索</span>
-                  </div>
-                </div>
+<!-- 快速操作面板 -->
+<div class="quick-actions" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; align-items: center; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+    <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('JAV')" title="搜索JAV相关源">
+      <span>🎬</span>
+      <span>JAV</span>
+    </button>
+    <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('电影')" title="搜索电影相关源">
+      <span>🎭</span>
+      <span>电影</span>
+    </button>
+    <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('磁力')" title="搜索磁力相关源">
+      <span>🧲</span>
+      <span>磁力</span>
+    </button>
+    <button class="btn-secondary btn-sm" onclick="window.app.getManager('community').searchCommunity('种子')" title="搜索种子相关源">
+      <span>🌱</span>
+      <span>种子</span>
+    </button>
+    <span style="color: var(--text-muted); font-size: 0.85rem;">快速搜索</span>
+  </div>
+</div>
 
-                <!-- 社区搜索源列表 -->
-                <div id="communitySourcesList" class="community-sources-container">
-                  <div class="loading-community">
-                    <div class="spinner"></div>
-                    <div>正在加载社区搜索源...</div>
-                  </div>
-                </div>
+<!-- 社区搜索源列表 -->
+<div id="communitySourcesList" class="community-sources-container">
+  <div class="loading-community">
+    <div class="spinner"></div>
+    <div>正在加载社区搜索源...</div>
+  </div>
+</div>
 
-                <!-- 错误处理和用户反馈改进 -->
-                <div id="communityErrorHandler" style="display: none;" class="error-handler">
-                  <div class="error-content">
-                    <span class="error-icon">⚠️</span>
-                    <div class="error-details">
-                      <h4>出现了一些问题</h4>
-                      <p id="errorMessage">加载数据时发生错误</p>
-                      <div class="error-actions">
-                        <button class="btn-primary" onclick="window.app.getManager('community').refreshCommunityData()">
-                          重新加载
-                        </button>
-                        <button class="btn-secondary" onclick="document.getElementById('communityErrorHandler').style.display = 'none'">
-                          忽略
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+<!-- 错误处理和用户反馈改进 -->
+<div id="communityErrorHandler" style="display: none;" class="error-handler">
+  <div class="error-content">
+    <span class="error-icon">⚠️</span>
+    <div class="error-details">
+      <h4>出现了一些问题</h4>
+      <p id="errorMessage">加载数据时发生错误</p>
+      <div class="error-actions">
+        <button class="btn-primary" onclick="window.app.getManager('community').refreshCommunityData()">
+          重新加载
+        </button>
+        <button class="btn-secondary" onclick="document.getElementById('communityErrorHandler').style.display = 'none'">
+          忽略
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
-                <!-- 页面底部信息 -->
-                <div class="community-footer" style="margin-top: 2rem; padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; border-top: 1px solid var(--border-color);">
-                  <p>🌟 社区由用户共同维护，分享优质搜索源让大家受益 🌟</p>
-                  <p>
-                    <a href="#" onclick="window.app.getManager('community').showShareSourceModal(); return false;" style="color: var(--accent-primary); text-decoration: none;">
-                      立即分享您的搜索源
-                    </a>
-                    |
-                    <a href="#" onclick="alert('举报请通过搜索源项目中的举报按钮'); return false;" style="color: var(--accent-primary); text-decoration: none;">
-                      举报不当内容
-                    </a>
-                    |
-                    <a href="#" onclick="alert('社区规则：\\n1. 分享的搜索源应该是合法的\\n2. 不得分享包含恶意内容的链接\\n3. 描述应该准确真实\\n4. 尊重他人的分享和评价'); return false;" style="color: var(--accent-primary); text-decoration: none;">
-                      社区规则
-                    </a>
-                  </p>
-                  <!-- 🆕 数据库状态指示器 -->
-                  <div class="db-status-indicator" id="dbStatusIndicator" style="margin-top: 0.5rem; font-size: 0.75rem;">
-                    <span id="dbStatus" style="color: var(--success-color);">✅ 数据库连接正常</span>
-                  </div>
-                </div>
+<!-- 页面底部信息 -->
+<div class="community-footer" style="margin-top: 2rem; padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; border-top: 1px solid var(--border-color);">
+  <p>🌟 社区由用户共同维护，分享优质搜索源让大家受益 🌟</p>
+  <p>
+    <a href="#" onclick="window.app.getManager('community').showShareSourceModal(); return false;" style="color: var(--accent-primary); text-decoration: none;">
+      立即分享您的搜索源
+    </a>
+    |
+    <a href="#" onclick="alert('举报请通过搜索源项目中的举报按钮'); return false;" style="color: var(--accent-primary); text-decoration: none;">
+      举报不当内容
+    </a>
+    |
+    <a href="#" onclick="alert('社区规则：\\n1. 分享的搜索源应该是合法的\\n2. 不得分享包含恶意内容的链接\\n3. 描述应该准确真实\\n4. 尊重他人的分享和评价'); return false;" style="color: var(--accent-primary); text-decoration: none;">
+      社区规则
+    </a>
+  </p>
+  <!-- 🆕 数据库状态指示器 -->
+  <div class="db-status-indicator" id="dbStatusIndicator" style="margin-top: 0.5rem; font-size: 0.75rem;">
+    <span id="dbStatus" style="color: var(--success-color);">✅ 数据库连接正常</span>
+  </div>
+</div>
             </div>
 
             <!-- 系统设置标签页 -->
@@ -699,7 +699,7 @@
                         </div>
 
                         <!-- 测试按钮 -->
-                        <button type="button" class="test-status-check-btn" onclick="window.app.getManager('settings').testSourceStatusCheck()">
+                        <button type="button" class="test-status-check-btn" onclick="app.getManager('settings').testSourceStatusCheck()">
                             <span>⚡</span>
                             <span>测试状态检查功能</span>
                         </button>
@@ -835,23 +835,16 @@
         <div class="spinner"></div>
     </div>
 
-<!-- 脚本文件 - ES6模块化 -->
-<script type="module">
-    // 修正导入路径
-    import DashboardApp from './src/pages/dashboard/dashboard-app.js';
-    import { configManager } from './src/core/config.js';
+    <!-- 脚本文件 - ES6模块化 -->
+    <script type="module">
+        // 修正导入路径
+        import DashboardApp from './src/pages/dashboard/dashboard-app.js';
 
-    // 页面加载完成后初始化
-    document.addEventListener('DOMContentLoaded', async () => {
-        console.log('DOM加载完成，开始初始化Dashboard');
-        
-        // 更新页面标题和品牌名称
-        try {
-            // 先初始化配置
-            console.log('开始初始化配置管理器...');
-            await configManager.init();
-            console.log('配置管理器初始化完成');
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM加载完成，开始初始化Dashboard');
             
+            // 更新页面标题和品牌名称
             if (window.API_CONFIG) {
                 const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
                 const pageTitle = document.getElementById('page-title');
@@ -860,211 +853,161 @@
                 if (pageTitle) pageTitle.textContent = `用户面板 - ${appName}`;
                 if (brandText) brandText.textContent = appName;
             }
-        } catch (error) {
-            console.error('配置初始化失败:', error);
-            // 继续执行，使用默认配置
-        }
-        
-        try {
-            // 关键修改：使用新架构创建app实例
-            console.log('正在创建DashboardApp实例...');
-            window.app = new DashboardApp();
-            console.log('DashboardApp实例已创建');
             
-            // 关键修改：等待app完全初始化
-            console.log('等待app初始化完成...');
-            const initSuccess = await window.app.waitForInitialization();
-            
-            if (initSuccess) {
-                console.log('✅ DashboardApp初始化成功');
+            try {
+                // 创建全局app实例
+                window.app = new DashboardApp();
+                console.log('DashboardApp实例已创建');
                 
                 // 绑定所有按钮事件
                 bindButtonEvents();
                 
-                console.log('✅ Dashboard完全就绪');
-            } else {
-                console.log('❌ DashboardApp初始化失败，但没有抛出异常');
-                // 不显示错误提示，因为init方法已经处理了错误显示和跳转
+            } catch (error) {
+                console.error('初始化Dashboard失败:', error);
+                alert('系统初始化失败，请刷新页面重试');
             }
-            
-        } catch (error) {
-            console.error('❌ 初始化Dashboard过程中捕获到异常:', error);
-            
-            // 友好的错误提示
-            const errorMessage = getErrorMessage(error);
-            console.log('显示错误消息:', errorMessage);
-            
-            // 记录详细错误信息供调试
-            console.error('详细错误信息:', {
-                message: error.message,
-                stack: error.stack,
-                timestamp: Date.now()
-            });
-            
-            // 只有在捕获到真正的异常时才显示alert
-            alert(errorMessage);
-        }
-    });
+        });
 
-    // 改进的错误消息处理
-    function getErrorMessage(error) {
-        if (error.message.includes('服务')) {
-            return '服务初始化失败，请检查网络连接后刷新页面重试';
-        } else if (error.message.includes('认证')) {
-            return '登录状态已过期，即将跳转到登录页面';
-        } else if (error.message.includes('配置')) {
-            return '系统配置加载失败，请刷新页面重试';
-        } else {
-            return '系统初始化失败，请刷新页面重试';
-        }
-    }
+        // 绑定按钮事件的函数
+        function bindButtonEvents() {
+            console.log('开始绑定按钮事件');
+            
+            // 等待app初始化完成
+            const waitForApp = () => {
+                if (!window.app) {
+                    console.log('等待app实例创建...');
+                    setTimeout(waitForApp, 100);
+                    return;
+                }
+                
+                if (!window.app.isReady()) {
+                    console.log('等待app初始化完成...');
+                    setTimeout(waitForApp, 100);
+                    return;
+                }
+                
+                console.log('app已就绪，开始绑定事件');
+                
+                // 绑定设置相关按钮
+                const settingsButtons = {
+                    'saveSettingsBtn': () => window.app.saveSettings(),
+                    'resetSettingsBtn': () => window.app.resetSettings(),
+                    'changePasswordBtn': () => window.app.changePassword(),
+                    'clearAllDataBtn': () => window.app.clearAllData(),
+                    'deleteAccountBtn': () => window.app.deleteAccount(),
+                    
+                    // 收藏相关
+                    'syncFavoritesBtn': () => window.app.syncFavorites(),
+                    'exportFavoritesBtn': () => window.app.exportFavorites(),
+                    
+                    // 历史相关
+                    'syncHistoryBtn': () => window.app.syncHistory(),
+                    'clearAllHistoryBtn': () => window.app.clearAllHistory(),
+                    
+                    // 搜索源相关
+                    'enableAllSourcesBtn': () => window.app.enableAllSources(),
+                    'disableAllSourcesBtn': () => window.app.disableAllSources(),
+                    'resetToDefaultsBtn': () => window.app.resetToDefaults(),
+                };
 
-    // 改进的按钮事件绑定函数
-    function bindButtonEvents() {
-        console.log('开始绑定按钮事件');
-        
-        // 验证app状态
-        if (!window.app || !window.app.isReady()) {
-            console.error('App未准备就绪，无法绑定事件');
-            return;
-        }
-        
-        // 验证服务可用性
-        const communityManager = window.app.getManager('community');
-        if (communityManager) {
-            console.log('✅ 社区管理器已就绪');
-            
-            // 验证社区管理器的子管理器
-            if (communityManager.communityTags && communityManager.communitySources) {
-                console.log('✅ 社区标签和源管理器已就绪');
-            } else {
-                console.warn('⚠️ 社区子管理器未完全初始化');
-            }
-        } else {
-            console.error('❌ 社区管理器未找到');
-        }
-        
-        // 绑定设置相关按钮
-        const settingsButtons = {
-            'saveSettingsBtn': () => window.app.saveSettings(),
-            'resetSettingsBtn': () => window.app.resetSettings(),
-            'changePasswordBtn': () => window.app.changePassword(),
-            'clearAllDataBtn': () => window.app.clearAllData(),
-            'deleteAccountBtn': () => window.app.deleteAccount(),
-            
-            // 收藏相关
-            'syncFavoritesBtn': () => window.app.syncFavorites(),
-            'exportFavoritesBtn': () => window.app.exportFavorites(),
-            
-            // 历史相关
-            'syncHistoryBtn': () => window.app.syncHistory(),
-            'clearAllHistoryBtn': () => window.app.clearAllHistory(),
-            
-            // 搜索源相关
-            'enableAllSourcesBtn': () => window.app.enableAllSources(),
-            'disableAllSourcesBtn': () => window.app.disableAllSources(),
-            'resetToDefaultsBtn': () => window.app.resetToDefaults(),
-        };
-
-        // 绑定所有按钮事件
-        let boundCount = 0;
-        Object.entries(settingsButtons).forEach(([id, handler]) => {
-            const btn = document.getElementById(id);
-            if (btn) {
-                btn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    try {
-                        console.log(`执行按钮操作: ${id}`);
-                        await handler();
-                    } catch (error) {
-                        console.error(`按钮 ${id} 执行失败:`, error);
-                        
-                        // 改进的错误提示
-                        const friendlyMessage = error.message.includes('服务') ? 
-                            '服务暂时不可用，请稍后重试' : 
-                            '操作失败，请稍后重试';
-                        alert(friendlyMessage);
+                // 绑定所有按钮事件
+                let boundCount = 0;
+                Object.entries(settingsButtons).forEach(([id, handler]) => {
+                    const btn = document.getElementById(id);
+                    if (btn) {
+                        btn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            try {
+                                console.log(`执行按钮操作: ${id}`);
+                                handler();
+                            } catch (error) {
+                                console.error(`按钮 ${id} 执行失败:`, error);
+                                alert('操作失败，请稍后重试');
+                            }
+                        });
+                        boundCount++;
+                        console.log(`已绑定按钮: ${id}`);
+                    } else {
+                        console.warn(`按钮 ${id} 未找到`);
                     }
                 });
-                boundCount++;
-                console.log(`✅ 已绑定按钮: ${id}`);
-            } else {
-                console.warn(`⚠️ 按钮 ${id} 未找到`);
-            }
-        });
 
-        // 绑定快速操作按钮
-        let actionButtonCount = 0;
-        document.querySelectorAll('.action-btn[data-action]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const action = btn.dataset.action;
-                console.log(`执行快速操作: ${action}`);
+                // 绑定快速操作按钮
+                let actionButtonCount = 0;
+                document.querySelectorAll('.action-btn[data-action]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const action = btn.dataset.action;
+                        console.log(`执行快速操作: ${action}`);
+                        
+                        try {
+                            switch (action) {
+                                case 'search':
+                                    window.location.href = 'index.html';
+                                    break;
+                                case 'favorites':
+                                    window.app.switchTab('favorites');
+                                    break;
+                                case 'sources':
+                                    window.app.switchTab('sources');
+                                    break;
+                                case 'export':
+                                    window.app.exportData();
+                                    break;
+                                default:
+                                    console.warn('未知操作:', action);
+                            }
+                        } catch (error) {
+                            console.error(`快速操作 ${action} 失败:`, error);
+                            alert('操作失败，请稍后重试');
+                        }
+                    });
+                    actionButtonCount++;
+                });
+
+                // 绑定搜索收藏按钮
+                const favoritesSearchBtn = document.querySelector('#favorites .search-box button');
+                if (favoritesSearchBtn) {
+                    favoritesSearchBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        try {
+                            console.log('执行搜索收藏操作');
+                            window.app.searchFavorites();
+                        } catch (error) {
+                            console.error('搜索收藏失败:', error);
+                            alert('搜索失败，请稍后重试');
+                        }
+                    });
+                    console.log('已绑定收藏搜索按钮');
+                }
+
+                console.log(`事件绑定完成 - 设置按钮: ${boundCount}个, 快速操作按钮: ${actionButtonCount}个`);
                 
-                try {
-                    switch (action) {
-                        case 'search':
-                            window.location.href = 'index.html';
-                            break;
-                        case 'favorites':
-                            window.app.switchTab('favorites');
-                            break;
-                        case 'sources':
-                            window.app.switchTab('sources');
-                            break;
-                        case 'export':
-                            window.app.exportData();
-                            break;
-                        default:
-                            console.warn('未知操作:', action);
-                    }
-                } catch (error) {
-                    console.error(`快速操作 ${action} 失败:`, error);
-                    alert('操作失败，请稍后重试');
+                // 验证社区管理器是否存在
+                const communityManager = window.app.getManager('community');
+                if (communityManager) {
+                    console.log('社区管理器已就绪');
+                } else {
+                    console.error('社区管理器未找到');
                 }
-            });
-            actionButtonCount++;
+                
+                console.log('所有按钮事件绑定完成');
+            };
+            
+            // 开始等待
+            waitForApp();
+        }
+
+        // 全局错误处理
+        window.addEventListener('error', (event) => {
+            console.error('全局错误:', event.error);
         });
 
-        // 修复收藏搜索按钮绑定
-        const favoritesSearchBtn = document.querySelector('#favorites .search-box button');
-        if (favoritesSearchBtn) {
-            favoritesSearchBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                try {
-                    console.log('执行搜索收藏操作');
-                    window.app.searchFavorites();
-                } catch (error) {
-                    console.error('搜索收藏失败:', error);
-                    alert('搜索失败，请稍后重试');
-                }
-            });
-            console.log('✅ 已绑定收藏搜索按钮');
-        }
-
-        console.log(`🎉 事件绑定完成 - 设置按钮: ${boundCount}个, 快速操作按钮: ${actionButtonCount}个`);
-    }
-
-    // 改进的全局错误处理
-    window.addEventListener('error', (event) => {
-        console.error('🚨 全局错误:', event.error);
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('未处理的Promise拒绝:', event.reason);
+        });
         
-        // 检查是否是服务相关错误
-        if (event.error?.message?.includes('服务') || event.error?.message?.includes('Service')) {
-            console.error('检测到服务相关错误，可能需要重新初始化');
-        }
-    });
-
-    window.addEventListener('unhandledrejection', (event) => {
-        console.error('🚨 未处理的Promise拒绝:', event.reason);
-        
-        // 检查是否是初始化失败
-        if (event.reason?.message?.includes('初始化') || event.reason?.message?.includes('initialization')) {
-            console.error('检测到初始化相关的Promise拒绝');
-        }
-    });
-    
-    console.log('📜 脚本加载完成');
-</script>
+        console.log('脚本加载完成');
+    </script>
 </body>
 </html>
