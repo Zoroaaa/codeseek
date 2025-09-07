@@ -1,5 +1,5 @@
 // src/services/auth/auth-service.js
-// 认证核心服务 - 从auth.js重构
+// 修复版认证核心服务
 
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { validateUsername, validateEmail, validatePassword } from '../../utils/validation.js';
@@ -35,6 +35,7 @@ export class AuthService {
       try {
         const user = JSON.parse(userStr);
         this.setAuth(user, token);
+        console.log('从localStorage恢复认证状态:', user.username);
       } catch (error) {
         console.error('解析用户信息失败:', error);
         this.clearAuth();
@@ -55,6 +56,8 @@ export class AuthService {
     if (this.apiClient) {
       this.apiClient.setToken(token);
     }
+    
+    console.log('✅ 认证信息已设置:', user.username);
     
     // 启动token刷新定时器
     this.startTokenRefresh();
@@ -79,6 +82,8 @@ export class AuthService {
       this.apiClient.clearToken();
     }
     
+    console.log('认证信息已清除');
+    
     // 停止token刷新
     this.stopTokenRefresh();
     
@@ -90,11 +95,14 @@ export class AuthService {
   async login(username, password) {
     try {
       this.showLoading(true);
+      console.log('开始登录流程...');
       
       const response = await this.apiClient.post('/api/auth/login', {
         username,
         password
       });
+      
+      console.log('登录响应:', response);
       
       if (response.success && response.user && response.token) {
         this.setAuth(response.user, response.token);
@@ -158,29 +166,54 @@ export class AuthService {
     }
   }
 
-  // 验证token
+  // 🔧 修复：验证token方法
   async verifyToken() {
+    console.log('开始验证token...');
+    
     if (!this.token) {
-      return false;
+      console.log('没有token需要验证');
+      return { success: false, error: '没有token' };
     }
 
     try {
-      const response = await this.apiClient.post('/api/auth/verify-token', {
-        token: this.token
-      });
+      // 🔧 关键修复：使用GET请求，token通过Authorization header发送
+      console.log('向服务器验证token...');
+      const response = await this.apiClient.get('/api/auth/verify');
       
-      if (response.success && response.user) {
+      console.log('token验证响应:', response);
+      
+      if (response && response.success && response.user) {
+        // 更新用户信息
         this.currentUser = response.user;
         localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.CURRENT_USER, JSON.stringify(response.user));
-        return true;
+        
+        console.log('✅ Token验证成功:', response.user.username);
+        
+        return {
+          success: true,
+          user: response.user
+        };
       } else {
+        console.warn('Token验证失败，清除认证信息');
         this.clearAuth();
-        return false;
+        return {
+          success: false,
+          error: 'Token验证失败'
+        };
       }
     } catch (error) {
-      console.error('验证token失败:', error);
-      this.clearAuth();
-      return false;
+      console.error('Token验证过程出错:', error);
+      
+      // 如果是401错误，说明token过期或无效
+      if (error.message.includes('401') || error.message.includes('unauthorized')) {
+        console.log('Token已过期，清除认证信息');
+        this.clearAuth();
+      }
+      
+      return {
+        success: false,
+        error: error.message || 'Token验证失败'
+      };
     }
   }
 
@@ -234,21 +267,66 @@ export class AuthService {
 
   // 注册验证
   validateRegistration(username, email, password) {
-    const usernameResult = validateUsername(username);
-    if (!usernameResult.valid) {
-      return { valid: false, message: usernameResult.errors[0] };
-    }
+    // 如果validation函数不存在，使用基本验证
+    try {
+      const usernameResult = validateUsername ? validateUsername(username) : this.basicValidateUsername(username);
+      if (!usernameResult.valid) {
+        return { valid: false, message: usernameResult.errors?.[0] || usernameResult.message };
+      }
 
-    const emailResult = validateEmail(email);
-    if (!emailResult.valid) {
-      return { valid: false, message: emailResult.errors[0] };
-    }
+      const emailResult = validateEmail ? validateEmail(email) : this.basicValidateEmail(email);
+      if (!emailResult.valid) {
+        return { valid: false, message: emailResult.errors?.[0] || emailResult.message };
+      }
 
-    const passwordResult = validatePassword(password);
-    if (!passwordResult.valid) {
-      return { valid: false, message: passwordResult.errors[0] };
-    }
+      const passwordResult = validatePassword ? validatePassword(password) : this.basicValidatePassword(password);
+      if (!passwordResult.valid) {
+        return { valid: false, message: passwordResult.errors?.[0] || passwordResult.message };
+      }
 
+      return { valid: true };
+    } catch (error) {
+      console.warn('验证函数不可用，使用基本验证');
+      return this.basicValidateRegistration(username, email, password);
+    }
+  }
+
+  // 基本验证方法（后备）
+  basicValidateRegistration(username, email, password) {
+    const usernameResult = this.basicValidateUsername(username);
+    if (!usernameResult.valid) return usernameResult;
+    
+    const emailResult = this.basicValidateEmail(email);
+    if (!emailResult.valid) return emailResult;
+    
+    const passwordResult = this.basicValidatePassword(password);
+    if (!passwordResult.valid) return passwordResult;
+    
+    return { valid: true };
+  }
+
+  basicValidateUsername(username) {
+    if (!username || username.length < 3) {
+      return { valid: false, message: '用户名至少需要3个字符' };
+    }
+    if (username.length > 20) {
+      return { valid: false, message: '用户名不能超过20个字符' };
+    }
+    return { valid: true };
+  }
+
+  basicValidateEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      return { valid: false, message: '请输入有效的邮箱地址' };
+    }
+    return { valid: true };
+  }
+
+  basicValidatePassword(password) {
+    if (!password || password.length < 6) {
+      return { valid: false, message: '密码至少需要6个字符' };
+    }
     return { valid: true };
   }
 
@@ -283,7 +361,9 @@ export class AuthService {
         this.token = response.token;
         localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN, response.token);
         this.apiClient.setToken(response.token);
+        console.log('Token已刷新');
       } else {
+        console.warn('Token刷新失败，清除认证信息');
         this.clearAuth();
       }
     } catch (error) {
@@ -349,7 +429,7 @@ export class AuthService {
   // 工具方法
   showNotification(message, type) {
     if (this.notificationService) {
-      this.notificationService.showToast(message, type);
+      this.notificationService.show(message, type);
     } else if (typeof window.showToast === 'function') {
       window.showToast(message, type);
     } else {
