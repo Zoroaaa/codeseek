@@ -170,6 +170,24 @@ export class APIClient {
       return { status: 'error', message: error.message };
     }
   }
+
+  // 🔧 新增：测试连接方法
+  async testConnection() {
+    try {
+      const healthResult = await this.healthCheck();
+      return { 
+        connected: healthResult.status === 'healthy',
+        status: healthResult.status,
+        message: healthResult.message 
+      };
+    } catch (error) {
+      return { 
+        connected: false, 
+        status: 'error',
+        error: error.message 
+      };
+    }
+  }
 }
 
 // 创建单例实例
