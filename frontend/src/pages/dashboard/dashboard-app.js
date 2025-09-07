@@ -180,19 +180,36 @@ export class DashboardApp {
     return this.isInitialized;
   }
 
-  // 🔧 改进：检查认证状态 - 使用新的认证服务
+  // 🔧 改进：检查认证状态 - 调试token问题
   async checkAuth() {
     console.log('步骤4: 开始认证检查...');
     
-    const token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-    if (!token) {
+    // 🔧 详细检查localStorage中的认证信息
+    console.log('检查localStorage中的认证信息...');
+    const authToken = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+    const currentUser = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.CURRENT_USER);
+    
+    console.log('auth_token:', authToken ? `存在 (长度: ${authToken.length})` : '不存在');
+    console.log('current_user:', currentUser ? '存在' : '不存在');
+    
+    // 🔧 也检查其他可能的key
+    console.log('检查其他可能的认证key...');
+    const allKeys = Object.keys(localStorage);
+    const authRelatedKeys = allKeys.filter(key => 
+      key.includes('auth') || key.includes('token') || key.includes('user')
+    );
+    console.log('localStorage中与认证相关的keys:', authRelatedKeys);
+    authRelatedKeys.forEach(key => {
+      console.log(`${key}: ${localStorage.getItem(key)?.substring(0, 50)}...`);
+    });
+
+    if (!authToken) {
       console.error('认证失败: 未找到认证token');
       throw new Error('未找到认证token，请重新登录');
     }
     console.log('✅ 找到认证token');
 
     try {
-      // 🔧 增加服务可用性检查
       console.log('获取认证服务...');
       const authService = getService('authService');
       if (!authService) {
@@ -205,21 +222,49 @@ export class DashboardApp {
       const result = await authService.verifyToken();
       console.log('Token验证结果:', result);
       
-      if (!result || !result.success || !result.user) {
+      if (!result || !result.success) {
         console.error('Token验证失败:', result);
+        
+        // 🔧 如果有存储的用户信息，尝试使用它
+        if (currentUser) {
+          try {
+            const userData = JSON.parse(currentUser);
+            console.log('尝试使用存储的用户信息:', userData);
+            this.currentUser = userData;
+            this.updateUserUI();
+            console.log('✅ 使用存储的用户信息完成认证');
+            return;
+          } catch (e) {
+            console.error('解析存储的用户信息失败:', e);
+          }
+        }
+        
+        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.CURRENT_USER);
         throw new Error('Token验证失败，请重新登录');
+      }
+      
+      if (!result.user) {
+        console.error('Token验证成功但未返回用户信息:', result);
+        throw new Error('认证服务返回的用户信息无效');
       }
       
       this.currentUser = result.user;
       console.log('✅ 认证成功，用户:', this.currentUser.username);
+      
+      // 🔧 保存用户信息到localStorage
+      localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.CURRENT_USER, JSON.stringify(this.currentUser));
+      
       this.updateUserUI();
       console.log('✅ 用户界面更新完成');
       
     } catch (error) {
       console.error('认证过程出错:', error);
-      
-      // 清除无效token
-      localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+      console.error('错误详情:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       
       // 根据错误类型提供不同的错误信息
       if (error.message.includes('网络') || error.message.includes('fetch')) {
