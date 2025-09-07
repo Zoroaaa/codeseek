@@ -494,4 +494,4 @@ export class UserSettingsService {
   }
 }
 
-export default UserService;
+export default UserSettingsService;
