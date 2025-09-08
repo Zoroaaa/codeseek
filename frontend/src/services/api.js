@@ -537,15 +537,27 @@ class APIService {
   }
 
   // 用户设置相关API - 支持详情提取设置
-  async getUserSettings() {
+async getUserSettings() {
     try {
       const response = await this.request('/api/user/settings');
-      return response.settings || {};
+      const serverSettings = response.settings || {};
+      
+      // ✅ 修复：合并服务器设置和默认设置
+      const mergedSettings = {
+        ...APP_CONSTANTS.DEFAULT_USER_SETTINGS,  // 先应用默认设置
+        ...serverSettings  // 再覆盖服务器设置
+      };
+      
+      console.log('合并后的用户设置:', mergedSettings);
+      return mergedSettings;
+      
     } catch (error) {
-      console.error('获取用户设置失败:', error);
-      return {};
+      console.error('获取用户设置失败，使用默认设置:', error);
+      
+      // ✅ 修复：失败时返回默认设置而不是空对象
+      return { ...APP_CONSTANTS.DEFAULT_USER_SETTINGS };
     }
-  }
+}
 
   async updateUserSettings(settings) {
     if (!this.token) {

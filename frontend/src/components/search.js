@@ -50,28 +50,26 @@ export class SearchManager {
   }
 
   // 🆕 加载详情提取配置
-  async loadDetailExtractionConfig() {
-    if (!authManager.isAuthenticated()) {
-      this.detailExtractionEnabled = false;
-      return;
-    }
-
+async loadDetailExtractionConfig() {
     try {
-      const userSettings = await apiService.getUserSettings();
+      // 无论是否登录，都尝试获取设置（未登录时会返回默认值）
+      const userSettings = authManager.isAuthenticated() 
+        ? await apiService.getUserSettings() 
+        : APP_CONSTANTS.DEFAULT_USER_SETTINGS;
       
-      this.detailExtractionEnabled = userSettings.enableDetailExtraction || false;
+      this.detailExtractionEnabled = userSettings.enableDetailExtraction;
       this.detailExtractionConfig = {
-        autoExtractDetails: userSettings.autoExtractDetails || false,
-        maxAutoExtractions: userSettings.maxAutoExtractions || 5,
-        extractionBatchSize: userSettings.extractionBatchSize || 3,
-        showExtractionProgress: userSettings.showExtractionProgress !== false,
-        enableCache: userSettings.enableCache !== false,
-        showScreenshots: userSettings.showScreenshots !== false,
-        showDownloadLinks: userSettings.showDownloadLinks !== false,
-        showMagnetLinks: userSettings.showMagnetLinks !== false,
-        showActressInfo: userSettings.showActressInfo !== false,
-        compactMode: userSettings.compactMode || false,
-        enableImagePreview: userSettings.enableImagePreview !== false
+        autoExtractDetails: userSettings.autoExtractDetails,
+        maxAutoExtractions: userSettings.maxAutoExtractions,
+        extractionBatchSize: userSettings.extractionBatchSize,
+        showExtractionProgress: userSettings.showExtractionProgress,
+        enableCache: userSettings.enableCache,
+        showScreenshots: userSettings.showScreenshots,
+        showDownloadLinks: userSettings.showDownloadLinks,
+        showMagnetLinks: userSettings.showMagnetLinks,
+        showActressInfo: userSettings.showActressInfo,
+        compactMode: userSettings.compactMode,
+        enableImagePreview: userSettings.enableImagePreview
       };
 
       console.log('详情提取配置已加载:', {
@@ -80,10 +78,10 @@ export class SearchManager {
       });
 
     } catch (error) {
-      console.warn('加载详情提取配置失败:', error);
-      this.detailExtractionEnabled = false;
+      console.warn('加载详情提取配置失败，使用默认配置:', error);
+      // 这种情况下已经在 getUserSettings 中处理了默认值
     }
-  }
+}
   
   // 暴露必要的全局方法
   exposeGlobalMethods() {
