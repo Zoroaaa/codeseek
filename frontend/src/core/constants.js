@@ -516,8 +516,8 @@ export const APP_CONSTANTS = {
     retryFailedSources: false,
     
     // 🆕 详情提取默认设置
-    enableDetailExtraction: false, // 默认关闭详情提取
-    autoExtractDetails: false, // 默认关闭自动提取
+    enableDetailExtraction: true, // 默认关闭详情提取
+    autoExtractDetails: true, // 默认关闭自动提取
     maxAutoExtractions: 5, // 自动提取最大数量
     detailExtractionTimeout: 15000, // 详情提取超时时间
     detailCacheDuration: 86400000, // 详情缓存时间（24小时）
