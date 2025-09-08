@@ -315,6 +315,25 @@ export class DetailExtractorService {
       }
 
       const content = await response.text();
+	    // 添加这些日志
+  console.log(`=== 页面内容调试 [${url}] ===`);
+  console.log('Content Length:', content.length);
+  console.log('Content Preview (first 1000 chars):', content.substring(0, 1000));
+  console.log('Content Contains Title Tags:', content.includes('<title>'));
+  console.log('Content Contains Body Tags:', content.includes('<body>'));
+  
+  // 检查是否是错误页面或登录页面
+  if (content.includes('登录') || content.includes('login') || content.includes('验证码')) {
+    console.warn('⚠️ 可能获取到了登录页面');
+  }
+  if (content.includes('404') || content.includes('Not Found')) {
+    console.warn('⚠️ 可能获取到了404页面');
+  }
+  if (content.includes('cloudflare') || content.includes('checking your browser')) {
+    console.warn('⚠️ 可能被Cloudflare拦截');
+  }
+  
+  console.log('=== 页面内容调试结束 ===');
       return content;
 
     } catch (error) {

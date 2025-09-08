@@ -42,6 +42,23 @@ export async function extractSingleDetailHandler(request, env) {
     
     // 执行详情提取
     const detailInfo = await detailExtractor.extractSingleDetail(searchResult, extractOptions);
+	
+	    // 添加这些日志来检查提取结果
+    console.log(`=== 详情提取结果检查 ===`);
+    console.log('Extraction Status:', detailInfo.extractionStatus);
+    console.log('Source Type:', detailInfo.sourceType);
+    console.log('Title:', detailInfo.title || 'No title');
+    console.log('Code:', detailInfo.code || 'No code found');
+    console.log('Cover Image:', detailInfo.coverImage || 'No cover image');
+    console.log('Description:', detailInfo.description?.substring(0, 100) || 'No description');
+    console.log('Tags Count:', detailInfo.tags?.length || 0);
+    console.log('Actresses Count:', detailInfo.actresses?.length || 0);
+    console.log('Extraction Time:', detailInfo.extractionTime, 'ms');
+    
+    if (detailInfo.extractionError) {
+      console.error('Extraction Error:', detailInfo.extractionError);
+    }
+    console.log(`=== 详情提取结果检查结束 ===`);
     
     // 记录用户行为（如果已认证）
     const user = await authenticate(request, env).catch(() => null);
