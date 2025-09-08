@@ -33,7 +33,7 @@
 	
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
     
-    <!-- 🆕 详情提取功能支持的meta标签 -->
+    <!-- 详情提取功能支持的meta标签 -->
     <meta name="detail-extraction-supported" content="true">
     <meta name="detail-extraction-version" content="1.0.0">
 </head>
@@ -49,7 +49,7 @@
             </div>
             <div class="nav-menu">
                 <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
-                <!-- 🆕 详情提取功能切换按钮 -->
+                <!-- 详情提取功能切换按钮 -->
                 <button id="detailExtractionToggle" class="detail-extraction-btn" title="切换详情提取功能" style="display:none;">
                     📋
                 </button>
@@ -97,7 +97,7 @@
                     </button>
                 </div>
                 
-                <!-- 🆕 搜索选项 -->
+                <!-- 搜索选项 -->
                 <div class="search-options" style="display:none;">
                     <label class="checkbox-label">
                         <input type="checkbox" id="enableDetailExtraction" disabled>
@@ -119,12 +119,12 @@
                     <li>输入完整番号获得最精确结果</li>
                     <li>使用空格分隔多个关键词</li>
                     <li>登录后可享受云端同步服务</li>
-                    <li>🆕 支持详情提取的站点会显示 📋 标识</li>
+                    <li>支持详情提取的站点会显示 📋 标识</li>
                 </ul>
             </div>
         </section>
 
-        <!-- 🆕 详情提取功能状态指示器 -->
+        <!-- 详情提取功能状态指示器 -->
         <section id="detailExtractionStatus" class="detail-extraction-status" style="display:none;">
             <div class="status-content">
                 <div class="status-header">
@@ -143,7 +143,7 @@
             <!-- 内容将通过JavaScript动态更新 -->
         </section>
 
-        <!-- 🆕 详情提取进度指示器 -->
+        <!-- 详情提取进度指示器 -->
         <section id="detailExtractionProgress" class="detail-extraction-progress" style="display:none;">
             <!-- 内容将通过JavaScript动态更新 -->
         </section>
@@ -151,7 +151,7 @@
         <!-- 搜索历史 -->
         <section id="historySection" class="history-section" style="display:none;">
             <div class="section-header">
-                <h2>🕐 搜索历史</h2>
+                <h2>🕒 搜索历史</h2>
                 <button id="clearHistoryBtn" class="clear-btn">清空历史</button>
             </div>
             <div id="historyList" class="history-list"></div>
@@ -162,7 +162,7 @@
             <div class="section-header">
                 <h2>🔍 搜索结果</h2>
                 <div class="section-actions">
-                    <!-- 🆕 详情提取控制按钮 -->
+                    <!-- 详情提取控制按钮 -->
                     <button id="batchExtractBtn" class="action-btn detail-action-btn" style="display:none;">
                         <span class="btn-icon">📋</span>
                         <span class="btn-text">批量提取</span>
@@ -173,7 +173,7 @@
             </div>
             <div id="searchInfo" class="search-info"></div>
             
-            <!-- 🆕 详情提取统计信息 -->
+            <!-- 详情提取统计信息 -->
             <div id="detailExtractionStats" class="detail-extraction-stats" style="display:none;">
                 <div class="stats-content">
                     <span class="stats-item">
@@ -311,7 +311,7 @@
         </div>
     </div>
 
-    <!-- 🆕 详情提取设置模态框 -->
+    <!-- 详情提取设置模态框 -->
     <div id="detailSettingsModal" class="modal" aria-labelledby="detail-settings-title" role="dialog" style="display:none;">
         <div class="modal-content">
             <span class="close" aria-label="关闭">&times;</span>
@@ -389,12 +389,12 @@
         <span class="status-text">检查连接...</span>
     </div>
 
-    <!-- 🆕 图片预览模态框容器 -->
+    <!-- 图片预览模态框容器 -->
     <div id="imagePreviewContainer"></div>
 
-    <!-- 🆕 核心变更：使用新服务架构的脚本加载 -->
+    <!-- 🔄 核心变更：使用统一搜索组件的脚本加载 -->
     <script type="module">
-        // 🆕 重要：现在使用新的服务架构初始化应用
+        // 🔄 重要：现在使用更新后的服务架构初始化应用
         import MagnetSearchApp from './src/pages/main/main.js';
         
         // 全局导航函数（保持向后兼容）
@@ -404,7 +404,7 @@
             }
         };
 
-        // 🆕 全局详情提取功能控制函数
+        // 全局详情提取功能控制函数
         window.toggleDetailExtraction = function() {
             if (window.app && window.app.toggleDetailExtraction) {
                 window.app.toggleDetailExtraction();
@@ -418,9 +418,10 @@
             }
         };
 
+        // 🔄 批量提取详情 - 使用统一搜索管理器
         window.batchExtractDetails = function() {
-            if (window.searchManager && window.searchManager.extractBatchDetails) {
-                window.searchManager.extractBatchDetails();
+            if (window.unifiedSearchManager && window.unifiedSearchManager.extractBatchDetails) {
+                window.unifiedSearchManager.extractBatchDetails();
             }
         };
 
@@ -437,10 +438,10 @@
                     document.getElementById('hero-title').textContent = `${appName} - 专业版`;
                 }
                 
-                // 🆕 核心变更：创建使用新服务架构的应用实例
+                // 🔄 核心变更：创建使用统一搜索组件的应用实例
                 window.app = new MagnetSearchApp();
                 
-                // 🆕 初始化详情提取功能相关的事件监听器
+                // 初始化详情提取功能相关的事件监听器
                 initDetailExtractionUI();
                 
                 console.log('✅ 应用初始化完成');
@@ -465,7 +466,7 @@
             }
         });
 
-        // 🆕 初始化详情提取功能UI
+        // 初始化详情提取功能UI
         function initDetailExtractionUI() {
             // 详情提取切换按钮
             const detailToggleBtn = document.getElementById('detailExtractionToggle');
@@ -498,7 +499,7 @@
             }
         }
 
-        // 🆕 处理详情设置表单提交
+        // 处理详情设置表单提交
         async function handleDetailSettingsSubmit(event) {
             event.preventDefault();
             
@@ -508,7 +509,6 @@
             }
 
             try {
-                const formData = new FormData(event.target);
                 const settings = {
                     autoExtractDetails: document.getElementById('autoExtractDetails').checked,
                     maxAutoExtractions: parseInt(document.getElementById('maxAutoExtractions').value),
@@ -531,9 +531,9 @@
                 // 关闭模态框
                 document.getElementById('detailSettingsModal').style.display = 'none';
                 
-                // 通知搜索管理器重新加载配置
-                if (window.searchManager && window.searchManager.loadDetailExtractionConfig) {
-                    await window.searchManager.loadDetailExtractionConfig();
+                // 🔄 通知统一搜索管理器重新加载配置
+                if (window.unifiedSearchManager && window.unifiedSearchManager.loadUserConfig) {
+                    await window.unifiedSearchManager.loadUserConfig();
                 }
 
                 showToast('详情提取设置已保存', 'success');
@@ -549,7 +549,7 @@
             }
         }
 
-        // 🆕 处理详情提取开关
+        // 处理详情提取开关
         async function handleDetailExtractionToggle(event) {
             if (!window.app || !window.app.currentUser) {
                 event.target.checked = false;
@@ -573,7 +573,7 @@
             }
         }
 
-        // 🆕 处理源状态检查开关
+        // 处理源状态检查开关
         async function handleSourceStatusToggle(event) {
             if (!window.app || !window.app.currentUser) {
                 event.target.checked = false;
@@ -608,7 +608,7 @@
             }
         });
 
-        // 🆕 服务架构健康检查（开发环境）
+        // 🔄 服务架构健康检查（开发环境）
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             window.addEventListener('load', () => {
                 setTimeout(() => {

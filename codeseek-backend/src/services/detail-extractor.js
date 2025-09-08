@@ -1,4 +1,4 @@
-// src/services/detail-extractor.js - 番号详情提取服务
+// src/services/detail-extractor.js - 修复版本：支持链接跟踪到详情页面
 import { utils } from '../utils.js';
 import { contentParser } from './content-parser.js';
 import { cacheManager } from './cache-manager.js';
@@ -10,110 +10,6 @@ export class DetailExtractorService {
     this.defaultTimeout = 15000;
     this.retryAttempts = 2;
     this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
-  }
-
-  /**
-   * 批量提取详情信息
-   * @param {Array} searchResults - 搜索结果数组
-   * @param {Object} options - 提取选项
-   * @returns {Array} 包含详情信息的结果数组
-   */
-  async extractBatchDetails(searchResults, options = {}) {
-    const {
-      enableCache = true,
-      timeout = this.defaultTimeout,
-      onProgress = null,
-      enableRetry = true
-    } = options;
-
-    console.log(`开始批量提取 ${searchResults.length} 个结果的详情信息`);
-
-    const results = [];
-    const concurrency = Math.min(this.maxConcurrentExtractions, searchResults.length);
-
-    // 分批处理，避免同时发起过多请求
-    for (let i = 0; i < searchResults.length; i += concurrency) {
-      const batch = searchResults.slice(i, i + concurrency);
-      
-      const batchPromises = batch.map(async (result, index) => {
-        try {
-          const globalIndex = i + index;
-          
-          // 检查缓存
-          if (enableCache) {
-            const cached = await cacheManager.getDetailCache(result.url);
-            if (cached) {
-              console.log(`使用缓存详情: ${result.title}`);
-              onProgress && onProgress({
-                current: globalIndex + 1,
-                total: searchResults.length,
-                status: 'cached',
-                item: result.title
-              });
-              
-              return {
-                ...result,
-                ...cached,
-                extractionStatus: 'cached',
-                extractionTime: 0
-              };
-            }
-          }
-
-          // 提取详情
-          const extractedDetails = await this.extractSingleDetail(result, {
-            timeout,
-            enableRetry
-          });
-
-          // 缓存结果
-          if (enableCache && extractedDetails.extractionStatus === 'success') {
-            await cacheManager.setDetailCache(result.url, extractedDetails, 24 * 60 * 60 * 1000); // 24小时缓存
-          }
-
-          onProgress && onProgress({
-            current: globalIndex + 1,
-            total: searchResults.length,
-            status: extractedDetails.extractionStatus,
-            item: result.title
-          });
-
-          return {
-            ...result,
-            ...extractedDetails
-          };
-
-        } catch (error) {
-          console.error(`批量提取详情失败 [${result.title}]:`, error);
-          
-          onProgress && onProgress({
-            current: i + index + 1,
-            total: searchResults.length,
-            status: 'error',
-            item: result.title,
-            error: error.message
-          });
-
-          return {
-            ...result,
-            extractionStatus: 'error',
-            extractionError: error.message,
-            extractionTime: 0
-          };
-        }
-      });
-
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
-
-      // 批次间延迟，避免频繁请求
-      if (i + concurrency < searchResults.length) {
-        await utils.delay(500);
-      }
-    }
-
-    console.log(`批量提取完成: ${results.length}/${searchResults.length}`);
-    return results;
   }
 
   /**
@@ -133,17 +29,21 @@ export class DetailExtractorService {
       const sourceType = this.detectSourceType(searchResult.url, searchResult.source);
       console.log(`检测到搜索源类型: ${sourceType}`);
 
-      // 获取页面内容
-      const pageContent = await this.fetchPageContent(searchResult.url, timeout);
+      // 第一步：获取搜索页面内容，查找详情页链接
+      const detailPageUrl = await this.findDetailPageUrl(searchResult, sourceType, timeout);
+      console.log(`找到详情页面URL: ${detailPageUrl}`);
+
+      // 第二步：获取详情页面内容
+      const pageContent = await this.fetchPageContent(detailPageUrl, timeout);
       
       if (!pageContent || pageContent.trim().length < 100) {
-        throw new Error('页面内容为空或过短');
+        throw new Error('详情页面内容为空或过短');
       }
 
-      // 解析详情信息
+      // 第三步：解析详情信息
       const detailInfo = await contentParser.parseDetailPage(pageContent, {
         sourceType,
-        originalUrl: searchResult.url,
+        originalUrl: detailPageUrl,  // 使用详情页URL
         originalTitle: searchResult.title
       });
 
@@ -159,7 +59,8 @@ export class DetailExtractorService {
         extractionStatus: 'success',
         extractionTime,
         sourceType,
-        extractedAt: Date.now()
+        extractedAt: Date.now(),
+        detailPageUrl // 保存详情页URL
       };
 
     } catch (error) {
@@ -186,6 +87,203 @@ export class DetailExtractorService {
     }
   }
 
+  /**
+   * 查找详情页面的实际URL
+   * @param {Object} searchResult - 搜索结果
+   * @param {string} sourceType - 源类型
+   * @param {number} timeout - 超时时间
+   * @returns {string} 详情页面URL
+   */
+  async findDetailPageUrl(searchResult, sourceType, timeout) {
+    try {
+      // 如果搜索结果已经包含详情页URL，直接使用
+      if (searchResult.detailUrl) {
+        console.log(`使用预设的详情页URL: ${searchResult.detailUrl}`);
+        return searchResult.detailUrl;
+      }
+
+      // 检查URL是否已经是详情页
+      if (this.isDetailPageUrl(searchResult.url, sourceType)) {
+        console.log(`搜索URL已经是详情页: ${searchResult.url}`);
+        return searchResult.url;
+      }
+
+      // 获取搜索页面内容，查找详情链接
+      console.log(`从搜索页面查找详情链接: ${searchResult.url}`);
+      const searchPageContent = await this.fetchPageContent(searchResult.url, timeout);
+      
+      if (!searchPageContent) {
+        throw new Error('无法获取搜索页面内容');
+      }
+
+      // 根据源类型解析详情链接
+      const detailUrl = await this.extractDetailUrlFromSearchPage(
+        searchPageContent, 
+        searchResult, 
+        sourceType
+      );
+
+      if (!detailUrl) {
+        throw new Error('在搜索页面中未找到详情链接');
+      }
+
+      return detailUrl;
+
+    } catch (error) {
+      console.warn(`查找详情页URL失败，使用原始URL: ${error.message}`);
+      // 降级：直接使用搜索结果URL
+      return searchResult.url;
+    }
+  }
+
+  /**
+   * 检查URL是否已经是详情页
+   * @param {string} url - URL
+   * @param {string} sourceType - 源类型
+   * @returns {boolean} 是否为详情页
+   */
+  isDetailPageUrl(url, sourceType) {
+    const urlLower = url.toLowerCase();
+    
+    switch (sourceType) {
+      case 'javbus':
+        // JavBus详情页通常包含番号路径，如 /ABC-123
+        return /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(url) && !urlLower.includes('/search');
+        
+      case 'javdb':
+        // JavDB详情页通常是 /v/xxxx 格式
+        return /\/v\/[a-zA-Z0-9]+/.test(url);
+        
+      case 'javlibrary':
+        // JavLibrary详情页通常包含 ?v= 参数
+        return url.includes('?v=') && !urlLower.includes('vl_searchbyid');
+        
+      case 'jable':
+        // Jable详情页通常是视频页面
+        return /\/videos\/[^\/]+/.test(url);
+        
+      case 'missav':
+        // MissAV详情页通常包含番号
+        return /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(url) && !urlLower.includes('/search');
+        
+      case 'sukebei':
+        // Sukebei详情页通常是种子页面
+        return /\/view\/\d+/.test(url);
+        
+      default:
+        // 通用检查：包含常见详情页标识
+        return !urlLower.includes('/search') && 
+               !urlLower.includes('/list') && 
+               !urlLower.includes('/category') &&
+               (url.includes('?') || /\/[A-Z]{2,6}-?\d{3,6}/i.test(url));
+    }
+  }
+
+  /**
+   * 从搜索页面提取详情URL
+   * @param {string} pageContent - 页面内容
+   * @param {Object} searchResult - 搜索结果
+   * @param {string} sourceType - 源类型
+   * @returns {string} 详情页URL
+   */
+  async extractDetailUrlFromSearchPage(pageContent, searchResult, sourceType) {
+    try {
+      const parser = this.createDOMParser();
+      const doc = parser.parseFromString(pageContent, 'text/html');
+      
+      // 根据不同源类型使用不同的选择器策略
+      const detailLinkSelectors = this.getDetailLinkSelectors(sourceType);
+      
+      for (const selectorConfig of detailLinkSelectors) {
+        const links = doc.querySelectorAll(selectorConfig.selector);
+        
+        for (const link of links) {
+          const href = link.getAttribute('href');
+          if (!href) continue;
+          
+          // 构建完整URL
+          const fullUrl = this.resolveRelativeUrl(href, searchResult.url);
+          
+          // 验证链接是否匹配搜索结果
+          if (this.isMatchingDetailLink(link, searchResult, selectorConfig)) {
+            console.log(`找到匹配的详情链接: ${fullUrl}`);
+            return fullUrl;
+          }
+        }
+      }
+      
+      // 如果没有找到匹配的链接，返回第一个可能的详情链接
+      const fallbackLink = this.findFallbackDetailLink(doc, searchResult, sourceType);
+      if (fallbackLink) {
+        return this.resolveRelativeUrl(fallbackLink, searchResult.url);
+      }
+      
+      return null;
+      
+    } catch (error) {
+      console.error('解析详情链接失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 删除原有的重复方法，避免代码冗余
+   */
+
+  // 删除以下方法，因为它们已经在内容解析器中实现：
+  // - getDetailLinkSelectors
+  // - isMatchingDetailLink  
+  // - findFallbackDetailLink
+  // - calculateSimilarity
+  // - createDOMParser
+
+  /**
+   * 解析相对URL为绝对URL
+   * @param {string} relativeUrl - 相对URL
+   * @param {string} baseUrl - 基础URL
+   * @returns {string} 绝对URL
+   */
+  resolveRelativeUrl(relativeUrl, baseUrl) {
+    if (!relativeUrl) return '';
+    if (relativeUrl.startsWith('http')) return relativeUrl;
+
+    try {
+      const base = new URL(baseUrl);
+      const resolved = new URL(relativeUrl, base);
+      return resolved.href;
+    } catch (error) {
+      console.warn('URL解析失败:', error.message);
+      return relativeUrl;
+    }
+  }
+
+  /**
+   * 从标题中提取番号
+   * @param {string} title - 标题
+   * @returns {string} 番号
+   */
+  extractCodeFromTitle(title) {
+    if (!title) return '';
+    
+    // 常见番号格式正则表达式
+    const patterns = [
+      /([A-Z]{2,6}-?\d{3,6})/i,  // ABC-123, ABCD123
+      /([A-Z]+\d{3,6})/i,        // ABC123
+      /(\d{3,6}[A-Z]{2,6})/i     // 123ABC
+    ];
+    
+    for (const pattern of patterns) {
+      const match = title.match(pattern);
+      if (match) {
+        return match[1].toUpperCase();
+      }
+    }
+    
+    return '';
+  }
+
+  // ... 其他现有方法保持不变 ...
+  
   /**
    * 获取页面内容
    * @param {string} url - 页面URL
@@ -309,31 +407,6 @@ export class DetailExtractorService {
   }
 
   /**
-   * 从标题中提取番号
-   * @param {string} title - 标题
-   * @returns {string} 番号
-   */
-  extractCodeFromTitle(title) {
-    if (!title) return '';
-    
-    // 常见番号格式正则表达式
-    const patterns = [
-      /([A-Z]{2,6}-?\d{3,6})/i,  // ABC-123, ABCD123
-      /([A-Z]+\d{3,6})/i,        // ABC123
-      /(\d{3,6}[A-Z]{2,6})/i     // 123ABC
-    ];
-    
-    for (const pattern of patterns) {
-      const match = title.match(pattern);
-      if (match) {
-        return match[1].toUpperCase();
-      }
-    }
-    
-    return '';
-  }
-
-  /**
    * 验证图片URL
    * @param {string} url - 图片URL
    * @returns {boolean} 是否有效
@@ -430,6 +503,110 @@ export class DetailExtractorService {
     if (isNaN(numRating)) return 0;
     
     return Math.max(0, Math.min(10, numRating));
+  }
+
+  /**
+   * 批量提取详情信息
+   * @param {Array} searchResults - 搜索结果数组
+   * @param {Object} options - 提取选项
+   * @returns {Array} 包含详情信息的结果数组
+   */
+  async extractBatchDetails(searchResults, options = {}) {
+    const {
+      enableCache = true,
+      timeout = this.defaultTimeout,
+      onProgress = null,
+      enableRetry = true
+    } = options;
+
+    console.log(`开始批量提取 ${searchResults.length} 个结果的详情信息`);
+
+    const results = [];
+    const concurrency = Math.min(this.maxConcurrentExtractions, searchResults.length);
+
+    // 分批处理，避免同时发起过多请求
+    for (let i = 0; i < searchResults.length; i += concurrency) {
+      const batch = searchResults.slice(i, i + concurrency);
+      
+      const batchPromises = batch.map(async (result, index) => {
+        try {
+          const globalIndex = i + index;
+          
+          // 检查缓存
+          if (enableCache) {
+            const cached = await cacheManager.getDetailCache(result.url);
+            if (cached) {
+              console.log(`使用缓存详情: ${result.title}`);
+              onProgress && onProgress({
+                current: globalIndex + 1,
+                total: searchResults.length,
+                status: 'cached',
+                item: result.title
+              });
+              
+              return {
+                ...result,
+                ...cached,
+                extractionStatus: 'cached',
+                extractionTime: 0
+              };
+            }
+          }
+
+          // 提取详情
+          const extractedDetails = await this.extractSingleDetail(result, {
+            timeout,
+            enableRetry
+          });
+
+          // 缓存结果
+          if (enableCache && extractedDetails.extractionStatus === 'success') {
+            await cacheManager.setDetailCache(result.url, extractedDetails, 24 * 60 * 60 * 1000); // 24小时缓存
+          }
+
+          onProgress && onProgress({
+            current: globalIndex + 1,
+            total: searchResults.length,
+            status: extractedDetails.extractionStatus,
+            item: result.title
+          });
+
+          return {
+            ...result,
+            ...extractedDetails
+          };
+
+        } catch (error) {
+          console.error(`批量提取详情失败 [${result.title}]:`, error);
+          
+          onProgress && onProgress({
+            current: i + index + 1,
+            total: searchResults.length,
+            status: 'error',
+            item: result.title,
+            error: error.message
+          });
+
+          return {
+            ...result,
+            extractionStatus: 'error',
+            extractionError: error.message,
+            extractionTime: 0
+          };
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+
+      // 批次间延迟，避免频繁请求
+      if (i + concurrency < searchResults.length) {
+        await utils.delay(500);
+      }
+    }
+
+    console.log(`批量提取完成: ${results.length}/${searchResults.length}`);
+    return results;
   }
 
   /**

@@ -1,10 +1,87 @@
-// src/services/content-parser.js - 网页内容解析器
+// src/services/content-parser.js - 更新版本：支持搜索页面和详情页面分层解析
 import { parserRules } from '../config/parser-rules.js';
 
 export class ContentParserService {
   constructor() {
     this.parseTimeout = 10000;
     this.maxRetries = 2;
+  }
+
+  /**
+   * 从搜索页面中提取详情页链接
+   * @param {string} htmlContent - 搜索页面HTML内容
+   * @param {Object} options - 解析选项
+   * @returns {Array} 详情页链接数组
+   */
+  async extractDetailLinksFromSearchPage(htmlContent, options = {}) {
+    const { sourceType, baseUrl, searchKeyword } = options;
+    
+    console.log(`从搜索页面提取详情链接，源类型: ${sourceType}`);
+
+    try {
+      // 创建DOM解析器
+      const parser = this.createDOMParser();
+      const doc = parser.parseFromString(htmlContent, 'text/html');
+
+      // 获取搜索页面解析规则
+      const searchPageRules = parserRules.getSearchPageRules(sourceType);
+      if (!searchPageRules || !searchPageRules.detailLinkSelectors) {
+        console.warn(`未找到 ${sourceType} 的搜索页面解析规则`);
+        return this.extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword);
+      }
+
+      const detailLinks = [];
+      const selectors = searchPageRules.detailLinkSelectors;
+
+      // 尝试每个选择器配置
+      for (const selectorConfig of selectors) {
+        console.log(`尝试选择器: ${selectorConfig.selector}`);
+        
+        const links = doc.querySelectorAll(selectorConfig.selector);
+        console.log(`找到 ${links.length} 个候选链接`);
+
+        for (const linkElement of links) {
+          const href = linkElement.getAttribute('href');
+          if (!href) continue;
+
+          // 构建完整URL
+          const fullUrl = this.resolveRelativeUrl(href, baseUrl);
+
+          // 验证链接有效性
+          if (!this.isValidDetailLink(fullUrl, selectorConfig)) {
+            continue;
+          }
+
+          // 提取链接相关信息
+          const linkInfo = this.extractLinkInfo(linkElement, selectorConfig, searchKeyword);
+          if (linkInfo) {
+            detailLinks.push({
+              url: fullUrl,
+              ...linkInfo
+            });
+          }
+        }
+
+        // 如果找到了链接，可以选择停止或继续查找更多
+        if (detailLinks.length > 0) {
+          console.log(`使用选择器 ${selectorConfig.selector} 找到 ${detailLinks.length} 个详情链接`);
+          break; // 找到就停止，避免重复
+        }
+      }
+
+      // 如果没有找到任何链接，使用通用规则
+      if (detailLinks.length === 0) {
+        console.log('使用通用规则提取详情链接');
+        return this.extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword);
+      }
+
+      console.log(`搜索页面链接提取完成，找到 ${detailLinks.length} 个详情链接`);
+      return detailLinks;
+
+    } catch (error) {
+      console.error('搜索页面链接提取失败:', error);
+      return [];
+    }
   }
 
   /**
@@ -16,21 +93,21 @@ export class ContentParserService {
   async parseDetailPage(htmlContent, options = {}) {
     const { sourceType, originalUrl, originalTitle } = options;
     
-    console.log(`开始解析页面内容，源类型: ${sourceType}`);
+    console.log(`开始解析详情页面内容，源类型: ${sourceType}`);
 
     try {
-      // 创建DOM解析器（使用DOMParser或jsdom）
+      // 创建DOM解析器
       const parser = this.createDOMParser();
       const doc = parser.parseFromString(htmlContent, 'text/html');
 
-      // 获取对应的解析规则
-      const rules = parserRules.getParserRules(sourceType);
-      if (!rules) {
-        console.warn(`未找到 ${sourceType} 的解析规则，使用通用规则`);
+      // 获取详情页面解析规则
+      const detailPageRules = parserRules.getDetailPageRules(sourceType);
+      if (!detailPageRules) {
+        console.warn(`未找到 ${sourceType} 的详情页面解析规则，使用通用规则`);
         return this.parseWithGenericRules(doc, originalUrl, originalTitle);
       }
 
-      console.log(`使用 ${sourceType} 专用解析规则`);
+      console.log(`使用 ${sourceType} 专用详情页解析规则`);
 
       // 应用解析规则
       const detailInfo = {
@@ -38,48 +115,48 @@ export class ContentParserService {
         originalUrl,
         
         // 基本信息
-        title: this.extractByRule(doc, rules.title),
-        originalTitle: this.extractByRule(doc, rules.originalTitle),
-        code: this.extractByRule(doc, rules.code),
+        title: this.extractByRule(doc, detailPageRules.title),
+        originalTitle: this.extractByRule(doc, detailPageRules.originalTitle),
+        code: this.extractByRule(doc, detailPageRules.code),
         
         // 媒体信息
-        coverImage: this.extractImageByRule(doc, rules.coverImage, originalUrl),
-        screenshots: this.extractMultipleImagesByRule(doc, rules.screenshots, originalUrl),
+        coverImage: this.extractImageByRule(doc, detailPageRules.coverImage, originalUrl),
+        screenshots: this.extractMultipleImagesByRule(doc, detailPageRules.screenshots, originalUrl),
         
         // 演员信息
-        actresses: this.extractActressesByRule(doc, rules.actresses),
-        director: this.extractByRule(doc, rules.director),
-        studio: this.extractByRule(doc, rules.studio),
-        label: this.extractByRule(doc, rules.label),
-        series: this.extractByRule(doc, rules.series),
+        actresses: this.extractActressesByRule(doc, detailPageRules.actresses),
+        director: this.extractByRule(doc, detailPageRules.director),
+        studio: this.extractByRule(doc, detailPageRules.studio),
+        label: this.extractByRule(doc, detailPageRules.label),
+        series: this.extractByRule(doc, detailPageRules.series),
         
         // 发布信息
-        releaseDate: this.extractByRule(doc, rules.releaseDate),
-        duration: this.extractByRule(doc, rules.duration),
+        releaseDate: this.extractByRule(doc, detailPageRules.releaseDate),
+        duration: this.extractByRule(doc, detailPageRules.duration),
         
         // 技术信息
-        quality: this.extractByRule(doc, rules.quality),
-        fileSize: this.extractByRule(doc, rules.fileSize),
-        resolution: this.extractByRule(doc, rules.resolution),
+        quality: this.extractByRule(doc, detailPageRules.quality),
+        fileSize: this.extractByRule(doc, detailPageRules.fileSize),
+        resolution: this.extractByRule(doc, detailPageRules.resolution),
         
         // 下载信息
-        downloadLinks: this.extractDownloadLinksByRule(doc, rules.downloadLinks, originalUrl),
-        magnetLinks: this.extractMagnetLinksByRule(doc, rules.magnetLinks),
+        downloadLinks: this.extractDownloadLinksByRule(doc, detailPageRules.downloadLinks, originalUrl),
+        magnetLinks: this.extractMagnetLinksByRule(doc, detailPageRules.magnetLinks),
         
         // 其他信息
-        description: this.extractByRule(doc, rules.description),
-        tags: this.extractTagsByRule(doc, rules.tags),
-        rating: this.extractRatingByRule(doc, rules.rating)
+        description: this.extractByRule(doc, detailPageRules.description),
+        tags: this.extractTagsByRule(doc, detailPageRules.tags),
+        rating: this.extractRatingByRule(doc, detailPageRules.rating)
       };
 
       // 数据清理和验证
       const cleanedInfo = this.cleanAndValidateData(detailInfo);
       
-      console.log(`页面解析完成，提取到 ${Object.keys(cleanedInfo).length} 个字段`);
+      console.log(`详情页面解析完成，提取到 ${Object.keys(cleanedInfo).length} 个字段`);
       return cleanedInfo;
 
     } catch (error) {
-      console.error('页面解析失败:', error);
+      console.error('详情页面解析失败:', error);
       
       // 降级到通用解析
       try {
@@ -91,6 +168,264 @@ export class ContentParserService {
         throw new Error(`页面解析失败: ${error.message}`);
       }
     }
+  }
+
+  /**
+   * 提取链接相关信息
+   * @param {Element} linkElement - 链接元素
+   * @param {Object} selectorConfig - 选择器配置
+   * @param {string} searchKeyword - 搜索关键词
+   * @returns {Object|null} 链接信息
+   */
+  extractLinkInfo(linkElement, selectorConfig, searchKeyword) {
+    try {
+      let title = '';
+      let code = '';
+      let score = 0; // 匹配分数
+
+      // 提取标题
+      if (selectorConfig.titleAttribute) {
+        title = linkElement.getAttribute(selectorConfig.titleAttribute) || '';
+      } else if (selectorConfig.titleSelector) {
+        const titleElement = linkElement.querySelector(selectorConfig.titleSelector) ||
+                           linkElement.closest('.item, .movie, .video, .result')?.querySelector(selectorConfig.titleSelector);
+        title = titleElement?.textContent?.trim() || '';
+      } else {
+        title = linkElement.textContent?.trim() || '';
+      }
+
+      // 提取番号
+      if (selectorConfig.codeSelector) {
+        const codeElement = linkElement.querySelector(selectorConfig.codeSelector) ||
+                          linkElement.closest('.item, .movie, .video, .result')?.querySelector(selectorConfig.codeSelector);
+        code = codeElement?.textContent?.trim() || '';
+      }
+
+      // 如果没有显式番号，从标题中提取
+      if (!code) {
+        code = this.extractCodeFromText(title);
+      }
+
+      // 计算匹配分数
+      if (searchKeyword) {
+        score = this.calculateMatchScore(title, code, searchKeyword);
+      }
+
+      // 验证是否需要包含番号
+      if (selectorConfig.mustContainCode && !code) {
+        return null;
+      }
+
+      return {
+        title: title || '未知标题',
+        code: code || '',
+        score,
+        extractedFrom: 'searchPage'
+      };
+
+    } catch (error) {
+      console.warn('提取链接信息失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 验证详情链接的有效性
+   * @param {string} url - 链接URL
+   * @param {Object} selectorConfig - 选择器配置
+   * @returns {boolean} 是否有效
+   */
+  isValidDetailLink(url, selectorConfig) {
+    if (!url || typeof url !== 'string') return false;
+
+    // 检查排除的链接模式
+    if (selectorConfig.excludeHrefs) {
+      const isExcluded = selectorConfig.excludeHrefs.some(excludePattern => 
+        url.toLowerCase().includes(excludePattern.toLowerCase())
+      );
+      if (isExcluded) return false;
+    }
+
+    // 检查是否为有效的HTTP(S)链接
+    try {
+      const urlObj = new URL(url);
+      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 计算匹配分数
+   * @param {string} title - 标题
+   * @param {string} code - 番号
+   * @param {string} searchKeyword - 搜索关键词
+   * @returns {number} 匹配分数 (0-100)
+   */
+  calculateMatchScore(title, code, searchKeyword) {
+    if (!searchKeyword) return 50; // 默认分数
+
+    let score = 0;
+    const keyword = searchKeyword.toLowerCase();
+    const titleLower = title.toLowerCase();
+    const codeLower = code.toLowerCase();
+
+    // 番号完全匹配 (40分)
+    if (code && keyword === codeLower) {
+      score += 40;
+    }
+    // 番号包含匹配 (30分)
+    else if (code && (codeLower.includes(keyword) || keyword.includes(codeLower))) {
+      score += 30;
+    }
+
+    // 标题完全匹配 (30分)
+    if (keyword === titleLower) {
+      score += 30;
+    }
+    // 标题包含匹配 (20分)
+    else if (titleLower.includes(keyword)) {
+      score += 20;
+    }
+
+    // 关键词相似度匹配 (最多30分)
+    const similarity = this.calculateTextSimilarity(titleLower, keyword);
+    score += Math.round(similarity * 30);
+
+    return Math.min(100, score);
+  }
+
+  /**
+   * 计算文本相似度
+   * @param {string} text1 - 文本1
+   * @param {string} text2 - 文本2
+   * @returns {number} 相似度 (0-1)
+   */
+  calculateTextSimilarity(text1, text2) {
+    if (!text1 || !text2) return 0;
+    
+    const normalize = (str) => str.toLowerCase().replace(/[^\w\d]/g, '');
+    const norm1 = normalize(text1);
+    const norm2 = normalize(text2);
+    
+    if (norm1 === norm2) return 1;
+    
+    // 简单的词汇重叠计算
+    const words1 = norm1.split(/\s+/).filter(w => w.length > 2);
+    const words2 = norm2.split(/\s+/).filter(w => w.length > 2);
+    
+    if (words1.length === 0 || words2.length === 0) return 0;
+    
+    const intersection = words1.filter(word => words2.includes(word));
+    const union = [...new Set([...words1, ...words2])];
+    
+    return intersection.length / union.length;
+  }
+
+  /**
+   * 使用通用规则提取详情链接
+   * @param {Document} doc - DOM文档
+   * @param {string} baseUrl - 基础URL
+   * @param {string} searchKeyword - 搜索关键词
+   * @returns {Array} 详情链接数组
+   */
+  extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword) {
+    const detailLinks = [];
+    
+    try {
+      // 通用选择器列表
+      const genericSelectors = [
+        'a[href*="/"][title]',
+        '.item a, .movie a, .video a, .result a',
+        'a[href]'
+      ];
+
+      for (const selector of genericSelectors) {
+        const links = doc.querySelectorAll(selector);
+        
+        for (const link of links) {
+          const href = link.getAttribute('href');
+          if (!href) continue;
+
+          const fullUrl = this.resolveRelativeUrl(href, baseUrl);
+          
+          // 简单验证
+          if (!this.isGenericDetailLink(fullUrl)) continue;
+
+          const title = link.getAttribute('title') || link.textContent?.trim() || '';
+          const code = this.extractCodeFromText(title);
+          
+          // 如果有搜索关键词，只保留相关的链接
+          if (searchKeyword) {
+            const score = this.calculateMatchScore(title, code, searchKeyword);
+            if (score < 20) continue; // 分数太低，跳过
+          }
+
+          detailLinks.push({
+            url: fullUrl,
+            title: title || '未知标题',
+            code: code || '',
+            score: searchKeyword ? this.calculateMatchScore(title, code, searchKeyword) : 50,
+            extractedFrom: 'generic'
+          });
+        }
+
+        if (detailLinks.length > 0) break; // 找到就停止
+      }
+
+      // 按分数排序
+      detailLinks.sort((a, b) => (b.score || 0) - (a.score || 0));
+      
+    } catch (error) {
+      console.error('通用规则提取详情链接失败:', error);
+    }
+
+    return detailLinks;
+  }
+
+  /**
+   * 检查是否为通用详情链接
+   * @param {string} url - URL
+   * @returns {boolean} 是否为详情链接
+   */
+  isGenericDetailLink(url) {
+    if (!url) return false;
+    
+    const urlLower = url.toLowerCase();
+    
+    // 排除明显的非详情页链接
+    const excludePatterns = [
+      '/search', '/category', '/tag', '/list', '/page', '?page',
+      '/login', '/register', '/user', '/profile', '/settings',
+      '.css', '.js', '.png', '.jpg', '.gif', '.ico'
+    ];
+    
+    return !excludePatterns.some(pattern => urlLower.includes(pattern));
+  }
+
+  /**
+   * 从文本中提取番号
+   * @param {string} text - 文本
+   * @returns {string} 番号
+   */
+  extractCodeFromText(text) {
+    if (!text) return '';
+    
+    // 常见番号格式正则表达式
+    const patterns = [
+      /([A-Z]{2,6}-?\d{3,6})/i,  // ABC-123, ABCD123
+      /([A-Z]+\d{3,6})/i,        // ABC123
+      /(\d{3,6}[A-Z]{2,6})/i     // 123ABC
+    ];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        return match[1].toUpperCase();
+      }
+    }
+    
+    return '';
   }
 
   /**
@@ -123,6 +458,28 @@ export class ContentParserService {
       })
     };
   }
+
+  /**
+   * 解析相对URL为绝对URL
+   * @param {string} relativeUrl - 相对URL
+   * @param {string} baseUrl - 基础URL
+   * @returns {string} 绝对URL
+   */
+  resolveRelativeUrl(relativeUrl, baseUrl) {
+    if (!relativeUrl) return '';
+    if (relativeUrl.startsWith('http')) return relativeUrl;
+
+    try {
+      const base = new URL(baseUrl);
+      const resolved = new URL(relativeUrl, base);
+      return resolved.href;
+    } catch (error) {
+      console.warn('URL解析失败:', error.message);
+      return relativeUrl;
+    }
+  }
+
+  // === 以下是原有的详情页面解析方法，保持不变 ===
 
   /**
    * 根据规则提取内容
@@ -395,6 +752,10 @@ export class ContentParserService {
       elements.forEach(element => {
         const tag = element.textContent?.trim() || '';
         if (tag && !tags.includes(tag)) {
+          // 检查是否在排除列表中
+          if (rule.excludeTexts && rule.excludeTexts.includes(tag)) {
+            return;
+          }
           tags.push(tag);
         }
       });
@@ -485,26 +846,6 @@ export class ContentParserService {
     });
 
     return result;
-  }
-
-  /**
-   * 解析相对URL为绝对URL
-   * @param {string} relativeUrl - 相对URL
-   * @param {string} baseUrl - 基础URL
-   * @returns {string} 绝对URL
-   */
-  resolveRelativeUrl(relativeUrl, baseUrl) {
-    if (!relativeUrl) return '';
-    if (relativeUrl.startsWith('http')) return relativeUrl;
-
-    try {
-      const base = new URL(baseUrl);
-      const resolved = new URL(relativeUrl, base);
-      return resolved.href;
-    } catch (error) {
-      console.warn('URL解析失败:', error.message);
-      return relativeUrl;
-    }
   }
 
   /**
