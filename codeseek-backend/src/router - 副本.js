@@ -1,4 +1,4 @@
-// src/router.js - 简化的路由器类（集成详情提取）
+// src/router.js - 简化的路由器类
 import { utils } from './utils.js';
 
 // 导入所有处理器
@@ -51,20 +51,7 @@ import {
     defaultHandler
 } from './handlers/system.js';
 
-// 导入详情提取处理器
-import {
-    extractSingleDetailHandler,
-    extractBatchDetailsHandler,
-    getDetailExtractionHistoryHandler,
-    getDetailCacheStatsHandler,
-    clearDetailCacheHandler,
-    deleteDetailCacheHandler,
-    getDetailExtractionConfigHandler,
-    updateDetailExtractionConfigHandler,
-    getDetailExtractionStatsHandler
-} from './handlers/detail.js';
-
-// 简化的路由器实现 - 专门修复参数路由问题
+// 🔧 简化的路由器实现 - 专门修复参数路由问题
 export class Router {
     constructor() {
         this.routes = new Map();
@@ -102,7 +89,7 @@ export class Router {
         };
     }
 
-    // 简化的路由处理逻辑
+    // 🔧 简化的路由处理逻辑
     async handle(request, env) {
         const url = new URL(request.url);
         const method = request.method;
@@ -148,7 +135,7 @@ export class Router {
         return utils.errorResponse(`API路径不存在: ${pathname}`, 404);
     }
 
-    // 简化的路由匹配算法
+    // 🔧 简化的路由匹配算法
     matchRoute(pattern, pathname) {
         const requestParts = pathname.split('/');
         const routeParts = pattern.parts;
@@ -231,17 +218,6 @@ export class Router {
         // 用户社区统计
         this.get('/api/community/user/stats', communityUserStatsHandler);
         this.get('/api/community/search', communitySearchHandler);
-
-        // 详情提取相关API路由
-        this.post('/api/detail/extract-single', extractSingleDetailHandler);
-        this.post('/api/detail/extract-batch', extractBatchDetailsHandler);
-        this.get('/api/detail/history', getDetailExtractionHistoryHandler);
-        this.get('/api/detail/cache/stats', getDetailCacheStatsHandler);
-        this.delete('/api/detail/cache/clear', clearDetailCacheHandler);
-        this.delete('/api/detail/cache/delete', deleteDetailCacheHandler);
-        this.get('/api/detail/config', getDetailExtractionConfigHandler);
-        this.put('/api/detail/config', updateDetailExtractionConfigHandler);
-        this.get('/api/detail/stats', getDetailExtractionStatsHandler);
 
         // 用户设置
         this.get('/api/user/settings', userGetSettingsHandler);

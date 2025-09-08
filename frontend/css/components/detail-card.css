@@ -1,0 +1,860 @@
+/* src/css/components/detail-card.css - 详情卡片组件样式 */
+
+/* ===================== 详情卡片基础样式 ===================== */
+
+.detail-card {
+  background: var(--card-background, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.detail-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.detail-card.compact {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+/* ===================== 状态指示器 ===================== */
+
+.detail-card-status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 10;
+}
+
+.detail-card-status.status-success {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.detail-card-status.status-cached {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.detail-card-status.status-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.detail-card-status.status-unknown {
+  background: rgba(156, 163, 175, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+/* ===================== 卡片头部 ===================== */
+
+.detail-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.detail-basic-info {
+  flex: 1;
+}
+
+.detail-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.detail-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.code-label {
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+.code-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary-color, #3b82f6);
+  background: rgba(59, 130, 246, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+.detail-original-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.original-title-label {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.original-title-value {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.4;
+}
+
+/* ===================== 操作按钮 ===================== */
+
+.detail-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--button-background, #ffffff);
+  color: var(--text-primary, #1f2937);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.action-btn:hover {
+  background: var(--button-hover-background, #f8fafc);
+  border-color: var(--border-hover-color, #cbd5e1);
+  transform: translateY(-1px);
+}
+
+.action-btn .btn-icon {
+  font-size: 14px;
+}
+
+.action-btn .btn-text {
+  white-space: nowrap;
+}
+
+.favorite-btn.favorited {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.favorite-btn.favorited:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* ===================== 媒体信息 ===================== */
+
+.detail-media-info {
+  margin-bottom: 20px;
+}
+
+.media-content {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.detail-cover {
+  flex-shrink: 0;
+  width: 200px;
+}
+
+.cover-image {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.cover-image:hover {
+  transform: scale(1.02);
+}
+
+.media-details {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ===================== 元数据 ===================== */
+
+.detail-metadata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  padding: 4px 0;
+}
+
+.meta-item strong {
+  color: var(--text-primary, #1f2937);
+  margin-right: 8px;
+  min-width: 80px;
+}
+
+/* 评分星级 */
+.star {
+  color: #fbbf24;
+  font-size: 16px;
+  margin-right: 2px;
+}
+
+.star-empty {
+  color: #d1d5db;
+}
+
+.star-half {
+  color: #fbbf24;
+  opacity: 0.6;
+}
+
+/* ===================== 描述 ===================== */
+
+.detail-description {
+  margin-top: 16px;
+}
+
+.detail-description h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 8px 0;
+}
+
+.description-text {
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ===================== 演员信息 ===================== */
+
+.detail-actresses {
+  margin-bottom: 20px;
+}
+
+.detail-actresses h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 12px 0;
+}
+
+.actresses-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.actress-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--card-background, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.actress-item:hover {
+  background: var(--button-hover-background, #f1f5f9);
+  border-color: var(--border-hover-color, #cbd5e1);
+}
+
+.actress-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.actress-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.actress-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1f2937);
+}
+
+.actress-profile-link {
+  font-size: 12px;
+  color: var(--primary-color, #3b82f6);
+  text-decoration: none;
+}
+
+.actress-profile-link:hover {
+  text-decoration: underline;
+}
+
+/* ===================== 下载信息 ===================== */
+
+.detail-card-downloads {
+  margin-bottom: 20px;
+}
+
+.detail-download-links,
+.detail-magnet-links {
+  margin-bottom: 16px;
+}
+
+.detail-download-links h4,
+.detail-magnet-links h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 12px 0;
+}
+
+/* 下载链接 */
+.download-links-list {
+  display: grid;
+  gap: 8px;
+}
+
+.download-link-item {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.download-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--card-background, #ffffff);
+  color: var(--text-primary, #1f2937);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.download-link:hover {
+  background: var(--button-hover-background, #f8fafc);
+  color: var(--primary-color, #3b82f6);
+}
+
+.link-type {
+  font-size: 16px;
+}
+
+.link-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.link-quality {
+  font-size: 12px;
+  color: var(--primary-color, #3b82f6);
+  background: rgba(59, 130, 246, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.link-size {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* 磁力链接 */
+.magnet-links-list {
+  display: grid;
+  gap: 12px;
+}
+
+.magnet-link-item {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--card-background, #ffffff);
+}
+
+.magnet-link-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.magnet-icon {
+  font-size: 16px;
+}
+
+.magnet-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary, #1f2937);
+  word-break: break-word;
+}
+
+.magnet-quality {
+  font-size: 12px;
+  color: var(--primary-color, #3b82f6);
+  background: rgba(59, 130, 246, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.magnet-size {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.magnet-stats {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 12px;
+}
+
+.magnet-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.magnet-copy-btn,
+.magnet-open-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--button-background, #ffffff);
+  color: var(--text-primary, #1f2937);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.magnet-copy-btn:hover,
+.magnet-open-btn:hover {
+  background: var(--button-hover-background, #f8fafc);
+  border-color: var(--border-hover-color, #cbd5e1);
+}
+
+/* ===================== 截图预览 ===================== */
+
+.detail-screenshots {
+  margin-bottom: 20px;
+}
+
+.detail-screenshots h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 12px 0;
+}
+
+.screenshots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.screenshot-item {
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.screenshot-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.screenshot-image:hover {
+  transform: scale(1.05);
+}
+
+/* ===================== 详细信息 ===================== */
+
+.detail-details {
+  margin-bottom: 20px;
+}
+
+.detail-tags h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 12px 0;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-item {
+  display: inline-block;
+  padding: 4px 8px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary-color, #3b82f6);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tag-item:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* ===================== 卡片元信息 ===================== */
+
+.detail-card-meta {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+.extraction-info {
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+  line-height: 1.4;
+}
+
+/* ===================== 图片预览模态框 ===================== */
+
+.image-preview-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-preview-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  cursor: pointer;
+}
+
+.image-preview-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  z-index: 10000;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.preview-close-btn {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.preview-close-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+}
+
+/* ===================== 响应式设计 ===================== */
+
+@media (max-width: 768px) {
+  .detail-card {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .detail-card-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .detail-card-actions {
+    order: -1;
+    justify-content: flex-end;
+  }
+  
+  .action-btn .btn-text {
+    display: none;
+  }
+  
+  .media-content {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .detail-cover {
+    width: 100%;
+    max-width: 200px;
+    margin: 0 auto;
+  }
+  
+  .detail-metadata {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  
+  .actresses-list {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .screenshots-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+  }
+  
+  .detail-card-status {
+    position: static;
+    margin-bottom: 12px;
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .detail-card {
+    padding: 12px;
+  }
+  
+  .detail-title {
+    font-size: 18px;
+  }
+  
+  .magnet-actions {
+    flex-direction: column;
+  }
+  
+  .magnet-copy-btn,
+  .magnet-open-btn {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .screenshots-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+}
+
+/* ===================== 紧凑模式 ===================== */
+
+.detail-card.compact {
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+}
+
+.detail-card.compact:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.detail-card.compact .detail-title {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.detail-card.compact .detail-cover {
+  width: 150px;
+}
+
+.detail-card.compact .screenshots-grid {
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.detail-card.compact .detail-metadata {
+  gap: 4px;
+}
+
+.detail-card.compact .meta-item {
+  font-size: 13px;
+}
+
+/* ===================== 深色主题适配 ===================== */
+
+@media (prefers-color-scheme: dark) {
+  .detail-card {
+    --card-background: #1f2937;
+    --text-primary: #f9fafb;
+    --text-secondary: #d1d5db;
+    --text-muted: #9ca3af;
+    --border-color: #374151;
+    --border-hover-color: #4b5563;
+    --button-background: #374151;
+    --button-hover-background: #4b5563;
+    --primary-color: #60a5fa;
+  }
+  
+  .detail-card {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  }
+  
+  .detail-card:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* ===================== 打印样式 ===================== */
+
+@media print {
+  .detail-card {
+    box-shadow: none;
+    border: 1px solid #ccc;
+    break-inside: avoid;
+    margin-bottom: 20px;
+  }
+  
+  .detail-card-status,
+  .detail-card-actions,
+  .magnet-actions {
+    display: none;
+  }
+  
+  .preview-close-btn {
+    display: none;
+  }
+  
+  .screenshot-image,
+  .cover-image {
+    cursor: default;
+  }
+  
+  .download-link,
+  .actress-profile-link {
+    color: #000;
+    text-decoration: underline;
+  }
+}
+
+/* ===================== 无障碍支持 ===================== */
+
+.detail-card:focus-within {
+  outline: 2px solid var(--primary-color, #3b82f6);
+  outline-offset: 2px;
+}
+
+.action-btn:focus,
+.download-link:focus,
+.magnet-copy-btn:focus,
+.magnet-open-btn:focus {
+  outline: 2px solid var(--primary-color, #3b82f6);
+  outline-offset: 2px;
+}
+
+.screenshot-image:focus,
+.cover-image:focus {
+  outline: 2px solid var(--primary-color, #3b82f6);
+  outline-offset: 2px;
+}
+
+/* 高对比度支持 */
+@media (prefers-contrast: high) {
+  .detail-card {
+    border-width: 2px;
+  }
+  
+  .action-btn,
+  .download-link,
+  .magnet-copy-btn,
+  .magnet-open-btn {
+    border-width: 2px;
+  }
+  
+  .tag-item {
+    border-width: 2px;
+  }
+}
+
+/* 减少动画支持 */
+@media (prefers-reduced-motion: reduce) {
+  .detail-card,
+  .action-btn,
+  .download-link,
+  .screenshot-image,
+  .cover-image,
+  .magnet-copy-btn,
+  .magnet-open-btn,
+  .preview-close-btn {
+    transition: none;
+  }
+  
+  .detail-card:hover,
+  .screenshot-image:hover,
+  .cover-image:hover {
+    transform: none;
+  }
+}

@@ -1,4 +1,4 @@
-/* CSS变量定义 - 优化颜色对比度和现代感 */
+/* CSS变量定义 - 集成详情提取功能支持 */
 :root {
   /* 浅色主题 */
   --bg-primary: #ffffff;
@@ -24,9 +24,82 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --transition-base: 0.2s ease-in-out;
+  
+  /* 🆕 详情提取功能专用变量 */
+  --detail-card-bg: #ffffff;
+  --detail-card-border: #e2e8f0;
+  --detail-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --detail-card-shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.15);
+  --detail-meta-bg: #f8fafc;
+  --detail-meta-text: #64748b;
+  --detail-tag-bg: #f1f5f9;
+  --detail-tag-text: #475569;
+  --detail-tag-border: #cbd5e1;
+  
+  /* 详情提取状态颜色 */
+  --extraction-success: #10b981;
+  --extraction-error: #ef4444;
+  --extraction-pending: #f59e0b;
+  --extraction-cached: #06b6d4;
+  --extraction-partial: #8b5cf6;
+  
+  /* 详情提取状态背景色 */
+  --extraction-success-bg: rgba(16, 185, 129, 0.1);
+  --extraction-error-bg: rgba(239, 68, 68, 0.1);
+  --extraction-pending-bg: rgba(245, 158, 11, 0.1);
+  --extraction-cached-bg: rgba(6, 182, 212, 0.1);
+  --extraction-partial-bg: rgba(139, 92, 246, 0.1);
+  
+  /* 详情提取进度条 */
+  --progress-bg: #f1f5f9;
+  --progress-fill: var(--accent-primary);
+  --progress-height: 8px;
+  --progress-radius: 4px;
+  
+  /* 详情卡片组件变量 */
+  --detail-header-height: 60px;
+  --detail-cover-width: 200px;
+  --detail-cover-aspect: 3/4;
+  --detail-screenshot-size: 120px;
+  --detail-actress-avatar-size: 40px;
+  
+  /* 磁力链接和下载链接样式 */
+  --download-link-bg: #f8fafc;
+  --download-link-border: #e2e8f0;
+  --download-link-hover: #f1f5f9;
+  --magnet-link-bg: #fef7ff;
+  --magnet-link-border: #e879f9;
+  --magnet-link-hover: #fae8ff;
+  
+  /* 图片预览模态框 */
+  --preview-backdrop: rgba(0, 0, 0, 0.8);
+  --preview-content-bg: #ffffff;
+  --preview-content-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+  
+  /* 演员信息卡片 */
+  --actress-card-bg: #f8fafc;
+  --actress-card-border: #e2e8f0;
+  --actress-card-hover: #f1f5f9;
+  
+  /* 详情支持标识 */
+  --detail-support-color: #8b5cf6;
+  --detail-support-bg: rgba(139, 92, 246, 0.1);
+  --detail-support-border: rgba(139, 92, 246, 0.2);
+  
+  /* 质量评分颜色 */
+  --quality-excellent: #10b981;
+  --quality-good: #84cc16;
+  --quality-fair: #f59e0b;
+  --quality-poor: #ef4444;
+  
+  /* 动画变量 */
+  --detail-animation-duration: 0.3s;
+  --detail-animation-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --detail-scale-hover: 1.02;
+  --detail-scale-active: 0.98;
 }
 
-/* 深色主题 - 提高对比度 */
+/* 深色主题 - 提高对比度并添加详情提取支持 */
 [data-theme="dark"] {
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
@@ -38,4 +111,214 @@
   --accent-hover: #3b82f6;
   --accent-light: #1e40af;
   --border-color: #475569;
+  
+  /* 🆕 深色主题详情提取变量 */
+  --detail-card-bg: #1e293b;
+  --detail-card-border: #475569;
+  --detail-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --detail-card-shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.35);
+  --detail-meta-bg: #334155;
+  --detail-meta-text: #94a3b8;
+  --detail-tag-bg: #475569;
+  --detail-tag-text: #cbd5e1;
+  --detail-tag-border: #64748b;
+  
+  /* 深色主题状态背景色 */
+  --extraction-success-bg: rgba(16, 185, 129, 0.15);
+  --extraction-error-bg: rgba(239, 68, 68, 0.15);
+  --extraction-pending-bg: rgba(245, 158, 11, 0.15);
+  --extraction-cached-bg: rgba(6, 182, 212, 0.15);
+  --extraction-partial-bg: rgba(139, 92, 246, 0.15);
+  
+  /* 深色主题详情卡片组件 */
+  --download-link-bg: #334155;
+  --download-link-border: #475569;
+  --download-link-hover: #475569;
+  --magnet-link-bg: #312e81;
+  --magnet-link-border: #6366f1;
+  --magnet-link-hover: #3730a3;
+  
+  /* 深色主题图片预览 */
+  --preview-backdrop: rgba(0, 0, 0, 0.9);
+  --preview-content-bg: #1e293b;
+  --preview-content-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  
+  /* 深色主题演员信息 */
+  --actress-card-bg: #334155;
+  --actress-card-border: #475569;
+  --actress-card-hover: #475569;
+  
+  /* 深色主题详情支持标识 */
+  --detail-support-bg: rgba(139, 92, 246, 0.15);
+  --detail-support-border: rgba(139, 92, 246, 0.3);
+}
+
+/* 🆕 详情提取功能专用CSS自定义属性 */
+:root {
+  /* 详情卡片布局变量 */
+  --detail-card-min-height: 400px;
+  --detail-card-max-width: 800px;
+  --detail-card-padding: 24px;
+  --detail-card-gap: 16px;
+  
+  /* 详情内容区域变量 */
+  --detail-content-grid-gap: 20px;
+  --detail-section-margin: 16px;
+  --detail-header-gap: 12px;
+  
+  /* 媒体内容变量 */
+  --cover-image-max-width: 200px;
+  --cover-image-border-radius: 8px;
+  --screenshot-grid-gap: 12px;
+  --screenshot-item-size: 120px;
+  --screenshot-border-radius: 6px;
+  
+  /* 演员信息变量 */
+  --actress-item-gap: 8px;
+  --actress-avatar-size: 32px;
+  --actress-list-gap: 12px;
+  
+  /* 下载和磁力链接变量 */
+  --download-section-gap: 16px;
+  --download-item-padding: 12px;
+  --download-item-border-radius: 6px;
+  --magnet-actions-gap: 8px;
+  --magnet-button-padding: 6px 12px;
+  
+  /* 标签和元数据变量 */
+  --tag-item-padding: 4px 8px;
+  --tag-item-border-radius: 12px;
+  --tag-list-gap: 6px;
+  --meta-item-gap: 8px;
+  
+  /* 详情提取进度变量 */
+  --progress-container-padding: 16px;
+  --progress-container-border-radius: 8px;
+  --progress-bar-height: 6px;
+  --progress-message-font-size: 14px;
+  
+  /* 详情切换按钮变量 */
+  --detail-toggle-size: 36px;
+  --detail-toggle-icon-size: 18px;
+  --detail-toggle-border-radius: 50%;
+  
+  /* 图片预览变量 */
+  --preview-max-width: 90vw;
+  --preview-max-height: 90vh;
+  --preview-border-radius: 8px;
+  --preview-close-size: 32px;
+  --preview-close-font-size: 24px;
+  
+  /* 状态指示器变量 */
+  --status-indicator-size: 12px;
+  --status-badge-padding: 4px 8px;
+  --status-badge-border-radius: 12px;
+  --status-badge-font-size: 11px;
+  
+  /* 交互反馈变量 */
+  --detail-hover-scale: 1.02;
+  --detail-active-scale: 0.98;
+  --detail-focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  
+  /* 评分星级变量 */
+  --star-size: 16px;
+  --star-color-full: #fbbf24;
+  --star-color-empty: #d1d5db;
+  --star-color-half: rgba(251, 191, 36, 0.6);
+  
+  /* 加载状态变量 */
+  --detail-skeleton-bg: #f1f5f9;
+  --detail-skeleton-highlight: #e2e8f0;
+  --detail-skeleton-animation: skeleton-loading 1.5s infinite ease-in-out;
+  
+  /* 错误状态变量 */
+  --detail-error-bg: rgba(239, 68, 68, 0.05);
+  --detail-error-border: rgba(239, 68, 68, 0.2);
+  --detail-error-icon-color: #ef4444;
+  
+  /* 成功状态变量 */
+  --detail-success-bg: rgba(16, 185, 129, 0.05);
+  --detail-success-border: rgba(16, 185, 129, 0.2);
+  --detail-success-icon-color: #10b981;
+}
+
+/* 🆕 详情提取功能的响应式变量 */
+@media (max-width: 768px) {
+  :root {
+    /* 移动设备上的详情卡片调整 */
+    --detail-card-padding: 16px;
+    --detail-card-gap: 12px;
+    --detail-content-grid-gap: 16px;
+    --detail-section-margin: 12px;
+    
+    /* 移动设备上的媒体内容调整 */
+    --cover-image-max-width: 150px;
+    --screenshot-item-size: 90px;
+    --screenshot-grid-gap: 8px;
+    
+    /* 移动设备上的演员信息调整 */
+    --actress-avatar-size: 28px;
+    --actress-list-gap: 8px;
+    
+    /* 移动设备上的下载链接调整 */
+    --download-item-padding: 10px;
+    --magnet-button-padding: 5px 10px;
+    
+    /* 移动设备上的图片预览调整 */
+    --preview-max-width: 95vw;
+    --preview-max-height: 85vh;
+    --preview-close-size: 28px;
+    --preview-close-font-size: 20px;
+    
+    /* 移动设备上的进度条调整 */
+    --progress-container-padding: 12px;
+    --progress-bar-height: 5px;
+    --progress-message-font-size: 13px;
+  }
+}
+
+/* 🆕 详情提取功能的高对比度模式支持 */
+@media (prefers-contrast: high) {
+  :root {
+    --detail-card-border: #000000;
+    --detail-tag-border: #000000;
+    --download-link-border: #000000;
+    --extraction-success: #006600;
+    --extraction-error: #cc0000;
+    --extraction-pending: #cc6600;
+  }
+  
+  [data-theme="dark"] {
+    --detail-card-border: #ffffff;
+    --detail-tag-border: #ffffff;
+    --download-link-border: #ffffff;
+    --extraction-success: #00ff00;
+    --extraction-error: #ff6666;
+    --extraction-pending: #ffaa00;
+  }
+}
+
+/* 🆕 详情提取功能的减少动画模式支持 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --detail-animation-duration: 0.01ms;
+    --detail-animation-easing: linear;
+    --transition-base: 0.01ms linear;
+  }
+}
+
+/* 🆕 打印模式下的详情卡片优化 */
+@media print {
+  :root {
+    --detail-card-bg: #ffffff;
+    --detail-card-border: #000000;
+    --detail-card-shadow: none;
+    --detail-meta-bg: #f5f5f5;
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --extraction-success: #000000;
+    --extraction-error: #000000;
+    --extraction-pending: #000000;
+    --extraction-cached: #000000;
+  }
 }

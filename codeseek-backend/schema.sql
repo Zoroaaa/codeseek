@@ -558,3 +558,253 @@ INSERT OR IGNORE INTO community_source_tags (id, tag_name, tag_description, tag_
 ('tag_torrent', '种子', '种子下载相关', '#84cc16', 0, 1, 'system', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('tag_magnet', '磁力', '磁力链接搜索', '#22c55e', 0, 1, 'system', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('tag_hd', '高清', '高清资源相关', '#a855f7', 0, 1, 'system', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+
+-- 详情提取系统数据库结构 - 添加到现有 schema.sql
+
+-- 详情缓存表
+CREATE TABLE IF NOT EXISTS detail_cache (
+    id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    url_hash TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    
+    -- 提取的详情信息 (JSON格式存储)
+    detail_data TEXT NOT NULL,
+    
+    -- 元数据
+    extraction_status TEXT DEFAULT 'success', -- success, error, partial
+    extraction_time INTEGER DEFAULT 0,
+    extraction_error TEXT,
+    
+    -- 缓存管理
+    cache_size INTEGER DEFAULT 0,
+    access_count INTEGER DEFAULT 0,
+    last_accessed INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    
+    -- 索引字段
+    UNIQUE(url_hash)
+);
+
+-- 详情提取历史表
+CREATE TABLE IF NOT EXISTS detail_extraction_history (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    url TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    keyword TEXT,
+    
+    -- 提取结果
+    extraction_status TEXT NOT NULL, -- success, error, timeout, cached
+    extraction_time INTEGER DEFAULT 0,
+    extraction_error TEXT,
+    data_size INTEGER DEFAULT 0,
+    
+    -- 提取配置
+    enable_cache INTEGER DEFAULT 1,
+    enable_retry INTEGER DEFAULT 1,
+    timeout_ms INTEGER DEFAULT 15000,
+    
+    -- 时间戳
+    created_at INTEGER NOT NULL,
+    
+    -- 外键约束
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+);
+
+-- 详情提取统计表
+CREATE TABLE IF NOT EXISTS detail_extraction_stats (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    
+    -- 统计数据
+    total_extractions INTEGER DEFAULT 0,
+    successful_extractions INTEGER DEFAULT 0,
+    cached_extractions INTEGER DEFAULT 0,
+    failed_extractions INTEGER DEFAULT 0,
+    
+    -- 性能统计
+    total_extraction_time INTEGER DEFAULT 0,
+    average_extraction_time INTEGER DEFAULT 0,
+    cache_hit_rate REAL DEFAULT 0.0,
+    
+    -- 按源类型统计 (JSON格式)
+    source_type_stats TEXT DEFAULT '{}',
+    
+    -- 时间戳
+    date_key TEXT NOT NULL, -- YYYY-MM-DD 格式
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    
+    -- 外键约束
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    
+    -- 确保每个用户每天只有一条记录
+    UNIQUE(user_id, date_key)
+);
+
+-- 详情提取配置表
+CREATE TABLE IF NOT EXISTS detail_extraction_config (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    
+    -- 基础配置
+    enable_detail_extraction INTEGER DEFAULT 1,
+    auto_extract_details INTEGER DEFAULT 0,
+    max_auto_extractions INTEGER DEFAULT 5,
+    extraction_batch_size INTEGER DEFAULT 3,
+    
+    -- 超时和重试配置
+    extraction_timeout INTEGER DEFAULT 15000,
+    enable_retry INTEGER DEFAULT 1,
+    max_retry_attempts INTEGER DEFAULT 2,
+    
+    -- 缓存配置
+    enable_cache INTEGER DEFAULT 1,
+    cache_duration INTEGER DEFAULT 86400000, -- 24小时
+    enable_local_cache INTEGER DEFAULT 1,
+    
+    -- 显示配置
+    show_screenshots INTEGER DEFAULT 1,
+    show_download_links INTEGER DEFAULT 1,
+    show_magnet_links INTEGER DEFAULT 1,
+    show_actress_info INTEGER DEFAULT 1,
+    compact_mode INTEGER DEFAULT 0,
+    enable_image_preview INTEGER DEFAULT 1,
+    show_extraction_progress INTEGER DEFAULT 1,
+    
+    -- 内容过滤配置
+    enable_content_filter INTEGER DEFAULT 0,
+    content_filter_keywords TEXT DEFAULT '[]', -- JSON数组
+    
+    -- 时间戳
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    
+    -- 外键约束
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    
+    -- 确保每个用户只有一条配置记录
+    UNIQUE(user_id)
+);
+
+-- 解析规则缓存表 (可选，用于缓存动态解析规则)
+CREATE TABLE IF NOT EXISTS parser_rules_cache (
+    id TEXT PRIMARY KEY,
+    source_type TEXT NOT NULL,
+    rules_data TEXT NOT NULL, -- JSON格式的解析规则
+    rules_version TEXT DEFAULT '1.0',
+    is_active INTEGER DEFAULT 1,
+    
+    -- 时间戳
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    
+    -- 确保每个源类型只有一条活跃规则
+    UNIQUE(source_type, is_active)
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_detail_cache_url_hash ON detail_cache(url_hash);
+CREATE INDEX IF NOT EXISTS idx_detail_cache_expires ON detail_cache(expires_at);
+CREATE INDEX IF NOT EXISTS idx_detail_cache_source_type ON detail_cache(source_type);
+CREATE INDEX IF NOT EXISTS idx_detail_cache_last_accessed ON detail_cache(last_accessed);
+
+CREATE INDEX IF NOT EXISTS idx_detail_history_user_created ON detail_extraction_history(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_detail_history_url ON detail_extraction_history(url);
+CREATE INDEX IF NOT EXISTS idx_detail_history_source_type ON detail_extraction_history(source_type);
+CREATE INDEX IF NOT EXISTS idx_detail_history_status ON detail_extraction_history(extraction_status);
+
+CREATE INDEX IF NOT EXISTS idx_detail_stats_user_date ON detail_extraction_stats(user_id, date_key);
+CREATE INDEX IF NOT EXISTS idx_detail_stats_date ON detail_extraction_stats(date_key);
+
+CREATE INDEX IF NOT EXISTS idx_parser_rules_source_active ON parser_rules_cache(source_type, is_active);
+
+-- 创建触发器
+
+-- 自动更新详情缓存的 updated_at
+CREATE TRIGGER IF NOT EXISTS update_detail_cache_timestamp 
+    AFTER UPDATE ON detail_cache
+    FOR EACH ROW
+    BEGIN
+        UPDATE detail_cache SET updated_at = strftime('%s', 'now') * 1000 WHERE id = NEW.id;
+    END;
+
+-- 自动更新详情提取配置的 updated_at
+CREATE TRIGGER IF NOT EXISTS update_detail_config_timestamp 
+    AFTER UPDATE ON detail_extraction_config
+    FOR EACH ROW
+    BEGIN
+        UPDATE detail_extraction_config SET updated_at = strftime('%s', 'now') * 1000 WHERE id = NEW.id;
+    END;
+
+-- 自动清理过期的详情缓存
+CREATE TRIGGER IF NOT EXISTS cleanup_expired_detail_cache
+    AFTER INSERT ON detail_cache
+    FOR EACH ROW
+    BEGIN
+        DELETE FROM detail_cache WHERE expires_at < strftime('%s', 'now') * 1000;
+    END;
+
+-- 自动更新用户详情提取统计
+CREATE TRIGGER IF NOT EXISTS update_detail_stats_after_extraction
+    AFTER INSERT ON detail_extraction_history
+    FOR EACH ROW
+    WHEN NEW.user_id IS NOT NULL
+    BEGIN
+        INSERT OR REPLACE INTO detail_extraction_stats (
+            id, user_id, date_key,
+            total_extractions, successful_extractions, cached_extractions, failed_extractions,
+            total_extraction_time, average_extraction_time, cache_hit_rate,
+            created_at, updated_at
+        ) VALUES (
+            COALESCE(
+                (SELECT id FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')),
+                NEW.user_id || '_' || date('now')
+            ),
+            NEW.user_id,
+            date('now'),
+            COALESCE((SELECT total_extractions FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + 1,
+            COALESCE((SELECT successful_extractions FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + 
+                CASE WHEN NEW.extraction_status = 'success' THEN 1 ELSE 0 END,
+            COALESCE((SELECT cached_extractions FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + 
+                CASE WHEN NEW.extraction_status = 'cached' THEN 1 ELSE 0 END,
+            COALESCE((SELECT failed_extractions FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + 
+                CASE WHEN NEW.extraction_status IN ('error', 'timeout') THEN 1 ELSE 0 END,
+            COALESCE((SELECT total_extraction_time FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + NEW.extraction_time,
+            -- 计算平均提取时间
+            CASE 
+                WHEN (COALESCE((SELECT total_extractions FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + 1) > 0
+                THEN (COALESCE((SELECT total_extraction_time FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + NEW.extraction_time) / 
+                     (COALESCE((SELECT total_extractions FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + 1)
+                ELSE 0
+            END,
+            -- 计算缓存命中率
+            CASE 
+                WHEN (COALESCE((SELECT total_extractions FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + 1) > 0
+                THEN CAST((COALESCE((SELECT cached_extractions FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + 
+                          CASE WHEN NEW.extraction_status = 'cached' THEN 1 ELSE 0 END) AS REAL) / 
+                     (COALESCE((SELECT total_extractions FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')), 0) + 1)
+                ELSE 0.0
+            END,
+            CASE 
+                WHEN (SELECT created_at FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now')) IS NULL 
+                THEN strftime('%s', 'now') * 1000
+                ELSE (SELECT created_at FROM detail_extraction_stats WHERE user_id = NEW.user_id AND date_key = date('now'))
+            END,
+            strftime('%s', 'now') * 1000
+        );
+    END;
+
+-- 在现有system_config中添加详情提取相关配置
+INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_public, created_at, updated_at) VALUES
+('detail_extraction_enabled', '1', '启用详情提取功能', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_max_cache_size', '50000', '详情缓存最大条目数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_default_timeout', '15000', '详情提取默认超时时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_max_batch_size', '20', '批量详情提取最大数量', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_cache_duration', '86400000', '详情缓存默认持续时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_max_concurrent', '3', '详情提取最大并发数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_enable_image_proxy', '0', '启用图片代理服务', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_supported_sources', '["javbus","javdb","javlibrary","jable","javmost","missav","sukebei"]', '支持详情提取的搜索源', 'json', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);

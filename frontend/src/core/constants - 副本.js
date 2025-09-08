@@ -1,8 +1,8 @@
-// 应用常量定义 - 集成详情提取功能支持
+// 应用常量定义 - 支持搜索源状态检查设置
 export const APP_CONSTANTS = {
   // 应用信息
   APP_NAME: '磁力快搜',
-  DEFAULT_VERSION: '1.3.0', // 🔧 版本升级，支持详情提取功能
+  DEFAULT_VERSION: '1.3.0', // 🔧 版本升级，支持搜索源分类管理和状态检查
   
   // 本地存储键名
   STORAGE_KEYS: {
@@ -13,10 +13,7 @@ export const APP_CONSTANTS = {
     API_CONFIG: 'api_config',
     CUSTOM_SOURCES: 'custom_search_sources',
     CUSTOM_CATEGORIES: 'custom_source_categories',
-    SOURCE_STATUS_CACHE: 'source_status_cache',
-    // 🆕 详情提取相关缓存
-    DETAIL_EXTRACTION_CACHE: 'detail_extraction_cache',
-    DETAIL_CONFIG_CACHE: 'detail_config_cache'
+    SOURCE_STATUS_CACHE: 'source_status_cache' // 🆕 搜索源状态缓存
   },
   
   // API配置
@@ -24,13 +21,8 @@ export const APP_CONSTANTS = {
     TIMEOUT: 10000,
     RETRY_ATTEMPTS: 3,
     CACHE_DURATION: 1800000, // 30分钟
-    SOURCE_CHECK_TIMEOUT: 8000,
-    SOURCE_STATUS_CACHE_DURATION: 300000,
-    // 🆕 详情提取API配置
-    DETAIL_EXTRACTION_TIMEOUT: 15000, // 详情提取超时时间
-    DETAIL_CACHE_DURATION: 86400000, // 详情缓存24小时
-    DETAIL_BATCH_SIZE: 20, // 最大批量提取数量
-    DETAIL_MAX_CONCURRENT: 3 // 最大并发提取数量
+    SOURCE_CHECK_TIMEOUT: 8000, // 🆕 搜索源状态检查超时时间（毫秒）
+    SOURCE_STATUS_CACHE_DURATION: 300000 // 🆕 搜索源状态缓存时间（5分钟）
   },
   
   // 用户限制
@@ -48,18 +40,12 @@ export const APP_CONSTANTS = {
     MAX_SOURCE_SUBTITLE_LENGTH: 100,
     MAX_CATEGORY_NAME_LENGTH: 30,
     MAX_CATEGORY_DESC_LENGTH: 100,
-    MIN_SOURCE_CHECK_TIMEOUT: 1000,
-    MAX_SOURCE_CHECK_TIMEOUT: 30000,
-    MIN_STATUS_CACHE_DURATION: 60000,
-    MAX_STATUS_CACHE_DURATION: 3600000,
     
-    // 🆕 详情提取限制
-    MAX_DETAIL_EXTRACTIONS_PER_BATCH: 20, // 每批最大提取数量
-    MIN_DETAIL_EXTRACTION_TIMEOUT: 5000, // 最小超时时间
-    MAX_DETAIL_EXTRACTION_TIMEOUT: 30000, // 最大超时时间
-    MIN_DETAIL_CACHE_DURATION: 3600000, // 最小缓存时间（1小时）
-    MAX_DETAIL_CACHE_DURATION: 604800000, // 最大缓存时间（7天）
-    MAX_AUTO_EXTRACTIONS: 10 // 自动提取最大数量
+// 🆕 搜索源状态检查限制（毫秒）
+    MIN_SOURCE_CHECK_TIMEOUT: 1000, // 最小超时时间（毫秒）
+    MAX_SOURCE_CHECK_TIMEOUT: 30000, // 最大超时时间（毫秒）
+    MIN_STATUS_CACHE_DURATION: 60000, // 最小缓存时间（毫秒）
+    MAX_STATUS_CACHE_DURATION: 3600000 // 最大缓存时间（毫秒）
   },
   
   // 主题选项
@@ -77,33 +63,16 @@ export const APP_CONSTANTS = {
     ERROR: 'error'
   },
   
-  // 搜索源状态枚举
+  // 🆕 搜索源状态枚举
   SOURCE_STATUS: {
-    UNKNOWN: 'unknown',
-    CHECKING: 'checking',
-    AVAILABLE: 'available',
-    UNAVAILABLE: 'unavailable',
-    TIMEOUT: 'timeout',
-    ERROR: 'error'
+    UNKNOWN: 'unknown',       // 未知状态
+    CHECKING: 'checking',     // 正在检查
+    AVAILABLE: 'available',   // 可用
+    UNAVAILABLE: 'unavailable', // 不可用
+    TIMEOUT: 'timeout',       // 超时
+    ERROR: 'error'            // 错误
   },
-
-  // 🆕 详情提取状态枚举
-  DETAIL_EXTRACTION_STATUS: {
-    PENDING: 'pending',
-    IN_PROGRESS: 'in_progress',
-    SUCCESS: 'success',
-    ERROR: 'error',
-    TIMEOUT: 'timeout',
-    CACHED: 'cached',
-    PARTIAL: 'partial'
-  },
-
-  // 🆕 支持详情提取的搜索源
-  DETAIL_EXTRACTION_SOURCES: [
-    'javbus', 'javdb', 'javlibrary', 'jable', 'javmost', 
-    'missav', 'javhdporn', 'javgg', 'av01', 'sukebei'
-  ],
-
+  
   // 搜索源分类定义
   SOURCE_CATEGORIES: {
     database: {
@@ -113,8 +82,7 @@ export const APP_CONSTANTS = {
       icon: '📚',
       color: '#3b82f6',
       isBuiltin: true,
-      order: 1,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      order: 1
     },
     streaming: {
       id: 'streaming',
@@ -123,8 +91,7 @@ export const APP_CONSTANTS = {
       icon: '🎥',
       color: '#10b981',
       isBuiltin: true,
-      order: 2,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      order: 2
     },
     torrent: {
       id: 'torrent',
@@ -133,8 +100,7 @@ export const APP_CONSTANTS = {
       icon: '🧲',
       color: '#f59e0b',
       isBuiltin: true,
-      order: 3,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      order: 3
     },
     community: {
       id: 'community',
@@ -143,8 +109,7 @@ export const APP_CONSTANTS = {
       icon: '💬',
       color: '#8b5cf6',
       isBuiltin: true,
-      order: 4,
-      supportsDetailExtraction: false // 论坛类不支持详情提取
+      order: 4
     },
     others: {
       id: 'others',
@@ -153,12 +118,11 @@ export const APP_CONSTANTS = {
       icon: '🌟',
       color: '#6b7280',
       isBuiltin: true,
-      order: 99,
-      supportsDetailExtraction: false
+      order: 99
     }
   },
   
-  // 增强版搜索来源 - 标记详情提取支持
+  // 增强版搜索来源
   SEARCH_SOURCES: [
     // 番号资料站
     {
@@ -170,8 +134,7 @@ export const APP_CONSTANTS = {
       category: 'database',
       isBuiltin: true,
       priority: 1,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     {
       id: 'javdb',
@@ -182,8 +145,7 @@ export const APP_CONSTANTS = {
       category: 'database',
       isBuiltin: true,
       priority: 2,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     {
       id: 'javlibrary',
@@ -194,8 +156,7 @@ export const APP_CONSTANTS = {
       category: 'database',
       isBuiltin: true,
       priority: 3,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     {
       id: 'javfinder',
@@ -206,8 +167,7 @@ export const APP_CONSTANTS = {
       category: 'database',
       isBuiltin: true,
       priority: 4,
-      isActive: true,
-      supportsDetailExtraction: false // 不支持详情提取
+      isActive: true
     },
     
     // 在线播放平台
@@ -220,8 +180,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 1,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     {
       id: 'javmost',
@@ -232,8 +191,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 2,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     {
       id: 'javguru',
@@ -244,8 +202,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 3,
-      isActive: true,
-      supportsDetailExtraction: false // 不支持详情提取
+      isActive: true
     },
     {
       id: 'av01',
@@ -256,8 +213,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 4,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     {
       id: 'missav',
@@ -268,8 +224,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 5,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     {
       id: 'javhdporn',
@@ -280,8 +235,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 6,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     {
       id: 'javgg',
@@ -292,8 +246,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 7,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     {
       id: 'javhihi',
@@ -304,8 +257,7 @@ export const APP_CONSTANTS = {
       category: 'streaming',
       isBuiltin: true,
       priority: 8,
-      isActive: true,
-      supportsDetailExtraction: false // 不支持详情提取
+      isActive: true
     },
     
     // 磁力搜索
@@ -318,8 +270,7 @@ export const APP_CONSTANTS = {
       category: 'torrent',
       isBuiltin: true,
       priority: 1,
-      isActive: true,
-      supportsDetailExtraction: false // 磁力站不支持详情提取
+      isActive: true
     },
     {
       id: 'magnetdl',
@@ -330,8 +281,7 @@ export const APP_CONSTANTS = {
       category: 'torrent',
       isBuiltin: true,
       priority: 2,
-      isActive: true,
-      supportsDetailExtraction: false // 磁力站不支持详情提取
+      isActive: true
     },
     {
       id: 'torrentkitty',
@@ -342,8 +292,7 @@ export const APP_CONSTANTS = {
       category: 'torrent',
       isBuiltin: true,
       priority: 3,
-      isActive: true,
-      supportsDetailExtraction: false // 磁力站不支持详情提取
+      isActive: true
     },
     {
       id: 'sukebei',
@@ -354,8 +303,7 @@ export const APP_CONSTANTS = {
       category: 'torrent',
       isBuiltin: true,
       priority: 4,
-      isActive: true,
-      supportsDetailExtraction: true // 🆕 支持详情提取
+      isActive: true
     },
     
     // 社区论坛
@@ -368,8 +316,7 @@ export const APP_CONSTANTS = {
       category: 'community',
       isBuiltin: true,
       priority: 1,
-      isActive: true,
-      supportsDetailExtraction: false // 论坛不支持详情提取
+      isActive: true
     },
     {
       id: 't66y',
@@ -380,8 +327,7 @@ export const APP_CONSTANTS = {
       category: 'community',
       isBuiltin: true,
       priority: 2,
-      isActive: true,
-      supportsDetailExtraction: false // 论坛不支持详情提取
+      isActive: true
     }
   ],
   
@@ -429,11 +375,7 @@ export const APP_CONSTANTS = {
     CUSTOM_SOURCES: 'custom_sources',
     CUSTOM_CATEGORIES: 'custom_categories',
     ADMIN: 'admin',
-    PREMIUM: 'premium',
-    // 🆕 详情提取权限
-    DETAIL_EXTRACTION: 'detail_extraction',
-    DETAIL_EXTRACTION_BATCH: 'detail_extraction_batch',
-    DETAIL_EXTRACTION_HISTORY: 'detail_extraction_history'
+    PREMIUM: 'premium'
   },
   
   // 用户行为追踪事件
@@ -451,21 +393,11 @@ export const APP_CONSTANTS = {
     SETTINGS_UPDATED: 'settings_updated',
     DATA_EXPORTED: 'data_exported',
     HISTORY_CLEARED: 'history_cleared',
+    
+    // 🆕 搜索源状态检查相关事件
     SOURCE_STATUS_CHECK_STARTED: 'source_status_check_started',
     SOURCE_STATUS_CHECK_COMPLETED: 'source_status_check_completed',
-    SOURCE_STATUS_CHECK_FAILED: 'source_status_check_failed',
-    
-    // 🆕 详情提取相关事件
-    DETAIL_EXTRACTION_STARTED: 'detail_extraction_started',
-    DETAIL_EXTRACTION_COMPLETED: 'detail_extraction_completed',
-    DETAIL_EXTRACTION_FAILED: 'detail_extraction_failed',
-    DETAIL_BATCH_EXTRACTION_STARTED: 'detail_batch_extraction_started',
-    DETAIL_BATCH_EXTRACTION_COMPLETED: 'detail_batch_extraction_completed',
-    DETAIL_CACHE_HIT: 'detail_cache_hit',
-    DETAIL_CACHE_CLEARED: 'detail_cache_cleared',
-    DOWNLOAD_LINK_CLICKED: 'download_link_clicked',
-    MAGNET_LINK_COPIED: 'magnet_link_copied',
-    IMAGE_PREVIEW_OPENED: 'image_preview_opened'
+    SOURCE_STATUS_CHECK_FAILED: 'source_status_check_failed'
   },
   
   // 错误代码定义
@@ -483,54 +415,33 @@ export const APP_CONSTANTS = {
     SOURCE_NOT_FOUND: 'SOURCE_NOT_FOUND',
     CATEGORY_NOT_FOUND: 'CATEGORY_NOT_FOUND',
     CATEGORY_IN_USE: 'CATEGORY_IN_USE',
+    
+    // 🆕 搜索源状态检查错误代码
     SOURCE_STATUS_CHECK_TIMEOUT: 'SOURCE_STATUS_CHECK_TIMEOUT',
     SOURCE_STATUS_CHECK_ERROR: 'SOURCE_STATUS_CHECK_ERROR',
-    SOURCE_STATUS_CACHE_EXPIRED: 'SOURCE_STATUS_CACHE_EXPIRED',
-    
-    // 🆕 详情提取错误代码
-    DETAIL_EXTRACTION_TIMEOUT: 'DETAIL_EXTRACTION_TIMEOUT',
-    DETAIL_EXTRACTION_ERROR: 'DETAIL_EXTRACTION_ERROR',
-    DETAIL_EXTRACTION_UNSUPPORTED_SOURCE: 'DETAIL_EXTRACTION_UNSUPPORTED_SOURCE',
-    DETAIL_EXTRACTION_BATCH_LIMIT_EXCEEDED: 'DETAIL_EXTRACTION_BATCH_LIMIT_EXCEEDED',
-    DETAIL_EXTRACTION_PERMISSION_DENIED: 'DETAIL_EXTRACTION_PERMISSION_DENIED',
-    DETAIL_CACHE_ERROR: 'DETAIL_CACHE_ERROR'
+    SOURCE_STATUS_CACHE_EXPIRED: 'SOURCE_STATUS_CACHE_EXPIRED'
   },
   
-  // 🆕 增强：默认用户设置 - 添加详情提取设置
+  // 🆕 增强：默认用户设置 - 添加搜索源状态检查设置
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
-    searchSources: ['javbus', 'javdb', 'javlibrary'],
-    customSearchSources: [],
-    customSourceCategories: [],
+    searchSources: ['javbus', 'javdb', 'javlibrary'], // 默认启用的搜索源
+    customSearchSources: [], // 用户自定义搜索源
+    customSourceCategories: [], // 用户自定义分类
     maxFavoritesPerUser: 1000,
     maxHistoryPerUser: 1000,
     allowAnalytics: true,
     searchSuggestions: true,
     autoSync: true,
     cacheResults: true,
-    checkSourceStatus: false,
-    sourceStatusCheckTimeout: 8000,
-    sourceStatusCacheDuration: 300000,
-    skipUnavailableSources: true,
-    showSourceStatus: true,
-    retryFailedSources: false,
     
-    // 🆕 详情提取默认设置
-    enableDetailExtraction: false, // 默认关闭详情提取
-    autoExtractDetails: false, // 默认关闭自动提取
-    maxAutoExtractions: 5, // 自动提取最大数量
-    detailExtractionTimeout: 15000, // 详情提取超时时间
-    detailCacheDuration: 86400000, // 详情缓存时间（24小时）
-    extractionBatchSize: 3, // 批量提取大小
-    showScreenshots: true, // 显示截图
-    showDownloadLinks: true, // 显示下载链接
-    showMagnetLinks: true, // 显示磁力链接
-    showActressInfo: true, // 显示演员信息
-    compactMode: false, // 紧凑模式
-    enableImagePreview: true, // 启用图片预览
-    showExtractionProgress: true, // 显示提取进度
-    enableContentFilter: false, // 启用内容过滤
-    contentFilterKeywords: [] // 内容过滤关键词
+// 🆕 搜索源状态检查默认设置（毫秒）
+    checkSourceStatus: false,              // 默认关闭状态检查
+    sourceStatusCheckTimeout: 8000,        // 检查超时时间（毫秒）
+    sourceStatusCacheDuration: 300000,     // 状态缓存时间（毫秒）
+    skipUnavailableSources: true,         // 跳过不可用搜索源
+    showSourceStatus: true,               // 显示搜索源状态
+    retryFailedSources: false             // 不重试失败的搜索源
   },
   
   // 搜索源管理相关常量
@@ -542,8 +453,7 @@ export const APP_CONSTANTS = {
       CATEGORY: 'category',
       PRIORITY: 'priority',
       CREATED_DATE: 'created_date',
-      STATUS: 'status',
-      DETAIL_SUPPORT: 'detail_support' // 🆕 按详情提取支持排序
+      STATUS: 'status' // 🆕 按状态排序
     },
     FILTER_OPTIONS: {
       ALL: 'all',
@@ -551,67 +461,26 @@ export const APP_CONSTANTS = {
       CUSTOM: 'custom',
       ENABLED: 'enabled',
       DISABLED: 'disabled',
-      AVAILABLE: 'available',
-      UNAVAILABLE: 'unavailable',
-      SUPPORTS_DETAIL: 'supports_detail', // 🆕 按详情提取支持过滤
-      NO_DETAIL: 'no_detail' // 🆕 不支持详情提取的源
+      AVAILABLE: 'available',    // 🆕 按可用性过滤
+      UNAVAILABLE: 'unavailable' // 🆕 按不可用性过滤
     }
   },
 
-  // 搜索源状态检查配置
+  // 🆕 搜索源状态检查配置
   SOURCE_STATUS_CHECK: {
-    DEFAULT_TIMEOUT: 8000,
-    MIN_TIMEOUT: 1000,
-    MAX_TIMEOUT: 30000,
-    DEFAULT_CACHE_DURATION: 300000,
-    MIN_CACHE_DURATION: 60000,
-    MAX_CACHE_DURATION: 3600000,
-    CONCURRENT_CHECKS: 3,
-    RETRY_ATTEMPTS: 2,
-    RETRY_DELAY: 1000,
-    HTTP_METHOD: 'HEAD',
-    FOLLOW_REDIRECTS: true,
+    DEFAULT_TIMEOUT: 8000,           // 默认超时时间（毫秒）
+    MIN_TIMEOUT: 1000,              // 最小超时时间（毫秒）
+    MAX_TIMEOUT: 30000,             // 最大超时时间（毫秒）
+    DEFAULT_CACHE_DURATION: 300000, // 默认缓存时间（毫秒）
+    MIN_CACHE_DURATION: 60000,      // 最小缓存时间（毫秒）
+    MAX_CACHE_DURATION: 3600000,    // 最大缓存时间（毫秒）
+    CONCURRENT_CHECKS: 3,           // 并发检查数量
+    RETRY_ATTEMPTS: 2,              // 重试次数
+    RETRY_DELAY: 1000,              // 重试延迟（毫秒）
+    
+    // 状态检查HTTP配置
+    HTTP_METHOD: 'HEAD',            // 使用HEAD方法减少带宽
+    FOLLOW_REDIRECTS: true,         // 跟随重定向
     USER_AGENT: 'MagnetSearch/1.3.0 StatusChecker'
-  },
-
-  // 🆕 详情提取配置
-  DETAIL_EXTRACTION_CONFIG: {
-    DEFAULT_TIMEOUT: 15000, // 默认超时时间
-    MIN_TIMEOUT: 5000, // 最小超时时间
-    MAX_TIMEOUT: 30000, // 最大超时时间
-    DEFAULT_CACHE_DURATION: 86400000, // 默认缓存时间（24小时）
-    MIN_CACHE_DURATION: 3600000, // 最小缓存时间（1小时）
-    MAX_CACHE_DURATION: 604800000, // 最大缓存时间（7天）
-    DEFAULT_BATCH_SIZE: 3, // 默认批量大小
-    MAX_BATCH_SIZE: 20, // 最大批量大小
-    MAX_CONCURRENT_EXTRACTIONS: 3, // 最大并发提取数
-    RETRY_ATTEMPTS: 2, // 重试次数
-    RETRY_DELAY: 1000, // 重试延迟
-    ENABLE_CACHE: true, // 启用缓存
-    ENABLE_PROGRESS: true, // 启用进度显示
-    
-    // 内容类型检测
-    CONTENT_TYPES: {
-      TORRENT: 'torrent',
-      DOWNLOAD: 'download', 
-      VIDEO: 'video',
-      MEDIA: 'media',
-      BASIC: 'basic',
-      UNKNOWN: 'unknown'
-    },
-    
-    // 支持的图片格式
-    SUPPORTED_IMAGE_FORMATS: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
-    
-    // 支持的下载类型
-    SUPPORTED_DOWNLOAD_TYPES: ['http', 'https', 'ftp', 'magnet'],
-    
-    // 质量评分权重
-    QUALITY_WEIGHTS: {
-      RESPONSE_TIME: 0.3, // 响应时间权重
-      CONTENT_COMPLETENESS: 0.4, // 内容完整性权重
-      IMAGE_QUALITY: 0.2, // 图片质量权重
-      METADATA_RICHNESS: 0.1 // 元数据丰富度权重
-    }
   }
 };

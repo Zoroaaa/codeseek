@@ -1,6 +1,7 @@
-// API服务主文件 - 集成详情提取功能
+// API服务主文件 - 已拆分社区功能到专门的服务文件
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
+
 
 class APIService {
   constructor() {
@@ -8,6 +9,8 @@ class APIService {
     this.token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
     this.maxRetries = 3;
     this.retryDelay = 1000;
+    
+
   }
 
   // 从环境变量或配置获取API基础URL
@@ -190,269 +193,6 @@ class APIService {
     }
   }
 
-  // 🆕 详情提取相关API
-  async extractSingleDetail(searchResult, options = {}) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!searchResult || !searchResult.url) {
-      throw new Error('搜索结果数据不完整');
-    }
-
-    try {
-      const requestData = {
-        searchResult,
-        options: {
-          enableCache: options.enableCache !== false,
-          timeout: options.timeout || APP_CONSTANTS.API.DETAIL_EXTRACTION_TIMEOUT,
-          enableRetry: options.enableRetry !== false
-        }
-      };
-
-      console.log(`开始提取详情: ${searchResult.title}`);
-
-      const response = await this.request('/api/detail/extract-single', {
-        method: 'POST',
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '详情提取失败');
-      }
-
-      return response.detailInfo;
-
-    } catch (error) {
-      console.error(`详情提取失败 [${searchResult.title}]:`, error);
-      throw error;
-    }
-  }
-
-  async extractBatchDetails(searchResults, options = {}) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!Array.isArray(searchResults) || searchResults.length === 0) {
-      throw new Error('搜索结果列表不能为空');
-    }
-
-    const maxBatchSize = APP_CONSTANTS.LIMITS.MAX_DETAIL_EXTRACTIONS_PER_BATCH;
-    if (searchResults.length > maxBatchSize) {
-      throw new Error(`批量处理数量不能超过 ${maxBatchSize} 个`);
-    }
-
-    try {
-      const requestData = {
-        searchResults,
-        options: {
-          enableCache: options.enableCache !== false,
-          timeout: options.timeout || APP_CONSTANTS.API.DETAIL_EXTRACTION_TIMEOUT,
-          enableRetry: options.enableRetry !== false
-        }
-      };
-
-      console.log(`开始批量提取 ${searchResults.length} 个结果的详情`);
-
-      const response = await this.request('/api/detail/extract-batch', {
-        method: 'POST',
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '批量详情提取失败');
-      }
-
-      return {
-        results: response.results || [],
-        stats: response.stats || {}
-      };
-
-    } catch (error) {
-      console.error('批量详情提取失败:', error);
-      throw error;
-    }
-  }
-
-  async getDetailExtractionHistory(options = {}) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    try {
-      const params = new URLSearchParams();
-      
-      if (options.limit) params.append('limit', options.limit.toString());
-      if (options.offset) params.append('offset', options.offset.toString());
-      if (options.source) params.append('source', options.source);
-
-      const endpoint = `/api/detail/history${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await this.request(endpoint);
-
-      if (!response.success) {
-        throw new Error(response.message || '获取历史失败');
-      }
-
-      return response.history || [];
-
-    } catch (error) {
-      console.error('获取详情提取历史失败:', error);
-      throw error;
-    }
-  }
-
-  async getDetailCacheStats() {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    try {
-      const response = await this.request('/api/detail/cache/stats');
-
-      if (!response.success) {
-        throw new Error(response.message || '获取缓存统计失败');
-      }
-
-      return response.stats || {};
-
-    } catch (error) {
-      console.error('获取缓存统计失败:', error);
-      throw error;
-    }
-  }
-
-  async clearDetailCache(operation = 'expired', options = {}) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!['expired', 'all', 'lru'].includes(operation)) {
-      throw new Error('无效的清理操作类型');
-    }
-
-    try {
-      const params = new URLSearchParams();
-      params.append('operation', operation);
-      
-      if (operation === 'lru' && options.count) {
-        params.append('count', options.count.toString());
-      }
-
-      const response = await this.request(`/api/detail/cache/clear?${params.toString()}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '清理缓存失败');
-      }
-
-      return {
-        operation: response.operation,
-        cleanedCount: response.cleanedCount || 0,
-        message: response.message
-      };
-
-    } catch (error) {
-      console.error('清理缓存失败:', error);
-      throw error;
-    }
-  }
-
-  async deleteDetailCache(url) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!url) {
-      throw new Error('URL参数不能为空');
-    }
-
-    try {
-      const response = await this.request('/api/detail/cache/delete', {
-        method: 'DELETE',
-        body: JSON.stringify({ url })
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '删除缓存失败');
-      }
-
-      return true;
-
-    } catch (error) {
-      console.error('删除缓存失败:', error);
-      throw error;
-    }
-  }
-
-  async getDetailExtractionConfig() {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    try {
-      const response = await this.request('/api/detail/config');
-
-      if (!response.success) {
-        throw new Error(response.message || '获取配置失败');
-      }
-
-      return response.config || {};
-
-    } catch (error) {
-      console.error('获取详情提取配置失败:', error);
-      throw error;
-    }
-  }
-
-  async updateDetailExtractionConfig(config) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!config || typeof config !== 'object') {
-      throw new Error('配置数据格式错误');
-    }
-
-    try {
-      const response = await this.request('/api/detail/config', {
-        method: 'PUT',
-        body: JSON.stringify({ config })
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '更新配置失败');
-      }
-
-      return true;
-
-    } catch (error) {
-      console.error('更新详情提取配置失败:', error);
-      throw error;
-    }
-  }
-
-  async getDetailExtractionStats() {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    try {
-      const response = await this.request('/api/detail/stats');
-
-      if (!response.success) {
-        throw new Error(response.message || '获取统计失败');
-      }
-
-      return response.stats || {};
-
-    } catch (error) {
-      console.error('获取详情提取统计失败:', error);
-      throw error;
-    }
-  }
-
   // 搜索源状态检查API
   async checkSourcesStatus(sources, keyword, options = {}) {
     try {
@@ -500,6 +240,7 @@ class APIService {
     }
   }
 
+  // 获取搜索源状态检查历史
   async getSourceStatusHistory(options = {}) {
     try {
       const params = new URLSearchParams();
@@ -536,7 +277,7 @@ class APIService {
     }
   }
 
-  // 用户设置相关API - 支持详情提取设置
+  // 用户设置相关API - 支持搜索源状态检查设置
   async getUserSettings() {
     try {
       const response = await this.request('/api/user/settings');
@@ -561,13 +302,7 @@ class APIService {
       'searchSources', 'customSearchSources', 'customSourceCategories',
       'allowAnalytics', 'searchSuggestions',
       'checkSourceStatus', 'sourceStatusCheckTimeout', 'sourceStatusCacheDuration',
-      'skipUnavailableSources', 'showSourceStatus', 'retryFailedSources',
-      // 🆕 详情提取设置
-      'enableDetailExtraction', 'autoExtractDetails', 'maxAutoExtractions',
-      'detailExtractionTimeout', 'detailCacheDuration', 'extractionBatchSize',
-      'showScreenshots', 'showDownloadLinks', 'showMagnetLinks', 'showActressInfo',
-      'compactMode', 'enableImagePreview', 'showExtractionProgress',
-      'enableContentFilter', 'contentFilterKeywords'
+      'skipUnavailableSources', 'showSourceStatus', 'retryFailedSources'
     ];
     
     const validSettings = {};
@@ -762,7 +497,6 @@ class APIService {
       urlTemplate: source.urlTemplate.trim(),
       category: source.category || 'other',
       isCustom: true,
-      supportsDetailExtraction: source.supportsDetailExtraction || false, // 🆕 详情提取支持
       createdAt: Date.now()
     };
     
@@ -848,24 +582,28 @@ class APIService {
       throw error;
     }
   }
+
+
 }
 
-// 全局错误恢复机制
+// 4. 添加全局错误恢复机制
 function initializeErrorRecovery() {
+  // 监听未捕获的错误
   window.addEventListener('error', function(event) {
     console.error('全局错误捕获:', event.error);
     
     if (event.error && event.error.message) {
       if (event.error.message.includes('GREATEST')) {
-        console.warn('检测到数据库兼容性问题，系统正在修复中...');
+        showToast('检测到数据库兼容性问题，系统正在修复中...', 'warning');
         
+        // 延迟提示用户刷新
         setTimeout(() => {
           if (confirm('数据库兼容性问题已修复，是否刷新页面以应用修复？')) {
             window.location.reload();
           }
         }, 3000);
       } else if (event.error.message.includes('ambiguous column name')) {
-        console.warn('数据库结构已更新，建议刷新页面');
+        showToast('数据库结构已更新，建议刷新页面', 'info');
         
         setTimeout(() => {
           if (confirm('检测到数据库结构更新，是否刷新页面以获得最新功能？')) {
@@ -876,19 +614,22 @@ function initializeErrorRecovery() {
     }
   });
   
+  // 监听未处理的Promise拒绝
   window.addEventListener('unhandledrejection', function(event) {
     console.error('未处理的Promise拒绝:', event.reason);
     
     if (event.reason && event.reason.message) {
       if (event.reason.message.includes('GREATEST') || 
           event.reason.message.includes('ambiguous column name')) {
-        event.preventDefault();
-        console.info('系统检测到数据库更新，正在应用修复...');
+        event.preventDefault(); // 防止在控制台显示错误
+        
+        showToast('系统检测到数据库更新，正在应用修复...', 'info');
       }
     }
   });
 }
 
+// 在页面加载时初始化错误恢复
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeErrorRecovery);
@@ -897,5 +638,6 @@ if (typeof document !== 'undefined') {
   }
 }
 
+// 创建单例实例
 export const apiService = new APIService();
 export default apiService;
