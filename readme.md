@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Logo](images/logo.png)
+![Logo](frontend/images/logo.png)
 
 **一个现代化的磁力搜索聚合平台**
 
@@ -21,6 +21,7 @@
 - 📱 **响应式设计**: 完美适配桌面和移动设备
 - 🎨 **主题切换**: 支持亮色/暗色/自动主题
 - 📊 **数据统计**: 详细的使用统计和分析
+- 🔍 **详情提取**: 支持自动提取磁力链接详情
 
 ## 🏗️ 技术架构
 
@@ -38,18 +39,35 @@
 
 ### 项目结构
 ```
-magnet-search-app/
-├── 📄 index.html                  # 主搜索页面
-├── 📄 dashboard.html              # 用户仪表板
-├── 📁 src/                        # ES6源码目录
-│   ├── 📁 core/                   # 核心配置层
-│   ├── 📁 utils/                  # 工具函数层
-│   ├── 📁 services/               # 服务层
-│   ├── 📁 components/             # 组件层
-│   └── 📁 pages/                  # 页面应用层
-├── 📁 css/                        # 样式文件
-├── 📁 images/                     # 静态资源
-└── 📄 worker.js                   # Cloudflare Worker后端
+磁力快搜/
+├── 📁 codeseek-backend/         # 后端代码 (Cloudflare Workers)
+│   ├── 📁 src/                 # 源代码目录
+│   │   ├── 📁 config/          # 配置文件
+│   │   ├── 📁 constants.js     # 常量定义
+│   │   ├── 📁 handlers/        # API处理器
+│   │   ├── 📁 index.js         # 主入口文件
+│   │   ├── 📁 middleware.js    # 中间件
+│   │   ├── 📁 router.js        # 路由管理
+│   │   ├── 📁 services/        # 服务层
+│   │   └── 📁 utils.js         # 工具函数
+│   ├── 📄 schema.sql           # 数据库结构
+│   └── 📄 wrangler.toml        # Wrangler配置文件
+├── 📁 frontend/                # 前端代码
+│   ├── 📁 css/                 # 样式文件
+│   │   ├── 📁 components/      # 组件样式
+│   │   ├── 📁 core/            # 核心样式
+│   │   ├── 📁 pages/           # 页面样式
+│   │   └── 📁 utils/           # 工具样式
+│   ├── 📁 images/              # 静态资源
+│   ├── 📁 src/                 # ES6源码目录
+│   │   ├── 📁 components/      # UI组件
+│   │   ├── 📁 core/            # 核心配置
+│   │   ├── 📁 pages/           # 页面应用
+│   │   ├── 📁 services/        # 服务层
+│   │   └── 📁 utils/           # 工具函数
+│   ├── 📄 index.html           # 主搜索页面
+│   └── 📄 dashboard.html       # 用户仪表板
+└── 📄 readme.md                # 项目文档
 ```
 
 ## 🚀 快速开始
@@ -60,15 +78,29 @@ magnet-search-app/
 - Git
 
 ### 本地开发
+
+#### 前端开发
 ```bash
 # 克隆项目
 git clone https://github.com/yourusername/magnet-search.git
 cd magnet-search
 
 # 启动本地服务器
-npx http-server . -p 3000
+npx http-server frontend -p 3000
 
 # 或使用Live Server扩展（推荐）
+```
+
+#### 后端开发
+```bash
+# 进入后端目录
+cd codeseek-backend
+
+# 安装依赖
+npm install
+
+# 本地开发服务器
+wrangler dev
 ```
 
 ### 部署到Cloudflare
@@ -78,7 +110,7 @@ npx http-server . -p 3000
 2. 构建设置：
    - 框架预设：`None`
    - 构建命令：`echo "Static site"`
-   - 构建输出目录：`/`
+   - 构建输出目录：`frontend`
 
 #### 后端部署 (Cloudflare Workers)
 ```bash
@@ -92,6 +124,7 @@ wrangler auth login
 wrangler d1 create magnet-search-db
 
 # 部署Worker
+cd codeseek-backend
 wrangler deploy
 ```
 
@@ -105,7 +138,7 @@ MAX_FAVORITES_PER_USER=1000
 MAX_HISTORY_PER_USER=1000
 ```
 
-### 数据库初始化
+#### 数据库初始化
 ```bash
 # 运行数据库迁移
 wrangler d1 execute magnet-search-db --file=./schema.sql
@@ -118,6 +151,7 @@ wrangler d1 execute magnet-search-db --file=./schema.sql
 - **结果缓存**: 智能缓存提升搜索速度
 - **搜索建议**: 基于历史的智能提示
 - **源管理**: 可自由启用/禁用搜索源
+- **详情提取**: 自动提取磁力链接详细信息
 
 ### 2. 自定义搜索源
 - **源配置**: 支持添加自定义搜索站点
@@ -143,10 +177,15 @@ wrangler d1 execute magnet-search-db --file=./schema.sql
 - **热门统计**: 热门关键词和搜索源
 - **活动热力图**: 用户活动时间分布
 
+### 6. 社区功能
+- **标签管理**: 创建和分享搜索标签
+- **源分享**: 社区贡献和分享搜索源
+- **用户统计**: 个人使用数据统计
+
 ## 🔧 配置说明
 
 ### 前端配置
-在`src/core/config.js`中配置API地址：
+在`frontend/src/core/config.js`中配置API地址：
 ```javascript
 const config = {
   BASE_URL: 'https://your-worker.your-subdomain.workers.dev',
@@ -156,7 +195,7 @@ const config = {
 ```
 
 ### 搜索源配置
-在`src/core/constants.js`中管理内置搜索源：
+在`frontend/src/core/constants.js`中管理内置搜索源：
 ```javascript
 SEARCH_SOURCES: [
   {
@@ -211,18 +250,33 @@ npm run test:coverage
 - `POST /api/auth/login` - 用户登录
 - `POST /api/auth/verify-token` - Token验证
 - `POST /api/auth/logout` - 用户登出
+- `POST /api/auth/change-password` - 更改密码
+- `DELETE /api/auth/delete-account` - 删除账户
 
 ### 用户数据接口
 - `GET /api/user/settings` - 获取用户设置
 - `PUT /api/user/settings` - 更新用户设置
 - `GET /api/user/favorites` - 获取收藏列表
 - `POST /api/user/favorites` - 同步收藏数据
-
-### 搜索接口
 - `GET /api/user/search-history` - 获取搜索历史
 - `POST /api/user/search-history` - 保存搜索记录
 - `DELETE /api/user/search-history/:id` - 删除历史记录
 - `GET /api/user/search-stats` - 获取搜索统计
+
+### 社区接口
+- `GET /api/community/tags` - 获取标签列表
+- `POST /api/community/tags` - 创建标签
+- `GET /api/community/sources` - 获取社区搜索源
+- `POST /api/community/sources` - 提交搜索源
+- `GET /api/community/sources/:id` - 获取源详情
+- `PUT /api/community/sources/:id` - 更新搜索源
+- `DELETE /api/community/sources/:id` - 删除搜索源
+
+### 系统接口
+- `GET /api/health` - 健康检查
+- `GET /api/sources/status` - 搜索源状态
+- `GET /api/search-sources` - 获取所有搜索源
+- `GET /api/config` - 获取系统配置
 
 ## 🤝 贡献指南
 
@@ -246,6 +300,7 @@ npm run test:coverage
 - 🎨 改进用户界面和交互体验
 - 🔧 重构Dashboard架构，提升可维护性
 - 📊 增强数据统计和可视化功能
+- 🔍 添加详情提取功能
 
 ### v1.2.0
 - 🔐 完善用户认证和安全机制

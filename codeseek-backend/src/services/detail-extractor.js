@@ -94,47 +94,55 @@ export class DetailExtractorService {
    * @param {number} timeout - 超时时间
    * @returns {string} 详情页面URL
    */
-  async findDetailPageUrl(searchResult, sourceType, timeout) {
-    try {
-      // 如果搜索结果已经包含详情页URL，直接使用
-      if (searchResult.detailUrl) {
-        console.log(`使用预设的详情页URL: ${searchResult.detailUrl}`);
-        return searchResult.detailUrl;
-      }
+// 在 detail-extractor.js 中修改 findDetailPageUrl 方法
+async findDetailPageUrl(searchResult, sourceType, timeout) {
+  try {
+    // 如果搜索结果已经包含详情页URL，直接使用
+    if (searchResult.detailUrl) {
+      console.log(`使用预设的详情页URL: ${searchResult.detailUrl}`);
+      return searchResult.detailUrl;
+    }
 
-      // 检查URL是否已经是详情页
-      if (this.isDetailPageUrl(searchResult.url, sourceType)) {
-        console.log(`搜索URL已经是详情页: ${searchResult.url}`);
-        return searchResult.url;
-      }
-
-      // 获取搜索页面内容，查找详情链接
-      console.log(`从搜索页面查找详情链接: ${searchResult.url}`);
-      const searchPageContent = await this.fetchPageContent(searchResult.url, timeout);
-      
-      if (!searchPageContent) {
-        throw new Error('无法获取搜索页面内容');
-      }
-
-      // 根据源类型解析详情链接
-      const detailUrl = await this.extractDetailUrlFromSearchPage(
-        searchPageContent, 
-        searchResult, 
-        sourceType
-      );
-
-      if (!detailUrl) {
-        throw new Error('在搜索页面中未找到详情链接');
-      }
-
-      return detailUrl;
-
-    } catch (error) {
-      console.warn(`查找详情页URL失败，使用原始URL: ${error.message}`);
-      // 降级：直接使用搜索结果URL
+    // 检查URL是否已经是详情页
+    if (this.isDetailPageUrl(searchResult.url, sourceType)) {
+      console.log(`搜索URL已经是详情页: ${searchResult.url}`);
       return searchResult.url;
     }
+
+    // 获取搜索页面内容，查找详情链接
+    console.log(`从搜索页面查找详情链接: ${searchResult.url}`);
+    const searchPageContent = await this.fetchPageContent(searchResult.url, timeout);
+    
+    if (!searchPageContent) {
+      throw new Error('无法获取搜索页面内容');
+    }
+
+    // 使用 contentParser 从搜索页面提取详情链接
+    const detailLinks = await contentParser.extractDetailLinksFromSearchPage(searchPageContent, {
+      sourceType,
+      baseUrl: searchResult.url,
+      searchKeyword: searchResult.title
+    });
+
+    if (detailLinks && detailLinks.length > 0) {
+      // 选择匹配度最高的链接
+      const bestMatch = detailLinks.reduce((best, current) => 
+        (current.score || 0) > (best.score || 0) ? current : best
+      );
+      
+      console.log(`找到最佳匹配详情链接: ${bestMatch.url}`);
+      return bestMatch.url;
+    }
+
+    // 如果没有找到链接，降级到原始URL
+    console.warn('未找到详情链接，使用原始URL');
+    return searchResult.url;
+
+  } catch (error) {
+    console.warn(`查找详情页URL失败，使用原始URL: ${error.message}`);
+    return searchResult.url;
   }
+}
 
   /**
    * 检查URL是否已经是详情页
