@@ -7,7 +7,7 @@ import networkUtils from '../../utils/network.js';
 import authManager from '../../services/auth.js';
 import themeManager from '../../services/theme.js';
 import searchManager from '../../components/search.js';
-import enhancedSearchManager  from '../../components//enhanced-search.js';
+import enhancedSearchManager  from '../../components/enhanced-search.js';
 import favoritesManager from '../../components/favorites.js';
 import apiService from '../../services/api.js';
 
