@@ -7,6 +7,7 @@ import networkUtils from '../../utils/network.js';
 import authManager from '../../services/auth.js';
 import themeManager from '../../services/theme.js';
 import searchManager from '../../components/search.js';
+import enhancedSearchManager  from '../../components//enhanced-search.js';
 import favoritesManager from '../../components/favorites.js';
 import apiService from '../../services/api.js';
 
@@ -381,6 +382,9 @@ renderSiteItem(source) {
     try {
       // 初始化搜索管理器
       await searchManager.init();
+	  
+	        // 初始化增强搜索管理器
+      await enhancedSearchManager.init();
       
       // 初始化收藏管理器
       await favoritesManager.init();

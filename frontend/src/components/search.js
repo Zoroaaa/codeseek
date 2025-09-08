@@ -130,45 +130,56 @@ export class SearchManager {
   }
 
   // 执行搜索 - 委托给增强搜索管理器
-  async performSearch() {
-    const searchInput = document.getElementById('searchInput');
-    const keyword = searchInput?.value.trim();
-    
-    if (!keyword) {
-      showToast('请输入搜索关键词', 'error');
-      searchInput?.focus();
-      return;
-    }
-
-    // 验证关键词
-    const validation = validateSearchKeyword(keyword);
-    if (!validation.valid) {
-      showToast(validation.errors[0], 'error');
-      return;
-    }
-
-    try {
-      // 检查是否启用了详情提取功能
-      const userSettings = authManager.isAuthenticated() ? 
-        await apiService.getUserSettings() : 
-        APP_CONSTANTS.DEFAULT_USER_SETTINGS;
-
-      if (userSettings.enableDetailExtraction && authManager.isAuthenticated()) {
-        // 使用增强搜索管理器
-        await enhancedSearchManager.performEnhancedSearch(keyword, {
-          useCache: userSettings.cacheResults,
-          saveToHistory: authManager.isAuthenticated()
-        });
-      } else {
-        // 使用基础搜索
-        await this.performBasicSearch(keyword);
-      }
-
-    } catch (error) {
-      console.error('搜索失败:', error);
-      showToast(`搜索失败: ${error.message}`, 'error');
-    }
+async performSearch() {
+  const searchInput = document.getElementById('searchInput');
+  const keyword = searchInput?.value.trim();
+  
+  if (!keyword) {
+    showToast('请输入搜索关键词', 'error');
+    searchInput?.focus();
+    return;
   }
+
+  const validation = validateSearchKeyword(keyword);
+  if (!validation.valid) {
+    showToast(validation.errors[0], 'error');
+    return;
+  }
+
+  try {
+    // 检查详情提取功能是否可用
+    const shouldUseEnhancedSearch = await this.shouldUseEnhancedSearch();
+    
+    if (shouldUseEnhancedSearch) {
+      // 动态导入并使用增强搜索
+      const { enhancedSearchManager } = await import('./enhanced-search.js');
+      await enhancedSearchManager.performEnhancedSearch(keyword, {
+        useCache: true,
+        saveToHistory: authManager.isAuthenticated()
+      });
+    } else {
+      // 使用基础搜索
+      await this.performBasicSearch(keyword);
+    }
+
+  } catch (error) {
+    console.error('搜索失败:', error);
+    showToast(`搜索失败: ${error.message}`, 'error');
+  }
+}
+
+// 新增方法：判断是否应该使用增强搜索
+async shouldUseEnhancedSearch() {
+  if (!authManager.isAuthenticated()) return false;
+  
+  try {
+    const userSettings = await apiService.getUserSettings();
+    return userSettings.enableDetailExtraction === true;
+  } catch (error) {
+    console.warn('获取用户设置失败:', error);
+    return false;
+  }
+}
 
   // 执行基础搜索（不包含详情提取）
   async performBasicSearch(keyword) {
