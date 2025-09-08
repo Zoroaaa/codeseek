@@ -34,40 +34,54 @@ export class ContentParserService {
       const selectors = searchPageRules.detailLinkSelectors;
 
       // 尝试每个选择器配置
-      for (const selectorConfig of selectors) {
-        console.log(`尝试选择器: ${selectorConfig.selector}`);
-        
-        const links = doc.querySelectorAll(selectorConfig.selector);
-        console.log(`找到 ${links.length} 个候选链接`);
+for (const selectorConfig of selectors) {
+  console.log(`尝试选择器: ${selectorConfig.selector}`);
+  
+  const links = doc.querySelectorAll(selectorConfig.selector);
+  console.log(`找到 ${links.length} 个候选链接`);
 
-        for (const linkElement of links) {
-          const href = linkElement.getAttribute('href');
-          if (!href) continue;
-
-          // 构建完整URL
-          const fullUrl = this.resolveRelativeUrl(href, baseUrl);
-
-          // 验证链接有效性
-          if (!this.isValidDetailLink(fullUrl, selectorConfig)) {
-            continue;
-          }
-
-          // 提取链接相关信息
-          const linkInfo = this.extractLinkInfo(linkElement, selectorConfig, searchKeyword);
-          if (linkInfo) {
-            detailLinks.push({
-              url: fullUrl,
-              ...linkInfo
-            });
-          }
+  for (const linkElement of links) {
+    let href = linkElement.getAttribute('href');
+    // 兼容 onclick 跳转（如 javbus）
+    if (!href || href === 'javascript:;' || href.startsWith('javascript')) {
+      const onclick = linkElement.getAttribute('onclick');
+      if (onclick) {
+        // 兼容 window.open('/MIMK-186', ...) 或 location.href='/MIMK-186'
+        let match = onclick.match(/window\.open\(['"]([^'"]+)['"]/);
+        if (!match) {
+          match = onclick.match(/location\.href\s*=\s*['"]([^'"]+)['"]/);
         }
-
-        // 如果找到了链接，可以选择停止或继续查找更多
-        if (detailLinks.length > 0) {
-          console.log(`使用选择器 ${selectorConfig.selector} 找到 ${detailLinks.length} 个详情链接`);
-          break; // 找到就停止，避免重复
+        if (match && match[1]) {
+          href = match[1];
         }
       }
+    }
+    if (!href) continue;
+
+    // 构建完整URL
+    const fullUrl = this.resolveRelativeUrl(href, baseUrl);
+
+    // 验证链接有效性
+    if (!this.isValidDetailLink(fullUrl, selectorConfig)) {
+      continue;
+    }
+
+    // 提取链接相关信息
+    const linkInfo = this.extractLinkInfo(linkElement, selectorConfig, searchKeyword);
+    if (linkInfo) {
+      detailLinks.push({
+        url: fullUrl,
+        ...linkInfo
+      });
+    }
+  }
+
+  // 如果找到了链接，可以选择停止或继续查找更多
+  if (detailLinks.length > 0) {
+    console.log(`使用选择器 ${selectorConfig.selector} 找到 ${detailLinks.length} 个详情链接`);
+    break; // 找到就停止，避免重复
+  }
+}
 
       // 如果没有找到任何链接，使用通用规则
       if (detailLinks.length === 0) {
