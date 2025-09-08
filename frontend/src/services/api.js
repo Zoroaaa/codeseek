@@ -1,4 +1,4 @@
-// API服务主文件 - 集成详情提取功能
+// API服务主文件 - 移除详情提取功能，改为调用 detail-api.js
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 
@@ -190,269 +190,6 @@ class APIService {
     }
   }
 
-  // 🆕 详情提取相关API
-  async extractSingleDetail(searchResult, options = {}) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!searchResult || !searchResult.url) {
-      throw new Error('搜索结果数据不完整');
-    }
-
-    try {
-      const requestData = {
-        searchResult,
-        options: {
-          enableCache: options.enableCache !== false,
-          timeout: options.timeout || APP_CONSTANTS.API.DETAIL_EXTRACTION_TIMEOUT,
-          enableRetry: options.enableRetry !== false
-        }
-      };
-
-      console.log(`开始提取详情: ${searchResult.title}`);
-
-      const response = await this.request('/api/detail/extract-single', {
-        method: 'POST',
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '详情提取失败');
-      }
-
-      return response.detailInfo;
-
-    } catch (error) {
-      console.error(`详情提取失败 [${searchResult.title}]:`, error);
-      throw error;
-    }
-  }
-
-  async extractBatchDetails(searchResults, options = {}) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!Array.isArray(searchResults) || searchResults.length === 0) {
-      throw new Error('搜索结果列表不能为空');
-    }
-
-    const maxBatchSize = APP_CONSTANTS.LIMITS.MAX_DETAIL_EXTRACTIONS_PER_BATCH;
-    if (searchResults.length > maxBatchSize) {
-      throw new Error(`批量处理数量不能超过 ${maxBatchSize} 个`);
-    }
-
-    try {
-      const requestData = {
-        searchResults,
-        options: {
-          enableCache: options.enableCache !== false,
-          timeout: options.timeout || APP_CONSTANTS.API.DETAIL_EXTRACTION_TIMEOUT,
-          enableRetry: options.enableRetry !== false
-        }
-      };
-
-      console.log(`开始批量提取 ${searchResults.length} 个结果的详情`);
-
-      const response = await this.request('/api/detail/extract-batch', {
-        method: 'POST',
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '批量详情提取失败');
-      }
-
-      return {
-        results: response.results || [],
-        stats: response.stats || {}
-      };
-
-    } catch (error) {
-      console.error('批量详情提取失败:', error);
-      throw error;
-    }
-  }
-
-  async getDetailExtractionHistory(options = {}) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    try {
-      const params = new URLSearchParams();
-      
-      if (options.limit) params.append('limit', options.limit.toString());
-      if (options.offset) params.append('offset', options.offset.toString());
-      if (options.source) params.append('source', options.source);
-
-      const endpoint = `/api/detail/history${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await this.request(endpoint);
-
-      if (!response.success) {
-        throw new Error(response.message || '获取历史失败');
-      }
-
-      return response.history || [];
-
-    } catch (error) {
-      console.error('获取详情提取历史失败:', error);
-      throw error;
-    }
-  }
-
-  async getDetailCacheStats() {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    try {
-      const response = await this.request('/api/detail/cache/stats');
-
-      if (!response.success) {
-        throw new Error(response.message || '获取缓存统计失败');
-      }
-
-      return response.stats || {};
-
-    } catch (error) {
-      console.error('获取缓存统计失败:', error);
-      throw error;
-    }
-  }
-
-  async clearDetailCache(operation = 'expired', options = {}) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!['expired', 'all', 'lru'].includes(operation)) {
-      throw new Error('无效的清理操作类型');
-    }
-
-    try {
-      const params = new URLSearchParams();
-      params.append('operation', operation);
-      
-      if (operation === 'lru' && options.count) {
-        params.append('count', options.count.toString());
-      }
-
-      const response = await this.request(`/api/detail/cache/clear?${params.toString()}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '清理缓存失败');
-      }
-
-      return {
-        operation: response.operation,
-        cleanedCount: response.cleanedCount || 0,
-        message: response.message
-      };
-
-    } catch (error) {
-      console.error('清理缓存失败:', error);
-      throw error;
-    }
-  }
-
-  async deleteDetailCache(url) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!url) {
-      throw new Error('URL参数不能为空');
-    }
-
-    try {
-      const response = await this.request('/api/detail/cache/delete', {
-        method: 'DELETE',
-        body: JSON.stringify({ url })
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '删除缓存失败');
-      }
-
-      return true;
-
-    } catch (error) {
-      console.error('删除缓存失败:', error);
-      throw error;
-    }
-  }
-
-  async getDetailExtractionConfig() {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    try {
-      const response = await this.request('/api/detail/config');
-
-      if (!response.success) {
-        throw new Error(response.message || '获取配置失败');
-      }
-
-      return response.config || {};
-
-    } catch (error) {
-      console.error('获取详情提取配置失败:', error);
-      throw error;
-    }
-  }
-
-  async updateDetailExtractionConfig(config) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    if (!config || typeof config !== 'object') {
-      throw new Error('配置数据格式错误');
-    }
-
-    try {
-      const response = await this.request('/api/detail/config', {
-        method: 'PUT',
-        body: JSON.stringify({ config })
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '更新配置失败');
-      }
-
-      return true;
-
-    } catch (error) {
-      console.error('更新详情提取配置失败:', error);
-      throw error;
-    }
-  }
-
-  async getDetailExtractionStats() {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-
-    try {
-      const response = await this.request('/api/detail/stats');
-
-      if (!response.success) {
-        throw new Error(response.message || '获取统计失败');
-      }
-
-      return response.stats || {};
-
-    } catch (error) {
-      console.error('获取详情提取统计失败:', error);
-      throw error;
-    }
-  }
-
   // 搜索源状态检查API
   async checkSourcesStatus(sources, keyword, options = {}) {
     try {
@@ -537,12 +274,12 @@ class APIService {
   }
 
   // 用户设置相关API - 支持详情提取设置
-async getUserSettings() {
+  async getUserSettings() {
     try {
       const response = await this.request('/api/user/settings');
       const serverSettings = response.settings || {};
       
-      // ✅ 修复：合并服务器设置和默认设置
+      // 合并服务器设置和默认设置
       const mergedSettings = {
         ...APP_CONSTANTS.DEFAULT_USER_SETTINGS,  // 先应用默认设置
         ...serverSettings  // 再覆盖服务器设置
@@ -554,10 +291,10 @@ async getUserSettings() {
     } catch (error) {
       console.error('获取用户设置失败，使用默认设置:', error);
       
-      // ✅ 修复：失败时返回默认设置而不是空对象
+      // 失败时返回默认设置而不是空对象
       return { ...APP_CONSTANTS.DEFAULT_USER_SETTINGS };
     }
-}
+  }
 
   async updateUserSettings(settings) {
     if (!this.token) {
@@ -574,7 +311,7 @@ async getUserSettings() {
       'allowAnalytics', 'searchSuggestions',
       'checkSourceStatus', 'sourceStatusCheckTimeout', 'sourceStatusCacheDuration',
       'skipUnavailableSources', 'showSourceStatus', 'retryFailedSources',
-      // 🆕 详情提取设置
+      // 详情提取设置 - 这些设置保留，但实际处理由 detail-api.js 管理
       'enableDetailExtraction', 'autoExtractDetails', 'maxAutoExtractions',
       'detailExtractionTimeout', 'detailCacheDuration', 'extractionBatchSize',
       'showScreenshots', 'showDownloadLinks', 'showMagnetLinks', 'showActressInfo',
@@ -774,7 +511,7 @@ async getUserSettings() {
       urlTemplate: source.urlTemplate.trim(),
       category: source.category || 'other',
       isCustom: true,
-      supportsDetailExtraction: source.supportsDetailExtraction || false, // 🆕 详情提取支持
+      supportsDetailExtraction: source.supportsDetailExtraction || false,
       createdAt: Date.now()
     };
     

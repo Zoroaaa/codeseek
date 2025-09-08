@@ -1,4 +1,4 @@
-// 增强版搜索组件 - 集成详情提取功能
+// src/components/search.js - 基础搜索组件（去除详情提取相关功能）
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../utils/format.js';
@@ -9,8 +9,8 @@ import authManager from '../services/auth.js';
 import favoritesManager from './favorites.js';
 import apiService from '../services/api.js';
 
-// 🆕 导入详情提取相关服务
-import detailAPIService from '../services/detail-api.js';
+// 引入增强搜索组件来处理详情提取
+import enhancedSearchManager from './enhanced-search.js';
 
 export class SearchManager {
   constructor() {
@@ -19,18 +19,6 @@ export class SearchManager {
     this.isInitialized = false;
     this.statusCheckInProgress = false;
     this.lastStatusCheckKeyword = null;
-    
-    // 🆕 详情提取相关属性
-    this.detailExtractionEnabled = false;
-    this.detailExtractionInProgress = false;
-    this.detailExtractionQueue = [];
-    this.detailExtractionConfig = {
-      autoExtractDetails: false,
-      maxAutoExtractions: 5,
-      extractionBatchSize: 3,
-      showExtractionProgress: true,
-      enableCache: true
-    };
   }
 
   async init() {
@@ -38,8 +26,6 @@ export class SearchManager {
 
     try {
       await this.loadSearchHistory();
-      // 🆕 加载详情提取配置
-      await this.loadDetailExtractionConfig();
       this.bindEvents();
       this.handleURLParams();
       this.exposeGlobalMethods();
@@ -48,40 +34,6 @@ export class SearchManager {
       console.error('搜索管理器初始化失败:', error);
     }
   }
-
-  // 🆕 加载详情提取配置
-async loadDetailExtractionConfig() {
-    try {
-      // 无论是否登录，都尝试获取设置（未登录时会返回默认值）
-      const userSettings = authManager.isAuthenticated() 
-        ? await apiService.getUserSettings() 
-        : APP_CONSTANTS.DEFAULT_USER_SETTINGS;
-      
-      this.detailExtractionEnabled = userSettings.enableDetailExtraction;
-      this.detailExtractionConfig = {
-        autoExtractDetails: userSettings.autoExtractDetails,
-        maxAutoExtractions: userSettings.maxAutoExtractions,
-        extractionBatchSize: userSettings.extractionBatchSize,
-        showExtractionProgress: userSettings.showExtractionProgress,
-        enableCache: userSettings.enableCache,
-        showScreenshots: userSettings.showScreenshots,
-        showDownloadLinks: userSettings.showDownloadLinks,
-        showMagnetLinks: userSettings.showMagnetLinks,
-        showActressInfo: userSettings.showActressInfo,
-        compactMode: userSettings.compactMode,
-        enableImagePreview: userSettings.enableImagePreview
-      };
-
-      console.log('详情提取配置已加载:', {
-        enabled: this.detailExtractionEnabled,
-        config: this.detailExtractionConfig
-      });
-
-    } catch (error) {
-      console.warn('加载详情提取配置失败，使用默认配置:', error);
-      // 这种情况下已经在 getUserSettings 中处理了默认值
-    }
-}
   
   // 暴露必要的全局方法
   exposeGlobalMethods() {
@@ -94,18 +46,7 @@ async loadDetailExtractionConfig() {
       checkSourceStatus: (sourceId) => this.checkSingleSourceStatus(sourceId),
       refreshSourceStatus: () => this.refreshAllSourcesStatus(),
       toggleStatusCheck: () => this.toggleStatusCheck(),
-      viewStatusHistory: () => this.viewStatusHistory(),
-      
-      // 🆕 详情提取相关方法
-      toggleDetailExtraction: () => this.toggleDetailExtraction(),
-      extractSingleDetail: (resultId) => this.extractSingleDetail(resultId),
-      extractBatchDetails: () => this.extractBatchDetails(),
-      toggleDetailDisplay: (resultId) => this.toggleDetailDisplay(resultId),
-      retryDetailExtraction: (resultId) => this.retryDetailExtraction(resultId),
-      previewImage: (imageUrl) => this.previewImage(imageUrl),
-      copyMagnetLink: (magnetLink) => this.copyMagnetLink(magnetLink),
-      recordDownloadClick: (url, type) => this.recordDownloadClick(url, type),
-      recordMagnetClick: (magnetLink) => this.recordMagnetClick(magnetLink)
+      viewStatusHistory: () => this.viewStatusHistory()
     };
   }
 
@@ -168,7 +109,6 @@ async loadDetailExtractionConfig() {
 
       if (e.key === 'Escape') {
         this.hideSearchSuggestions();
-        this.hideImagePreview(); // 🆕 关闭图片预览
       }
     });
   }
@@ -189,7 +129,7 @@ async loadDetailExtractionConfig() {
     }
   }
 
-  // 🆕 执行增强搜索 - 支持详情提取
+  // 执行搜索 - 委托给增强搜索管理器
   async performSearch() {
     const searchInput = document.getElementById('searchInput');
     const keyword = searchInput?.value.trim();
@@ -207,6 +147,31 @@ async loadDetailExtractionConfig() {
       return;
     }
 
+    try {
+      // 检查是否启用了详情提取功能
+      const userSettings = authManager.isAuthenticated() ? 
+        await apiService.getUserSettings() : 
+        APP_CONSTANTS.DEFAULT_USER_SETTINGS;
+
+      if (userSettings.enableDetailExtraction && authManager.isAuthenticated()) {
+        // 使用增强搜索管理器
+        await enhancedSearchManager.performEnhancedSearch(keyword, {
+          useCache: userSettings.cacheResults,
+          saveToHistory: authManager.isAuthenticated()
+        });
+      } else {
+        // 使用基础搜索
+        await this.performBasicSearch(keyword);
+      }
+
+    } catch (error) {
+      console.error('搜索失败:', error);
+      showToast(`搜索失败: ${error.message}`, 'error');
+    }
+  }
+
+  // 执行基础搜索（不包含详情提取）
+  async performBasicSearch(keyword) {
     try {
       showLoading(true);
       
@@ -229,594 +194,17 @@ async loadDetailExtractionConfig() {
       // 显示搜索结果
       this.displaySearchResults(keyword, results);
 
-      // 🆕 处理详情提取
-      if (this.detailExtractionEnabled && authManager.isAuthenticated()) {
-        await this.handleDetailExtraction(results, keyword);
-      }
-
       // 更新搜索历史
       if (saveToHistory) {
         await this.addToHistory(keyword);
       }
 
     } catch (error) {
-      console.error('搜索失败:', error);
-      showToast(`搜索失败: ${error.message}`, 'error');
+      console.error('基础搜索失败:', error);
+      throw error;
     } finally {
       showLoading(false);
       this.statusCheckInProgress = false;
-      this.detailExtractionInProgress = false;
-    }
-  }
-
-  // 🆕 处理详情提取
-  async handleDetailExtraction(searchResults, keyword) {
-    if (this.detailExtractionInProgress) {
-      console.log('详情提取正在进行中，跳过本次请求');
-      return;
-    }
-
-    try {
-      this.detailExtractionInProgress = true;
-      
-      // 确定要提取详情的结果
-      const resultsToExtract = this.detailExtractionConfig.autoExtractDetails ? 
-        searchResults.slice(0, this.detailExtractionConfig.maxAutoExtractions) :
-        searchResults.filter(result => this.shouldExtractDetail(result));
-
-      if (resultsToExtract.length === 0) {
-        console.log('没有需要提取详情的结果');
-        return;
-      }
-
-      // 显示提取进度
-      if (this.detailExtractionConfig.showExtractionProgress) {
-        this.showExtractionProgress(resultsToExtract.length);
-      }
-
-      // 分批提取详情
-      await this.extractDetailsInBatches(resultsToExtract);
-
-    } catch (error) {
-      console.error('详情提取失败:', error);
-      showToast('详情提取失败: ' + error.message, 'error');
-    } finally {
-      this.detailExtractionInProgress = false;
-      this.hideExtractionProgress();
-    }
-  }
-
-  // 🆕 分批提取详情
-  async extractDetailsInBatches(results) {
-    const batchSize = this.detailExtractionConfig.extractionBatchSize;
-    let processedCount = 0;
-
-    for (let i = 0; i < results.length; i += batchSize) {
-      const batch = results.slice(i, i + batchSize);
-      
-      try {
-        // 批量提取详情
-        const extractionResult = await detailAPIService.extractBatchDetails(batch, {
-          enableCache: this.detailExtractionConfig.enableCache,
-          timeout: 15000
-        });
-
-        // 处理提取结果
-        for (const result of extractionResult.results) {
-          await this.handleSingleExtractionResult(result);
-          processedCount++;
-          
-          // 更新进度
-          if (this.detailExtractionConfig.showExtractionProgress) {
-            this.updateExtractionProgress(processedCount, results.length);
-          }
-        }
-
-        // 批次间延迟
-        if (i + batchSize < results.length) {
-          await this.delay(500);
-        }
-
-      } catch (error) {
-        console.error(`批次 ${i / batchSize + 1} 详情提取失败:`, error);
-        
-        // 处理失败的批次中的每个结果
-        batch.forEach(() => {
-          processedCount++;
-          if (this.detailExtractionConfig.showExtractionProgress) {
-            this.updateExtractionProgress(processedCount, results.length);
-          }
-        });
-      }
-    }
-
-    console.log(`详情提取完成: ${processedCount}/${results.length}`);
-  }
-
-  // 🆕 处理单个提取结果
-  async handleSingleExtractionResult(result) {
-    try {
-      const resultContainer = document.querySelector(`[data-result-id="${result.id}"]`);
-      if (!resultContainer) {
-        console.warn('未找到对应的结果容器:', result.id);
-        return;
-      }
-
-      if (result.extractionStatus === 'success') {
-        // 创建详情卡片并插入到结果中
-        this.insertDetailCard(resultContainer, result);
-        // 添加展开/收起按钮
-        this.addDetailToggleButton(resultContainer);
-      } else {
-        // 显示提取失败状态
-        this.showExtractionError(resultContainer, result.extractionError);
-      }
-
-    } catch (error) {
-      console.error('处理提取结果失败:', error);
-    }
-  }
-
-  // 🆕 插入详情卡片
-  insertDetailCard(resultContainer, detailInfo) {
-    let detailContainer = resultContainer.querySelector('.result-detail-container');
-    
-    if (!detailContainer) {
-      detailContainer = document.createElement('div');
-      detailContainer.className = 'result-detail-container';
-      detailContainer.style.display = 'none';
-      resultContainer.appendChild(detailContainer);
-    }
-
-    const detailCardHTML = this.createDetailCardHTML(detailInfo);
-    detailContainer.innerHTML = detailCardHTML;
-  }
-
-  // 🆕 创建详情卡片HTML
-  createDetailCardHTML(detailInfo) {
-    const config = this.detailExtractionConfig;
-    
-    // 基本信息部分
-    const basicInfoHTML = this.createBasicInfoHTML(detailInfo);
-    
-    // 媒体信息部分
-    const mediaInfoHTML = this.createMediaInfoHTML(detailInfo, config);
-    
-    // 演员信息部分
-    const actressInfoHTML = config.showActressInfo ? 
-      this.createActressInfoHTML(detailInfo) : '';
-    
-    // 下载链接部分
-    const downloadLinksHTML = config.showDownloadLinks ? 
-      this.createDownloadLinksHTML(detailInfo) : '';
-    
-    // 磁力链接部分
-    const magnetLinksHTML = config.showMagnetLinks ? 
-      this.createMagnetLinksHTML(detailInfo) : '';
-    
-    // 截图预览部分
-    const screenshotsHTML = config.showScreenshots ? 
-      this.createScreenshotsHTML(detailInfo, config) : '';
-    
-    // 详情信息部分
-    const detailsHTML = this.createDetailsHTML(detailInfo);
-    
-    // 状态指示器
-    const statusHTML = this.createStatusHTML(detailInfo);
-
-    return `
-      <div class="detail-card ${config.compactMode ? 'compact' : ''}" 
-           data-card-id="${detailInfo.id}" 
-           data-url="${escapeHtml(detailInfo.detailUrl || detailInfo.url)}">
-        
-        <!-- 状态指示器 -->
-        ${statusHTML}
-        
-        <!-- 卡片头部 -->
-        <div class="detail-card-header">
-          ${basicInfoHTML}
-        </div>
-        
-        <!-- 媒体信息 -->
-        ${mediaInfoHTML}
-        
-        <!-- 演员信息 -->
-        ${actressInfoHTML}
-        
-        <!-- 下载信息 -->
-        <div class="detail-card-downloads">
-          ${downloadLinksHTML}
-          ${magnetLinksHTML}
-        </div>
-        
-        <!-- 截图预览 -->
-        ${screenshotsHTML}
-        
-        <!-- 详细信息 -->
-        ${detailsHTML}
-        
-        <!-- 提取信息 -->
-        <div class="detail-card-meta">
-          <small class="extraction-info">
-            提取来源: ${escapeHtml(detailInfo.sourceType || 'unknown')} | 
-            提取时间: ${detailInfo.extractionTime ? `${detailInfo.extractionTime}ms` : '未知'} |
-            ${detailInfo.fromCache ? '来自缓存' : '实时提取'} |
-            ${formatRelativeTime(detailInfo.extractedAt || Date.now())}
-          </small>
-        </div>
-      </div>
-    `;
-  }
-
-  // 🆕 创建基本信息HTML
-  createBasicInfoHTML(detailInfo) {
-    const title = detailInfo.title || '未知标题';
-    const code = detailInfo.code || '';
-    const originalTitle = detailInfo.originalTitle || '';
-
-    return `
-      <div class="detail-basic-info">
-        <h4 class="detail-title" title="${escapeHtml(title)}">
-          ${escapeHtml(title)}
-        </h4>
-        
-        ${code ? `
-          <div class="detail-code">
-            <span class="code-label">番号:</span>
-            <span class="code-value">${escapeHtml(code)}</span>
-          </div>
-        ` : ''}
-        
-        ${originalTitle ? `
-          <div class="detail-original-title">
-            <span class="original-title-label">原标题:</span>
-            <span class="original-title-value">${escapeHtml(originalTitle)}</span>
-          </div>
-        ` : ''}
-      </div>
-    `;
-  }
-
-  // 🆕 创建媒体信息HTML
-  createMediaInfoHTML(detailInfo, config) {
-    if (!detailInfo.coverImage && !detailInfo.description) {
-      return '';
-    }
-
-    const coverImageHTML = detailInfo.coverImage ? `
-      <div class="detail-cover">
-        <img src="${escapeHtml(detailInfo.coverImage)}" 
-             alt="封面图片" 
-             class="cover-image"
-             loading="lazy"
-             onerror="this.style.display='none'"
-             ${config.enableImagePreview ? `onclick="window.searchManager.previewImage('${escapeHtml(detailInfo.coverImage)}')"` : ''}>
-      </div>
-    ` : '';
-
-    const metadataHTML = this.createMetadataHTML(detailInfo);
-
-    const descriptionHTML = detailInfo.description ? `
-      <div class="detail-description">
-        <h5>简介:</h5>
-        <p class="description-text">${escapeHtml(detailInfo.description)}</p>
-      </div>
-    ` : '';
-
-    return `
-      <div class="detail-media-info">
-        <div class="media-content">
-          ${coverImageHTML}
-          <div class="media-details">
-            ${metadataHTML}
-            ${descriptionHTML}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  // 🆕 创建元数据HTML
-  createMetadataHTML(detailInfo) {
-    const metadata = [];
-
-    if (detailInfo.releaseDate) {
-      metadata.push(`<span class="meta-item"><strong>发行日期:</strong> ${escapeHtml(detailInfo.releaseDate)}</span>`);
-    }
-
-    if (detailInfo.duration) {
-      metadata.push(`<span class="meta-item"><strong>时长:</strong> ${escapeHtml(detailInfo.duration)}分钟</span>`);
-    }
-
-    if (detailInfo.director) {
-      metadata.push(`<span class="meta-item"><strong>导演:</strong> ${escapeHtml(detailInfo.director)}</span>`);
-    }
-
-    if (detailInfo.studio) {
-      metadata.push(`<span class="meta-item"><strong>制作商:</strong> ${escapeHtml(detailInfo.studio)}</span>`);
-    }
-
-    if (detailInfo.label) {
-      metadata.push(`<span class="meta-item"><strong>发行商:</strong> ${escapeHtml(detailInfo.label)}</span>`);
-    }
-
-    if (detailInfo.series) {
-      metadata.push(`<span class="meta-item"><strong>系列:</strong> ${escapeHtml(detailInfo.series)}</span>`);
-    }
-
-    if (detailInfo.quality) {
-      metadata.push(`<span class="meta-item"><strong>画质:</strong> ${escapeHtml(detailInfo.quality)}</span>`);
-    }
-
-    if (detailInfo.fileSize) {
-      metadata.push(`<span class="meta-item"><strong>文件大小:</strong> ${escapeHtml(detailInfo.fileSize)}</span>`);
-    }
-
-    if (detailInfo.rating && detailInfo.rating > 0) {
-      const stars = this.generateStarsHTML(detailInfo.rating);
-      metadata.push(`<span class="meta-item"><strong>评分:</strong> ${stars} (${detailInfo.rating}/10)</span>`);
-    }
-
-    return metadata.length > 0 ? `
-      <div class="detail-metadata">
-        ${metadata.join('')}
-      </div>
-    ` : '';
-  }
-
-  // 🆕 创建演员信息HTML
-  createActressInfoHTML(detailInfo) {
-    if (!detailInfo.actresses || detailInfo.actresses.length === 0) {
-      return '';
-    }
-
-    const actressesHTML = detailInfo.actresses.map(actress => {
-      const name = actress.name || actress;
-      const avatarHTML = actress.avatar ? `
-        <img src="${escapeHtml(actress.avatar)}" 
-             alt="${escapeHtml(name)}" 
-             class="actress-avatar"
-             loading="lazy"
-             onerror="this.style.display='none'">
-      ` : '';
-
-      const profileLinkHTML = actress.profileUrl ? `
-        <a href="${escapeHtml(actress.profileUrl)}" 
-           target="_blank" 
-           rel="noopener noreferrer"
-           class="actress-profile-link">查看资料</a>
-      ` : '';
-
-      return `
-        <div class="actress-item">
-          ${avatarHTML}
-          <div class="actress-info">
-            <span class="actress-name">${escapeHtml(name)}</span>
-            ${profileLinkHTML}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div class="detail-actresses">
-        <h5>演员信息:</h5>
-        <div class="actresses-list">
-          ${actressesHTML}
-        </div>
-      </div>
-    `;
-  }
-
-  // 🆕 创建下载链接HTML
-  createDownloadLinksHTML(detailInfo) {
-    if (!detailInfo.downloadLinks || detailInfo.downloadLinks.length === 0) {
-      return '';
-    }
-
-    const linksHTML = detailInfo.downloadLinks.map((link, index) => {
-      const name = link.name || `下载链接 ${index + 1}`;
-      const sizeInfo = link.size ? `<span class="link-size">(${escapeHtml(link.size)})</span>` : '';
-      const qualityInfo = link.quality ? `<span class="link-quality">[${escapeHtml(link.quality)}]</span>` : '';
-      const typeInfo = link.type ? `<span class="link-type">${this.getDownloadTypeIcon(link.type)}</span>` : '';
-
-      return `
-        <div class="download-link-item">
-          <a href="${escapeHtml(link.url)}" 
-             target="_blank" 
-             rel="noopener noreferrer"
-             class="download-link"
-             onclick="window.searchManager.recordDownloadClick('${escapeHtml(link.url)}', '${escapeHtml(link.type || 'unknown')}')">
-            ${typeInfo}
-            <span class="link-name">${escapeHtml(name)}</span>
-            ${qualityInfo}
-            ${sizeInfo}
-          </a>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div class="detail-download-links">
-        <h5>下载链接:</h5>
-        <div class="download-links-list">
-          ${linksHTML}
-        </div>
-      </div>
-    `;
-  }
-
-  // 🆕 创建磁力链接HTML
-  createMagnetLinksHTML(detailInfo) {
-    if (!detailInfo.magnetLinks || detailInfo.magnetLinks.length === 0) {
-      return '';
-    }
-
-    const linksHTML = detailInfo.magnetLinks.map((link, index) => {
-      const name = link.name || `磁力链接 ${index + 1}`;
-      const sizeInfo = link.size ? `<span class="magnet-size">(${escapeHtml(link.size)})</span>` : '';
-      const seedInfo = link.seeders || link.leechers ? `
-        <span class="magnet-seeds">
-          种子: ${link.seeders || 0} | 下载: ${link.leechers || 0}
-        </span>
-      ` : '';
-      const qualityInfo = link.quality ? `<span class="magnet-quality">[${escapeHtml(link.quality)}]</span>` : '';
-
-      return `
-        <div class="magnet-link-item">
-          <div class="magnet-link-header">
-            <span class="magnet-icon">🧲</span>
-            <span class="magnet-name">${escapeHtml(name)}</span>
-            ${qualityInfo}
-            ${sizeInfo}
-          </div>
-          
-          ${seedInfo ? `<div class="magnet-stats">${seedInfo}</div>` : ''}
-          
-          <div class="magnet-actions">
-            <button class="magnet-copy-btn" 
-                    onclick="window.searchManager.copyMagnetLink('${escapeHtml(link.magnet)}')">
-              复制磁力链接
-            </button>
-            <a href="${escapeHtml(link.magnet)}" 
-               class="magnet-open-btn"
-               onclick="window.searchManager.recordMagnetClick('${escapeHtml(link.magnet)}')">
-              打开磁力链接
-            </a>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div class="detail-magnet-links">
-        <h5>磁力链接:</h5>
-        <div class="magnet-links-list">
-          ${linksHTML}
-        </div>
-      </div>
-    `;
-  }
-
-  // 🆕 创建截图预览HTML
-  createScreenshotsHTML(detailInfo, config) {
-    if (!detailInfo.screenshots || detailInfo.screenshots.length === 0) {
-      return '';
-    }
-
-    const screenshotsHTML = detailInfo.screenshots.map((screenshot, index) => `
-      <div class="screenshot-item">
-        <img src="${escapeHtml(screenshot)}" 
-             alt="截图 ${index + 1}" 
-             class="screenshot-image"
-             loading="lazy"
-             onerror="this.parentElement.style.display='none'"
-             ${config.enableImagePreview ? `onclick="window.searchManager.previewImage('${escapeHtml(screenshot)}')"` : ''}>
-      </div>
-    `).join('');
-
-    return `
-      <div class="detail-screenshots">
-        <h5>截图预览:</h5>
-        <div class="screenshots-grid">
-          ${screenshotsHTML}
-        </div>
-      </div>
-    `;
-  }
-
-  // 🆕 创建详细信息HTML
-  createDetailsHTML(detailInfo) {
-    const tagsHTML = detailInfo.tags && detailInfo.tags.length > 0 ? `
-      <div class="detail-tags">
-        <h5>标签:</h5>
-        <div class="tags-list">
-          ${detailInfo.tags.map(tag => `
-            <span class="tag-item">${escapeHtml(tag)}</span>
-          `).join('')}
-        </div>
-      </div>
-    ` : '';
-
-    return tagsHTML ? `
-      <div class="detail-details">
-        ${tagsHTML}
-      </div>
-    ` : '';
-  }
-
-  // 🆕 创建状态指示器HTML
-  createStatusHTML(detailInfo) {
-    const status = detailInfo.extractionStatus || 'unknown';
-    const statusClass = `status-${status}`;
-    const statusText = this.getExtractionStatusText(status);
-    const statusIcon = this.getExtractionStatusIcon(status);
-
-    return `
-      <div class="detail-card-status ${statusClass}">
-        <span class="status-icon">${statusIcon}</span>
-        <span class="status-text">${statusText}</span>
-      </div>
-    `;
-  }
-
-  // 🆕 添加详情展开/收起按钮
-  addDetailToggleButton(resultContainer) {
-    const actionsContainer = resultContainer.querySelector('.result-actions');
-    if (!actionsContainer) return;
-
-    // 检查是否已存在按钮
-    if (actionsContainer.querySelector('.detail-toggle-btn')) return;
-
-    const toggleButton = document.createElement('button');
-    toggleButton.className = 'action-btn detail-toggle-btn';
-    toggleButton.innerHTML = `
-      <span class="btn-icon">📋</span>
-      <span class="btn-text">查看详情</span>
-    `;
-    
-    toggleButton.addEventListener('click', () => {
-      this.toggleDetailDisplay(resultContainer.dataset.resultId || resultContainer.dataset.id);
-    });
-
-    actionsContainer.appendChild(toggleButton);
-  }
-
-  // 🆕 切换详情显示状态
-  toggleDetailDisplay(resultId) {
-    const resultContainer = document.querySelector(`[data-result-id="${resultId}"], [data-id="${resultId}"]`);
-    if (!resultContainer) return;
-
-    const detailContainer = resultContainer.querySelector('.result-detail-container');
-    const toggleBtn = resultContainer.querySelector('.detail-toggle-btn');
-    
-    if (!detailContainer || !toggleBtn) return;
-
-    const isVisible = detailContainer.style.display !== 'none';
-    
-    detailContainer.style.display = isVisible ? 'none' : 'block';
-    
-    const btnText = toggleBtn.querySelector('.btn-text');
-    const btnIcon = toggleBtn.querySelector('.btn-icon');
-    
-    if (btnText) {
-      btnText.textContent = isVisible ? '查看详情' : '隐藏详情';
-    }
-    
-    if (btnIcon) {
-      btnIcon.textContent = isVisible ? '📋' : '📄';
-    }
-
-    // 添加动画效果
-    if (!isVisible) {
-      detailContainer.style.opacity = '0';
-      detailContainer.style.transform = 'translateY(-10px)';
-      
-      requestAnimationFrame(() => {
-        detailContainer.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-        detailContainer.style.opacity = '1';
-        detailContainer.style.transform = 'translateY(0)';
-      });
     }
   }
 
@@ -853,7 +241,7 @@ async loadDetailExtractionConfig() {
     }
   }
 
-  // 显示搜索结果 - 增强版，支持状态显示和不可用结果处理
+  // 显示搜索结果
   displaySearchResults(keyword, results) {
     const resultsSection = document.getElementById('resultsSection');
     const searchInfo = document.getElementById('searchInfo');
@@ -887,16 +275,9 @@ async loadDetailExtractionConfig() {
         }
       }
       
-      // 🆕 添加详情提取信息
-      let detailExtractionInfo = '';
-      if (this.detailExtractionEnabled && authManager.isAuthenticated()) {
-        const supportedCount = results.filter(r => this.shouldExtractDetail(r)).length;
-        detailExtractionInfo = ` | 支持详情提取: ${supportedCount}`;
-      }
-      
       searchInfo.innerHTML = `
         搜索关键词: <strong>${escapeHtml(keyword)}</strong> 
-        (${results.length}个结果${statusInfo}${detailExtractionInfo}) 
+        (${results.length}个结果${statusInfo}) 
         <small>${new Date().toLocaleString()}</small>
       `;
     }
@@ -1000,16 +381,6 @@ async loadDetailExtractionConfig() {
         case 'viewDetails':
           this.viewSourceStatusDetails(resultId);
           break;
-        // 🆕 详情提取相关操作
-        case 'extractDetail':
-          this.extractSingleDetail(resultId);
-          break;
-        case 'toggleDetail':
-          this.toggleDetailDisplay(resultId);
-          break;
-        case 'retryExtraction':
-          this.retryDetailExtraction(resultId);
-          break;
       }
     });
   }
@@ -1018,7 +389,6 @@ async loadDetailExtractionConfig() {
   createResultHTML(result) {
     const isFavorited = favoritesManager.isFavorited(result.url);
     const isUnavailable = this.isResultUnavailable(result);
-    const supportsDetailExtraction = this.shouldExtractDetail(result);
     
     // 状态指示器HTML（增强版，包含不可用原因）
     let statusIndicator = '';
@@ -1072,14 +442,6 @@ async loadDetailExtractionConfig() {
         <span>访问</span>
       </button>
     `;
-
-    // 🆕 详情提取按钮
-    const detailExtractionButtonHTML = supportsDetailExtraction && !isUnavailable ? `
-      <button class="action-btn detail-btn" data-action="extractDetail" data-result-id="${result.id}" title="提取详情信息">
-        <span class="btn-icon">📋</span>
-        <span class="btn-text">详情</span>
-      </button>
-    ` : '';
     
     return `
       <div class="result-item ${isUnavailable ? 'result-unavailable' : ''}" 
@@ -1109,7 +471,6 @@ async loadDetailExtractionConfig() {
           <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(result.url)}">
             <span>复制</span>
           </button>
-          ${detailExtractionButtonHTML}
           ${result.status ? `
             <button class="action-btn status-btn" data-action="checkStatus" data-source="${result.source}" data-result-id="${result.id}" title="重新检查状态">
               <span>🔄</span>
@@ -1121,363 +482,17 @@ async loadDetailExtractionConfig() {
             ` : ''}
           ` : ''}
         </div>
-        
-        <!-- 🆕 详情显示容器 -->
-        <div class="result-detail-container" style="display: none;">
-          <!-- 详情内容将在这里动态插入 -->
-        </div>
       </div>
     `;
   }
 
-  // 🆕 判断是否应该提取详情
-  shouldExtractDetail(result) {
-    if (!result || !result.source) return false;
-    return APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES.includes(result.source);
-  }
-
-  // 🆕 判断结果是否不可用
+  // 判断结果是否不可用
   isResultUnavailable(result) {
     if (!result.status) return false;
     
     return result.status === APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE ||
            result.status === APP_CONSTANTS.SOURCE_STATUS.TIMEOUT ||
            result.status === APP_CONSTANTS.SOURCE_STATUS.ERROR;
-  }
-
-  // 🆕 显示提取进度
-  showExtractionProgress(total) {
-    let progressContainer = document.getElementById('extraction-progress');
-    
-    if (!progressContainer) {
-      progressContainer = document.createElement('div');
-      progressContainer.id = 'extraction-progress';
-      progressContainer.className = 'extraction-progress-container';
-      
-      const searchResults = document.getElementById('resultsSection');
-      if (searchResults) {
-        searchResults.insertBefore(progressContainer, searchResults.firstChild);
-      }
-    }
-
-    progressContainer.innerHTML = `
-      <div class="progress-header">
-        <span class="progress-title">正在提取详情信息</span>
-        <span class="progress-stats">0 / ${total}</span>
-      </div>
-      <div class="progress-bar">
-        <div class="progress-fill" style="width: 0%"></div>
-      </div>
-      <div class="progress-message">正在处理搜索结果...</div>
-    `;
-
-    progressContainer.style.display = 'block';
-  }
-
-  // 🆕 更新提取进度
-  updateExtractionProgress(processed, total) {
-    const progressContainer = document.getElementById('extraction-progress');
-    if (!progressContainer) return;
-
-    const progressStats = progressContainer.querySelector('.progress-stats');
-    const progressFill = progressContainer.querySelector('.progress-fill');
-    const progressMessage = progressContainer.querySelector('.progress-message');
-
-    if (progressStats) {
-      progressStats.textContent = `${processed} / ${total}`;
-    }
-
-    if (progressFill) {
-      const percentage = (processed / total) * 100;
-      progressFill.style.width = `${percentage}%`;
-    }
-
-    if (progressMessage) {
-      if (processed === total) {
-        progressMessage.textContent = '详情提取完成！';
-      } else {
-        progressMessage.textContent = `正在处理第 ${processed + 1} 个结果...`;
-      }
-    }
-  }
-
-  // 🆕 隐藏提取进度
-  hideExtractionProgress() {
-    const progressContainer = document.getElementById('extraction-progress');
-    if (progressContainer) {
-      setTimeout(() => {
-        progressContainer.style.display = 'none';
-      }, 2000);
-    }
-  }
-
-  // 🆕 显示提取错误
-  showExtractionError(resultContainer, error) {
-    const detailContainer = resultContainer.querySelector('.result-detail-container') ||
-                           this.createDetailContainer(resultContainer);
-
-    detailContainer.innerHTML = `
-      <div class="extraction-error">
-        <div class="error-icon">⌘</div>
-        <div class="error-message">
-          <strong>详情提取失败</strong>
-          <small>${escapeHtml(error || '未知错误')}</small>
-        </div>
-        <button class="retry-btn" onclick="window.searchManager.retryDetailExtraction('${resultContainer.dataset.resultId}')">
-          重试
-        </button>
-      </div>
-    `;
-  }
-
-  // 🆕 创建详情容器
-  createDetailContainer(resultContainer) {
-    const detailContainer = document.createElement('div');
-    detailContainer.className = 'result-detail-container';
-    detailContainer.style.display = 'none';
-    resultContainer.appendChild(detailContainer);
-    return detailContainer;
-  }
-
-  // 🆕 单独提取详情
-  async extractSingleDetail(resultId) {
-    const result = this.currentResults.find(r => r.id === resultId);
-    if (!result) {
-      showToast('未找到对应的搜索结果', 'error');
-      return;
-    }
-
-    if (!this.shouldExtractDetail(result)) {
-      showToast('该搜索源不支持详情提取', 'warning');
-      return;
-    }
-
-    try {
-      showLoading(true);
-      showToast('正在提取详情...', 'info');
-      
-      const extractedDetail = await detailAPIService.extractSingleDetail(result, {
-        enableCache: this.detailExtractionConfig.enableCache,
-        timeout: 15000
-      });
-
-      await this.handleSingleExtractionResult({
-        ...result,
-        ...extractedDetail
-      });
-
-      showToast('详情提取成功', 'success');
-
-    } catch (error) {
-      console.error('单独详情提取失败:', error);
-      showToast('详情提取失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
-    }
-  }
-
-  // 🆕 重试详情提取
-  async retryDetailExtraction(resultId) {
-    const result = this.currentResults.find(r => r.id === resultId);
-    if (!result) {
-      showToast('未找到对应的搜索结果', 'error');
-      return;
-    }
-
-    try {
-      showToast('正在重试详情提取...', 'info');
-      
-      const extractedDetail = await detailAPIService.extractSingleDetail(result, {
-        enableCache: false,
-        useLocalCache: false
-      });
-
-      await this.handleSingleExtractionResult({
-        ...result,
-        ...extractedDetail
-      });
-
-      showToast('详情提取成功', 'success');
-
-    } catch (error) {
-      console.error('重试详情提取失败:', error);
-      showToast('重试失败: ' + error.message, 'error');
-    }
-  }
-
-  // 🆕 切换详情提取功能
-  async toggleDetailExtraction() {
-    if (!authManager.isAuthenticated()) {
-      showToast('请先登录以使用详情提取功能', 'error');
-      return;
-    }
-
-    try {
-      const userSettings = await apiService.getUserSettings();
-      const newState = !this.detailExtractionEnabled;
-      
-      await apiService.updateUserSettings({
-        ...userSettings,
-        enableDetailExtraction: newState
-      });
-      
-      this.detailExtractionEnabled = newState;
-      
-      // 重新加载配置
-      await this.loadDetailExtractionConfig();
-      
-      showToast(`详情提取功能已${newState ? '启用' : '禁用'}`, 'success');
-      
-    } catch (error) {
-      console.error('切换详情提取功能失败:', error);
-      showToast('设置更新失败: ' + error.message, 'error');
-    }
-  }
-
-  // 🆕 图片预览
-  previewImage(imageUrl) {
-    if (!imageUrl) return;
-
-    // 创建预览模态框
-    let previewModal = document.getElementById('image-preview-modal');
-    
-    if (!previewModal) {
-      previewModal = document.createElement('div');
-      previewModal.id = 'image-preview-modal';
-      previewModal.className = 'image-preview-modal';
-      previewModal.innerHTML = `
-        <div class="image-preview-backdrop" onclick="window.searchManager.hideImagePreview()"></div>
-        <div class="image-preview-container">
-          <img class="image-preview-img" src="" alt="图片预览">
-          <button class="image-preview-close" onclick="window.searchManager.hideImagePreview()">×</button>
-        </div>
-      `;
-      document.body.appendChild(previewModal);
-    }
-
-    const previewImg = previewModal.querySelector('.image-preview-img');
-    previewImg.src = imageUrl;
-    previewModal.style.display = 'flex';
-
-    // 记录行为
-    if (authManager.isAuthenticated()) {
-      apiService.recordAction('image_preview', { imageUrl }).catch(console.error);
-    }
-  }
-
-  // 🆕 隐藏图片预览
-  hideImagePreview() {
-    const previewModal = document.getElementById('image-preview-modal');
-    if (previewModal) {
-      previewModal.style.display = 'none';
-    }
-  }
-
-  // 🆕 复制磁力链接
-  async copyMagnetLink(magnetLink) {
-    try {
-      await navigator.clipboard.writeText(magnetLink);
-      showToast('磁力链接已复制到剪贴板', 'success');
-      
-      if (authManager.isAuthenticated()) {
-        apiService.recordAction('magnet_link_copied', { magnetLink }).catch(console.error);
-      }
-    } catch (error) {
-      // 降级到传统方法
-      const textArea = document.createElement('textarea');
-      textArea.value = magnetLink;
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        showToast('磁力链接已复制到剪贴板', 'success');
-      } catch (err) {
-        showToast('复制失败', 'error');
-      }
-      document.body.removeChild(textArea);
-    }
-  }
-
-  // 🆕 记录下载点击
-  recordDownloadClick(url, type) {
-    if (authManager.isAuthenticated()) {
-      apiService.recordAction('download_link_clicked', { url, type }).catch(console.error);
-    }
-  }
-
-  // 🆕 记录磁力点击
-  recordMagnetClick(magnetLink) {
-    if (authManager.isAuthenticated()) {
-      apiService.recordAction('magnet_link_clicked', { magnetLink }).catch(console.error);
-    }
-  }
-
-  // 🆕 获取下载类型图标
-  getDownloadTypeIcon(type) {
-    const icons = {
-      'http': '🌐',
-      'https': '🔒',
-      'ftp': '📁',
-      'magnet': '🧲',
-      'torrent': '📦',
-      'unknown': '📎'
-    };
-    return icons[type] || icons.unknown;
-  }
-
-  // 🆕 生成星级评分HTML
-  generateStarsHTML(rating) {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-    
-    for (let i = 0; i < fullStars; i++) {
-      stars.push('<span class="star">★</span>');
-    }
-    
-    if (hasHalfStar) {
-      stars.push('<span class="star star-half">★</span>');
-    }
-    
-    const emptyStars = 10 - fullStars - (hasHalfStar ? 1 : 0);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push('<span class="star star-empty">★</span>');
-    }
-    
-    return stars.join('');
-  }
-
-  // 🆕 获取提取状态文本
-  getExtractionStatusText(status) {
-    const statusTexts = {
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.SUCCESS]: '提取成功',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.ERROR]: '提取失败',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.TIMEOUT]: '提取超时',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.CACHED]: '来自缓存',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.PARTIAL]: '部分成功',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.PENDING]: '等待中',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.IN_PROGRESS]: '提取中'
-    };
-    return statusTexts[status] || '未知';
-  }
-
-  // 🆕 获取提取状态图标
-  getExtractionStatusIcon(status) {
-    const statusIcons = {
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.SUCCESS]: '✅',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.ERROR]: '❌',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.TIMEOUT]: '⏱️',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.CACHED]: '💾',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.PARTIAL]: '⚠️',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.PENDING]: '⏳',
-      [APP_CONSTANTS.DETAIL_EXTRACTION_STATUS.IN_PROGRESS]: '🔄'
-    };
-    return statusIcons[status] || '❓';
-  }
-
-  // 🆕 延迟函数
-  delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   // 获取状态样式类
@@ -1734,6 +749,7 @@ async loadDetailExtractionConfig() {
       showToast('无法打开链接', 'error');
     }
   }
+
 
   // 复制到剪贴板
   async copyToClipboard(text) {

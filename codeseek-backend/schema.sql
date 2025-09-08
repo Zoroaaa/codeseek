@@ -544,7 +544,17 @@ INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_pu
 ('community_enabled', '1', '启用搜索源共享社区功能', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('community_require_approval', '0', '新分享的搜索源需要审核', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('community_max_shares_per_user', '50', '每个用户最大分享数量', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('community_min_rating_to_feature', '4.0', '推荐搜索源的最低评分', 'float', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+('community_min_rating_to_feature', '4.0', '推荐搜索源的最低评分', 'float', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+('detail_extraction_enabled', '1', '启用详情提取功能', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_max_cache_size', '50000', '详情缓存最大条目数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_default_timeout', '15000', '详情提取默认超时时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_max_batch_size', '20', '批量详情提取最大数量', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_cache_duration', '86400000', '详情缓存默认持续时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_max_concurrent', '3', '详情提取最大并发数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_enable_image_proxy', '0', '启用图片代理服务', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detail_supported_sources', '["javbus","javdb","javlibrary","jable","javmost","missav","sukebei"]', '支持详情提取的搜索源', 'json', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+
 
 -- 🆕 初始化官方标签
 INSERT OR IGNORE INTO community_source_tags (id, tag_name, tag_description, tag_color, is_official, tag_active, created_by, created_at, updated_at) VALUES
@@ -798,13 +808,3 @@ CREATE TRIGGER IF NOT EXISTS update_detail_stats_after_extraction
         );
     END;
 
--- 在现有system_config中添加详情提取相关配置
-INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_public, created_at, updated_at) VALUES
-('detail_extraction_enabled', '1', '启用详情提取功能', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_cache_size', '50000', '详情缓存最大条目数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_default_timeout', '15000', '详情提取默认超时时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_batch_size', '20', '批量详情提取最大数量', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_cache_duration', '86400000', '详情缓存默认持续时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_concurrent', '3', '详情提取最大并发数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_enable_image_proxy', '0', '启用图片代理服务', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_supported_sources', '["javbus","javdb","javlibrary","jable","javmost","missav","sukebei"]', '支持详情提取的搜索源', 'json', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
