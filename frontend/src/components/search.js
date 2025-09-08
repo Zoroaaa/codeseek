@@ -750,7 +750,6 @@ export class SearchManager {
     }
   }
 
-
   // 复制到剪贴板
   async copyToClipboard(text) {
     try {
@@ -835,19 +834,19 @@ export class SearchManager {
 
   // 添加到历史记录
   async addToHistory(keyword) {
-    const settings = await apiService.getUserSettings();
-    const maxHistory = settings.maxHistoryPerUser || 100;
-    
-    // 如果超出限制，删除最旧的记录
-    if (this.searchHistory.length >= maxHistory) {
-        const oldestId = this.searchHistory[this.searchHistory.length - 1].id;
-        await apiService.deleteSearchHistory(oldestId);
-        this.searchHistory.pop();
-    }
-      
     if (!authManager.isAuthenticated()) return;
 
     try {
+      const settings = await apiService.getUserSettings();
+      const maxHistory = settings.maxHistoryPerUser || 100;
+      
+      // 如果超出限制，删除最旧的记录
+      if (this.searchHistory.length >= maxHistory) {
+        const oldestId = this.searchHistory[this.searchHistory.length - 1].id;
+        await apiService.deleteSearchHistory(oldestId);
+        this.searchHistory.pop();
+      }
+
       await searchHistoryManager.addToHistory(keyword, 'manual');
       
       this.searchHistory = this.searchHistory.filter(item => 
@@ -863,9 +862,9 @@ export class SearchManager {
         source: 'manual'
       });
 
-      const maxHistory = APP_CONSTANTS.LIMITS.MAX_HISTORY;
-      if (this.searchHistory.length > maxHistory) {
-        this.searchHistory = this.searchHistory.slice(0, maxHistory);
+      const maxHistoryLimit = APP_CONSTANTS.LIMITS.MAX_HISTORY;
+      if (this.searchHistory.length > maxHistoryLimit) {
+        this.searchHistory = this.searchHistory.slice(0, maxHistoryLimit);
       }
 
       this.renderHistory();
@@ -1010,9 +1009,7 @@ export class SearchManager {
         exportTime: new Date().toISOString(),
         version: window.API_CONFIG?.APP_VERSION || '1.0.0',
         statusCheckEnabled: this.statusCheckInProgress,
-        lastCheckKeyword: this.lastStatusCheckKeyword,
-        detailExtractionEnabled: this.detailExtractionEnabled, // 🆕 包含详情提取状态
-        detailExtractionConfig: this.detailExtractionConfig
+        lastCheckKeyword: this.lastStatusCheckKeyword
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -1076,7 +1073,7 @@ export class SearchManager {
       const displayText = item.keyword || item.query;
       return `
         <div class="suggestion-item" data-keyword="${escapeHtml(displayText)}">
-          <span class="suggestion-icon">🕑</span>
+          <span class="suggestion-icon">🕒</span>
           <span class="suggestion-text">${escapeHtml(displayText)}</span>
         </div>
       `;
@@ -1107,6 +1104,30 @@ export class SearchManager {
     const quickTips = document.getElementById('quickTips');
     if (quickTips) {
       quickTips.style.display = 'none';
+    }
+  }
+
+  // 工具方法：截断URL显示
+  truncateUrl(url) {
+    if (!url || url.length <= 50) return url;
+    return url.substring(0, 47) + '...';
+  }
+
+  // 清理资源
+  cleanup() {
+    this.currentResults = [];
+    this.searchHistory = [];
+    this.statusCheckInProgress = false;
+    
+    // 清理DOM元素
+    const suggestionsContainer = document.getElementById('searchSuggestions');
+    if (suggestionsContainer) {
+      suggestionsContainer.remove();
+    }
+
+    // 清理全局方法
+    if (window.searchManager) {
+      delete window.searchManager;
     }
   }
 }
