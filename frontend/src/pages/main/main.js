@@ -828,8 +828,278 @@ class MagnetSearchApp {
     });
   }
 
-  // 其他方法保持不变...
-  // [省略其他已有的方法以节省空间]
+  // 绑定模态框事件
+  bindModalEvents() {
+    // 登录模态框事件
+    const loginModal = document.getElementById('loginModal');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const showRegisterBtn = document.getElementById('showRegister');
+    const showLoginBtn = document.getElementById('showLogin');
+    const closeModalBtns = document.querySelectorAll('.close-modal');
+
+    // 关闭模态框事件
+    if (closeModalBtns) {
+      closeModalBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (loginModal) loginModal.style.display = 'none';
+        });
+      });
+    }
+
+    // 点击模态框背景关闭
+    if (loginModal) {
+      loginModal.addEventListener('click', (e) => {
+        if (e.target === loginModal) {
+          loginModal.style.display = 'none';
+        }
+      });
+    }
+
+    // 切换到注册表单
+    if (showRegisterBtn && loginForm && registerForm) {
+      showRegisterBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+      });
+    }
+
+    // 切换到登录表单
+    if (showLoginBtn && loginForm && registerForm) {
+      showLoginBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        registerForm.style.display = 'none';
+        loginForm.style.display = 'block';
+      });
+    }
+
+    // 登录表单提交
+    if (loginForm) {
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(loginForm);
+        const username = formData.get('username');
+        const password = formData.get('password');
+        
+        try {
+          showLoading(true);
+          const result = await authManager.login(username, password);
+          
+          if (result.success) {
+            this.currentUser = result.user;
+            if (loginModal) loginModal.style.display = 'none';
+            document.querySelector('.main-content').style.display = 'block';
+            
+            // 初始化组件
+            await this.initComponents();
+            await this.loadUserSearchSettings();
+            await this.initDetailExtractionService();
+            
+            showToast('登录成功', 'success');
+          } else {
+            showToast(result.message || '登录失败', 'error');
+          }
+        } catch (error) {
+          console.error('登录失败:', error);
+          showToast('登录失败: ' + error.message, 'error');
+        } finally {
+          showLoading(false);
+        }
+      });
+    }
+
+    // 注册表单提交
+    if (registerForm) {
+      registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(registerForm);
+        const username = formData.get('username');
+        const password = formData.get('password');
+        const confirmPassword = formData.get('confirmPassword');
+        
+        if (password !== confirmPassword) {
+          showToast('密码确认不匹配', 'error');
+          return;
+        }
+        
+        try {
+          showLoading(true);
+          const result = await authManager.register(username, password);
+          
+          if (result.success) {
+            showToast('注册成功，请登录', 'success');
+            registerForm.style.display = 'none';
+            loginForm.style.display = 'block';
+          } else {
+            showToast(result.message || '注册失败', 'error');
+          }
+        } catch (error) {
+          console.error('注册失败:', error);
+          showToast('注册失败: ' + error.message, 'error');
+        } finally {
+          showLoading(false);
+        }
+      });
+    }
+
+    // ESC键关闭模态框
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && loginModal && loginModal.style.display === 'block') {
+        loginModal.style.display = 'none';
+      }
+    });
+  }
+
+  // 绑定键盘快捷键
+  bindKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Ctrl+K 或 Cmd+K 聚焦搜索框
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+      
+      // Ctrl+Enter 或 Cmd+Enter 执行搜索
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (unifiedSearchManager && unifiedSearchManager.isInitialized) {
+          unifiedSearchManager.performSearch();
+        }
+      }
+      
+      // Ctrl+/ 或 Cmd+/ 显示快捷键帮助
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        this.showKeyboardShortcuts();
+      }
+    });
+  }
+
+  // 绑定网络事件
+  bindNetworkEvents() {
+    // 网络状态变化监听
+    window.addEventListener('online', () => {
+      this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS.CONNECTED;
+      this.updateConnectionStatus('网络已连接');
+      showToast('网络连接已恢复', 'success');
+    });
+
+    window.addEventListener('offline', () => {
+      this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS.ERROR;
+      this.updateConnectionStatus('网络已断开');
+      showToast('网络连接已断开', 'warning');
+    });
+  }
+
+  // 绑定搜索源变化事件
+  bindSearchSourcesChangeEvent() {
+    // 监听搜索源配置变化
+    document.addEventListener('searchSourcesChanged', async (event) => {
+      try {
+        console.log('检测到搜索源配置变化:', event.detail);
+        
+        // 重新加载用户搜索设置
+        await this.loadUserSearchSettings();
+        
+        // 重新渲染站点导航
+        this.renderSiteNavigation();
+        
+        // 通知搜索管理器重新加载配置
+        if (unifiedSearchManager && unifiedSearchManager.isInitialized) {
+          await unifiedSearchManager.loadUserConfig();
+        }
+        
+        showToast('搜索源配置已更新', 'success');
+      } catch (error) {
+        console.error('处理搜索源变化事件失败:', error);
+      }
+    });
+  }
+
+  // 显示键盘快捷键帮助
+  showKeyboardShortcuts() {
+    const shortcuts = [
+      { key: 'Ctrl/Cmd + K', desc: '聚焦搜索框' },
+      { key: 'Ctrl/Cmd + Enter', desc: '执行搜索' },
+      { key: 'Ctrl/Cmd + /', desc: '显示快捷键帮助' },
+      { key: 'Escape', desc: '关闭模态框' }
+    ];
+    
+    const shortcutList = shortcuts.map(item => 
+      `<li><kbd>${item.key}</kbd> - ${item.desc}</li>`
+    ).join('');
+    
+    const modal = document.createElement('div');
+    modal.className = 'keyboard-shortcuts-modal';
+    modal.innerHTML = `
+      <div class="modal-backdrop" onclick="this.parentElement.remove()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h3>键盘快捷键</h3>
+            <button class="close-btn" onclick="this.closest('.keyboard-shortcuts-modal').remove()">×</button>
+          </div>
+          <div class="modal-body">
+            <ul class="shortcuts-list">
+              ${shortcutList}
+            </ul>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // 3秒后自动关闭
+    setTimeout(() => {
+      if (modal.parentElement) {
+        modal.remove();
+      }
+    }, 5000);
+  }
+
+  // 检查认证状态
+  async checkAuthStatus() {
+    try {
+      const isAuthenticated = authManager.isAuthenticated();
+      if (isAuthenticated) {
+        this.currentUser = authManager.getCurrentUser();
+        console.log('用户已登录:', this.currentUser?.username);
+      } else {
+        this.currentUser = null;
+        console.log('用户未登录');
+      }
+    } catch (error) {
+      console.warn('检查认证状态失败:', error);
+      this.currentUser = null;
+    }
+  }
+
+  // 导航到Dashboard
+  async navigateToDashboard() {
+    try {
+      showLoading(true);
+      console.log('前往Dashboard');
+
+      // 根据环境决定URL格式
+      const isDev = isDevEnv();
+      const dashboardUrl = isDev ? './dashboard.html' : './dashboard';
+      
+      window.location.href = dashboardUrl;
+
+    } catch (error) {
+      console.error('跳转到dashboard失败:', error);
+      showToast('跳转失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
 
   // 导出应用状态（调试用）
   exportAppStatus() {
