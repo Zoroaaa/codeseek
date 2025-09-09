@@ -7,6 +7,7 @@ import networkUtils from '../../utils/network.js';
 import authManager from '../../services/auth.js';
 import themeManager from '../../services/theme.js';
 import unifiedSearchManager from '../../components/search.js'; // 🔄 使用统一搜索组件
+import detailCardManager from '../../components/detail-card.js'; // 🔄 使用统一搜索组件
 import favoritesManager from '../../components/favorites.js';
 import apiService from '../../services/api.js';
 
@@ -381,6 +382,9 @@ class MagnetSearchApp {
     try {
       // 🔄 初始化统一搜索管理器
       await unifiedSearchManager.init();
+	  
+	  // 🔄 初始化搜索详情管理器
+      await detailCardManager.init();
       
       // 初始化收藏管理器
       await favoritesManager.init();
