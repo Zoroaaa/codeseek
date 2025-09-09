@@ -192,5 +192,34 @@ export const utils = {
             console.warn('JSON解析失败:', error);
             return fallback;
         }
-    }
+    },
+	
+	    // 添加延迟工具函数（如果还没有的话）
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    },
+
+    // 添加深度克隆函数（如果需要的话）
+    deepClone(obj) {
+        if (obj === null || typeof obj !== 'object') return obj;
+        if (obj instanceof Date) return new Date(obj.getTime());
+        if (obj instanceof Array) return obj.map(item => this.deepClone(item));
+        if (typeof obj === 'object') {
+            const cloned = {};
+            Object.keys(obj).forEach(key => {
+                cloned[key] = this.deepClone(obj[key]);
+            });
+            return cloned;
+        }
+    },
+
+    // 添加安全的数据库操作包装器
+    async safeDbOperation(operation, errorMessage = '数据库操作失败') {
+        try {
+            return await operation();
+        } catch (error) {
+            console.error(errorMessage + ':', error);
+            throw new Error(errorMessage + ': ' + error.message);
+        }
+    },
 };
