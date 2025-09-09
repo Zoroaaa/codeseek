@@ -847,3 +847,4 @@ function validateDetailConfig(config) {
   }
   
   return errors;
+}
