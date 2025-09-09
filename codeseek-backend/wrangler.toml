@@ -17,6 +17,9 @@ binding = "DB"
 database_name = "codeseek"
 database_id = "42216a7e-3dbb-4feb-9974-2a8ee32af550"
 
+[observability]
+enabled = true   # ✅ 新增这段
+
 [env.production]
 name = "codeseek-backend-prod"
 

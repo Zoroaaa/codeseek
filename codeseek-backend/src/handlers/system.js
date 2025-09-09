@@ -5,7 +5,7 @@ import {
     checkSingleSourceStatus, 
     saveStatusCheckResults,
     analyzePageContent
-} from '../services.js';
+} from '../services/services.js';
 import { CONFIG } from '../constants.js';
 
 // ===================== 健康检查相关 =====================

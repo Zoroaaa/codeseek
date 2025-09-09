@@ -17,13 +17,26 @@ export const CONFIG = {
         DEFAULT_CACHE_DURATION: 86400000, // 24小时
         MIN_CACHE_DURATION: 3600000, // 1小时
         MAX_CACHE_DURATION: 604800000, // 7天
-        MAX_CONCURRENT_EXTRACTIONS: 3,
-        MAX_RETRY_ATTEMPTS: 2,
+        MAX_CONCURRENT_EXTRACTIONS: 4,
         RETRY_DELAY: 1000,
-        SUPPORTED_SOURCES: [
-            'javbus', 'javdb', 'javlibrary', 'jable', 'javmost', 
-            'missav', 'javhdporn', 'javgg', 'av01', 'sukebei'
-        ]
+        
+        // 解析相关配置
+        PARSE_TIMEOUT: 10000, // 解析超时时间
+        MAX_RETRY_ATTEMPTS: 2, // 最大重试次数
+        
+        // 缓存相关配置
+        CACHE_MAX_SIZE: 1000, // 缓存最大条目数
+        CACHE_CLEANUP_INTERVAL: 3600000, // 缓存清理间隔 (1小时)
+        
+        // HTML解析相关配置
+        HTML_PARSER_CACHE_SIZE: 100, // HTML解析器缓存大小
+        MAX_GENERIC_LINKS_PER_PAGE: 200, // 每页最大通用链接数
+        
+        // 下载链接限制配置
+        MAX_DOWNLOAD_LINKS: 10, // 单个详情页最大下载链接数
+        MAX_MAGNET_LINKS: 10, // 单个详情页最大磁力链接数
+        MAX_SCREENSHOTS: 10, // 单个详情页最大截图数
+        
     },
     
     ALLOWED_ACTIONS: [
@@ -84,5 +97,17 @@ export const DETAIL_CONFIG_VALIDATION = {
     extractionBatchSize: {
         min: CONFIG.DETAIL_EXTRACTION.MIN_BATCH_SIZE,
         max: CONFIG.DETAIL_EXTRACTION.MAX_BATCH_SIZE
+    },
+    maxDownloadLinks: {
+        min: 1,
+        max: CONFIG.DETAIL_EXTRACTION.MAX_DOWNLOAD_LINKS
+    },
+    maxMagnetLinks: {
+        min: 1,
+        max: CONFIG.DETAIL_EXTRACTION.MAX_MAGNET_LINKS
+    },
+    maxScreenshots: {
+        min: 1,
+        max: CONFIG.DETAIL_EXTRACTION.MAX_SCREENSHOTS
     }
 };

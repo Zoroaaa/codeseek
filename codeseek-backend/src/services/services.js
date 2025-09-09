@@ -1,5 +1,5 @@
 // src/services.js - 复杂的业务逻辑服务
-import { utils } from './utils.js';
+import { utils } from '../utils.js';
 
 // 搜索源状态检查相关
 export async function checkSingleSourceStatus(source, keyword, keywordHash, options = {}) {

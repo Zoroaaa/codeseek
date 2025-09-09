@@ -1,11 +1,12 @@
 // src/services/cache-manager.js - 详情缓存管理服务（Cloudflare Workers 兼容版本）
 import { utils } from '../utils.js';
+import { CONFIG } from '../constants.js';
 
 export class CacheManagerService {
   constructor() {
-    this.maxCacheSize = 1000; // 最大缓存条目数
-    this.defaultTTL = 24 * 60 * 60 * 1000; // 默认24小时TTL
-    this.cleanupInterval = 60 * 60 * 1000; // 每小时清理一次过期缓存
+    this.maxCacheSize = CONFIG.DETAIL_EXTRACTION.CACHE_MAX_SIZE; // 从配置引用
+    this.defaultTTL = CONFIG.DETAIL_EXTRACTION.DEFAULT_CACHE_DURATION; // 从配置引用
+    this.cleanupInterval = CONFIG.DETAIL_EXTRACTION.CACHE_CLEANUP_INTERVAL; // 从配置引用
     this.compressionEnabled = true;
     this.cleanupTimer = null;
     this.initialized = false;

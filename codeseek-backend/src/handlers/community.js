@@ -1,7 +1,7 @@
 // src/handlers/community.js - 社区相关路由处理器
 import { utils } from '../utils.js';
 import { authenticate } from '../middleware.js';
-import { updateUserStatsAfterDelete } from '../services.js';
+import { updateUserStatsAfterDelete } from '../services/services.js';
 
 // ===================== 标签管理相关 =====================
 

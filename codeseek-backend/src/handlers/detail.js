@@ -57,6 +57,9 @@ export async function extractSingleDetailHandler(request, env) {
     console.log('Description:', detailInfo.description?.substring(0, 100) || 'No description');
     console.log('Tags Count:', detailInfo.tags?.length || 0);
     console.log('Actresses Count:', detailInfo.actresses?.length || 0);
+    console.log('Download Links Count:', detailInfo.downloadLinks?.length || 0);
+    console.log('Magnet Links Count:', detailInfo.magnetLinks?.length || 0);
+    console.log('Screenshots Count:', detailInfo.screenshots?.length || 0);
     console.log('Extraction Time:', detailInfo.extractionTime, 'ms');
     
     if (detailInfo.extractionError) {
@@ -556,7 +559,7 @@ export async function getDetailExtractionConfigHandler(request, env) {
       enableContentFilter: Boolean(userConfig.enable_content_filter),
       contentFilterKeywords: JSON.parse(userConfig.content_filter_keywords || '[]')
     } : {
-      // 默认配置
+      // 默认配置 - 从常量引用
       enableDetailExtraction: true,
       autoExtractDetails: false,
       maxAutoExtractions: 5,
@@ -584,7 +587,10 @@ export async function getDetailExtractionConfigHandler(request, env) {
       minTimeout: CONFIG.DETAIL_EXTRACTION.MIN_TIMEOUT,
       maxCacheDuration: CONFIG.DETAIL_EXTRACTION.MAX_CACHE_DURATION,
       minCacheDuration: CONFIG.DETAIL_EXTRACTION.MIN_CACHE_DURATION,
-      maxBatchSize: CONFIG.DETAIL_EXTRACTION.MAX_BATCH_SIZE
+      maxBatchSize: CONFIG.DETAIL_EXTRACTION.MAX_BATCH_SIZE,
+      maxDownloadLinks: CONFIG.DETAIL_EXTRACTION.MAX_DOWNLOAD_LINKS,
+      maxMagnetLinks: CONFIG.DETAIL_EXTRACTION.MAX_MAGNET_LINKS,
+      maxScreenshots: CONFIG.DETAIL_EXTRACTION.MAX_SCREENSHOTS
     };
     
     return utils.successResponse({
@@ -755,6 +761,14 @@ export async function getDetailExtractionStatsHandler(request, env) {
       })),
       cache: {
         hitRate: (weekStats?.week_cache_hit_rate || 0).toFixed(1)
+      },
+      limits: {
+        maxBatchSize: CONFIG.DETAIL_EXTRACTION.MAX_BATCH_SIZE,
+        maxDownloadLinks: CONFIG.DETAIL_EXTRACTION.MAX_DOWNLOAD_LINKS,
+        maxMagnetLinks: CONFIG.DETAIL_EXTRACTION.MAX_MAGNET_LINKS,
+        maxScreenshots: CONFIG.DETAIL_EXTRACTION.MAX_SCREENSHOTS,
+        maxTimeout: CONFIG.DETAIL_EXTRACTION.MAX_TIMEOUT,
+        minTimeout: CONFIG.DETAIL_EXTRACTION.MIN_TIMEOUT
       }
     };
     
@@ -789,7 +803,7 @@ async function saveDetailExtractionHistory(env, userId, searchResult, detailInfo
       historyId, userId, searchResult.url, detailInfo.sourceType || 'unknown',
       searchResult.keyword || '', detailInfo.extractionStatus || 'unknown',
       detailInfo.extractionTime || 0, detailInfo.extractionError || '',
-      JSON.stringify(detailInfo).length, 1, 1, 15000, now
+      JSON.stringify(detailInfo).length, 1, 1, CONFIG.DETAIL_EXTRACTION.DEFAULT_TIMEOUT, now
     ).run();
     
   } catch (error) {
@@ -836,6 +850,33 @@ function validateDetailConfig(config) {
     if (isNaN(maxAuto) || maxAuto < DETAIL_CONFIG_VALIDATION.maxAutoExtractions.min || 
         maxAuto > DETAIL_CONFIG_VALIDATION.maxAutoExtractions.max) {
       errors.push(`自动提取数量必须在 ${DETAIL_CONFIG_VALIDATION.maxAutoExtractions.min}-${DETAIL_CONFIG_VALIDATION.maxAutoExtractions.max} 之间`);
+    }
+  }
+  
+  // 验证下载链接数量限制
+  if (config.hasOwnProperty('maxDownloadLinks')) {
+    const maxDownloads = Number(config.maxDownloadLinks);
+    if (isNaN(maxDownloads) || maxDownloads < DETAIL_CONFIG_VALIDATION.maxDownloadLinks.min || 
+        maxDownloads > DETAIL_CONFIG_VALIDATION.maxDownloadLinks.max) {
+      errors.push(`下载链接数量必须在 ${DETAIL_CONFIG_VALIDATION.maxDownloadLinks.min}-${DETAIL_CONFIG_VALIDATION.maxDownloadLinks.max} 之间`);
+    }
+  }
+  
+  // 验证磁力链接数量限制
+  if (config.hasOwnProperty('maxMagnetLinks')) {
+    const maxMagnets = Number(config.maxMagnetLinks);
+    if (isNaN(maxMagnets) || maxMagnets < DETAIL_CONFIG_VALIDATION.maxMagnetLinks.min || 
+        maxMagnets > DETAIL_CONFIG_VALIDATION.maxMagnetLinks.max) {
+      errors.push(`磁力链接数量必须在 ${DETAIL_CONFIG_VALIDATION.maxMagnetLinks.min}-${DETAIL_CONFIG_VALIDATION.maxMagnetLinks.max} 之间`);
+    }
+  }
+  
+  // 验证截图数量限制
+  if (config.hasOwnProperty('maxScreenshots')) {
+    const maxScreenshots = Number(config.maxScreenshots);
+    if (isNaN(maxScreenshots) || maxScreenshots < DETAIL_CONFIG_VALIDATION.maxScreenshots.min || 
+        maxScreenshots > DETAIL_CONFIG_VALIDATION.maxScreenshots.max) {
+      errors.push(`截图数量必须在 ${DETAIL_CONFIG_VALIDATION.maxScreenshots.min}-${DETAIL_CONFIG_VALIDATION.maxScreenshots.max} 之间`);
     }
   }
   

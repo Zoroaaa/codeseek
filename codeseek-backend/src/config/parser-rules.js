@@ -13,7 +13,7 @@ export class ParserRulesConfig {
               titleSelector: 'img[title], img[alt]',
               titleAttribute: 'title',
               mustContainCode: true,
-              strictDomainCheck: true, // 新增：严格域名检查
+              strictDomainCheck: false, // 修改：放宽域名检查以支持子域名
               excludeHrefs: [
                 '/search/', '/category/', '/star/', '/studio/', '/label/', '/genre/',
                 '/actresses/', '/uncensored/', '/forum/', '/doc/', '/page/', '/en',
@@ -36,7 +36,7 @@ export class ParserRulesConfig {
               titleSelector: 'img',
               titleAttribute: 'title',
               mustContainCode: true,
-              strictDomainCheck: true,
+              strictDomainCheck: false,
               excludeHrefs: ['/search/', '/category/', '/genre/', '/actresses/'],
               requirePattern: /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i
             }
@@ -69,7 +69,7 @@ export class ParserRulesConfig {
             fallback: 'data-src'
           },
           actresses: {
-            selector: '.star-name a, .actress a, .info .genre:contains("演员") a',
+            selector: '.star-name a, .actress a, .info .genre:contains("演員") a',
             extractProfile: true
           },
           director: {
@@ -106,7 +106,7 @@ export class ParserRulesConfig {
           },
           tags: {
             selector: '.genre a, .tag a, .category a',
-            excludeTexts: ['演员', '導演', '製作商', '發行商', '系列', '發行日期', '長度']
+            excludeTexts: ['演員', '導演', '製作商', '發行商', '系列', '發行日期', '長度']
           },
           magnetLinks: {
             selector: 'a[href^="magnet:"], .magnet-link',
@@ -144,7 +144,7 @@ export class ParserRulesConfig {
               selector: 'a[href*="/v/"]:not([href*="/search"])',
               titleSelector: '.video-title, .title, h4',
               mustContainCode: false, // JavDB的/v/链接通常是详情页
-              strictDomainCheck: true,
+              strictDomainCheck: false, // 修改：支持子域名
               excludeHrefs: ['/search/', '/actors/', '/makers/', '/publishers/'],
               requirePattern: /\/v\/[a-zA-Z0-9]+/
             },
@@ -154,7 +154,7 @@ export class ParserRulesConfig {
               titleSelector: '.video-title, .title, h4',
               codeSelector: '.video-number, .uid, .meta strong',
               mustContainCode: true,
-              strictDomainCheck: true,
+              strictDomainCheck: false,
               excludeHrefs: ['/search/', '/actors/', '/makers/', '/publishers/']
             }
           ]
@@ -185,7 +185,7 @@ export class ParserRulesConfig {
             fallback: 'data-src'
           },
           actresses: {
-            selector: '.panel-block:contains("演员") .value a, .actress-tag a',
+            selector: '.panel-block:contains("演員") .value a, .actress-tag a',
             extractProfile: true
           },
           director: {
@@ -222,7 +222,7 @@ export class ParserRulesConfig {
           },
           tags: {
             selector: '.panel-block:contains("類別") .tag a, .genre-tag a',
-            excludeTexts: ['演员', '導演', '片商', '廠牌', '系列', '時間', '時長']
+            excludeTexts: ['演員', '導演', '片商', '廠牌', '系列', '時間', '時長']
           },
           magnetLinks: {
             selector: 'a[href^="magnet:"], .magnet-link',
@@ -248,7 +248,7 @@ export class ParserRulesConfig {
               titleSelector: '.title, img[title]',
               titleAttribute: 'title',
               mustContainCode: true,
-              strictDomainCheck: true,
+              strictDomainCheck: false,
               excludeHrefs: ['/vl_searchbyid', '/vl_star', '/vl_director'],
               requirePattern: /\?v=[a-zA-Z0-9]+/
             },
@@ -258,7 +258,7 @@ export class ParserRulesConfig {
               titleSelector: '.title, .video-title',
               codeSelector: '.id',
               mustContainCode: true,
-              strictDomainCheck: true,
+              strictDomainCheck: false,
               excludeHrefs: ['/vl_searchbyid', '/vl_star', '/vl_director']
             }
           ]
@@ -332,11 +332,11 @@ export class ParserRulesConfig {
               selector: 'a[href*="/videos/"]:not([href*="/search"])',
               titleSelector: '.title, .video-title',
               mustContainCode: false, // Jable的视频链接通常是详情页
-              strictDomainCheck: true, // 重要：严格检查域名
+              strictDomainCheck: false, // 修改：支持子域名
               excludeHrefs: ['/search/', '/categories/', '/models/'],
               requirePattern: /\/videos\/[^\/]+/,
-              // 新增：严格的域名白名单
-              allowedDomains: ['jable.tv'],
+              // 修改：放宽域名白名单以支持子域名
+              allowedDomainPatterns: [/^.*\.jable\.tv$/, /^jable\.tv$/],
               excludeDomains: [
                 'go.mnaspm.com', 'mnaspm.com', 'asacp.org', 'seedmm.cyou', 
                 'busfan.cyou', 'dmmsee.ink', 'ph7zhi.vip', '8pla6t.vip'
@@ -347,8 +347,8 @@ export class ParserRulesConfig {
               selector: '.video-item a, .list-videos a',
               titleSelector: '.title, h4, .video-title',
               mustContainCode: true,
-              strictDomainCheck: true,
-              allowedDomains: ['jable.tv'],
+              strictDomainCheck: false,
+              allowedDomainPatterns: [/^.*\.jable\.tv$/, /^jable\.tv$/],
               excludeHrefs: ['/search/', '/categories/', '/models/']
             }
           ]
@@ -403,12 +403,82 @@ export class ParserRulesConfig {
             extractQuality: '.quality, .resolution',
             // 新增：严格过滤垃圾链接
             strictValidation: true,
-            allowedDomains: ['jable.tv'], // 只允许同域名下载链接
+            allowedDomainPatterns: [/^.*\.jable\.tv$/, /^jable\.tv$/], // 只允许同域名下载链接
             excludeDomains: [
               'go.mnaspm.com', 'mnaspm.com', 'asacp.org', 'seedmm.cyou',
               'busfan.cyou', 'dmmsee.ink', 'ph7zhi.vip', '8pla6t.vip',
               'ltrpvkga.com', 'frozaflurkiveltra.com', 'shvaszc.cc', 'fpnylxm.cc'
             ]
+          }
+        }
+      },
+
+      // 新增：JavGG 解析规则 - 根据实际链接优化
+      javgg: {
+        searchPage: {
+          detailLinkSelectors: [
+            {
+              // JavGG专用：/jav/格式的详情页链接
+              selector: 'a[href*="/jav/"]:not([href*="/search"])',
+              titleSelector: '.title, .video-title, h3',
+              mustContainCode: true, // JavGG的链接通常包含番号
+              strictDomainCheck: false,
+              excludeHrefs: ['/search/', '/category/', '/tag/', '/page/'],
+              requirePattern: /\/jav\/[A-Z]{2,6}-?\d{3,6}[^\/]*\/?/i,
+              allowedDomainPatterns: [/^.*\.javgg\.net$/, /^javgg\.net$/]
+            },
+            {
+              // 备用：通用容器中的链接
+              selector: '.video-item a, .movie-item a, .item a',
+              titleSelector: '.title, h3, .video-title',
+              mustContainCode: true,
+              strictDomainCheck: false,
+              allowedDomainPatterns: [/^.*\.javgg\.net$/, /^javgg\.net$/],
+              excludeHrefs: ['/search/', '/category/', '/tag/']
+            }
+          ]
+        },
+        detailPage: {
+          title: {
+            selector: 'h1, .video-title, .title',
+            transform: [
+              { type: 'replace', pattern: '\\s+', replacement: ' ' },
+              { type: 'trim' }
+            ]
+          },
+          code: {
+            selector: 'h1, .video-title, .code, .video-meta',
+            transform: [
+              { type: 'extract', pattern: '([A-Z]{2,6}-?\\d{3,6})', group: 1 },
+              { type: 'uppercase' }
+            ]
+          },
+          coverImage: {
+            selector: '.video-cover img, .poster img, .cover img',
+            attribute: 'src',
+            fallback: 'data-src'
+          },
+          screenshots: {
+            selector: '.screenshots img, .preview img, .gallery img',
+            attribute: 'src',
+            fallback: 'data-src'
+          },
+          actresses: {
+            selector: '.actress a, .performer a, .stars a',
+            extractProfile: true
+          },
+          description: {
+            selector: '.description, .summary, .content',
+            transform: [{ type: 'trim' }]
+          },
+          tags: {
+            selector: '.tag a, .genre a, .category a',
+            excludeTexts: []
+          },
+          downloadLinks: {
+            selector: 'a[href*="download"], .download-link',
+            strictValidation: true,
+            allowedDomainPatterns: [/^.*\.javgg\.net$/, /^javgg\.net$/]
           }
         }
       },
@@ -422,18 +492,18 @@ export class ParserRulesConfig {
               selector: 'a[href*="/view/"]:not([href*="/?"])',
               titleSelector: null, // 直接使用链接文本
               mustContainCode: false, // Sukebei的/view/链接是详情页
-              strictDomainCheck: true,
+              strictDomainCheck: false,
               excludeHrefs: ['/user/', '/?'],
               requirePattern: /\/view\/\d+/,
-              allowedDomains: ['sukebei.nyaa.si']
+              allowedDomainPatterns: [/^.*\.sukebei\.nyaa\.si$/, /^sukebei\.nyaa\.si$/]
             },
             {
               // 备用：表格中的torrent名称链接
               selector: 'tr td:first-child a, .torrent-name a',
               titleSelector: null, // 直接使用链接文本
               mustContainCode: true,
-              strictDomainCheck: true,
-              allowedDomains: ['sukebei.nyaa.si'],
+              strictDomainCheck: false,
+              allowedDomainPatterns: [/^.*\.sukebei\.nyaa\.si$/, /^sukebei\.nyaa\.si$/],
               excludeHrefs: ['/user/', '/?']
             }
           ]
@@ -476,7 +546,7 @@ export class ParserRulesConfig {
         }
       },
 
-      // JavMost 解析规则 - 修复版
+      // JavMost 解析规则 - 修复版 (支持子域名)
       javmost: {
         searchPage: {
           detailLinkSelectors: [
@@ -485,18 +555,18 @@ export class ParserRulesConfig {
               selector: 'a[href*="/"][href]:not([href*="/search"]):not([href*="/tag"])',
               titleSelector: '.title, h3, .video-title',
               mustContainCode: true,
-              strictDomainCheck: true,
+              strictDomainCheck: false, // 修改：支持子域名
               excludeHrefs: ['/search/', '/tag/', '/category/', '/page/'],
-              requirePattern: /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i,
-              allowedDomains: ['javmost.com', 'www5.javmost.com']
+              requirePattern: /\/[A-Z]{2,6}-?\d{3,6}[^\/]*(?:\/|$)/i,
+              allowedDomainPatterns: [/^.*\.javmost\.com$/, /^javmost\.com$/] // 支持www5.javmost.com等子域名
             },
             {
               // 备用：video-item中的链接
               selector: '.video-item a, .movie-item a',
               titleSelector: '.title, h3',
               mustContainCode: true,
-              strictDomainCheck: true,
-              allowedDomains: ['javmost.com', 'www5.javmost.com'],
+              strictDomainCheck: false,
+              allowedDomainPatterns: [/^.*\.javmost\.com$/, /^javmost\.com$/],
               excludeHrefs: ['/search/', '/tag/', '/category/']
             }
           ]
@@ -532,7 +602,7 @@ export class ParserRulesConfig {
           downloadLinks: {
             selector: 'a[href*="/"][title], .download-link',
             strictValidation: true,
-            allowedDomains: ['javmost.com', 'www5.javmost.com'],
+            allowedDomainPatterns: [/^.*\.javmost\.com$/, /^javmost\.com$/],
             excludeDomains: [
               'go.mnaspm.com', 'mnaspm.com', 'asacp.org'
             ]
@@ -549,9 +619,9 @@ export class ParserRulesConfig {
               selector: 'a[href*="/watch/"]:not([href*="?s="])',
               titleSelector: '.title, h3',
               mustContainCode: true,
-              strictDomainCheck: true,
+              strictDomainCheck: false,
               excludeHrefs: ['?s=', '/search/', '/category/'],
-              allowedDomains: ['jav.guru']
+              allowedDomainPatterns: [/^.*\.jav\.guru$/, /^jav\.guru$/]
             }
           ]
         },
@@ -583,7 +653,7 @@ export class ParserRulesConfig {
               titleSelector: '.title, h1, h2, h3, h4, img[alt]',
               titleAttribute: 'title',
               mustContainCode: true,
-              strictDomainCheck: true,
+              strictDomainCheck: false, // 修改：通用规则也支持子域名
               excludeHrefs: [
                 '/search/', '/category/', '/tag/', '/list/', '/page/', '/genre/',
                 '/actresses/', '/studio/', '/label/', '/forum/', '/doc/', '/terms',
@@ -596,7 +666,7 @@ export class ParserRulesConfig {
               selector: '.item a, .movie a, .video a, .result a',
               titleSelector: '.title, h1, h2, h3, h4, img[alt]',
               mustContainCode: true,
-              strictDomainCheck: true,
+              strictDomainCheck: false,
               excludeHrefs: ['/search/', '/category/', '/tag/', '/list/', '/page/']
             },
             {
@@ -604,7 +674,7 @@ export class ParserRulesConfig {
               selector: 'a[href]:not([href*="/search"]):not([href*="/page"])',
               titleSelector: '.title, h1, h2, h3, h4, img[alt]',
               mustContainCode: true,
-              strictDomainCheck: true,
+              strictDomainCheck: false,
               excludeHrefs: [
                 '/search/', '/category/', '/tag/', '/list/', '/page/', '?page',
                 '/genre/', '/actresses/', '/studio/', '/label/', '/forum/', '/doc/',
@@ -741,20 +811,22 @@ export class ParserRulesConfig {
     // 检查所有选择器配置的排除规则
     for (const selectorConfig of searchPageRules.detailLinkSelectors) {
       
-      // 1. 严格域名检查
-      if (selectorConfig.strictDomainCheck && expectedDomain) {
+      // 1. 增强的域名检查 - 支持子域名模式
+      if (selectorConfig.strictDomainCheck !== false && expectedDomain) {
         const linkDomain = this.extractDomainFromUrl(href);
         
-        // 检查域名白名单
-        if (selectorConfig.allowedDomains && selectorConfig.allowedDomains.length > 0) {
-          if (!selectorConfig.allowedDomains.some(domain => 
-            linkDomain === domain || linkDomain.endsWith('.' + domain))) {
-            console.log(`❌ 域名不在白名单: ${linkDomain} (允许: ${selectorConfig.allowedDomains.join(', ')})`);
+        // 检查域名模式匹配（新增功能）
+        if (selectorConfig.allowedDomainPatterns && selectorConfig.allowedDomainPatterns.length > 0) {
+          const domainMatches = selectorConfig.allowedDomainPatterns.some(pattern => 
+            pattern.test && pattern.test(linkDomain)
+          );
+          if (!domainMatches) {
+            console.log(`❌ 域名不匹配模式: ${linkDomain} (模式: ${selectorConfig.allowedDomainPatterns.map(p => p.source).join(', ')})`);
             return false;
           }
         } else {
-          // 标准域名一致性检查
-          if (linkDomain !== expectedDomain) {
+          // 标准域名一致性检查 - 支持子域名
+          if (!this.isDomainOrSubdomain(linkDomain, expectedDomain)) {
             console.log(`❌ 域名不匹配: ${linkDomain} != ${expectedDomain}`);
             return false;
           }
@@ -798,6 +870,27 @@ export class ParserRulesConfig {
     }
 
     return true;
+  }
+
+  /**
+   * 检查是否为域名或子域名 - 新增方法
+   * @param {string} linkDomain - 链接域名
+   * @param {string} expectedDomain - 期望域名
+   * @returns {boolean} 是否匹配
+   */
+  isDomainOrSubdomain(linkDomain, expectedDomain) {
+    if (!linkDomain || !expectedDomain) return false;
+    
+    const linkDomainLower = linkDomain.toLowerCase();
+    const expectedDomainLower = expectedDomain.toLowerCase();
+    
+    // 完全匹配
+    if (linkDomainLower === expectedDomainLower) return true;
+    
+    // 子域名匹配
+    if (linkDomainLower.endsWith('.' + expectedDomainLower)) return true;
+    
+    return false;
   }
 
   /**
@@ -867,10 +960,10 @@ export class ParserRulesConfig {
       return false;
     }
 
-    // 严格域名检查
+    // 增强的域名检查
     if (expectedDomain) {
       const linkDomain = this.extractDomainFromUrl(href);
-      if (linkDomain !== expectedDomain) {
+      if (!this.isDomainOrSubdomain(linkDomain, expectedDomain)) {
         // 检查已知的垃圾域名
         const spamDomains = [
           'go.mnaspm.com', 'mnaspm.com', 'asacp.org', 'seedmm.cyou',
@@ -900,6 +993,8 @@ export class ParserRulesConfig {
         return this.isValidJavLibrarySearchLink(href, content);
       case 'jable':
         return this.isValidJableSearchLink(href, content);
+      case 'javgg':
+        return this.isValidJavGGSearchLink(href, content);
       case 'missav':
         return this.isValidMissAVSearchLink(href, content);
       case 'sukebei':
@@ -970,6 +1065,20 @@ export class ParserRulesConfig {
   }
 
   /**
+   * JavGG搜索链接验证 - 新增
+   */
+  isValidJavGGSearchLink(href, content) {
+    // JavGG详情页格式：/jav/[code]
+    if (!/\/jav\/[A-Z]{2,6}-?\d{3,6}[^\/]*\/?/i.test(href)) return false;
+    
+    // 检查域名
+    const domain = this.extractDomainFromUrl(href);
+    const allowedDomains = ['javgg.net'];
+    
+    return allowedDomains.some(allowed => domain === allowed || domain.endsWith('.' + allowed));
+  }
+
+  /**
    * MissAV搜索链接验证
    */
   isValidMissAVSearchLink(href, content) {
@@ -989,17 +1098,15 @@ export class ParserRulesConfig {
   }
 
   /**
-   * JavMost搜索链接验证
+   * JavMost搜索链接验证 - 支持子域名
    */
   isValidJavMostSearchLink(href, content) {
     // 必须包含番号路径
-    if (!/\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(href)) return false;
+    if (!/\/[A-Z]{2,6}-?\d{3,6}[^\/]*(?:\/|$)/i.test(href)) return false;
     
-    // 检查域名
+    // 检查域名 - 支持子域名
     const domain = this.extractDomainFromUrl(href);
-    const allowedDomains = ['javmost.com', 'www5.javmost.com'];
-    
-    return allowedDomains.some(allowed => domain === allowed || domain.endsWith('.' + allowed));
+    return this.isDomainOrSubdomain(domain, 'javmost.com');
   }
 
   /**
@@ -1026,6 +1133,7 @@ export class ParserRulesConfig {
       /\/v\/[a-zA-Z0-9]+/,               // JavDB格式
       /\?v=[a-zA-Z0-9]+/,                // JavLibrary格式
       /\/videos\/[^\/]+/,                // Jable格式
+      /\/jav\/[^\/]+/,                   // JavGG格式
       /\/view\/\d+/                      // Sukebei格式
     ];
     
@@ -1050,16 +1158,18 @@ export class ParserRulesConfig {
 
     // 严格域名检查
     if (rules.strictValidation && expectedDomain) {
-      // 检查域名白名单
-      if (rules.allowedDomains && rules.allowedDomains.length > 0) {
-        if (!rules.allowedDomains.some(domain => 
-          linkDomain === domain || linkDomain.endsWith('.' + domain))) {
+      // 检查域名模式匹配
+      if (rules.allowedDomainPatterns && rules.allowedDomainPatterns.length > 0) {
+        const domainMatches = rules.allowedDomainPatterns.some(pattern => 
+          pattern.test && pattern.test(linkDomain)
+        );
+        if (!domainMatches) {
           console.log(`❌ 下载链接域名不在白名单: ${linkDomain}`);
           return false;
         }
       } else {
         // 标准域名检查
-        if (linkDomain !== expectedDomain) {
+        if (!this.isDomainOrSubdomain(linkDomain, expectedDomain)) {
           console.log(`❌ 下载链接域名不匹配: ${linkDomain} != ${expectedDomain}`);
           return false;
         }
@@ -1089,6 +1199,8 @@ export class ParserRulesConfig {
     return true;
   }
 
+  // 其余方法保持不变...
+  
   /**
    * 添加自定义解析规则
    * @param {string} sourceType - 源类型
@@ -1210,10 +1322,10 @@ export class ParserRulesConfig {
       'javdb': /javdb\.com/,
       'javlibrary': /javlibrary\.com/,
       'jable': /jable\.tv/,
+      'javgg': /javgg\.net/,
       'javmost': /javmost\.com/,
       'missav': /missav\.com/,
       'javhdporn': /javhd\.porn/,
-      'javgg': /javgg\.net/,
       'av01': /av01\.tv/,
       'sukebei': /sukebei\.nyaa\.si/,
       'javguru': /jav\.guru/
@@ -1234,7 +1346,7 @@ export class ParserRulesConfig {
    */
   exportRules() {
     return {
-      version: '2.2',
+      version: '2.3',
       exportTime: Date.now(),
       rules: { ...this.rules }
     };

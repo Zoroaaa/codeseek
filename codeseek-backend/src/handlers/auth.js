@@ -198,6 +198,58 @@ export async function authVerifyTokenHandler(request, env) {
     }
 }
 
+// Token刷新
+export async function authRefreshTokenHandler(request, env) {
+    try {
+        const user = await authenticate(request, env);
+        if (!user) return utils.errorResponse('认证失败', 401);
+
+        const jwtSecret = env.JWT_SECRET;
+        if (!jwtSecret) {
+            console.error('JWT_SECRET 环境变量未设置');
+            return utils.errorResponse('服务器配置错误', 500);
+        }
+
+        const expiryDays = parseInt(env.JWT_EXPIRY_DAYS || '30');
+        const expirySeconds = expiryDays * 24 * 60 * 60;
+
+        // 生成新的token
+        const payload = {
+            userId: user.id,
+            username: user.username,
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + expirySeconds
+        };
+
+        const newToken = await utils.generateJWT(payload, jwtSecret);
+        const newTokenHash = await utils.hashPassword(newToken);
+
+        // 获取当前session
+        const authHeader = request.headers.get('Authorization');
+        const oldToken = authHeader.substring(7);
+        const oldTokenHash = await utils.hashPassword(oldToken);
+
+        // 更新session的token
+        const expiresAt = Date.now() + (expirySeconds * 1000);
+        await env.DB.prepare(`
+            UPDATE user_sessions 
+            SET token_hash = ?, expires_at = ?, last_activity = ?
+            WHERE token_hash = ? AND user_id = ?
+        `).bind(newTokenHash, expiresAt, Date.now(), oldTokenHash, user.id).run();
+
+        await utils.logUserAction(env, user.id, 'token_refresh', {}, request);
+
+        return utils.successResponse({
+            message: 'Token刷新成功',
+            token: newToken
+        });
+
+    } catch (error) {
+        console.error('Token刷新失败:', error);
+        return utils.errorResponse('Token刷新失败', 401);
+    }
+}
+
 // 修改密码
 export async function authChangePasswordHandler(request, env) {
     try {

@@ -6,6 +6,7 @@ import {
     authRegisterHandler,
     authLoginHandler,
     authVerifyTokenHandler,
+    authRefreshTokenHandler,  // 新增：刷新token处理器
     authChangePasswordHandler,
     authLogoutHandler,
     authDeleteAccountHandler
@@ -203,6 +204,7 @@ export class Router {
         this.post('/api/auth/register', authRegisterHandler);
         this.post('/api/auth/login', authLoginHandler);
         this.post('/api/auth/verify-token', authVerifyTokenHandler);
+        this.post('/api/auth/refresh', authRefreshTokenHandler);  // 新增：刷新token路由
         this.put('/api/auth/change-password', authChangePasswordHandler);
         this.post('/api/auth/logout', authLogoutHandler);
         this.post('/api/auth/delete-account', authDeleteAccountHandler);

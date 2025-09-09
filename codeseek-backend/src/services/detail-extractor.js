@@ -1,19 +1,22 @@
-// src/services/detail-extractor.js - 优化版本：严格的详情页面识别和域名验证
+// src/services/detail-extractor.js - 重构版本：主调度器，大幅简化
 import { utils } from '../utils.js';
-import { contentParser } from './content-parser.js';
+import { searchLinkExtractor } from './search-link-extractor.js';
+import { detailContentParser } from './detail-content-parser.js';
+import { extractionValidator } from './extraction-validator.js';
 import { cacheManager } from './cache-manager.js';
 import { CONFIG } from '../constants.js';
 
 export class DetailExtractorService {
   constructor() {
-    this.maxConcurrentExtractions = 3;
-    this.defaultTimeout = 15000;
-    this.retryAttempts = 2;
+    this.maxConcurrentExtractions = CONFIG.DETAIL_EXTRACTION.MAX_CONCURRENT_EXTRACTIONS; // 从配置引用
+    this.defaultTimeout = CONFIG.DETAIL_EXTRACTION.DEFAULT_TIMEOUT; // 从配置引用
+    this.retryAttempts = CONFIG.DETAIL_EXTRACTION.MAX_RETRY_ATTEMPTS; // 从配置引用
+    this.retryDelay = CONFIG.DETAIL_EXTRACTION.RETRY_DELAY; // 从配置引用
     this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
   }
 
   /**
-   * 提取单个结果的详情信息 - 优化版本
+   * 提取单个结果的详情信息 - 简化版本
    * @param {Object} searchResult - 搜索结果对象
    * @param {Object} options - 提取选项
    * @returns {Object} 详情信息对象
@@ -23,13 +26,13 @@ export class DetailExtractorService {
     const startTime = Date.now();
 
     try {
-      console.log(`=== 开始提取详情 (优化版本) ===`);
+      console.log(`=== 开始提取详情 (简化版本) ===`);
       console.log(`标题: ${searchResult.title}`);
       console.log(`搜索URL: ${searchResult.url}`);
 
       // 检测搜索源类型
-      const sourceType = this.detectSourceType(searchResult.url, searchResult.source);
-      const searchDomain = this.extractDomain(searchResult.url);
+      const sourceType = extractionValidator.detectSourceType(searchResult.url, searchResult.source);
+      const searchDomain = extractionValidator.extractDomain(searchResult.url);
       
       console.log(`检测到搜索源类型: ${sourceType}`);
       console.log(`搜索域名: ${searchDomain}`);
@@ -39,7 +42,7 @@ export class DetailExtractorService {
       console.log(`确定的详情页面URL: ${detailPageUrl}`);
 
       // 验证详情页面URL的有效性
-      if (!this.validateDetailPageUrl(detailPageUrl, searchResult.url, sourceType)) {
+      if (!extractionValidator.validateDetailPageUrl(detailPageUrl, searchResult.url, sourceType)) {
         throw new Error('未找到有效的详情页面URL');
       }
 
@@ -53,7 +56,7 @@ export class DetailExtractorService {
       console.log(`详情页面内容长度: ${pageContent.length}`);
 
       // 第三步：解析详情信息
-      const detailInfo = await contentParser.parseDetailPage(pageContent, {
+      const detailInfo = await detailContentParser.parseDetailPage(pageContent, {
         sourceType,
         originalUrl: detailPageUrl,
         originalTitle: searchResult.title
@@ -88,7 +91,7 @@ export class DetailExtractorService {
       // 重试机制
       if (enableRetry && this.retryAttempts > 0) {
         console.log(`尝试重试提取: ${searchResult.title}`);
-        await utils.delay(1000);
+        await utils.delay(this.retryDelay);
         
         return await this.extractSingleDetail(searchResult, {
           ...options,
@@ -108,7 +111,7 @@ export class DetailExtractorService {
   }
 
   /**
-   * 查找真正的详情页面URL - 优化版本
+   * 查找真正的详情页面URL - 简化版本
    * @param {Object} searchResult - 搜索结果
    * @param {string} sourceType - 源类型
    * @param {string} searchDomain - 搜索域名
@@ -117,13 +120,13 @@ export class DetailExtractorService {
    */
   async findActualDetailPageUrl(searchResult, sourceType, searchDomain, timeout) {
     try {
-      console.log(`=== 查找真实详情页面URL (优化版本) ===`);
+      console.log(`=== 查找真实详情页面URL (简化版本) ===`);
       console.log(`搜索结果URL: ${searchResult.url}`);
       console.log(`源类型: ${sourceType}`);
       console.log(`搜索域名: ${searchDomain}`);
       
       // 检查URL是否已经是详情页
-      const isAlreadyDetail = this.isDetailPageUrl(searchResult.url, sourceType, searchDomain);
+      const isAlreadyDetail = extractionValidator.isDetailPageUrl(searchResult.url, sourceType, searchDomain);
       console.log(`是否已经是详情页: ${isAlreadyDetail}`);
       
       if (isAlreadyDetail) {
@@ -141,9 +144,9 @@ export class DetailExtractorService {
         throw new Error('无法获取搜索页面内容');
       }
 
-      // 使用 contentParser 从搜索页面提取详情链接
+      // 使用 searchLinkExtractor 从搜索页面提取详情链接
       console.log(`开始从搜索页面提取详情链接...`);
-      const detailLinks = await contentParser.extractDetailLinksFromSearchPage(searchPageContent, {
+      const detailLinks = await searchLinkExtractor.extractDetailLinksFromSearchPage(searchPageContent, {
         sourceType,
         baseUrl: searchResult.url,
         searchKeyword: this.extractSearchKeyword(searchResult)
@@ -177,12 +180,7 @@ export class DetailExtractorService {
   }
 
   /**
-   * 过滤有效的详情链接 - 新增方法
-   * @param {Array} detailLinks - 详情链接数组
-   * @param {string} searchDomain - 搜索域名
-   * @param {string} searchUrl - 搜索URL
-   * @param {string} sourceType - 源类型
-   * @returns {Array} 过滤后的有效链接数组
+   * 过滤有效的详情链接 - 简化版本，委托给 extractionValidator
    */
   filterValidDetailLinks(detailLinks, searchDomain, searchUrl, sourceType) {
     console.log(`=== 过滤有效详情链接 ===`);
@@ -193,34 +191,34 @@ export class DetailExtractorService {
     const validLinks = detailLinks.filter(link => {
       // 1. 基本验证
       if (!link || !link.url || typeof link.url !== 'string') {
-        console.log(`❌ 跳过无效链接: ${link?.url || 'undefined'}`);
+        console.log(`⌧ 跳过无效链接: ${link?.url || 'undefined'}`);
         return false;
       }
 
-      // 2. 域名一致性检查（磁力链接等特殊协议除外）
+      // 2. 域名一致性检查（支持子域名）
       if (link.url.startsWith('http')) {
-        const linkDomain = this.extractDomain(link.url);
-        if (linkDomain !== searchDomain) {
-          console.log(`❌ 跳过不同域名链接: ${link.url} (${linkDomain} != ${searchDomain})`);
+        const linkDomain = extractionValidator.extractDomain(link.url);
+        if (!extractionValidator.isDomainOrSubdomainMatch(linkDomain, searchDomain)) {
+          console.log(`⌧ 跳过不同域名链接: ${link.url} (${linkDomain} != ${searchDomain})`);
           return false;
         }
       }
 
       // 3. 确保不是搜索页面本身
-      if (this.normalizeUrl(link.url) === this.normalizeUrl(searchUrl)) {
-        console.log(`❌ 跳过相同的搜索URL: ${link.url}`);
+      if (extractionValidator.normalizeUrl(link.url) === extractionValidator.normalizeUrl(searchUrl)) {
+        console.log(`⌧ 跳过相同的搜索URL: ${link.url}`);
         return false;
       }
 
       // 4. 检查是否为详情页面URL
-      if (!this.isDetailPageUrl(link.url, sourceType, searchDomain)) {
-        console.log(`❌ 跳过非详情页面: ${link.url}`);
+      if (!extractionValidator.isDetailPageUrl(link.url, sourceType, searchDomain)) {
+        console.log(`⌧ 跳过非详情页面: ${link.url}`);
         return false;
       }
 
       // 5. 排除明显的搜索页面特征
-      if (this.containsSearchIndicators(link.url)) {
-        console.log(`❌ 跳过包含搜索指示器的链接: ${link.url}`);
+      if (extractionValidator.containsSearchIndicators(link.url)) {
+        console.log(`⌧ 跳过包含搜索指示器的链接: ${link.url}`);
         return false;
       }
 
@@ -233,496 +231,8 @@ export class DetailExtractorService {
   }
 
   /**
-   * 检查URL是否包含搜索指示器 - 新增方法
-   * @param {string} url - URL
-   * @returns {boolean} 是否包含搜索指示器
+   * 选择最佳详情链接 - 简化版本，委托给 extractionValidator
    */
-  containsSearchIndicators(url) {
-    const urlLower = url.toLowerCase();
-    
-    const searchIndicators = [
-      '/search/', '/search?', '?q=', '?s=', '?query=', '?keyword=',
-      '/page/', '/list/', '/category/', '/genre/', '/actresses/',
-      '/studio/', '/label/', '/uncensored/', '/forum/', '/doc/',
-      '/terms', '/privacy', '/login', '/register'
-    ];
-
-    return searchIndicators.some(indicator => urlLower.includes(indicator));
-  }
-
-  /**
-   * 检查URL是否为详情页面 - 增强版本
-   * @param {string} url - URL
-   * @param {string} sourceType - 源类型
-   * @param {string} expectedDomain - 期望的域名
-   * @returns {boolean} 是否为详情页
-   */
-  isDetailPageUrl(url, sourceType, expectedDomain) {
-    if (!url || typeof url !== 'string') return false;
-
-    const urlLower = url.toLowerCase();
-    const urlDomain = this.extractDomain(url);
-
-    // 验证域名一致性（HTTP链接）
-    if (url.startsWith('http') && urlDomain !== expectedDomain) {
-      return false;
-    }
-
-    // 排除明显的非详情页面
-    if (this.containsSearchIndicators(url)) {
-      return false;
-    }
-
-    // 根据源类型进行专门验证
-    switch (sourceType) {
-      case 'javbus':
-        return this.isJavBusDetailPage(url);
-        
-      case 'javdb':
-        return this.isJavDBDetailPage(url);
-        
-      case 'javlibrary':
-        return this.isJavLibraryDetailPage(url);
-        
-      case 'jable':
-        return this.isJableDetailPage(url);
-        
-      case 'missav':
-        return this.isMissAVDetailPage(url);
-        
-      case 'sukebei':
-        return this.isSukebeiDetailPage(url);
-        
-      case 'javmost':
-        return this.isJavMostDetailPage(url);
-        
-      case 'javguru':
-        return this.isJavGuruDetailPage(url);
-        
-      default:
-        return this.isGenericDetailPage(url);
-    }
-  }
-
-  /**
-   * JavBus详情页面验证 - 新增方法
-   */
-  isJavBusDetailPage(url) {
-    // JavBus详情页通常包含番号路径，如 /ABC-123
-    const hasCodePattern = /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(url);
-    const notSearchPage = !url.toLowerCase().includes('/search');
-    const notGenrePage = !url.toLowerCase().includes('/genre/');
-    const notActressPage = !url.toLowerCase().includes('/actresses/');
-    
-    return hasCodePattern && notSearchPage && notGenrePage && notActressPage;
-  }
-
-  /**
-   * JavDB详情页面验证 - 新增方法
-   */
-  isJavDBDetailPage(url) {
-    // JavDB详情页通常是 /v/xxxx 格式
-    const hasVideoPattern = /\/v\/[a-zA-Z0-9]+/.test(url);
-    const hasCodePattern = /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(url);
-    const notSearchPage = !url.toLowerCase().includes('/search');
-    
-    return (hasVideoPattern || hasCodePattern) && notSearchPage;
-  }
-
-  /**
-   * JavLibrary详情页面验证 - 新增方法
-   */
-  isJavLibraryDetailPage(url) {
-    // JavLibrary详情页通常包含 ?v= 参数
-    const hasVideoParam = /\?v=[a-zA-Z0-9]+/.test(url);
-    const notSearchPage = !url.toLowerCase().includes('vl_searchbyid');
-    
-    return hasVideoParam && notSearchPage;
-  }
-
-  /**
-   * Jable详情页面验证 - 新增方法
-   */
-  isJableDetailPage(url) {
-    // Jable详情页通常是视频页面 /videos/xxx
-    const hasVideoPath = /\/videos\/[^\/\?]+/.test(url);
-    const notSearchPage = !url.toLowerCase().includes('/search');
-    
-    return hasVideoPath && notSearchPage;
-  }
-
-  /**
-   * MissAV详情页面验证 - 新增方法
-   */
-  isMissAVDetailPage(url) {
-    // MissAV详情页通常包含番号
-    const hasCodePattern = /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(url);
-    const notSearchPage = !url.toLowerCase().includes('/search');
-    const notActressPage = !url.toLowerCase().includes('/actresses/');
-    
-    return hasCodePattern && notSearchPage && notActressPage;
-  }
-
-  /**
-   * Sukebei详情页面验证 - 新增方法
-   */
-  isSukebeiDetailPage(url) {
-    // Sukebei详情页通常是种子页面 /view/数字
-    const hasViewPattern = /\/view\/\d+/.test(url);
-    
-    return hasViewPattern;
-  }
-
-  /**
-   * JavMost详情页面验证 - 新增方法
-   */
-  isJavMostDetailPage(url) {
-    // JavMost详情页通常包含番号路径
-    const hasCodePattern = /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(url);
-    const notSearchPage = !url.toLowerCase().includes('/search');
-    
-    return hasCodePattern && notSearchPage;
-  }
-
-  /**
-   * JavGuru详情页面验证 - 新增方法
-   */
-  isJavGuruDetailPage(url) {
-    // JavGuru的详情页模式
-    const notSearchPage = !url.toLowerCase().includes('?s=');
-    const hasDetailIndicators = /\/(watch|video|play)\//.test(url.toLowerCase()) || 
-                               /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(url);
-    
-    return notSearchPage && hasDetailIndicators;
-  }
-
-  /**
-   * 通用详情页面验证 - 新增方法
-   */
-  isGenericDetailPage(url) {
-    const urlLower = url.toLowerCase();
-    
-    // 详情页面特征
-    const detailIndicators = [
-      '/video/', '/watch/', '/play/', '/view/', '/detail/',
-      '/movie/', '/film/', '/content/'
-    ];
-    
-    const hasDetailIndicator = detailIndicators.some(indicator => 
-      urlLower.includes(indicator)
-    );
-    
-    const hasCodePattern = /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(url);
-    
-    return hasDetailIndicator || hasCodePattern;
-  }
-
-  /**
-   * 验证详情页面URL - 新增方法
-   * @param {string} detailUrl - 详情页面URL
-   * @param {string} searchUrl - 搜索URL
-   * @param {string} sourceType - 源类型
-   * @returns {boolean} 是否为有效的详情页面URL
-   */
-  validateDetailPageUrl(detailUrl, searchUrl, sourceType) {
-    console.log(`=== 验证详情页面URL ===`);
-    console.log(`详情URL: ${detailUrl}`);
-    console.log(`搜索URL: ${searchUrl}`);
-
-    // 1. 基本验证
-    if (!detailUrl || typeof detailUrl !== 'string') {
-      console.log(`❌ 详情URL无效`);
-      return false;
-    }
-
-    // 2. 不能与搜索URL完全相同
-    if (this.normalizeUrl(detailUrl) === this.normalizeUrl(searchUrl)) {
-      console.log(`❌ 详情URL与搜索URL相同`);
-      return false;
-    }
-
-    // 3. 域名必须一致
-    const detailDomain = this.extractDomain(detailUrl);
-    const searchDomain = this.extractDomain(searchUrl);
-    
-    if (detailDomain !== searchDomain) {
-      console.log(`❌ 域名不一致: ${detailDomain} != ${searchDomain}`);
-      return false;
-    }
-
-    // 4. 必须是详情页面格式
-    if (!this.isDetailPageUrl(detailUrl, sourceType, searchDomain)) {
-      console.log(`❌ 不是有效的详情页面格式`);
-      return false;
-    }
-
-    console.log(`✅ 详情页面URL验证通过`);
-    return true;
-  }
-
-  /**
-   * 提取域名 - 新增工具方法
-   * @param {string} url - URL
-   * @returns {string} 域名
-   */
-  extractDomain(url) {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.hostname.toLowerCase();
-    } catch {
-      return '';
-    }
-  }
-
-  /**
-   * 标准化URL - 新增工具方法
-   * @param {string} url - URL
-   * @returns {string} 标准化的URL
-   */
-  normalizeUrl(url) {
-    if (!url) return '';
-    
-    try {
-      const urlObj = new URL(url);
-      // 移除尾部斜杠和常见查询参数
-      let normalized = urlObj.origin + urlObj.pathname;
-      
-      // 移除尾部斜杠
-      if (normalized.endsWith('/') && normalized.length > 1) {
-        normalized = normalized.slice(0, -1);
-      }
-      
-      return normalized.toLowerCase();
-    } catch {
-      return url.toLowerCase();
-    }
-  }
-
-  /**
-   * 验证和增强详情数据 - 增强版本
-   * @param {Object} detailInfo - 解析的详情信息
-   * @param {Object} searchResult - 原始搜索结果
-   * @param {string} detailPageUrl - 详情页URL
-   * @param {string} searchDomain - 搜索域名
-   * @returns {Object} 验证后的详情信息
-   */
-  validateAndEnhanceDetails(detailInfo, searchResult, detailPageUrl, searchDomain) {
-    const validated = {
-      // 基本信息
-      title: detailInfo.title || searchResult.title || '未知标题',
-      originalTitle: detailInfo.originalTitle || '',
-      code: detailInfo.code || this.extractCodeFromUrl(detailPageUrl) || 
-            this.extractCodeFromTitle(searchResult.title) || '',
-      
-      // 媒体信息
-      coverImage: this.validateImageUrl(detailInfo.coverImage) || '',
-      screenshots: (detailInfo.screenshots || []).filter(url => this.validateImageUrl(url)),
-      
-      // 演员信息
-      actresses: detailInfo.actresses || [],
-      director: detailInfo.director || '',
-      studio: detailInfo.studio || '',
-      label: detailInfo.label || '',
-      series: detailInfo.series || '',
-      
-      // 发布信息
-      releaseDate: this.validateDate(detailInfo.releaseDate) || '',
-      duration: detailInfo.duration || '',
-      
-      // 技术信息
-      quality: detailInfo.quality || '',
-      fileSize: detailInfo.fileSize || '',
-      resolution: detailInfo.resolution || '',
-      
-      // 下载链接 - 严格过滤，确保域名一致
-      downloadLinks: this.validateAndFilterDownloadLinks(detailInfo.downloadLinks || [], searchDomain),
-      magnetLinks: this.validateMagnetLinks(detailInfo.magnetLinks || []),
-      
-      // 其他信息
-      description: detailInfo.description || '',
-      tags: detailInfo.tags || [],
-      rating: this.validateRating(detailInfo.rating),
-      
-      // 元数据
-      detailUrl: detailPageUrl,
-      searchUrl: searchResult.url,
-      sourceType: detailInfo.sourceType || 'unknown'
-    };
-
-    return validated;
-  }
-
-  /**
-   * 验证和过滤下载链接 - 增强版本，增加域名验证
-   * @param {Array} links - 下载链接数组
-   * @param {string} expectedDomain - 期望的域名
-   * @returns {Array} 过滤后的链接数组
-   */
-  validateAndFilterDownloadLinks(links, expectedDomain) {
-    if (!Array.isArray(links)) return [];
-    
-    return links.filter(link => {
-      if (!link || typeof link !== 'object') return false;
-      
-      // 验证URL有效性
-      if (!link.url || !this.validateImageUrl(link.url)) return false;
-      
-      // 对于HTTP链接，验证域名一致性
-      if (link.url.startsWith('http')) {
-        const linkDomain = this.extractDomain(link.url);
-        if (linkDomain !== expectedDomain) {
-          console.log(`❌ 过滤不同域名的下载链接: ${link.url} (${linkDomain} != ${expectedDomain})`);
-          return false;
-        }
-      }
-      
-      // 过滤掉明显的垃圾链接
-      const urlLower = link.url.toLowerCase();
-      const nameLower = (link.name || '').toLowerCase();
-      
-      const excludeDomains = [
-        'seedmm.cyou', 'busfan.cyou', 'dmmsee.ink', 'ph7zhi.vip', '8pla6t.vip',
-        'ltrpvkga.com', 'frozaflurkiveltra.com', 'shvaszc.cc', 'fpnylxm.cc',
-        'mvqttfwf.com', 'jempoprostoklimor.com', '128zha.cc', 'aciyopg.cc',
-        'mnaspm.com', 'asacp.org', 'pr0rze.vip'
-      ];
-      
-      // 排除垃圾域名
-      if (excludeDomains.some(domain => urlLower.includes(domain))) {
-        console.log(`❌ 过滤垃圾域名链接: ${link.url}`);
-        return false;
-      }
-      
-      // 排除明显的导航链接
-      const excludeTexts = [
-        'english', '中文', '日本語', '한국의', '有碼', '無碼', '女優', '類別',
-        '論壇', '下一頁', '上一頁', '首頁', 'terms', 'privacy', '登入', 'agent_code'
-      ];
-      
-      if (excludeTexts.some(text => nameLower.includes(text.toLowerCase()))) {
-        console.log(`❌ 过滤导航文本链接: ${link.name}`);
-        return false;
-      }
-      
-      return true;
-    }).map(link => ({
-      name: link.name || '下载链接',
-      url: link.url,
-      type: link.type || 'unknown',
-      size: link.size || '',
-      quality: link.quality || ''
-    }));
-  }
-
-  // 保持原有的其他验证方法...
-  validateImageUrl(url) {
-    if (!url || typeof url !== 'string') return false;
-    
-    try {
-      const urlObj = new URL(url);
-      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  }
-
-  validateDate(dateStr) {
-    if (!dateStr) return '';
-    
-    try {
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return '';
-      
-      return date.toISOString().split('T')[0];
-    } catch {
-      return '';
-    }
-  }
-
-  validateMagnetLinks(magnetLinks) {
-    if (!Array.isArray(magnetLinks)) return [];
-    
-    return magnetLinks.filter(link => {
-      if (!link || typeof link !== 'object') return false;
-      return link.magnet && link.magnet.startsWith('magnet:?xt=urn:btih:');
-    }).map(link => ({
-      name: link.name || '磁力链接',
-      magnet: link.magnet,
-      size: link.size || '',
-      seeders: link.seeders || 0,
-      leechers: link.leechers || 0,
-      quality: link.quality || '',
-      addedDate: link.addedDate || ''
-    }));
-  }
-
-  validateRating(rating) {
-    if (rating === null || rating === undefined) return 0;
-    
-    const numRating = parseFloat(rating);
-    if (isNaN(numRating)) return 0;
-    
-    return Math.max(0, Math.min(10, numRating));
-  }
-
-  extractCodeFromTitle(title) {
-    if (!title) return '';
-    
-    const patterns = [
-      /([A-Z]{2,6}-?\d{3,6})/i,
-      /([A-Z]+\d{3,6})/i,
-      /(\d{3,6}[A-Z]{2,6})/i
-    ];
-    
-    for (const pattern of patterns) {
-      const match = title.match(pattern);
-      if (match) {
-        return match[1].toUpperCase();
-      }
-    }
-    
-    return '';
-  }
-
-  extractCodeFromUrl(url) {
-    if (!url) return '';
-    
-    const patterns = [
-      /\/([A-Z]{2,6}-?\d{3,6})(?:\/|$)/i,
-      /[?&].*?([A-Z]{2,6}-?\d{3,6})/i
-    ];
-    
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) {
-        return match[1].toUpperCase();
-      }
-    }
-    
-    return '';
-  }
-
-  // 保持原有的其他方法...
-  detectSourceType(url, sourceId) {
-    const urlLower = url.toLowerCase();
-    
-    if (urlLower.includes('javbus.com')) return 'javbus';
-    if (urlLower.includes('javdb.com')) return 'javdb';
-    if (urlLower.includes('javlibrary.com')) return 'javlibrary';
-    if (urlLower.includes('jable.tv')) return 'jable';
-    if (urlLower.includes('javmost.com')) return 'javmost';
-    if (urlLower.includes('missav.com')) return 'missav';
-    if (urlLower.includes('javhd.porn')) return 'javhdporn';
-    if (urlLower.includes('javgg.net')) return 'javgg';
-    if (urlLower.includes('av01.tv')) return 'av01';
-    if (urlLower.includes('sukebei.nyaa.si')) return 'sukebei';
-    if (urlLower.includes('jav.guru')) return 'javguru';
-    
-    if (sourceId) return sourceId;
-    
-    return 'generic';
-  }
-
   selectBestDetailLink(detailLinks, searchResult, sourceType) {
     console.log(`=== 选择最佳详情链接 ===`);
     
@@ -730,7 +240,7 @@ export class DetailExtractorService {
     console.log(`搜索关键词: ${searchKeyword}`);
     
     const scoredLinks = detailLinks.map(link => {
-      const enhancedScore = this.calculateEnhancedMatchScore(link, searchResult, searchKeyword);
+      const enhancedScore = extractionValidator.calculateEnhancedMatchScore(link, searchResult, searchKeyword);
       console.log(`链接评分: ${link.url} - ${enhancedScore}分`);
       console.log(`  标题: ${link.title}`);
       console.log(`  番号: ${link.code}`);
@@ -749,68 +259,58 @@ export class DetailExtractorService {
     return bestLink;
   }
 
-  calculateEnhancedMatchScore(link, searchResult, searchKeyword) {
-    let score = link.score || 0;
-    
-    if (searchKeyword && link.code) {
-      if (searchKeyword.toLowerCase() === link.code.toLowerCase()) {
-        score += 30;
-      } else if (link.code.toLowerCase().includes(searchKeyword.toLowerCase()) || 
-                 searchKeyword.toLowerCase().includes(link.code.toLowerCase())) {
-        score += 20;
-      }
-    }
-    
-    if (searchResult.title && link.title) {
-      const titleSimilarity = this.calculateTextSimilarity(
-        searchResult.title.toLowerCase(), 
-        link.title.toLowerCase()
-      );
-      score += titleSimilarity * 15;
-    }
-    
-    if (this.isHighQualityDetailUrl(link.url, searchResult.source)) {
-      score += 10;
-    }
-    
-    if (link.extractedFrom === 'javbus_moviebox' || 
-        link.extractedFrom === 'javdb_video' ||
-        link.extractedFrom === 'javlibrary_video') {
-      score += 15;
-    }
-    
-    return Math.min(100, Math.max(0, score));
+  /**
+   * 验证和增强详情数据 - 简化版本，委托给 extractionValidator
+   */
+  validateAndEnhanceDetails(detailInfo, searchResult, detailPageUrl, searchDomain) {
+    const validated = {
+      // 基本信息
+      title: detailInfo.title || searchResult.title || '未知标题',
+      originalTitle: detailInfo.originalTitle || '',
+      code: detailInfo.code || extractionValidator.extractCodeFromUrl(detailPageUrl) || 
+            extractionValidator.extractCodeFromTitle(searchResult.title) || '',
+      
+      // 媒体信息
+      coverImage: extractionValidator.validateImageUrl(detailInfo.coverImage) ? detailInfo.coverImage : '',
+      screenshots: (detailInfo.screenshots || []).filter(url => extractionValidator.validateImageUrl(url)),
+      
+      // 演员信息
+      actresses: detailInfo.actresses || [],
+      director: detailInfo.director || '',
+      studio: detailInfo.studio || '',
+      label: detailInfo.label || '',
+      series: detailInfo.series || '',
+      
+      // 发布信息
+      releaseDate: extractionValidator.validateDate(detailInfo.releaseDate) || '',
+      duration: detailInfo.duration || '',
+      
+      // 技术信息
+      quality: detailInfo.quality || '',
+      fileSize: detailInfo.fileSize || '',
+      resolution: detailInfo.resolution || '',
+      
+      // 下载信息 - 严格过滤，确保域名一致
+      downloadLinks: extractionValidator.validateAndFilterDownloadLinks(detailInfo.downloadLinks || [], searchDomain),
+      magnetLinks: extractionValidator.validateMagnetLinks(detailInfo.magnetLinks || []),
+      
+      // 其他信息
+      description: detailInfo.description || '',
+      tags: detailInfo.tags || [],
+      rating: extractionValidator.validateRating(detailInfo.rating),
+      
+      // 元数据
+      detailUrl: detailPageUrl,
+      searchUrl: searchResult.url,
+      sourceType: detailInfo.sourceType || 'unknown'
+    };
+
+    return validated;
   }
 
-  calculateTextSimilarity(text1, text2) {
-    if (!text1 || !text2) return 0;
-    
-    const words1 = text1.split(/\s+/).filter(w => w.length > 2);
-    const words2 = text2.split(/\s+/).filter(w => w.length > 2);
-    
-    if (words1.length === 0 || words2.length === 0) return 0;
-    
-    const intersection = words1.filter(word => words2.includes(word));
-    const union = [...new Set([...words1, ...words2])];
-    
-    return intersection.length / union.length;
-  }
-
-  isHighQualityDetailUrl(url, source) {
-    const urlLower = url.toLowerCase();
-    
-    if (/[A-Z]{2,6}-?\d{3,6}/i.test(url)) return true;
-    
-    const qualityPatterns = [
-      /\/v\/[a-zA-Z0-9]+/,
-      /\?v=[a-zA-Z0-9]+/,
-      /\/videos\/[^\/]+/,
-      /\/view\/\d+/
-    ];
-    
-    return qualityPatterns.some(pattern => pattern.test(url));
-  }
-
+  /**
+   * 提取搜索关键词 - 简化版本
+   */
   extractSearchKeyword(searchResult) {
     const sources = [
       searchResult.keyword,
@@ -825,12 +325,15 @@ export class DetailExtractorService {
       }
     }
     
-    const urlCode = this.extractCodeFromUrl(searchResult.url);
+    const urlCode = extractionValidator.extractCodeFromUrl(searchResult.url);
     if (urlCode) return urlCode;
     
     return '';
   }
 
+  /**
+   * 获取页面内容 - 简化版本
+   */
   async fetchPageContent(url, timeout) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -892,6 +395,9 @@ export class DetailExtractorService {
     }
   }
 
+  /**
+   * 分析页面内容 - 简化版本
+   */
   analyzePageContent(content, url) {
     const analysis = {
       hasTitle: false,
@@ -955,7 +461,11 @@ export class DetailExtractorService {
     return analysis;
   }
 
-  // 批量提取方法保持不变...
+  // ==================== 批量提取方法 ====================
+
+  /**
+   * 批量提取详情信息 - 保持原有接口
+   */
   async extractBatchDetails(searchResults, options = {}) {
     const {
       enableCache = true,
@@ -1002,7 +512,7 @@ export class DetailExtractorService {
           });
 
           if (enableCache && extractedDetails.extractionStatus === 'success') {
-            await cacheManager.setDetailCache(result.url, extractedDetails, 24 * 60 * 60 * 1000);
+            await cacheManager.setDetailCache(result.url, extractedDetails, CONFIG.DETAIL_EXTRACTION.DEFAULT_CACHE_DURATION);
           }
 
           onProgress && onProgress({
@@ -1049,6 +559,9 @@ export class DetailExtractorService {
     return results;
   }
 
+  /**
+   * 获取提取统计信息
+   */
   getExtractionStats() {
     return {
       totalExtractions: this.totalExtractions || 0,
@@ -1060,5 +573,6 @@ export class DetailExtractorService {
   }
 }
 
+// 创建单例实例
 export const detailExtractor = new DetailExtractorService();
 export default detailExtractor;
