@@ -1,4 +1,4 @@
-// src/services/search-link-extractor.js - 搜索页面详情链接提取服务
+// src/services/search-link-extractor.js - 根据实际搜索数据优化的搜索页面详情链接提取服务
 import { parserRules } from '../config/parser-rules.js';
 import { cloudflareHTMLParser } from '../utils/html-parser.js';
 import { extractionValidator } from './extraction-validator.js';
@@ -6,12 +6,12 @@ import { CONFIG } from '../constants.js';
 
 export class SearchLinkExtractorService {
   constructor() {
-    this.parseTimeout = CONFIG.DETAIL_EXTRACTION.PARSE_TIMEOUT; // 从配置引用
-    this.maxRetries = CONFIG.DETAIL_EXTRACTION.MAX_RETRY_ATTEMPTS; // 从配置引用
+    this.parseTimeout = CONFIG.DETAIL_EXTRACTION.PARSE_TIMEOUT;
+    this.maxRetries = CONFIG.DETAIL_EXTRACTION.MAX_RETRY_ATTEMPTS;
   }
 
   /**
-   * 从搜索页面中提取详情页链接 - 优化版本
+   * 从搜索页面中提取详情页链接 - 根据实际数据优化版本
    * @param {string} htmlContent - 搜索页面HTML内容
    * @param {Object} options - 解析选项
    * @returns {Array} 详情页链接数组
@@ -19,7 +19,7 @@ export class SearchLinkExtractorService {
   async extractDetailLinksFromSearchPage(htmlContent, options = {}) {
     const { sourceType, baseUrl, searchKeyword } = options;
     
-    console.log(`=== 开始提取详情链接 (优化版本) ===`);
+    console.log(`=== 开始提取详情链接 (根据实际数据优化) ===`);
     console.log(`源类型: ${sourceType}`);
     console.log(`基础URL: ${baseUrl}`);
     console.log(`搜索关键词: ${searchKeyword}`);
@@ -31,40 +31,24 @@ export class SearchLinkExtractorService {
       
       console.log(`基础域名: ${baseDomain}`);
 
-      // 获取搜索页面解析规则
-      const searchPageRules = parserRules.getSearchPageRules(sourceType);
-      
-      console.log(`解析规则存在: ${!!searchPageRules}`);
-      console.log(`选择器配置数量: ${searchPageRules?.detailLinkSelectors?.length || 0}`);
-      
-      if (!searchPageRules || !searchPageRules.detailLinkSelectors) {
-        console.warn(`未找到 ${sourceType} 的搜索页面解析规则`);
-        return this.extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword, baseDomain);
-      }
-
-      const detailLinks = [];
-      const selectors = searchPageRules.detailLinkSelectors;
-
-      // 针对不同源类型使用专门的提取策略
+      // 根据不同源类型使用专门的提取策略
       switch (sourceType) {
         case 'javbus':
           return this.extractJavBusDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
         case 'javdb':
           return this.extractJavDBDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
-        case 'javlibrary':
-          return this.extractJavLibraryDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
         case 'jable':
           return this.extractJableDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
-        case 'sukebei':
-          return this.extractSukebeiDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
-        case 'javmost':
-          return this.extractJavMostDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
-        case 'javguru':
-          return this.extractJavGuruDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
         case 'javgg':
           return this.extractJavGGDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
+        case 'javmost':
+          return this.extractJavMostDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
+        case 'sukebei':
+          return this.extractSukebeiDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
+        case 'javguru':
+          return this.extractJavGuruDetailLinks(doc, baseUrl, searchKeyword, baseDomain);
         default:
-          return this.extractWithConfiguredRules(doc, baseUrl, searchKeyword, baseDomain, selectors);
+          return this.extractWithGenericRules(doc, baseUrl, searchKeyword, baseDomain, sourceType);
       }
 
     } catch (error) {
@@ -76,109 +60,7 @@ export class SearchLinkExtractorService {
   }
 
   /**
-   * 使用配置的规则提取详情链接
-   */
-  async extractWithConfiguredRules(doc, baseUrl, searchKeyword, baseDomain, selectors) {
-    const detailLinks = [];
-
-    // 尝试每个选择器配置
-    for (const selectorConfig of selectors) {
-      console.log(`\n--- 尝试选择器: ${selectorConfig.selector} ---`);
-      
-      const links = doc.querySelectorAll(selectorConfig.selector);
-      
-      console.log(`找到 ${links.length} 个候选链接元素`);
-
-      for (const linkElement of links) {
-        let href = linkElement.getAttribute('href');
-        
-        console.log(`原始href: ${href}`);
-        
-        // 兼容 onclick 跳转（如 javbus）
-        if (!href || href === 'javascript:;' || href.startsWith('javascript')) {
-          const onclick = linkElement.getAttribute('onclick');
-          if (onclick) {
-            console.log(`检测到onclick: ${onclick}`);
-            
-            let match = onclick.match(/window\.open\(['"]([^'"]+)['"]/);
-            if (!match) {
-              match = onclick.match(/location\.href\s*=\s*['"]([^'"]+)['"]/);
-            }
-            if (match && match[1]) {
-              href = match[1];
-              console.log(`从onclick提取href: ${href}`);
-            }
-          }
-        }
-        
-        if (!href) {
-          console.log(`跳过: href为空`);
-          continue;
-        }
-
-        // 构建完整URL
-        const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
-        
-        console.log(`完整URL: ${fullUrl}`);
-
-        // 增强版链接有效性验证
-        const isValid = this.isValidDetailLink(fullUrl, selectorConfig, sourceType, baseDomain, baseUrl);
-        
-        console.log(`链接有效性: ${isValid}`);
-        if (!isValid) {
-          console.log(`跳过: 链接验证失败`);
-          continue;
-        }
-
-        // 提取链接相关信息
-        const linkInfo = this.extractLinkInfo(linkElement, selectorConfig, searchKeyword);
-        
-        console.log(`链接信息:`, linkInfo);
-        
-        if (linkInfo) {
-          const detailLink = {
-            url: fullUrl,
-            ...linkInfo
-          };
-          
-          detailLinks.push(detailLink);
-          
-          console.log(`✅ 成功添加详情链接: ${fullUrl}`);
-          console.log(`  标题: ${linkInfo.title}`);
-          console.log(`  番号: ${linkInfo.code}`);
-          console.log(`  匹配分数: ${linkInfo.score}`);
-        }
-      }
-
-      // 如果找到链接就停止，避免重复
-      if (detailLinks.length > 0) {
-        console.log(`使用选择器 ${selectorConfig.selector} 找到 ${detailLinks.length} 个详情链接`);
-        break;
-      } else {
-        console.log(`选择器 ${selectorConfig.selector} 未找到有效链接`);
-      }
-    }
-
-    // 所有选择器尝试完毕
-    if (detailLinks.length === 0) {
-      console.log('使用通用规则提取详情链接');
-      return this.extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword, baseDomain);
-    }
-
-    // 按匹配分数排序，优选最佳匹配
-    detailLinks.sort((a, b) => (b.score || 0) - (a.score || 0));
-
-    console.log(`=== 详情链接提取完成 ===`);
-    console.log(`总共找到 ${detailLinks.length} 个详情链接:`);
-    detailLinks.forEach((link, index) => {
-      console.log(`  ${index + 1}. ${link.url} (${link.title}) [${link.score}分]`);
-    });
-
-    return detailLinks;
-  }
-
-  /**
-   * JavBus专用详情链接提取 - 优化版本
+   * JavBus专用详情链接提取 - 根据实际数据 /IPX-156
    */
   extractJavBusDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
     console.log('=== JavBus专用提取开始 ===');
@@ -204,12 +86,12 @@ export class SearchLinkExtractorService {
         const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
         
         // 验证域名一致性 - 支持子域名
-        if (!extractionValidator.isDomainOrSubdomainMatch(fullUrl, baseDomain)) {
+        if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) {
           console.log(`跳过不同域名: ${fullUrl}`);
           return;
         }
         
-        // JavBus详情页必须包含番号路径
+        // JavBus详情页必须是番号路径：/IPX-156
         if (!/\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(fullUrl)) {
           console.log(`跳过非详情页: ${fullUrl}`);
           return;
@@ -259,7 +141,7 @@ export class SearchLinkExtractorService {
           const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
           
           // 验证域名和格式
-          if (extractionValidator.isDomainOrSubdomainMatch(fullUrl, baseDomain) && 
+          if (extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain) && 
               /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(fullUrl) &&
               !extractionValidator.containsSearchIndicators(fullUrl) &&
               extractionValidator.normalizeUrl(fullUrl) !== extractionValidator.normalizeUrl(baseUrl)) {
@@ -292,7 +174,7 @@ export class SearchLinkExtractorService {
   }
 
   /**
-   * JavDB专用详情链接提取 - 优化版本
+   * JavDB专用详情链接提取 - 根据实际数据 /v/KkZ97
    */
   extractJavDBDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
     console.log('=== JavDB专用提取开始 ===');
@@ -318,7 +200,7 @@ export class SearchLinkExtractorService {
           const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
           
           // 验证域名一致性 - 支持子域名
-          if (!extractionValidator.isDomainOrSubdomainMatch(fullUrl, baseDomain)) {
+          if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) {
             console.log(`跳过不同域名: ${fullUrl}`);
             return;
           }
@@ -329,8 +211,8 @@ export class SearchLinkExtractorService {
             return;
           }
           
-          // JavDB详情页格式验证
-          if (!/\/v\/[a-zA-Z0-9]+/.test(href) && !/\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(href)) {
+          // JavDB详情页格式验证：/v/xxxx
+          if (!/\/v\/[a-zA-Z0-9]+/.test(href)) {
             console.log(`跳过非详情格式: ${fullUrl}`);
             return;
           }
@@ -371,77 +253,7 @@ export class SearchLinkExtractorService {
   }
 
   /**
-   * JavLibrary专用详情链接提取 - 优化版本
-   */
-  extractJavLibraryDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
-    console.log('=== JavLibrary专用提取开始 ===');
-    const detailLinks = [];
-    
-    try {
-      // JavLibrary的视频选择器
-      const videoSelectors = [
-        '.videos .video a',
-        '.video-title a',
-        'a[href*="?v="]'
-      ];
-      
-      for (const selector of videoSelectors) {
-        const links = doc.querySelectorAll(selector);
-        console.log(`选择器 ${selector} 找到 ${links.length} 个链接`);
-        
-        links.forEach(link => {
-          const href = link.getAttribute('href');
-          if (!href || href.includes('vl_searchbyid')) return;
-          
-          const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
-          
-          // 验证域名一致性 - 支持子域名
-          if (!extractionValidator.isDomainOrSubdomainMatch(fullUrl, baseDomain)) {
-            console.log(`跳过不同域名: ${fullUrl}`);
-            return;
-          }
-          
-          // 确保不是搜索URL本身
-          if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) {
-            console.log(`跳过相同URL: ${fullUrl}`);
-            return;
-          }
-          
-          // JavLibrary详情页格式验证
-          if (!fullUrl.includes('?v=')) {
-            console.log(`跳过非详情格式: ${fullUrl}`);
-            return;
-          }
-          
-          const title = link.textContent?.trim() || link.getAttribute('title') || '';
-          const code = extractionValidator.extractCodeFromText(title) || extractionValidator.extractCodeFromText(fullUrl);
-          const score = this.calculateMatchScore(title, code, searchKeyword);
-          
-          detailLinks.push({
-            url: fullUrl,
-            title: title || '未知标题',
-            code: code || '',
-            score,
-            extractedFrom: 'javlibrary_video'
-          });
-        });
-        
-        if (detailLinks.length > 0) break;
-      }
-      
-    } catch (error) {
-      console.error('JavLibrary专用提取失败:', error);
-    }
-    
-    const uniqueLinks = this.removeDuplicateLinks(detailLinks);
-    uniqueLinks.sort((a, b) => (b.score || 0) - (a.score || 0));
-    
-    console.log(`JavLibrary提取完成，找到 ${uniqueLinks.length} 个有效链接`);
-    return uniqueLinks;
-  }
-
-  /**
-   * Jable专用详情链接提取 - 增强版本
+   * Jable专用详情链接提取 - 根据实际数据 /videos/ipx-156/
    */
   extractJableDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
     console.log('=== Jable专用提取开始 ===');
@@ -472,6 +284,8 @@ export class SearchLinkExtractorService {
           }
           
           if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) return;
+          
+          // Jable详情页格式：/videos/xxx
           if (!(/\/videos\/[^\/\?]+/.test(fullUrl))) return;
           if (extractionValidator.containsSearchIndicators(fullUrl)) return;
           
@@ -504,7 +318,7 @@ export class SearchLinkExtractorService {
   }
 
   /**
-   * JavGG专用详情链接提取 - 新增方法
+   * JavGG专用详情链接提取 - 根据实际数据 /jav/ipx-156-reduce-mosaic/
    */
   extractJavGGDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
     console.log('=== JavGG专用提取开始 ===');
@@ -529,7 +343,7 @@ export class SearchLinkExtractorService {
           const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
           
           // 验证域名一致性
-          if (!extractionValidator.isDomainMatch(fullUrl, baseDomain)) {
+          if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) {
             console.log(`跳过不同域名: ${fullUrl}`);
             return;
           }
@@ -540,8 +354,8 @@ export class SearchLinkExtractorService {
             return;
           }
           
-          // JavGG详情页格式验证
-          if (!/\/jav\/[A-Z]{2,6}-?\d{3,6}[^\/]*\/?/i.test(fullUrl)) {
+          // JavGG详情页格式验证：/jav/xxx
+          if (!/\/jav\/[a-z0-9\-]+/i.test(fullUrl)) {
             console.log(`跳过非详情格式: ${fullUrl}`);
             return;
           }
@@ -587,62 +401,7 @@ export class SearchLinkExtractorService {
   }
 
   /**
-   * Sukebei专用详情链接提取 - 新增方法
-   */
-  extractSukebeiDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
-    console.log('=== Sukebei专用提取开始 ===');
-    const detailLinks = [];
-    
-    try {
-      const torrentSelectors = [
-        'tr td:first-child a',
-        '.torrent-name a',
-        'a[href*="/view/"]'
-      ];
-      
-      for (const selector of torrentSelectors) {
-        const links = doc.querySelectorAll(selector);
-        console.log(`选择器 ${selector} 找到 ${links.length} 个链接`);
-        
-        links.forEach(link => {
-          const href = link.getAttribute('href');
-          if (!href) return;
-          
-          const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
-          
-          if (!extractionValidator.isDomainOrSubdomainMatch(fullUrl, baseDomain)) return;
-          if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) return;
-          if (!(/\/view\/\d+/.test(fullUrl))) return;
-          
-          const title = link.textContent?.trim() || link.getAttribute('title') || '';
-          const code = extractionValidator.extractCodeFromText(title) || extractionValidator.extractCodeFromText(fullUrl);
-          const score = this.calculateMatchScore(title, code, searchKeyword);
-          
-          detailLinks.push({
-            url: fullUrl,
-            title: title || '未知标题',
-            code: code || '',
-            score,
-            extractedFrom: 'sukebei_torrent'
-          });
-        });
-        
-        if (detailLinks.length > 0) break;
-      }
-      
-    } catch (error) {
-      console.error('Sukebei专用提取失败:', error);
-    }
-    
-    const uniqueLinks = this.removeDuplicateLinks(detailLinks);
-    uniqueLinks.sort((a, b) => (b.score || 0) - (a.score || 0));
-    
-    console.log(`Sukebei提取完成，找到 ${uniqueLinks.length} 个有效链接`);
-    return uniqueLinks;
-  }
-
-  /**
-   * JavMost专用详情链接提取 - 支持子域名
+   * JavMost专用详情链接提取 - 根据实际数据 /IPX-156/ （支持子域名）
    */
   extractJavMostDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
     console.log('=== JavMost专用提取开始 ===');
@@ -665,7 +424,7 @@ export class SearchLinkExtractorService {
           
           const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
           
-          // JavMost支持子域名检查
+          // JavMost支持子域名检查（重要：www5.javmost.com）
           const linkDomain = extractionValidator.extractDomain(fullUrl);
           if (!extractionValidator.isDomainOrSubdomain(linkDomain, 'javmost.com')) {
             console.log(`跳过非JavMost域名: ${linkDomain}`);
@@ -675,7 +434,7 @@ export class SearchLinkExtractorService {
           if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) return;
           if (extractionValidator.containsSearchIndicators(fullUrl)) return;
           
-          // JavMost通常包含番号或特定路径
+          // JavMost详情页格式：/IPX-156/
           const hasCodePattern = /\/[A-Z]{2,6}-?\d{3,6}[^\/]*(?:\/|$)/i.test(fullUrl);
           if (!hasCodePattern) return;
           
@@ -707,7 +466,64 @@ export class SearchLinkExtractorService {
   }
 
   /**
-   * JavGuru专用详情链接提取 - 新增方法
+   * Sukebei专用详情链接提取 - 根据实际数据 /view/3403743
+   */
+  extractSukebeiDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
+    console.log('=== Sukebei专用提取开始 ===');
+    const detailLinks = [];
+    
+    try {
+      const torrentSelectors = [
+        'tr td:first-child a',
+        '.torrent-name a',
+        'a[href*="/view/"]'
+      ];
+      
+      for (const selector of torrentSelectors) {
+        const links = doc.querySelectorAll(selector);
+        console.log(`选择器 ${selector} 找到 ${links.length} 个链接`);
+        
+        links.forEach(link => {
+          const href = link.getAttribute('href');
+          if (!href) return;
+          
+          const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
+          
+          if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) return;
+          if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) return;
+          
+          // Sukebei详情页格式：/view/数字
+          if (!(/\/view\/\d+/.test(fullUrl))) return;
+          
+          const title = link.textContent?.trim() || link.getAttribute('title') || '';
+          const code = extractionValidator.extractCodeFromText(title) || extractionValidator.extractCodeFromText(fullUrl);
+          const score = this.calculateMatchScore(title, code, searchKeyword);
+          
+          detailLinks.push({
+            url: fullUrl,
+            title: title || '未知标题',
+            code: code || '',
+            score,
+            extractedFrom: 'sukebei_torrent'
+          });
+        });
+        
+        if (detailLinks.length > 0) break;
+      }
+      
+    } catch (error) {
+      console.error('Sukebei专用提取失败:', error);
+    }
+    
+    const uniqueLinks = this.removeDuplicateLinks(detailLinks);
+    uniqueLinks.sort((a, b) => (b.score || 0) - (a.score || 0));
+    
+    console.log(`Sukebei提取完成，找到 ${uniqueLinks.length} 个有效链接`);
+    return uniqueLinks;
+  }
+
+  /**
+   * JavGuru专用详情链接提取 - 根据实际数据 /268681/ipx-156-sana-matsunaga...
    */
   extractJavGuruDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
     console.log('=== JavGuru专用提取开始 ===');
@@ -717,9 +533,8 @@ export class SearchLinkExtractorService {
       const videoSelectors = [
         '.video-item a',
         '.movie-item a',
-        'a[href*="/watch/"]',
-        'a[href*="/video/"]',
-        'a[href*="/play/"]'
+        'a[href]:not([href*="?s="])',
+        'a[href*="/"][href]:not([href*="/search"])'
       ];
       
       for (const selector of videoSelectors) {
@@ -732,13 +547,12 @@ export class SearchLinkExtractorService {
           
           const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
           
-          if (!extractionValidator.isDomainOrSubdomainMatch(fullUrl, baseDomain)) return;
+          if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) return;
           if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) return;
           if (extractionValidator.containsSearchIndicators(fullUrl)) return;
           
-          // JavGuru的详情页特征
-          const hasDetailPattern = /\/(watch|video|play)\//.test(fullUrl.toLowerCase()) || 
-                                 /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(fullUrl);
+          // JavGuru的详情页面特征：/数字/描述
+          const hasDetailPattern = /\/\d+\/[a-z0-9\-]+/i.test(fullUrl);
           if (!hasDetailPattern) return;
           
           const title = link.textContent?.trim() || link.getAttribute('title') || '';
@@ -771,86 +585,152 @@ export class SearchLinkExtractorService {
   /**
    * 使用通用规则提取详情链接 - 优化版本
    */
-  extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword, baseDomain) {
+  extractWithGenericRules(doc, baseUrl, searchKeyword, baseDomain, sourceType) {
     console.log('=== 使用通用规则提取详情链接 ===');
     const detailLinks = [];
-    const maxGenericLinks = CONFIG.DETAIL_EXTRACTION.MAX_GENERIC_LINKS_PER_PAGE; // 从配置引用
+    const maxGenericLinks = CONFIG.DETAIL_EXTRACTION.MAX_GENERIC_LINKS_PER_PAGE;
     
     try {
-      // 通用选择器列表 - 更严格的顺序
-      const genericSelectors = [
-        // 优先查找包含番号的链接
-        'a[href*="/"][href]:not([href*="/search"]):not([href*="/page"])',
-        // 然后查找带标题的链接
-        'a[href*="/"][title]:not([href*="/search"])',
-        // 最后查找容器内的链接
-        '.item a, .movie a, .video a, .result a'
-      ];
-
-      for (const selector of genericSelectors) {
-        console.log(`尝试通用选择器: ${selector}`);
-        const links = doc.querySelectorAll(selector);
-        console.log(`找到 ${links.length} 个候选链接`);
+      // 获取解析规则
+      const searchPageRules = parserRules.getSearchPageRules(sourceType);
+      
+      if (searchPageRules && searchPageRules.detailLinkSelectors) {
+        console.log('使用配置的解析规则');
         
-        let processedCount = 0;
-        for (const link of links) {
-          // 限制处理数量以提高性能
-          if (processedCount >= maxGenericLinks) {
-            console.log(`已达到通用链接处理限制 (${maxGenericLinks})，停止处理`);
-            break;
-          }
+        // 尝试每个选择器配置
+        for (const selectorConfig of searchPageRules.detailLinkSelectors) {
+          console.log(`\n--- 尝试选择器: ${selectorConfig.selector} ---`);
           
-          const href = link.getAttribute('href');
-          if (!href) continue;
+          const links = doc.querySelectorAll(selectorConfig.selector);
+          console.log(`找到 ${links.length} 个候选链接元素`);
 
-          const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
-          
-          // 域名验证 - 支持子域名
-          if (!extractionValidator.isDomainOrSubdomainMatch(fullUrl, baseDomain)) {
-            console.log(`跳过不同域名: ${fullUrl}`);
-            continue;
-          }
-          
-          // 确保不是搜索URL本身
-          if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) {
-            console.log(`跳过相同URL: ${fullUrl}`);
-            continue;
-          }
-          
-          // 简单验证
-          if (!this.isGenericDetailLink(fullUrl)) {
-            console.log(`跳过非详情链接: ${fullUrl}`);
-            continue;
-          }
+          for (const linkElement of links) {
+            let href = linkElement.getAttribute('href');
+            
+            // 兼容 onclick 跳转（如 javbus）
+            if (!href || href === 'javascript:;' || href.startsWith('javascript')) {
+              const onclick = linkElement.getAttribute('onclick');
+              if (onclick) {
+                let match = onclick.match(/window\.open\(['"]([^'"]+)['"]/);
+                if (!match) {
+                  match = onclick.match(/location\.href\s*=\s*['"]([^'"]+)['"]/);
+                }
+                if (match && match[1]) {
+                  href = match[1];
+                }
+              }
+            }
+            
+            if (!href) continue;
 
-          const title = link.getAttribute('title') || link.textContent?.trim() || '';
-          const code = extractionValidator.extractCodeFromText(title) || extractionValidator.extractCodeFromText(fullUrl);
-          
-          // 如果有搜索关键词，只保留相关的链接
-          if (searchKeyword) {
-            const score = this.calculateMatchScore(title, code, searchKeyword);
-            if (score < 20) {
-              console.log(`跳过低分链接: ${fullUrl} (${score}分)`);
-              continue; // 分数太低，跳过
+            // 构建完整URL
+            const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
+            
+            // 增强版链接有效性验证
+            const isValid = this.isValidDetailLink(fullUrl, selectorConfig, sourceType, baseDomain, baseUrl);
+            
+            if (!isValid) continue;
+
+            // 提取链接相关信息
+            const linkInfo = this.extractLinkInfo(linkElement, selectorConfig, searchKeyword);
+            
+            if (linkInfo) {
+              const detailLink = {
+                url: fullUrl,
+                ...linkInfo
+              };
+              
+              detailLinks.push(detailLink);
+              
+              console.log(`✅ 成功添加详情链接: ${fullUrl}`);
+              console.log(`  标题: ${linkInfo.title}`);
+              console.log(`  番号: ${linkInfo.code}`);
+              console.log(`  匹配分数: ${linkInfo.score}`);
             }
           }
 
-          detailLinks.push({
-            url: fullUrl,
-            title: title || '未知标题',
-            code: code || '',
-            score: searchKeyword ? this.calculateMatchScore(title, code, searchKeyword) : 50,
-            extractedFrom: 'generic'
-          });
-          
-          processedCount++;
+          // 如果找到链接就停止，避免重复
+          if (detailLinks.length > 0) {
+            console.log(`使用选择器 ${selectorConfig.selector} 找到 ${detailLinks.length} 个详情链接`);
+            break;
+          }
         }
-
-        if (detailLinks.length > 0) break; // 找到就停止
       }
 
-      // 按分数排序
-      detailLinks.sort((a, b) => (b.score || 0) - (a.score || 0));
+      // 如果配置规则没找到，使用通用选择器
+      if (detailLinks.length === 0) {
+        console.log('使用通用选择器提取详情链接');
+        
+        const genericSelectors = [
+          // 优先查找包含番号的链接
+          'a[href*="/"][href]:not([href*="/search"]):not([href*="/page"])',
+          // 然后查找带标题的链接
+          'a[href*="/"][title]:not([href*="/search"])',
+          // 最后查找容器内的链接
+          '.item a, .movie a, .video a, .result a'
+        ];
+
+        for (const selector of genericSelectors) {
+          console.log(`尝试通用选择器: ${selector}`);
+          const links = doc.querySelectorAll(selector);
+          console.log(`找到 ${links.length} 个候选链接`);
+          
+          let processedCount = 0;
+          for (const link of links) {
+            // 限制处理数量以提高性能
+            if (processedCount >= maxGenericLinks) {
+              console.log(`已达到通用链接处理限制 (${maxGenericLinks})，停止处理`);
+              break;
+            }
+            
+            const href = link.getAttribute('href');
+            if (!href) continue;
+
+            const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
+            
+            // 域名验证 - 支持子域名
+            if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) {
+              continue;
+            }
+            
+            // 确保不是搜索URL本身
+            if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) {
+              continue;
+            }
+            
+            // 简单验证
+            if (!this.isGenericDetailLink(fullUrl)) {
+              continue;
+            }
+
+            const title = link.getAttribute('title') || link.textContent?.trim() || '';
+            const code = extractionValidator.extractCodeFromText(title) || extractionValidator.extractCodeFromText(fullUrl);
+            
+            // 如果有搜索关键词，只保留相关的链接
+            if (searchKeyword) {
+              const score = this.calculateMatchScore(title, code, searchKeyword);
+              if (score < 20) {
+                continue; // 分数太低，跳过
+              }
+            }
+
+            detailLinks.push({
+              url: fullUrl,
+              title: title || '未知标题',
+              code: code || '',
+              score: searchKeyword ? this.calculateMatchScore(title, code, searchKeyword) : 50,
+              extractedFrom: 'generic'
+            });
+            
+            processedCount++;
+          }
+
+          if (detailLinks.length > 0) break; // 找到就停止
+        }
+
+        // 按分数排序
+        detailLinks.sort((a, b) => (b.score || 0) - (a.score || 0));
+      }
       
     } catch (error) {
       console.error('通用规则提取详情链接失败:', error);
@@ -884,10 +764,10 @@ export class SearchLinkExtractorService {
     const detailPatterns = [
       /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i,  // 直接番号路径
       /\/v\/[a-zA-Z0-9]+/,               // JavDB格式
-      /\?v=[a-zA-Z0-9]+/,                // JavLibrary格式
       /\/videos\/[^\/]+/,                // Jable格式
       /\/jav\/[^\/]+/,                   // JavGG格式
       /\/view\/\d+/,                     // Sukebei格式
+      /\/\d+\/[a-z0-9\-]+/i,            // JavGuru格式
       /\/(watch|play|video|movie)\//     // 通用视频页面
     ];
     
@@ -910,13 +790,13 @@ export class SearchLinkExtractorService {
           pattern.test && pattern.test(urlDomain)
         );
         if (!domainMatches) {
-          console.log(`⌧ 域名不匹配模式: ${urlDomain}`);
+          console.log(`⌐ 域名不匹配模式: ${urlDomain}`);
           return false;
         }
       } else if (selectorConfig.strictDomainCheck !== false) {
         // 标准域名检查 - 支持子域名
         if (!extractionValidator.isDomainOrSubdomain(urlDomain, expectedDomain)) {
-          console.log(`⌧ 域名不匹配: ${urlDomain} != ${expectedDomain}`);
+          console.log(`⌐ 域名不匹配: ${urlDomain} != ${expectedDomain}`);
           return false;
         }
       }
@@ -924,18 +804,18 @@ export class SearchLinkExtractorService {
     
     // 2. 确保不是搜索URL本身
     if (extractionValidator.normalizeUrl(url) === extractionValidator.normalizeUrl(baseUrl)) {
-      console.log(`⌧ 与搜索URL相同: ${url}`);
+      console.log(`⌐ 与搜索URL相同: ${url}`);
       return false;
     }
     
     // 3. 检查搜索指示器
     if (extractionValidator.containsSearchIndicators(url)) {
-      console.log(`⌧ 包含搜索指示器: ${url}`);
+      console.log(`⌐ 包含搜索指示器: ${url}`);
       return false;
     }
     
     // 4. 根据源类型进行专门验证
-    return extractionValidator.isValidDetailPageUrl(url, sourceType, expectedDomain);
+    return extractionValidator.isDetailPageUrl(url, sourceType, expectedDomain);
   }
 
   /**
@@ -945,7 +825,7 @@ export class SearchLinkExtractorService {
     try {
       let title = '';
       let code = '';
-      let score = 0; // 匹配分数
+      let score = 0;
 
       // 提取标题
       if (selectorConfig.titleAttribute) {

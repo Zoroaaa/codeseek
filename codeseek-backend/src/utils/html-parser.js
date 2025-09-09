@@ -1,10 +1,10 @@
-// src/utils/html-parser.js - 优化版本：平衡的HTML解析，避免过严验证误杀有效链接
+// src/utils/html-parser.js - 根据实际搜索数据优化的HTML解析器
 import { CONFIG } from '../constants.js';
 
 export class CloudflareHTMLParser {
   constructor() {
     this.elementCache = new Map();
-    this.maxCacheSize = CONFIG.DETAIL_EXTRACTION.HTML_PARSER_CACHE_SIZE; // 从配置引用
+    this.maxCacheSize = CONFIG.DETAIL_EXTRACTION.HTML_PARSER_CACHE_SIZE;
     this.debugMode = false;
   }
 
@@ -27,7 +27,7 @@ class CloudflareDocument {
   constructor(html) {
     this.html = html || '';
     this.elementCache = new Map();
-    this.maxCacheSize = CONFIG.DETAIL_EXTRACTION.HTML_PARSER_CACHE_SIZE; // 从配置引用
+    this.maxCacheSize = CONFIG.DETAIL_EXTRACTION.HTML_PARSER_CACHE_SIZE;
   }
 
   querySelector(selector) {
@@ -59,16 +59,16 @@ class CloudflareDocument {
     
     // 根据选择器类型选择解析策略
     if (selector.includes('.movie-box')) {
-      this._parseMovieBoxLinks(elements);
+      this._parseJavBusMovieBox(elements);
     }
     else if (selector.includes('.movie-list') || selector.includes('.grid-item') || selector.includes('.video-node')) {
-      this._parseJavDBLinks(elements);
+      this._parseJavDBContainers(elements);
     }
     else if (selector.includes('.video-item') || selector.includes('.list-videos')) {
-      this._parseJableLinks(elements);
+      this._parseJableContainers(elements);
     }
     else if (selector.includes('tr td:first-child') || selector.includes('.torrent-name')) {
-      this._parseSukebeiLinks(elements);
+      this._parseSukebeiTorrents(elements);
     }
     else if (selector.startsWith('a[href') || (selector.includes('a') && selector.includes('[href'))) {
       this._parseGenericLinks(elements, selector);
@@ -85,14 +85,14 @@ class CloudflareDocument {
   }
 
   /**
-   * JavBus movie-box 解析 - 修复版本
+   * JavBus movie-box 解析 - 根据实际数据优化
    */
-  _parseMovieBoxLinks(elements) {
+  _parseJavBusMovieBox(elements) {
     console.log('开始解析JavBus movie-box链接...');
     
-    // 方法1: 匹配 <a class="movie-box"> 结构（修复后）
+    // JavBus的movie-box结构模式
     const movieBoxPatterns = [
-      // 主要模式：<a class="movie-box" href="...">
+      // 主要模式：<a class="movie-box" href="/IPX-156">
       /<a[^>]*class="[^"]*movie-box[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi,
       // 备用模式：href在class之前
       /<a[^>]*href="([^"]+)"[^>]*class="[^"]*movie-box[^"]*"[^>]*>([\s\S]*?)<\/a>/gi
@@ -109,8 +109,8 @@ class CloudflareDocument {
         
         console.log(`检查movie-box链接: ${href}`);
         
-        // 宽松但合理的验证
-        if (this._isValidMovieLink(href, content, 'javbus')) {
+        // JavBus详情页验证：必须是 /番号 格式
+        if (this._isValidJavBusLink(href, content)) {
           const element = this._createMovieElement(href, content, match[0]);
           elements.push(element);
           console.log(`✓ 添加JavBus movie-box链接: ${href}`);
@@ -119,13 +119,13 @@ class CloudflareDocument {
         }
       }
       
-      if (foundAny) break; // 找到就停止尝试其他模式
+      if (foundAny) break;
     }
 
     // 如果没找到，尝试更宽松的匹配
     if (!foundAny) {
       console.log('尝试宽松匹配...');
-      this._parseMovieBoxLinksLoose(elements);
+      this._parseJavBusLinksLoose(elements);
     }
 
     console.log(`JavBus解析找到 ${elements.length} 个有效链接`);
@@ -134,9 +134,9 @@ class CloudflareDocument {
   /**
    * JavBus 宽松匹配（后备方案）
    */
-  _parseMovieBoxLinksLoose(elements) {
+  _parseJavBusLinksLoose(elements) {
     // 查找任何包含番号的javbus链接
-    const loosePattern = /<a[^>]*href="([^"]*(?:javbus\.com\/|\/)[A-Z]{2,6}-?\d{3,6}[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+    const loosePattern = /<a[^>]*href="([^"]*\/[A-Z]{2,6}-?\d{3,6}[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
     let match;
     
     while ((match = loosePattern.exec(this.html)) !== null) {
@@ -152,10 +152,10 @@ class CloudflareDocument {
   }
 
   /**
-   * JavDB 链接解析 - 优化版本
+   * JavDB 容器解析 - 根据实际数据优化
    */
-  _parseJavDBLinks(elements) {
-    console.log('开始解析JavDB链接...');
+  _parseJavDBContainers(elements) {
+    console.log('开始解析JavDB容器链接...');
     
     const containerPatterns = [
       // movie-list容器
@@ -187,10 +187,8 @@ class CloudflareDocument {
    */
   _parseJavDBDirectLinks(elements) {
     const directPatterns = [
-      // /v/ 格式的链接
-      /<a[^>]*href="([^"]*\/v\/[a-zA-Z0-9]+[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
-      // 包含番号的链接
-      /<a[^>]*href="([^"]*javdb[^"]*\/[A-Z]{2,6}-?\d{3,6}[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi
+      // /v/ 格式的链接 - JavDB的实际格式
+      /<a[^>]*href="([^"]*\/v\/[a-zA-Z0-9]+[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi
     ];
 
     for (const pattern of directPatterns) {
@@ -199,7 +197,7 @@ class CloudflareDocument {
         const href = match[1];
         const content = match[2];
         
-        if (this._isValidMovieLink(href, content, 'javdb')) {
+        if (this._isValidJavDBLink(href, content)) {
           const element = this._createMovieElement(href, content, match[0]);
           elements.push(element);
           console.log(`✓ JavDB直接匹配: ${href}`);
@@ -209,10 +207,10 @@ class CloudflareDocument {
   }
 
   /**
-   * Jable 链接解析 - 优化版本
+   * Jable 容器解析 - 根据实际数据优化
    */
-  _parseJableLinks(elements) {
-    console.log('开始解析Jable链接...');
+  _parseJableContainers(elements) {
+    console.log('开始解析Jable容器链接...');
     
     const containerPatterns = [
       /<div[^>]*class="[^"]*video-item[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
@@ -227,7 +225,7 @@ class CloudflareDocument {
       }
     }
 
-    // 直接匹配 /videos/ 链接
+    // 直接匹配 /videos/ 链接 - Jable的实际格式
     if (elements.length === 0) {
       const directPattern = /<a[^>]*href="([^"]*\/videos\/[^\/\?"]+[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
       let match;
@@ -236,7 +234,7 @@ class CloudflareDocument {
         const href = match[1];
         const content = match[2];
         
-        if (this._isValidMovieLink(href, content, 'jable')) {
+        if (this._isValidJableLink(href, content)) {
           const element = this._createMovieElement(href, content, match[0]);
           elements.push(element);
           console.log(`✓ Jable直接匹配: ${href}`);
@@ -248,10 +246,10 @@ class CloudflareDocument {
   }
 
   /**
-   * Sukebei 链接解析 - 优化版本
+   * Sukebei 种子解析 - 根据实际数据优化
    */
-  _parseSukebeiLinks(elements) {
-    console.log('开始解析Sukebei链接...');
+  _parseSukebeiTorrents(elements) {
+    console.log('开始解析Sukebei种子链接...');
     
     // 方法1: 表格行匹配
     const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
@@ -269,7 +267,7 @@ class CloudflareDocument {
       }
     }
 
-    // 方法2: 直接匹配 /view/ 链接
+    // 方法2: 直接匹配 /view/ 链接 - Sukebei的实际格式
     if (elements.length === 0) {
       const directPattern = /<a[^>]*href="([^"]*\/view\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
       let directMatch;
@@ -278,7 +276,7 @@ class CloudflareDocument {
         const href = directMatch[1];
         const content = directMatch[2];
         
-        if (this._isValidMovieLink(href, content, 'sukebei')) {
+        if (this._isValidSukebeiLink(href, content)) {
           const element = this._createMovieElement(href, content, directMatch[0]);
           elements.push(element);
           console.log(`✓ Sukebei直接匹配: ${href}`);
@@ -290,7 +288,7 @@ class CloudflareDocument {
   }
 
   /**
-   * 通用链接解析 - 平衡版本
+   * 通用链接解析 - 根据实际数据平衡版本
    */
   _parseGenericLinks(elements, selector) {
     console.log(`开始解析通用链接，选择器: ${selector}`);
@@ -311,9 +309,9 @@ class CloudflareDocument {
     for (const pattern of patterns) {
       let match;
       let count = 0;
-      const maxLinks = CONFIG.DETAIL_EXTRACTION.MAX_GENERIC_LINKS_PER_PAGE; // 从配置引用
+      const maxLinks = CONFIG.DETAIL_EXTRACTION.MAX_GENERIC_LINKS_PER_PAGE;
       
-      while ((match = pattern.exec(this.html)) !== null && count < maxLinks) { // 限制数量防性能问题
+      while ((match = pattern.exec(this.html)) !== null && count < maxLinks) {
         count++;
         const href = match[1];
         const content = match[3] || match[2];
@@ -430,7 +428,7 @@ class CloudflareDocument {
    */
   _isNavigationText(text) {
     const navTexts = [
-      'english', '中文', '日本語', '한국의', '有碼', '無碼', '女優', '類別',
+      'english', '中文', '日本語', '한국어', '有碼', '無碼', '女優', '類別',
       '論壇', '下一页', '上一页', '首页', 'next', 'prev', 'page', 'home',
       'login', 'register', 'terms', 'privacy', 'contact', 'about', 'help'
     ];
@@ -441,7 +439,7 @@ class CloudflareDocument {
   }
 
   /**
-   * 验证电影链接 - 平衡版本（不过严也不过松）
+   * 验证电影链接 - 根据实际数据平衡版本
    */
   _isValidMovieLink(href, content, sourceType) {
     if (!href || typeof href !== 'string') return false;
@@ -469,27 +467,33 @@ class CloudflareDocument {
         return this._isValidJableLink(href, content);
       case 'sukebei':
         return this._isValidSukebeiLink(href, content);
+      case 'javgg':
+        return this._isValidJavGGLink(href, content);
+      case 'javmost':
+        return this._isValidJavMostLink(href, content);
+      case 'javguru':
+        return this._isValidJavGuruLink(href, content);
       default:
         return this._isValidGenericLink(href, content);
     }
   }
 
   /**
-   * JavBus链接验证 - 平衡版本
+   * JavBus链接验证 - 根据实际数据 /IPX-156
    */
   _isValidJavBusLink(href, content) {
-    // 必须包含番号或者是已知的详情页格式
-    const hasCode = /[A-Z]{2,6}-?\d{3,6}/i.test(href);
-    const isDomainOk = !href.startsWith('http') || href.includes('javbus') || href.includes('www.javbus');
+    // 必须包含番号路径：/IPX-156
+    const hasCode = /\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(href);
+    const isDomainOk = !href.startsWith('http') || href.includes('javbus');
     
     return hasCode && isDomainOk;
   }
 
   /**
-   * JavDB链接验证 - 平衡版本
+   * JavDB链接验证 - 根据实际数据 /v/KkZ97
    */
   _isValidJavDBLink(href, content) {
-    const isDetailFormat = /\/v\/[a-zA-Z0-9]+/.test(href) || /[A-Z]{2,6}-?\d{3,6}/i.test(href);
+    const isDetailFormat = /\/v\/[a-zA-Z0-9]+/.test(href);
     const isDomainOk = !href.startsWith('http') || href.includes('javdb');
     const notSearchPage = !href.includes('/search') && !href.includes('/actors');
     
@@ -497,7 +501,7 @@ class CloudflareDocument {
   }
 
   /**
-   * Jable链接验证 - 平衡版本（支持子域名）
+   * Jable链接验证 - 根据实际数据 /videos/ipx-156/
    */
   _isValidJableLink(href, content) {
     const isVideoFormat = /\/videos\/[^\/\?]+/.test(href);
@@ -508,13 +512,46 @@ class CloudflareDocument {
   }
 
   /**
-   * Sukebei链接验证 - 平衡版本
+   * Sukebei链接验证 - 根据实际数据 /view/3403743
    */
   _isValidSukebeiLink(href, content) {
     const isDetailFormat = /\/view\/\d+/.test(href) || /[A-Z]{2,6}-?\d{3,6}/i.test(content);
     const isDomainOk = !href.startsWith('http') || href.includes('sukebei.nyaa.si');
     
     return isDetailFormat && isDomainOk;
+  }
+
+  /**
+   * JavGG链接验证 - 根据实际数据 /jav/ipx-156-reduce-mosaic/
+   */
+  _isValidJavGGLink(href, content) {
+    const isJavFormat = /\/jav\/[a-z0-9\-]+/i.test(href);
+    const isDomainOk = !href.startsWith('http') || href.includes('javgg.net');
+    const notSearchPage = !href.includes('/search');
+    
+    return isJavFormat && isDomainOk && notSearchPage;
+  }
+
+  /**
+   * JavMost链接验证 - 根据实际数据 /IPX-156/ （支持子域名）
+   */
+  _isValidJavMostLink(href, content) {
+    const hasCodePattern = /\/[A-Z]{2,6}-?\d{3,6}[^\/]*(?:\/|$)/i.test(href);
+    const isDomainOk = !href.startsWith('http') || href.includes('javmost.com');
+    const notSearchPage = !href.includes('/search');
+    
+    return hasCodePattern && isDomainOk && notSearchPage;
+  }
+
+  /**
+   * JavGuru链接验证 - 根据实际数据 /268681/ipx-156-sana-matsunaga...
+   */
+  _isValidJavGuruLink(href, content) {
+    const hasDetailPattern = /\/\d+\/[a-z0-9\-]+/i.test(href);
+    const isDomainOk = !href.startsWith('http') || href.includes('jav.guru');
+    const notSearchPage = !href.includes('?s=');
+    
+    return hasDetailPattern && isDomainOk && notSearchPage;
   }
 
   /**
@@ -542,7 +579,8 @@ class CloudflareDocument {
       /\/watch\/[^\/]+/,
       /\/play\/[^\/]+/,
       /\/movie\/[^\/]+/,
-      /\/jav\/[^\/]+/     // 支持JavGG格式
+      /\/jav\/[^\/]+/,
+      /\/\d+\/[a-z0-9\-]+/i
     ];
     
     return detailPatterns.some(pattern => pattern.test(href));

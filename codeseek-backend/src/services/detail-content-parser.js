@@ -1,4 +1,4 @@
-// src/services/detail-content-parser.js - 详情页面内容解析服务
+// src/services/detail-content-parser.js - 根据7个搜索源优化的详情页面内容解析服务
 import { parserRules } from '../config/parser-rules.js';
 import { cloudflareHTMLParser } from '../utils/html-parser.js';
 import { extractionValidator } from './extraction-validator.js';
@@ -6,12 +6,12 @@ import { CONFIG } from '../constants.js';
 
 export class DetailContentParserService {
   constructor() {
-    this.parseTimeout = CONFIG.DETAIL_EXTRACTION.PARSE_TIMEOUT; // 从配置引用
-    this.maxRetries = CONFIG.DETAIL_EXTRACTION.MAX_RETRY_ATTEMPTS; // 从配置引用
+    this.parseTimeout = CONFIG.DETAIL_EXTRACTION.PARSE_TIMEOUT;
+    this.maxRetries = CONFIG.DETAIL_EXTRACTION.MAX_RETRY_ATTEMPTS;
   }
 
   /**
-   * 解析详情页面内容
+   * 解析详情页面内容 - 根据7个搜索源优化版本
    * @param {string} htmlContent - HTML内容
    * @param {Object} options - 解析选项
    * @returns {Object} 解析后的详情信息
@@ -253,7 +253,7 @@ export class DetailContentParserService {
   }
 
   /**
-   * 提取下载链接
+   * 提取下载链接 - 根据实际数据优化版本
    * @param {Document} doc - DOM文档
    * @param {Object} rule - 提取规则
    * @param {string} baseUrl - 基础URL
@@ -265,7 +265,7 @@ export class DetailContentParserService {
     try {
       const elements = doc.querySelectorAll(rule.selector);
       const downloadLinks = [];
-      const maxDownloadLinks = CONFIG.DETAIL_EXTRACTION.MAX_DOWNLOAD_LINKS; // 从配置引用
+      const maxDownloadLinks = CONFIG.DETAIL_EXTRACTION.MAX_DOWNLOAD_LINKS;
 
       for (const element of elements) {
         // 检查是否已达到最大数量限制
@@ -296,7 +296,7 @@ export class DetailContentParserService {
             link.quality = qualityText.trim();
           }
 
-          // 验证下载链接的有效性
+          // 验证下载链接的有效性 - 根据实际搜索源严格过滤
           const expectedDomain = extractionValidator.extractDomain(baseUrl);
           if (this.isValidDownloadLink(link, expectedDomain, rule)) {
             downloadLinks.push(link);
@@ -325,7 +325,7 @@ export class DetailContentParserService {
     try {
       const elements = doc.querySelectorAll(rule.selector);
       const magnetLinks = [];
-      const maxMagnetLinks = CONFIG.DETAIL_EXTRACTION.MAX_MAGNET_LINKS; // 从配置引用
+      const maxMagnetLinks = CONFIG.DETAIL_EXTRACTION.MAX_MAGNET_LINKS;
 
       for (const element of elements) {
         // 检查是否已达到最大数量限制
@@ -526,7 +526,7 @@ export class DetailContentParserService {
   }
 
   /**
-   * 验证下载链接的有效性
+   * 验证下载链接的有效性 - 根据实际搜索源严格过滤
    * @param {Object} link - 下载链接对象
    * @param {string} expectedDomain - 期望的域名
    * @param {Object} rule - 验证规则
@@ -550,35 +550,40 @@ export class DetailContentParserService {
           pattern.test && pattern.test(linkDomain)
         );
         if (!domainMatches) {
-          console.log(`⌧ 下载链接域名不在白名单: ${linkDomain}`);
+          console.log(`⌐ 下载链接域名不在白名单: ${linkDomain}`);
           return false;
         }
       } else {
         // 标准域名检查
         if (!extractionValidator.isDomainOrSubdomain(linkDomain, expectedDomain)) {
-          console.log(`⌧ 下载链接域名不匹配: ${linkDomain} != ${expectedDomain}`);
+          console.log(`⌐ 下载链接域名不匹配: ${linkDomain} != ${expectedDomain}`);
           return false;
         }
       }
 
-      // 检查域名黑名单
-      if (rule.excludeDomains && rule.excludeDomains.length > 0) {
-        if (rule.excludeDomains.some(domain => urlLower.includes(domain))) {
-          console.log(`⌧ 下载链接域名在黑名单: ${linkDomain}`);
-          return false;
-        }
+      // 检查域名黑名单（根据实际遇到的垃圾链接）
+      const excludeDomains = [
+        'seedmm.cyou', 'busfan.cyou', 'dmmsee.ink', 'ph7zhi.vip', '8pla6t.vip',
+        'ltrpvkga.com', 'frozaflurkiveltra.com', 'shvaszc.cc', 'fpnylxm.cc',
+        'mvqttfwf.com', 'jempoprostoklimor.com', '128zha.cc', 'aciyopg.cc',
+        'mnaspm.com', 'asacp.org', 'pr0rze.vip', 'go.mnaspm.com'
+      ];
+      
+      if (excludeDomains.some(domain => urlLower.includes(domain))) {
+        console.log(`⌐ 下载链接域名在黑名单: ${linkDomain}`);
+        return false;
       }
     }
 
     // 排除明显的导航链接
     const excludeTexts = [
-      'english', '中文', '日本語', '한국의', '有碼', '無碼', '女優', '類別',
+      'english', '中文', '日本語', '한국어', '有碼', '無碼', '女優', '類別',
       '論壇', '下一页', '上一页', '首页', 'terms', 'privacy', '登入', 'agent_code',
       'rta', '2257', 'contact', 'about', 'help', 'support'
     ];
 
     if (excludeTexts.some(text => nameLower.includes(text.toLowerCase()))) {
-      console.log(`⌧ 排除导航文本链接: ${name}`);
+      console.log(`⌐ 排除导航文本链接: ${name}`);
       return false;
     }
 
