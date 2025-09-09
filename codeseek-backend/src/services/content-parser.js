@@ -7,96 +7,151 @@ export class ContentParserService {
     this.maxRetries = 2;
   }
 
-  /**
-   * 从搜索页面中提取详情页链接
-   * @param {string} htmlContent - 搜索页面HTML内容
-   * @param {Object} options - 解析选项
-   * @returns {Array} 详情页链接数组
-   */
-  async extractDetailLinksFromSearchPage(htmlContent, options = {}) {
-    const { sourceType, baseUrl, searchKeyword } = options;
-    
-    console.log(`从搜索页面提取详情链接，源类型: ${sourceType}`);
-
-    try {
-      // 创建DOM解析器
-      const parser = this.createDOMParser();
-      const doc = parser.parseFromString(htmlContent, 'text/html');
-
-      // 获取搜索页面解析规则
-      const searchPageRules = parserRules.getSearchPageRules(sourceType);
-      if (!searchPageRules || !searchPageRules.detailLinkSelectors) {
-        console.warn(`未找到 ${sourceType} 的搜索页面解析规则`);
-        return this.extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword);
-      }
-
-      const detailLinks = [];
-      const selectors = searchPageRules.detailLinkSelectors;
-
-      // 尝试每个选择器配置
-for (const selectorConfig of selectors) {
-  console.log(`尝试选择器: ${selectorConfig.selector}`);
+/**
+ * 从搜索页面中提取详情页链接
+ * @param {string} htmlContent - 搜索页面HTML内容
+ * @param {Object} options - 解析选项
+ * @returns {Array} 详情页链接数组
+ */
+async extractDetailLinksFromSearchPage(htmlContent, options = {}) {
+  const { sourceType, baseUrl, searchKeyword } = options;
   
-  const links = doc.querySelectorAll(selectorConfig.selector);
-  console.log(`找到 ${links.length} 个候选链接`);
+  // 【调试位置1】方法开始
+  console.log(`=== 开始提取详情链接 ===`);
+  console.log(`源类型: ${sourceType}`);
+  console.log(`基础URL: ${baseUrl}`);
+  console.log(`搜索关键字: ${searchKeyword}`);
+  console.log(`HTML长度: ${htmlContent.length}`);
 
-  for (const linkElement of links) {
-    let href = linkElement.getAttribute('href');
-    // 兼容 onclick 跳转（如 javbus）
-    if (!href || href === 'javascript:;' || href.startsWith('javascript')) {
-      const onclick = linkElement.getAttribute('onclick');
-      if (onclick) {
-        // 兼容 window.open('/MIMK-186', ...) 或 location.href='/MIMK-186'
-        let match = onclick.match(/window\.open\(['"]([^'"]+)['"]/);
-        if (!match) {
-          match = onclick.match(/location\.href\s*=\s*['"]([^'"]+)['"]/);
+  try {
+    // 创建DOM解析器
+    const parser = this.createDOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+
+    // 获取搜索页面解析规则
+    const searchPageRules = parserRules.getSearchPageRules(sourceType);
+    
+    // 【调试位置2】检查规则
+    console.log(`解析规则存在: ${!!searchPageRules}`);
+    console.log(`选择器配置数量: ${searchPageRules?.detailLinkSelectors?.length || 0}`);
+    
+    if (!searchPageRules || !searchPageRules.detailLinkSelectors) {
+      console.warn(`未找到 ${sourceType} 的搜索页面解析规则`);
+      return this.extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword);
+    }
+
+    const detailLinks = [];
+    const selectors = searchPageRules.detailLinkSelectors;
+
+    // 尝试每个选择器配置
+    for (const selectorConfig of selectors) {
+      // 【调试位置3】每个选择器开始
+      console.log(`\n--- 尝试选择器: ${selectorConfig.selector} ---`);
+      
+      const links = doc.querySelectorAll(selectorConfig.selector);
+      
+      // 【调试位置4】找到的元素数量
+      console.log(`找到 ${links.length} 个候选链接元素`);
+
+      for (const linkElement of links) {
+        let href = linkElement.getAttribute('href');
+        
+        // 【调试位置5】每个链接的原始href
+        console.log(`原始href: ${href}`);
+        
+        // 兼容 onclick 跳转（如 javbus）
+        if (!href || href === 'javascript:;' || href.startsWith('javascript')) {
+          const onclick = linkElement.getAttribute('onclick');
+          if (onclick) {
+            // 【调试位置6】onclick处理
+            console.log(`检测到onclick: ${onclick}`);
+            
+            let match = onclick.match(/window\.open\(['"]([^'"]+)['"]/);
+            if (!match) {
+              match = onclick.match(/location\.href\s*=\s*['"]([^'"]+)['"]/);
+            }
+            if (match && match[1]) {
+              href = match[1];
+              console.log(`从onclick提取href: ${href}`);
+            }
+          }
         }
-        if (match && match[1]) {
-          href = match[1];
+        
+        if (!href) {
+          console.log(`跳过: href为空`);
+          continue;
+        }
+
+        // 构建完整URL
+        const fullUrl = this.resolveRelativeUrl(href, baseUrl);
+        
+        // 【调试位置7】URL解析结果
+        console.log(`完整URL: ${fullUrl}`);
+
+        // 验证链接有效性
+        const isValid = this.isValidDetailLink(fullUrl, selectorConfig);
+        
+        // 【调试位置8】验证结果
+        console.log(`链接有效性: ${isValid}`);
+        if (!isValid) {
+          console.log(`跳过: 链接验证失败`);
+          continue;
+        }
+
+        // 提取链接相关信息
+        const linkInfo = this.extractLinkInfo(linkElement, selectorConfig, searchKeyword);
+        
+        // 【调试位置9】链接信息提取结果
+        console.log(`链接信息:`, linkInfo);
+        
+        if (linkInfo) {
+          const detailLink = {
+            url: fullUrl,
+            ...linkInfo
+          };
+          
+          detailLinks.push(detailLink);
+          
+          // 【调试位置10】成功添加链接
+          console.log(`✓ 成功添加详情链接: ${fullUrl}`);
+          console.log(`  标题: ${linkInfo.title}`);
+          console.log(`  番号: ${linkInfo.code}`);
+          console.log(`  匹配分数: ${linkInfo.score}`);
         }
       }
+
+      // 【调试位置11】每个选择器结束
+      if (detailLinks.length > 0) {
+        console.log(`使用选择器 ${selectorConfig.selector} 找到 ${detailLinks.length} 个详情链接`);
+        break; // 找到就停止，避免重复
+      } else {
+        console.log(`选择器 ${selectorConfig.selector} 未找到有效链接`);
+      }
     }
-    if (!href) continue;
 
-    // 构建完整URL
-    const fullUrl = this.resolveRelativeUrl(href, baseUrl);
-
-    // 验证链接有效性
-    if (!this.isValidDetailLink(fullUrl, selectorConfig)) {
-      continue;
+    // 【调试位置12】所有选择器尝试完毕
+    if (detailLinks.length === 0) {
+      console.log('使用通用规则提取详情链接');
+      return this.extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword);
     }
 
-    // 提取链接相关信息
-    const linkInfo = this.extractLinkInfo(linkElement, selectorConfig, searchKeyword);
-    if (linkInfo) {
-      detailLinks.push({
-        url: fullUrl,
-        ...linkInfo
-      });
-    }
-  }
+    // 【调试位置13】方法结束
+    console.log(`=== 详情链接提取完成 ===`);
+    console.log(`总共找到 ${detailLinks.length} 个详情链接:`);
+    detailLinks.forEach((link, index) => {
+      console.log(`  ${index + 1}. ${link.url} (${link.title}) [${link.score}分]`);
+    });
 
-  // 如果找到了链接，可以选择停止或继续查找更多
-  if (detailLinks.length > 0) {
-    console.log(`使用选择器 ${selectorConfig.selector} 找到 ${detailLinks.length} 个详情链接`);
-    break; // 找到就停止，避免重复
+    return detailLinks;
+
+  } catch (error) {
+    // 【调试位置14】错误处理
+    console.error('=== 详情链接提取失败 ===');
+    console.error('错误信息:', error.message);
+    console.error('错误堆栈:', error.stack);
+    return [];
   }
 }
-
-      // 如果没有找到任何链接，使用通用规则
-      if (detailLinks.length === 0) {
-        console.log('使用通用规则提取详情链接');
-        return this.extractDetailLinksWithGenericRules(doc, baseUrl, searchKeyword);
-      }
-
-      console.log(`搜索页面链接提取完成，找到 ${detailLinks.length} 个详情链接`);
-      return detailLinks;
-
-    } catch (error) {
-      console.error('搜索页面链接提取失败:', error);
-      return [];
-    }
-  }
 
   /**
    * 解析详情页面内容

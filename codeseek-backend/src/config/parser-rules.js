@@ -869,3 +869,29 @@ export class ParserRulesConfig {
 // 创建单例实例
 export const parserRules = new ParserRulesConfig();
 export default parserRules;
+
+// 额外的搜索页面规则配置
+const searchPageRules = {
+  javguru: {
+    detailLinkSelectors: [{
+      selector: '.post-inner a',  // 文章链接选择器
+      titleSelector: '.post-title',
+      mustContainCode: true
+    }]
+  },
+  javgg: {
+    detailLinkSelectors: [{
+      selector: '.movie-box',  // 影片卡片选择器
+      titleSelector: 'img',
+      titleAttribute: 'title',
+      mustContainCode: true
+    }]
+  },
+  sukebei: {
+    detailLinkSelectors: [{
+      selector: 'tr.success td:nth-child(2) a',  // 种子标题链接
+      titleSelector: 'a',
+      mustContainCode: true
+    }]
+  }
+};
