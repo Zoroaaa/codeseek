@@ -1,4 +1,4 @@
-// src/services/detail-api.js - 详情提取API服务
+// src/services/detail-api.js - 修复版本：匹配后端API响应结构
 import apiService from './api.js';
 import authManager from './auth.js';
 
@@ -51,18 +51,48 @@ class DetailAPIService {
         throw new Error(response.message || '详情提取失败');
       }
 
-      const result = response.detailInfo;
+      // 修复：正确获取详情信息
+      const detailInfo = response.detailInfo || response.data?.detailInfo;
+      
+      if (!detailInfo) {
+        throw new Error('服务器返回的详情信息为空');
+      }
 
-      // 本地缓存结果
-      if (result.extractionStatus === 'success' && options.useLocalCache !== false) {
+      // 检查提取状态
+      if (detailInfo.extractionStatus === 'error') {
+        throw new Error(detailInfo.extractionError || '详情提取失败');
+      }
+
+      // 组合完整结果
+      const result = {
+        ...searchResult,
+        ...detailInfo,
+        // 保留重要的元数据
+        extractionTime: response.extractionTime || detailInfo.extractionTime || 0,
+        fromCache: response.fromCache || detailInfo.extractionStatus === 'cached',
+        extractedAt: detailInfo.extractedAt || Date.now()
+      };
+
+      // 本地缓存成功的结果
+      if (detailInfo.extractionStatus === 'success' && options.useLocalCache !== false) {
         this.setToLocalCache(cacheKey, result);
       }
 
+      console.log(`详情提取完成: ${searchResult.title} (状态: ${detailInfo.extractionStatus})`);
       return result;
 
     } catch (error) {
       console.error(`详情提取失败 [${searchResult.title}]:`, error);
-      throw error;
+      
+      // 返回带错误信息的基础结果，而不是抛出异常
+      return {
+        ...searchResult,
+        extractionStatus: 'error',
+        extractionError: error.message,
+        extractionTime: 0,
+        extractedAt: Date.now(),
+        fromCache: false
+      };
     }
   }
 
@@ -70,7 +100,7 @@ class DetailAPIService {
    * 批量提取搜索结果的详情信息
    * @param {Array} searchResults - 搜索结果数组
    * @param {Object} options - 提取选项
-   * @returns {Promise<Array>} 详情信息数组
+   * @returns {Promise<Object>} 包含结果和统计的对象
    */
   async extractBatchDetails(searchResults, options = {}) {
     if (!Array.isArray(searchResults) || searchResults.length === 0) {
@@ -88,7 +118,8 @@ class DetailAPIService {
         options: {
           enableCache: options.enableCache !== false,
           timeout: options.timeout || 15000,
-          enableRetry: options.enableRetry !== false
+          enableRetry: options.enableRetry !== false,
+          onProgress: options.onProgress
         }
       };
 
@@ -103,21 +134,32 @@ class DetailAPIService {
         throw new Error(response.message || '批量详情提取失败');
       }
 
-      const results = response.results || [];
+      // 修复：正确处理批量响应
+      const results = response.results || response.data?.results || [];
+      const stats = response.stats || response.data?.stats || {};
 
       // 本地缓存成功的结果
       if (options.useLocalCache !== false) {
         results.forEach(result => {
           if (result.extractionStatus === 'success') {
-            const cacheKey = this.generateCacheKey(result.url);
+            const cacheKey = this.generateCacheKey(result.url || result.searchUrl);
             this.setToLocalCache(cacheKey, result);
           }
         });
       }
 
+      console.log(`批量提取完成: ${results.length}/${searchResults.length}`);
+      
       return {
         results,
-        stats: response.stats || {}
+        stats: {
+          total: stats.total || results.length,
+          successful: stats.successful || results.filter(r => r.extractionStatus === 'success').length,
+          cached: stats.cached || results.filter(r => r.extractionStatus === 'cached').length,
+          failed: stats.failed || results.filter(r => r.extractionStatus === 'error').length,
+          totalTime: stats.totalTime || 0,
+          averageTime: stats.averageTime || 0
+        }
       };
 
     } catch (error) {
@@ -150,7 +192,7 @@ class DetailAPIService {
         throw new Error(response.message || '获取历史失败');
       }
 
-      return response.history || [];
+      return response.history || response.data?.history || [];
 
     } catch (error) {
       console.error('获取详情提取历史失败:', error);
@@ -174,7 +216,7 @@ class DetailAPIService {
         throw new Error(response.message || '获取缓存统计失败');
       }
 
-      return response.stats || {};
+      return response.stats || response.data?.stats || {};
 
     } catch (error) {
       console.error('获取缓存统计失败:', error);
@@ -219,9 +261,9 @@ class DetailAPIService {
       }
 
       return {
-        operation: response.operation,
+        operation: response.operation || operation,
         cleanedCount: response.cleanedCount || 0,
-        message: response.message
+        message: response.message || '缓存清理完成'
       };
 
     } catch (error) {
@@ -251,6 +293,11 @@ class DetailAPIService {
       });
 
       if (!response.success) {
+        // 对于404错误，认为删除成功
+        if (response.status === 404) {
+          console.log('缓存不存在，视为删除成功');
+          return true;
+        }
         throw new Error(response.message || '删除缓存失败');
       }
 
@@ -262,7 +309,7 @@ class DetailAPIService {
 
     } catch (error) {
       console.error('删除缓存失败:', error);
-      throw error;
+      return false; // 返回false而不是抛出异常
     }
   }
 
@@ -282,11 +329,26 @@ class DetailAPIService {
         throw new Error(response.message || '获取配置失败');
       }
 
-      return response.config || {};
+      return response.config || response.data?.config || {};
 
     } catch (error) {
       console.error('获取详情提取配置失败:', error);
-      throw error;
+      // 返回默认配置而不是抛出异常
+      return {
+        enableDetailExtraction: true,
+        autoExtractDetails: false,
+        maxAutoExtractions: 5,
+        extractionBatchSize: 3,
+        extractionTimeout: 15000,
+        enableRetry: true,
+        enableCache: true,
+        showScreenshots: true,
+        showDownloadLinks: true,
+        showMagnetLinks: true,
+        showActressInfo: true,
+        compactMode: false,
+        enableImagePreview: true
+      };
     }
   }
 
@@ -338,11 +400,12 @@ class DetailAPIService {
         throw new Error(response.message || '获取统计失败');
       }
 
-      return response.stats || {};
+      return this.formatStats(response.stats || response.data?.stats || {});
 
     } catch (error) {
       console.error('获取详情提取统计失败:', error);
-      throw error;
+      // 返回空统计而不是抛出异常
+      return this.formatStats({});
     }
   }
 
@@ -354,7 +417,13 @@ class DetailAPIService {
    * @returns {string} 缓存键
    */
   generateCacheKey(url) {
-    return 'detail_' + btoa(url).substring(0, 16);
+    if (!url) return '';
+    try {
+      return 'detail_' + btoa(encodeURIComponent(url)).substring(0, 16);
+    } catch (error) {
+      // 处理特殊字符编码问题
+      return 'detail_' + url.replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
+    }
   }
 
   /**
@@ -363,6 +432,8 @@ class DetailAPIService {
    * @returns {Object|null} 缓存数据
    */
   getFromLocalCache(key) {
+    if (!key) return null;
+    
     const cached = this.requestCache.get(key);
     if (!cached) return null;
 
@@ -372,6 +443,8 @@ class DetailAPIService {
       return null;
     }
 
+    // 更新访问时间
+    cached.lastAccessed = Date.now();
     return cached.data;
   }
 
@@ -381,16 +454,41 @@ class DetailAPIService {
    * @param {Object} data - 数据
    */
   setToLocalCache(key, data) {
+    if (!key || !data) return;
+
     // 限制缓存大小
     if (this.requestCache.size >= this.maxCacheSize) {
-      const firstKey = this.requestCache.keys().next().value;
-      this.requestCache.delete(firstKey);
+      // 删除最旧的缓存项
+      const oldestKey = this.findOldestCacheKey();
+      if (oldestKey) {
+        this.requestCache.delete(oldestKey);
+      }
     }
 
     this.requestCache.set(key, {
       data,
-      expiresAt: Date.now() + this.cacheExpiration
+      expiresAt: Date.now() + this.cacheExpiration,
+      lastAccessed: Date.now(),
+      createdAt: Date.now()
     });
+  }
+
+  /**
+   * 查找最旧的缓存键
+   * @returns {string|null} 最旧的缓存键
+   */
+  findOldestCacheKey() {
+    let oldestKey = null;
+    let oldestTime = Date.now();
+
+    for (const [key, cached] of this.requestCache) {
+      if (cached.lastAccessed < oldestTime) {
+        oldestTime = cached.lastAccessed;
+        oldestKey = key;
+      }
+    }
+
+    return oldestKey;
   }
 
   /**
@@ -398,7 +496,9 @@ class DetailAPIService {
    * @param {string} key - 缓存键
    */
   removeFromLocalCache(key) {
-    this.requestCache.delete(key);
+    if (key) {
+      this.requestCache.delete(key);
+    }
   }
 
   /**
@@ -416,18 +516,22 @@ class DetailAPIService {
   getLocalCacheStats() {
     const now = Date.now();
     let expiredCount = 0;
+    let totalSize = 0;
 
     for (const [key, cached] of this.requestCache) {
       if (now > cached.expiresAt) {
         expiredCount++;
       }
+      // 估算缓存大小
+      totalSize += JSON.stringify(cached.data).length;
     }
 
     return {
       totalItems: this.requestCache.size,
       expiredItems: expiredCount,
       maxSize: this.maxCacheSize,
-      hitRate: 0 // 需要单独统计
+      totalSize,
+      averageSize: this.requestCache.size > 0 ? Math.round(totalSize / this.requestCache.size) : 0
     };
   }
 
@@ -478,61 +582,6 @@ class DetailAPIService {
   }
 
   /**
-   * 验证详情配置
-   * @param {Object} config - 配置对象
-   * @returns {Object} 验证结果
-   */
-  validateConfig(config) {
-    const result = {
-      valid: true,
-      errors: []
-    };
-
-    if (!config || typeof config !== 'object') {
-      result.valid = false;
-      result.errors.push('配置必须是对象类型');
-      return result;
-    }
-
-    // 验证超时时间
-    if (config.hasOwnProperty('detailExtractionTimeout')) {
-      const timeout = Number(config.detailExtractionTimeout);
-      if (isNaN(timeout) || timeout < 5000 || timeout > 30000) {
-        result.valid = false;
-        result.errors.push('详情提取超时时间必须在 5-30 秒之间');
-      }
-    }
-
-    // 验证缓存时间
-    if (config.hasOwnProperty('detailCacheDuration')) {
-      const duration = Number(config.detailCacheDuration);
-      if (isNaN(duration) || duration < 60 * 60 * 1000 || duration > 7 * 24 * 60 * 60 * 1000) {
-        result.valid = false;
-        result.errors.push('缓存时间必须在 1 小时到 7 天之间');
-      }
-    }
-
-    // 验证批量大小
-    if (config.hasOwnProperty('maxBatchSize')) {
-      const batchSize = Number(config.maxBatchSize);
-      if (isNaN(batchSize) || batchSize < 1 || batchSize > 50) {
-        result.valid = false;
-        result.errors.push('批量处理数量必须在 1-50 之间');
-      }
-    }
-
-    // 验证内容过滤关键词
-    if (config.hasOwnProperty('contentFilterKeywords')) {
-      if (!Array.isArray(config.contentFilterKeywords)) {
-        result.valid = false;
-        result.errors.push('内容过滤关键词必须是数组类型');
-      }
-    }
-
-    return result;
-  }
-
-  /**
    * 格式化提取统计信息
    * @param {Object} stats - 原始统计数据
    * @returns {Object} 格式化后的统计数据
@@ -540,10 +589,22 @@ class DetailAPIService {
   formatStats(stats) {
     if (!stats || typeof stats !== 'object') {
       return {
-        user: {},
+        user: {
+          totalExtractions: 0,
+          successfulExtractions: 0,
+          failedExtractions: 0,
+          successRate: 0,
+          cacheHitRate: 0,
+          averageExtractionTime: 0,
+          todayExtractions: 0
+        },
         sources: [],
-        service: {},
-        cache: {}
+        cache: {
+          totalItems: 0,
+          totalSize: 0,
+          expiredItems: 0,
+          hitRate: 0
+        }
       };
     }
 
@@ -555,10 +616,10 @@ class DetailAPIService {
         successRate: stats.user?.successRate || 0,
         cacheHitRate: stats.user?.cacheHitRate || 0,
         averageExtractionTime: stats.user?.averageExtractionTime || 0,
-        todayExtractions: stats.user?.todayExtractions || 0
+        todayExtractions: stats.user?.todayExtractions || 0,
+        weekExtractions: stats.user?.weekExtractions || 0
       },
       sources: Array.isArray(stats.sources) ? stats.sources : [],
-      service: stats.service || {},
       cache: {
         totalItems: stats.cache?.totalItems || 0,
         totalSize: stats.cache?.totalSize || 0,
@@ -639,7 +700,7 @@ class DetailAPIService {
       cacheExpiration: this.cacheExpiration,
       maxCacheSize: this.maxCacheSize,
       timestamp: Date.now(),
-      version: '1.0.0'
+      version: '1.1.0'
     };
   }
 }

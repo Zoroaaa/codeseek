@@ -1,4 +1,4 @@
-// src/handlers/detail.js - 详情提取API处理器（Cloudflare Workers 兼容版本）
+// src/handlers/detail.js - 修复版本：统一响应结构和错误处理
 import { utils } from '../utils.js';
 import { authenticate } from '../middleware.js';
 import { CONFIG, DETAIL_EXTRACTION_STATUS, DETAIL_CONFIG_VALIDATION } from '../constants.js';
@@ -13,7 +13,11 @@ import { cacheManager, initializeCacheManager } from '../services/cache-manager.
 export async function extractSingleDetailHandler(request, env) {
   try {
     // 确保缓存管理器已初始化
-    await initializeCacheManager(env);
+    try {
+      await initializeCacheManager(env);
+    } catch (cacheError) {
+      console.warn('缓存管理器初始化失败，继续处理:', cacheError.message);
+    }
     
     const body = await request.json().catch(() => ({}));
     const { searchResult, options = {} } = body;
@@ -42,8 +46,8 @@ export async function extractSingleDetailHandler(request, env) {
     
     // 执行详情提取
     const detailInfo = await detailExtractor.extractSingleDetail(searchResult, extractOptions);
-	
-	    // 添加这些日志来检查提取结果
+    
+    // 添加详情提取结果检查
     console.log(`=== 详情提取结果检查 ===`);
     console.log('Extraction Status:', detailInfo.extractionStatus);
     console.log('Source Type:', detailInfo.sourceType);
@@ -63,28 +67,47 @@ export async function extractSingleDetailHandler(request, env) {
     // 记录用户行为（如果已认证）
     const user = await authenticate(request, env).catch(() => null);
     if (user) {
-      await utils.logUserAction(env, user.id, 'detail_extraction', {
-        url: searchResult.url,
-        source: searchResult.source,
-        extractionStatus: detailInfo.extractionStatus,
-        extractionTime: detailInfo.extractionTime
-      }, request);
-      
-      // 保存到详情提取历史
-      await saveDetailExtractionHistory(env, user.id, searchResult, detailInfo);
+      try {
+        await utils.logUserAction(env, user.id, 'detail_extraction', {
+          url: searchResult.url,
+          source: searchResult.source,
+          extractionStatus: detailInfo.extractionStatus,
+          extractionTime: detailInfo.extractionTime
+        }, request);
+        
+        // 保存到详情提取历史
+        await saveDetailExtractionHistory(env, user.id, searchResult, detailInfo);
+      } catch (logError) {
+        console.warn('记录用户行为失败:', logError.message);
+      }
     }
     
+    // 修复：统一成功响应结构
     return utils.successResponse({
-      searchResult,
-      detailInfo,
-      extractionTime: detailInfo.extractionTime,
+      detailInfo: detailInfo, // 将详情信息包装在 detailInfo 字段中
+      searchResult: searchResult, // 保留原始搜索结果
+      extractionTime: detailInfo.extractionTime || 0,
       fromCache: detailInfo.extractionStatus === 'cached',
-      message: '详情提取完成'
+      extractionStatus: detailInfo.extractionStatus || 'unknown',
+      message: detailInfo.extractionStatus === 'success' ? '详情提取完成' : '详情提取失败'
     });
     
   } catch (error) {
-    console.error('详情提取失败:', error);
-    return utils.errorResponse('详情提取失败: ' + error.message, 500);
+    console.error('详情提取处理失败:', error);
+    
+    // 修复：确保即使出现异常也返回结构化的错误响应
+    const errorDetail = {
+      extractionStatus: 'error',
+      extractionError: error.message,
+      extractionTime: 0,
+      extractedAt: Date.now()
+    };
+    
+    return utils.errorResponse({
+      message: '详情提取失败: ' + error.message,
+      detailInfo: errorDetail,
+      extractionStatus: 'error'
+    }, 500);
   }
 }
 
@@ -94,7 +117,11 @@ export async function extractSingleDetailHandler(request, env) {
 export async function extractBatchDetailsHandler(request, env) {
   try {
     // 确保缓存管理器已初始化
-    await initializeCacheManager(env);
+    try {
+      await initializeCacheManager(env);
+    } catch (cacheError) {
+      console.warn('缓存管理器初始化失败，继续处理:', cacheError.message);
+    }
     
     const body = await request.json().catch(() => ({}));
     const { searchResults, options = {} } = body;
@@ -147,30 +174,47 @@ export async function extractBatchDetailsHandler(request, env) {
     // 记录用户行为（如果已认证）
     const user = await authenticate(request, env).catch(() => null);
     if (user) {
-      await utils.logUserAction(env, user.id, 'batch_detail_extraction', {
-        batchSize: searchResults.length,
-        stats,
-        totalTime
-      }, request);
-      
-      // 批量保存到详情提取历史
-      for (const result of detailResults) {
-        const searchResult = searchResults.find(sr => sr.url === result.url);
-        if (searchResult) {
-          await saveDetailExtractionHistory(env, user.id, searchResult, result);
+      try {
+        await utils.logUserAction(env, user.id, 'batch_detail_extraction', {
+          batchSize: searchResults.length,
+          stats,
+          totalTime
+        }, request);
+        
+        // 批量保存到详情提取历史
+        for (const result of detailResults) {
+          const searchResult = searchResults.find(sr => sr.url === result.url || sr.url === result.searchUrl);
+          if (searchResult) {
+            await saveDetailExtractionHistory(env, user.id, searchResult, result);
+          }
         }
+      } catch (logError) {
+        console.warn('记录用户行为失败:', logError.message);
       }
     }
     
+    // 修复：统一批量响应结构
     return utils.successResponse({
       results: detailResults,
       stats,
+      batchSize: searchResults.length,
+      totalTime,
       message: `批量详情提取完成: ${stats.successful}/${stats.total} 成功`
     });
     
   } catch (error) {
     console.error('批量详情提取失败:', error);
-    return utils.errorResponse('批量详情提取失败: ' + error.message, 500);
+    return utils.errorResponse({
+      message: '批量详情提取失败: ' + error.message,
+      stats: {
+        total: 0,
+        successful: 0,
+        cached: 0,
+        failed: 0,
+        totalTime: 0,
+        averageTime: 0
+      }
+    }, 500);
   }
 }
 
@@ -219,14 +263,17 @@ export async function getDetailExtractionHistoryHandler(request, env) {
     
     return utils.successResponse({
       history,
-      total: result.results.length,
-      limit,
-      offset
+      pagination: {
+        total: result.results.length,
+        limit,
+        offset,
+        hasMore: result.results.length === limit
+      }
     });
     
   } catch (error) {
     console.error('获取详情提取历史失败:', error);
-    return utils.errorResponse('获取历史失败', 500);
+    return utils.errorResponse('获取历史失败: ' + error.message, 500);
   }
 }
 
@@ -243,7 +290,11 @@ export async function getDetailCacheStatsHandler(request, env) {
   
   try {
     // 确保缓存管理器已初始化
-    await initializeCacheManager(env);
+    try {
+      await initializeCacheManager(env);
+    } catch (cacheError) {
+      console.warn('缓存管理器初始化失败:', cacheError.message);
+    }
     
     // 获取缓存统计（优先使用缓存管理器的统计）
     let stats;
@@ -251,7 +302,7 @@ export async function getDetailCacheStatsHandler(request, env) {
     try {
       stats = await cacheManager.getCacheStats();
     } catch (cacheError) {
-      console.warn('获取缓存管理器统计失败，使用数据库统计:', cacheError);
+      console.warn('获取缓存管理器统计失败，使用数据库统计:', cacheError.message);
       
       // 降级到数据库统计
       const totalResult = await env.DB.prepare(`
@@ -274,11 +325,11 @@ export async function getDetailCacheStatsHandler(request, env) {
       `).first();
       
       stats = {
-        totalItems: totalResult.total || 0,
-        expiredItems: expiredResult.expired || 0,
-        totalSize: sizeResult.total_size || 0,
-        averageSize: (totalResult.total > 0) ? Math.round((sizeResult.total_size || 0) / totalResult.total) : 0,
-        hitRate: (hitRateResult.total_access > 0) ? 
+        totalItems: totalResult?.total || 0,
+        expiredItems: expiredResult?.expired || 0,
+        totalSize: sizeResult?.total_size || 0,
+        averageSize: (totalResult?.total > 0) ? Math.round((sizeResult?.total_size || 0) / totalResult.total) : 0,
+        hitRate: (hitRateResult?.total_access > 0) ? 
           Math.round((hitRateResult.total_access / Math.max(hitRateResult.cache_items, 1)) * 100) : 0
       };
     }
@@ -290,7 +341,7 @@ export async function getDetailCacheStatsHandler(request, env) {
     
   } catch (error) {
     console.error('获取缓存统计失败:', error);
-    return utils.errorResponse('获取缓存统计失败', 500);
+    return utils.errorResponse('获取缓存统计失败: ' + error.message, 500);
   }
 }
 
@@ -305,10 +356,14 @@ export async function clearDetailCacheHandler(request, env) {
   
   try {
     // 确保缓存管理器已初始化
-    await initializeCacheManager(env);
+    try {
+      await initializeCacheManager(env);
+    } catch (cacheError) {
+      console.warn('缓存管理器初始化失败:', cacheError.message);
+    }
     
     const url = new URL(request.url);
-    const operation = url.searchParams.get('operation');
+    const operation = url.searchParams.get('operation') || 'expired';
     
     let cleanedCount = 0;
     let message = '';
@@ -319,7 +374,7 @@ export async function clearDetailCacheHandler(request, env) {
           cleanedCount = await cacheManager.cleanupExpiredCache();
           message = `已清理 ${cleanedCount} 个过期缓存项`;
         } catch (cacheError) {
-          console.warn('缓存管理器清理失败，使用数据库清理:', cacheError);
+          console.warn('缓存管理器清理失败，使用数据库清理:', cacheError.message);
           const result = await env.DB.prepare(`
             DELETE FROM detail_cache WHERE expires_at < ?
           `).bind(Date.now()).run();
@@ -331,19 +386,15 @@ export async function clearDetailCacheHandler(request, env) {
       case 'all':
         try {
           await cacheManager.clearAllCache();
-          const allResult = await env.DB.prepare(`
-            DELETE FROM detail_cache
-          `).run();
-          cleanedCount = allResult.changes || 0;
-          message = `已清空所有缓存 (${cleanedCount} 项)`;
         } catch (cacheError) {
-          console.warn('缓存管理器清空失败，使用数据库清空:', cacheError);
-          const allResult = await env.DB.prepare(`
-            DELETE FROM detail_cache
-          `).run();
-          cleanedCount = allResult.changes || 0;
-          message = `已清空所有缓存 (${cleanedCount} 项)`;
+          console.warn('缓存管理器清空失败:', cacheError.message);
         }
+        
+        const allResult = await env.DB.prepare(`
+          DELETE FROM detail_cache
+        `).run();
+        cleanedCount = allResult.changes || 0;
+        message = `已清空所有缓存 (${cleanedCount} 项)`;
         break;
         
       case 'lru':
@@ -353,7 +404,7 @@ export async function clearDetailCacheHandler(request, env) {
           cleanedCount = count;
           message = `已清理 ${cleanedCount} 个最近最少使用的缓存项`;
         } catch (cacheError) {
-          console.warn('缓存管理器LRU清理失败，使用数据库清理:', cacheError);
+          console.warn('缓存管理器LRU清理失败，使用数据库清理:', cacheError.message);
           const lruResult = await env.DB.prepare(`
             DELETE FROM detail_cache 
             WHERE id IN (
@@ -372,11 +423,15 @@ export async function clearDetailCacheHandler(request, env) {
     }
     
     // 记录用户行为
-    await utils.logUserAction(env, user.id, 'detail_cache_clear', {
-      operation,
-      cleanedCount,
-      timestamp: Date.now()
-    }, request);
+    try {
+      await utils.logUserAction(env, user.id, 'detail_cache_clear', {
+        operation,
+        cleanedCount,
+        timestamp: Date.now()
+      }, request);
+    } catch (logError) {
+      console.warn('记录清理操作失败:', logError.message);
+    }
     
     return utils.successResponse({
       operation,
@@ -401,7 +456,11 @@ export async function deleteDetailCacheHandler(request, env) {
   
   try {
     // 确保缓存管理器已初始化
-    await initializeCacheManager(env);
+    try {
+      await initializeCacheManager(env);
+    } catch (cacheError) {
+      console.warn('缓存管理器初始化失败:', cacheError.message);
+    }
     
     const body = await request.json().catch(() => ({}));
     const { url } = body;
@@ -422,7 +481,7 @@ export async function deleteDetailCacheHandler(request, env) {
     try {
       success = await cacheManager.deleteDetailCache(url);
     } catch (cacheError) {
-      console.warn('缓存管理器删除失败，使用数据库删除:', cacheError);
+      console.warn('缓存管理器删除失败，使用数据库删除:', cacheError.message);
       // 生成URL哈希
       const urlHash = await utils.hashPassword(url);
       
@@ -435,10 +494,14 @@ export async function deleteDetailCacheHandler(request, env) {
     
     if (success) {
       // 记录用户行为
-      await utils.logUserAction(env, user.id, 'detail_cache_delete', {
-        url,
-        timestamp: Date.now()
-      }, request);
+      try {
+        await utils.logUserAction(env, user.id, 'detail_cache_delete', {
+          url,
+          timestamp: Date.now()
+        }, request);
+      } catch (logError) {
+        console.warn('记录删除操作失败:', logError.message);
+      }
       
       return utils.successResponse({
         message: '缓存删除成功',
@@ -531,7 +594,7 @@ export async function getDetailExtractionConfigHandler(request, env) {
     
   } catch (error) {
     console.error('获取详情提取配置失败:', error);
-    return utils.errorResponse('获取配置失败', 500);
+    return utils.errorResponse('获取配置失败: ' + error.message, 500);
   }
 }
 
@@ -599,10 +662,14 @@ export async function updateDetailExtractionConfigHandler(request, env) {
     ).run();
     
     // 记录用户行为
-    await utils.logUserAction(env, user.id, 'detail_config_update', {
-      changedKeys: Object.keys(config),
-      timestamp: now
-    }, request);
+    try {
+      await utils.logUserAction(env, user.id, 'detail_config_update', {
+        changedKeys: Object.keys(config),
+        timestamp: now
+      }, request);
+    } catch (logError) {
+      console.warn('记录配置更新失败:', logError.message);
+    }
     
     return utils.successResponse({
       message: '配置更新成功',
@@ -698,7 +765,7 @@ export async function getDetailExtractionStatsHandler(request, env) {
     
   } catch (error) {
     console.error('获取详情提取统计失败:', error);
-    return utils.errorResponse('获取统计失败', 500);
+    return utils.errorResponse('获取统计失败: ' + error.message, 500);
   }
 }
 
@@ -780,4 +847,3 @@ function validateDetailConfig(config) {
   }
   
   return errors;
-}
