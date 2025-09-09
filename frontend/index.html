@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="css/components/status.css">
     <link rel="stylesheet" href="css/components/search-status.css">
     
+    
     <!-- 主页专用样式 -->
     <link rel="stylesheet" href="css/pages/main.css">
     
@@ -34,8 +35,7 @@
     
     <!-- 详情提取功能支持的meta标签 -->
     <meta name="detail-extraction-supported" content="true">
-    <meta name="detail-extraction-version" content="2.0.0">
-    <meta name="detail-extraction-features" content="batch,progress,cache,retry,filter">
+    <meta name="detail-extraction-version" content="1.0.0">
 </head>
 <body>
     <!-- 导航栏 -->
@@ -49,18 +49,10 @@
             </div>
             <div class="nav-menu">
                 <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
-                
                 <!-- 详情提取功能切换按钮 -->
                 <button id="detailExtractionToggle" class="detail-extraction-btn" title="切换详情提取功能" style="display:none;">
-                    <span class="btn-icon">🔋</span>
-                    <span class="btn-text">详情提取</span>
+                    📋
                 </button>
-                
-                <!-- 详情提取设置按钮 -->
-                <button id="detailSettingsBtn" class="detail-settings-btn" title="详情提取设置" style="display:none;" onclick="openDetailSettings()">
-                    <span class="btn-icon">⚙️</span>
-                </button>
-                
                 <div id="userMenu" class="user-menu">
                     <button id="loginBtn" class="login-btn">登录</button>
                     <div id="userInfo" class="user-info" style="display:none;">
@@ -69,7 +61,6 @@
                             <button class="dropdown-btn" title="用户菜单">▼</button>
                             <div class="dropdown-content">
                                 <a href="#" onclick="navigateToDashboard(); return false;">个人中心</a>
-                                <a href="#" onclick="openDetailSettings(); return false;" id="detailSettingsLink" style="display:none;">详情设置</a>
                                 <a href="#" id="logoutBtn">退出登录</a>
                             </div>
                         </div>
@@ -106,44 +97,17 @@
                     </button>
                 </div>
                 
-                <!-- 高级搜索选项 -->
+                <!-- 搜索选项 -->
                 <div class="search-options" style="display:none;">
-                    <div class="options-row">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="enableDetailExtraction" disabled>
-                            <span>自动提取详情</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="enableSourceStatus" disabled>
-                            <span>检查源状态</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="enableContentFilter" disabled>
-                            <span>内容过滤</span>
-                        </label>
-                    </div>
-                    <div class="options-row">
-                        <label for="extractionMode">提取模式:</label>
-                        <select id="extractionMode" class="option-select" disabled>
-                            <option value="auto">自动提取</option>
-                            <option value="manual">手动提取</option>
-                            <option value="selective">选择性提取</option>
-                            <option value="smart">智能提取</option>
-                        </select>
-                        <label for="extractionQuality">提取质量:</label>
-                        <select id="extractionQuality" class="option-select" disabled>
-                            <option value="high">高质量</option>
-                            <option value="balanced">平衡</option>
-                            <option value="fast">快速</option>
-                        </select>
-                    </div>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enableDetailExtraction" disabled>
+                        <span>自动提取详情</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enableSourceStatus" disabled>
+                        <span>检查源状态</span>
+                    </label>
                 </div>
-                
-                <!-- 搜索选项切换按钮 -->
-                <button id="toggleSearchOptions" class="toggle-options-btn" title="显示/隐藏高级选项">
-                    <span class="btn-icon">⚙️</span>
-                    <span class="btn-text">高级选项</span>
-                </button>
             </div>
         </section>
 
@@ -155,44 +119,21 @@
                     <li>输入完整番号获得最精确结果</li>
                     <li>使用空格分隔多个关键词</li>
                     <li>登录后可享受云端同步服务</li>
-                    <li>支持详情提取的站点会显示 🔋 标识</li>
-                    <li>使用高级选项自定义搜索和提取行为</li>
+                    <li>支持详情提取的站点会显示 📋 标识</li>
                 </ul>
             </div>
         </section>
 
-        <!-- 详情提取功能状态指示器（增强版） -->
+        <!-- 详情提取功能状态指示器 -->
         <section id="detailExtractionStatus" class="detail-extraction-status" style="display:none;">
             <div class="status-content">
                 <div class="status-header">
-                    <span class="status-icon">🔋</span>
+                    <span class="status-icon">📋</span>
                     <span class="status-text">详情提取功能</span>
                     <span class="status-badge" id="detailStatusBadge">未启用</span>
-                    <div class="status-actions">
-                        <button id="detailStatusRefresh" class="status-action-btn" title="刷新状态">🔄</button>
-                        <button id="detailStatusSettings" class="status-action-btn" title="设置" onclick="openDetailSettings()">⚙️</button>
-                    </div>
                 </div>
                 <div class="status-description" id="detailStatusDescription">
                     详情提取功能可以自动获取番号的详细信息，包括封面图片、演员信息、下载链接等。
-                </div>
-                <div class="status-stats" id="detailStatusStats" style="display:none;">
-                    <div class="stat-item">
-                        <span class="stat-label">支持源数量:</span>
-                        <span class="stat-value" id="supportedSourcesCount">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">总提取次数:</span>
-                        <span class="stat-value" id="totalExtractionsCount">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">成功率:</span>
-                        <span class="stat-value" id="extractionSuccessRate">0%</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">缓存命中率:</span>
-                        <span class="stat-value" id="cacheHitRate">0%</span>
-                    </div>
                 </div>
             </div>
         </section>
@@ -202,30 +143,16 @@
             <!-- 内容将通过JavaScript动态更新 -->
         </section>
 
-        <!-- 详情提取进度指示器（增强版） -->
+        <!-- 详情提取进度指示器 -->
         <section id="detailExtractionProgress" class="detail-extraction-progress" style="display:none;">
             <!-- 内容将通过JavaScript动态更新 -->
-        </section>
-
-        <!-- 智能提取建议（新增） -->
-        <section id="extractionSuggestions" class="extraction-suggestions" style="display:none;">
-            <div class="suggestions-header">
-                <h3>🤖 智能提取建议</h3>
-                <button class="suggestions-close" onclick="this.parentElement.parentElement.style.display='none'">×</button>
-            </div>
-            <div class="suggestions-content" id="suggestionsContent">
-                <!-- 建议内容将通过JavaScript动态生成 -->
-            </div>
         </section>
 
         <!-- 搜索历史 -->
         <section id="historySection" class="history-section" style="display:none;">
             <div class="section-header">
                 <h2>🕒 搜索历史</h2>
-                <div class="section-actions">
-                    <button id="clearHistoryBtn" class="clear-btn">清空历史</button>
-                    <button id="exportHistoryBtn" class="action-btn" style="display:none;">导出历史</button>
-                </div>
+                <button id="clearHistoryBtn" class="clear-btn">清空历史</button>
             </div>
             <div id="historyList" class="history-list"></div>
         </section>
@@ -237,20 +164,8 @@
                 <div class="section-actions">
                     <!-- 详情提取控制按钮 -->
                     <button id="batchExtractBtn" class="action-btn detail-action-btn" style="display:none;">
-                        <span class="btn-icon">🔋</span>
+                        <span class="btn-icon">📋</span>
                         <span class="btn-text">批量提取</span>
-                    </button>
-                    <button id="smartExtractBtn" class="action-btn smart-action-btn" style="display:none;">
-                        <span class="btn-icon">🤖</span>
-                        <span class="btn-text">智能提取</span>
-                    </button>
-                    <button id="cancelExtractionBtn" class="action-btn cancel-action-btn" style="display:none;">
-                        <span class="btn-icon">⏹️</span>
-                        <span class="btn-text">取消提取</span>
-                    </button>
-                    <button id="refreshStatusBtn" class="action-btn status-action-btn" style="display:none;">
-                        <span class="btn-icon">🔄</span>
-                        <span class="btn-text">刷新状态</span>
                     </button>
                     <button id="exportResultsBtn" class="action-btn" style="display:none;">导出结果</button>
                     <button id="clearResultsBtn" class="clear-btn">清空结果</button>
@@ -258,34 +173,21 @@
             </div>
             <div id="searchInfo" class="search-info"></div>
             
-            <!-- 详情提取统计信息（增强版） -->
+            <!-- 详情提取统计信息 -->
             <div id="detailExtractionStats" class="detail-extraction-stats" style="display:none;">
                 <div class="stats-content">
-                    <div class="stats-row">
-                        <span class="stats-item">
-                            <span class="stats-label">支持详情提取:</span>
-                            <span class="stats-value" id="supportedCount">0</span>
-                        </span>
-                        <span class="stats-item">
-                            <span class="stats-label">已提取:</span>
-                            <span class="stats-value" id="extractedCount">0</span>
-                        </span>
-                        <span class="stats-item">
-                            <span class="stats-label">提取成功率:</span>
-                            <span class="stats-value" id="successRate">0%</span>
-                        </span>
-                        <span class="stats-item">
-                            <span class="stats-label">平均时间:</span>
-                            <span class="stats-value" id="averageTime">0ms</span>
-                        </span>
-                    </div>
-                    <div class="stats-progress">
-                        <div class="progress-label">整体进度</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="overallProgress" style="width: 0%"></div>
-                        </div>
-                        <div class="progress-text" id="progressText">0/0</div>
-                    </div>
+                    <span class="stats-item">
+                        <span class="stats-label">支持详情提取:</span>
+                        <span class="stats-value" id="supportedCount">0</span>
+                    </span>
+                    <span class="stats-item">
+                        <span class="stats-label">已提取:</span>
+                        <span class="stats-value" id="extractedCount">0</span>
+                    </span>
+                    <span class="stats-item">
+                        <span class="stats-label">提取成功率:</span>
+                        <span class="stats-value" id="successRate">0%</span>
+                    </span>
                 </div>
             </div>
             
@@ -299,26 +201,16 @@
                 <div class="section-actions">
                     <button id="syncFavoritesBtn" class="sync-btn" style="display:none;">同步收藏</button>
                     <button id="importFavoritesBtn" class="action-btn" style="display:none;">导入收藏</button>
-                    <button id="exportFavoritesBtn" class="action-btn" style="display:none;">导出收藏</button>
                 </div>
             </div>
             <div class="favorites-controls" style="display:none;">
-                <div class="controls-row">
-                    <input type="text" id="favoritesSearch" placeholder="搜索收藏..." class="search-input">
-                    <select id="favoritesSort" class="sort-select">
-                        <option value="date-desc">按时间降序</option>
-                        <option value="date-asc">按时间升序</option>
-                        <option value="name-asc">按名称升序</option>
-                        <option value="name-desc">按名称降序</option>
-                        <option value="source">按来源分组</option>
-                    </select>
-                    <select id="favoritesFilter" class="filter-select">
-                        <option value="all">全部收藏</option>
-                        <option value="with-details">有详情的</option>
-                        <option value="without-details">无详情的</option>
-                        <option value="recent">最近添加</option>
-                    </select>
-                </div>
+                <input type="text" id="favoritesSearch" placeholder="搜索收藏..." class="search-input">
+                <select id="favoritesSort" class="sort-select">
+                    <option value="date-desc">按时间降序</option>
+                    <option value="date-asc">按时间升序</option>
+                    <option value="name-asc">按名称升序</option>
+                    <option value="name-desc">按名称降序</option>
+                </select>
             </div>
             <div id="favorites" class="favorites-grid"></div>
         </section>
@@ -327,7 +219,6 @@
         <section id="sitesSection" class="sites-section">
             <!-- 内容将通过JavaScript动态加载 -->
             <div class="loading-sites">
-                <div class="loading-spinner"></div>
                 <p>正在加载站点导航...</p>
             </div>
         </section>
@@ -420,195 +311,67 @@
         </div>
     </div>
 
-    <!-- 详情提取设置模态框（增强版） -->
-    <div id="detailSettingsModal" class="modal detail-settings-modal" aria-labelledby="detail-settings-title" role="dialog" style="display:none;">
-        <div class="modal-content modal-large">
+    <!-- 详情提取设置模态框 -->
+    <div id="detailSettingsModal" class="modal" aria-labelledby="detail-settings-title" role="dialog" style="display:none;">
+        <div class="modal-content">
             <span class="close" aria-label="关闭">&times;</span>
-            <h2 id="detail-settings-title">🔋 详情提取设置</h2>
-            
-            <div class="settings-tabs">
-                <button class="tab-btn active" data-tab="basic">基础设置</button>
-                <button class="tab-btn" data-tab="advanced">高级设置</button>
-                <button class="tab-btn" data-tab="display">显示选项</button>
-                <button class="tab-btn" data-tab="performance">性能优化</button>
-            </div>
-            
+            <h2 id="detail-settings-title">详情提取设置</h2>
             <form id="detailSettingsForm" novalidate>
-                <!-- 基础设置 -->
-                <div id="basicSettings" class="settings-panel active">
-                    <h3>基础提取设置</h3>
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="autoExtractDetails">
-                            <span>自动提取详情信息</span>
-                            <small>搜索后自动开始详情提取</small>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label for="maxAutoExtractions">自动提取数量上限:</label>
-                        <input type="number" id="maxAutoExtractions" min="1" max="20" value="5">
-                        <small>自动模式下最多提取多少个结果的详情</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="extractionBatchSize">批量提取大小:</label>
-                        <input type="number" id="extractionBatchSize" min="1" max="20" value="3">
-                        <small>每批次同时处理的提取任务数量</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="extractionTimeout">提取超时时间:</label>
-                        <input type="number" id="extractionTimeout" min="5000" max="30000" step="1000" value="15000">
-                        <small>单个详情提取的最大等待时间（毫秒）</small>
-                    </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="autoExtractDetails">
+                        <span>自动提取详情信息</span>
+                    </label>
                 </div>
-                
-                <!-- 高级设置 -->
-                <div id="advancedSettings" class="settings-panel">
-                    <h3>高级提取设置</h3>
-                    <div class="form-group">
-                        <label for="maxConcurrentExtractions">最大并发数:</label>
-                        <input type="number" id="maxConcurrentExtractions" min="1" max="10" value="4">
-                        <small>同时进行的最大提取任务数</small>
-                    </div>
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="enableExtractionRetry">
-                            <span>启用失败重试</span>
-                            <small>提取失败时自动重试</small>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label for="maxExtractionRetries">最大重试次数:</label>
-                        <input type="number" id="maxExtractionRetries" min="0" max="5" value="2">
-                    </div>
-                    <div class="form-group">
-                        <label for="extractionRetryDelay">重试延迟:</label>
-                        <input type="number" id="extractionRetryDelay" min="500" max="5000" step="500" value="1000">
-                        <small>重试前的等待时间（毫秒）</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="cacheStrategy">缓存策略:</label>
-                        <select id="cacheStrategy">
-                            <option value="aggressive">激进缓存</option>
-                            <option value="normal">正常缓存</option>
-                            <option value="conservative">保守缓存</option>
-                            <option value="disabled">禁用缓存</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label for="maxAutoExtractions">自动提取数量上限:</label>
+                    <input type="number" id="maxAutoExtractions" min="1" max="10" value="5">
                 </div>
-                
-                <!-- 显示选项 -->
-                <div id="displaySettings" class="settings-panel">
-                    <h3>内容显示设置</h3>
-                    <div class="form-group-grid">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="showScreenshots">
-                            <span>显示截图预览</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="showDownloadLinks">
-                            <span>显示下载链接</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="showMagnetLinks">
-                            <span>显示磁力链接</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="showActressInfo">
-                            <span>显示演员信息</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="showMetadata">
-                            <span>显示元数据</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="showTags">
-                            <span>显示标签</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="enableImagePreview">
-                            <span>启用图片预览</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="compactMode">
-                            <span>紧凑模式</span>
-                        </label>
-                    </div>
+                <div class="form-group">
+                    <label for="extractionBatchSize">批量提取大小:</label>
+                    <input type="number" id="extractionBatchSize" min="1" max="20" value="3">
                 </div>
-                
-                <!-- 性能优化 -->
-                <div id="performanceSettings" class="settings-panel">
-                    <h3>性能与过滤设置</h3>
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="enableContentFilter">
-                            <span>启用内容过滤</span>
-                            <small>根据关键词过滤不适宜的内容</small>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label for="contentFilterKeywords">过滤关键词:</label>
-                        <textarea id="contentFilterKeywords" placeholder="输入过滤关键词，用逗号分隔" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="enableImageOptimization">
-                            <span>启用图片优化</span>
-                            <small>自动优化图片加载和显示</small>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label for="preferredImageQuality">图片质量偏好:</label>
-                        <select id="preferredImageQuality">
-                            <option value="high">高质量</option>
-                            <option value="medium">中等质量</option>
-                            <option value="low">低质量（节省流量）</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="showExtractionProgress">
-                            <span>显示提取进度</span>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="showExtractionStats">
-                            <span>显示提取统计</span>
-                        </label>
-                    </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="showScreenshots">
+                        <span>显示截图预览</span>
+                    </label>
                 </div>
-                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="showDownloadLinks">
+                        <span>显示下载链接</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="showMagnetLinks">
+                        <span>显示磁力链接</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="showActressInfo">
+                        <span>显示演员信息</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enableImagePreview">
+                        <span>启用图片预览</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="compactMode">
+                        <span>紧凑模式</span>
+                    </label>
+                </div>
                 <div class="form-actions">
                     <button type="submit" class="submit-btn">保存设置</button>
                     <button type="button" class="cancel-btn" onclick="document.getElementById('detailSettingsModal').style.display='none'">取消</button>
-                    <button type="button" class="reset-btn" onclick="resetDetailSettings()">重置为默认</button>
-                    <button type="button" class="test-btn" onclick="testDetailExtraction()">测试提取</button>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- 详情提取历史模态框（新增） -->
-    <div id="extractionHistoryModal" class="modal" aria-labelledby="extraction-history-title" role="dialog" style="display:none;">
-        <div class="modal-content modal-large">
-            <span class="close" aria-label="关闭">&times;</span>
-            <h2 id="extraction-history-title">📊 详情提取历史</h2>
-            
-            <div class="history-controls">
-                <input type="text" id="historySearch" placeholder="搜索历史记录..." class="search-input">
-                <select id="historyFilter" class="filter-select">
-                    <option value="all">全部记录</option>
-                    <option value="success">成功</option>
-                    <option value="failed">失败</option>
-                    <option value="recent">最近7天</option>
-                </select>
-                <button id="clearHistoryBtn" class="action-btn">清空历史</button>
-                <button id="exportHistoryBtn" class="action-btn">导出历史</button>
-            </div>
-            
-            <div id="extractionHistoryList" class="extraction-history-list">
-                <!-- 历史记录将动态加载 -->
-            </div>
         </div>
     </div>
 
@@ -618,7 +381,6 @@
     <!-- Loading -->
     <div id="loading" class="loading" style="display:none;" aria-label="加载中">
         <div class="spinner"></div>
-        <div class="loading-text">正在处理请求...</div>
     </div>
 
     <!-- 连接状态指示器 -->
@@ -630,22 +392,7 @@
     <!-- 图片预览模态框容器 -->
     <div id="imagePreviewContainer"></div>
 
-    <!-- 详情提取帮助提示（新增） -->
-    <div id="extractionHelpTooltip" class="extraction-help-tooltip" style="display:none;">
-        <div class="tooltip-content">
-            <h4>详情提取功能说明</h4>
-            <ul>
-                <li>🔋 标识的站点支持详情提取</li>
-                <li>自动模式：搜索后立即开始提取</li>
-                <li>手动模式：点击"详情"按钮单独提取</li>
-                <li>批量模式：一次性提取多个结果</li>
-                <li>智能模式：根据质量自动选择最佳结果</li>
-            </ul>
-            <button class="tooltip-close" onclick="this.parentElement.parentElement.style.display='none'">知道了</button>
-        </div>
-    </div>
-
-    <!-- 主要脚本加载 -->
+    <!-- 🔄 核心变更：使用统一搜索组件的脚本加载 -->
     <script type="module">
         // 🔄 重要：现在使用更新后的服务架构初始化应用
         import MagnetSearchApp from './src/pages/main/main.js';
@@ -671,79 +418,10 @@
             }
         };
 
-        // 重置详情设置为默认值
-        window.resetDetailSettings = function() {
-            if (confirm('确定要重置所有详情提取设置为默认值吗？')) {
-                // 重置表单字段为默认值
-                document.getElementById('autoExtractDetails').checked = true;
-                document.getElementById('maxAutoExtractions').value = 5;
-                document.getElementById('extractionBatchSize').value = 3;
-                document.getElementById('extractionTimeout').value = 15000;
-                document.getElementById('maxConcurrentExtractions').value = 4;
-                document.getElementById('enableExtractionRetry').checked = true;
-                document.getElementById('maxExtractionRetries').value = 2;
-                document.getElementById('extractionRetryDelay').value = 1000;
-                document.getElementById('cacheStrategy').value = 'normal';
-                document.getElementById('showScreenshots').checked = true;
-                document.getElementById('showDownloadLinks').checked = true;
-                document.getElementById('showMagnetLinks').checked = true;
-                document.getElementById('showActressInfo').checked = true;
-                document.getElementById('showMetadata').checked = true;
-                document.getElementById('showTags').checked = true;
-                document.getElementById('enableImagePreview').checked = true;
-                document.getElementById('compactMode').checked = false;
-                document.getElementById('enableContentFilter').checked = false;
-                document.getElementById('contentFilterKeywords').value = '';
-                document.getElementById('enableImageOptimization').checked = true;
-                document.getElementById('preferredImageQuality').value = 'high';
-                document.getElementById('showExtractionProgress').checked = true;
-                document.getElementById('showExtractionStats').checked = true;
-                
-                showToast('设置已重置为默认值', 'success');
-            }
-        };
-
-        // 测试详情提取功能
-        window.testDetailExtraction = async function() {
-            if (!window.app || !window.app.currentUser) {
-                showToast('请先登录后再进行测试', 'error');
-                return;
-            }
-
-            try {
-                showLoading(true);
-                showToast('正在测试详情提取功能...', 'info');
-                
-                // 这里可以添加实际的测试逻辑
-                await new Promise(resolve => setTimeout(resolve, 2000)); // 模拟测试
-                
-                showToast('详情提取功能测试通过！', 'success');
-            } catch (error) {
-                console.error('测试详情提取功能失败:', error);
-                showToast('测试失败: ' + error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        };
-
         // 🔄 批量提取详情 - 使用统一搜索管理器
         window.batchExtractDetails = function() {
             if (window.unifiedSearchManager && window.unifiedSearchManager.extractBatchDetails) {
                 window.unifiedSearchManager.extractBatchDetails();
-            }
-        };
-
-        // 智能提取详情（新增）
-        window.smartExtractDetails = function() {
-            if (window.unifiedSearchManager && window.unifiedSearchManager.smartExtractDetails) {
-                window.unifiedSearchManager.smartExtractDetails();
-            }
-        };
-
-        // 取消详情提取（新增）
-        window.cancelExtraction = function() {
-            if (window.unifiedSearchManager && window.unifiedSearchManager.cancelExtraction) {
-                window.unifiedSearchManager.cancelExtraction();
             }
         };
 
@@ -765,12 +443,6 @@
                 
                 // 初始化详情提取功能相关的事件监听器
                 initDetailExtractionUI();
-                
-                // 初始化高级搜索选项
-                initAdvancedSearchOptions();
-                
-                // 初始化设置面板
-                initDetailSettingsPanel();
                 
                 console.log('✅ 应用初始化完成');
                 
@@ -808,18 +480,6 @@
                 batchExtractBtn.addEventListener('click', window.batchExtractDetails);
             }
 
-            // 智能提取按钮
-            const smartExtractBtn = document.getElementById('smartExtractBtn');
-            if (smartExtractBtn) {
-                smartExtractBtn.addEventListener('click', window.smartExtractDetails);
-            }
-
-            // 取消提取按钮
-            const cancelExtractionBtn = document.getElementById('cancelExtractionBtn');
-            if (cancelExtractionBtn) {
-                cancelExtractionBtn.addEventListener('click', window.cancelExtraction);
-            }
-
             // 详情设置表单
             const detailSettingsForm = document.getElementById('detailSettingsForm');
             if (detailSettingsForm) {
@@ -829,7 +489,6 @@
             // 搜索选项复选框
             const enableDetailCheckbox = document.getElementById('enableDetailExtraction');
             const enableStatusCheckbox = document.getElementById('enableSourceStatus');
-            const enableFilterCheckbox = document.getElementById('enableContentFilter');
             
             if (enableDetailCheckbox) {
                 enableDetailCheckbox.addEventListener('change', handleDetailExtractionToggle);
@@ -838,58 +497,6 @@
             if (enableStatusCheckbox) {
                 enableStatusCheckbox.addEventListener('change', handleSourceStatusToggle);
             }
-            
-            if (enableFilterCheckbox) {
-                enableFilterCheckbox.addEventListener('change', handleContentFilterToggle);
-            }
-        }
-
-        // 初始化高级搜索选项
-        function initAdvancedSearchOptions() {
-            const toggleBtn = document.getElementById('toggleSearchOptions');
-            const optionsPanel = document.querySelector('.search-options');
-            
-            if (toggleBtn && optionsPanel) {
-                toggleBtn.addEventListener('click', () => {
-                    const isVisible = optionsPanel.style.display !== 'none';
-                    optionsPanel.style.display = isVisible ? 'none' : 'block';
-                    
-                    const btnText = toggleBtn.querySelector('.btn-text');
-                    const btnIcon = toggleBtn.querySelector('.btn-icon');
-                    
-                    if (btnText) {
-                        btnText.textContent = isVisible ? '高级选项' : '隐藏选项';
-                    }
-                    
-                    if (btnIcon) {
-                        btnIcon.textContent = isVisible ? '⚙️' : '🔼';
-                    }
-                });
-            }
-        }
-
-        // 初始化设置面板
-        function initDetailSettingsPanel() {
-            const tabButtons = document.querySelectorAll('.tab-btn');
-            const settingsPanels = document.querySelectorAll('.settings-panel');
-            
-            tabButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const targetTab = btn.dataset.tab;
-                    
-                    // 更新标签按钮状态
-                    tabButtons.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    
-                    // 更新面板显示状态
-                    settingsPanels.forEach(panel => {
-                        panel.classList.remove('active');
-                        if (panel.id === targetTab + 'Settings') {
-                            panel.classList.add('active');
-                        }
-                    });
-                });
-            });
         }
 
         // 处理详情设置表单提交
@@ -906,26 +513,12 @@
                     autoExtractDetails: document.getElementById('autoExtractDetails').checked,
                     maxAutoExtractions: parseInt(document.getElementById('maxAutoExtractions').value),
                     extractionBatchSize: parseInt(document.getElementById('extractionBatchSize').value),
-                    extractionTimeout: parseInt(document.getElementById('extractionTimeout').value),
-                    maxConcurrentExtractions: parseInt(document.getElementById('maxConcurrentExtractions').value),
-                    enableExtractionRetry: document.getElementById('enableExtractionRetry').checked,
-                    maxExtractionRetries: parseInt(document.getElementById('maxExtractionRetries').value),
-                    extractionRetryDelay: parseInt(document.getElementById('extractionRetryDelay').value),
-                    cacheStrategy: document.getElementById('cacheStrategy').value,
                     showScreenshots: document.getElementById('showScreenshots').checked,
                     showDownloadLinks: document.getElementById('showDownloadLinks').checked,
                     showMagnetLinks: document.getElementById('showMagnetLinks').checked,
                     showActressInfo: document.getElementById('showActressInfo').checked,
-                    showMetadata: document.getElementById('showMetadata').checked,
-                    showTags: document.getElementById('showTags').checked,
                     enableImagePreview: document.getElementById('enableImagePreview').checked,
-                    compactMode: document.getElementById('compactMode').checked,
-                    enableContentFilter: document.getElementById('enableContentFilter').checked,
-                    contentFilterKeywords: document.getElementById('contentFilterKeywords').value.split(',').map(k => k.trim()).filter(k => k),
-                    enableImageOptimization: document.getElementById('enableImageOptimization').checked,
-                    preferredImageQuality: document.getElementById('preferredImageQuality').value,
-                    showExtractionProgress: document.getElementById('showExtractionProgress').checked,
-                    showExtractionStats: document.getElementById('showExtractionStats').checked
+                    compactMode: document.getElementById('compactMode').checked
                 };
 
                 // 保存设置到后端
@@ -999,30 +592,6 @@
                 showToast(`源状态检查已${enabled ? '启用' : '禁用'}`, 'success');
             } catch (error) {
                 console.error('切换源状态检查失败:', error);
-                event.target.checked = !event.target.checked;
-                showToast('设置失败: ' + error.message, 'error');
-            }
-        }
-
-        // 处理内容过滤开关
-        async function handleContentFilterToggle(event) {
-            if (!window.app || !window.app.currentUser) {
-                event.target.checked = false;
-                showToast('请先登录', 'error');
-                return;
-            }
-
-            try {
-                const enabled = event.target.checked;
-                const currentSettings = await apiService.getUserSettings();
-                await apiService.updateUserSettings({
-                    ...currentSettings,
-                    enableContentFilter: enabled
-                });
-
-                showToast(`内容过滤已${enabled ? '启用' : '禁用'}`, 'success');
-            } catch (error) {
-                console.error('切换内容过滤失败:', error);
                 event.target.checked = !event.target.checked;
                 showToast('设置失败: ' + error.message, 'error');
             }
