@@ -15,102 +15,123 @@ export class DetailExtractorService {
     this.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   }
 
-  /**
-   * 提取单个结果的详情信息 - 根据实际搜索数据优化版本
-   * @param {Object} searchResult - 搜索结果对象
-   * @param {Object} options - 提取选项
-   * @returns {Object} 详情信息对象
-   */
-  async extractSingleDetail(searchResult, options = {}) {
-    const { timeout = this.defaultTimeout, enableRetry = true } = options;
-    const startTime = Date.now();
+/**
+ * 提取单个搜索结果的详情信息 - 根据实际搜索数据优化版本
+ * @param {Object} searchResult - 搜索结果对象
+ * @param {Object} options - 提取选项
+ * @returns {Object} 详情信息对象
+ */
+async extractSingleDetail(searchResult, options = {}) {
+  const { timeout = this.defaultTimeout, enableRetry = true } = options;
+  const startTime = Date.now();
 
-    try {
-      console.log(`=== 开始提取详情 (根据实际数据优化) ===`);
-      console.log(`标题: ${searchResult.title}`);
-      console.log(`搜索URL: ${searchResult.url}`);
+  try {
+    console.log(`=== 开始提取详情 (根据实际数据优化) ===`);
+    console.log(`标题: ${searchResult.title}`);
+    console.log(`搜索URL: ${searchResult.url}`);
+    console.log(`原始ID: ${searchResult.id}`); // 添加ID日志
 
-      // 检测搜索源类型 - 使用优化的检测逻辑
-      const sourceType = extractionValidator.detectSourceType(searchResult.url, searchResult.source);
-      const searchDomain = extractionValidator.extractDomain(searchResult.url);
-      
-      console.log(`检测到搜索源类型: ${sourceType}`);
-      console.log(`搜索域名: ${searchDomain}`);
-      console.log(`源配置存在: ${!!SOURCE_SPECIFIC_CONFIG[sourceType]}`);
+    // 检测搜索源类型 - 使用优化的检测逻辑
+    const sourceType = extractionValidator.detectSourceType(searchResult.url, searchResult.source);
+    const searchDomain = extractionValidator.extractDomain(searchResult.url);
+    
+    console.log(`检测到搜索源类型: ${sourceType}`);
+    console.log(`搜索域名: ${searchDomain}`);
+    console.log(`源配置存在: ${!!SOURCE_SPECIFIC_CONFIG[sourceType]}`);
 
-      // 第一步：确定真正的详情页面URL
-      const detailPageUrl = await this.findActualDetailPageUrl(searchResult, sourceType, searchDomain, timeout);
-      console.log(`确定的详情页面URL: ${detailPageUrl}`);
+    // 第一步：确定真正的详情页面URL
+    const detailPageUrl = await this.findActualDetailPageUrl(searchResult, sourceType, searchDomain, timeout);
+    console.log(`确定的详情页面URL: ${detailPageUrl}`);
 
-      // 验证详情页面URL的有效性
-      if (!extractionValidator.validateDetailPageUrl(detailPageUrl, searchResult.url, sourceType)) {
-        throw new Error('未找到有效的详情页面URL');
-      }
-
-      // 第二步：获取详情页面内容
-      const pageContent = await this.fetchPageContent(detailPageUrl, timeout);
-      
-      if (!pageContent || pageContent.trim().length < 100) {
-        throw new Error('详情页面内容为空或过短');
-      }
-
-      console.log(`详情页面内容长度: ${pageContent.length}`);
-
-      // 第三步：解析详情信息
-      const detailInfo = await detailContentParser.parseDetailPage(pageContent, {
-        sourceType,
-        originalUrl: detailPageUrl,
-        originalTitle: searchResult.title
-      });
-
-      const extractionTime = Date.now() - startTime;
-
-      // 验证和增强数据
-      const validatedDetails = this.validateAndEnhanceDetails(
-        detailInfo, 
-        searchResult, 
-        detailPageUrl, 
-        searchDomain,
-        sourceType
-      );
-
-      console.log(`详情提取成功: ${searchResult.title} (${extractionTime}ms)`);
-
-      return {
-        ...validatedDetails,
-        extractionStatus: 'success',
-        extractionTime,
-        sourceType,
-        extractedAt: Date.now(),
-        detailPageUrl,
-        searchUrl: searchResult.url
-      };
-
-    } catch (error) {
-      const extractionTime = Date.now() - startTime;
-      console.error(`详情提取失败 [${searchResult.title}]:`, error);
-
-      // 重试机制
-      if (enableRetry && this.retryAttempts > 0) {
-        console.log(`尝试重试提取: ${searchResult.title}`);
-        await utils.delay(this.retryDelay);
-        
-        return await this.extractSingleDetail(searchResult, {
-          ...options,
-          enableRetry: false
-        });
-      }
-
-      return {
-        extractionStatus: 'error',
-        extractionError: error.message,
-        extractionTime,
-        extractedAt: Date.now(),
-        detailPageUrl: searchResult.url,
-        searchUrl: searchResult.url
-      };
+    // 验证详情页面URL的有效性
+    if (!extractionValidator.validateDetailPageUrl(detailPageUrl, searchResult.url, sourceType)) {
+      throw new Error('未找到有效的详情页面URL');
     }
+
+    // 第二步：获取详情页面内容
+    const pageContent = await this.fetchPageContent(detailPageUrl, timeout);
+    
+    if (!pageContent || pageContent.trim().length < 100) {
+      throw new Error('详情页面内容为空或过短');
+    }
+
+    console.log(`详情页面内容长度: ${pageContent.length}`);
+
+    // 第三步：解析详情信息
+    const detailInfo = await detailContentParser.parseDetailPage(pageContent, {
+      sourceType,
+      originalUrl: detailPageUrl,
+      originalTitle: searchResult.title
+    });
+
+    const extractionTime = Date.now() - startTime;
+
+    // 验证和增强数据
+    const validatedDetails = this.validateAndEnhanceDetails(
+      detailInfo, 
+      searchResult, 
+      detailPageUrl, 
+      searchDomain,
+      sourceType
+    );
+
+    console.log(`详情提取成功: ${searchResult.title} (${extractionTime}ms)`);
+
+    // 关键修复：确保返回包含原始ID的完整数据
+    return {
+      // 保留原始搜索结果的关键标识信息
+      id: searchResult.id,
+      originalId: searchResult.id,
+      originalUrl: searchResult.url,
+      originalTitle: searchResult.title,
+      originalSource: searchResult.source,
+      
+      // 验证后的详情数据
+      ...validatedDetails,
+      
+      // 提取状态和元数据
+      extractionStatus: 'success',
+      extractionTime,
+      sourceType,
+      extractedAt: Date.now(),
+      detailPageUrl,
+      searchUrl: searchResult.url
+    };
+
+  } catch (error) {
+    const extractionTime = Date.now() - startTime;
+    console.error(`详情提取失败 [${searchResult.title}]:`, error);
+
+    // 重试机制
+    if (enableRetry && this.retryAttempts > 0) {
+      console.log(`尝试重试提取: ${searchResult.title}`);
+      await utils.delay(this.retryDelay);
+      
+      return await this.extractSingleDetail(searchResult, {
+        ...options,
+        enableRetry: false
+      });
+    }
+
+    // 错误情况也要保留原始ID
+    return {
+      // 保留原始标识信息
+      id: searchResult.id,
+      originalId: searchResult.id,
+      originalUrl: searchResult.url,
+      originalTitle: searchResult.title,
+      originalSource: searchResult.source,
+      
+      // 错误状态
+      extractionStatus: 'error',
+      extractionError: error.message,
+      extractionTime,
+      extractedAt: Date.now(),
+      detailPageUrl: searchResult.url,
+      searchUrl: searchResult.url
+    };
   }
+}
 
   /**
    * 查找真正的详情页面URL - 根据实际数据优化版本

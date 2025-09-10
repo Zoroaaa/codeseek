@@ -335,91 +335,169 @@ export class UnifiedSearchManager {
     }
   }
 
-  /**
-   * 执行详情提取 - 使用完善的detailAPIService
-   */
-  async executeDetailExtraction(results, keyword) {
-    const startTime = Date.now();
+/**
+ * 执行详情提取 - 使用完善的detailAPIService
+ */
+async executeDetailExtraction(results, keyword) {
+  const startTime = Date.now();
+  
+  try {
+    // 生成批次ID用于进度跟踪
+    const batchId = this.generateBatchId();
     
-    try {
-      // 生成批次ID用于进度跟踪
-      const batchId = this.generateBatchId();
-      
-      // 设置进度回调
-      const progressCallback = (progress) => {
-        if (this.config.showExtractionProgress) {
-          this.updateExtractionProgress(progress.current, progress.total, progress.item);
-        }
-        
-        // 记录详细进度信息
-        console.log(`详情提取进度 [${progress.current}/${progress.total}]: ${progress.item} - ${progress.status}`);
-        
-        if (progress.error) {
-          console.warn(`提取错误 [${progress.item}]:`, progress.error);
-        }
-      };
+    console.log(`=== 开始详情提取流程 ===`);
+    console.log(`搜索结果数量: ${results.length}`);
+    console.log(`关键词: ${keyword}`);
+    console.log(`批次ID: ${batchId}`);
+    
+    // 构建ID映射表，确保结果能正确对应
+    const resultIdMap = new Map();
+    const resultUrlMap = new Map();
+    results.forEach(result => {
+      if (result.id) {
+        resultIdMap.set(result.url, result.id); // 以URL为键建立映射
+        resultUrlMap.set(result.id, result); // 以ID为键建立反向映射
+        console.log(`ID映射: ${result.id} -> ${result.url} (${result.title})`);
+      }
+    });
 
-      // 使用detailAPIService执行批量详情提取
-      const extractionResult = await detailAPIService.extractBatchDetails(results, {
-        enableCache: this.config.enableCache,
-        timeout: this.config.extractionTimeout,
-        enableRetry: this.config.enableRetry,
-        maxRetries: this.config.maxRetryAttempts,
-        maxConcurrency: this.config.extractionBatchSize,
-        progressInterval: 1000,
-        stopOnError: false,
-        strictValidation: this.config.strictValidation,
-        batchId,
-        onProgress: progressCallback
+    console.log(`构建了 ${resultIdMap.size} 个ID映射`);
+    
+    // 设置进度回调
+    const progressCallback = (progress) => {
+      if (this.config.showExtractionProgress) {
+        this.updateExtractionProgress(progress.current, progress.total, progress.item);
+      }
+      
+      // 记录详细进度信息
+      console.log(`详情提取进度 [${progress.current}/${progress.total}]: ${progress.item} - ${progress.status}`);
+      
+      if (progress.error) {
+        console.warn(`提取错误 [${progress.item}]:`, progress.error);
+      }
+    };
+
+    // 使用detailAPIService执行批量详情提取
+    const extractionResult = await detailAPIService.extractBatchDetails(results, {
+      enableCache: this.config.enableCache,
+      timeout: this.config.extractionTimeout,
+      enableRetry: this.config.enableRetry,
+      maxRetries: this.config.maxRetryAttempts,
+      maxConcurrency: this.config.extractionBatchSize,
+      progressInterval: 1000,
+      stopOnError: false,
+      strictValidation: this.config.strictValidation,
+      batchId,
+      onProgress: progressCallback
+    });
+
+    // 关键修复：处理返回结果，确保ID正确映射
+    if (extractionResult.results) {
+      console.log(`=== 修复返回结果的ID映射 ===`);
+      
+      extractionResult.results.forEach((result, index) => {
+        // 确保每个结果都有正确的ID
+        let finalId = result.id;
+        
+        // 如果后端返回的结果没有id，通过多种方式找回原始id
+        if (!finalId) {
+          // 方法1：通过searchUrl或originalUrl找回ID
+          if (result.searchUrl) {
+            finalId = resultIdMap.get(result.searchUrl);
+          }
+          
+          if (!finalId && result.originalUrl) {
+            finalId = resultIdMap.get(result.originalUrl);
+          }
+          
+          // 方法2：通过url字段找回ID
+          if (!finalId && result.url) {
+            finalId = resultIdMap.get(result.url);
+          }
+          
+          // 方法3：通过索引对应原始结果
+          if (!finalId && index < results.length) {
+            finalId = results[index].id;
+          }
+          
+          // 方法4：生成临时ID
+          if (!finalId) {
+            finalId = `temp_${Date.now()}_${index}`;
+            console.warn(`无法找回原始ID，生成临时ID: ${finalId}`);
+          }
+          
+          result.id = finalId;
+        }
+        
+        // 确保原始搜索结果信息被保留
+        const originalResult = resultUrlMap.get(finalId) || results.find(r => r.id === finalId);
+        if (originalResult) {
+          result.originalId = originalResult.id;
+          result.originalTitle = originalResult.title || result.title;
+          result.originalSource = originalResult.source;
+          result.originalUrl = originalResult.url;
+          
+          // 如果标题为空，使用原始标题
+          if (!result.title || result.title === '未知标题') {
+            result.title = originalResult.title || result.title;
+          }
+        }
+        
+        console.log(`结果ID映射完成: ${finalId} -> ${result.title} (${result.extractionStatus})`);
       });
-
-      const totalTime = Date.now() - startTime;
-      
-      console.log(`=== 批量详情提取完成 ===`);
-      console.log(`总用时: ${totalTime}ms`);
-      console.log(`处理结果: ${extractionResult.results?.length || 0} 个`);
-      console.log(`统计信息:`, extractionResult.stats);
-      
-      return {
-        ...extractionResult,
-        totalTime,
-        keyword,
-        batchId
-      };
-
-    } catch (error) {
-      const totalTime = Date.now() - startTime;
-      console.error('批量详情提取失败:', error);
-      
-      return {
-        results: results.map(result => ({
-          ...result,
-          extractionStatus: 'error',
-          extractionError: error.message,
-          extractionTime: 0
-        })),
-        stats: {
-          total: results.length,
-          successful: 0,
-          failed: results.length,
-          cached: 0,
-          totalTime,
-          averageTime: 0,
-          successRate: 0,
-          cacheHitRate: 0
-        },
-        summary: {
-          processed: results.length,
-          successful: 0,
-          failed: results.length,
-          message: `批量详情提取失败: ${error.message}`
-        },
-        totalTime,
-        keyword,
-        error: error.message
-      };
     }
+
+    const totalTime = Date.now() - startTime;
+    
+    console.log(`=== 批量详情提取完成 ===`);
+    console.log(`总用时: ${totalTime}ms`);
+    console.log(`处理结果: ${extractionResult.results?.length || 0} 个`);
+    console.log(`统计信息:`, extractionResult.stats);
+    
+    return {
+      ...extractionResult,
+      totalTime,
+      keyword,
+      batchId
+    };
+
+  } catch (error) {
+    const totalTime = Date.now() - startTime;
+    console.error('批量详情提取失败:', error);
+    
+    // 构建错误响应，确保每个结果都有正确的ID
+    const errorResults = results.map(result => ({
+      ...result, // 保留原始结果的所有字段，包括ID
+      extractionStatus: 'error',
+      extractionError: error.message,
+      extractionTime: 0,
+      extractedAt: Date.now()
+    }));
+    
+    return {
+      results: errorResults,
+      stats: {
+        total: results.length,
+        successful: 0,
+        failed: results.length,
+        cached: 0,
+        totalTime,
+        averageTime: 0,
+        successRate: 0,
+        cacheHitRate: 0
+      },
+      summary: {
+        processed: results.length,
+        successful: 0,
+        failed: results.length,
+        message: `批量详情提取失败: ${error.message}`
+      },
+      totalTime,
+      keyword,
+      error: error.message
+    };
   }
+}
 
   /**
    * 处理提取结果
@@ -463,52 +541,149 @@ export class UnifiedSearchManager {
     }
   }
 
-  /**
-   * 处理单个提取结果
-   */
-  async handleSingleExtractionResult(result) {
-    try {
-      const resultContainer = document.querySelector(`[data-result-id="${result.id}"]`);
-      if (!resultContainer) {
-        console.warn('未找到对应的结果容器:', result.id);
-        return;
+/**
+ * 处理单个提取结果
+ */
+async handleSingleExtractionResult(result) {
+  try {
+    console.log(`=== 处理单个提取结果 ===`);
+    console.log(`结果ID: ${result.id}`);
+    console.log(`标题: ${result.title}`);
+    console.log(`源类型: ${result.sourceType}`);
+    console.log(`提取状态: ${result.extractionStatus}`);
+    
+    // 尝试多种方式找到对应的DOM容器
+    let resultContainer = null;
+    
+    // 方式1：使用data-result-id属性
+    if (result.id) {
+      resultContainer = document.querySelector(`[data-result-id="${result.id}"]`);
+      if (resultContainer) {
+        console.log(`通过data-result-id找到容器: ${result.id}`);
       }
-
-      if (result.extractionStatus === 'success' || result.extractionStatus === 'cached') {
-        // 创建详情卡片
-        const detailCardHTML = detailCardManager.createDetailCardHTML(result, result, {
-          compactMode: this.config.compactMode,
-          showScreenshots: this.config.showScreenshots,
-          showDownloadLinks: this.config.showDownloadLinks,
-          showMagnetLinks: this.config.showMagnetLinks,
-          showActressInfo: this.config.showActressInfo,
-          enableImagePreview: this.config.enableImagePreview,
-          enableContentFilter: this.config.enableContentFilter,
-          contentFilterKeywords: this.config.contentFilterKeywords
-        });
-
-        // 插入详情卡片
-        const detailContainer = this.getOrCreateDetailContainer(resultContainer);
-        detailContainer.innerHTML = detailCardHTML;
-        detailContainer.style.display = 'block';
-
-        // 添加展开/收起功能
-        this.addDetailToggleButton(resultContainer);
-        
-        // 添加详情卡片事件绑定
-        this.bindDetailCardEvents(detailContainer, result);
-
-        console.log(`详情卡片创建成功: ${result.title}`);
-
-      } else {
-        // 显示提取失败状态
-        this.showExtractionError(resultContainer, result.extractionError, result);
-      }
-
-    } catch (error) {
-      console.error('处理提取结果失败:', error);
     }
+    
+    // 方式2：使用data-id属性（备选）
+    if (!resultContainer && result.id) {
+      resultContainer = document.querySelector(`[data-id="${result.id}"]`);
+      if (resultContainer) {
+        console.log(`通过data-id找到容器: ${result.id}`);
+      }
+    }
+    
+    // 方式3：使用originalId（如果存在）
+    if (!resultContainer && result.originalId) {
+      resultContainer = document.querySelector(`[data-result-id="${result.originalId}"]`) ||
+                       document.querySelector(`[data-id="${result.originalId}"]`);
+      if (resultContainer) {
+        console.log(`通过originalId找到容器: ${result.originalId}`);
+      }
+    }
+    
+    // 方式4：通过URL匹配（最后的备选方案）
+    if (!resultContainer && (result.originalUrl || result.searchUrl)) {
+      const searchUrl = result.originalUrl || result.searchUrl;
+      const allContainers = document.querySelectorAll('.result-item');
+      
+      for (const container of allContainers) {
+        const titleElement = container.querySelector('.result-title');
+        const urlElement = container.querySelector('.result-url');
+        const visitButton = container.querySelector('[data-url]');
+        
+        if (visitButton && visitButton.dataset.url === searchUrl) {
+          resultContainer = container;
+          console.log(`通过URL匹配找到容器: ${searchUrl}`);
+          break;
+        }
+        
+        if (urlElement && urlElement.textContent.includes(searchUrl)) {
+          resultContainer = container;
+          console.log(`通过URL文本匹配找到容器: ${searchUrl}`);
+          break;
+        }
+      }
+    }
+    
+    if (!resultContainer) {
+      console.error('完全找不到结果容器，详细信息:', {
+        searchId: result.id,
+        originalId: result.originalId,
+        title: result.title,
+        url: result.originalUrl || result.searchUrl,
+        extractionStatus: result.extractionStatus
+      });
+      
+      // 输出当前页面所有可用容器的信息用于调试
+      const allContainers = Array.from(document.querySelectorAll('.result-item'));
+      console.log('所有可用的结果容器:', allContainers.map(el => ({
+        dataId: el.dataset.id,
+        resultId: el.dataset.resultId,
+        title: el.querySelector('.result-title')?.textContent?.trim(),
+        url: el.querySelector('[data-url]')?.dataset.url
+      })));
+      
+      return;
+    }
+
+    // 处理提取结果
+    if (result.extractionStatus === 'success' || result.extractionStatus === 'cached') {
+      await this.processSuccessfulExtraction(resultContainer, result);
+    } else {
+      await this.processFailedExtraction(resultContainer, result);
+    }
+
+  } catch (error) {
+    console.error('处理提取结果失败:', error, {
+      resultId: result.id,
+      title: result.title,
+      extractionStatus: result.extractionStatus
+    });
   }
+}
+
+/**
+ * 处理成功的提取结果
+ */
+async processSuccessfulExtraction(resultContainer, result) {
+  try {
+    // 创建详情卡片
+    const detailCardHTML = detailCardManager.createDetailCardHTML(result, result, {
+      compactMode: this.config.compactMode,
+      showScreenshots: this.config.showScreenshots,
+      showDownloadLinks: this.config.showDownloadLinks,
+      showMagnetLinks: this.config.showMagnetLinks,
+      showActressInfo: this.config.showActressInfo,
+      enableImagePreview: this.config.enableImagePreview,
+      enableContentFilter: this.config.enableContentFilter,
+      contentFilterKeywords: this.config.contentFilterKeywords
+    });
+
+    // 插入详情卡片
+    const detailContainer = this.getOrCreateDetailContainer(resultContainer);
+    detailContainer.innerHTML = detailCardHTML;
+    detailContainer.style.display = 'block';
+
+    // 添加展开/收起功能
+    this.addDetailToggleButton(resultContainer);
+    
+    // 添加详情卡片事件绑定
+    this.bindDetailCardEvents(detailContainer, result);
+
+    console.log(`详情卡片创建成功: ${result.title} (${result.extractionStatus})`);
+    
+  } catch (error) {
+    console.error('处理成功提取结果失败:', error);
+    await this.processFailedExtraction(resultContainer, result);
+  }
+}
+
+/**
+ * 处理失败的提取结果
+ */
+async processFailedExtraction(resultContainer, result) {
+  // 显示提取失败状态
+  this.showExtractionError(resultContainer, result.extractionError, result);
+}
 
   /**
    * 绑定详情卡片事件

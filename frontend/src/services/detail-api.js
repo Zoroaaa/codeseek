@@ -463,67 +463,81 @@ class DetailAPIService {
 
   // ===================== 响应处理方法 =====================
 
-  /**
-   * 处理单个提取响应
-   */
-  processExtractionResponse(response, originalResult) {
-    const data = response.data || response;
-    const detailInfo = data.detailInfo || data;
-    const metadata = data.metadata || {};
+/**
+ * 处理单个提取响应
+ */
+processExtractionResponse(response, originalResult) {
+  const data = response.data || response;
+  const detailInfo = data.detailInfo || data;
+  const metadata = data.metadata || {};
 
-    // 与后端buildSuccessResponse结构保持一致
-    return {
-      // 从原始搜索结果继承的基础信息
-      ...originalResult,
-      
-      // 后端返回的详情信息
-      title: detailInfo.title || originalResult.title || '未知标题',
-      code: detailInfo.code || '',
-      sourceType: detailInfo.sourceType || 'unknown',
-      
-      // URL信息
-      detailUrl: detailInfo.detailPageUrl || detailInfo.detailUrl || originalResult.url,
-      searchUrl: detailInfo.searchUrl || originalResult.url,
-      originalUrl: originalResult.url,
-      
-      // 媒体信息
-      coverImage: detailInfo.coverImage || '',
-      screenshots: Array.isArray(detailInfo.screenshots) ? detailInfo.screenshots : [],
-      
-      // 演员信息
-      actresses: Array.isArray(detailInfo.actresses) ? detailInfo.actresses : [],
-      director: detailInfo.director || '',
-      studio: detailInfo.studio || '',
-      label: detailInfo.label || '',
-      series: detailInfo.series || '',
-      
-      // 发布信息
-      releaseDate: detailInfo.releaseDate || '',
-      duration: detailInfo.duration || '',
-      
-      // 技术信息
-      quality: detailInfo.quality || '',
-      fileSize: detailInfo.fileSize || '',
-      resolution: detailInfo.resolution || '',
-      
-      // 下载信息
-      downloadLinks: Array.isArray(detailInfo.downloadLinks) ? detailInfo.downloadLinks : [],
-      magnetLinks: Array.isArray(detailInfo.magnetLinks) ? detailInfo.magnetLinks : [],
-      
-      // 其他信息
-      description: detailInfo.description || '',
-      tags: Array.isArray(detailInfo.tags) ? detailInfo.tags : [],
-      rating: typeof detailInfo.rating === 'number' ? detailInfo.rating : 0,
-      
-      // 提取元数据
-      extractionStatus: detailInfo.extractionStatus || this.EXTRACTION_STATUS.SUCCESS,
-      extractionTime: detailInfo.extractionTime || metadata.totalTime || 0,
-      extractedAt: detailInfo.extractedAt || Date.now(),
-      fromCache: metadata.fromCache || detailInfo.extractionStatus === this.EXTRACTION_STATUS.CACHED,
-      retryCount: metadata.retryCount || 0,
-      cacheKey: metadata.cacheKey || null
-    };
-  }
+  console.log('处理提取响应:', {
+    originalId: originalResult.id,
+    originalTitle: originalResult.title,
+    responseTitle: detailInfo.title,
+    extractionStatus: detailInfo.extractionStatus
+  });
+
+  // 与后端buildSuccessResponse结构保持一致
+  return {
+    // 关键修复：确保原始ID被正确保留并优先使用
+    id: originalResult.id,  // 明确设置为原始搜索结果的ID
+    originalId: originalResult.id,
+    
+    // 从原始搜索结果继承的基础信息
+    originalUrl: originalResult.url,
+    originalTitle: originalResult.title,
+    originalSource: originalResult.source,
+    source: originalResult.source, // 保持兼容性
+    
+    // 后端返回的详情信息会覆盖同名字段
+    title: detailInfo.title || originalResult.title || '未知标题',
+    code: detailInfo.code || '',
+    sourceType: detailInfo.sourceType || 'unknown',
+    
+    // URL信息
+    detailUrl: detailInfo.detailPageUrl || detailInfo.detailUrl || originalResult.url,
+    searchUrl: detailInfo.searchUrl || originalResult.url,
+    url: detailInfo.detailUrl || originalResult.url, // 兼容性字段
+    
+    // 媒体信息
+    coverImage: detailInfo.coverImage || '',
+    screenshots: Array.isArray(detailInfo.screenshots) ? detailInfo.screenshots : [],
+    
+    // 演员信息
+    actresses: Array.isArray(detailInfo.actresses) ? detailInfo.actresses : [],
+    director: detailInfo.director || '',
+    studio: detailInfo.studio || '',
+    label: detailInfo.label || '',
+    series: detailInfo.series || '',
+    
+    // 发布信息
+    releaseDate: detailInfo.releaseDate || '',
+    duration: detailInfo.duration || '',
+    
+    // 技术信息
+    quality: detailInfo.quality || '',
+    fileSize: detailInfo.fileSize || '',
+    resolution: detailInfo.resolution || '',
+    
+    // 下载信息
+    downloadLinks: Array.isArray(detailInfo.downloadLinks) ? detailInfo.downloadLinks : [],
+    magnetLinks: Array.isArray(detailInfo.magnetLinks) ? detailInfo.magnetLinks : [],
+    
+    // 其他信息
+    description: detailInfo.description || '',
+    tags: Array.isArray(detailInfo.tags) ? detailInfo.tags : [],
+    rating: typeof detailInfo.rating === 'number' ? detailInfo.rating : 0,
+    
+    // 提取元数据
+    extractionStatus: detailInfo.extractionStatus || this.EXTRACTION_STATUS.SUCCESS,
+    extractionTime: detailInfo.extractionTime || metadata.totalTime || 0,
+    extractedAt: detailInfo.extractedAt || Date.now(),
+    fromCache: metadata.fromCache || detailInfo.extractionStatus === this.EXTRACTION_STATUS.CACHED,
+    retryCount: metadata.retryCount || 0,
+    cacheKey: metadata.cacheKey || null
+  };
+}
 
   /**
    * 处理批量响应
