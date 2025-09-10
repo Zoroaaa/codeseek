@@ -1,4 +1,4 @@
-// src/components/search.js - 完善的统一搜索组件（集成完善的后端详情提取服务）
+// src/components/search.js - 统一搜索组件（集成基础搜索和详情提取功能）
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../utils/format.js';
@@ -19,33 +19,21 @@ export class UnifiedSearchManager {
     this.statusCheckInProgress = false;
     this.lastStatusCheckKeyword = null;
     
-    // 详情提取相关状态 - 与后端服务对齐
+    // 详情提取相关状态
     this.extractionInProgress = false;
     this.extractionQueue = [];
-    this.extractionStats = {
-      totalExtractions: 0,
-      successfulExtractions: 0,
-      failedExtractions: 0,
-      cacheHits: 0,
-      averageTime: 0
-    };
-    
-    // 配置管理 - 与后端constants.js保持一致
     this.config = {
       // 基础搜索配置
       useCache: true,
       saveToHistory: true,
       
-      // 详情提取配置 - 与后端CONFIG.DETAIL_EXTRACTION对齐
+      // 详情提取配置
       enableDetailExtraction: false,
       autoExtractDetails: false,
       maxAutoExtractions: 5,
       extractionBatchSize: 3,
-      extractionTimeout: 15000,
-      enableRetry: true,
-      maxRetryAttempts: 2,
-      enableCache: true,
       showExtractionProgress: true,
+      enableCache: true,
       
       // 显示选项
       showScreenshots: true,
@@ -53,17 +41,8 @@ export class UnifiedSearchManager {
       showMagnetLinks: true,
       showActressInfo: true,
       compactMode: false,
-      enableImagePreview: true,
-      
-      // 高级选项
-      strictValidation: true,
-      enableContentFilter: false,
-      contentFilterKeywords: []
+      enableImagePreview: true
     };
-    
-    // 进度追踪
-    this.progressCallbacks = new Map();
-    this.extractionInsights = [];
   }
 
   async init() {
@@ -72,9 +51,6 @@ export class UnifiedSearchManager {
     try {
       // 初始化详情卡片管理器
       await detailCardManager.init();
-      
-      // 检查详情API服务健康状态
-      await this.checkDetailServiceHealth();
       
       // 加载用户配置
       await this.loadUserConfig();
@@ -92,58 +68,14 @@ export class UnifiedSearchManager {
       this.exposeGlobalMethods();
       
       this.isInitialized = true;
-      console.log('统一搜索管理器初始化完成，详情提取服务已就绪');
+      console.log('统一搜索管理器初始化完成');
     } catch (error) {
       console.error('搜索管理器初始化失败:', error);
-      showToast('搜索功能初始化失败，部分功能可能不可用', 'warning');
     }
   }
 
   /**
-   * 检查详情提取服务健康状态
-   */
-  async checkDetailServiceHealth() {
-    try {
-      if (!authManager.isAuthenticated()) {
-        console.log('用户未登录，跳过详情服务健康检查');
-        return;
-      }
-      
-      const healthCheck = await detailAPIService.checkServiceHealth();
-      
-      if (healthCheck.healthy) {
-        console.log(`详情提取服务健康检查通过 (响应时间: ${healthCheck.responseTime}ms)`);
-        this.updateServiceStatus(true, healthCheck);
-      } else {
-        console.warn('详情提取服务健康检查失败:', healthCheck.error);
-        this.updateServiceStatus(false, healthCheck);
-      }
-    } catch (error) {
-      console.warn('详情服务健康检查异常:', error);
-      this.updateServiceStatus(false, { error: error.message });
-    }
-  }
-
-  /**
-   * 更新服务状态指示器
-   */
-  updateServiceStatus(isHealthy, healthData) {
-    const statusIndicator = document.getElementById('detailServiceStatus');
-    if (statusIndicator) {
-      statusIndicator.className = `service-status ${isHealthy ? 'healthy' : 'unhealthy'}`;
-      statusIndicator.innerHTML = `
-        <span class="status-icon">${isHealthy ? '✅' : '⚠️'}</span>
-        <span class="status-text">详情提取: ${isHealthy ? '正常' : '异常'}</span>
-        ${healthData.responseTime ? `<small>${healthData.responseTime}ms</small>` : ''}
-      `;
-      statusIndicator.title = isHealthy ? 
-        `详情提取服务运行正常\n响应时间: ${healthData.responseTime}ms\n缓存命中率: ${healthData.localCache?.hitRate || 0}%` :
-        `详情提取服务异常: ${healthData.error || '未知错误'}`;
-    }
-  }
-
-  /**
-   * 执行搜索 - 增强版本，完整集成后端详情提取服务
+   * 执行搜索 - 智能选择基础搜索或增强搜索
    */
   async performSearch() {
     const searchInput = document.getElementById('searchInput');
@@ -167,7 +99,7 @@ export class UnifiedSearchManager {
       // 隐藏提示区域
       this.hideQuickTips();
 
-      // 显示搜索状态检查进度（如果可用）
+      // 显示搜索状态检查进度（如果启用）
       await this.showSearchStatusIfEnabled(keyword);
 
       // 执行基础搜索
@@ -192,8 +124,7 @@ export class UnifiedSearchManager {
 
       // 检查是否启用详情提取
       if (this.shouldUseDetailExtraction() && authManager.isAuthenticated()) {
-        console.log('开始详情提取流程...');
-        await this.handleDetailExtraction(searchResults, keyword);
+        await this.handleDetailExtraction(searchResults);
       } else if (!authManager.isAuthenticated() && this.config.enableDetailExtraction) {
         showToast('登录后可使用详情提取功能', 'info', 3000);
       }
@@ -252,9 +183,9 @@ export class UnifiedSearchManager {
   }
 
   /**
-   * 处理详情提取 - 完全重写，集成完善的后端服务
+   * 处理详情提取
    */
-  async handleDetailExtraction(searchResults, keyword) {
+  async handleDetailExtraction(searchResults) {
     if (this.extractionInProgress) {
       console.log('详情提取正在进行中，跳过本次请求');
       return;
@@ -263,49 +194,27 @@ export class UnifiedSearchManager {
     try {
       this.extractionInProgress = true;
       
-      console.log(`=== 开始详情提取流程 ===`);
-      console.log(`搜索结果数量: ${searchResults.length}`);
-      console.log(`关键词: ${keyword}`);
-      console.log(`配置:`, this.config);
-      
       // 确定要提取详情的结果
-      const resultsToExtract = this.selectResultsForExtraction(searchResults);
-      
+      const resultsToExtract = this.config.autoExtractDetails ? 
+        searchResults.slice(0, this.config.maxAutoExtractions) :
+        searchResults.filter(result => this.shouldExtractDetail(result));
+
       if (resultsToExtract.length === 0) {
         console.log('没有需要提取详情的结果');
-        this.showExtractionInsight('no_results', { 
-          total: searchResults.length,
-          keyword 
-        });
         return;
       }
-
-      console.log(`筛选出 ${resultsToExtract.length} 个结果进行详情提取`);
 
       // 显示提取进度
       if (this.config.showExtractionProgress) {
         this.showExtractionProgress(resultsToExtract.length);
       }
 
-      // 执行详情提取
-      const extractionResult = await this.executeDetailExtraction(resultsToExtract, keyword);
-      
-      // 处理提取结果
-      await this.processExtractionResults(extractionResult, resultsToExtract);
-      
-      // 更新统计信息
-      this.updateExtractionStats(extractionResult);
-      
-      // 显示提取洞察
-      this.showExtractionInsights(extractionResult, keyword);
+      // 分批提取详情
+      await this.extractDetailsInBatches(resultsToExtract);
 
     } catch (error) {
       console.error('详情提取失败:', error);
       showToast('详情提取失败: ' + error.message, 'error');
-      this.showExtractionInsight('error', { 
-        error: error.message,
-        keyword 
-      });
     } finally {
       this.extractionInProgress = false;
       this.hideExtractionProgress();
@@ -313,154 +222,52 @@ export class UnifiedSearchManager {
   }
 
   /**
-   * 选择要提取详情的结果
+   * 分批提取详情
    */
-  selectResultsForExtraction(searchResults) {
-    // 过滤支持详情提取的结果
-    const supportedResults = searchResults.filter(result => 
-      this.shouldExtractDetail(result)
-    );
-    
-    console.log(`支持详情提取的结果: ${supportedResults.length}/${searchResults.length}`);
-    
-    if (this.config.autoExtractDetails) {
-      // 自动提取模式：取前N个结果
-      const selected = supportedResults.slice(0, this.config.maxAutoExtractions);
-      console.log(`自动提取模式，选择前 ${selected.length} 个结果`);
-      return selected;
-    } else {
-      // 手动模式：返回所有支持的结果，让用户选择
-      console.log(`手动提取模式，返回所有 ${supportedResults.length} 个支持的结果`);
-      return supportedResults;
-    }
-  }
+  async extractDetailsInBatches(results) {
+    const batchSize = this.config.extractionBatchSize;
+    let processedCount = 0;
 
-  /**
-   * 执行详情提取 - 使用完善的detailAPIService
-   */
-  async executeDetailExtraction(results, keyword) {
-    const startTime = Date.now();
-    
-    try {
-      // 生成批次ID用于进度跟踪
-      const batchId = this.generateBatchId();
+    for (let i = 0; i < results.length; i += batchSize) {
+      const batch = results.slice(i, i + batchSize);
       
-      // 设置进度回调
-      const progressCallback = (progress) => {
-        if (this.config.showExtractionProgress) {
-          this.updateExtractionProgress(progress.current, progress.total, progress.item);
-        }
-        
-        // 记录详细进度信息
-        console.log(`详情提取进度 [${progress.current}/${progress.total}]: ${progress.item} - ${progress.status}`);
-        
-        if (progress.error) {
-          console.warn(`提取错误 [${progress.item}]:`, progress.error);
-        }
-      };
-
-      // 使用detailAPIService执行批量详情提取
-      const extractionResult = await detailAPIService.extractBatchDetails(results, {
-        enableCache: this.config.enableCache,
-        timeout: this.config.extractionTimeout,
-        enableRetry: this.config.enableRetry,
-        maxRetries: this.config.maxRetryAttempts,
-        maxConcurrency: this.config.extractionBatchSize,
-        progressInterval: 1000,
-        stopOnError: false,
-        strictValidation: this.config.strictValidation,
-        batchId,
-        onProgress: progressCallback
-      });
-
-      const totalTime = Date.now() - startTime;
-      
-      console.log(`=== 批量详情提取完成 ===`);
-      console.log(`总用时: ${totalTime}ms`);
-      console.log(`处理结果: ${extractionResult.results?.length || 0} 个`);
-      console.log(`统计信息:`, extractionResult.stats);
-      
-      return {
-        ...extractionResult,
-        totalTime,
-        keyword,
-        batchId
-      };
-
-    } catch (error) {
-      const totalTime = Date.now() - startTime;
-      console.error('批量详情提取失败:', error);
-      
-      return {
-        results: results.map(result => ({
-          ...result,
-          extractionStatus: 'error',
-          extractionError: error.message,
-          extractionTime: 0
-        })),
-        stats: {
-          total: results.length,
-          successful: 0,
-          failed: results.length,
-          cached: 0,
-          totalTime,
-          averageTime: 0,
-          successRate: 0,
-          cacheHitRate: 0
-        },
-        summary: {
-          processed: results.length,
-          successful: 0,
-          failed: results.length,
-          message: `批量详情提取失败: ${error.message}`
-        },
-        totalTime,
-        keyword,
-        error: error.message
-      };
-    }
-  }
-
-  /**
-   * 处理提取结果
-   */
-  async processExtractionResults(extractionResult, originalResults) {
-    const { results, stats } = extractionResult;
-    
-    console.log(`=== 处理详情提取结果 ===`);
-    console.log(`结果数量: ${results?.length || 0}`);
-    console.log(`成功: ${stats?.successful || 0}`);
-    console.log(`失败: ${stats?.failed || 0}`);
-    console.log(`缓存命中: ${stats?.cached || 0}`);
-    
-    if (!results || results.length === 0) {
-      console.warn('没有详情提取结果需要处理');
-      return;
-    }
-
-    // 逐个处理提取结果
-    for (const result of results) {
       try {
-        await this.handleSingleExtractionResult(result);
+        // 批量提取详情
+        const extractionResult = await detailAPIService.extractBatchDetails(batch, {
+          enableCache: this.config.enableCache,
+          timeout: 15000
+        });
+
+        // 处理提取结果
+        for (const result of extractionResult.results) {
+          await this.handleSingleExtractionResult(result);
+          processedCount++;
+          
+          // 更新进度
+          if (this.config.showExtractionProgress) {
+            this.updateExtractionProgress(processedCount, results.length);
+          }
+        }
+
+        // 批次间延迟
+        if (i + batchSize < results.length) {
+          await this.delay(500);
+        }
+
       } catch (error) {
-        console.error(`处理单个提取结果失败 [${result.id}]:`, error);
+        console.error(`批次 ${i / batchSize + 1} 详情提取失败:`, error);
+        
+        // 处理失败的批次中的每个结果
+        batch.forEach(() => {
+          processedCount++;
+          if (this.config.showExtractionProgress) {
+            this.updateExtractionProgress(processedCount, results.length);
+          }
+        });
       }
     }
 
-    // 显示批量处理完成提示
-    const successCount = stats?.successful || 0;
-    const cachedCount = stats?.cached || 0;
-    const totalProcessed = successCount + cachedCount;
-    
-    if (totalProcessed > 0) {
-      showToast(
-        `详情提取完成: ${totalProcessed} 个成功 (${successCount} 新提取, ${cachedCount} 缓存)`,
-        'success',
-        5000
-      );
-    } else {
-      showToast('详情提取完成，但没有成功获取到详细信息', 'warning');
-    }
+    console.log(`详情提取完成: ${processedCount}/${results.length}`);
   }
 
   /**
@@ -482,9 +289,7 @@ export class UnifiedSearchManager {
           showDownloadLinks: this.config.showDownloadLinks,
           showMagnetLinks: this.config.showMagnetLinks,
           showActressInfo: this.config.showActressInfo,
-          enableImagePreview: this.config.enableImagePreview,
-          enableContentFilter: this.config.enableContentFilter,
-          contentFilterKeywords: this.config.contentFilterKeywords
+          enableImagePreview: this.config.enableImagePreview
         });
 
         // 插入详情卡片
@@ -494,815 +299,16 @@ export class UnifiedSearchManager {
 
         // 添加展开/收起功能
         this.addDetailToggleButton(resultContainer);
-        
-        // 添加详情卡片事件绑定
-        this.bindDetailCardEvents(detailContainer, result);
-
-        console.log(`详情卡片创建成功: ${result.title}`);
 
       } else {
         // 显示提取失败状态
-        this.showExtractionError(resultContainer, result.extractionError, result);
+        this.showExtractionError(resultContainer, result.extractionError);
       }
 
     } catch (error) {
       console.error('处理提取结果失败:', error);
     }
   }
-
-  /**
-   * 绑定详情卡片事件
-   */
-  bindDetailCardEvents(detailContainer, result) {
-    // 下载链接点击事件
-    const downloadLinks = detailContainer.querySelectorAll('.download-link');
-    downloadLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
-        this.handleDownloadLinkClick(e, result);
-      });
-    });
-
-    // 磁力链接点击事件
-    const magnetLinks = detailContainer.querySelectorAll('.magnet-link');
-    magnetLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
-        this.handleMagnetLinkClick(e, result);
-      });
-    });
-
-    // 图片预览事件
-    const images = detailContainer.querySelectorAll('.preview-image');
-    images.forEach(img => {
-      img.addEventListener('click', (e) => {
-        this.handleImagePreview(e, result);
-      });
-    });
-
-    // 演员信息点击事件
-    const actresses = detailContainer.querySelectorAll('.actress-link');
-    actresses.forEach(actress => {
-      actress.addEventListener('click', (e) => {
-        this.handleActressClick(e, result);
-      });
-    });
-  }
-
-  /**
-   * 处理下载链接点击
-   */
-  handleDownloadLinkClick(event, result) {
-    const link = event.currentTarget;
-    const url = link.dataset.url;
-    const name = link.dataset.name || '下载链接';
-    
-    if (url) {
-      // 记录用户行为
-      if (authManager.isAuthenticated()) {
-        apiService.recordAction('download_click', { 
-          url, 
-          name, 
-          sourceResult: result.url,
-          extractionId: result.id 
-        }).catch(console.error);
-      }
-      
-      // 复制链接到剪贴板
-      this.copyToClipboard(url).then(() => {
-        showToast(`下载链接已复制: ${name}`, 'success');
-      });
-    }
-  }
-
-  /**
-   * 处理磁力链接点击
-   */
-  handleMagnetLinkClick(event, result) {
-    const link = event.currentTarget;
-    const magnet = link.dataset.magnet;
-    const name = link.dataset.name || '磁力链接';
-    
-    if (magnet) {
-      // 记录用户行为
-      if (authManager.isAuthenticated()) {
-        apiService.recordAction('magnet_click', { 
-          magnet: magnet.substring(0, 50), // 只记录前50个字符
-          name, 
-          sourceResult: result.url,
-          extractionId: result.id 
-        }).catch(console.error);
-      }
-      
-      // 复制磁力链接到剪贴板
-      this.copyToClipboard(magnet).then(() => {
-        showToast(`磁力链接已复制: ${name}`, 'success');
-      });
-    }
-  }
-
-  /**
-   * 处理图片预览
-   */
-  handleImagePreview(event, result) {
-    if (!this.config.enableImagePreview) return;
-    
-    const img = event.currentTarget;
-    const src = img.src || img.dataset.src;
-    
-    if (src) {
-      // 记录用户行为
-      if (authManager.isAuthenticated()) {
-        apiService.recordAction('image_preview', { 
-          imageUrl: src,
-          sourceResult: result.url,
-          extractionId: result.id 
-        }).catch(console.error);
-      }
-      
-      // 显示图片预览（这里可以集成现有的图片预览组件）
-      this.showImagePreview(src, result);
-    }
-  }
-
-  /**
-   * 处理演员点击
-   */
-  handleActressClick(event, result) {
-    const actress = event.currentTarget;
-    const name = actress.dataset.name;
-    const profileUrl = actress.dataset.profileUrl;
-    
-    if (name) {
-      // 记录用户行为
-      if (authManager.isAuthenticated()) {
-        apiService.recordAction('actress_click', { 
-          actressName: name,
-          profileUrl,
-          sourceResult: result.url,
-          extractionId: result.id 
-        }).catch(console.error);
-      }
-      
-      // 可以集成演员搜索功能
-      if (profileUrl) {
-        window.open(profileUrl, '_blank', 'noopener,noreferrer');
-      } else {
-        // 使用演员名称进行新搜索
-        this.searchByActress(name);
-      }
-    }
-  }
-
-  /**
-   * 显示图片预览
-   */
-  showImagePreview(src, result) {
-    // 创建图片预览模态框
-    const modal = document.createElement('div');
-    modal.className = 'image-preview-modal';
-    modal.innerHTML = `
-      <div class="image-preview-backdrop" onclick="this.parentElement.remove()">
-        <div class="image-preview-container">
-          <img src="${escapeHtml(src)}" alt="预览图片" class="preview-image-large">
-          <button class="close-preview" onclick="this.closest('.image-preview-modal').remove()">×</button>
-          <div class="image-info">
-            <small>来源: ${escapeHtml(result.title || result.url)}</small>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // 添加键盘事件
-    const handleKeydown = (e) => {
-      if (e.key === 'Escape') {
-        modal.remove();
-        document.removeEventListener('keydown', handleKeydown);
-      }
-    };
-    document.addEventListener('keydown', handleKeydown);
-  }
-
-  /**
-   * 按演员搜索
-   */
-  searchByActress(actressName) {
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-      searchInput.value = actressName;
-      this.performSearch();
-    }
-  }
-
-  /**
-   * 更新提取统计信息
-   */
-  updateExtractionStats(extractionResult) {
-    const { stats } = extractionResult;
-    
-    if (stats) {
-      this.extractionStats.totalExtractions += stats.total || 0;
-      this.extractionStats.successfulExtractions += stats.successful || 0;
-      this.extractionStats.failedExtractions += stats.failed || 0;
-      this.extractionStats.cacheHits += stats.cached || 0;
-      
-      // 更新平均时间
-      if (stats.averageTime) {
-        this.extractionStats.averageTime = 
-          (this.extractionStats.averageTime + stats.averageTime) / 2;
-      }
-    }
-    
-    // 更新UI中的统计显示
-    this.updateStatsDisplay();
-  }
-
-  /**
-   * 更新统计显示
-   */
-  updateStatsDisplay() {
-    const statsContainer = document.getElementById('extractionStats');
-    if (statsContainer && this.extractionStats.totalExtractions > 0) {
-      const successRate = (this.extractionStats.successfulExtractions / this.extractionStats.totalExtractions * 100).toFixed(1);
-      const cacheHitRate = (this.extractionStats.cacheHits / this.extractionStats.totalExtractions * 100).toFixed(1);
-      
-      statsContainer.innerHTML = `
-        <div class="stats-summary">
-          <span class="stat-item">总提取: ${this.extractionStats.totalExtractions}</span>
-          <span class="stat-item">成功率: ${successRate}%</span>
-          <span class="stat-item">缓存命中: ${cacheHitRate}%</span>
-          <span class="stat-item">平均用时: ${Math.round(this.extractionStats.averageTime)}ms</span>
-        </div>
-      `;
-      statsContainer.style.display = 'block';
-    }
-  }
-
-  /**
-   * 显示提取洞察
-   */
-  showExtractionInsights(extractionResult, keyword) {
-    const { stats, results } = extractionResult;
-    
-    const insights = [];
-    
-    // 性能洞察
-    if (stats && stats.averageTime) {
-      if (stats.averageTime < 5000) {
-        insights.push({
-          type: 'performance',
-          icon: '⚡',
-          message: `详情提取速度良好 (平均 ${Math.round(stats.averageTime)}ms)`,
-          level: 'success'
-        });
-      } else if (stats.averageTime > 15000) {
-        insights.push({
-          type: 'performance',
-          icon: '⏰',
-          message: `详情提取较慢，建议检查网络或降低批次大小`,
-          level: 'warning'
-        });
-      }
-    }
-    
-    // 缓存洞察
-    if (stats && stats.cacheHitRate > 50) {
-      insights.push({
-        type: 'cache',
-        icon: '💾',
-        message: `缓存命中率 ${stats.cacheHitRate.toFixed(1)}%，显著提升了提取速度`,
-        level: 'info'
-      });
-    }
-    
-    // 内容洞察
-    if (results && results.length > 0) {
-      const withScreenshots = results.filter(r => r.screenshots && r.screenshots.length > 0).length;
-      const withDownloads = results.filter(r => r.downloadLinks && r.downloadLinks.length > 0).length;
-      
-      if (withScreenshots > 0) {
-        insights.push({
-          type: 'content',
-          icon: '🖼️',
-          message: `${withScreenshots} 个结果包含截图预览`,
-          level: 'info'
-        });
-      }
-      
-      if (withDownloads > 0) {
-        insights.push({
-          type: 'content',
-          icon: '⬇️',
-          message: `${withDownloads} 个结果包含下载链接`,
-          level: 'info'
-        });
-      }
-    }
-    
-    // 显示洞察
-    this.displayInsights(insights);
-  }
-
-  /**
-   * 显示单个提取洞察
-   */
-  showExtractionInsight(type, data) {
-    const insights = [];
-    
-    switch (type) {
-      case 'no_results':
-        insights.push({
-          type: 'info',
-          icon: 'ℹ️',
-          message: `搜索到 ${data.total} 个结果，但没有支持详情提取的源`,
-          level: 'info'
-        });
-        break;
-        
-      case 'error':
-        insights.push({
-          type: 'error',
-          icon: '❌',
-          message: `详情提取失败: ${data.error}`,
-          level: 'error'
-        });
-        break;
-        
-      case 'partial':
-        insights.push({
-          type: 'warning',
-          icon: '⚠️',
-          message: `部分详情提取失败，已获取 ${data.successful}/${data.total} 个结果`,
-          level: 'warning'
-        });
-        break;
-    }
-    
-    this.displayInsights(insights);
-  }
-
-  /**
-   * 显示洞察信息
-   */
-  displayInsights(insights) {
-    if (insights.length === 0) return;
-    
-    const insightsContainer = document.getElementById('extractionInsights');
-    if (!insightsContainer) return;
-    
-    insightsContainer.innerHTML = insights.map(insight => `
-      <div class="insight-item insight-${insight.level}">
-        <span class="insight-icon">${insight.icon}</span>
-        <span class="insight-message">${escapeHtml(insight.message)}</span>
-      </div>
-    `).join('');
-    
-    insightsContainer.style.display = 'block';
-    
-    // 自动隐藏信息类洞察
-    if (insights.every(i => i.level === 'info')) {
-      setTimeout(() => {
-        insightsContainer.style.display = 'none';
-      }, 8000);
-    }
-  }
-
-  /**
-   * 提取单个详情
-   */
-  async extractSingleDetail(resultId) {
-    const result = this.currentResults.find(r => r.id === resultId);
-    if (!result) {
-      showToast('未找到对应的搜索结果', 'error');
-      return;
-    }
-
-    if (!this.shouldExtractDetail(result)) {
-      showToast('该搜索源不支持详情提取', 'warning');
-      return;
-    }
-
-    try {
-      showLoading(true);
-      showToast('正在提取详情...', 'info');
-      
-      const extractedDetail = await detailAPIService.extractSingleDetail(result, {
-        enableCache: this.config.enableCache,
-        timeout: this.config.extractionTimeout,
-        enableRetry: this.config.enableRetry,
-        maxRetries: this.config.maxRetryAttempts,
-        strictValidation: this.config.strictValidation
-      });
-
-      await this.handleSingleExtractionResult({
-        ...result,
-        ...extractedDetail
-      });
-
-      // 更新统计
-      this.updateExtractionStats({
-        stats: {
-          total: 1,
-          successful: extractedDetail.extractionStatus === 'success' ? 1 : 0,
-          failed: extractedDetail.extractionStatus === 'error' ? 1 : 0,
-          cached: extractedDetail.extractionStatus === 'cached' ? 1 : 0,
-          averageTime: extractedDetail.extractionTime || 0
-        }
-      });
-
-      showToast('详情提取成功', 'success');
-
-    } catch (error) {
-      console.error('单独详情提取失败:', error);
-      showToast('详情提取失败: ' + error.message, 'error');
-    } finally {
-      showLoading(false);
-    }
-  }
-
-  /**
-   * 重试详情提取
-   */
-  async retryExtraction(resultId) {
-    const result = this.currentResults.find(r => r.id === resultId);
-    if (!result) {
-      showToast('未找到对应的搜索结果', 'error');
-      return;
-    }
-
-    try {
-      showToast('正在重试详情提取...', 'info');
-      
-      const extractedDetail = await detailAPIService.extractSingleDetail(result, {
-        enableCache: false,
-        useLocalCache: false,
-        enableRetry: true,
-        maxRetries: this.config.maxRetryAttempts,
-        timeout: this.config.extractionTimeout
-      });
-
-      await this.handleSingleExtractionResult({
-        ...result,
-        ...extractedDetail
-      });
-
-      showToast('详情提取成功', 'success');
-
-    } catch (error) {
-      console.error('重试详情提取失败:', error);
-      showToast('重试失败: ' + error.message, 'error');
-    }
-  }
-
-  // ===================== 详情提取辅助方法 =====================
-
-  /**
-   * 判断是否应该提取详情
-   */
-  shouldExtractDetail(result) {
-    if (!result || !result.source) return false;
-    return APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES?.includes(result.source) || false;
-  }
-
-  /**
-   * 获取或创建详情容器
-   */
-  getOrCreateDetailContainer(resultContainer) {
-    let detailContainer = resultContainer.querySelector('.result-detail-container');
-    
-    if (!detailContainer) {
-      detailContainer = document.createElement('div');
-      detailContainer.className = 'result-detail-container';
-      detailContainer.style.display = 'none';
-      resultContainer.appendChild(detailContainer);
-    }
-    
-    return detailContainer;
-  }
-
-  /**
-   * 添加详情展开/收起按钮
-   */
-  addDetailToggleButton(resultContainer) {
-    const actionsContainer = resultContainer.querySelector('.result-actions');
-    if (!actionsContainer) return;
-
-    // 检查是否已存在按钮
-    if (actionsContainer.querySelector('.detail-toggle-btn')) return;
-
-    const toggleButton = document.createElement('button');
-    toggleButton.className = 'action-btn detail-toggle-btn';
-    toggleButton.innerHTML = `
-      <span class="btn-icon">📋</span>
-      <span class="btn-text">查看详情</span>
-    `;
-    
-    toggleButton.addEventListener('click', () => {
-      this.toggleDetailDisplay(resultContainer.dataset.resultId || resultContainer.dataset.id);
-    });
-
-    actionsContainer.appendChild(toggleButton);
-  }
-
-  /**
-   * 切换详情显示状态
-   */
-  toggleDetailDisplay(resultId) {
-    const resultContainer = document.querySelector(`[data-result-id="${resultId}"], [data-id="${resultId}"]`);
-    if (!resultContainer) return;
-
-    const detailContainer = resultContainer.querySelector('.result-detail-container');
-    const toggleBtn = resultContainer.querySelector('.detail-toggle-btn');
-    
-    if (!detailContainer || !toggleBtn) return;
-
-    const isVisible = detailContainer.style.display !== 'none';
-    
-    detailContainer.style.display = isVisible ? 'none' : 'block';
-    
-    const btnText = toggleBtn.querySelector('.btn-text');
-    const btnIcon = toggleBtn.querySelector('.btn-icon');
-    
-    if (btnText) {
-      btnText.textContent = isVisible ? '查看详情' : '隐藏详情';
-    }
-    
-    if (btnIcon) {
-      btnIcon.textContent = isVisible ? '📋' : '🔄';
-    }
-
-    // 添加动画效果
-    if (!isVisible) {
-      detailContainer.style.opacity = '0';
-      detailContainer.style.transform = 'translateY(-10px)';
-      
-      requestAnimationFrame(() => {
-        detailContainer.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-        detailContainer.style.opacity = '1';
-        detailContainer.style.transform = 'translateY(0)';
-      });
-    }
-  }
-
-  /**
-   * 显示提取错误
-   */
-  showExtractionError(resultContainer, error, result) {
-    const detailContainer = this.getOrCreateDetailContainer(resultContainer);
-
-    // 生成错误建议
-    const suggestions = this.generateErrorSuggestions(error, result);
-
-    detailContainer.innerHTML = `
-      <div class="extraction-error">
-        <div class="error-icon">⌫</div>
-        <div class="error-content">
-          <div class="error-message">
-            <strong>详情提取失败</strong>
-            <small>${escapeHtml(error || '未知错误')}</small>
-          </div>
-          ${suggestions.length > 0 ? `
-            <div class="error-suggestions">
-              <strong>建议:</strong>
-              <ul>
-                ${suggestions.map(suggestion => `<li>${escapeHtml(suggestion)}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-        </div>
-        <div class="error-actions">
-          <button class="retry-btn" onclick="window.unifiedSearchManager.retryExtraction('${resultContainer.dataset.resultId}')">
-            重试
-          </button>
-          <button class="diagnose-btn" onclick="window.unifiedSearchManager.diagnoseExtraction('${resultContainer.dataset.resultId}')">
-            诊断
-          </button>
-        </div>
-      </div>
-    `;
-    
-    detailContainer.style.display = 'block';
-    this.addDetailToggleButton(resultContainer);
-  }
-
-  /**
-   * 生成错误建议
-   */
-  generateErrorSuggestions(error, result) {
-    const suggestions = [];
-    const errorLower = (error || '').toLowerCase();
-    
-    if (errorLower.includes('timeout') || errorLower.includes('超时')) {
-      suggestions.push('网络连接较慢，建议稍后重试');
-      suggestions.push('可以在设置中增加提取超时时间');
-    } else if (errorLower.includes('network') || errorLower.includes('网络')) {
-      suggestions.push('检查网络连接状态');
-      suggestions.push('目标网站可能暂时无法访问');
-    } else if (errorLower.includes('parse') || errorLower.includes('解析')) {
-      suggestions.push('目标页面结构可能已变更');
-      suggestions.push('尝试直接访问页面查看内容');
-    } else if (errorLower.includes('validation') || errorLower.includes('验证')) {
-      suggestions.push('URL格式可能有问题');
-      suggestions.push('确保搜索结果来源有效');
-    } else {
-      suggestions.push('请稍后重试');
-      suggestions.push('如问题持续存在，请联系支持');
-    }
-    
-    return suggestions;
-  }
-
-  /**
-   * 诊断提取问题
-   */
-  async diagnoseExtraction(resultId) {
-    const result = this.currentResults.find(r => r.id === resultId);
-    if (!result) return;
-    
-    try {
-      showToast('正在诊断提取问题...', 'info');
-      
-      // 检查详情API服务健康状态
-      const healthCheck = await detailAPIService.checkServiceHealth();
-      
-      const diagnostics = [];
-      
-      // 服务健康检查
-      if (healthCheck.healthy) {
-        diagnostics.push('✅ 详情提取服务正常运行');
-      } else {
-        diagnostics.push('❌ 详情提取服务异常: ' + (healthCheck.error || '未知错误'));
-      }
-      
-      // URL可访问性检查
-      diagnostics.push('🔍 检查目标URL可访问性...');
-      try {
-        const response = await fetch(result.url, { method: 'HEAD', mode: 'no-cors' });
-        diagnostics.push('✅ 目标URL可以访问');
-      } catch {
-        diagnostics.push('❌ 目标URL无法访问或被阻止');
-      }
-      
-      // 源支持检查
-      if (this.shouldExtractDetail(result)) {
-        diagnostics.push('✅ 该源支持详情提取');
-      } else {
-        diagnostics.push('❌ 该源不支持详情提取');
-      }
-      
-      // 显示诊断结果
-      const diagnosticText = diagnostics.join('\n');
-      
-      // 创建诊断模态框
-      this.showDiagnosticModal(diagnosticText, result);
-      
-    } catch (error) {
-      console.error('诊断失败:', error);
-      showToast('诊断失败: ' + error.message, 'error');
-    }
-  }
-
-  /**
-   * 显示诊断模态框
-   */
-  showDiagnosticModal(diagnosticText, result) {
-    const modal = document.createElement('div');
-    modal.className = 'diagnostic-modal';
-    modal.innerHTML = `
-      <div class="modal-backdrop" onclick="this.parentElement.remove()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-          <div class="modal-header">
-            <h3>详情提取诊断结果</h3>
-            <button class="close-btn" onclick="this.closest('.diagnostic-modal').remove()">×</button>
-          </div>
-          <div class="modal-body">
-            <div class="diagnostic-info">
-              <strong>目标结果:</strong> ${escapeHtml(result.title)}<br>
-              <strong>URL:</strong> <a href="${escapeHtml(result.url)}" target="_blank">${escapeHtml(result.url)}</a><br>
-              <strong>源类型:</strong> ${escapeHtml(result.source)}
-            </div>
-            <div class="diagnostic-results">
-              <pre>${escapeHtml(diagnosticText)}</pre>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button onclick="this.closest('.diagnostic-modal').remove()">关闭</button>
-            <button onclick="window.unifiedSearchManager.retryExtraction('${result.id}')">重试提取</button>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(modal);
-  }
-
-  /**
-   * 显示提取进度
-   */
-  showExtractionProgress(total) {
-    let progressContainer = document.getElementById('extraction-progress');
-    
-    if (!progressContainer) {
-      progressContainer = document.createElement('div');
-      progressContainer.id = 'extraction-progress';
-      progressContainer.className = 'extraction-progress-container';
-      
-      const searchResults = document.getElementById('resultsSection');
-      if (searchResults) {
-        searchResults.insertBefore(progressContainer, searchResults.firstChild);
-      }
-    }
-
-    progressContainer.innerHTML = `
-      <div class="progress-header">
-        <span class="progress-title">正在提取详情信息</span>
-        <span class="progress-stats">0 / ${total}</span>
-        <button class="progress-close" onclick="this.closest('.extraction-progress-container').style.display='none'">×</button>
-      </div>
-      <div class="progress-bar">
-        <div class="progress-fill" style="width: 0%"></div>
-      </div>
-      <div class="progress-message">正在处理搜索结果...</div>
-      <div class="progress-details">
-        <small>平均用时: <span class="avg-time">计算中...</span> | 成功率: <span class="success-rate">计算中...</span></small>
-      </div>
-    `;
-
-    progressContainer.style.display = 'block';
-  }
-
-  /**
-   * 更新提取进度
-   */
-  updateExtractionProgress(processed, total, currentItem) {
-    const progressContainer = document.getElementById('extraction-progress');
-    if (!progressContainer) return;
-
-    const progressStats = progressContainer.querySelector('.progress-stats');
-    const progressFill = progressContainer.querySelector('.progress-fill');
-    const progressMessage = progressContainer.querySelector('.progress-message');
-
-    if (progressStats) {
-      progressStats.textContent = `${processed} / ${total}`;
-    }
-
-    if (progressFill) {
-      const percentage = (processed / total) * 100;
-      progressFill.style.width = `${percentage}%`;
-    }
-
-    if (progressMessage) {
-      if (processed === total) {
-        progressMessage.textContent = '详情提取完成！';
-      } else {
-        progressMessage.textContent = `正在处理: ${currentItem || '搜索结果'}`;
-      }
-    }
-
-    // 更新详细信息
-    this.updateProgressDetails(processed, total);
-  }
-
-  /**
-   * 更新进度详细信息
-   */
-  updateProgressDetails(processed, total) {
-    const progressContainer = document.getElementById('extraction-progress');
-    if (!progressContainer || this.extractionStats.totalExtractions === 0) return;
-
-    const avgTimeElement = progressContainer.querySelector('.avg-time');
-    const successRateElement = progressContainer.querySelector('.success-rate');
-
-    if (avgTimeElement && this.extractionStats.averageTime > 0) {
-      avgTimeElement.textContent = `${Math.round(this.extractionStats.averageTime)}ms`;
-    }
-
-    if (successRateElement && this.extractionStats.totalExtractions > 0) {
-      const rate = (this.extractionStats.successfulExtractions / this.extractionStats.totalExtractions * 100).toFixed(1);
-      successRateElement.textContent = `${rate}%`;
-    }
-  }
-
-  /**
-   * 隐藏提取进度
-   */
-  hideExtractionProgress() {
-    const progressContainer = document.getElementById('extraction-progress');
-    if (progressContainer) {
-      setTimeout(() => {
-        progressContainer.style.display = 'none';
-      }, 3000);
-    }
-  }
-
-  /**
-   * 生成批次ID
-   */
-  generateBatchId() {
-    return 'batch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
-
-  // ===================== 基础搜索功能方法（保持原样） =====================
 
   /**
    * 显示搜索结果
@@ -1532,6 +538,262 @@ export class UnifiedSearchManager {
   }
 
   /**
+   * 提取单个详情
+   */
+  async extractSingleDetail(resultId) {
+    const result = this.currentResults.find(r => r.id === resultId);
+    if (!result) {
+      showToast('未找到对应的搜索结果', 'error');
+      return;
+    }
+
+    if (!this.shouldExtractDetail(result)) {
+      showToast('该搜索源不支持详情提取', 'warning');
+      return;
+    }
+
+    try {
+      showLoading(true);
+      showToast('正在提取详情...', 'info');
+      
+      const extractedDetail = await detailAPIService.extractSingleDetail(result, {
+        enableCache: this.config.enableCache,
+        timeout: 15000
+      });
+
+      await this.handleSingleExtractionResult({
+        ...result,
+        ...extractedDetail
+      });
+
+      showToast('详情提取成功', 'success');
+
+    } catch (error) {
+      console.error('单独详情提取失败:', error);
+      showToast('详情提取失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  /**
+   * 重试详情提取
+   */
+  async retryExtraction(resultId) {
+    const result = this.currentResults.find(r => r.id === resultId);
+    if (!result) {
+      showToast('未找到对应的搜索结果', 'error');
+      return;
+    }
+
+    try {
+      showToast('正在重试详情提取...', 'info');
+      
+      const extractedDetail = await detailAPIService.extractSingleDetail(result, {
+        enableCache: false,
+        useLocalCache: false
+      });
+
+      await this.handleSingleExtractionResult({
+        ...result,
+        ...extractedDetail
+      });
+
+      showToast('详情提取成功', 'success');
+
+    } catch (error) {
+      console.error('重试详情提取失败:', error);
+      showToast('重试失败: ' + error.message, 'error');
+    }
+  }
+
+  // ===================== 详情提取辅助方法 =====================
+
+  /**
+   * 判断是否应该提取详情
+   */
+  shouldExtractDetail(result) {
+    if (!result || !result.source) return false;
+    return APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES?.includes(result.source) || false;
+  }
+
+  /**
+   * 获取或创建详情容器
+   */
+  getOrCreateDetailContainer(resultContainer) {
+    let detailContainer = resultContainer.querySelector('.result-detail-container');
+    
+    if (!detailContainer) {
+      detailContainer = document.createElement('div');
+      detailContainer.className = 'result-detail-container';
+      detailContainer.style.display = 'none';
+      resultContainer.appendChild(detailContainer);
+    }
+    
+    return detailContainer;
+  }
+
+  /**
+   * 添加详情展开/收起按钮
+   */
+  addDetailToggleButton(resultContainer) {
+    const actionsContainer = resultContainer.querySelector('.result-actions');
+    if (!actionsContainer) return;
+
+    // 检查是否已存在按钮
+    if (actionsContainer.querySelector('.detail-toggle-btn')) return;
+
+    const toggleButton = document.createElement('button');
+    toggleButton.className = 'action-btn detail-toggle-btn';
+    toggleButton.innerHTML = `
+      <span class="btn-icon">📋</span>
+      <span class="btn-text">查看详情</span>
+    `;
+    
+    toggleButton.addEventListener('click', () => {
+      this.toggleDetailDisplay(resultContainer.dataset.resultId || resultContainer.dataset.id);
+    });
+
+    actionsContainer.appendChild(toggleButton);
+  }
+
+  /**
+   * 切换详情显示状态
+   */
+  toggleDetailDisplay(resultId) {
+    const resultContainer = document.querySelector(`[data-result-id="${resultId}"], [data-id="${resultId}"]`);
+    if (!resultContainer) return;
+
+    const detailContainer = resultContainer.querySelector('.result-detail-container');
+    const toggleBtn = resultContainer.querySelector('.detail-toggle-btn');
+    
+    if (!detailContainer || !toggleBtn) return;
+
+    const isVisible = detailContainer.style.display !== 'none';
+    
+    detailContainer.style.display = isVisible ? 'none' : 'block';
+    
+    const btnText = toggleBtn.querySelector('.btn-text');
+    const btnIcon = toggleBtn.querySelector('.btn-icon');
+    
+    if (btnText) {
+      btnText.textContent = isVisible ? '查看详情' : '隐藏详情';
+    }
+    
+    if (btnIcon) {
+      btnIcon.textContent = isVisible ? '📋' : '🔄';
+    }
+
+    // 添加动画效果
+    if (!isVisible) {
+      detailContainer.style.opacity = '0';
+      detailContainer.style.transform = 'translateY(-10px)';
+      
+      requestAnimationFrame(() => {
+        detailContainer.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        detailContainer.style.opacity = '1';
+        detailContainer.style.transform = 'translateY(0)';
+      });
+    }
+  }
+
+  /**
+   * 显示提取错误
+   */
+  showExtractionError(resultContainer, error) {
+    const detailContainer = this.getOrCreateDetailContainer(resultContainer);
+
+    detailContainer.innerHTML = `
+      <div class="extraction-error">
+        <div class="error-icon">❌</div>
+        <div class="error-message">
+          <strong>详情提取失败</strong>
+          <small>${escapeHtml(error || '未知错误')}</small>
+        </div>
+        <button class="retry-btn" onclick="window.unifiedSearchManager.retryExtraction('${resultContainer.dataset.resultId}')">
+          重试
+        </button>
+      </div>
+    `;
+    
+    detailContainer.style.display = 'block';
+  }
+
+  /**
+   * 显示提取进度
+   */
+  showExtractionProgress(total) {
+    let progressContainer = document.getElementById('extraction-progress');
+    
+    if (!progressContainer) {
+      progressContainer = document.createElement('div');
+      progressContainer.id = 'extraction-progress';
+      progressContainer.className = 'extraction-progress-container';
+      
+      const searchResults = document.getElementById('resultsSection');
+      if (searchResults) {
+        searchResults.insertBefore(progressContainer, searchResults.firstChild);
+      }
+    }
+
+    progressContainer.innerHTML = `
+      <div class="progress-header">
+        <span class="progress-title">正在提取详情信息</span>
+        <span class="progress-stats">0 / ${total}</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: 0%"></div>
+      </div>
+      <div class="progress-message">正在处理搜索结果...</div>
+    `;
+
+    progressContainer.style.display = 'block';
+  }
+
+  /**
+   * 更新提取进度
+   */
+  updateExtractionProgress(processed, total) {
+    const progressContainer = document.getElementById('extraction-progress');
+    if (!progressContainer) return;
+
+    const progressStats = progressContainer.querySelector('.progress-stats');
+    const progressFill = progressContainer.querySelector('.progress-fill');
+    const progressMessage = progressContainer.querySelector('.progress-message');
+
+    if (progressStats) {
+      progressStats.textContent = `${processed} / ${total}`;
+    }
+
+    if (progressFill) {
+      const percentage = (processed / total) * 100;
+      progressFill.style.width = `${percentage}%`;
+    }
+
+    if (progressMessage) {
+      if (processed === total) {
+        progressMessage.textContent = '详情提取完成！';
+      } else {
+        progressMessage.textContent = `正在处理第 ${processed + 1} 个结果...`;
+      }
+    }
+  }
+
+  /**
+   * 隐藏提取进度
+   */
+  hideExtractionProgress() {
+    const progressContainer = document.getElementById('extraction-progress');
+    if (progressContainer) {
+      setTimeout(() => {
+        progressContainer.style.display = 'none';
+      }, 2000);
+    }
+  }
+
+  // ===================== 基础搜索功能方法 =====================
+
+  /**
    * 打开搜索结果
    */
   openResult(url, source) {
@@ -1634,7 +896,7 @@ export class UnifiedSearchManager {
           }
         }
 
-        const statusEmoji = statusResult.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ? '✅' : '⌫';
+        const statusEmoji = statusResult.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE ? '✅' : '❌';
         const contentInfo = statusResult.contentMatch ? '，内容匹配' : '';
         let reasonInfo = '';
         
@@ -1965,8 +1227,7 @@ export class UnifiedSearchManager {
         version: window.API_CONFIG?.APP_VERSION || '1.0.0',
         statusCheckEnabled: this.statusCheckInProgress,
         lastCheckKeyword: this.lastStatusCheckKeyword,
-        detailExtractionEnabled: this.config.enableDetailExtraction,
-        extractionStats: this.extractionStats
+        detailExtractionEnabled: this.config.enableDetailExtraction
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -2180,8 +1441,8 @@ export class UnifiedSearchManager {
   getStatusIcon(status) {
     const statusIcons = {
       [APP_CONSTANTS.SOURCE_STATUS.AVAILABLE]: '✅',
-      [APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE]: '⌫',
-      [APP_CONSTANTS.SOURCE_STATUS.TIMEOUT]: 'ⱱ️',
+      [APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE]: '❌',
+      [APP_CONSTANTS.SOURCE_STATUS.TIMEOUT]: '⏱️',
       [APP_CONSTANTS.SOURCE_STATUS.ERROR]: '⚠️',
       [APP_CONSTANTS.SOURCE_STATUS.CHECKING]: '🔄',
       [APP_CONSTANTS.SOURCE_STATUS.UNKNOWN]: '❓'
@@ -2207,11 +1468,8 @@ export class UnifiedSearchManager {
           autoExtractDetails: userSettings.autoExtractDetails === true,
           maxAutoExtractions: userSettings.maxAutoExtractions || 5,
           extractionBatchSize: Math.min(userSettings.extractionBatchSize || 3, 5),
-          extractionTimeout: Math.min(Math.max(userSettings.extractionTimeout || 15000, 5000), 30000),
-          enableRetry: userSettings.enableRetry !== false,
-          maxRetryAttempts: Math.min(userSettings.maxRetryAttempts || 2, 5),
-          enableCache: userSettings.enableCache !== false,
           showExtractionProgress: userSettings.showExtractionProgress !== false,
+          enableCache: userSettings.enableCache !== false,
           
           // 显示选项
           showScreenshots: userSettings.showScreenshots !== false,
@@ -2219,13 +1477,7 @@ export class UnifiedSearchManager {
           showMagnetLinks: userSettings.showMagnetLinks !== false,
           showActressInfo: userSettings.showActressInfo !== false,
           compactMode: userSettings.compactMode === true,
-          enableImagePreview: userSettings.enableImagePreview !== false,
-          
-          // 高级选项
-          strictValidation: userSettings.strictValidation !== false,
-          enableContentFilter: userSettings.enableContentFilter === true,
-          contentFilterKeywords: Array.isArray(userSettings.contentFilterKeywords) ? 
-            userSettings.contentFilterKeywords : []
+          enableImagePreview: userSettings.enableImagePreview !== false
         };
         
         console.log('用户搜索配置已加载:', this.config);
@@ -2238,20 +1490,14 @@ export class UnifiedSearchManager {
           autoExtractDetails: false,
           maxAutoExtractions: 5,
           extractionBatchSize: 3,
-          extractionTimeout: 15000,
-          enableRetry: true,
-          maxRetryAttempts: 2,
-          enableCache: true,
           showExtractionProgress: true,
+          enableCache: true,
           showScreenshots: true,
           showDownloadLinks: true,
           showMagnetLinks: true,
           showActressInfo: true,
           compactMode: false,
-          enableImagePreview: true,
-          strictValidation: true,
-          enableContentFilter: false,
-          contentFilterKeywords: []
+          enableImagePreview: true
         };
       }
     } catch (error) {
@@ -2339,7 +1585,6 @@ export class UnifiedSearchManager {
     document.addEventListener('authStateChanged', () => {
       this.loadUserConfig();
       this.loadSearchHistory();
-      this.checkDetailServiceHealth();
     });
 
     // 监听收藏变化事件
@@ -2381,23 +1626,11 @@ export class UnifiedSearchManager {
       extractSingleDetail: (resultId) => this.extractSingleDetail(resultId),
       retryExtraction: (resultId) => this.retryExtraction(resultId),
       toggleDetailDisplay: (resultId) => this.toggleDetailDisplay(resultId),
-      diagnoseExtraction: (resultId) => this.diagnoseExtraction(resultId),
-      refreshConfig: () => this.loadUserConfig(),
-      getExtractionStats: () => this.extractionStats,
-      resetExtractionStats: () => {
-        this.extractionStats = {
-          totalExtractions: 0,
-          successfulExtractions: 0,
-          failedExtractions: 0,
-          cacheHits: 0,
-          averageTime: 0
-        };
-        this.updateStatsDisplay();
-      }
+      refreshConfig: () => this.loadUserConfig()
     };
 
     // 保持向后兼容
-	window.searchManager = window.unifiedSearchManager;
+    window.searchManager = window.unifiedSearchManager;
     window.enhancedSearchManager = window.unifiedSearchManager;
   }
 
@@ -2425,7 +1658,6 @@ export class UnifiedSearchManager {
     this.currentResults = [];
     this.searchHistory = [];
     this.extractionQueue = [];
-    this.progressCallbacks.clear();
     
     // 清理DOM元素
     const suggestionsContainer = document.getElementById('searchSuggestions');
@@ -2436,11 +1668,6 @@ export class UnifiedSearchManager {
     const progressContainer = document.getElementById('extraction-progress');
     if (progressContainer) {
       progressContainer.remove();
-    }
-
-    const insightsContainer = document.getElementById('extractionInsights');
-    if (insightsContainer) {
-      insightsContainer.remove();
     }
 
     // 清理全局方法
