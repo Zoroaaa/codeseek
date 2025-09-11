@@ -61,42 +61,47 @@ export class DetailExtractionManager {
   /**
    * 处理配置更新 - 新增方法
    */
-  handleConfigUpdate() {
-    // 检查详情提取是否被启用
-    if (this.config.enableDetailExtraction !== undefined) {
-      const wasEnabled = this.isExtractionEnabled;
-      this.isExtractionEnabled = this.config.enableDetailExtraction;
+handleConfigUpdate() {
+  // 检查详情提取是否被启用
+  if (this.config.enableDetailExtraction !== undefined) {
+    const wasEnabled = this.isExtractionEnabled; // 保存之前的状态
+    
+    // 不需要手动设置 isExtractionEnabled，因为它是 getter，会自动计算
+    // this.isExtractionEnabled = this.config.enableDetailExtraction; // 删除这行
+    
+    // 直接比较当前状态和之前状态
+    const isNowEnabled = this.isExtractionEnabled; // 这会重新计算当前状态
+    
+    if (wasEnabled !== isNowEnabled) {
+      console.log(`详情提取功能${isNowEnabled ? '已启用' : '已禁用'}`);
       
-      if (wasEnabled !== this.isExtractionEnabled) {
-        console.log(`详情提取功能${this.isExtractionEnabled ? '已启用' : '已禁用'}`);
-        
-        // 触发状态变更事件
-        document.dispatchEvent(new CustomEvent('detailExtractionStateChanged', {
-          detail: { enabled: this.isExtractionEnabled }
-        }));
-      }
-    }
-
-    // 更新批处理大小
-    if (this.config.extractionBatchSize) {
-      this.batchSize = this.config.extractionBatchSize;
-    }
-
-    // 更新超时设置
-    if (this.config.extractionTimeout) {
-      this.timeout = this.config.extractionTimeout;
-    }
-
-    // 更新重试设置
-    if (this.config.enableRetry !== undefined) {
-      this.retryEnabled = this.config.enableRetry;
-    }
-
-    // 更新缓存设置
-    if (this.config.enableCache !== undefined) {
-      this.cacheEnabled = this.config.enableCache;
+      // 触发状态变更事件
+      document.dispatchEvent(new CustomEvent('detailExtractionStateChanged', {
+        detail: { enabled: isNowEnabled }
+      }));
     }
   }
+
+  // 更新批处理大小
+  if (this.config.extractionBatchSize) {
+    this.batchSize = this.config.extractionBatchSize;
+  }
+
+  // 更新超时设置
+  if (this.config.extractionTimeout) {
+    this.timeout = this.config.extractionTimeout;
+  }
+
+  // 更新重试设置
+  if (this.config.enableRetry !== undefined) {
+    this.retryEnabled = this.config.enableRetry;
+  }
+
+  // 更新缓存设置
+  if (this.config.enableCache !== undefined) {
+    this.cacheEnabled = this.config.enableCache;
+  }
+}
 
   /**
    * 获取当前配置 - 新增方法
