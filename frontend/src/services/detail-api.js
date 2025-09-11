@@ -1,6 +1,14 @@
-// src/services/detail-api.js - 与后端详情提取服务完全匹配的前端API服务
+// src/services/detail-api.js - 集成用户配置服务的详情提取API
+// 与后端 detail.js 处理器完全对接，支持动态配置
+
 import apiService from './api.js';
 import authManager from './auth.js';
+import detailConfigAPI from './detail-config-api.js';
+import { 
+  DETAIL_EXTRACTION_STATUS,
+  DEFAULT_USER_CONFIG 
+} from '../core/detail-config.js';
+import { SYSTEM_LIMITS } from '../core/constants.js';
 
 class DetailAPIService {
   constructor() {
@@ -11,36 +19,78 @@ class DetailAPIService {
     this.extractionQueue = new Map();
     this.retryDelays = [1000, 2000, 5000]; // 重试延迟时间
     
-    // 新增：与后端配置保持一致的常量
-    this.EXTRACTION_STATUS = {
-      SUCCESS: 'success',
-      ERROR: 'error', 
-      TIMEOUT: 'timeout',
-      CACHED: 'cached',
-      PARTIAL: 'partial'
-    };
+    // 状态常量 - 与后端同步
+    this.EXTRACTION_STATUS = DETAIL_EXTRACTION_STATUS;
     
-    // 支持的源类型（与后端constants.js保持一致）
+    // 支持的源类型
     this.SUPPORTED_SOURCES = [
       'javbus', 'javdb', 'jable', 'javgg', 'javmost', 'sukebei', 'javguru'
     ];
     
-    // 详情提取限制（与后端CONFIG保持一致）
-    this.LIMITS = {
-      MAX_BATCH_SIZE: 20,
-      MIN_BATCH_SIZE: 1,
-      DEFAULT_TIMEOUT: 15000,
-      MIN_TIMEOUT: 5000,
-      MAX_TIMEOUT: 30000,
-      MAX_CONCURRENT_EXTRACTIONS: 4,
-      MAX_DOWNLOAD_LINKS: 10,
-      MAX_MAGNET_LINKS: 10,
-      MAX_SCREENSHOTS: 10
+    // 系统限制 - 从 constants.js 获取
+    this.LIMITS = SYSTEM_LIMITS.DETAIL_EXTRACTION;
+  }
+
+  /**
+   * 获取用户配置并应用到API调用选项
+   */
+  async getConfigAwareOptions(overrides = {}) {
+    try {
+      // 获取用户配置
+      let userConfig;
+      if (authManager.isAuthenticated()) {
+        const configData = await detailConfigAPI.getUserConfig();
+        userConfig = configData.config || DEFAULT_USER_CONFIG;
+      } else {
+        userConfig = DEFAULT_USER_CONFIG;
+      }
+      
+      // 合并用户配置和覆盖选项
+      return this.mergeConfigWithOverrides(userConfig, overrides);
+    } catch (error) {
+      console.error('获取用户配置失败，使用默认配置:', error);
+      return this.mergeConfigWithOverrides(DEFAULT_USER_CONFIG, overrides);
+    }
+  }
+
+  /**
+   * 合并用户配置和覆盖选项
+   */
+  mergeConfigWithOverrides(userConfig, overrides) {
+    return {
+      // 基础选项
+      enableCache: userConfig.enableCache && (overrides.enableCache !== false),
+      timeout: overrides.timeout || userConfig.extractionTimeout,
+      enableRetry: userConfig.enableRetry && (overrides.enableRetry !== false),
+      maxRetries: overrides.maxRetries || userConfig.maxRetryAttempts,
+      
+      // 内容控制
+      maxDownloadLinks: overrides.maxDownloadLinks || userConfig.maxDownloadLinks,
+      maxMagnetLinks: overrides.maxMagnetLinks || userConfig.maxMagnetLinks,
+      maxScreenshots: overrides.maxScreenshots || userConfig.maxScreenshots,
+      
+      // 质量控制
+      strictValidation: overrides.strictValidation !== undefined ? 
+        overrides.strictValidation : userConfig.enableStrictDomainCheck,
+      requireMinimumData: userConfig.requireMinimumData,
+      validateImageUrls: userConfig.validateImageUrls,
+      validateDownloadLinks: userConfig.validateDownloadLinks,
+      
+      // 过滤选项
+      enableContentFilter: userConfig.enableContentFilter,
+      contentFilterKeywords: userConfig.contentFilterKeywords,
+      enableSpamFilter: userConfig.enableSpamFilter,
+      
+      // 其他选项
+      sourceType: overrides.sourceType || null,
+      preferOriginalSources: userConfig.preferOriginalSources,
+      enableAutoCodeExtraction: userConfig.enableAutoCodeExtraction,
+      useLocalCache: overrides.useLocalCache !== false && userConfig.enableLocalCache
     };
   }
 
   /**
-   * 提取单个搜索结果的详情信息 - 与后端extractSingleDetailHandler完全匹配
+   * 提取单个搜索结果的详情信息 - 配置感知版本
    */
   async extractSingleDetail(searchResult, options = {}) {
     if (!searchResult || !searchResult.url) {
@@ -48,9 +98,12 @@ class DetailAPIService {
     }
 
     try {
+      // 获取配置感知的选项
+      const configOptions = await this.getConfigAwareOptions(options);
+      
       // 检查本地缓存
       const cacheKey = this.generateCacheKey(searchResult.url);
-      if (options.useLocalCache !== false) {
+      if (configOptions.useLocalCache !== false) {
         const cached = this.getFromLocalCache(cacheKey);
         if (cached) {
           console.log(`本地缓存命中: ${searchResult.title}`);
@@ -68,23 +121,16 @@ class DetailAPIService {
           code: searchResult.code || '',
           id: searchResult.id || this.generateResultId(searchResult.url)
         },
-        options: {
-          enableCache: options.enableCache !== false,
-          timeout: this.validateTimeout(options.timeout || this.LIMITS.DEFAULT_TIMEOUT),
-          enableRetry: options.enableRetry !== false,
-          maxRetries: Math.min(options.maxRetries || 2, 5),
-          strictValidation: options.strictValidation !== false,
-          sourceType: options.sourceType || this.inferSourceType(searchResult.url),
-          useLocalCache: options.useLocalCache !== false
-        }
+        options: configOptions
       };
 
       console.log(`开始提取详情: ${searchResult.title}`);
+      console.log('使用配置:', configOptions);
 
       const response = await apiService.request('/api/detail/extract-single', {
         method: 'POST',
         body: JSON.stringify(requestData),
-        timeout: requestData.options.timeout
+        timeout: configOptions.timeout
       });
 
       if (!response.success) {
@@ -95,7 +141,7 @@ class DetailAPIService {
       const result = this.processExtractionResponse(response, searchResult);
 
       // 本地缓存成功的结果
-      if (result.extractionStatus === this.EXTRACTION_STATUS.SUCCESS && options.useLocalCache !== false) {
+      if (result.extractionStatus === this.EXTRACTION_STATUS.SUCCESS && configOptions.useLocalCache !== false) {
         this.setToLocalCache(cacheKey, result);
       }
 
@@ -109,7 +155,7 @@ class DetailAPIService {
   }
 
   /**
-   * 批量提取搜索结果的详情信息 - 与后端extractBatchDetailsHandler完全匹配
+   * 批量提取搜索结果的详情信息 - 配置感知版本
    */
   async extractBatchDetails(searchResults, options = {}) {
     // 输入验证 - 与后端validateBatchInput匹配
@@ -119,6 +165,9 @@ class DetailAPIService {
     }
 
     try {
+      // 获取配置感知的批量选项
+      const configOptions = await this.getBatchConfigOptions(options);
+      
       // 生成批次ID用于进度跟踪
       const batchId = this.generateBatchId();
       
@@ -133,19 +182,13 @@ class DetailAPIService {
           id: result.id || this.generateResultId(result.url)
         })),
         options: {
-          enableCache: options.enableCache !== false,
-          timeout: this.validateTimeout(options.timeout || this.LIMITS.DEFAULT_TIMEOUT),
-          enableRetry: options.enableRetry !== false,
-          maxRetries: Math.min(options.maxRetries || 2, 5),
-          maxConcurrency: Math.min(options.maxConcurrency || this.LIMITS.MAX_CONCURRENT_EXTRACTIONS, 10),
-          progressInterval: options.progressInterval || 1000,
-          stopOnError: options.stopOnError || false,
-          strictValidation: options.strictValidation !== false,
+          ...configOptions,
           batchId: batchId
         }
       };
 
       console.log(`开始批量提取 ${searchResults.length} 个结果的详情`);
+      console.log('批量提取配置:', configOptions);
 
       // 设置进度回调
       if (options.onProgress && typeof options.onProgress === 'function') {
@@ -155,7 +198,7 @@ class DetailAPIService {
       const response = await apiService.request('/api/detail/extract-batch', {
         method: 'POST',
         body: JSON.stringify(requestData),
-        timeout: requestData.options.timeout * 2 // 批量请求给更长超时时间
+        timeout: configOptions.timeout * 2 // 批量请求给更长超时时间
       });
 
       // 清理进度回调
@@ -172,6 +215,37 @@ class DetailAPIService {
       console.error('批量详情提取失败:', error);
       throw error;
     }
+  }
+
+  /**
+   * 获取批量提取的配置选项
+   */
+  async getBatchConfigOptions(overrides = {}) {
+    const baseOptions = await this.getConfigAwareOptions(overrides);
+    
+    // 获取用户配置
+    let userConfig;
+    try {
+      if (authManager.isAuthenticated()) {
+        const configData = await detailConfigAPI.getUserConfig();
+        userConfig = configData.config || DEFAULT_USER_CONFIG;
+      } else {
+        userConfig = DEFAULT_USER_CONFIG;
+      }
+    } catch (error) {
+      userConfig = DEFAULT_USER_CONFIG;
+    }
+    
+    return {
+      ...baseOptions,
+      // 批量特定选项
+      batchSize: overrides.batchSize || userConfig.extractionBatchSize,
+      maxConcurrency: userConfig.enableConcurrentExtraction ? 
+        (overrides.maxConcurrency || userConfig.maxConcurrentExtractions) : 1,
+      enableSmartBatching: userConfig.enableSmartBatching,
+      progressInterval: overrides.progressInterval || 1000,
+      stopOnError: overrides.stopOnError || false
+    };
   }
 
   /**
@@ -343,91 +417,6 @@ class DetailAPIService {
   }
 
   /**
-   * 获取详情提取配置 - 与后端getDetailExtractionConfigHandler匹配
-   */
-  async getConfig() {
-    if (!authManager.isAuthenticated()) {
-      throw new Error('用户未登录');
-    }
-
-    try {
-      const response = await apiService.request('/api/detail/config');
-
-      if (!response.success) {
-        throw new Error(response.message || '获取配置失败');
-      }
-
-      const configData = response.data || response;
-      
-      return {
-        config: configData.config || this.getDefaultConfig(),
-        usage: configData.usage || {},
-        recommendations: Array.isArray(configData.recommendations) ? configData.recommendations : [],
-        validation: configData.validation || {
-          rules: this.getValidationRules(),
-          supportedSources: this.SUPPORTED_SOURCES
-        },
-        systemLimits: configData.config?.systemLimits || this.LIMITS,
-        isDefault: configData.config?.isDefault || false
-      };
-
-    } catch (error) {
-      console.error('获取详情提取配置失败:', error);
-      return this.getFallbackConfig();
-    }
-  }
-
-  /**
-   * 更新详情提取配置 - 与后端updateDetailExtractionConfigHandler匹配
-   */
-  async updateConfig(config, validateOnly = false) {
-    if (!authManager.isAuthenticated()) {
-      throw new Error('用户未登录');
-    }
-
-    if (!config || typeof config !== 'object') {
-      throw new Error('配置数据格式错误');
-    }
-
-    // 前端预验证
-    const validation = this.validateConfig(config);
-    if (!validation.valid) {
-      throw new Error(`配置验证失败: ${validation.errors.join(', ')}`);
-    }
-
-    try {
-      const response = await apiService.request('/api/detail/config', {
-        method: 'PUT',
-        body: JSON.stringify({ 
-          config,
-          validateOnly 
-        })
-      });
-
-      if (!response.success) {
-        const errorData = response.data || response;
-        if (errorData.errors) {
-          throw new Error(`配置验证失败: ${errorData.errors.join(', ')}`);
-        }
-        throw new Error(response.message || '更新配置失败');
-      }
-
-      const resultData = response.data || response;
-      return {
-        valid: resultData.valid !== false,
-        changes: Array.isArray(resultData.changes) ? resultData.changes : [],
-        warnings: Array.isArray(resultData.warnings) ? resultData.warnings : [],
-        optimizations: Array.isArray(resultData.optimizations) ? resultData.optimizations : [],
-        message: resultData.message || (validateOnly ? '配置验证通过' : '配置更新成功')
-      };
-
-    } catch (error) {
-      console.error('更新详情提取配置失败:', error);
-      throw error;
-    }
-  }
-
-  /**
    * 获取详情提取统计信息 - 与后端getDetailExtractionStatsHandler匹配
    */
   async getStats() {
@@ -463,81 +452,81 @@ class DetailAPIService {
 
   // ===================== 响应处理方法 =====================
 
-/**
- * 处理单个提取响应
- */
-processExtractionResponse(response, originalResult) {
-  const data = response.data || response;
-  const detailInfo = data.detailInfo || data;
-  const metadata = data.metadata || {};
+  /**
+   * 处理单个提取响应
+   */
+  processExtractionResponse(response, originalResult) {
+    const data = response.data || response;
+    const detailInfo = data.detailInfo || data;
+    const metadata = data.metadata || {};
 
-  console.log('处理提取响应:', {
-    originalId: originalResult.id,
-    originalTitle: originalResult.title,
-    responseTitle: detailInfo.title,
-    extractionStatus: detailInfo.extractionStatus
-  });
+    console.log('处理提取响应:', {
+      originalId: originalResult.id,
+      originalTitle: originalResult.title,
+      responseTitle: detailInfo.title,
+      extractionStatus: detailInfo.extractionStatus
+    });
 
-  // 与后端buildSuccessResponse结构保持一致
-  return {
-    // 关键修复：确保原始ID被正确保留并优先使用
-    id: originalResult.id,  // 明确设置为原始搜索结果的ID
-    originalId: originalResult.id,
-    
-    // 从原始搜索结果继承的基础信息
-    originalUrl: originalResult.url,
-    originalTitle: originalResult.title,
-    originalSource: originalResult.source,
-    source: originalResult.source, // 保持兼容性
-    
-    // 后端返回的详情信息会覆盖同名字段
-    title: detailInfo.title || originalResult.title || '未知标题',
-    code: detailInfo.code || '',
-    sourceType: detailInfo.sourceType || 'unknown',
-    
-    // URL信息
-    detailUrl: detailInfo.detailPageUrl || detailInfo.detailUrl || originalResult.url,
-    searchUrl: detailInfo.searchUrl || originalResult.url,
-    url: detailInfo.detailUrl || originalResult.url, // 兼容性字段
-    
-    // 媒体信息
-    coverImage: detailInfo.coverImage || '',
-    screenshots: Array.isArray(detailInfo.screenshots) ? detailInfo.screenshots : [],
-    
-    // 演员信息
-    actresses: Array.isArray(detailInfo.actresses) ? detailInfo.actresses : [],
-    director: detailInfo.director || '',
-    studio: detailInfo.studio || '',
-    label: detailInfo.label || '',
-    series: detailInfo.series || '',
-    
-    // 发布信息
-    releaseDate: detailInfo.releaseDate || '',
-    duration: detailInfo.duration || '',
-    
-    // 技术信息
-    quality: detailInfo.quality || '',
-    fileSize: detailInfo.fileSize || '',
-    resolution: detailInfo.resolution || '',
-    
-    // 下载信息
-    downloadLinks: Array.isArray(detailInfo.downloadLinks) ? detailInfo.downloadLinks : [],
-    magnetLinks: Array.isArray(detailInfo.magnetLinks) ? detailInfo.magnetLinks : [],
-    
-    // 其他信息
-    description: detailInfo.description || '',
-    tags: Array.isArray(detailInfo.tags) ? detailInfo.tags : [],
-    rating: typeof detailInfo.rating === 'number' ? detailInfo.rating : 0,
-    
-    // 提取元数据
-    extractionStatus: detailInfo.extractionStatus || this.EXTRACTION_STATUS.SUCCESS,
-    extractionTime: detailInfo.extractionTime || metadata.totalTime || 0,
-    extractedAt: detailInfo.extractedAt || Date.now(),
-    fromCache: metadata.fromCache || detailInfo.extractionStatus === this.EXTRACTION_STATUS.CACHED,
-    retryCount: metadata.retryCount || 0,
-    cacheKey: metadata.cacheKey || null
-  };
-}
+    // 与后端buildSuccessResponse结构保持一致
+    return {
+      // 关键修复：确保原始ID被正确保留并优先使用
+      id: originalResult.id,  // 明确设置为原始搜索结果的ID
+      originalId: originalResult.id,
+      
+      // 从原始搜索结果继承的基础信息
+      originalUrl: originalResult.url,
+      originalTitle: originalResult.title,
+      originalSource: originalResult.source,
+      source: originalResult.source, // 保持兼容性
+      
+      // 后端返回的详情信息会覆盖同名字段
+      title: detailInfo.title || originalResult.title || '未知标题',
+      code: detailInfo.code || '',
+      sourceType: detailInfo.sourceType || 'unknown',
+      
+      // URL信息
+      detailUrl: detailInfo.detailPageUrl || detailInfo.detailUrl || originalResult.url,
+      searchUrl: detailInfo.searchUrl || originalResult.url,
+      url: detailInfo.detailUrl || originalResult.url, // 兼容性字段
+      
+      // 媒体信息
+      coverImage: detailInfo.coverImage || '',
+      screenshots: Array.isArray(detailInfo.screenshots) ? detailInfo.screenshots : [],
+      
+      // 演员信息
+      actresses: Array.isArray(detailInfo.actresses) ? detailInfo.actresses : [],
+      director: detailInfo.director || '',
+      studio: detailInfo.studio || '',
+      label: detailInfo.label || '',
+      series: detailInfo.series || '',
+      
+      // 发布信息
+      releaseDate: detailInfo.releaseDate || '',
+      duration: detailInfo.duration || '',
+      
+      // 技术信息
+      quality: detailInfo.quality || '',
+      fileSize: detailInfo.fileSize || '',
+      resolution: detailInfo.resolution || '',
+      
+      // 下载信息
+      downloadLinks: Array.isArray(detailInfo.downloadLinks) ? detailInfo.downloadLinks : [],
+      magnetLinks: Array.isArray(detailInfo.magnetLinks) ? detailInfo.magnetLinks : [],
+      
+      // 其他信息
+      description: detailInfo.description || '',
+      tags: Array.isArray(detailInfo.tags) ? detailInfo.tags : [],
+      rating: typeof detailInfo.rating === 'number' ? detailInfo.rating : 0,
+      
+      // 提取元数据
+      extractionStatus: detailInfo.extractionStatus || this.EXTRACTION_STATUS.SUCCESS,
+      extractionTime: detailInfo.extractionTime || metadata.totalTime || 0,
+      extractedAt: detailInfo.extractedAt || Date.now(),
+      fromCache: metadata.fromCache || detailInfo.extractionStatus === this.EXTRACTION_STATUS.CACHED,
+      retryCount: metadata.retryCount || 0,
+      cacheKey: metadata.cacheKey || null
+    };
+  }
 
   /**
    * 处理批量响应
@@ -657,45 +646,6 @@ processExtractionResponse(response, originalResult) {
     }
     
     return { valid: true };
-  }
-
-  /**
-   * 配置验证
-   */
-  validateConfig(config) {
-    const errors = [];
-    const warnings = [];
-    
-    // 超时时间验证
-    if (config.hasOwnProperty('extractionTimeout')) {
-      const timeout = Number(config.extractionTimeout);
-      if (isNaN(timeout) || timeout < this.LIMITS.MIN_TIMEOUT || timeout > this.LIMITS.MAX_TIMEOUT) {
-        errors.push(`提取超时时间必须在 ${this.LIMITS.MIN_TIMEOUT}-${this.LIMITS.MAX_TIMEOUT}ms 之间`);
-      }
-    }
-    
-    // 批量大小验证
-    if (config.hasOwnProperty('extractionBatchSize')) {
-      const batchSize = Number(config.extractionBatchSize);
-      if (isNaN(batchSize) || batchSize < this.LIMITS.MIN_BATCH_SIZE || batchSize > this.LIMITS.MAX_BATCH_SIZE) {
-        errors.push(`批量大小必须在 ${this.LIMITS.MIN_BATCH_SIZE}-${this.LIMITS.MAX_BATCH_SIZE} 之间`);
-      }
-    }
-    
-    // 性能警告
-    if (config.extractionTimeout > this.LIMITS.DEFAULT_TIMEOUT * 2) {
-      warnings.push('超时时间设置过长可能影响用户体验');
-    }
-    
-    if (config.extractionBatchSize > 5) {
-      warnings.push('批量大小过大可能导致请求阻塞');
-    }
-    
-    return {
-      valid: errors.length === 0,
-      errors,
-      warnings
-    };
   }
 
   /**
@@ -952,66 +902,103 @@ processExtractionResponse(response, originalResult) {
   // ===================== 默认数据和工具方法 =====================
 
   /**
-   * 获取默认配置
+   * 延迟函数
    */
-  getDefaultConfig() {
-    return {
-      enableDetailExtraction: true,
-      autoExtractDetails: false,
-      maxAutoExtractions: 5,
-      extractionBatchSize: 3,
-      extractionTimeout: this.LIMITS.DEFAULT_TIMEOUT,
-      enableRetry: true,
-      maxRetryAttempts: 2,
-      enableCache: true,
-      cacheDuration: 86400000,
-      enableLocalCache: true,
-      showScreenshots: true,
-      showDownloadLinks: true,
-      showMagnetLinks: true,
-      showActressInfo: true,
-      compactMode: false,
-      enableImagePreview: true,
-      showExtractionProgress: true,
-      enableContentFilter: false,
-      contentFilterKeywords: []
-    };
+  async delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
-   * 获取验证规则
+   * 生成错误建议
    */
-  getValidationRules() {
-    return {
-      extractionTimeout: {
-        min: this.LIMITS.MIN_TIMEOUT,
-        max: this.LIMITS.MAX_TIMEOUT
-      },
-      cacheDuration: {
-        min: 3600000, // 1小时
-        max: 604800000 // 7天
-      },
-      maxAutoExtractions: {
-        min: 1,
-        max: 10
-      },
-      extractionBatchSize: {
-        min: this.LIMITS.MIN_BATCH_SIZE,
-        max: this.LIMITS.MAX_BATCH_SIZE
-      },
-      maxDownloadLinks: {
-        min: 1,
-        max: this.LIMITS.MAX_DOWNLOAD_LINKS
-      },
-      maxMagnetLinks: {
-        min: 1,
-        max: this.LIMITS.MAX_MAGNET_LINKS
-      },
-      maxScreenshots: {
-        min: 1,
-        max: this.LIMITS.MAX_SCREENSHOTS
-      }
+  generateErrorSuggestions(errorType, errorMessage) {
+    const suggestions = [];
+    
+    switch (errorType) {
+      case 'TimeoutError':
+        suggestions.push('尝试增加超时时间');
+        suggestions.push('检查网络连接');
+        suggestions.push('稍后重试');
+        break;
+      case 'ValidationError':
+        suggestions.push('检查输入数据格式');
+        suggestions.push('确保URL有效');
+        break;
+      case 'NetworkError':
+        suggestions.push('检查网络连接');
+        suggestions.push('目标网站可能暂时不可用');
+        break;
+      case 'ParseError':
+        suggestions.push('目标页面结构可能已变更');
+        suggestions.push('尝试使用通用解析模式');
+        break;
+      default:
+        suggestions.push('请重试操作');
+        break;
+    }
+    
+    return suggestions;
+  }
+
+  /**
+   * 获取相对时间
+   */
+  getRelativeTime(timestamp) {
+    const now = Date.now();
+    const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+    const diff = now - time;
+    
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
+    if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`;
+    return `${Math.floor(diff / 604800000)}周前`;
+  }
+
+  /**
+   * 获取状态徽章
+   */
+  getStatusBadge(status) {
+    const badges = {
+      [this.EXTRACTION_STATUS.SUCCESS]: { text: '成功', color: 'green', icon: '✓' },
+      [this.EXTRACTION_STATUS.CACHED]: { text: '缓存', color: 'blue', icon: '⚡' },
+      [this.EXTRACTION_STATUS.PARTIAL]: { text: '部分', color: 'yellow', icon: '⚠' },
+      [this.EXTRACTION_STATUS.ERROR]: { text: '失败', color: 'red', icon: '✗' },
+      [this.EXTRACTION_STATUS.TIMEOUT]: { text: '超时', color: 'orange', icon: '⏱' }
     };
+    
+    return badges[status] || { text: '未知', color: 'gray', icon: '?' };
+  }
+
+  /**
+   * 获取性能评级
+   */
+  getPerformanceRating(extractionTime) {
+    if (extractionTime < 3000) return 'excellent';
+    if (extractionTime < 8000) return 'good';
+    if (extractionTime < 15000) return 'fair';
+    return 'poor';
+  }
+
+  /**
+   * 估算质量
+   */
+  getEstimatedQuality(item) {
+    let score = 0;
+    
+    if (item.extractionTime < 5000) score += 2;
+    else if (item.extractionTime < 10000) score += 1;
+    
+    if (item.dataSize > 5000) score += 2;
+    else if (item.dataSize > 2000) score += 1;
+    
+    if (item.extractionStatus === this.EXTRACTION_STATUS.SUCCESS) score += 3;
+    else if (item.extractionStatus === this.EXTRACTION_STATUS.CACHED) score += 2;
+    
+    if (score >= 6) return 'high';
+    if (score >= 4) return 'medium';
+    if (score >= 2) return 'low';
+    return 'unknown';
   }
 
   /**
@@ -1122,125 +1109,6 @@ processExtractionResponse(response, originalResult) {
   }
 
   /**
-   * 获取后备配置
-   */
-  getFallbackConfig() {
-    return {
-      config: this.getDefaultConfig(),
-      usage: {},
-      recommendations: [],
-      validation: {
-        rules: this.getValidationRules(),
-        supportedSources: this.SUPPORTED_SOURCES
-      },
-      systemLimits: this.LIMITS,
-      isDefault: true
-    };
-  }
-
-  // ===================== 辅助工具方法 =====================
-
-  /**
-   * 延迟函数
-   */
-  async delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * 生成错误建议
-   */
-  generateErrorSuggestions(errorType, errorMessage) {
-    const suggestions = [];
-    
-    switch (errorType) {
-      case 'TimeoutError':
-        suggestions.push('尝试增加超时时间');
-        suggestions.push('检查网络连接');
-        suggestions.push('稍后重试');
-        break;
-      case 'ValidationError':
-        suggestions.push('检查输入数据格式');
-        suggestions.push('确保URL有效');
-        break;
-      case 'NetworkError':
-        suggestions.push('检查网络连接');
-        suggestions.push('目标网站可能暂时不可用');
-        break;
-      case 'ParseError':
-        suggestions.push('目标页面结构可能已变更');
-        suggestions.push('尝试使用通用解析模式');
-        break;
-      default:
-        suggestions.push('请重试操作');
-        break;
-    }
-    
-    return suggestions;
-  }
-
-  /**
-   * 获取相对时间
-   */
-  getRelativeTime(timestamp) {
-    const now = Date.now();
-    const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-    const diff = now - time;
-    
-    if (diff < 60000) return '刚刚';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
-    if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`;
-    return `${Math.floor(diff / 604800000)}周前`;
-  }
-
-  /**
-   * 获取状态徽章
-   */
-  getStatusBadge(status) {
-    const badges = {
-      [this.EXTRACTION_STATUS.SUCCESS]: { text: '成功', color: 'green', icon: '✓' },
-      [this.EXTRACTION_STATUS.CACHED]: { text: '缓存', color: 'blue', icon: '⚡' },
-      [this.EXTRACTION_STATUS.PARTIAL]: { text: '部分', color: 'yellow', icon: '⚠' },
-      [this.EXTRACTION_STATUS.ERROR]: { text: '失败', color: 'red', icon: '✗' },
-      [this.EXTRACTION_STATUS.TIMEOUT]: { text: '超时', color: 'orange', icon: 'ⱱ' }
-    };
-    
-    return badges[status] || { text: '未知', color: 'gray', icon: '?' };
-  }
-
-  /**
-   * 获取性能评级
-   */
-  getPerformanceRating(extractionTime) {
-    if (extractionTime < 3000) return 'excellent';
-    if (extractionTime < 8000) return 'good';
-    if (extractionTime < 15000) return 'fair';
-    return 'poor';
-  }
-
-  /**
-   * 估算质量
-   */
-  getEstimatedQuality(item) {
-    let score = 0;
-    
-    if (item.extractionTime < 5000) score += 2;
-    else if (item.extractionTime < 10000) score += 1;
-    
-    if (item.dataSize > 5000) score += 2;
-    else if (item.dataSize > 2000) score += 1;
-    
-    if (item.extractionStatus === this.EXTRACTION_STATUS.SUCCESS) score += 3;
-    else if (item.extractionStatus === this.EXTRACTION_STATUS.CACHED) score += 2;
-    
-    if (score >= 6) return 'high';
-    if (score >= 4) return 'medium';
-    if (score >= 2) return 'low';
-    return 'unknown';
-  }
-
-  /**
    * 验证提取结果
    */
   validateExtractionResult(result) {
@@ -1338,7 +1206,8 @@ processExtractionResponse(response, originalResult) {
           size: this.requestCache.size,
           maxSize: this.maxCacheSize,
           hitRate: this.calculateLocalCacheHitRate()
-        }
+        },
+        configService: await detailConfigAPI.checkServiceHealth()
       };
     } catch (error) {
       return {
@@ -1378,7 +1247,7 @@ processExtractionResponse(response, originalResult) {
   exportServiceStatus() {
     return {
       type: 'detail-api-service',
-      version: '3.0.0', // 与后端同步的版本号
+      version: '3.0.0',
       localCacheStats: this.getLocalCacheStats(),
       cacheExpiration: this.cacheExpiration,
       maxCacheSize: this.maxCacheSize,
@@ -1392,11 +1261,12 @@ processExtractionResponse(response, originalResult) {
         enhancedErrorHandling: true,
         improvedCaching: true,
         batchProcessing: true,
-        configValidation: true,
+        configAwareProcessing: true, // 新增：配置感知处理
         progressTracking: true,
         retryMechanism: true,
         statisticsReporting: true,
-        backendSync: true // 新增：与后端同步功能
+        backendSync: true,
+        dynamicConfiguration: true // 新增：动态配置功能
       }
     };
   }
@@ -1408,6 +1278,10 @@ processExtractionResponse(response, originalResult) {
     this.clearLocalCache();
     this.progressCallbacks.clear();
     this.extractionQueue.clear();
+    
+    // 重置配置服务
+    detailConfigAPI.reset();
+    
     console.log('详情提取服务已重置');
   }
 
@@ -1420,8 +1294,96 @@ processExtractionResponse(response, originalResult) {
       limits: this.LIMITS,
       extractionStatuses: this.EXTRACTION_STATUS,
       cacheStats: this.getLocalCacheStats(),
-      version: '3.0.0'
+      version: '3.0.0',
+      configService: {
+        available: true,
+        cached: detailConfigAPI.isConfigCacheValid(),
+        lastUpdate: detailConfigAPI.lastCacheTime
+      }
     };
+  }
+
+  /**
+   * 获取当前生效的配置摘要
+   */
+  async getEffectiveConfigSummary() {
+    try {
+      const configData = await detailConfigAPI.getUserConfig();
+      const config = configData.config;
+      
+      return {
+        extractionEnabled: config.enableDetailExtraction,
+        autoExtraction: config.autoExtractDetails,
+        timeout: config.extractionTimeout,
+        batchSize: config.extractionBatchSize,
+        concurrency: config.enableConcurrentExtraction ? config.maxConcurrentExtractions : 1,
+        cacheEnabled: config.enableCache,
+        localCacheEnabled: config.enableLocalCache,
+        retryEnabled: config.enableRetry,
+        maxRetries: config.maxRetryAttempts,
+        isDefault: configData.isDefault,
+        lastUpdated: Date.now()
+      };
+    } catch (error) {
+      console.error('获取生效配置摘要失败:', error);
+      return {
+        extractionEnabled: DEFAULT_USER_CONFIG.enableDetailExtraction,
+        autoExtraction: DEFAULT_USER_CONFIG.autoExtractDetails,
+        timeout: DEFAULT_USER_CONFIG.extractionTimeout,
+        batchSize: DEFAULT_USER_CONFIG.extractionBatchSize,
+        concurrency: DEFAULT_USER_CONFIG.maxConcurrentExtractions,
+        cacheEnabled: DEFAULT_USER_CONFIG.enableCache,
+        localCacheEnabled: DEFAULT_USER_CONFIG.enableLocalCache,
+        retryEnabled: DEFAULT_USER_CONFIG.enableRetry,
+        maxRetries: DEFAULT_USER_CONFIG.maxRetryAttempts,
+        isDefault: true,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * 预加载用户配置（用于优化性能）
+   */
+  async preloadUserConfig() {
+    if (authManager.isAuthenticated()) {
+      try {
+        await detailConfigAPI.getUserConfig();
+        console.log('用户配置预加载完成');
+        return true;
+      } catch (error) {
+        console.warn('用户配置预加载失败:', error);
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 监听配置变更（如果需要实时更新）
+   */
+  onConfigChange(callback) {
+    if (typeof callback === 'function') {
+      // 简单的配置变更监听机制
+      this.configChangeCallback = callback;
+      
+      // 当配置更新时调用回调
+      const originalUpdateConfig = detailConfigAPI.updateUserConfig.bind(detailConfigAPI);
+      detailConfigAPI.updateUserConfig = async (...args) => {
+        const result = await originalUpdateConfig(...args);
+        if (result.valid && this.configChangeCallback) {
+          this.configChangeCallback(result.config);
+        }
+        return result;
+      };
+    }
+  }
+
+  /**
+   * 移除配置变更监听
+   */
+  offConfigChange() {
+    this.configChangeCallback = null;
   }
 }
 

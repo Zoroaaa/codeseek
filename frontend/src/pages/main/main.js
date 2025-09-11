@@ -1,4 +1,4 @@
-// 主应用入口 - 使用统一搜索组件，完善详情提取服务集成
+// 主应用入口 - 集成统一搜索组件和配置管理架构
 import { APP_CONSTANTS } from '../../core/constants.js';
 import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
@@ -16,39 +16,17 @@ class MagnetSearchApp {
   constructor() {
     this.currentUser = null;
     this.isInitialized = false;
-    this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS.CHECKING;
+    this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS?.CHECKING || 'checking';
     
-    // 搜索源和分类管理
+    // 搜索源和分类管理 - 简化版本，主要通过统一搜索管理器处理
     this.allSearchSources = [];
     this.allCategories = [];
-    this.enabledSources = [];
-    this.customSearchSources = [];
-    this.customCategories = [];
     
-    // 详情提取功能状态 - 完善版本
+    // 详情提取功能状态
     this.detailExtractionAvailable = false;
     this.detailExtractionEnabled = false;
-    this.detailExtractionConfig = {
-      enableDetailExtraction: false,
-      autoExtractDetails: false,
-      maxAutoExtractions: 5,
-      extractionBatchSize: 3,
-      extractionTimeout: 15000,
-      enableRetry: true,
-      maxRetryAttempts: 2,
-      enableCache: true,
-      showExtractionProgress: true,
-      showScreenshots: true,
-      showDownloadLinks: true,
-      showMagnetLinks: true,
-      showActressInfo: true,
-      compactMode: false,
-      enableImagePreview: true,
-      enableContentFilter: false,
-      contentFilterKeywords: []
-    };
     
-    // 详情提取统计信息
+    // 详情提取统计信息 - 通过统一搜索管理器获取
     this.detailExtractionStats = {
       totalExtractions: 0,
       successfulExtractions: 0,
@@ -102,8 +80,6 @@ class MagnetSearchApp {
         document.querySelector('.main-content').style.display = 'block';
         // 已登录用户初始化组件
         await this.initComponents();
-        // 加载用户的搜索源设置
-        await this.loadUserSearchSettings();
         // 检查详情提取功能可用性
         await this.checkDetailExtractionAvailability();
         // 初始化详情提取UI
@@ -129,7 +105,7 @@ class MagnetSearchApp {
       
     } catch (error) {
       console.error('❌ 应用初始化失败:', error);
-      this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS.ERROR;
+      this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS?.ERROR || 'error';
       this.updateConnectionStatus('连接失败');
       this.performanceMetrics.errorCount++;
       showToast('应用初始化失败，请刷新页面重试', 'error', 5000);
@@ -142,14 +118,14 @@ class MagnetSearchApp {
   loadBuiltinData() {
     try {
       // 加载内置搜索源
-      const builtinSources = APP_CONSTANTS.SEARCH_SOURCES.map(source => ({
+      const builtinSources = (APP_CONSTANTS.SEARCH_SOURCES || []).map(source => ({
         ...source,
         isBuiltin: true,
         isCustom: false
       }));
       
       // 加载内置分类
-      const builtinCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(category => ({
+      const builtinCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES || {}).map(category => ({
         ...category,
         isBuiltin: true,
         isCustom: false
@@ -161,80 +137,16 @@ class MagnetSearchApp {
       this.allSearchSources = [...builtinSources];
       this.allCategories = [...builtinCategories];
       
-      // 设置默认可用的搜索源
-      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
-      
     } catch (error) {
       console.error('加载内置数据失败:', error);
       this.performanceMetrics.errorCount++;
       // 使用空数组作为后备
       this.allSearchSources = [];
       this.allCategories = [];
-      this.enabledSources = [];
     }
   }
 
-  // 加载用户的搜索源设置
-  async loadUserSearchSettings() {
-    if (!this.currentUser) return;
-    
-    try {
-      const userSettings = await apiService.getUserSettings();
-      
-      // 加载用户的自定义搜索源和分类
-      this.customSearchSources = userSettings.customSearchSources || [];
-      this.customCategories = userSettings.customSourceCategories || [];
-      this.enabledSources = userSettings.searchSources || APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
-      
-      // 加载详情提取设置
-      this.detailExtractionEnabled = userSettings.enableDetailExtraction || false;
-      this.updateDetailExtractionConfig(userSettings);
-      
-      // 合并内置和自定义数据
-      this.allSearchSources = [
-        ...APP_CONSTANTS.SEARCH_SOURCES.map(s => ({ ...s, isBuiltin: true, isCustom: false })),
-        ...this.customSearchSources.map(s => ({ ...s, isBuiltin: false, isCustom: true }))
-      ];
-      
-      this.allCategories = [
-        ...Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(c => ({ ...c, isBuiltin: true, isCustom: false })),
-        ...this.customCategories.map(c => ({ ...c, isBuiltin: false, isCustom: true }))
-      ];
-      
-      console.log(`用户设置：可用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源，详情提取：${this.detailExtractionEnabled ? '可用' : '禁用'}`);
-      
-    } catch (error) {
-      console.warn('加载用户搜索源设置失败，使用默认设置:', error);
-      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
-      this.detailExtractionEnabled = false;
-    }
-  }
-
-  // 更新详情提取配置
-  updateDetailExtractionConfig(userSettings) {
-    this.detailExtractionConfig = {
-      enableDetailExtraction: userSettings.enableDetailExtraction !== false,
-      autoExtractDetails: userSettings.autoExtractDetails === true,
-      maxAutoExtractions: Math.min(userSettings.maxAutoExtractions || 5, APP_CONSTANTS.LIMITS.MAX_AUTO_EXTRACTIONS),
-      extractionBatchSize: Math.min(userSettings.extractionBatchSize || 3, APP_CONSTANTS.LIMITS.MAX_DETAIL_EXTRACTIONS_PER_BATCH),
-      extractionTimeout: Math.min(Math.max(userSettings.extractionTimeout || 15000, APP_CONSTANTS.LIMITS.MIN_DETAIL_EXTRACTION_TIMEOUT), APP_CONSTANTS.LIMITS.MAX_DETAIL_EXTRACTION_TIMEOUT),
-      enableRetry: userSettings.enableRetry !== false,
-      maxRetryAttempts: Math.min(userSettings.maxRetryAttempts || 2, 5),
-      enableCache: userSettings.enableCache !== false,
-      showExtractionProgress: userSettings.showExtractionProgress !== false,
-      showScreenshots: userSettings.showScreenshots !== false,
-      showDownloadLinks: userSettings.showDownloadLinks !== false,
-      showMagnetLinks: userSettings.showMagnetLinks !== false,
-      showActressInfo: userSettings.showActressInfo !== false,
-      compactMode: userSettings.compactMode === true,
-      enableImagePreview: userSettings.enableImagePreview !== false,
-      enableContentFilter: userSettings.enableContentFilter === true,
-      contentFilterKeywords: Array.isArray(userSettings.contentFilterKeywords) ? 
-        userSettings.contentFilterKeywords : []
-    };
-  }
-
-  // 检查详情提取功能可用性 - 完善版本
+  // 检查详情提取功能可用性 - 通过统一搜索管理器
   async checkDetailExtractionAvailability() {
     if (!this.currentUser) {
       this.detailExtractionAvailable = false;
@@ -243,23 +155,21 @@ class MagnetSearchApp {
     }
 
     try {
-      // 检查后端是否支持详情提取功能
+      // 通过统一搜索管理器检查详情提取服务健康状态
       const healthCheck = await detailAPIService.checkServiceHealth();
       this.detailExtractionAvailable = healthCheck.healthy;
       
       if (this.detailExtractionAvailable) {
-        // 获取详情提取配置和统计
-        const [config, stats] = await Promise.all([
-          detailAPIService.getConfig().catch(() => null),
-          detailAPIService.getStats().catch(() => null)
-        ]);
+        // 获取当前详情提取配置和统计
+        const configSummary = await detailAPIService.getEffectiveConfigSummary();
+        this.detailExtractionEnabled = configSummary.extractionEnabled;
         
-        if (config) {
-          console.log('详情提取服务配置:', config);
-        }
-        
-        if (stats) {
+        // 获取统计信息
+        try {
+          const stats = await detailAPIService.getStats();
           this.updateDetailExtractionStats(stats);
+        } catch (error) {
+          console.warn('获取详情提取统计失败:', error);
         }
         
         // 如果后端支持但用户未启用，显示提示
@@ -270,7 +180,7 @@ class MagnetSearchApp {
       
       this.updateDetailExtractionUI(this.detailExtractionAvailable);
       
-      console.log(`详情提取功能：${this.detailExtractionAvailable ? '可用' : '不可用'}，用户设置：${this.detailExtractionEnabled ? '可用' : '禁用'}`);
+      console.log(`详情提取功能：${this.detailExtractionAvailable ? '可用' : '不可用'}，用户设置：${this.detailExtractionEnabled ? '启用' : '禁用'}`);
       
     } catch (error) {
       console.warn('检查详情提取功能可用性失败:', error);
@@ -334,9 +244,9 @@ class MagnetSearchApp {
       // 绑定详情提取相关事件
       this.bindDetailExtractionEvents();
       
-      // 如果用户已启用详情提取，初始化相关组件
-      if (this.detailExtractionEnabled) {
-        await this.initDetailExtractionComponents();
+      // 如果用户已启用详情提取，确保详情卡片管理器已初始化
+      if (this.detailExtractionEnabled && !detailCardManager.isInitialized) {
+        await detailCardManager.init();
       }
       
     } catch (error) {
@@ -344,79 +254,51 @@ class MagnetSearchApp {
     }
   }
 
-  // 初始化详情提取相关组件
-  async initDetailExtractionComponents() {
-    try {
-      // 确保详情卡片管理器已初始化
-      if (!detailCardManager.isInitialized) {
-        await detailCardManager.init();
+  // 绑定详情提取相关事件
+  bindDetailExtractionEvents() {
+    // 监听详情配置变更事件（从统一搜索管理器发出）
+    document.addEventListener('searchConfigChanged', (event) => {
+      if (event.detail.config) {
+        const config = event.detail.config;
+        
+        // 更新详情提取启用状态
+        if (config.enableDetailExtraction !== this.detailExtractionEnabled) {
+          this.detailExtractionEnabled = config.enableDetailExtraction;
+          this.updateDetailExtractionUI(this.detailExtractionAvailable);
+          
+          // 触发状态变更事件
+          this.dispatchDetailExtractionStateChanged();
+        }
       }
-      
-      // 更新详情卡片管理器配置
-      await detailCardManager.loadUserConfig();
-      
-      console.log('详情提取组件初始化完成');
-      
-    } catch (error) {
-      console.error('初始化详情提取组件失败:', error);
+    });
+
+    // 监听详情提取完成事件
+    document.addEventListener('detailExtractionCompleted', (event) => {
+      if (event.detail.stats) {
+        this.updateDetailExtractionStats(event.detail.stats);
+        this.updateDetailExtractionStatsDisplay();
+        this.performanceMetrics.extractionCount++;
+      }
+    });
+
+    // 绑定详情提取切换按钮
+    const detailToggleBtn = document.getElementById('detailExtractionToggle');
+    if (detailToggleBtn) {
+      detailToggleBtn.addEventListener('click', () => this.toggleDetailExtraction());
+    }
+
+    // 绑定批量提取按钮
+    const batchExtractBtn = document.getElementById('batchExtractBtn');
+    if (batchExtractBtn) {
+      batchExtractBtn.addEventListener('click', () => this.batchExtractDetails());
     }
   }
 
-  // 绑定详情提取相关事件
-  bindDetailExtractionEvents() {
-    // 监听详情提取状态变更
-    window.addEventListener('detailExtractionStateChanged', async (event) => {
-      console.log('检测到详情提取状态变更:', event.detail);
-      
-      try {
-        this.detailExtractionEnabled = event.detail.enabled;
-        
-        // 重新渲染站点导航以更新详情提取标识
-        this.renderSiteNavigation();
-        
-        // 更新UI状态
-        this.updateDetailExtractionUI(this.detailExtractionAvailable);
-        
-        // 如果启用了详情提取，初始化相关组件
-        if (this.detailExtractionEnabled) {
-          await this.initDetailExtractionComponents();
-        }
-        
-        showToast(`详情提取功能已${this.detailExtractionEnabled ? '启用' : '禁用'}`, 'success', 2000);
-      } catch (error) {
-        console.error('处理详情提取状态变更失败:', error);
-      }
-    });
-
-    // 监听详情提取配置变更
-    window.addEventListener('detailExtractionConfigChanged', async (event) => {
-      console.log('检测到详情提取配置变更:', event.detail);
-      
-      try {
-        // 重新加载用户配置
-        await this.loadUserSearchSettings();
-        
-        // 通知统一搜索管理器重新加载配置
-        if (unifiedSearchManager.isInitialized) {
-          await unifiedSearchManager.loadUserConfig();
-        }
-        
-        // 通知详情卡片管理器重新加载配置
-        if (detailCardManager.isInitialized) {
-          await detailCardManager.loadUserConfig();
-        }
-        
-        showToast('详情提取配置已更新', 'success', 2000);
-      } catch (error) {
-        console.error('处理详情提取配置变更失败:', error);
-      }
-    });
-
-    // 监听详情提取统计更新
-    window.addEventListener('detailExtractionStatsUpdated', (event) => {
-      this.updateDetailExtractionStats(event.detail);
-      this.updateDetailExtractionStatsDisplay();
-    });
+  // 触发详情提取状态变更事件
+  dispatchDetailExtractionStateChanged() {
+    window.dispatchEvent(new CustomEvent('detailExtractionStateChanged', {
+      detail: { enabled: this.detailExtractionEnabled }
+    }));
   }
 
   // 更新详情提取统计信息
@@ -444,10 +326,16 @@ class MagnetSearchApp {
       const rate = Math.round((this.detailExtractionStats.successfulExtractions / this.detailExtractionStats.totalExtractions) * 100);
       
       if (supportedCount) {
-        const supportedSources = this.allSearchSources.filter(source => 
-          this.supportsDetailExtraction(source.id)
-        ).length;
-        supportedCount.textContent = supportedSources;
+        // 通过统一搜索管理器获取支持详情提取的搜索源数量
+        try {
+          const config = unifiedSearchManager.configManager?.getConfig() || {};
+          const supportedSources = this.allSearchSources.filter(source => 
+            this.supportsDetailExtraction(source.id)
+          ).length;
+          supportedCount.textContent = supportedSources;
+        } catch (error) {
+          supportedCount.textContent = '0';
+        }
       }
       
       if (extractedCount) {
@@ -501,31 +389,29 @@ class MagnetSearchApp {
     }
 
     try {
-      const userSettings = await apiService.getUserSettings();
-      await apiService.updateUserSettings({
-        ...userSettings,
-        enableDetailExtraction: true
-      });
-      
-      this.detailExtractionEnabled = true;
-      
-      // 通知统一搜索管理器重新加载配置
-      if (unifiedSearchManager.isInitialized) {
-        await unifiedSearchManager.loadUserConfig();
+      // 通过统一搜索管理器的配置管理器更新配置
+      if (unifiedSearchManager.configManager) {
+        await unifiedSearchManager.configManager.updateDisplayConfig({
+          enableDetailExtraction: true
+        });
+        
+        this.detailExtractionEnabled = true;
+        
+        // 确保详情卡片管理器已初始化
+        if (!detailCardManager.isInitialized) {
+          await detailCardManager.init();
+        }
+        
+        // 更新UI
+        this.updateDetailExtractionUI(this.detailExtractionAvailable);
+        
+        showToast('详情提取功能已启用！', 'success');
+        
+        // 触发状态变更事件
+        this.dispatchDetailExtractionStateChanged();
+      } else {
+        throw new Error('配置管理器未初始化');
       }
-      
-      // 初始化详情提取组件
-      await this.initDetailExtractionComponents();
-      
-      // 更新UI
-      this.updateDetailExtractionUI(this.detailExtractionAvailable);
-      
-      showToast('详情提取功能已启用！', 'success');
-      
-      // 触发状态变更事件
-      window.dispatchEvent(new CustomEvent('detailExtractionStateChanged', {
-        detail: { enabled: true }
-      }));
       
     } catch (error) {
       console.error('启用详情提取功能失败:', error);
@@ -547,29 +433,30 @@ class MagnetSearchApp {
 
     try {
       const newState = !this.detailExtractionEnabled;
-      const userSettings = await apiService.getUserSettings();
       
-      await apiService.updateUserSettings({
-        ...userSettings,
-        enableDetailExtraction: newState
-      });
-      
-      this.detailExtractionEnabled = newState;
-      
-      // 如果启用，初始化组件
-      if (newState) {
-        await this.initDetailExtractionComponents();
+      // 通过统一搜索管理器的配置管理器更新配置
+      if (unifiedSearchManager.configManager) {
+        await unifiedSearchManager.configManager.updateDisplayConfig({
+          enableDetailExtraction: newState
+        });
+        
+        this.detailExtractionEnabled = newState;
+        
+        // 如果启用，确保详情卡片管理器已初始化
+        if (newState && !detailCardManager.isInitialized) {
+          await detailCardManager.init();
+        }
+        
+        // 更新UI
+        this.updateDetailExtractionUI(this.detailExtractionAvailable);
+        
+        // 触发状态变更事件
+        this.dispatchDetailExtractionStateChanged();
+        
+        showToast(`详情提取功能已${newState ? '启用' : '禁用'}`, 'success');
+      } else {
+        throw new Error('配置管理器未初始化');
       }
-      
-      // 更新UI
-      this.updateDetailExtractionUI(this.detailExtractionAvailable);
-      
-      // 触发状态变更事件
-      window.dispatchEvent(new CustomEvent('detailExtractionStateChanged', {
-        detail: { enabled: newState }
-      }));
-      
-      showToast(`详情提取功能已${newState ? '启用' : '禁用'}`, 'success');
       
     } catch (error) {
       console.error('切换详情提取功能失败:', error);
@@ -584,131 +471,107 @@ class MagnetSearchApp {
       return;
     }
 
-    if (!unifiedSearchManager.currentResults || unifiedSearchManager.currentResults.length === 0) {
-      showToast('没有搜索结果可以提取详情', 'warning');
-      return;
-    }
-
-    try {
-      // 筛选支持详情提取的结果
-      const supportedResults = unifiedSearchManager.currentResults.filter(result => 
-        this.supportsDetailExtraction(result.source)
-      );
-
-      if (supportedResults.length === 0) {
-        showToast('当前搜索结果中没有支持详情提取的源', 'info');
-        return;
-      }
-
-      // 让用户选择要提取的数量
-      const maxCount = Math.min(supportedResults.length, this.detailExtractionConfig.maxAutoExtractions);
-      const count = prompt(`发现 ${supportedResults.length} 个支持详情提取的结果\n请输入要提取的数量 (最多 ${maxCount} 个):`, maxCount.toString());
-      
-      if (!count || isNaN(count) || count < 1) return;
-      
-      const extractCount = Math.min(parseInt(count), maxCount);
-      const resultsToExtract = supportedResults.slice(0, extractCount);
-
-      // 执行批量提取
-      showToast(`开始批量提取 ${extractCount} 个结果的详情...`, 'info');
-      
-      const extractionResult = await detailAPIService.extractBatchDetails(resultsToExtract, {
-        enableCache: this.detailExtractionConfig.enableCache,
-        timeout: this.detailExtractionConfig.extractionTimeout,
-        enableRetry: this.detailExtractionConfig.enableRetry,
-        maxRetries: this.detailExtractionConfig.maxRetryAttempts,
-        maxConcurrency: this.detailExtractionConfig.extractionBatchSize,
-        onProgress: (progress) => {
-          console.log(`批量提取进度: ${progress.current}/${progress.total}`);
+    // 通过统一搜索管理器执行批量提取
+    if (unifiedSearchManager.isInitialized && unifiedSearchManager.extractionManager) {
+      try {
+        const currentResults = unifiedSearchManager.resultsRenderer.getCurrentResults();
+        
+        if (!currentResults || currentResults.length === 0) {
+          showToast('没有搜索结果可以提取详情', 'warning');
+          return;
         }
-      });
 
-      // 处理提取结果
-      this.processBatchExtractionResults(extractionResult);
-      
-      // 更新统计
-      this.updateDetailExtractionStats(extractionResult);
-      this.updateDetailExtractionStatsDisplay();
-      
-      const successCount = extractionResult.stats?.successful || 0;
-      const totalCount = extractionResult.results?.length || 0;
-      showToast(`批量详情提取完成: ${successCount}/${totalCount} 成功`, successCount > 0 ? 'success' : 'warning');
-      
-    } catch (error) {
-      console.error('批量提取详情失败:', error);
-      showToast('批量提取失败: ' + error.message, 'error');
+        // 筛选支持详情提取的结果
+        const supportedResults = currentResults.filter(result => 
+          this.supportsDetailExtraction(result.source)
+        );
+
+        if (supportedResults.length === 0) {
+          showToast('当前搜索结果中没有支持详情提取的源', 'info');
+          return;
+        }
+
+        // 获取当前配置
+        const config = unifiedSearchManager.configManager.getConfig();
+        const maxCount = Math.min(supportedResults.length, config.maxAutoExtractions || 5);
+        
+        const count = prompt(`发现 ${supportedResults.length} 个支持详情提取的结果\n请输入要提取的数量 (最多 ${maxCount} 个):`, maxCount.toString());
+        
+        if (!count || isNaN(count) || count < 1) return;
+        
+        const extractCount = Math.min(parseInt(count), maxCount);
+        const resultsToExtract = supportedResults.slice(0, extractCount);
+
+        // 执行批量提取
+        showToast(`开始批量提取 ${extractCount} 个结果的详情...`, 'info');
+        
+        await unifiedSearchManager.extractionManager.handleDetailExtraction(
+          resultsToExtract,
+          document.getElementById('searchInput')?.value || '',
+          config
+        );
+        
+        // 更新性能计数
+        this.performanceMetrics.extractionCount += extractCount;
+        
+      } catch (error) {
+        console.error('批量提取详情失败:', error);
+        showToast('批量提取失败: ' + error.message, 'error');
+        this.performanceMetrics.errorCount++;
+      }
+    } else {
+      showToast('搜索管理器未正确初始化', 'error');
     }
   }
 
-  // 处理批量提取结果
-  processBatchExtractionResults(extractionResult) {
-    if (!extractionResult.results || extractionResult.results.length === 0) {
-      console.warn('没有批量提取结果需要处理');
-      return;
-    }
-
-    // 为每个成功提取的结果创建详情卡片
-    extractionResult.results.forEach(result => {
-      if (result.extractionStatus === 'success' || result.extractionStatus === 'cached') {
-        try {
-          // 找到对应的搜索结果容器
-          const resultContainer = document.querySelector(`[data-result-id="${result.id}"]`);
-          if (resultContainer) {
-            // 创建详情容器
-            let detailContainer = resultContainer.querySelector('.result-detail-container');
-            if (!detailContainer) {
-              detailContainer = document.createElement('div');
-              detailContainer.className = 'result-detail-container';
-              resultContainer.appendChild(detailContainer);
-            }
-
-            // 使用详情卡片管理器渲染详情
-            const searchResult = unifiedSearchManager.currentResults.find(r => r.id === result.id);
-            if (searchResult) {
-              detailCardManager.renderDetailCard(searchResult, result, detailContainer, this.detailExtractionConfig);
-              detailContainer.style.display = 'block';
-            }
-          }
-        } catch (error) {
-          console.error(`处理提取结果失败 [${result.id}]:`, error);
-        }
-      }
-    });
-  }
-
-  // 初始化站点导航 - 显示所有搜索源，标识详情提取支持
+  // 初始化站点导航 - 集成统一搜索管理器
   async initSiteNavigation() {
     try {
-      // 使用所有可用的搜索源（包括内置和自定义），而不是只使用可用的源
-      this.renderSiteNavigation(this.allSearchSources.map(source => source.id));
+      // 获取所有可用的搜索源（通过统一搜索管理器）
+      let searchSources = this.allSearchSources;
+      
+      // 如果统一搜索管理器已初始化，获取其配置的搜索源
+      if (unifiedSearchManager.isInitialized && unifiedSearchManager.configManager) {
+        try {
+          const config = unifiedSearchManager.configManager.getConfig();
+          // 这里可以根据配置过滤搜索源，但当前保持显示所有源
+          this.renderSiteNavigation(searchSources);
+        } catch (error) {
+          console.warn('获取搜索配置失败，使用默认配置:', error);
+          this.renderSiteNavigation(searchSources);
+        }
+      } else {
+        this.renderSiteNavigation(searchSources);
+      }
     } catch (error) {
       console.error('初始化站点导航失败:', error);
       // 出错时使用默认配置中的所有内置源
-      const allBuiltinSourceIds = APP_CONSTANTS.SEARCH_SOURCES.map(source => source.id);
-      this.renderSiteNavigation(allBuiltinSourceIds);
+      const allBuiltinSources = (APP_CONSTANTS.SEARCH_SOURCES || []).map(source => ({
+        ...source,
+        isBuiltin: true,
+        isCustom: false
+      }));
+      this.renderSiteNavigation(allBuiltinSources);
     }
   }
 
-  // 渲染站点导航 - 修改为显示所有搜索源，并标识详情提取支持
-  renderSiteNavigation(sourceIds = null) {
+  // 渲染站点导航 - 显示所有搜索源，并标识详情提取支持
+  renderSiteNavigation(sourcesToDisplay = null) {
     const sitesSection = document.getElementById('sitesSection');
     if (!sitesSection) return;
 
-    // 如果没有传入特定的源ID列表，则显示所有搜索源
-    let sourcesToDisplay;
-    if (sourceIds && Array.isArray(sourceIds)) {
-      sourcesToDisplay = this.allSearchSources.filter(source => 
-        sourceIds.includes(source.id)
-      );
+    // 如果没有传入特定的源列表，则显示所有搜索源
+    let sources;
+    if (sourcesToDisplay && Array.isArray(sourcesToDisplay)) {
+      sources = sourcesToDisplay;
     } else {
-      // 显示所有搜索源（内置 + 自定义）
-      sourcesToDisplay = this.allSearchSources;
+      sources = this.allSearchSources;
     }
 
     // 如果没有可显示的搜索源，显示提示
-    if (sourcesToDisplay.length === 0) {
+    if (sources.length === 0) {
       sitesSection.innerHTML = `
-        <h2>🌐 资源站点导航</h2>
+        <h2>🌍 资源站点导航</h2>
         <div class="empty-state">
           <p>暂无可用的搜索源</p>
           <p>请在个人中心搜索源管理页面添加搜索源</p>
@@ -719,15 +582,15 @@ class MagnetSearchApp {
     }
 
     // 按分类组织搜索源
-    const sourcesByCategory = this.groupSourcesByCategory(sourcesToDisplay);
+    const sourcesByCategory = this.groupSourcesByCategory(sources);
 
     // 生成HTML
     let navigationHTML = `
-      <h2>🌐 资源站点导航</h2>
+      <h2>🌍 资源站点导航</h2>
       ${this.detailExtractionAvailable ? `
         <div class="detail-extraction-notice">
           <span class="notice-icon">✨</span>
-          <span>标有 <strong>📋</strong> 的站点支持详情提取功能</span>
+          <span>标有 <strong>🔋</strong> 的站点支持详情提取功能</span>
           ${!this.detailExtractionEnabled ? `
             <button onclick="window.app.enableDetailExtraction()" class="enable-detail-btn">启用详情提取</button>
           ` : ''}
@@ -741,8 +604,8 @@ class MagnetSearchApp {
       .filter(category => sourcesByCategory[category.id] && sourcesByCategory[category.id].length > 0)
       .sort((a, b) => (a.order || 999) - (b.order || 999))
       .forEach(category => {
-        const sources = sourcesByCategory[category.id];
-        const supportedCount = sources.filter(s => this.supportsDetailExtraction(s.id)).length;
+        const categorySources = sourcesByCategory[category.id];
+        const supportedCount = categorySources.filter(s => this.supportsDetailExtraction(s.id)).length;
         
         navigationHTML += `
           <div class="site-category">
@@ -751,7 +614,7 @@ class MagnetSearchApp {
               ${supportedCount > 0 ? `<span class="detail-support-count">(${supportedCount}个支持详情提取)</span>` : ''}
             </h3>
             <div class="site-list">
-              ${sources.map(source => this.renderSiteItem(source)).join('')}
+              ${categorySources.map(source => this.renderSiteItem(source)).join('')}
             </div>
           </div>
         `;
@@ -763,23 +626,34 @@ class MagnetSearchApp {
 
   // 渲染单个站点项，包含启用状态和详情提取支持标识
   renderSiteItem(source) {
-    const isEnabled = this.enabledSources.includes(source.id);
+    // 通过统一搜索管理器检查源的启用状态
+    let isEnabled = true; // 默认显示为启用，具体启用状态由搜索时判断
+    
+    try {
+      if (unifiedSearchManager.isInitialized && unifiedSearchManager.configManager) {
+        const config = unifiedSearchManager.configManager.getConfig();
+        // 这里可以添加检查逻辑，当前简化处理
+      }
+    } catch (error) {
+      console.warn('检查搜索源启用状态失败:', error);
+    }
+
     const statusClass = isEnabled ? 'enabled' : 'disabled';
-    const statusText = isEnabled ? '已启用' : '未启用';
+    const statusText = isEnabled ? '可用' : '未启用';
     const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
     
     return `
-      <a href="${source.urlTemplate.replace('{keyword}', 'search')}" 
+      <a href="${source.urlTemplate ? source.urlTemplate.replace('{keyword}', 'search') : '#'}" 
          target="_blank" 
          class="site-item ${statusClass}" 
          rel="noopener noreferrer"
          title="${source.subtitle || source.name} - ${statusText}${supportsDetailExtraction ? ' - 支持详情提取' : ''}">
         <div class="site-info">
           <div class="site-header">
-            <strong>${source.icon} ${source.name}</strong>
+            <strong>${source.icon || '🔍'} ${source.name}</strong>
             <div class="site-badges">
               ${source.isCustom ? '<span class="custom-badge">自定义</span>' : ''}
-              ${supportsDetailExtraction ? '<span class="detail-support-badge">📋</span>' : ''}
+              ${supportsDetailExtraction ? '<span class="detail-support-badge">🔋</span>' : ''}
               <span class="status-badge ${statusClass}">${statusText}</span>
             </div>
           </div>
@@ -821,9 +695,11 @@ class MagnetSearchApp {
     try {
       // 初始化统一搜索管理器
       await unifiedSearchManager.init();
-	  
-	  // 初始化搜索详情管理器
-      await detailCardManager.init();
+      
+      // 初始化详情卡片管理器（如果需要）
+      if (this.detailExtractionEnabled || this.detailExtractionAvailable) {
+        await detailCardManager.init();
+      }
       
       // 初始化收藏管理器
       await favoritesManager.init();
@@ -847,7 +723,8 @@ class MagnetSearchApp {
   // 隐藏连接状态
   hideConnectionStatus() {
     const status = document.getElementById('connectionStatus');
-    if (status && this.connectionStatus === APP_CONSTANTS.CONNECTION_STATUS.CONNECTED) {
+    const connectedStatus = APP_CONSTANTS.CONNECTION_STATUS?.CONNECTED || 'connected';
+    if (status && this.connectionStatus === connectedStatus) {
       setTimeout(() => {
         status.style.display = 'none';
       }, 2000);
@@ -873,17 +750,21 @@ class MagnetSearchApp {
       const config = configManager.getConfig();
       const result = await networkUtils.testAPIConnection(config.BASE_URL);
       
+      const connectedStatus = APP_CONSTANTS.CONNECTION_STATUS?.CONNECTED || 'connected';
+      const warningStatus = APP_CONSTANTS.CONNECTION_STATUS?.WARNING || 'warning';
+      const errorStatus = APP_CONSTANTS.CONNECTION_STATUS?.ERROR || 'error';
+      
       if (result.connected) {
-        this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS.CONNECTED;
+        this.connectionStatus = connectedStatus;
         this.updateConnectionStatus('连接正常');
         console.log('✅ API连接正常');
       } else {
-        this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS.WARNING;
+        this.connectionStatus = warningStatus;
         this.updateConnectionStatus('连接不稳定');
         console.warn('⚠️ API连接不稳定');
       }
     } catch (error) {
-      this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS.ERROR;
+      this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS?.ERROR || 'error';
       this.updateConnectionStatus('连接失败');
       this.performanceMetrics.errorCount++;
       console.error('❌ API连接失败:', error);
@@ -903,6 +784,7 @@ class MagnetSearchApp {
         if (unifiedSearchManager.isInitialized) {
           setTimeout(() => {
             unifiedSearchManager.performSearch();
+            this.performanceMetrics.searchCount++;
           }, 500);
         }
       }
@@ -920,10 +802,10 @@ class MagnetSearchApp {
     // 网络状态监听
     this.bindNetworkEvents();
     
-    // 监听搜索源变更事件
-    this.bindSearchSourcesChangeEvent();
-
-    // 详情提取相关事件在 bindDetailExtractionEvents 中处理
+    // 监听统一搜索管理器的搜索事件，更新性能计数
+    document.addEventListener('searchResultsRendered', () => {
+      this.performanceMetrics.searchCount++;
+    });
   }
 
   // 修改：用户登录后更新站点导航
@@ -954,12 +836,14 @@ class MagnetSearchApp {
         // 登录后初始化组件
         await this.initComponents();
         
-        // 重新加载用户搜索源设置并更新站点导航（显示所有源）
-        await this.loadUserSearchSettings();
-        await this.initSiteNavigation(); // 这里会显示所有搜索源
+        // 重新初始化站点导航（显示所有源）
+        await this.initSiteNavigation();
         
         // 检查详情提取功能可用性
         await this.checkDetailExtractionAvailability();
+        
+        // 初始化详情提取UI
+        await this.initDetailExtractionUI();
         
         // 处理URL参数（如搜索查询）
         this.handleURLParams();
@@ -973,23 +857,6 @@ class MagnetSearchApp {
       console.error('登录失败:', error);
       this.performanceMetrics.errorCount++;
     }
-  }
-
-  // 修改：绑定搜索源变更事件监听
-  bindSearchSourcesChangeEvent() {
-    window.addEventListener('searchSourcesChanged', async (event) => {
-      console.log('检测到搜索源设置变更，更新站点导航');
-      try {
-        // 更新启用的搜索源列表
-        this.enabledSources = event.detail.newSources;
-        
-        // 重新渲染站点导航（显示所有源，但会标识启用状态）
-        this.renderSiteNavigation();
-        showToast('站点导航已更新', 'success', 2000);
-      } catch (error) {
-        console.error('更新站点导航失败:', error);
-      }
-    });
   }
 
   // 绑定模态框事件
@@ -1091,7 +958,7 @@ class MagnetSearchApp {
       }
     });
 
-    // 页面可见性变化处理
+    // 页面可视性变化处理
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && this.isInitialized) {
         setTimeout(() => {
@@ -1267,10 +1134,9 @@ class MagnetSearchApp {
       
       // 清空统一搜索管理器数据
       if (unifiedSearchManager.isInitialized) {
-        unifiedSearchManager.searchHistory = [];
-        unifiedSearchManager.currentResults = [];
-        unifiedSearchManager.renderHistory();
-        unifiedSearchManager.clearResults();
+        await unifiedSearchManager.cleanup();
+        // 重新初始化为未登录状态
+        await unifiedSearchManager.init();
       }
       
       if (favoritesManager.isInitialized) {
@@ -1284,15 +1150,12 @@ class MagnetSearchApp {
       this.updateDetailExtractionUI(false);
       
       // 重置为默认内置搜索源，但站点导航仍显示所有源
-      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
-      this.customSearchSources = [];
-      this.customCategories = [];
-      this.allSearchSources = APP_CONSTANTS.SEARCH_SOURCES.map(s => ({ 
+      this.allSearchSources = (APP_CONSTANTS.SEARCH_SOURCES || []).map(s => ({ 
         ...s, 
         isBuiltin: true, 
         isCustom: false 
       }));
-      this.allCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES).map(c => ({ 
+      this.allCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES || {}).map(c => ({ 
         ...c, 
         isBuiltin: true, 
         isCustom: false 
@@ -1349,46 +1212,10 @@ class MagnetSearchApp {
     }
   }
 
-  // 获取当前启用的搜索源
-  getEnabledSources() {
-    return this.allSearchSources.filter(source => 
-      this.enabledSources.includes(source.id)
-    );
-  }
-
-  // 获取指定分类的搜索源
-  getSourcesByCategory(categoryId) {
-    return this.allSearchSources.filter(source => 
-      source.category === categoryId && this.enabledSources.includes(source.id)
-    );
-  }
-
-  // 根据ID获取搜索源
-  getSourceById(sourceId) {
-    return this.allSearchSources.find(source => source.id === sourceId);
-  }
-
-  // 根据ID获取分类
-  getCategoryById(categoryId) {
-    return this.allCategories.find(category => category.id === categoryId);
-  }
-
-  // 检查搜索源是否启用
-  isSourceEnabled(sourceId) {
-    return this.enabledSources.includes(sourceId);
-  }
-
   // 检查搜索源是否支持详情提取
   supportsDetailExtraction(sourceId) {
-    const source = this.getSourceById(sourceId);
-    return source && (source.supportsDetailExtraction || APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES.includes(sourceId));
-  }
-
-  // 获取支持详情提取的搜索源
-  getDetailExtractionSources() {
-    return this.allSearchSources.filter(source => 
-      this.supportsDetailExtraction(source.id)
-    );
+    const detailSources = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || [];
+    return detailSources.includes(sourceId);
   }
 
   // 获取应用性能统计
@@ -1420,13 +1247,11 @@ class MagnetSearchApp {
         username: this.currentUser.username,
         email: this.currentUser.email
       } : null,
-      enabledSources: this.enabledSources,
       detailExtractionEnabled: this.detailExtractionEnabled,
-      detailExtractionConfig: this.detailExtractionConfig,
       detailExtractionStats: this.detailExtractionStats,
       performanceStats: this.getPerformanceStats(),
       timestamp: Date.now(),
-      version: APP_CONSTANTS.DEFAULT_VERSION
+      version: APP_CONSTANTS.DEFAULT_VERSION || '3.0.0'
     };
   }
 }
@@ -1437,7 +1262,8 @@ window.addEventListener('error', (event) => {
   if (window.app && window.app.performanceMetrics) {
     window.app.performanceMetrics.errorCount++;
   }
-  if (window.app && window.app.connectionStatus !== APP_CONSTANTS.CONNECTION_STATUS.ERROR) {
+  const errorStatus = APP_CONSTANTS.CONNECTION_STATUS?.ERROR || 'error';
+  if (window.app && window.app.connectionStatus !== errorStatus) {
     showToast('应用出现错误，请刷新页面重试', 'error');
   }
 });

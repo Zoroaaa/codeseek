@@ -18,6 +18,8 @@
     <link rel="stylesheet" href="css/components/loading.css">
     <link rel="stylesheet" href="css/components/search.css">
 	<link rel="stylesheet" href="css/components/detail-card.css">
+    <!-- 🔄 新增：搜索配置管理样式 -->
+    <link rel="stylesheet" href="css/components/search-config.css">
     <link rel="stylesheet" href="css/components/status.css">
     <link rel="stylesheet" href="css/components/search-status.css">
     
@@ -34,8 +36,11 @@
     
     <!-- 详情提取功能支持的meta标签 -->
     <meta name="detail-extraction-supported" content="true">
-    <meta name="detail-extraction-version" content="1.0.0">
+    <meta name="detail-extraction-version" content="2.0.0">
     <meta name="detail-extraction-backend-sync" content="true">
+    <!-- 🔄 新增：配置管理支持标识 -->
+    <meta name="search-config-management-supported" content="true">
+    <meta name="unified-search-architecture" content="true">
 </head>
 <body>
     <!-- 导航栏 -->
@@ -53,6 +58,10 @@
                 <button id="detailExtractionToggle" class="detail-extraction-btn" title="切换详情提取功能" style="display:none;">
                     📋
                 </button>
+                <!-- 🔄 新增：配置管理按钮 -->
+                <button id="configManagementBtn" class="config-management-btn" title="搜索与详情提取配置" style="display:none;">
+                    ⚙️
+                </button>
                 <!-- 详情提取服务状态指示器 -->
                 <div id="detailServiceStatus" class="service-status" title="详情提取服务状态" style="display:none;">
                     <span class="status-icon">⚠️</span>
@@ -67,6 +76,8 @@
                             <div class="dropdown-content">
                                 <a href="#" onclick="navigateToDashboard(); return false;">个人中心</a>
                                 <a href="#" onclick="window.openDetailSettings && window.openDetailSettings(); return false;">详情设置</a>
+                                <!-- 🔄 新增：配置管理入口 -->
+                                <a href="#" onclick="window.openConfigManagement && window.openConfigManagement(); return false;">配置管理</a>
                                 <a href="#" id="logoutBtn">退出登录</a>
                             </div>
                         </div>
@@ -131,6 +142,7 @@
                     <li>登录后可享受云端同步服务</li>
                     <li>支持详情提取的站点会显示 📋 标识</li>
                     <li>详情提取包含高清封面、演员信息、下载链接等</li>
+                    <li>🔄 新功能：在配置管理中可自定义搜索和提取选项</li>
                 </ul>
             </div>
         </section>
@@ -156,6 +168,27 @@
                         <span class="feature-item">💾 智能缓存和加速</span>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- 🔄 新增：搜索配置管理区域 -->
+        <section id="searchConfigSection" class="search-config-section" style="display:none;">
+            <div class="section-header">
+                <h2>⚙️ 搜索与详情提取配置</h2>
+                <div class="section-actions">
+                    <button id="showConfigBtn" class="config-btn" title="显示配置管理界面">
+                        <span class="btn-icon">⚙️</span>
+                        <span class="btn-text">配置管理</span>
+                    </button>
+                    <button id="hideConfigBtn" class="config-btn" style="display:none;" title="隐藏配置管理界面">
+                        <span class="btn-icon">🔽</span>
+                        <span class="btn-text">收起配置</span>
+                    </button>
+                </div>
+            </div>
+            <!-- 🔄 配置管理UI容器 - 由SearchConfigManager动态渲染 -->
+            <div id="searchConfigContainer" class="search-config-container" style="display:none;">
+                <!-- 内容将通过SearchConfigManager的initConfigUI方法动态生成 -->
             </div>
         </section>
 
@@ -509,9 +542,9 @@
     <!-- 图片预览模态框容器 -->
     <div id="imagePreviewContainer"></div>
 
-    <!-- 📄 核心变更：使用统一搜索组件的脚本加载 -->
+    <!-- 🔄 核心变更：使用统一搜索组件的脚本加载 -->
     <script type="module">
-        // 📄 重要：现在使用更新后的服务架构初始化应用
+        // 🔄 重要：现在使用更新后的服务架构初始化应用
         import MagnetSearchApp from './src/pages/main/main.js';
         
         // 全局导航函数（保持向后兼容）
@@ -525,6 +558,25 @@
         window.toggleDetailExtraction = function() {
             if (window.app && window.app.toggleDetailExtraction) {
                 window.app.toggleDetailExtraction();
+            }
+        };
+
+        // 🔄 新增：配置管理功能
+        window.openConfigManagement = function() {
+            const configSection = document.getElementById('searchConfigSection');
+            const configContainer = document.getElementById('searchConfigContainer');
+            
+            if (configSection && configContainer) {
+                configSection.style.display = 'block';
+                configContainer.style.display = 'block';
+                
+                // 初始化配置UI（如果还未初始化）
+                if (window.unifiedSearchManager && window.unifiedSearchManager.configManager) {
+                    window.unifiedSearchManager.configManager.initConfigUI('searchConfigContainer');
+                }
+                
+                // 滚动到配置区域
+                configSection.scrollIntoView({ behavior: 'smooth' });
             }
         };
 
@@ -558,7 +610,7 @@
             }
         };
 
-        // 📄 批量提取详情 - 使用统一搜索管理器
+        // 🔄 批量提取详情 - 使用统一搜索管理器
         window.batchExtractDetails = function() {
             if (window.app && window.app.batchExtractDetails) {
                 window.app.batchExtractDetails();
@@ -577,34 +629,37 @@
             try {
                 if (!window.app || !window.app.currentUser) return;
                 
-                const userSettings = await apiService.getUserSettings();
-                
-                // 基础设置
-                document.getElementById('autoExtractDetails').checked = userSettings.autoExtractDetails || false;
-                document.getElementById('maxAutoExtractions').value = userSettings.maxAutoExtractions || 5;
-                document.getElementById('extractionBatchSize').value = userSettings.extractionBatchSize || 3;
-                document.getElementById('extractionTimeout').value = userSettings.extractionTimeout || 15000;
-                
-                // 显示设置
-                document.getElementById('showScreenshots').checked = userSettings.showScreenshots !== false;
-                document.getElementById('showDownloadLinks').checked = userSettings.showDownloadLinks !== false;
-                document.getElementById('showMagnetLinks').checked = userSettings.showMagnetLinks !== false;
-                document.getElementById('showActressInfo').checked = userSettings.showActressInfo !== false;
-                document.getElementById('enableImagePreview').checked = userSettings.enableImagePreview !== false;
-                document.getElementById('compactMode').checked = userSettings.compactMode || false;
-                
-                // 高级设置
-                document.getElementById('enableRetry').checked = userSettings.enableRetry !== false;
-                document.getElementById('maxRetryAttempts').value = userSettings.maxRetryAttempts || 2;
-                document.getElementById('enableCache').checked = userSettings.enableCache !== false;
-                document.getElementById('showExtractionProgress').checked = userSettings.showExtractionProgress !== false;
-                document.getElementById('strictValidation').checked = userSettings.strictValidation !== false;
-                
-                // 内容过滤设置
-                document.getElementById('enableContentFilter').checked = userSettings.enableContentFilter || false;
-                document.getElementById('contentFilterKeywords').value = 
-                    Array.isArray(userSettings.contentFilterKeywords) ? 
-                    userSettings.contentFilterKeywords.join(', ') : '';
+                // 🔄 通过统一配置管理器获取设置
+                if (window.unifiedSearchManager && window.unifiedSearchManager.configManager) {
+                    const config = window.unifiedSearchManager.configManager.getConfig();
+                    
+                    // 基础设置
+                    document.getElementById('autoExtractDetails').checked = config.autoExtractDetails || false;
+                    document.getElementById('maxAutoExtractions').value = config.maxAutoExtractions || 5;
+                    document.getElementById('extractionBatchSize').value = config.extractionBatchSize || 3;
+                    document.getElementById('extractionTimeout').value = config.extractionTimeout || 15000;
+                    
+                    // 显示设置
+                    document.getElementById('showScreenshots').checked = config.showScreenshots !== false;
+                    document.getElementById('showDownloadLinks').checked = config.showDownloadLinks !== false;
+                    document.getElementById('showMagnetLinks').checked = config.showMagnetLinks !== false;
+                    document.getElementById('showActressInfo').checked = config.showActressInfo !== false;
+                    document.getElementById('enableImagePreview').checked = config.enableImagePreview !== false;
+                    document.getElementById('compactMode').checked = config.compactMode || false;
+                    
+                    // 高级设置
+                    document.getElementById('enableRetry').checked = config.enableRetry !== false;
+                    document.getElementById('maxRetryAttempts').value = config.maxRetryAttempts || 2;
+                    document.getElementById('enableCache').checked = config.enableCache !== false;
+                    document.getElementById('showExtractionProgress').checked = config.showExtractionProgress !== false;
+                    document.getElementById('strictValidation').checked = config.strictValidation !== false;
+                    
+                    // 内容过滤设置
+                    document.getElementById('enableContentFilter').checked = config.enableContentFilter || false;
+                    document.getElementById('contentFilterKeywords').value = 
+                        Array.isArray(config.contentFilterKeywords) ? 
+                        config.contentFilterKeywords.join(', ') : '';
+                }
                 
             } catch (error) {
                 console.error('加载详情设置失败:', error);
@@ -624,11 +679,14 @@
                     document.getElementById('hero-title').textContent = `${appName} - 专业版`;
                 }
                 
-                // 📄 核心变更：创建使用统一搜索组件的应用实例
+                // 🔄 核心变更：创建使用统一搜索组件的应用实例
                 window.app = new MagnetSearchApp();
                 
                 // 初始化详情提取功能相关的事件监听器
                 initDetailExtractionUI();
+                
+                // 🔄 新增：初始化配置管理UI
+                initConfigManagementUI();
                 
                 console.log('✅ 应用初始化完成');
                 
@@ -701,6 +759,89 @@
             window.addEventListener('detailExtractionStatsUpdated', handleDetailExtractionStatsUpdated);
         }
 
+        // 🔄 新增：初始化配置管理UI
+        function initConfigManagementUI() {
+            // 配置管理按钮
+            const configManagementBtn = document.getElementById('configManagementBtn');
+            if (configManagementBtn) {
+                configManagementBtn.addEventListener('click', window.openConfigManagement);
+            }
+
+            // 显示配置按钮
+            const showConfigBtn = document.getElementById('showConfigBtn');
+            if (showConfigBtn) {
+                showConfigBtn.addEventListener('click', () => {
+                    const configSection = document.getElementById('searchConfigSection');
+                    const configContainer = document.getElementById('searchConfigContainer');
+                    const hideConfigBtn = document.getElementById('hideConfigBtn');
+                    
+                    if (configSection && configContainer) {
+                        configSection.style.display = 'block';
+                        configContainer.style.display = 'block';
+                        showConfigBtn.style.display = 'none';
+                        if (hideConfigBtn) hideConfigBtn.style.display = 'inline-flex';
+                        
+                        // 初始化配置UI
+                        if (window.unifiedSearchManager && window.unifiedSearchManager.configManager) {
+                            window.unifiedSearchManager.configManager.initConfigUI('searchConfigContainer');
+                        }
+                    }
+                });
+            }
+
+            // 隐藏配置按钮
+            const hideConfigBtn = document.getElementById('hideConfigBtn');
+            if (hideConfigBtn) {
+                hideConfigBtn.addEventListener('click', () => {
+                    const configContainer = document.getElementById('searchConfigContainer');
+                    const showConfigBtn = document.getElementById('showConfigBtn');
+                    
+                    if (configContainer) {
+                        configContainer.style.display = 'none';
+                        hideConfigBtn.style.display = 'none';
+                        if (showConfigBtn) showConfigBtn.style.display = 'inline-flex';
+                    }
+                });
+            }
+
+            // 监听配置变更事件
+            document.addEventListener('searchConfigChanged', handleSearchConfigChanged);
+            document.addEventListener('detailConfigSaved', handleDetailConfigSaved);
+        }
+
+        // 🔄 新增：处理搜索配置变更
+        function handleSearchConfigChanged(event) {
+            console.log('搜索配置已变更:', event.detail);
+            
+            // 更新UI状态
+            updateConfigRelatedUI(event.detail.config);
+        }
+
+        // 🔄 新增：处理详情配置保存
+        function handleDetailConfigSaved(event) {
+            console.log('详情配置已保存:', event.detail);
+            
+            // 可以在这里添加保存后的处理逻辑
+            showToast('配置已保存并生效', 'success');
+        }
+
+        // 🔄 新增：更新配置相关UI
+        function updateConfigRelatedUI(config) {
+            // 更新导航栏中的配置管理按钮显示
+            const configManagementBtn = document.getElementById('configManagementBtn');
+            if (configManagementBtn && window.app && window.app.currentUser) {
+                configManagementBtn.style.display = 'inline-block';
+            }
+            
+            // 根据配置更新其他UI元素
+            if (config.enableDetailExtraction) {
+                const detailToggleBtn = document.getElementById('detailExtractionToggle');
+                if (detailToggleBtn) {
+                    detailToggleBtn.classList.add('active');
+                }
+            }
+        }
+
         // 处理详情设置表单提交
         async function handleDetailSettingsSubmit(event) {
             event.preventDefault();
@@ -739,25 +880,13 @@
                         .split(',').map(k => k.trim()).filter(k => k.length > 0)
                 };
 
-                // 保存设置到后端
-                const currentSettings = await apiService.getUserSettings();
-                await apiService.updateUserSettings({
-                    ...currentSettings,
-                    ...settings
-                });
+                // 🔄 通过统一配置管理器保存设置
+                if (window.unifiedSearchManager && window.unifiedSearchManager.configManager) {
+                    await window.unifiedSearchManager.configManager.updateDisplayConfig(settings);
+                }
 
                 // 关闭模态框
                 document.getElementById('detailSettingsModal').style.display = 'none';
-                
-                // 📄 通知统一搜索管理器重新加载配置
-                if (window.unifiedSearchManager && window.unifiedSearchManager.loadUserConfig) {
-                    await window.unifiedSearchManager.loadUserConfig();
-                }
-
-                // 通知详情卡片管理器重新加载配置
-                if (window.detailCardManager && window.detailCardManager.loadUserConfig) {
-                    await window.detailCardManager.loadUserConfig();
-                }
 
                 showToast('详情提取设置已保存', 'success');
                 
@@ -782,11 +911,13 @@
 
             try {
                 const enabled = event.target.checked;
-                const currentSettings = await apiService.getUserSettings();
-                await apiService.updateUserSettings({
-                    ...currentSettings,
-                    enableDetailExtraction: enabled
-                });
+                
+                // 🔄 通过统一配置管理器更新设置
+                if (window.unifiedSearchManager && window.unifiedSearchManager.configManager) {
+                    await window.unifiedSearchManager.configManager.updateDisplayConfig({
+                        enableDetailExtraction: enabled
+                    });
+                }
 
                 showToast(`详情提取功能已${enabled ? '启用' : '禁用'}`, 'success');
             } catch (error) {
@@ -830,11 +961,13 @@
 
             try {
                 const enabled = event.target.checked;
-                const currentSettings = await apiService.getUserSettings();
-                await apiService.updateUserSettings({
-                    ...currentSettings,
-                    autoExtractDetails: enabled
-                });
+                
+                // 🔄 通过统一配置管理器更新设置
+                if (window.unifiedSearchManager && window.unifiedSearchManager.configManager) {
+                    await window.unifiedSearchManager.configManager.updateDisplayConfig({
+                        autoExtractDetails: enabled
+                    });
+                }
 
                 showToast(`自动提取详情已${enabled ? '启用' : '禁用'}`, 'success');
             } catch (error) {
@@ -848,7 +981,7 @@
         function handleDetailExtractionStateChanged(event) {
             console.log('详情提取状态已变更:', event.detail);
             
-            // 更新相关UI元素
+            // 更新相关UI元素 
             const toggleBtn = document.getElementById('detailExtractionToggle');
             const batchBtn = document.getElementById('batchExtractBtn');
             const statusSection = document.getElementById('detailExtractionStatus');
@@ -915,7 +1048,7 @@
             }
         });
 
-        // 📄 服务架构健康检查（开发环境）
+        // 🔄 服务架构健康检查（开发环境）
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             window.addEventListener('load', () => {
                 setTimeout(() => {
