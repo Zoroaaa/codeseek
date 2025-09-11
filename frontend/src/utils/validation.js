@@ -6,8 +6,8 @@ export const validationRules = {
   // 验证用户名
   username: {
     required: true,
-    minLength: APP_CONSTANTS.VALIDATION.USERNAME.MIN_LENGTH,
-    maxLength: APP_CONSTANTS.VALIDATION.USERNAME.MAX_LENGTH,
+    minLength: APP_CONSTANTS.LIMITS.MIN_USERNAME_LENGTH,
+    maxLength: APP_CONSTANTS.LIMITS.MAX_USERNAME_LENGTH,
     pattern: /^[a-zA-Z0-9_\u4e00-\u9fa5]+$/,
     message: '用户名只能包含字母、数字、下划线或中文'
   },
@@ -15,23 +15,23 @@ export const validationRules = {
   // 验证邮箱
   email: {
     required: true,
-    pattern: APP_CONSTANTS.VALIDATION.EMAIL.PATTERN,
+    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     message: '请输入有效的邮箱地址'
   },
 
   // 验证密码
   password: {
     required: true,
-    minLength: APP_CONSTANTS.VALIDATION.PASSWORD.MIN_LENGTH,
-    maxLength: APP_CONSTANTS.VALIDATION.PASSWORD.MAX_LENGTH,
+    minLength: APP_CONSTANTS.LIMITS.MIN_PASSWORD_LENGTH,
+    maxLength: 50,
     message: '密码长度应在6-50个字符之间'
   },
 
   // 验证搜索关键词
   searchKeyword: {
     required: true,
-    minLength: APP_CONSTANTS.VALIDATION.SEARCH_QUERY.MIN_LENGTH,
-    maxLength: APP_CONSTANTS.VALIDATION.SEARCH_QUERY.MAX_LENGTH,
+    minLength: APP_CONSTANTS.LIMITS.MIN_SEARCH_KEYWORD_LENGTH,
+    maxLength: APP_CONSTANTS.LIMITS.MAX_SEARCH_KEYWORD_LENGTH,
     pattern: /^[^<>]*$/,
     message: '搜索关键词不能包含特殊字符'
   }
