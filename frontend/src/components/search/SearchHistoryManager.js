@@ -1,5 +1,5 @@
 // src/components/search/SearchHistoryManager.js - 搜索历史管理子组件
-import { APP_CONSTANTS } from '../../core/constants-1.js';
+import { APP_CONSTANTS } from '../../core/constants.js';
 import { showToast, showLoading } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
 import { searchHistoryManager as apiHistoryManager } from '../../services/search.js';

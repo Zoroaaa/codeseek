@@ -8,7 +8,7 @@ import {
   DETAIL_EXTRACTION_STATUS,
   DEFAULT_USER_CONFIG 
 } from '../core/detail-config.js';
-import { SYSTEM_LIMITS } from '../core/constants-1.js';
+import { APP_CONSTANTS  } from '../core/constants.js';
 
 class DetailAPIService {
   constructor() {
@@ -28,7 +28,7 @@ class DetailAPIService {
     ];
     
     // 系统限制 - 从 constants.js 获取
-    this.LIMITS = SYSTEM_LIMITS.DETAIL_EXTRACTION;
+    this.LIMITS = APP_CONSTANTS.LIMITS;
   }
 
   /**

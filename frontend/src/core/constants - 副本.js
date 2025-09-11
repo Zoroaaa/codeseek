@@ -1,12 +1,10 @@
-// src/core/constants.js - 保守优化版本：只移除详情提取配置硬编码，保持其他功能完整
-// 详情提取配置已迁移至 detail-config.js，由 detail-config-api.js 动态管理
-
+// 应用常量定义 - 完善的详情提取功能支持
 export const APP_CONSTANTS = {
-  // 应用信息 - 保持不变
+  // 应用信息
   APP_NAME: '磁力快搜',
   DEFAULT_VERSION: '1.4.0', // 版本升级，完善详情提取功能集成
   
-  // 本地存储键名 - 保持不变，只添加详情配置相关
+  // 本地存储键名
   STORAGE_KEYS: {
     AUTH_TOKEN: 'auth_token',
     CURRENT_USER: 'current_user',
@@ -16,31 +14,31 @@ export const APP_CONSTANTS = {
     CUSTOM_SOURCES: 'custom_search_sources',
     CUSTOM_CATEGORIES: 'custom_source_categories',
     SOURCE_STATUS_CACHE: 'source_status_cache',
-    // 详情提取相关缓存 - 保持不变
+    // 详情提取相关缓存
     DETAIL_EXTRACTION_CACHE: 'detail_extraction_cache',
-    DETAIL_CONFIG_CACHE: 'detail_config_cache', // 新增：配置缓存
+    DETAIL_CONFIG_CACHE: 'detail_config_cache',
     DETAIL_EXTRACTION_STATS: 'detail_extraction_stats',
     DETAIL_USER_PREFERENCES: 'detail_user_preferences'
   },
   
-  // API配置 - 保持原有功能，添加详情配置管理端点
+  // API配置
   API: {
     TIMEOUT: 10000,
     RETRY_ATTEMPTS: 3,
     CACHE_DURATION: 1800000, // 30分钟
     SOURCE_CHECK_TIMEOUT: 8000,
     SOURCE_STATUS_CACHE_DURATION: 300000,
-    // 详情提取API配置 - 与后端完全对齐，但移除用户可配置部分
-    DETAIL_EXTRACTION_TIMEOUT: 15000, // 系统默认值，用户可通过配置API修改
-    DETAIL_CACHE_DURATION: 86400000, // 系统默认值，用户可通过配置API修改
-    DETAIL_BATCH_SIZE: 20, // 系统最大值
-    DETAIL_MAX_CONCURRENT: 3, // 系统默认值
-    DETAIL_HEALTH_CHECK_INTERVAL: 300000,
-    DETAIL_RETRY_DELAY: 1000,
-    DETAIL_PROGRESS_UPDATE_INTERVAL: 1000
+    // 详情提取API配置 - 与后端完全对齐
+    DETAIL_EXTRACTION_TIMEOUT: 15000, // 详情提取超时时间
+    DETAIL_CACHE_DURATION: 86400000, // 详情缓存24小时
+    DETAIL_BATCH_SIZE: 20, // 最大批量提取数量
+    DETAIL_MAX_CONCURRENT: 3, // 最大并发提取数量
+    DETAIL_HEALTH_CHECK_INTERVAL: 300000, // 健康检查间隔（5分钟）
+    DETAIL_RETRY_DELAY: 1000, // 重试延迟
+    DETAIL_PROGRESS_UPDATE_INTERVAL: 1000 // 进度更新间隔
   },
   
-  // 用户限制 - 保持不变
+  // 用户限制
   LIMITS: {
     MAX_FAVORITES: 1000,
     MAX_HISTORY: 1000,
@@ -60,30 +58,30 @@ export const APP_CONSTANTS = {
     MIN_STATUS_CACHE_DURATION: 60000,
     MAX_STATUS_CACHE_DURATION: 3600000,
     
-    // 详情提取限制 - 保留系统级限制，与后端 constants.js 同步
-    MAX_DETAIL_EXTRACTIONS_PER_BATCH: 20, // 系统最大值
-    MIN_DETAIL_EXTRACTION_TIMEOUT: 5000, // 系统最小值
-    MAX_DETAIL_EXTRACTION_TIMEOUT: 30000, // 系统最大值
-    MIN_DETAIL_CACHE_DURATION: 3600000, // 系统最小值
-    MAX_DETAIL_CACHE_DURATION: 604800000, // 系统最大值
-    MAX_AUTO_EXTRACTIONS: 10, // 系统最大值
-    MAX_DOWNLOAD_LINKS: 15, // 系统最大值（用户可在此范围内配置）
-    MAX_MAGNET_LINKS: 15, // 系统最大值（用户可在此范围内配置）
-    MAX_SCREENSHOTS: 20, // 系统最大值（用户可在此范围内配置）
-    MAX_CONTENT_FILTER_KEYWORDS: 50, // 系统最大值
-    MAX_DETAIL_CARD_CACHE_SIZE: 100,
-    MIN_QUALITY_SCORE: 0,
-    MAX_QUALITY_SCORE: 100
+    // 详情提取限制 - 与后端服务对齐
+    MAX_DETAIL_EXTRACTIONS_PER_BATCH: 20, // 每批最大提取数量
+    MIN_DETAIL_EXTRACTION_TIMEOUT: 5000, // 最小超时时间
+    MAX_DETAIL_EXTRACTION_TIMEOUT: 30000, // 最大超时时间
+    MIN_DETAIL_CACHE_DURATION: 3600000, // 最小缓存时间（1小时）
+    MAX_DETAIL_CACHE_DURATION: 604800000, // 最大缓存时间（7天）
+    MAX_AUTO_EXTRACTIONS: 10, // 自动提取最大数量
+    MAX_DOWNLOAD_LINKS: 10, // 最大下载链接数
+    MAX_MAGNET_LINKS: 10, // 最大磁力链接数
+    MAX_SCREENSHOTS: 15, // 最大截图数量
+    MAX_CONTENT_FILTER_KEYWORDS: 50, // 最大内容过滤关键词数
+    MAX_DETAIL_CARD_CACHE_SIZE: 100, // 详情卡片缓存大小
+    MIN_QUALITY_SCORE: 0, // 最小质量评分
+    MAX_QUALITY_SCORE: 100 // 最大质量评分
   },
   
-  // 主题选项 - 保持不变
+  // 主题选项
   THEMES: {
     LIGHT: 'light',
     DARK: 'dark',
     AUTO: 'auto'
   },
   
-  // 连接状态 - 保持不变
+  // 连接状态
   CONNECTION_STATUS: {
     CHECKING: 'checking',
     CONNECTED: 'connected',
@@ -91,7 +89,7 @@ export const APP_CONSTANTS = {
     ERROR: 'error'
   },
   
-  // 搜索源状态枚举 - 保持不变
+  // 搜索源状态枚举
   SOURCE_STATUS: {
     UNKNOWN: 'unknown',
     CHECKING: 'checking',
@@ -101,7 +99,7 @@ export const APP_CONSTANTS = {
     ERROR: 'error'
   },
 
-  // 详情提取状态枚举 - 保持不变，与后端同步
+  // 详情提取状态枚举 - 与后端完全对齐
   DETAIL_EXTRACTION_STATUS: {
     PENDING: 'pending',
     IN_PROGRESS: 'in_progress',
@@ -110,12 +108,12 @@ export const APP_CONSTANTS = {
     TIMEOUT: 'timeout',
     CACHED: 'cached',
     PARTIAL: 'partial',
-    FILTERED: 'filtered',
-    CANCELLED: 'cancelled',
-    RATE_LIMITED: 'rate_limited'
+    FILTERED: 'filtered', // 内容被过滤
+    CANCELLED: 'cancelled', // 用户取消
+    RATE_LIMITED: 'rate_limited' // 速率限制
   },
 
-  // 详情提取质量等级 - 保持不变
+  // 详情提取质量等级
   DETAIL_QUALITY_LEVELS: {
     EXCELLENT: { min: 80, label: '优秀', color: '#10b981', icon: '⭐' },
     GOOD: { min: 60, label: '良好', color: '#3b82f6', icon: '✅' },
@@ -123,14 +121,14 @@ export const APP_CONSTANTS = {
     POOR: { min: 0, label: '较差', color: '#ef4444', icon: '❌' }
   },
 
-  // 支持详情提取的搜索源 - 保持不变
+  // 支持详情提取的搜索源 - 与后端service保持同步
   DETAIL_EXTRACTION_SOURCES: [
     'javbus', 'javdb', 'javlibrary', 'jable', 'javmost', 
     'missav', 'javhdporn', 'javgg', 'av01', 'sukebei',
-    'javguru', 'javhihi'
+    'javguru', 'javhihi' // 新增支持的源
   ],
 
-  // 详情提取源能力映射 - 保持不变
+  // 详情提取源能力映射
   DETAIL_EXTRACTION_CAPABILITIES: {
     'javbus': {
       screenshots: true,
@@ -211,7 +209,7 @@ export const APP_CONSTANTS = {
     }
   },
 
-  // 搜索源分类定义 - 保持不变，增强详情提取支持标识
+  // 搜索源分类定义 - 增强版本
   SOURCE_CATEGORIES: {
     database: {
       id: 'database',
@@ -222,7 +220,7 @@ export const APP_CONSTANTS = {
       isBuiltin: true,
       order: 1,
       supportsDetailExtraction: true,
-      extractionPriority: 'high',
+      extractionPriority: 'high', // 提取优先级
       typicalCapabilities: ['screenshots', 'actresses', 'metadata', 'rating']
     },
     streaming: {
@@ -275,7 +273,7 @@ export const APP_CONSTANTS = {
     }
   },
   
-  // 增强版搜索源 - 保持完整功能，完善详情提取支持标识
+  // 增强版搜索来源 - 完善详情提取支持标识
   SEARCH_SOURCES: [
     // 番号资料站
     {
@@ -290,7 +288,7 @@ export const APP_CONSTANTS = {
       isActive: true,
       supportsDetailExtraction: true,
       extractionQuality: 'excellent',
-      averageExtractionTime: 3000,
+      averageExtractionTime: 3000, // 平均提取时间（毫秒）
       supportedFeatures: ['screenshots', 'downloadLinks', 'magnetLinks', 'actresses', 'metadata', 'description', 'rating', 'tags']
     },
     {
@@ -327,7 +325,7 @@ export const APP_CONSTANTS = {
       id: 'javfinder',
       name: 'JavFinder',
       subtitle: '智能搜索引擎，结果精准',
-      icon: '🔍',
+      icon: '🔎',
       urlTemplate: 'https://javfinder.is/search/{keyword}',
       category: 'database',
       isBuiltin: true,
@@ -419,7 +417,7 @@ export const APP_CONSTANTS = {
       id: 'javhdporn',
       name: 'JavHD.porn',
       subtitle: '高清资源下载，质量优秀',
-      icon: '🎬',
+      icon: '📽️',
       urlTemplate: 'https://javhd.porn/search/{keyword}',
       category: 'streaming',
       isBuiltin: true,
@@ -496,7 +494,7 @@ export const APP_CONSTANTS = {
       id: 'torrentkitty',
       name: 'TorrentKitty',
       subtitle: '种子搜索引擎，下载资源丰富',
-      icon: '🱡',
+      icon: '🐱',
       urlTemplate: 'https://www.torrentkitty.tv/search/{keyword}',
       category: 'torrent',
       isBuiltin: true,
@@ -556,10 +554,10 @@ export const APP_CONSTANTS = {
     }
   ],
   
-  // 搜索源和分类验证规则 - 保持不变
+  // 搜索源和分类验证规则
   VALIDATION_RULES: {
     SOURCE: {
-      REQUIRED_FIELDS: ['name', 'urlTemplate', 'category'],
+      REQUIRED_FIELDS: [ 'name', 'urlTemplate', 'category'],
       URL_PATTERN: /^https?:\/\/.+\{keyword\}.*/,
       NAME_PATTERN: /^[a-zA-Z0-9\u4e00-\u9fa5\s\-_.()（）]+$/,
       ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
@@ -575,6 +573,7 @@ export const APP_CONSTANTS = {
       ICON_PATTERN: /^[\u{1F000}-\u{1F9FF}]|^[\u{2600}-\u{26FF}]|^[\u{2700}-\u{27BF}]/u,
       COLOR_PATTERN: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
     },
+    // 详情提取验证规则
     DETAIL_EXTRACTION: {
       MIN_TITLE_LENGTH: 2,
       MAX_TITLE_LENGTH: 200,
@@ -589,21 +588,21 @@ export const APP_CONSTANTS = {
     }
   },
   
-  // 默认颜色选项 - 保持不变
+  // 默认颜色选项
   DEFAULT_COLORS: [
     '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
     '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
     '#f97316', '#6366f1', '#14b8a6', '#eab308'
   ],
   
-  // 默认图标选项 - 保持不变
+  // 默认图标选项
   DEFAULT_ICONS: [
     '📚', '🎥', '🧲', '💬', '🌟', '🔍', '📺', '🎬',
-    '🎭', '🎪', '🎦', '🎬', '⚡', '💫', '🌙', '🔗',
-    '🱡', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲'
+    '🎭', '🎪', '🎦', '📽️', '⚡', '💫', '🌙', '🔗',
+    '🐱', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲'
   ],
   
-  // 权限定义 - 保持不变，添加详情提取配置权限
+  // 权限定义
   PERMISSIONS: {
     SEARCH: 'search',
     FAVORITE: 'favorite',
@@ -618,11 +617,11 @@ export const APP_CONSTANTS = {
     DETAIL_EXTRACTION_BATCH: 'detail_extraction_batch',
     DETAIL_EXTRACTION_HISTORY: 'detail_extraction_history',
     DETAIL_EXTRACTION_CACHE_MANAGEMENT: 'detail_extraction_cache_management',
-    DETAIL_EXTRACTION_CONFIG: 'detail_extraction_config', // 新增：配置管理权限
+    DETAIL_EXTRACTION_CONFIG: 'detail_extraction_config',
     DETAIL_EXTRACTION_STATS: 'detail_extraction_stats'
   },
   
-  // 用户行为追踪事件 - 保持不变，添加配置相关事件
+  // 用户行为追踪事件
   ANALYTICS_EVENTS: {
     SEARCH_PERFORMED: 'search_performed',
     RESULT_CLICKED: 'result_clicked',
@@ -658,14 +657,10 @@ export const APP_CONSTANTS = {
     DETAIL_CARD_SHARED: 'detail_card_shared',
     DETAIL_EXPORTED: 'detail_exported',
     ISSUE_REPORTED: 'issue_reported',
-    DETAIL_QUALITY_RATED: 'detail_quality_rated',
-    // 新增：配置相关事件
-    DETAIL_CONFIG_UPDATED: 'detail_config_updated',
-    DETAIL_CONFIG_RESET: 'detail_config_reset',
-    DETAIL_CONFIG_PRESET_APPLIED: 'detail_config_preset_applied'
+    DETAIL_QUALITY_RATED: 'detail_quality_rated'
   },
   
-  // 错误代码定义 - 保持不变，添加配置相关错误
+  // 错误代码定义
   ERROR_CODES: {
     INVALID_SEARCH_SOURCE: 'INVALID_SEARCH_SOURCE',
     INVALID_SOURCE_CATEGORY: 'INVALID_SOURCE_CATEGORY',
@@ -697,15 +692,10 @@ export const APP_CONSTANTS = {
     DETAIL_RATE_LIMIT_EXCEEDED: 'DETAIL_RATE_LIMIT_EXCEEDED',
     DETAIL_CONTENT_FILTERED: 'DETAIL_CONTENT_FILTERED',
     DETAIL_SERVICE_UNAVAILABLE: 'DETAIL_SERVICE_UNAVAILABLE',
-    DETAIL_CONCURRENT_LIMIT_EXCEEDED: 'DETAIL_CONCURRENT_LIMIT_EXCEEDED',
-    // 新增：配置相关错误
-    DETAIL_CONFIG_VALIDATION_ERROR: 'DETAIL_CONFIG_VALIDATION_ERROR',
-    DETAIL_CONFIG_SAVE_ERROR: 'DETAIL_CONFIG_SAVE_ERROR',
-    DETAIL_CONFIG_LOAD_ERROR: 'DETAIL_CONFIG_LOAD_ERROR',
-    DETAIL_CONFIG_PRESET_NOT_FOUND: 'DETAIL_CONFIG_PRESET_NOT_FOUND'
+    DETAIL_CONCURRENT_LIMIT_EXCEEDED: 'DETAIL_CONCURRENT_LIMIT_EXCEEDED'
   },
   
-  // 默认用户设置 - 移除详情提取硬编码配置，其他保持不变
+  // 增强：默认用户设置 - 完善详情提取设置
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
     searchSources: ['javbus', 'javdb', 'javlibrary'],
@@ -724,12 +714,60 @@ export const APP_CONSTANTS = {
     showSourceStatus: true,
     retryFailedSources: false,
     
-    // 注意：详情提取相关设置已迁移至 detail-config.js
-    // 这些设置将通过 DetailConfigAPI 动态获取和管理
-    // enableDetailExtraction, autoExtractDetails 等配置不再硬编码在此处
+    // 详情提取完善设置
+    enableDetailExtraction: true, // 默认开启详情提取
+    autoExtractDetails: false, // 默认关闭自动提取（让用户选择）
+    maxAutoExtractions: 5, // 自动提取最大数量
+    detailExtractionTimeout: 15000, // 详情提取超时时间
+    detailCacheDuration: 86400000, // 详情缓存时间（24小时）
+    extractionBatchSize: 3, // 批量提取大小
+    maxRetryAttempts: 2, // 最大重试次数
+    enableRetry: true, // 启用重试
+    enableCache: true, // 启用缓存
+    useLocalCache: true, // 使用本地缓存
+    strictValidation: true, // 严格验证
+    
+    // 显示设置
+    showScreenshots: true, // 显示截图
+    showDownloadLinks: true, // 显示下载链接
+    showMagnetLinks: true, // 显示磁力链接
+    showActressInfo: true, // 显示演员信息
+    compactMode: false, // 紧凑模式
+    enableImagePreview: true, // 启用图片预览
+    showExtractionProgress: true, // 显示提取进度
+    showQualityIndicator: true, // 显示质量指示器
+    enableGalleryMode: true, // 启用画廊模式
+    
+    // 内容过滤设置
+    enableContentFilter: false, // 启用内容过滤
+    contentFilterKeywords: [], // 内容过滤关键词
+    contentFilterMode: 'hide', // 过滤模式：hide/warn/block
+    adultContentWarning: true, // 成人内容警告
+    
+    // 高级设置
+    prefetchDetails: false, // 预取详情
+    backgroundExtractionEnabled: false, // 后台提取
+    extractionPriority: 'quality', // 提取优先级：speed/quality/balanced
+    downloadPreferences: {
+      preferredFormat: 'auto',
+      qualityPreference: 'high',
+      autoDownload: false
+    },
+    
+    // 性能设置
+    maxConcurrentExtractions: 3, // 最大并发提取数
+    extractionQueueSize: 20, // 提取队列大小
+    cacheCleanupInterval: 86400000, // 缓存清理间隔（24小时）
+    performanceMode: 'balanced', // 性能模式：fast/balanced/quality
+    
+    // 通知设置
+    showExtractionNotifications: true, // 显示提取通知
+    notifyOnExtractionComplete: true, // 提取完成通知
+    notifyOnExtractionError: false, // 提取错误通知
+    soundNotifications: false // 声音通知
   },
   
-  // 搜索源管理相关常量 - 保持不变，增强详情提取支持
+  // 搜索源管理相关常量
   SOURCE_MANAGEMENT: {
     DEFAULT_CATEGORY: 'others',
     SORT_OPTIONS: {
@@ -739,9 +777,9 @@ export const APP_CONSTANTS = {
       PRIORITY: 'priority',
       CREATED_DATE: 'created_date',
       STATUS: 'status',
-      DETAIL_SUPPORT: 'detail_support',
-      EXTRACTION_QUALITY: 'extraction_quality',
-      AVERAGE_TIME: 'average_time'
+      DETAIL_SUPPORT: 'detail_support', // 按详情提取支持排序
+      EXTRACTION_QUALITY: 'extraction_quality', // 按提取质量排序
+      AVERAGE_TIME: 'average_time' // 按平均提取时间排序
     },
     FILTER_OPTIONS: {
       ALL: 'all',
@@ -751,14 +789,14 @@ export const APP_CONSTANTS = {
       DISABLED: 'disabled',
       AVAILABLE: 'available',
       UNAVAILABLE: 'unavailable',
-      SUPPORTS_DETAIL: 'supports_detail',
-      NO_DETAIL: 'no_detail',
-      HIGH_QUALITY: 'high_quality',
-      FAST_EXTRACTION: 'fast_extraction'
+      SUPPORTS_DETAIL: 'supports_detail', // 按详情提取支持过滤
+      NO_DETAIL: 'no_detail', // 不支持详情提取的源
+      HIGH_QUALITY: 'high_quality', // 高质量提取源
+      FAST_EXTRACTION: 'fast_extraction' // 快速提取源
     }
   },
 
-  // 搜索源状态检查配置 - 保持不变
+  // 搜索源状态检查配置
   SOURCE_STATUS_CHECK: {
     DEFAULT_TIMEOUT: 8000,
     MIN_TIMEOUT: 1000,
@@ -774,24 +812,21 @@ export const APP_CONSTANTS = {
     USER_AGENT: 'MagnetSearch/1.4.0 StatusChecker'
   },
 
-  // 详情提取配置 - 保留系统级配置，移除用户可配置部分
+  // 详情提取配置 - 与后端完全对齐
   DETAIL_EXTRACTION_CONFIG: {
-    // 系统级技术限制（与后端 constants.js 完全同步）
-    DEFAULT_TIMEOUT: 15000,
-    MIN_TIMEOUT: 5000,
-    MAX_TIMEOUT: 30000,
-    DEFAULT_CACHE_DURATION: 86400000,
-    MIN_CACHE_DURATION: 3600000,
-    MAX_CACHE_DURATION: 604800000,
-    DEFAULT_BATCH_SIZE: 3,
-    MAX_BATCH_SIZE: 20,
-    MAX_CONCURRENT_EXTRACTIONS: 4,
-    RETRY_ATTEMPTS: 2,
-    RETRY_DELAY: 1000,
-    
-    // 系统级功能配置
-    ENABLE_CACHE: true,
-    ENABLE_PROGRESS: true,
+    DEFAULT_TIMEOUT: 15000, // 默认超时时间
+    MIN_TIMEOUT: 5000, // 最小超时时间
+    MAX_TIMEOUT: 30000, // 最大超时时间
+    DEFAULT_CACHE_DURATION: 86400000, // 默认缓存时间（24小时）
+    MIN_CACHE_DURATION: 3600000, // 最小缓存时间（1小时）
+    MAX_CACHE_DURATION: 604800000, // 最大缓存时间（7天）
+    DEFAULT_BATCH_SIZE: 3, // 默认批量大小
+    MAX_BATCH_SIZE: 20, // 最大批量大小
+    MAX_CONCURRENT_EXTRACTIONS: 4, // 最大并发提取数
+    RETRY_ATTEMPTS: 2, // 重试次数
+    RETRY_DELAY: 1000, // 重试延迟
+    ENABLE_CACHE: true, // 启用缓存
+    ENABLE_PROGRESS: true, // 启用进度显示
     
     // 内容类型检测
     CONTENT_TYPES: {
@@ -803,17 +838,19 @@ export const APP_CONSTANTS = {
       UNKNOWN: 'unknown'
     },
     
-    // 支持的格式
+    // 支持的图片格式
     SUPPORTED_IMAGE_FORMATS: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'],
+    
+    // 支持的下载类型
     SUPPORTED_DOWNLOAD_TYPES: ['http', 'https', 'ftp', 'magnet', 'ed2k'],
     
     // 质量评分权重
     QUALITY_WEIGHTS: {
-      RESPONSE_TIME: 0.2,
-      CONTENT_COMPLETENESS: 0.4,
-      IMAGE_QUALITY: 0.2,
-      METADATA_RICHNESS: 0.1,
-      DATA_ACCURACY: 0.1
+      RESPONSE_TIME: 0.2, // 响应时间权重
+      CONTENT_COMPLETENESS: 0.4, // 内容完整性权重
+      IMAGE_QUALITY: 0.2, // 图片质量权重
+      METADATA_RICHNESS: 0.1, // 元数据丰富度权重
+      DATA_ACCURACY: 0.1 // 数据准确性权重
     },
     
     // 提取优先级定义
@@ -824,7 +861,7 @@ export const APP_CONSTANTS = {
       NONE: { weight: 0.0, timeout: 0, retries: 0 }
     },
     
-    // 内容验证规则（系统级）
+    // 内容验证规则
     VALIDATION_RULES: {
       MIN_TITLE_LENGTH: 2,
       MAX_TITLE_LENGTH: 200,
@@ -839,7 +876,7 @@ export const APP_CONSTANTS = {
       OPTIONAL_FIELDS: ['code', 'description', 'screenshots', 'downloadLinks', 'magnetLinks', 'actresses']
     },
     
-    // 性能优化设置（系统级）
+    // 性能优化设置
     PERFORMANCE: {
       PREFETCH_ENABLED: false,
       LAZY_LOADING: true,
@@ -850,19 +887,20 @@ export const APP_CONSTANTS = {
       MEMORY_OPTIMIZATION: true
     },
     
-    // 错误处理配置（系统级）
+    // 错误处理配置
     ERROR_HANDLING: {
       CONTINUE_ON_ERROR: true,
       LOG_ERRORS: true,
       RETRY_ON_TIMEOUT: true,
       RETRY_ON_NETWORK_ERROR: true,
       FAIL_FAST: false,
-      ERROR_THRESHOLD: 0.3
+      ERROR_THRESHOLD: 0.3 // 30%错误率阈值
     }
   },
 
-  // UI配置常量 - 保持不变
+  // UI配置常量
   UI_CONFIG: {
+    // 详情卡片配置
     DETAIL_CARD: {
       ANIMATION_DURATION: 300,
       MAX_TITLE_LENGTH: 100,
@@ -870,10 +908,11 @@ export const APP_CONSTANTS = {
       THUMBNAIL_SIZE: { width: 240, height: 320 },
       SCREENSHOT_GRID_COLUMNS: 'auto-fit',
       SCREENSHOT_MIN_WIDTH: 200,
-      LAZY_LOAD_THRESHOLD: 100,
-      AUTO_HIDE_PROGRESS: 3000
+      LAZY_LOAD_THRESHOLD: 100, // 像素
+      AUTO_HIDE_PROGRESS: 3000 // 3秒后自动隐藏进度
     },
     
+    // 进度指示器配置
     PROGRESS_INDICATOR: {
       UPDATE_INTERVAL: 1000,
       SHOW_PERCENTAGE: true,
@@ -882,6 +921,7 @@ export const APP_CONSTANTS = {
       AUTO_HIDE_DELAY: 5000
     },
     
+    // 通知配置
     NOTIFICATIONS: {
       SUCCESS_DURATION: 3000,
       ERROR_DURATION: 5000,
@@ -890,6 +930,7 @@ export const APP_CONSTANTS = {
       MAX_NOTIFICATIONS: 5
     },
     
+    // 响应式断点
     BREAKPOINTS: {
       MOBILE: 480,
       TABLET: 768,
@@ -898,31 +939,34 @@ export const APP_CONSTANTS = {
     }
   },
 
-  // 缓存策略配置 - 保持不变
+  // 缓存策略配置
   CACHE_STRATEGY: {
+    // 本地缓存策略
     LOCAL_CACHE: {
-      MAX_SIZE: 100,
-      TTL: 1800000,
-      CLEANUP_INTERVAL: 300000,
+      MAX_SIZE: 100, // 最大缓存项数
+      TTL: 1800000, // 30分钟
+      CLEANUP_INTERVAL: 300000, // 5分钟清理一次
       STORAGE_KEY: 'magnet_search_cache'
     },
     
+    // 远程缓存策略
     REMOTE_CACHE: {
-      TTL: 86400000,
+      TTL: 86400000, // 24小时
       MAX_SIZE: 1000,
       COMPRESSION: true,
       VERSIONING: true
     },
     
+    // 图片缓存策略
     IMAGE_CACHE: {
-      TTL: 604800000,
+      TTL: 604800000, // 7天
       MAX_SIZE: 500,
       COMPRESSION_QUALITY: 0.8,
       THUMBNAIL_GENERATION: true
     }
   },
 
-  // 性能监控配置 - 保持不变
+  // 性能监控配置
   PERFORMANCE_MONITORING: {
     ENABLED: true,
     METRICS: {
@@ -932,87 +976,8 @@ export const APP_CONSTANTS = {
       MEMORY_USAGE: true,
       ERROR_RATE: true
     },
-    SAMPLING_RATE: 0.1,
+    SAMPLING_RATE: 0.1, // 10%采样率
     BATCH_SIZE: 100,
-    FLUSH_INTERVAL: 300000
-  },
-
-  // 新增：详情提取配置API端点（与 detail-config.js 对接）
-  DETAIL_CONFIG_ENDPOINTS: {
-    GET_CONFIG: '/api/detail/config',
-    UPDATE_CONFIG: '/api/detail/config',
-    RESET_CONFIG: '/api/detail/config/reset',
-    APPLY_PRESET: '/api/detail/config/preset'
+    FLUSH_INTERVAL: 300000 // 5分钟
   }
 };
-
-// 导出常用常量 - 保持向后兼容
-export const STORAGE_KEYS = APP_CONSTANTS.STORAGE_KEYS;
-export const THEMES = APP_CONSTANTS.THEMES;
-export const SOURCE_CATEGORIES = APP_CONSTANTS.SOURCE_CATEGORIES;
-export const SEARCH_SOURCES = APP_CONSTANTS.SEARCH_SOURCES;
-export const DETAIL_EXTRACTION_SOURCES = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES;
-export const DETAIL_EXTRACTION_CAPABILITIES = APP_CONSTANTS.DETAIL_EXTRACTION_CAPABILITIES;
-export const DETAIL_EXTRACTION_STATUS = APP_CONSTANTS.DETAIL_EXTRACTION_STATUS;
-export const DETAIL_QUALITY_LEVELS = APP_CONSTANTS.DETAIL_QUALITY_LEVELS;
-export const DEFAULT_USER_SETTINGS = APP_CONSTANTS.DEFAULT_USER_SETTINGS;
-export const PERMISSIONS = APP_CONSTANTS.PERMISSIONS;
-export const ERROR_CODES = APP_CONSTANTS.ERROR_CODES;
-export const ANALYTICS_EVENTS = APP_CONSTANTS.ANALYTICS_EVENTS;
-export const VALIDATION_RULES = APP_CONSTANTS.VALIDATION_RULES;
-export const SOURCE_MANAGEMENT = APP_CONSTANTS.SOURCE_MANAGEMENT;
-export const DETAIL_EXTRACTION_CONFIG = APP_CONSTANTS.DETAIL_EXTRACTION_CONFIG;
-
-// 工具函数 - 保持不变
-export function getStorageKey(key) {
-  return STORAGE_KEYS[key] || key;
-}
-
-export function isDetailExtractionSupported(sourceId) {
-  return DETAIL_EXTRACTION_SOURCES.includes(sourceId);
-}
-
-export function getDetailExtractionCapabilities(sourceId) {
-  return DETAIL_EXTRACTION_CAPABILITIES[sourceId] || null;
-}
-
-export function getSourceByCategory(category) {
-  return SEARCH_SOURCES.filter(source => source.category === category);
-}
-
-export function getSourcesSupportingDetailExtraction() {
-  return SEARCH_SOURCES.filter(source => source.supportsDetailExtraction);
-}
-
-// 新增：详情提取配置相关工具函数
-export function getDetailConfigEndpoint(endpoint) {
-  return APP_CONSTANTS.DETAIL_CONFIG_ENDPOINTS[endpoint.toUpperCase()];
-}
-
-export function isDetailExtractionEnabled() {
-  // 这个函数现在应该通过 DetailConfigAPI 来获取用户配置
-  // 这里只返回系统级开关状态
-  return true; // 系统级默认启用，具体用户配置由 detail-config-api.js 管理
-}
-
-// 向后兼容性检查函数
-export function validateLegacySettings(settings) {
-  const warnings = [];
-  
-  // 检查是否使用了已迁移的详情提取配置
-  const detailConfigKeys = [
-    'enableDetailExtraction', 'autoExtractDetails', 'detailExtractionTimeout',
-    'detailCacheDuration', 'extractionBatchSize', 'maxRetryAttempts'
-  ];
-  
-  detailConfigKeys.forEach(key => {
-    if (settings.hasOwnProperty(key)) {
-      warnings.push(`配置项 ${key} 已迁移至详情提取配置管理，请使用 DetailConfigAPI 进行管理`);
-    }
-  });
-  
-  return warnings;
-}
-
-// 默认导出 - 保持向后兼容
-export default APP_CONSTANTS;

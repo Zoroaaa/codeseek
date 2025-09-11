@@ -1,5 +1,5 @@
 // src/components/search/SearchResultsRenderer.js - 搜索结果渲染子组件
-import { APP_CONSTANTS } from '../../core/constants-1.js';
+import { APP_CONSTANTS } from '../../core/constants.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../../utils/format.js';
 import favoritesManager from '../favorites.js';
 import authManager from '../../services/auth.js';
