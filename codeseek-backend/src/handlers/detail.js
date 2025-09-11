@@ -467,7 +467,7 @@ function logBatchExtractionAction(env, userId, searchResults, detailResults, sta
     failedExtractions: stats.failed,
     totalTime: stats.totalTime
   }, request);
-}详情提取相关 =====================
+}
 
 /**
  * 提取单个搜索结果的详情信息 - 使用配置服务版本
@@ -753,55 +753,6 @@ export async function resetDetailExtractionConfigHandler(request, env) {
   }
 }
 
-/**
- * 应用配置预设 - 新增
- */
-export async function applyConfigPresetHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-  
-  try {
-    const body = await utils.safeJsonParse(request, {});
-    const { preset } = body;
-    
-    if (!preset) {
-      return utils.errorResponse('预设名称不能为空', 400);
-    }
-    
-    const presets = detailConfigService.getConfigPresets();
-    if (!presets[preset]) {
-      return utils.errorResponse(`未知的配置预设: ${preset}`, 400);
-    }
-    
-    const presetConfig = presets[preset].config;
-    
-    // 保存预设配置
-    await detailConfigService.saveUserConfig(env, user.id, presetConfig);
-    
-    // 记录用户行为
-    try {
-      await utils.logUserAction(env, user.id, 'detail_config_preset_apply', {
-        preset,
-        timestamp: Date.now()
-      }, request);
-    } catch (logError) {
-      console.warn('记录预设应用失败:', logError.message);
-    }
-    
-    return utils.successResponse({
-      message: `已应用 ${presets[preset].name} 配置预设`,
-      preset,
-      config: presetConfig,
-      description: presets[preset].description
-    });
-    
-  } catch (error) {
-    console.error('应用配置预设失败:', error);
-    return utils.errorResponse('应用预设失败: ' + error.message, 500);
-  }
-}
 
 // ===================== 其他处理器保持不变 =====================
 
@@ -1048,36 +999,3 @@ export async function getDetailExtractionStatsHandler(request, env) {
   }
 }
 
-// ===================== 新增的配置管理处理器 =====================
-
-/**
- * 重置详情提取配置 - 新增
- */
-export async function resetDetailExtractionConfigHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-  
-  try {
-    const result = await detailConfigService.resetUserConfig(env, user.id);
-    
-    // 记录用户行为
-    try {
-      await utils.logUserAction(env, user.id, 'detail_config_reset', {
-        timestamp: Date.now()
-      }, request);
-    } catch (logError) {
-      console.warn('记录配置重置失败:', logError.message);
-    }
-    
-    return utils.successResponse({
-      message: '配置已重置为默认值',
-      config: result.config
-    });
-    
-  } catch (error) {
-    console.error('重置详情提取配置失败:', error);
-    return utils.errorResponse('重置配置失败: ' + error.message, 500);
-
-// =====================

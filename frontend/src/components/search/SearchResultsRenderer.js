@@ -7,6 +7,7 @@ import authManager from '../../services/auth.js';
 export class SearchResultsRenderer {
   constructor() {
     this.currentResults = [];
+	this.config = {}; // 添加配置属性
   }
 
   /**
@@ -19,6 +20,41 @@ export class SearchResultsRenderer {
     } catch (error) {
       console.error('搜索结果渲染器初始化失败:', error);
     }
+  }
+  
+    /**
+   * 更新配置 - 新增方法
+   */
+  updateConfig(config) {
+    if (!config || typeof config !== 'object') {
+      console.warn('SearchResultsRenderer: 无效的配置对象');
+      return;
+    }
+
+    // 合并配置
+    this.config = { ...this.config, ...config };
+    
+    console.log('SearchResultsRenderer: 配置已更新', this.config);
+    
+    // 如果当前有结果，重新渲染以应用新配置
+    if (this.currentResults.length > 0) {
+      const keyword = document.getElementById('searchInput')?.value || '';
+      this.displaySearchResults(keyword, this.currentResults, this.config);
+    }
+  }
+
+  /**
+   * 获取当前配置 - 新增方法
+   */
+  getConfig() {
+    return { ...this.config };
+  }
+
+  /**
+   * 处理配置变更 - 新增方法（别名方法，兼容不同调用方式）
+   */
+  handleConfigChange(config) {
+    this.updateConfig(config);
   }
 
   /**

@@ -11,6 +11,7 @@ export class DetailExtractionManager {
   constructor() {
     this.extractionInProgress = false;
     this.extractionQueue = [];
+	this.config = {}; // 添加配置属性
     this.extractionStats = {
       totalExtractions: 0,
       successfulExtractions: 0,
@@ -37,6 +38,85 @@ export class DetailExtractionManager {
     } catch (error) {
       console.error('详情提取管理器初始化失败:', error);
     }
+  }
+  
+    /**
+   * 更新配置 - 新增方法
+   */
+  updateConfig(config) {
+    if (!config || typeof config !== 'object') {
+      console.warn('DetailExtractionManager: 无效的配置对象');
+      return;
+    }
+
+    // 合并配置
+    this.config = { ...this.config, ...config };
+    
+    console.log('DetailExtractionManager: 配置已更新', this.config);
+    
+    // 根据配置更新功能状态
+    this.handleConfigUpdate();
+  }
+
+  /**
+   * 处理配置更新 - 新增方法
+   */
+  handleConfigUpdate() {
+    // 检查详情提取是否被启用
+    if (this.config.enableDetailExtraction !== undefined) {
+      const wasEnabled = this.isExtractionEnabled;
+      this.isExtractionEnabled = this.config.enableDetailExtraction;
+      
+      if (wasEnabled !== this.isExtractionEnabled) {
+        console.log(`详情提取功能${this.isExtractionEnabled ? '已启用' : '已禁用'}`);
+        
+        // 触发状态变更事件
+        document.dispatchEvent(new CustomEvent('detailExtractionStateChanged', {
+          detail: { enabled: this.isExtractionEnabled }
+        }));
+      }
+    }
+
+    // 更新批处理大小
+    if (this.config.extractionBatchSize) {
+      this.batchSize = this.config.extractionBatchSize;
+    }
+
+    // 更新超时设置
+    if (this.config.extractionTimeout) {
+      this.timeout = this.config.extractionTimeout;
+    }
+
+    // 更新重试设置
+    if (this.config.enableRetry !== undefined) {
+      this.retryEnabled = this.config.enableRetry;
+    }
+
+    // 更新缓存设置
+    if (this.config.enableCache !== undefined) {
+      this.cacheEnabled = this.config.enableCache;
+    }
+  }
+
+  /**
+   * 获取当前配置 - 新增方法
+   */
+  getConfig() {
+    return { ...this.config };
+  }
+
+  /**
+   * 处理配置变更 - 新增方法（别名方法，兼容不同调用方式）
+   */
+  handleConfigChange(config) {
+    this.updateConfig(config);
+  }
+
+  /**
+   * 检查详情提取是否启用 - 新增方法
+   */
+  get isExtractionEnabled() {
+    return this.config.enableDetailExtraction && authManager.isAuthenticated();
   }
 
   /**
