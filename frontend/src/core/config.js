@@ -1,5 +1,5 @@
 // 配置管理模块
-import { APP_CONSTANTS } from './constants-1.js';
+import { APP_CONSTANTS } from './constants.js';
 
 class ConfigManager {
   constructor() {
