@@ -1,4 +1,4 @@
-// 应用常量定义 - 移除详情提取配置，保持其他功能完全不变
+// 应用常量定义 - 完善的详情提取功能支持
 export const APP_CONSTANTS = {
   // 应用信息
   APP_NAME: '磁力快搜',
@@ -417,7 +417,7 @@ export const APP_CONSTANTS = {
       id: 'javhdporn',
       name: 'JavHD.porn',
       subtitle: '高清资源下载，质量优秀',
-      icon: '🎞️',
+      icon: '📽️',
       urlTemplate: 'https://javhd.porn/search/{keyword}',
       category: 'streaming',
       isBuiltin: true,
@@ -598,7 +598,7 @@ export const APP_CONSTANTS = {
   // 默认图标选项
   DEFAULT_ICONS: [
     '📚', '🎥', '🧲', '💬', '🌟', '🔍', '📺', '🎬',
-    '🎭', '🎪', '🎦', '🎞️', '⚡', '💫', '🌙', '🔗',
+    '🎭', '🎪', '🎦', '📽️', '⚡', '💫', '🌙', '🔗',
     '🐱', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲'
   ],
   
@@ -695,7 +695,7 @@ export const APP_CONSTANTS = {
     DETAIL_CONCURRENT_LIMIT_EXCEEDED: 'DETAIL_CONCURRENT_LIMIT_EXCEEDED'
   },
   
-  // 默认用户设置 - 移除详情提取设置（由 detail-config.js 管理）
+  // 增强：默认用户设置 - 完善详情提取设置
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
     searchSources: ['javbus', 'javdb', 'javlibrary'],
@@ -712,9 +712,59 @@ export const APP_CONSTANTS = {
     sourceStatusCacheDuration: 300000,
     skipUnavailableSources: true,
     showSourceStatus: true,
-    retryFailedSources: false
+    retryFailedSources: false,
     
-    // 注意：详情提取相关设置已移至 detail-config.js 管理
+    // 详情提取完善设置
+    enableDetailExtraction: true, // 默认开启详情提取
+    autoExtractDetails: false, // 默认关闭自动提取（让用户选择）
+    maxAutoExtractions: 5, // 自动提取最大数量
+    detailExtractionTimeout: 15000, // 详情提取超时时间
+    detailCacheDuration: 86400000, // 详情缓存时间（24小时）
+    extractionBatchSize: 3, // 批量提取大小
+    maxRetryAttempts: 2, // 最大重试次数
+    enableRetry: true, // 启用重试
+    enableCache: true, // 启用缓存
+    useLocalCache: true, // 使用本地缓存
+    strictValidation: true, // 严格验证
+    
+    // 显示设置
+    showScreenshots: true, // 显示截图
+    showDownloadLinks: true, // 显示下载链接
+    showMagnetLinks: true, // 显示磁力链接
+    showActressInfo: true, // 显示演员信息
+    compactMode: false, // 紧凑模式
+    enableImagePreview: true, // 启用图片预览
+    showExtractionProgress: true, // 显示提取进度
+    showQualityIndicator: true, // 显示质量指示器
+    enableGalleryMode: true, // 启用画廊模式
+    
+    // 内容过滤设置
+    enableContentFilter: false, // 启用内容过滤
+    contentFilterKeywords: [], // 内容过滤关键词
+    contentFilterMode: 'hide', // 过滤模式：hide/warn/block
+    adultContentWarning: true, // 成人内容警告
+    
+    // 高级设置
+    prefetchDetails: false, // 预取详情
+    backgroundExtractionEnabled: false, // 后台提取
+    extractionPriority: 'quality', // 提取优先级：speed/quality/balanced
+    downloadPreferences: {
+      preferredFormat: 'auto',
+      qualityPreference: 'high',
+      autoDownload: false
+    },
+    
+    // 性能设置
+    maxConcurrentExtractions: 3, // 最大并发提取数
+    extractionQueueSize: 20, // 提取队列大小
+    cacheCleanupInterval: 86400000, // 缓存清理间隔（24小时）
+    performanceMode: 'balanced', // 性能模式：fast/balanced/quality
+    
+    // 通知设置
+    showExtractionNotifications: true, // 显示提取通知
+    notifyOnExtractionComplete: true, // 提取完成通知
+    notifyOnExtractionError: false, // 提取错误通知
+    soundNotifications: false // 声音通知
   },
   
   // 搜索源管理相关常量
@@ -760,6 +810,92 @@ export const APP_CONSTANTS = {
     HTTP_METHOD: 'HEAD',
     FOLLOW_REDIRECTS: true,
     USER_AGENT: 'MagnetSearch/1.4.0 StatusChecker'
+  },
+
+  // 详情提取配置 - 与后端完全对齐
+  DETAIL_EXTRACTION_CONFIG: {
+    DEFAULT_TIMEOUT: 15000, // 默认超时时间
+    MIN_TIMEOUT: 5000, // 最小超时时间
+    MAX_TIMEOUT: 30000, // 最大超时时间
+    DEFAULT_CACHE_DURATION: 86400000, // 默认缓存时间（24小时）
+    MIN_CACHE_DURATION: 3600000, // 最小缓存时间（1小时）
+    MAX_CACHE_DURATION: 604800000, // 最大缓存时间（7天）
+    DEFAULT_BATCH_SIZE: 3, // 默认批量大小
+    MAX_BATCH_SIZE: 20, // 最大批量大小
+    MAX_CONCURRENT_EXTRACTIONS: 4, // 最大并发提取数
+    RETRY_ATTEMPTS: 2, // 重试次数
+    RETRY_DELAY: 1000, // 重试延迟
+    ENABLE_CACHE: true, // 启用缓存
+    ENABLE_PROGRESS: true, // 启用进度显示
+    
+    // 内容类型检测
+    CONTENT_TYPES: {
+      TORRENT: 'torrent',
+      DOWNLOAD: 'download', 
+      VIDEO: 'video',
+      MEDIA: 'media',
+      BASIC: 'basic',
+      UNKNOWN: 'unknown'
+    },
+    
+    // 支持的图片格式
+    SUPPORTED_IMAGE_FORMATS: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'],
+    
+    // 支持的下载类型
+    SUPPORTED_DOWNLOAD_TYPES: ['http', 'https', 'ftp', 'magnet', 'ed2k'],
+    
+    // 质量评分权重
+    QUALITY_WEIGHTS: {
+      RESPONSE_TIME: 0.2, // 响应时间权重
+      CONTENT_COMPLETENESS: 0.4, // 内容完整性权重
+      IMAGE_QUALITY: 0.2, // 图片质量权重
+      METADATA_RICHNESS: 0.1, // 元数据丰富度权重
+      DATA_ACCURACY: 0.1 // 数据准确性权重
+    },
+    
+    // 提取优先级定义
+    EXTRACTION_PRIORITIES: {
+      HIGH: { weight: 1.0, timeout: 15000, retries: 3 },
+      MEDIUM: { weight: 0.7, timeout: 12000, retries: 2 },
+      LOW: { weight: 0.5, timeout: 10000, retries: 1 },
+      NONE: { weight: 0.0, timeout: 0, retries: 0 }
+    },
+    
+    // 内容验证规则
+    VALIDATION_RULES: {
+      MIN_TITLE_LENGTH: 2,
+      MAX_TITLE_LENGTH: 200,
+      MIN_DESCRIPTION_LENGTH: 5,
+      MAX_DESCRIPTION_LENGTH: 2000,
+      MAX_SCREENSHOTS: 15,
+      MAX_DOWNLOAD_LINKS: 10,
+      MAX_MAGNET_LINKS: 10,
+      MAX_TAGS: 20,
+      MAX_ACTRESSES: 20,
+      REQUIRED_FIELDS: ['title', 'extractionStatus'],
+      OPTIONAL_FIELDS: ['code', 'description', 'screenshots', 'downloadLinks', 'magnetLinks', 'actresses']
+    },
+    
+    // 性能优化设置
+    PERFORMANCE: {
+      PREFETCH_ENABLED: false,
+      LAZY_LOADING: true,
+      IMAGE_COMPRESSION: true,
+      CACHE_PRELOAD: false,
+      BACKGROUND_PROCESSING: false,
+      QUEUE_PROCESSING: true,
+      MEMORY_OPTIMIZATION: true
+    },
+    
+    // 错误处理配置
+    ERROR_HANDLING: {
+      CONTINUE_ON_ERROR: true,
+      LOG_ERRORS: true,
+      RETRY_ON_TIMEOUT: true,
+      RETRY_ON_NETWORK_ERROR: true,
+      FAIL_FAST: false,
+      ERROR_THRESHOLD: 0.3 // 30%错误率阈值
+    }
   },
 
   // UI配置常量

@@ -1,5 +1,5 @@
 // 主应用入口 - 集成统一搜索组件和配置管理架构
-import { APP_CONSTANTS } from '../../core/constants.js';
+import { APP_CONSTANTS } from '../../core/constants-1.js';
 import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { isDevEnv } from '../../utils/helpers.js';

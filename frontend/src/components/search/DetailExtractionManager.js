@@ -1,5 +1,5 @@
 // src/components/search/DetailExtractionManager.js - 详情提取管理子组件
-import { APP_CONSTANTS } from '../../core/constants.js';
+import { APP_CONSTANTS } from '../../core/constants-1.js';
 import { showToast, showLoading } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
 import detailAPIService from '../../services/detail-api.js';

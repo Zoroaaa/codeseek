@@ -1,6 +1,6 @@
 // src/components/search.js - 重构后的统一搜索组件（主组件集成子组件）
 // 专注于搜索流程编排、搜索请求协调、子组件通信、搜索状态管理
-import { APP_CONSTANTS } from '../core/constants.js';
+import { APP_CONSTANTS } from '../core/constants-1.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml } from '../utils/format.js';
 import { validateSearchKeyword } from '../utils/validation.js';
