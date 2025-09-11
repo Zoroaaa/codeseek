@@ -2,7 +2,6 @@
 // 合并了详情提取配置管理的完整功能
 import { showToast, showLoading } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
-import { validateConfig } from '../../utils/validation.js';
 import detailConfigAPI from '../../services/detail-config-api.js';
 import authManager from '../../services/auth.js';
 import apiService from '../../services/api.js';
