@@ -38,6 +38,49 @@ export function showToast(message, type = 'info', duration = 3000) {
   };
 }
 
+// 显示模态框
+export function showModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  modal.style.display = 'flex';
+  modal.classList.add('show');
+  
+  // 防止页面滚动
+  document.body.style.overflow = 'hidden';
+  
+  // 点击背景关闭
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      hideModal(modalId);
+    }
+  });
+}
+
+// 隐藏模态框
+export function hideModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  modal.style.display = 'none';
+  modal.classList.remove('show');
+  
+  // 恢复页面滚动
+  document.body.style.overflow = '';
+}
+
+// 切换模态框显示状态
+export function toggleModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  
+  if (modal.style.display === 'flex' || modal.classList.contains('show')) {
+    hideModal(modalId);
+  } else {
+    showModal(modalId);
+  }
+}
+
 // 元素选择器增强
 export function $(selector, context = document) {
   return context.querySelector(selector);
