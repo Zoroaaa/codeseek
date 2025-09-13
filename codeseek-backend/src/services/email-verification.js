@@ -129,12 +129,16 @@ export class EmailVerificationService {
         if (!this.resendApiKey) {
             throw new Error('邮件服务未配置');
         }
+		
+		    // 使用映射后的模板类型
+			// 获取邮件模板
+    const templateType = this.getTemplateType(verificationType);
+    const template = await this.getEmailTemplate(templateType);
+    
+    if (!template) {
+        throw new Error(`邮件模板不存在: ${templateType}`);
+    }
 
-        // 获取邮件模板
-        const template = await this.getEmailTemplate(templateType);
-        if (!template) {
-            throw new Error('邮件模板不存在');
-        }
 
         // 准备模板变量
         const vars = {
@@ -375,6 +379,18 @@ export class EmailVerificationService {
             period: timeRange
         };
     }
+	
+	// 在 sendVerificationEmail 方法中，添加类型映射函数
+getTemplateType(verificationType) {
+    const mapping = {
+        'registration': 'registration',
+        'password_reset': 'password_reset',
+        'email_change_old': 'email_change',
+        'email_change_new': 'email_change', 
+        'account_delete': 'account_delete'
+    };
+    return mapping[verificationType] || verificationType;
+}
 }
 
 // 邮箱验证工具函数

@@ -54,29 +54,30 @@ export async function authRegisterHandler(request, env) {
         const isEmailVerificationRequired = env.EMAIL_VERIFICATION_REQUIRED === 'true';
 
         // 如果启用了邮箱验证且需要验证码
-        if (isEmailVerificationRequired && verificationCode) {
-            try {
-                await emailService.verifyCode(normalizedEmail, verificationCode, 'registration');
-            } catch (error) {
-                return utils.errorResponse(error.message);
-            }
-        }
+if (isEmailVerificationRequired && verificationCode) {
+    try {
+        await emailService.verifyCode(normalizedEmail, verificationCode, 'registration');
+        // 创建用户时直接设置为已验证
+        emailVerified = 1;
+    } catch (error) {
+        return utils.errorResponse(error.message);
+    }
+}
 
         const userId = utils.generateId();
         const passwordHash = await utils.hashPassword(password);
         const now = Date.now();
 
         // 创建用户账户
-        await env.DB.prepare(`
-            INSERT INTO users (
-                id, username, email, password_hash, email_verified,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).bind(
-            userId, username, normalizedEmail, passwordHash,
-            isEmailVerificationRequired && verificationCode ? 1 : 0,
-            now, now
-        ).run();
+await env.DB.prepare(`
+    INSERT INTO users (
+        id, username, email, password_hash, email_verified,
+        created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+`).bind(
+    userId, username, normalizedEmail, passwordHash, emailVerified,
+    now, now
+).run();
 
         await utils.logUserAction(env, userId, 'register', { 
             emailVerified: isEmailVerificationRequired && verificationCode 
@@ -366,7 +367,7 @@ export async function authSendEmailChangeCodeHandler(request, env) {
         }
 
         const targetEmail = emailType === 'old' ? changeRequest.old_email : changeRequest.new_email;
-        const verificationType = `email_change_${emailType}`;
+        const verificationType = emailType === 'old' ? 'email_change_old' : 'email_change_new';
         const ipAddress = utils.getClientIP(request);
 
         // 检查发送频率限制
@@ -437,7 +438,7 @@ export async function authVerifyEmailChangeCodeHandler(request, env) {
         }
 
         const targetEmail = emailType === 'old' ? changeRequest.old_email : changeRequest.new_email;
-        const verificationType = `email_change_${emailType}`;
+        const verificationType = emailType === 'old' ? 'email_change_old' : 'email_change_new';
 
         // 验证验证码
         try {

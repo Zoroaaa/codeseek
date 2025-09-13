@@ -22,8 +22,6 @@ CREATE TABLE IF NOT EXISTS users (
     last_login INTEGER,                         -- 最后登录时间
     login_count INTEGER DEFAULT 0               -- 登录次数统计
 	email_verified INTEGER DEFAULT 0            -- 0:未验证 1:已验证
-	email_verification_token TEXT               -- 当前邮箱验证token
-	email_verification_expires INTEGER          -- 验证码过期时间
 );
 
 -- 用户会话管理表
@@ -1075,7 +1073,7 @@ INSERT OR IGNORE INTO email_templates (
     required_variables, created_at, updated_at
 ) VALUES 
 -- 注册验证模板
-('tpl_register_verify', 'registration_verification', 'verification',
+('tpl_register_verify', 'registration', 'verification',
  '验证您的{{siteName}}账户', 
  '<!DOCTYPE html><html><head><meta charset="utf-8"><title>验证邮箱</title></head><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;"><h1 style="margin: 0; font-size: 28px;">验证您的邮箱</h1></div><div style="background: white; padding: 40px; border: 1px solid #eee; border-top: none; border-radius: 0 0 10px 10px;"><p style="font-size: 16px; line-height: 1.6; color: #333;">您好 <strong>{{username}}</strong>，</p><p style="font-size: 16px; line-height: 1.6; color: #333;">感谢您注册{{siteName}}！请使用以下验证码完成邮箱验证：</p><div style="background: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;"><span style="font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 5px; font-family: monospace;">{{verificationCode}}</span></div><p style="font-size: 14px; color: #666; text-align: center;">验证码将在 <strong>{{expiryMinutes}} 分钟</strong> 后过期</p><p style="font-size: 16px; line-height: 1.6; color: #333;">如果您没有注册此账户，请忽略此邮件。</p><hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="font-size: 12px; color: #999; text-align: center;">此邮件由系统自动发送，请勿回复。<br>{{siteName}} - 让搜索更简单</p></div></body></html>',
  '验证您的{{siteName}}账户\n\n您好 {{username}}，\n\n感谢您注册{{siteName}}！您的验证码是：{{verificationCode}}\n\n此验证码将在 {{expiryMinutes}} 分钟后过期。\n\n如果您没有注册此账户，请忽略此邮件。\n\n{{siteName}}',
@@ -1083,7 +1081,7 @@ INSERT OR IGNORE INTO email_templates (
  strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 
 -- 密码重置模板  
-('tpl_password_reset', 'password_reset', 'verification',
+('tpl_password_reset', 'password_reset', 'password_reset',
  '重置您的{{siteName}}密码',
  '<!DOCTYPE html><html><head><meta charset="utf-8"><title>密码重置</title></head><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><div style="background: linear-gradient(135deg, #ff7b7b 0%, #d63031 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;"><h1 style="margin: 0; font-size: 28px;">密码重置请求</h1></div><div style="background: white; padding: 40px; border: 1px solid #eee; border-top: none; border-radius: 0 0 10px 10px;"><p style="font-size: 16px; line-height: 1.6; color: #333;">您好 <strong>{{username}}</strong>，</p><p style="font-size: 16px; line-height: 1.6; color: #333;">我们收到了您的密码重置请求。请使用以下验证码继续重置密码：</p><div style="background: #f8f9fa; border: 2px dashed #d63031; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;"><span style="font-size: 32px; font-weight: bold; color: #d63031; letter-spacing: 5px; font-family: monospace;">{{verificationCode}}</span></div><p style="font-size: 14px; color: #666; text-align: center;">验证码将在 <strong>{{expiryMinutes}} 分钟</strong> 后过期</p><p style="font-size: 16px; line-height: 1.6; color: #333;">如果您没有申请密码重置，请立即联系我们的客服团队。</p><hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="font-size: 12px; color: #999; text-align: center;">此邮件由系统自动发送，请勿回复。<br>{{siteName}} - 让搜索更简单</p></div></body></html>',
  '重置您的{{siteName}}密码\n\n您好 {{username}}，\n\n我们收到了您的密码重置请求。您的验证码是：{{verificationCode}}\n\n此验证码将在 {{expiryMinutes}} 分钟后过期。\n\n如果您没有申请密码重置，请立即联系客服。\n\n{{siteName}}',
@@ -1091,7 +1089,7 @@ INSERT OR IGNORE INTO email_templates (
  strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 
 -- 邮箱更改模板
-('tpl_email_change', 'email_change', 'verification',
+('tpl_email_change', 'email_change', 'email_change',
  '验证您的新邮箱地址',
  '<!DOCTYPE html><html><head><meta charset="utf-8"><title>邮箱验证</title></head><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><div style="background: linear-gradient(135deg, #00b894 0%, #00a085 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;"><h1 style="margin: 0; font-size: 28px;">验证新邮箱</h1></div><div style="background: white; padding: 40px; border: 1px solid #eee; border-top: none; border-radius: 0 0 10px 10px;"><p style="font-size: 16px; line-height: 1.6; color: #333;">您好 <strong>{{username}}</strong>，</p><p style="font-size: 16px; line-height: 1.6; color: #333;">您申请将账户邮箱从 <strong>{{oldEmail}}</strong> 更改为 <strong>{{newEmail}}</strong>。</p><p style="font-size: 16px; line-height: 1.6; color: #333;">请使用以下验证码验证您的新邮箱地址：</p><div style="background: #f8f9fa; border: 2px dashed #00b894; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;"><span style="font-size: 32px; font-weight: bold; color: #00b894; letter-spacing: 5px; font-family: monospace;">{{verificationCode}}</span></div><p style="font-size: 14px; color: #666; text-align: center;">验证码将在 <strong>{{expiryMinutes}} 分钟</strong> 后过期</p><p style="font-size: 16px; line-height: 1.6; color: #333;">如果您没有申请更改邮箱，请立即联系我们。</p><hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="font-size: 12px; color: #999; text-align: center;">此邮件由系统自动发送，请勿回复。<br>{{siteName}} - 让搜索更简单</p></div></body></html>',
  '验证您的新邮箱地址\n\n您好 {{username}}，\n\n您申请将账户邮箱从 {{oldEmail}} 更改为 {{newEmail}}。\n\n您的验证码是：{{verificationCode}}\n\n此验证码将在 {{expiryMinutes}} 分钟后过期。\n\n如果您没有申请更改邮箱，请立即联系我们。\n\n{{siteName}}',
@@ -1099,7 +1097,7 @@ INSERT OR IGNORE INTO email_templates (
  strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 
 -- 账户删除模板
-('tpl_account_delete', 'account_delete', 'verification',  
+('tpl_account_delete', 'account_delete', 'account_delete',  
  '确认删除您的{{siteName}}账户',
  '<!DOCTYPE html><html><head><meta charset="utf-8"><title>账户删除确认</title></head><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><div style="background: linear-gradient(135deg, #e84393 0%, #d63031 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;"><h1 style="margin: 0; font-size: 28px;">账户删除确认</h1></div><div style="background: white; padding: 40px; border: 1px solid #eee; border-top: none; border-radius: 0 0 10px 10px;"><p style="font-size: 16px; line-height: 1.6; color: #333;">您好 <strong>{{username}}</strong>，</p><p style="font-size: 16px; line-height: 1.6; color: #333;">我们收到了删除您账户的申请。这将<strong>永久删除</strong>您的所有数据，包括收藏、历史记录等。</p><p style="font-size: 16px; line-height: 1.6; color: #333;">如果您确认要删除账户，请使用以下验证码：</p><div style="background: #f8f9fa; border: 2px dashed #e84393; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;"><span style="font-size: 32px; font-weight: bold; color: #e84393; letter-spacing: 5px; font-family: monospace;">{{verificationCode}}</span></div><p style="font-size: 14px; color: #666; text-align: center;">验证码将在 <strong>{{expiryMinutes}} 分钟</strong> 后过期</p><div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0;"><p style="font-size: 14px; color: #856404; margin: 0;"><strong>⚠️ 重要提醒：</strong>账户删除后无法恢复，请谨慎操作！</p></div><p style="font-size: 16px; line-height: 1.6; color: #333;">如果您不想删除账户，请忽略此邮件。</p><hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="font-size: 12px; color: #999; text-align: center;">此邮件由系统自动发送，请勿回复。<br>{{siteName}} - 让搜索更简单</p></div></body></html>',
  '确认删除您的{{siteName}}账户\n\n您好 {{username}}，\n\n我们收到了删除您账户的申请。这将永久删除您的所有数据。\n\n如果您确认要删除账户，验证码是：{{verificationCode}}\n\n此验证码将在 {{expiryMinutes}} 分钟后过期。\n\n⚠️ 重要提醒：账户删除后无法恢复，请谨慎操作！\n\n如果您不想删除账户，请忽略此邮件。\n\n{{siteName}}',
