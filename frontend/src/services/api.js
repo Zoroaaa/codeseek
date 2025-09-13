@@ -120,10 +120,10 @@ class APIService {
     });
   }
 
-  async login(username, password) {
+  async login(identifier, password) {
     const response = await this.request('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ identifier, password })
     });
     
     if (response.success && response.token) {
