@@ -846,7 +846,51 @@ INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_pu
 ('email_rate_limit_per_day', '20', '每天最大发送邮件数', 'integer', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('resend_api_key_set', '0', 'Resend API密钥是否已配置', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('default_from_email', 'noreply@codeseek.pp.ua', '默认发件人邮箱', 'string', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('default_from_name', '磁力快搜', '默认发件人姓名', 'string', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+('default_from_name', '磁力快搜', '默认发件人姓名', 'string', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+-- 忘记密码功能配置
+('forgot_password_enabled', '1', '是否启用忘记密码功能', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('forgot_password_rate_limit_per_hour', '3', '忘记密码每小时最大请求次数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('forgot_password_rate_limit_per_day', '10', '忘记密码每天最大请求次数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('reset_password_require_verification', '1', '重置密码是否需要邮箱验证', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('reset_password_code_expiry', '1800000', '重置密码验证码过期时间（毫秒，默认30分钟）', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+-- 安全相关配置
+('password_reset_max_attempts', '5', '密码重置最大尝试次数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('password_reset_lockout_duration', '3600000', '密码重置锁定持续时间（毫秒，默认1小时）', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('force_logout_after_password_reset', '1', '密码重置后是否强制退出所有设备', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+-- 邮件模板配置
+('forgot_password_email_subject', '重置您的密码', '忘记密码邮件主题', 'string', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('forgot_password_success_message', '如果该邮箱已注册，我们已发送重置链接', '忘记密码成功提示信息', 'string', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+-- 安全监控配置
+('security_monitoring_enabled', '1', '是否启用安全事件监控', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('security_event_retention_days', '90', '安全事件保留天数', 'integer', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('high_risk_threshold', '70', '高风险事件阈值', 'integer', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+-- 异常登录检测
+('detect_unusual_login_location', '1', '检测异常登录地点', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detect_unusual_login_time', '1', '检测异常登录时间', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detect_multiple_failed_logins', '1', '检测多次登录失败', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+-- 通知配置
+('notify_admin_on_suspicious_activity', '1', '可疑活动时通知管理员', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('notify_user_on_password_reset', '1', '密码重置时通知用户', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+-- 安全监控配置
+('security_monitoring_enabled', '1', '是否启用安全事件监控', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('security_event_retention_days', '90', '安全事件保留天数', 'integer', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('high_risk_threshold', '70', '高风险事件阈值', 'integer', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+-- 异常登录检测
+('detect_unusual_login_location', '1', '检测异常登录地点', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detect_unusual_login_time', '1', '检测异常登录时间', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('detect_multiple_failed_logins', '1', '检测多次登录失败', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+
+-- 通知配置
+('notify_admin_on_suspicious_activity', '1', '可疑活动时通知管理员', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+('notify_user_on_password_reset', '1', '密码重置时通知用户', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- 官方标签初始化
 INSERT OR IGNORE INTO community_source_tags (id, tag_name, tag_description, tag_color, is_official, tag_active, created_by, created_at, updated_at) VALUES
@@ -941,6 +985,7 @@ CREATE TABLE IF NOT EXISTS email_change_requests (
     -- 时间管理
     expires_at INTEGER NOT NULL,                -- 整个请求过期时间（通常30分钟）
     created_at INTEGER NOT NULL,                -- 创建时间
+	updated_at INTEGER,                         -- 更新时间
     completed_at INTEGER,                       -- 完成时间
     
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
@@ -1073,7 +1118,7 @@ INSERT OR IGNORE INTO email_templates (
     required_variables, created_at, updated_at
 ) VALUES 
 -- 注册验证模板
-('tpl_register_verify', 'registration', 'verification',
+('tpl_register_verify', 'registration_verification', 'registration',
  '验证您的{{siteName}}账户', 
  '<!DOCTYPE html><html><head><meta charset="utf-8"><title>验证邮箱</title></head><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;"><h1 style="margin: 0; font-size: 28px;">验证您的邮箱</h1></div><div style="background: white; padding: 40px; border: 1px solid #eee; border-top: none; border-radius: 0 0 10px 10px;"><p style="font-size: 16px; line-height: 1.6; color: #333;">您好 <strong>{{username}}</strong>，</p><p style="font-size: 16px; line-height: 1.6; color: #333;">感谢您注册{{siteName}}！请使用以下验证码完成邮箱验证：</p><div style="background: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;"><span style="font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 5px; font-family: monospace;">{{verificationCode}}</span></div><p style="font-size: 14px; color: #666; text-align: center;">验证码将在 <strong>{{expiryMinutes}} 分钟</strong> 后过期</p><p style="font-size: 16px; line-height: 1.6; color: #333;">如果您没有注册此账户，请忽略此邮件。</p><hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="font-size: 12px; color: #999; text-align: center;">此邮件由系统自动发送，请勿回复。<br>{{siteName}} - 让搜索更简单</p></div></body></html>',
  '验证您的{{siteName}}账户\n\n您好 {{username}}，\n\n感谢您注册{{siteName}}！您的验证码是：{{verificationCode}}\n\n此验证码将在 {{expiryMinutes}} 分钟后过期。\n\n如果您没有注册此账户，请忽略此邮件。\n\n{{siteName}}',
@@ -1102,4 +1147,159 @@ INSERT OR IGNORE INTO email_templates (
  '<!DOCTYPE html><html><head><meta charset="utf-8"><title>账户删除确认</title></head><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><div style="background: linear-gradient(135deg, #e84393 0%, #d63031 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;"><h1 style="margin: 0; font-size: 28px;">账户删除确认</h1></div><div style="background: white; padding: 40px; border: 1px solid #eee; border-top: none; border-radius: 0 0 10px 10px;"><p style="font-size: 16px; line-height: 1.6; color: #333;">您好 <strong>{{username}}</strong>，</p><p style="font-size: 16px; line-height: 1.6; color: #333;">我们收到了删除您账户的申请。这将<strong>永久删除</strong>您的所有数据，包括收藏、历史记录等。</p><p style="font-size: 16px; line-height: 1.6; color: #333;">如果您确认要删除账户，请使用以下验证码：</p><div style="background: #f8f9fa; border: 2px dashed #e84393; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;"><span style="font-size: 32px; font-weight: bold; color: #e84393; letter-spacing: 5px; font-family: monospace;">{{verificationCode}}</span></div><p style="font-size: 14px; color: #666; text-align: center;">验证码将在 <strong>{{expiryMinutes}} 分钟</strong> 后过期</p><div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0;"><p style="font-size: 14px; color: #856404; margin: 0;"><strong>⚠️ 重要提醒：</strong>账户删除后无法恢复，请谨慎操作！</p></div><p style="font-size: 16px; line-height: 1.6; color: #333;">如果您不想删除账户，请忽略此邮件。</p><hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="font-size: 12px; color: #999; text-align: center;">此邮件由系统自动发送，请勿回复。<br>{{siteName}} - 让搜索更简单</p></div></body></html>',
  '确认删除您的{{siteName}}账户\n\n您好 {{username}}，\n\n我们收到了删除您账户的申请。这将永久删除您的所有数据。\n\n如果您确认要删除账户，验证码是：{{verificationCode}}\n\n此验证码将在 {{expiryMinutes}} 分钟后过期。\n\n⚠️ 重要提醒：账户删除后无法恢复，请谨慎操作！\n\n如果您不想删除账户，请忽略此邮件。\n\n{{siteName}}',
  '["username", "siteName", "verificationCode", "expiryMinutes"]',
+ strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+ 
+ -- 忘记密码专用模板
+('tpl_forgot_password', 'forgot_password_verification', 'forgot_password',
+ '重置您的{{siteName}}密码', 
+ '<!DOCTYPE html><html><head><meta charset="utf-8"><title>密码重置</title></head><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;"><h1 style="margin: 0; font-size: 28px;">🔒 密码重置</h1></div><div style="background: white; padding: 40px; border: 1px solid #eee; border-top: none; border-radius: 0 0 10px 10px;"><p style="font-size: 16px; line-height: 1.6; color: #333;">您好 <strong>{{username}}</strong>，</p><p style="font-size: 16px; line-height: 1.6; color: #333;">我们收到了您的密码重置请求。如果这是您本人操作，请使用以下验证码重置密码：</p><div style="background: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;"><span style="font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 5px; font-family: monospace;">{{verificationCode}}</span></div><p style="font-size: 14px; color: #666; text-align: center;">验证码将在 <strong>{{expiryMinutes}} 分钟</strong> 后过期</p><div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0;"><p style="font-size: 14px; color: #856404; margin: 0;"><strong>⚠️ 安全提醒：</strong></p><ul style="font-size: 14px; color: #856404; margin: 10px 0;"><li>如果您没有申请密码重置，请忽略此邮件</li><li>请勿将验证码分享给任何人</li><li>建议使用强密码保护您的账户</li></ul></div><hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="font-size: 12px; color: #999; text-align: center;">此邮件由系统自动发送，请勿回复。<br>{{siteName}} - 让搜索更简单</p></div></body></html>',
+ '重置您的{{siteName}}密码\n\n您好 {{username}}，\n\n我们收到了您的密码重置请求。如果这是您本人操作，请使用以下验证码：\n\n验证码：{{verificationCode}}\n\n此验证码将在 {{expiryMinutes}} 分钟后过期。\n\n安全提醒：\n- 如果您没有申请密码重置，请忽略此邮件\n- 请勿将验证码分享给任何人\n- 建议使用强密码保护您的账户\n\n{{siteName}}',
+ '["username", "siteName", "verificationCode", "expiryMinutes"]',
  strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+
+
+-- ===============================================
+-- 忘记密码功能数据库更新脚本
+-- 说明：在现有schema基础上添加忘记密码功能支持
+-- ===============================================
+
+
+
+-- 3. 创建密码重置日志表（用于安全审计和频率限制）
+CREATE TABLE IF NOT EXISTS password_reset_logs (
+    id TEXT PRIMARY KEY,                        -- 重置记录唯一标识
+    user_id TEXT,                               -- 用户ID（可能为空，用于记录未找到用户的情况）
+    email TEXT NOT NULL,                        -- 请求重置的邮箱
+    email_hash TEXT NOT NULL,                   -- 邮箱哈希（用于索引）
+    
+    -- 请求信息
+    request_type TEXT NOT NULL,                 -- 请求类型：forgot_password/change_password
+    request_status TEXT DEFAULT 'initiated',   -- 状态：initiated/code_sent/code_verified/completed/failed
+    
+    -- 安全信息
+    ip_address TEXT,                            -- 请求IP地址
+    user_agent TEXT,                            -- 用户代理
+    verification_code_sent INTEGER DEFAULT 0,   -- 是否已发送验证码
+    verification_attempts INTEGER DEFAULT 0,    -- 验证尝试次数
+    
+    -- 时间戳
+    created_at INTEGER NOT NULL,                -- 创建时间戳
+    code_sent_at INTEGER,                       -- 验证码发送时间
+    verified_at INTEGER,                        -- 验证成功时间
+    completed_at INTEGER,                       -- 重置完成时间
+    
+    -- 关联验证记录
+    verification_id TEXT,                       -- 关联的邮箱验证记录ID
+    
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL,
+    FOREIGN KEY (verification_id) REFERENCES email_verifications (id) ON DELETE SET NULL
+);
+
+-- 4. 创建安全锁定表（防止暴力破解）
+CREATE TABLE IF NOT EXISTS security_lockouts (
+    id TEXT PRIMARY KEY,                        -- 锁定记录唯一标识
+    lockout_type TEXT NOT NULL,                 -- 锁定类型：password_reset/login/verification
+    identifier TEXT NOT NULL,                   -- 标识符（邮箱/IP等）
+    identifier_hash TEXT NOT NULL,              -- 标识符哈希
+    
+    -- 锁定信息
+    attempt_count INTEGER DEFAULT 1,            -- 尝试次数
+    max_attempts INTEGER NOT NULL,              -- 最大允许次数
+    lockout_duration INTEGER NOT NULL,          -- 锁定持续时间（毫秒）
+    
+    -- 时间管理
+    first_attempt_at INTEGER NOT NULL,          -- 首次尝试时间
+    last_attempt_at INTEGER NOT NULL,           -- 最后尝试时间
+    locked_until INTEGER NOT NULL,              -- 锁定到什么时候
+    created_at INTEGER NOT NULL,                -- 创建时间戳
+    
+    -- 额外信息
+    ip_address TEXT,                            -- 相关IP地址
+    user_agent TEXT,                            -- 用户代理
+    notes TEXT,                                 -- 备注信息
+    
+    UNIQUE(lockout_type, identifier_hash)
+);
+
+-- 5. 添加相关索引
+-- 密码重置日志索引
+CREATE INDEX IF NOT EXISTS idx_password_reset_logs_email ON password_reset_logs(email_hash);
+CREATE INDEX IF NOT EXISTS idx_password_reset_logs_user ON password_reset_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_logs_status ON password_reset_logs(request_status);
+CREATE INDEX IF NOT EXISTS idx_password_reset_logs_created ON password_reset_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_password_reset_logs_ip ON password_reset_logs(ip_address);
+
+-- 安全锁定索引
+CREATE INDEX IF NOT EXISTS idx_security_lockouts_identifier ON security_lockouts(lockout_type, identifier_hash);
+CREATE INDEX IF NOT EXISTS idx_security_lockouts_locked_until ON security_lockouts(locked_until);
+CREATE INDEX IF NOT EXISTS idx_security_lockouts_created ON security_lockouts(created_at DESC);
+
+-- 6. 添加清理过期数据的触发器
+CREATE TRIGGER IF NOT EXISTS cleanup_expired_password_reset_logs
+    AFTER INSERT ON password_reset_logs
+    FOR EACH ROW
+    BEGIN
+        -- 清理30天前的密码重置日志
+        DELETE FROM password_reset_logs 
+        WHERE created_at < strftime('%s', 'now', '-30 days') * 1000;
+        
+        -- 清理过期的安全锁定记录
+        DELETE FROM security_lockouts 
+        WHERE locked_until < strftime('%s', 'now') * 1000;
+    END;
+
+-- 7. 更新现有的邮件模板使用次数
+CREATE TRIGGER IF NOT EXISTS update_email_template_usage_on_send
+    AFTER INSERT ON email_send_logs
+    FOR EACH ROW
+    WHEN NEW.template_name IS NOT NULL
+    BEGIN
+        UPDATE email_templates 
+        SET usage_count = usage_count + 1
+        WHERE template_name = NEW.template_name;
+    END;
+
+-- 8. 添加用户安全事件记录表（可选，用于详细的安全审计）
+CREATE TABLE IF NOT EXISTS user_security_events (
+    id TEXT PRIMARY KEY,                        -- 事件唯一标识
+    user_id TEXT,                               -- 用户ID（可能为空）
+    event_type TEXT NOT NULL,                   -- 事件类型
+    event_subtype TEXT,                         -- 事件子类型
+    
+    -- 事件详情
+    event_status TEXT DEFAULT 'success',        -- 事件状态：success/failed/blocked
+    event_data TEXT DEFAULT '{}',              -- 事件数据（JSON格式）
+    
+    -- 安全上下文
+    ip_address TEXT,                            -- IP地址
+    user_agent TEXT,                            -- 用户代理
+    session_id TEXT,                            -- 会话ID
+    
+    -- 风险评估
+    risk_score INTEGER DEFAULT 0,               -- 风险评分（0-100）
+    risk_factors TEXT DEFAULT '[]',             -- 风险因素（JSON数组）
+    
+    -- 时间戳
+    created_at INTEGER NOT NULL,                -- 创建时间戳
+    
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+);
+
+-- 用户安全事件索引
+CREATE INDEX IF NOT EXISTS idx_security_events_user ON user_security_events(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_security_events_type ON user_security_events(event_type, event_subtype);
+CREATE INDEX IF NOT EXISTS idx_security_events_status ON user_security_events(event_status);
+CREATE INDEX IF NOT EXISTS idx_security_events_risk ON user_security_events(risk_score DESC);
+CREATE INDEX IF NOT EXISTS idx_security_events_ip ON user_security_events(ip_address);
+
+
+
+
+-- 10. 更新现有用户表，为不活跃用户添加标记（如果需要）
+-- 这里可以添加一些用户状态的优化，比如标记长期不活跃的用户
+
+-- 添加用户最后密码更改时间字段（如果不存在）
+-- ALTER TABLE users ADD COLUMN last_password_change INTEGER;
+
+-- 为现有用户设置最后密码更改时间为创建时间
+-- UPDATE users SET last_password_change = created_at WHERE last_password_change IS NULL;

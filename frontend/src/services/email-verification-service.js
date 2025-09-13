@@ -1,4 +1,4 @@
-// src/services/email-verification-service.js - 前端邮箱验证服务
+// src/services/email-verification-service.js - 更新版本，新增忘记密码功能
 import apiService from './api.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { validateEmail } from '../utils/validation.js';
@@ -23,7 +23,6 @@ class EmailVerificationService {
             });
 
             if (response.success) {
-                // 存储验证状态
                 this.pendingVerifications.set('registration', {
                     email,
                     maskedEmail: response.maskedEmail,
@@ -31,9 +30,7 @@ class EmailVerificationService {
                     type: 'registration'
                 });
 
-                // 启动倒计时
                 this.startCountdown('registration', response.expiresAt);
-
                 showToast(`验证码已发送到 ${response.maskedEmail}`, 'success');
                 return {
                     success: true,
@@ -52,48 +49,127 @@ class EmailVerificationService {
         }
     }
 
-    // 验证注册验证码（在注册时调用）
-async verifyRegistrationCode(registrationData, code) {
-    try {
-        if (!registrationData || !registrationData.username || !registrationData.email || !registrationData.password) {
-            throw new Error('注册数据不完整');
-        }
+    // 🆕 新增：发送忘记密码验证码（未登录用户）
+    async sendForgotPasswordCode(email) {
+        try {
+            if (!validateEmail(email).valid) {
+                throw new Error('请输入有效的邮箱地址');
+            }
 
-        if (!this.validateVerificationCode(code)) {
-            throw new Error('验证码格式错误');
-        }
+            showLoading(true);
+            const response = await apiService.request('/api/auth/forgot-password', {
+                method: 'POST',
+                body: JSON.stringify({ email })
+            });
 
-        showLoading(true);
-        
-        // 调用注册API，包含验证码
-        const response = await apiService.request('/api/auth/register', {
-            method: 'POST',
-            body: JSON.stringify({
-                username: registrationData.username,
-                email: registrationData.email,
-                password: registrationData.password,
-                verificationCode: code
-            })
-        });
-        
-        if (response.success) {
-            // 清除待验证状态
-            this.clearVerification('registration');
-            showToast('注册成功！', 'success');
-            return { success: true, user: response.user };
-        } else {
-            throw new Error(response.message || '注册验证失败');
+            if (response.success) {
+                this.pendingVerifications.set('forgot_password', {
+                    email,
+                    maskedEmail: response.maskedEmail,
+                    expiresAt: Date.now() + 900000, // 15分钟有效期
+                    type: 'forgot_password'
+                });
+
+                this.startCountdown('forgot_password', Date.now() + 900000);
+                showToast(`验证码已发送到 ${response.maskedEmail}`, 'success');
+                return {
+                    success: true,
+                    maskedEmail: response.maskedEmail,
+                    expiresAt: Date.now() + 900000
+                };
+            } else {
+                throw new Error(response.message || '发送失败');
+            }
+        } catch (error) {
+            console.error('发送忘记密码验证码失败:', error);
+            showToast(error.message || '发送验证码失败，请稍后重试', 'error');
+            throw error;
+        } finally {
+            showLoading(false);
         }
-    } catch (error) {
-        console.error('注册验证失败:', error);
-        showToast(error.message || '注册验证失败，请重试', 'error');
-        throw error;
-    } finally {
-        showLoading(false);
     }
-}
 
-    // 发送密码重置验证码
+    // 🆕 新增：重置密码（使用验证码）
+    async resetPasswordWithCode(email, verificationCode, newPassword) {
+        try {
+            if (!validateEmail(email).valid) {
+                throw new Error('请输入有效的邮箱地址');
+            }
+
+            if (!this.validateVerificationCode(verificationCode)) {
+                throw new Error('验证码格式错误');
+            }
+
+            if (!newPassword || newPassword.length < 6) {
+                throw new Error('新密码长度至少6个字符');
+            }
+
+            showLoading(true);
+            const response = await apiService.request('/api/auth/reset-password', {
+                method: 'POST',
+                body: JSON.stringify({
+                    email,
+                    verificationCode,
+                    newPassword
+                })
+            });
+
+            if (response.success) {
+                this.clearVerification('forgot_password');
+                showToast('密码重置成功，请使用新密码登录', 'success');
+                return response;
+            } else {
+                throw new Error(response.message || '重置失败');
+            }
+        } catch (error) {
+            console.error('重置密码失败:', error);
+            showToast(error.message || '重置密码失败', 'error');
+            throw error;
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 验证注册验证码（在注册时调用）
+    async verifyRegistrationCode(registrationData, code) {
+        try {
+            if (!registrationData || !registrationData.username || !registrationData.email || !registrationData.password) {
+                throw new Error('注册数据不完整');
+            }
+
+            if (!this.validateVerificationCode(code)) {
+                throw new Error('验证码格式错误');
+            }
+
+            showLoading(true);
+            
+            const response = await apiService.request('/api/auth/register', {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: registrationData.username,
+                    email: registrationData.email,
+                    password: registrationData.password,
+                    verificationCode: code
+                })
+            });
+            
+            if (response.success) {
+                this.clearVerification('registration');
+                showToast('注册成功！', 'success');
+                return { success: true, user: response.user };
+            } else {
+                throw new Error(response.message || '注册验证失败');
+            }
+        } catch (error) {
+            console.error('注册验证失败:', error);
+            showToast(error.message || '注册验证失败，请重试', 'error');
+            throw error;
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 发送密码重置验证码（已登录用户）
     async sendPasswordResetCode() {
         try {
             showLoading(true);
@@ -210,7 +286,6 @@ async verifyRegistrationCode(registrationData, code) {
             });
 
             if (response.success) {
-                // 更新验证状态
                 const verification = this.pendingVerifications.get('email_change');
                 if (verification) {
                     verification[`${emailType}EmailCodeSent`] = true;
@@ -250,18 +325,15 @@ async verifyRegistrationCode(registrationData, code) {
             });
 
             if (response.success) {
-                // 更新验证状态
                 const verification = this.pendingVerifications.get('email_change');
                 if (verification) {
                     verification[`${emailType}EmailVerified`] = true;
                 }
 
                 if (response.completed) {
-                    // 邮箱更改完成
                     this.clearVerification('email_change');
                     showToast('邮箱更改成功！', 'success');
                     
-                    // 触发用户信息更新事件
                     window.dispatchEvent(new CustomEvent('emailChanged', {
                         detail: { newEmail: response.newEmail }
                     }));
@@ -336,7 +408,6 @@ async verifyRegistrationCode(registrationData, code) {
                 this.clearVerification('account_delete');
                 showToast('账户已删除', 'success');
                 
-                // 触发登出事件
                 window.dispatchEvent(new CustomEvent('accountDeleted'));
                 return response;
             } else {
@@ -353,7 +424,6 @@ async verifyRegistrationCode(registrationData, code) {
 
     // 启动倒计时
     startCountdown(type, expiresAt) {
-        // 清除现有定时器
         if (this.timers.has(type)) {
             clearInterval(this.timers.get(type));
         }
@@ -362,20 +432,17 @@ async verifyRegistrationCode(registrationData, code) {
             const remaining = expiresAt - Date.now();
             
             if (remaining <= 0) {
-                // 验证码过期
                 clearInterval(timer);
                 this.timers.delete(type);
                 
-                // 触发过期事件
                 window.dispatchEvent(new CustomEvent('verificationExpired', {
                     detail: { type }
                 }));
             } else {
-                // 触发倒计时更新事件
                 window.dispatchEvent(new CustomEvent('verificationCountdown', {
                     detail: { 
                         type, 
-                        remaining: Math.ceil(remaining / 1000) // 秒数
+                        remaining: Math.ceil(remaining / 1000)
                     }
                 }));
             }
@@ -435,13 +502,8 @@ async verifyRegistrationCode(registrationData, code) {
 
     // 验证码输入格式化（自动添加空格）
     formatVerificationCode(input) {
-        // 移除非数字字符
         const cleaned = input.replace(/\D/g, '');
-        
-        // 限制长度为6位
         const limited = cleaned.substring(0, 6);
-        
-        // 每3位添加空格
         return limited.replace(/(\d{3})(\d{1,3})?/, '$1 $2').trim();
     }
 

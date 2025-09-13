@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="css/components/loading.css">
     <link rel="stylesheet" href="css/components/search.css">
 	<link rel="stylesheet" href="css/components/detail-card.css">
-    <!-- 🆕 新增：邮箱验证样式 -->
+    <!-- 🆕 邮箱验证样式 -->
     <link rel="stylesheet" href="css/components/email-verification.css">
     <!-- 搜索配置管理样式 -->
     <link rel="stylesheet" href="css/components/search-config.css">
@@ -117,8 +117,8 @@
                     <li>输入完整番号获得最精确结果</li>
                     <li>使用空格分隔多个关键词</li>
                     <li>登录后可享受云端同步服务</li>
-                    <li>支持详情提取的站点会显示 📋 标识</li>
-                    <li>详情提取包含高清封面、演员信息、下载链接等</li>
+                    <li>支持详情提取的站点会显示 🔋 标识</li>
+                    <li>详情提取包含高清小图、演员信息、下载链接等</li>
                     <li>在配置管理中可自定义搜索和提取选项</li>
                 </ul>
             </div>
@@ -187,7 +187,7 @@
                 <div class="section-actions">
                     <!-- 详情提取控制按钮 -->
                     <button id="batchExtractBtn" class="action-btn detail-action-btn" style="display:none;" title="批量提取当前搜索结果的详情信息">
-                        <span class="btn-icon">📋</span>
+                        <span class="btn-icon">🔋</span>
                         <span class="btn-text">批量提取</span>
                     </button>
                     <button id="refreshStatsBtn" class="action-btn stats-btn" style="display:none;" title="刷新详情提取统计">
@@ -285,7 +285,8 @@
                 <button type="submit" class="submit-btn">登录</button>
                 <div class="form-links">
                     <a href="#" id="showRegister">还没有账号？注册</a>
-                    <a href="#" id="showPasswordReset">忘记密码？</a>
+                    <!-- 🆕 更新忘记密码链接 -->
+                    <a href="#" id="showForgotPassword">忘记密码？</a>
                 </div>
             </form>
         </div>
@@ -420,6 +421,11 @@
             emailVerificationUI.showPasswordResetModal();
         };
 
+        // 🆕 显示忘记密码模态框的全局函数
+        window.showForgotPasswordModal = function() {
+            emailVerificationUI.showForgotPasswordModal();
+        };
+
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('🚀 开始初始化应用...');
@@ -466,7 +472,7 @@
 
         // 🆕 初始化邮箱验证集成
         function initEmailVerificationIntegration() {
-            console.log('🔐 初始化邮箱验证集成...');
+            console.log('📧 初始化邮箱验证集成...');
             
             // 修改注册表单提交处理
             const registerForm = document.getElementById('registerForm');
@@ -523,13 +529,23 @@
                 });
             }
             
-            // 添加密码重置链接处理
+            // 🆕 添加忘记密码链接处理（更新的ID）
+            const showForgotPasswordLink = document.getElementById('showForgotPassword');
+            if (showForgotPasswordLink) {
+                showForgotPasswordLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.getElementById('loginModal').style.display = 'none';
+                    emailVerificationUI.showForgotPasswordModal();
+                });
+            }
+            
+            // 保持向后兼容的旧ID处理
             const showPasswordResetLink = document.getElementById('showPasswordReset');
             if (showPasswordResetLink) {
                 showPasswordResetLink.addEventListener('click', (e) => {
                     e.preventDefault();
                     document.getElementById('loginModal').style.display = 'none';
-                    emailVerificationUI.showPasswordResetModal();
+                    emailVerificationUI.showForgotPasswordModal();
                 });
             }
             

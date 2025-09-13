@@ -1,4 +1,4 @@
-// src/router.js - 添加邮箱验证路由的更新版本
+// src/router.js - 增强版本，添加忘记密码路由
 import { utils } from './utils.js';
 
 // 导入所有处理器
@@ -10,13 +10,16 @@ import {
     authChangePasswordHandler,
     authLogoutHandler,
     authDeleteAccountHandler,
-    // 新增的邮箱验证处理器
+    // 邮箱验证处理器
     authSendRegistrationCodeHandler,
     authSendPasswordResetCodeHandler,
     authRequestEmailChangeHandler,
     authSendEmailChangeCodeHandler,
     authVerifyEmailChangeCodeHandler,
-    authSendAccountDeleteCodeHandler
+    authSendAccountDeleteCodeHandler,
+    // 新增：忘记密码处理器
+    authForgotPasswordHandler,
+    authResetPasswordHandler
 } from './handlers/auth.js';
 
 import {
@@ -196,7 +199,7 @@ export class Router {
         this.get('/api/health', healthCheckHandler);
 
         // ===============================================
-        // 认证相关路由（更新版本，包含邮箱验证）
+        // 认证相关路由（增强版本，包含邮箱验证和忘记密码）
         // ===============================================
         
         // 基础认证
@@ -210,12 +213,16 @@ export class Router {
         this.put('/api/auth/change-password', authChangePasswordHandler);
         this.post('/api/auth/send-password-reset-code', authSendPasswordResetCodeHandler);
         
+        // 新增：忘记密码功能
+        this.post('/api/auth/forgot-password', authForgotPasswordHandler);
+        this.post('/api/auth/reset-password', authResetPasswordHandler);
+        
         // 账户删除（集成邮箱验证）
         this.post('/api/auth/delete-account', authDeleteAccountHandler);
         this.post('/api/auth/send-account-delete-code', authSendAccountDeleteCodeHandler);
 
         // ===============================================
-        // 邮箱验证相关路由（新增）
+        // 邮箱验证相关路由
         // ===============================================
         
         // 注册邮箱验证

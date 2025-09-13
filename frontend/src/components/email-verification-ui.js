@@ -1,4 +1,4 @@
-// src/components/email-verification-ui.js - 邮箱验证UI组件
+// src/components/email-verification-ui.js - 更新版本，新增忘记密码UI功能
 import emailVerificationService from '../services/email-verification-service.js';
 import { showToast, showModal, hideModal } from '../utils/dom.js';
 import authManager from '../services/auth.js';
@@ -36,16 +36,330 @@ export class EmailVerificationUI {
         });
     }
 
+    // 🆕 新增：显示忘记密码模态框
+    showForgotPasswordModal() {
+        // 清理可能存在的模态框，避免重复ID
+        this.hideForgotPasswordModal();
+        
+        const modalHtml = `
+            <div class="modal-overlay" id="forgotPasswordModal">
+                <div class="modal-content verification-modal">
+                    <div class="modal-header">
+                        <h3>找回密码</h3>
+                        <button class="modal-close" onclick="emailVerificationUI.hideForgotPasswordModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- 步骤1：输入邮箱 -->
+                        <div class="verification-step active" id="forgotPasswordStep1">
+                            <div class="verification-icon">
+                                <i class="icon-mail"></i>
+                            </div>
+                            <p class="verification-text">
+                                请输入您的注册邮箱地址，我们将发送验证码到该邮箱
+                            </p>
+                            <form onsubmit="emailVerificationUI.submitForgotPasswordEmail(event)">
+                                <div class="form-group">
+                                    <input type="email" 
+                                           id="forgotPasswordEmail" 
+                                           placeholder="请输入注册邮箱" 
+                                           required 
+                                           autocomplete="email">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full" id="sendForgotCodeBtn">
+                                    发送验证码
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- 步骤2：输入验证码和新密码 -->
+                        <div class="verification-step" id="forgotPasswordStep2" style="display: none;">
+                            <div class="verification-icon">
+                                <i class="icon-shield-check"></i>
+                            </div>
+                            <p class="verification-text">
+                                请输入发送到 <strong id="forgotPasswordMaskedEmail"></strong> 的验证码，并设置新密码
+                            </p>
+                            <form onsubmit="emailVerificationUI.submitPasswordReset(event)">
+                                <div class="form-group">
+                                    <label>邮箱验证码</label>
+                                    <div class="verification-code-input">
+                                        <input type="text" 
+                                               id="forgotPasswordCode" 
+                                               placeholder="000 000" 
+                                               maxlength="7"
+                                               autocomplete="off"
+                                               oninput="emailVerificationUI.formatCodeInput(this)"
+                                               onkeypress="emailVerificationUI.handleCodeKeyPress(event, 'forgot_password')">
+                                    </div>
+                                    <div class="verification-timer" id="forgotPasswordTimer" style="display: none;">
+                                        <span id="forgotPasswordCountdown"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>新密码</label>
+                                    <input type="password" 
+                                           id="forgotPasswordNewPassword" 
+                                           placeholder="请输入新密码（至少6位）" 
+                                           required 
+                                           minlength="6"
+                                           autocomplete="new-password">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>确认新密码</label>
+                                    <input type="password" 
+                                           id="forgotPasswordConfirmPassword" 
+                                           placeholder="请再次输入新密码" 
+                                           required 
+                                           minlength="6"
+                                           autocomplete="new-password">
+                                </div>
+                                
+                                <div class="verification-actions">
+                                    <button type="submit" class="btn btn-primary btn-full">
+                                        重置密码
+                                    </button>
+                                    <button type="button" 
+                                            class="btn btn-secondary btn-full" 
+                                            id="resendForgotCodeBtn"
+                                            onclick="emailVerificationUI.resendForgotPasswordCode()" 
+                                            disabled>
+                                        重新发送验证码
+                                    </button>
+                                    <button type="button" 
+                                            class="btn btn-outline btn-full" 
+                                            onclick="emailVerificationUI.goBackToEmailInput()">
+                                        返回上一步
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- 步骤3：成功提示 -->
+                        <div class="verification-step" id="forgotPasswordStep3" style="display: none;">
+                            <div class="verification-success">
+                                <div class="success-icon">
+                                    <i class="icon-check-circle"></i>
+                                </div>
+                                <h4>密码重置成功！</h4>
+                                <p>您的密码已成功重置，请使用新密码登录</p>
+                                <div class="success-actions">
+                                    <button class="btn btn-primary btn-full" 
+                                            onclick="emailVerificationUI.redirectToLogin()">
+                                        去登录
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    // 🆕 新增：提交忘记密码邮箱
+    async submitForgotPasswordEmail(event) {
+        event.preventDefault();
+        
+        const email = document.getElementById('forgotPasswordEmail').value.trim();
+        
+        if (!email) {
+            showToast('请输入邮箱地址', 'error');
+            return;
+        }
+
+        try {
+            const btn = document.getElementById('sendForgotCodeBtn');
+            btn.disabled = true;
+            btn.textContent = '发送中...';
+
+            // 存储邮箱地址供后续使用
+            this.verificationData.forgotPasswordEmail = email;
+
+            const result = await emailVerificationService.sendForgotPasswordCode(email);
+            
+            if (result.success) {
+                // 切换到步骤2
+                this.showForgotPasswordStep(2);
+                document.getElementById('forgotPasswordMaskedEmail').textContent = result.maskedEmail;
+                document.getElementById('forgotPasswordTimer').style.display = 'block';
+                
+                // 聚焦到验证码输入框
+                setTimeout(() => {
+                    document.getElementById('forgotPasswordCode').focus();
+                }, 100);
+            }
+        } catch (error) {
+            console.error('发送忘记密码验证码失败:', error);
+            const btn = document.getElementById('sendForgotCodeBtn');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '发送验证码';
+            }
+        }
+    }
+
+    // 🆕 新增：重新发送忘记密码验证码
+    async resendForgotPasswordCode() {
+        const email = this.verificationData.forgotPasswordEmail;
+        if (!email) {
+            showToast('邮箱地址丢失，请返回重新输入', 'error');
+            this.goBackToEmailInput();
+            return;
+        }
+
+        try {
+            const btn = document.getElementById('resendForgotCodeBtn');
+            btn.disabled = true;
+            btn.textContent = '发送中...';
+
+            await emailVerificationService.sendForgotPasswordCode(email);
+            
+            // 重新启动倒计时
+            document.getElementById('forgotPasswordTimer').style.display = 'block';
+            
+        } catch (error) {
+            console.error('重新发送验证码失败:', error);
+            const btn = document.getElementById('resendForgotCodeBtn');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '重新发送验证码';
+            }
+        }
+    }
+
+    // 🆕 新增：提交密码重置
+    async submitPasswordReset(event) {
+        event.preventDefault();
+        
+        const email = this.verificationData.forgotPasswordEmail;
+        const code = this.getCleanCode('forgotPasswordCode');
+        const newPassword = document.getElementById('forgotPasswordNewPassword').value;
+        const confirmPassword = document.getElementById('forgotPasswordConfirmPassword').value;
+
+        // 验证输入
+        if (!email) {
+            showToast('邮箱地址丢失，请返回重新输入', 'error');
+            this.goBackToEmailInput();
+            return;
+        }
+
+        if (!emailVerificationService.validateVerificationCode(code)) {
+            showToast('请输入正确的6位验证码', 'error');
+            return;
+        }
+
+        if (!newPassword || newPassword.length < 6) {
+            showToast('新密码长度至少6个字符', 'error');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            showToast('两次输入的密码不一致', 'error');
+            return;
+        }
+
+        try {
+            const result = await emailVerificationService.resetPasswordWithCode(
+                email, code, newPassword
+            );
+
+            if (result.success) {
+                // 切换到成功步骤
+                this.showForgotPasswordStep(3);
+                
+                // 清理验证数据
+                this.verificationData.forgotPasswordEmail = null;
+            }
+        } catch (error) {
+            console.error('密码重置失败:', error);
+            // 错误处理已在service层完成，这里不需要重复显示toast
+        }
+    }
+
+    // 🆕 新增：返回邮箱输入步骤
+    goBackToEmailInput() {
+        this.showForgotPasswordStep(1);
+        
+        // 清空之前输入的内容
+        const emailInput = document.getElementById('forgotPasswordEmail');
+        if (emailInput) {
+            emailInput.value = '';
+            emailInput.focus();
+        }
+        
+        // 清理验证数据
+        this.verificationData.forgotPasswordEmail = null;
+        emailVerificationService.clearVerification('forgot_password');
+    }
+
+    // 🆕 新增：重定向到登录
+    redirectToLogin() {
+        this.hideForgotPasswordModal();
+        
+        // 显示登录模态框
+        const loginModal = document.getElementById('loginModal');
+        if (loginModal) {
+            loginModal.style.display = 'block';
+            
+            // 如果有保存的邮箱地址，自动填入登录表单
+            const savedEmail = this.verificationData.forgotPasswordEmail;
+            if (savedEmail) {
+                const loginUsernameInput = document.getElementById('loginUsername');
+                if (loginUsernameInput) {
+                    loginUsernameInput.value = savedEmail;
+                    
+                    // 聚焦到密码输入框
+                    const loginPasswordInput = document.getElementById('loginPassword');
+                    if (loginPasswordInput) {
+                        loginPasswordInput.focus();
+                    }
+                }
+            }
+        }
+        
+        showToast('请使用新密码登录', 'info');
+    }
+
+    // 🆕 新增：显示忘记密码的指定步骤
+    showForgotPasswordStep(stepNumber) {
+        // 隐藏所有步骤
+        document.querySelectorAll('#forgotPasswordModal .verification-step').forEach(step => {
+            step.classList.remove('active');
+            step.style.display = 'none';
+        });
+        
+        // 显示指定步骤
+        const targetStep = document.getElementById(`forgotPasswordStep${stepNumber}`);
+        if (targetStep) {
+            targetStep.classList.add('active');
+            targetStep.style.display = 'block';
+        }
+    }
+
+    // 🆕 新增：隐藏忘记密码模态框
+    hideForgotPasswordModal() {
+        const modal = document.getElementById('forgotPasswordModal');
+        if (modal) {
+            modal.remove();
+        }
+        
+        // 清理相关数据和定时器
+        this.verificationData.forgotPasswordEmail = null;
+        emailVerificationService.clearVerification('forgot_password');
+    }
+
     // 显示注册验证码模态框
     showRegistrationVerificationModal(email = null) {
-        // 确保有邮箱地址
         const targetEmail = email || this.verificationData?.email;
         if (!targetEmail) {
             showToast('缺少邮箱地址信息', 'error');
             return;
         }
 
-        // 先清理可能存在的模态框，避免重复ID
         this.hideRegistrationModal();
         
         const modalHtml = `
@@ -109,33 +423,6 @@ export class EmailVerificationUI {
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     }
 
-    // 🆕 新增：清理所有验证模态框的方法
-    clearAllVerificationModals() {
-        // 清理可能存在的所有验证模态框
-        const modalIds = [
-            'registrationVerificationModal',
-            'passwordResetModal', 
-            'emailChangeModal',
-            'accountDeleteModal'
-        ];
-        
-        modalIds.forEach(modalId => {
-            const existingModal = document.getElementById(modalId);
-            if (existingModal) {
-                existingModal.remove();
-                console.log(`已清理模态框: ${modalId}`);
-            }
-        });
-        
-        // 清理可能的重复元素
-        document.querySelectorAll('.modal-overlay').forEach(modal => {
-            if (modal.classList.contains('verification-modal') || 
-                modal.innerHTML.includes('verification-')) {
-                modal.remove();
-            }
-        });
-    }
-
     // 发送注册验证码
     async sendRegistrationCode() {
         try {
@@ -148,16 +435,13 @@ export class EmailVerificationUI {
             btn.disabled = true;
             btn.textContent = '发送中...';
 
-            // 通过emailVerificationService发送验证码
             const result = await emailVerificationService.sendRegistrationCode(email);
             
             if (result.success) {
-                // 切换到输入验证码步骤
                 this.showStep('step-enter-code');
                 document.getElementById('maskedEmailDisplay').textContent = result.maskedEmail;
                 document.getElementById('registrationTimer').style.display = 'block';
                 
-                // 聚焦到验证码输入框
                 setTimeout(() => {
                     document.getElementById('registrationVerificationCode').focus();
                 }, 100);
@@ -178,51 +462,47 @@ export class EmailVerificationUI {
     }
 
     // 完成注册（带验证码）
-async completeRegistration() {
-    try {
-        const code = this.getCleanCode('registrationVerificationCode');
-        if (!emailVerificationService.validateVerificationCode(code)) {
-            showToast('请输入正确的6位验证码', 'error');
-            return;
-        }
+    async completeRegistration() {
+        try {
+            const code = this.getCleanCode('registrationVerificationCode');
+            if (!emailVerificationService.validateVerificationCode(code)) {
+                showToast('请输入正确的6位验证码', 'error');
+                return;
+            }
 
-        // 获取注册表单数据 - 针对你的HTML结构优化
-        const registrationData = this.getRegistrationData();
-        if (!registrationData) {
-            showToast('注册信息不完整，请重新填写表单', 'error');
-            this.hideRegistrationModal();
-            return;
-        }
+            const registrationData = this.getRegistrationData();
+            if (!registrationData) {
+                showToast('注册信息不完整，请重新填写表单', 'error');
+                this.hideRegistrationModal();
+                return;
+            }
 
-        // 通过emailVerificationService处理注册验证，而不是直接调用API
-        const result = await emailVerificationService.verifyRegistrationCode(
-            registrationData,
-            code
-        );
+            const result = await emailVerificationService.verifyRegistrationCode(
+                registrationData,
+                code
+            );
 
-        if (result.success) {
-            this.hideRegistrationModal();
-            
-            // 自动登录新注册的用户 - 使用你HTML中的app实例
-            setTimeout(async () => {
-                if (window.app && window.app.authManager) {
-                    try {
-                        await window.app.authManager.login(registrationData.username, registrationData.password);
-                        showToast('注册成功，已自动登录！', 'success');
-                    } catch (loginError) {
-                        console.error('自动登录失败:', loginError);
-                        showToast('注册成功，请手动登录', 'info');
+            if (result.success) {
+                this.hideRegistrationModal();
+                
+                setTimeout(async () => {
+                    if (window.app && window.app.authManager) {
+                        try {
+                            await window.app.authManager.login(registrationData.username, registrationData.password);
+                            showToast('注册成功，已自动登录！', 'success');
+                        } catch (loginError) {
+                            console.error('自动登录失败:', loginError);
+                            showToast('注册成功，请手动登录', 'info');
+                        }
                     }
-                }
-            }, 1000);
+                }, 1000);
+            }
+        } catch (error) {
+            console.error('注册验证失败:', error);
         }
-    } catch (error) {
-        console.error('注册验证失败:', error);
-        // 错误处理已在service层完成，这里不需要重复显示toast
     }
-}
 
-    // 显示密码重置验证模态框
+    // 显示密码重置验证模态框（已登录用户）
     showPasswordResetModal() {
         const user = authManager.getCurrentUser();
         if (!user) {
@@ -238,7 +518,7 @@ async completeRegistration() {
                         <button class="modal-close" onclick="emailVerificationUI.hidePasswordResetModal()">&times;</button>
                     </div>
                     <div class="modal-body">
-                        <form id="passwordResetForm" onsubmit="emailVerificationUI.submitPasswordReset(event)">
+                        <form id="passwordResetForm" onsubmit="emailVerificationUI.submitPasswordResetForLoggedUser(event)">
                             <div class="form-group">
                                 <label>当前密码</label>
                                 <input type="password" id="currentPassword" required>
@@ -290,7 +570,6 @@ async completeRegistration() {
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         
-        // 监听密码输入，决定是否显示验证码区域
         document.getElementById('confirmNewPassword').addEventListener('blur', () => {
             const currentPassword = document.getElementById('currentPassword').value;
             const newPassword = document.getElementById('newPassword').value;
@@ -302,7 +581,7 @@ async completeRegistration() {
         });
     }
 
-    // 发送密码重置验证码
+    // 发送密码重置验证码（已登录用户）
     async sendPasswordResetCode() {
         try {
             const btn = document.getElementById('sendPasswordCodeBtn');
@@ -320,8 +599,8 @@ async completeRegistration() {
         }
     }
 
-    // 提交密码重置
-    async submitPasswordReset(event) {
+    // 提交密码重置（已登录用户）
+    async submitPasswordResetForLoggedUser(event) {
         event.preventDefault();
         
         const currentPassword = document.getElementById('currentPassword').value;
@@ -346,7 +625,6 @@ async completeRegistration() {
             
             this.hidePasswordResetModal();
             
-            // 密码修改成功后会自动登出，提示用户重新登录
             setTimeout(() => {
                 window.location.reload();
             }, 2000);
@@ -386,7 +664,6 @@ async completeRegistration() {
                             </div>
                         </div>
 
-                        <!-- 步骤1：输入新邮箱 -->
                         <div class="email-change-step active" id="emailChangeStep1">
                             <form onsubmit="emailVerificationUI.submitEmailChangeRequest(event)">
                                 <div class="form-group">
@@ -405,7 +682,6 @@ async completeRegistration() {
                             </form>
                         </div>
 
-                        <!-- 步骤2：验证新邮箱 -->
                         <div class="email-change-step" id="emailChangeStep2" style="display: none;">
                             <div class="verification-info">
                                 <p>我们需要验证您的新邮箱地址：<strong id="newEmailDisplay"></strong></p>
@@ -441,7 +717,6 @@ async completeRegistration() {
                             </div>
                         </div>
 
-                        <!-- 步骤3：完成提示 -->
                         <div class="email-change-step" id="emailChangeStep3" style="display: none;">
                             <div class="verification-success">
                                 <div class="success-icon">
@@ -477,7 +752,6 @@ async completeRegistration() {
                 this.verificationData.emailChangeRequestId = result.requestId;
                 this.verificationData.newEmail = newEmail;
                 
-                // 切换到步骤2
                 this.showEmailChangeStep(2);
                 document.getElementById('newEmailDisplay').textContent = this.maskEmail(newEmail);
             }
@@ -521,11 +795,9 @@ async completeRegistration() {
             );
             
             if (result.completed) {
-                // 邮箱更改完成，显示成功页面
                 this.showEmailChangeStep(3);
                 document.getElementById('finalNewEmail').textContent = this.verificationData.newEmail;
                 
-                // 更新当前用户信息
                 const currentUser = authManager.getCurrentUser();
                 if (currentUser) {
                     currentUser.email = this.verificationData.newEmail;
@@ -669,7 +941,6 @@ async completeRegistration() {
             
             this.hideAccountDeleteModal();
             
-            // 账户删除成功，清除本地数据并跳转
             setTimeout(() => {
                 authManager.clearAuth();
                 window.location.href = '/';
@@ -694,7 +965,6 @@ async completeRegistration() {
     }
 
     showEmailChangeStep(stepNumber) {
-        // 更新步骤指示器
         document.querySelectorAll('.step').forEach((step, index) => {
             if (index + 1 <= stepNumber) {
                 step.classList.add('active');
@@ -703,7 +973,6 @@ async completeRegistration() {
             }
         });
 
-        // 显示对应步骤
         document.querySelectorAll('.email-change-step').forEach(step => {
             step.classList.remove('active');
             step.style.display = 'none';
@@ -730,6 +999,9 @@ async completeRegistration() {
                     this.completeRegistration();
                     break;
                 case 'password':
+                    this.submitPasswordResetForLoggedUser(event);
+                    break;
+                case 'forgot_password':
                     this.submitPasswordReset(event);
                     break;
                 case 'emailChange':
@@ -761,6 +1033,7 @@ async completeRegistration() {
         const countdownElements = {
             'registration': 'registrationCountdown',
             'password_reset': 'passwordResetCountdown',
+            'forgot_password': 'forgotPasswordCountdown',
             'email_change_new': 'newEmailCountdown',
             'account_delete': 'deleteCountdown'
         };
@@ -773,7 +1046,6 @@ async completeRegistration() {
             }
         }
 
-        // 更新重发按钮状态
         this.updateResendButtonState(type, remaining);
     }
 
@@ -781,6 +1053,7 @@ async completeRegistration() {
         const buttonMaps = {
             'registration': 'resendRegistrationCodeBtn',
             'password_reset': 'sendPasswordCodeBtn',
+            'forgot_password': 'resendForgotCodeBtn',
             'email_change_new': 'sendNewEmailCodeBtn',
             'account_delete': 'sendDeleteCodeBtn'
         };
@@ -789,7 +1062,7 @@ async completeRegistration() {
         if (buttonId) {
             const button = document.getElementById(buttonId);
             if (button) {
-                if (remaining <= 60) { // 最后60秒允许重发
+                if (remaining <= 60) {
                     button.disabled = false;
                     button.textContent = button.textContent.replace('发送中...', '重新发送验证码');
                 }
@@ -800,10 +1073,10 @@ async completeRegistration() {
     handleVerificationExpired(type) {
         showToast('验证码已过期，请重新获取', 'warning');
         
-        // 重置相关按钮状态
         const buttonMaps = {
             'registration': 'resendRegistrationCodeBtn',
             'password_reset': 'sendPasswordCodeBtn',
+            'forgot_password': 'resendForgotCodeBtn',
             'email_change_new': 'sendNewEmailCodeBtn',
             'account_delete': 'sendDeleteCodeBtn'
         };
@@ -820,12 +1093,10 @@ async completeRegistration() {
 
     handleEmailChanged(newEmail) {
         showToast('邮箱更改成功！', 'success');
-        // 可以在这里更新UI中显示的邮箱地址
         this.updateEmailDisplays(newEmail);
     }
 
     updateEmailDisplays(newEmail) {
-        // 更新页面中所有显示邮箱的地方
         document.querySelectorAll('.user-email-display').forEach(element => {
             element.textContent = this.maskEmail(newEmail);
         });
@@ -833,74 +1104,100 @@ async completeRegistration() {
 
     handleAccountDeleted() {
         showToast('账户已删除', 'info');
-        // 清除所有本地数据
         localStorage.clear();
         sessionStorage.clear();
     }
 
-    // 获取注册数据（需要与注册表单集成）
-getRegistrationData() {
-    // 优先从存储的数据中获取（你的HTML已经正确存储了数据）
-    if (this.verificationData && 
-        this.verificationData.username && 
-        this.verificationData.email && 
-        this.verificationData.password) {
-        console.log('从verificationData获取注册数据:', {
-            username: this.verificationData.username,
-            email: this.verificationData.email
-        });
-        return this.verificationData;
+    getRegistrationData() {
+        if (this.verificationData && 
+            this.verificationData.username && 
+            this.verificationData.email && 
+            this.verificationData.password) {
+            console.log('从verificationData获取注册数据:', {
+                username: this.verificationData.username,
+                email: this.verificationData.email
+            });
+            return this.verificationData;
+        }
+
+        const usernameEl = document.getElementById('regUsername');
+        const emailEl = document.getElementById('regEmail');
+        const passwordEl = document.getElementById('regPassword');
+
+        if (usernameEl && emailEl && passwordEl) {
+            const data = {
+                username: usernameEl.value.trim(),
+                email: emailEl.value.trim(),
+                password: passwordEl.value
+            };
+            
+            if (data.username && data.email && data.password) {
+                console.log('从DOM获取到注册数据:', { username: data.username, email: data.email });
+                return data;
+            }
+        }
+
+        console.error('无法获取注册表单数据');
+        return null;
     }
 
-    // 备用方案：从你的HTML表单元素获取
-    // 根据你的HTML，使用正确的ID
-    const usernameEl = document.getElementById('regUsername');
-    const emailEl = document.getElementById('regEmail');
-    const passwordEl = document.getElementById('regPassword');
-
-    if (usernameEl && emailEl && passwordEl) {
-        const data = {
-            username: usernameEl.value.trim(),
-            email: emailEl.value.trim(),
-            password: passwordEl.value
+    setRegistrationData(username, email, password) {
+        this.verificationData = {
+            username: username.trim(),
+            email: email.trim(),
+            password: password
         };
-        
-        // 验证数据完整性
-        if (data.username && data.email && data.password) {
-            console.log('从DOM获取到注册数据:', { username: data.username, email: data.email });
-            return data;
+        console.log('已设置注册数据:', { username, email });
+    }
+
+    startRegistrationWithVerification(registrationForm) {
+        try {
+            let registrationData;
+            
+            if (typeof registrationForm === 'object' && registrationForm.username) {
+                registrationData = registrationForm;
+            } else if (typeof registrationForm === 'string' || registrationForm instanceof HTMLFormElement) {
+                registrationData = this.extractFormData(registrationForm);
+            } else {
+                registrationData = this.getRegistrationData();
+            }
+
+            if (!registrationData) {
+                throw new Error('无法获取注册信息，请检查表单数据');
+            }
+
+            if (!registrationData.username || !registrationData.email || !registrationData.password) {
+                throw new Error('请填写完整的注册信息');
+            }
+
+            this.setRegistrationData(
+                registrationData.username,
+                registrationData.email,
+                registrationData.password
+            );
+
+            this.showRegistrationVerificationModal(registrationData.email);
+
+        } catch (error) {
+            console.error('启动注册验证流程失败:', error);
+            showToast(error.message || '启动注册验证失败', 'error');
         }
     }
 
-    console.error('无法获取注册表单数据');
-    console.log('verificationData:', this.verificationData);
-    console.log('DOM elements found:', {
-        username: !!document.getElementById('regUsername'),
-        email: !!document.getElementById('regEmail'),
-        password: !!document.getElementById('regPassword')
-    });
-    return null;
-}
+    extractFormData(formSelector) {
+        const form = typeof formSelector === 'string' 
+            ? document.querySelector(formSelector)
+            : formSelector;
 
-// 设置注册数据的方法（你的HTML已经在使用）
-setRegistrationData(username, email, password) {
-    this.verificationData = {
-        username: username.trim(),
-        email: email.trim(),
-        password: password
-    };
-    console.log('已设置注册数据:', { username, email });
-}
+        if (!form) return null;
 
-// 设置注册数据的方法（供外部调用）
-setRegistrationData(username, email, password) {
-    this.verificationData = {
-        username: username.trim(),
-        email: email.trim(),
-        password: password
-    };
-    console.log('已设置注册数据:', { username, email });
-}
+        const formData = new FormData(form);
+        return {
+            username: formData.get('username') || '',
+            email: formData.get('email') || '',
+            password: formData.get('password') || ''
+        };
+    }
 
     // 隐藏模态框的方法
     hideRegistrationModal() {
@@ -926,65 +1223,6 @@ setRegistrationData(username, email, password) {
     goBackToStep1() {
         this.showEmailChangeStep(1);
     }
-	
-	    // 启动注册验证流程 - 架构优化版本
-    async startRegistrationWithVerification(registrationForm) {
-        try {
-            // 从表单或参数中获取数据
-            let registrationData;
-            
-            if (typeof registrationForm === 'object' && registrationForm.username) {
-                // 直接传入的数据对象
-                registrationData = registrationForm;
-            } else if (typeof registrationForm === 'string' || registrationForm instanceof HTMLFormElement) {
-                // 表单元素或选择器
-                registrationData = this.extractFormData(registrationForm);
-            } else {
-                // 从当前页面的表单中自动提取
-                registrationData = this.getRegistrationData();
-            }
-
-            if (!registrationData) {
-                throw new Error('无法获取注册信息，请检查表单数据');
-            }
-
-            // 基础验证
-            if (!registrationData.username || !registrationData.email || !registrationData.password) {
-                throw new Error('请填写完整的注册信息');
-            }
-
-            // 存储注册数据供后续验证使用
-            this.setRegistrationData(
-                registrationData.username,
-                registrationData.email,
-                registrationData.password
-            );
-
-            // 显示邮箱验证模态框
-            this.showRegistrationVerificationModal(registrationData.email);
-
-        } catch (error) {
-            console.error('启动注册验证流程失败:', error);
-            showToast(error.message || '启动注册验证失败', 'error');
-        }
-    }
-
-    // 从表单中提取数据
-    extractFormData(formSelector) {
-        const form = typeof formSelector === 'string' 
-            ? document.querySelector(formSelector)
-            : formSelector;
-
-        if (!form) return null;
-
-        const formData = new FormData(form);
-        return {
-            username: formData.get('username') || '',
-            email: formData.get('email') || '',
-            password: formData.get('password') || ''
-        };
-    }
-
 }
 
 // 创建全局实例

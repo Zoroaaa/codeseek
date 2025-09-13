@@ -1,4 +1,4 @@
-/* src/css/components/email-verification.css - 邮箱验证相关样式 */
+/* src/css/components/email-verification.css - 邮箱验证相关样式 - 支持忘记密码功能 */
 
 /* ===============================================
  * 邮箱验证模态框基础样式
@@ -52,6 +52,100 @@
 .verification-modal .modal-body {
     padding: 2rem;
 }
+
+/* ===============================================
+ * 🆕 忘记密码模态框特定样式
+ * =============================================== */
+
+#forgotPasswordModal .modal-header {
+    background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%);
+}
+
+#forgotPasswordModal .verification-icon {
+    background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%);
+}
+
+/* 忘记密码步骤导航 */
+.forgot-password-steps {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.forgot-step {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    margin: 0 8px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.forgot-step.active {
+    background: #3182ce;
+    transform: scale(1.2);
+}
+
+.forgot-step.completed {
+    background: #48bb78;
+}
+
+.forgot-step::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    width: 16px;
+    height: 2px;
+    background: #e2e8f0;
+    transform: translateY(-50%);
+    transition: background 0.3s ease;
+}
+
+.forgot-step:last-child::after {
+    display: none;
+}
+
+.forgot-step.completed::after {
+    background: #48bb78;
+}
+
+/* 忘记密码表单特定样式 */
+.forgot-password-form {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.forgot-password-form .form-group {
+    margin-bottom: 1.25rem;
+}
+
+.forgot-password-form input[type="email"] {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    padding: 0.875rem 1rem;
+}
+
+.forgot-password-form input[type="email"]:focus {
+    background: white;
+    border-color: #3182ce;
+    box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}
+
+.forgot-password-form .password-group {
+    position: relative;
+}
+
+.forgot-password-form .password-strength {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.password-strength-weak { color: #e53e3e; }
+.password-strength-medium { color: #d69e2e; }
+.password-strength-strong { color: #38a169; }
 
 /* ===============================================
  * 验证步骤样式
@@ -202,9 +296,61 @@
     transition: all 0.2s ease;
 }
 
-.verification-actions .btn:hover {
+.verification-actions .btn:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ===============================================
+ * 🆕 密码重置成功页面样式
+ * =============================================== */
+
+.password-reset-success {
+    text-align: center;
+    padding: 2rem 0;
+}
+
+.password-reset-success .success-icon {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 2rem;
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    color: white;
+    animation: successBounce 0.8s ease-out;
+}
+
+@keyframes successBounce {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.1); }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.password-reset-success h4 {
+    color: #2d3748;
+    margin: 0 0 1rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.password-reset-success p {
+    color: #4a5568;
+    line-height: 1.6;
+    margin: 0 0 2rem;
+    font-size: 1.1rem;
+}
+
+.success-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 280px;
+    margin: 0 auto;
 }
 
 /* ===============================================
@@ -319,6 +465,42 @@
     flex-direction: column;
     gap: 0.75rem;
     margin-top: 2rem;
+}
+
+/* ===============================================
+ * 🆕 返回导航按钮样式
+ * =============================================== */
+
+.btn-outline {
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn-outline:hover:not(:disabled) {
+    background: #667eea;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.nav-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #667eea;
+    text-decoration: none;
+    padding: 0.5rem 0;
+    transition: color 0.2s ease;
+}
+
+.nav-button:hover {
+    color: #5a67d8;
+}
+
+.nav-button::before {
+    content: '←';
+    font-size: 1rem;
 }
 
 /* ===============================================
@@ -540,6 +722,90 @@
 }
 
 /* ===============================================
+ * 🆕 邮箱掩码显示样式
+ * =============================================== */
+
+.masked-email {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: #667eea;
+    background: #f0f4ff;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+/* ===============================================
+ * 🆕 验证状态指示器
+ * =============================================== */
+
+.verification-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    margin: 1rem 0;
+}
+
+.verification-status.success {
+    background: #f0fff4;
+    color: #22543d;
+    border: 1px solid #9ae6b4;
+}
+
+.verification-status.warning {
+    background: #fffbeb;
+    color: #744210;
+    border: 1px solid #f6d55c;
+}
+
+.verification-status.error {
+    background: #fff5f5;
+    color: #742a2a;
+    border: 1px solid #feb2b2;
+}
+
+.verification-status-icon {
+    font-size: 1rem;
+}
+
+/* ===============================================
+ * 🆕 进度指示器
+ * =============================================== */
+
+.progress-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+    color: #4a5568;
+}
+
+.progress-dots {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    animation: pulse-dot 1.4s infinite ease-in-out both;
+}
+
+.progress-dot:nth-child(1) { animation-delay: -0.32s; }
+.progress-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes pulse-dot {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+}
+
+/* ===============================================
  * 响应式设计
  * =============================================== */
 
@@ -586,6 +852,21 @@
         text-align: center;
         word-break: break-word;
     }
+
+    /* 🆕 忘记密码移动端适配 */
+    .forgot-password-form {
+        max-width: none;
+    }
+
+    .password-reset-success .success-icon {
+        width: 80px;
+        height: 80px;
+        font-size: 2rem;
+    }
+
+    .success-actions {
+        max-width: none;
+    }
 }
 
 @media (max-width: 480px) {
@@ -604,6 +885,22 @@
     .btn {
         padding: 0.65rem 1.25rem;
         font-size: 0.8rem;
+    }
+
+    /* 🆕 超小屏幕适配 */
+    .forgot-step {
+        width: 10px;
+        height: 10px;
+        margin: 0 6px;
+    }
+
+    .forgot-step::after {
+        width: 12px;
+    }
+
+    .masked-email {
+        font-size: 0.8rem;
+        padding: 0.2rem 0.4rem;
     }
 }
 
@@ -751,5 +1048,40 @@
     .btn-secondary:hover:not(:disabled) {
         background: #718096;
         border-color: #a0aec0;
+    }
+
+    /* 🆕 忘记密码深色主题 */
+    .forgot-password-form input[type="email"] {
+        background: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+
+    .forgot-password-form input[type="email"]:focus {
+        background: #2d3748;
+        border-color: #3182ce;
+    }
+
+    .masked-email {
+        background: #2d3748;
+        color: #81c4ff;
+    }
+
+    .verification-status.success {
+        background: #22543d;
+        color: #9ae6b4;
+        border-color: #276749;
+    }
+
+    .verification-status.warning {
+        background: #744210;
+        color: #f6d55c;
+        border-color: #975a16;
+    }
+
+    .verification-status.error {
+        background: #742a2a;
+        color: #feb2b2;
+        border-color: #9b2c2c;
     }
 }

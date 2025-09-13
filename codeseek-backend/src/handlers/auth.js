@@ -1,4 +1,4 @@
-// src/handlers/auth.js - 集成邮箱验证的认证处理器
+// src/handlers/auth.js - 扩展版本，添加忘记密码功能和邮箱登录支持
 import { utils } from '../utils.js';
 import { authenticate } from '../middleware.js';
 import { EmailVerificationService, emailVerificationUtils } from '../services/email-verification.js';
@@ -8,6 +8,9 @@ export async function authRegisterHandler(request, env) {
     try {
         const body = await request.json().catch(() => ({}));
         const { username, email, password, verificationCode } = body;
+
+        // 初始化邮箱验证状态
+        let emailVerified = 0;
 
         const errors = utils.validateInput({ username, email, password }, {
             username: { 
@@ -53,34 +56,34 @@ export async function authRegisterHandler(request, env) {
         const emailService = new EmailVerificationService(env);
         const isEmailVerificationRequired = env.EMAIL_VERIFICATION_REQUIRED === 'true';
 
-        // 如果启用了邮箱验证且需要验证码
-if (isEmailVerificationRequired && verificationCode) {
-    try {
-        await emailService.verifyCode(normalizedEmail, verificationCode, 'registration');
-        // 创建用户时直接设置为已验证
-        emailVerified = 1;
-    } catch (error) {
-        return utils.errorResponse(error.message);
-    }
-}
+        // 如果启用了邮箱验证且提供了验证码
+        if (isEmailVerificationRequired && verificationCode) {
+            try {
+                await emailService.verifyCode(normalizedEmail, verificationCode, 'registration');
+                // 创建用户时直接设置为已验证
+                emailVerified = 1;
+            } catch (error) {
+                return utils.errorResponse(error.message);
+            }
+        }
 
         const userId = utils.generateId();
         const passwordHash = await utils.hashPassword(password);
         const now = Date.now();
 
         // 创建用户账户
-await env.DB.prepare(`
-    INSERT INTO users (
-        id, username, email, password_hash, email_verified,
-        created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-`).bind(
-    userId, username, normalizedEmail, passwordHash, emailVerified,
-    now, now
-).run();
+        await env.DB.prepare(`
+            INSERT INTO users (
+                id, username, email, password_hash, email_verified,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+            userId, username, normalizedEmail, passwordHash, emailVerified,
+            now, now
+        ).run();
 
         await utils.logUserAction(env, userId, 'register', { 
-            emailVerified: isEmailVerificationRequired && verificationCode 
+            emailVerified: Boolean(emailVerified)
         }, request);
 
         return utils.successResponse({ 
@@ -89,7 +92,7 @@ await env.DB.prepare(`
                 id: userId, 
                 username, 
                 email: normalizedEmail,
-                emailVerified: isEmailVerificationRequired && verificationCode
+                emailVerified: Boolean(emailVerified)
             },
             requiresEmailVerification: isEmailVerificationRequired && !verificationCode
         });
@@ -100,8 +103,118 @@ await env.DB.prepare(`
     }
 }
 
-// 发送注册验证码
-export async function authSendRegistrationCodeHandler(request, env) {
+// 用户登录（支持用户名或邮箱登录）
+export async function authLoginHandler(request, env) {
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { identifier, password } = body; // 改用identifier支持用户名或邮箱
+
+        const errors = utils.validateInput({ identifier, password }, {
+            identifier: { required: true, maxLength: 50 },
+            password: { required: true, maxLength: 50 }
+        });
+
+        if (errors.length > 0) {
+            return utils.errorResponse(errors[0], 400);
+        }
+
+        // 判断是邮箱还是用户名登录
+        const isEmail = emailVerificationUtils.isValidEmail(identifier);
+        const normalizedIdentifier = isEmail ? 
+            emailVerificationUtils.normalizeEmail(identifier) : identifier;
+
+        // 根据标识符类型查询用户
+        const user = await env.DB.prepare(`
+            SELECT * FROM users WHERE ${isEmail ? 'email' : 'username'} = ?
+        `).bind(normalizedIdentifier).first();
+
+        if (!user) {
+            return utils.errorResponse('用户名/邮箱或密码错误', 401);
+        }
+
+        const passwordHash = await utils.hashPassword(password);
+        if (passwordHash !== user.password_hash) {
+            return utils.errorResponse('用户名/邮箱或密码错误', 401);
+        }
+
+        // 检查用户是否被禁用
+        if (!user.is_active) {
+            return utils.errorResponse('账户已被禁用，请联系管理员', 403);
+        }
+
+        const jwtSecret = env.JWT_SECRET;
+        if (!jwtSecret) {
+            console.error('JWT_SECRET 环境变量未设置');
+            return utils.errorResponse('服务器配置错误', 500);
+        }
+
+        const expiryDays = parseInt(env.JWT_EXPIRY_DAYS || '30');
+        const expirySeconds = expiryDays * 24 * 60 * 60;
+
+        const payload = {
+            userId: user.id,
+            username: user.username,
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + expirySeconds
+        };
+
+        const token = await utils.generateJWT(payload, jwtSecret);
+        const tokenHash = await utils.hashPassword(token);
+
+        // 清理过期会话
+        await env.DB.prepare(`
+            DELETE FROM user_sessions WHERE user_id = ? AND expires_at < ?
+        `).bind(user.id, Date.now()).run();
+
+        const sessionId = utils.generateId();
+        const expiresAt = Date.now() + (expirySeconds * 1000);
+
+        await env.DB.prepare(`
+            INSERT INTO user_sessions (
+                id, user_id, token_hash, expires_at, created_at, 
+                last_activity, ip_address, user_agent
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+            sessionId, user.id, tokenHash, expiresAt, Date.now(), 
+            Date.now(), utils.getClientIP(request), 
+            request.headers.get('User-Agent') || ''
+        ).run();
+
+        // 更新登录统计
+        await env.DB.prepare(`
+            UPDATE users SET 
+                last_login = ?, 
+                login_count = login_count + 1 
+            WHERE id = ?
+        `).bind(Date.now(), user.id).run();
+
+        await utils.logUserAction(env, user.id, 'login', { 
+            loginMethod: isEmail ? 'email' : 'username',
+            sessionId,
+            identifier: normalizedIdentifier
+        }, request);
+
+        return utils.successResponse({
+            message: '登录成功',
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                emailVerified: Boolean(user.email_verified),
+                permissions: JSON.parse(user.permissions || '[]'),
+                settings: JSON.parse(user.settings || '{}')
+            }
+        });
+
+    } catch (error) {
+        console.error('登录失败:', error);
+        return utils.errorResponse('登录失败，请稍后重试', 500);
+    }
+}
+
+// 忘记密码 - 发送重置验证码
+export async function authForgotPasswordHandler(request, env) {
     try {
         const body = await request.json().catch(() => ({}));
         const { email } = body;
@@ -112,48 +225,144 @@ export async function authSendRegistrationCodeHandler(request, env) {
 
         const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
 
-        // 检查邮箱是否已注册
-        const existingUser = await env.DB.prepare(`
-            SELECT id FROM users WHERE email = ?
+        // 检查邮箱是否存在
+        const user = await env.DB.prepare(`
+            SELECT id, username, email FROM users WHERE email = ? AND is_active = 1
         `).bind(normalizedEmail).first();
 
-        if (existingUser) {
-            return utils.errorResponse('该邮箱已被注册');
-        }
-
-        // 检查临时邮箱
-        if (emailVerificationUtils.isTempEmail(normalizedEmail)) {
-            return utils.errorResponse('不支持临时邮箱，请使用常用邮箱');
+        if (!user) {
+            // 为了安全，不透露用户是否存在，总是返回成功
+            return utils.successResponse({
+                message: `如果该邮箱已注册，我们已向 ${emailVerificationUtils.maskEmail(normalizedEmail)} 发送密码重置验证码`,
+                maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail)
+            });
         }
 
         const emailService = new EmailVerificationService(env);
         const ipAddress = utils.getClientIP(request);
 
-        // 检查发送频率限制
-        await emailService.checkEmailRateLimit(normalizedEmail, ipAddress);
+        try {
+            // 检查发送频率限制
+            await emailService.checkEmailRateLimit(normalizedEmail, ipAddress);
 
-        // 创建验证记录
-        const verification = await emailService.createEmailVerification(
-            normalizedEmail, 'registration', null, { ipAddress }
-        );
+            // 创建验证记录
+            const verification = await emailService.createEmailVerification(
+                normalizedEmail, 'forgot_password', user.id, { 
+                    ipAddress,
+                    requestedAt: Date.now()
+                }
+            );
 
-        // 发送验证邮件
-        await emailService.sendVerificationEmail(
-            normalizedEmail, 
-            verification.code, 
-            'verification',
-            { username: '新用户' }
-        );
+            // 发送验证邮件
+            await emailService.sendVerificationEmail(
+                normalizedEmail, 
+                verification.code, 
+                'password_reset',
+                { username: user.username }
+            );
+
+            await utils.logUserAction(env, user.id, 'password_reset_request', {
+                method: 'email_verification',
+                ipAddress
+            }, request);
+
+        } catch (error) {
+            console.error('发送密码重置验证码失败:', error);
+            // 即使发送失败，也不透露错误详情
+        }
 
         return utils.successResponse({
-            message: `验证码已发送到 ${emailVerificationUtils.maskEmail(normalizedEmail)}`,
-            maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail),
-            expiresAt: verification.expiresAt
+            message: `如果该邮箱已注册，我们已向 ${emailVerificationUtils.maskEmail(normalizedEmail)} 发送密码重置验证码`,
+            maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail)
         });
 
     } catch (error) {
-        console.error('发送验证码失败:', error);
-        return utils.errorResponse(error.message || '验证码发送失败');
+        console.error('忘记密码处理失败:', error);
+        return utils.errorResponse('服务暂时不可用，请稍后重试', 500);
+    }
+}
+
+// 重置密码（使用验证码）
+export async function authResetPasswordHandler(request, env) {
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { email, verificationCode, newPassword } = body;
+
+        const errors = utils.validateInput({ email, verificationCode, newPassword }, {
+            email: { 
+                required: true,
+                pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                message: '邮箱格式不正确'
+            },
+            verificationCode: { 
+                required: true,
+                pattern: /^\d{6}$/,
+                message: '验证码必须是6位数字'
+            },
+            newPassword: { 
+                required: true, 
+                minLength: 6,
+                maxLength: 50
+            }
+        });
+
+        if (errors.length > 0) {
+            return utils.errorResponse(errors[0]);
+        }
+
+        const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
+
+        // 检查用户是否存在且激活
+        const user = await env.DB.prepare(`
+            SELECT * FROM users WHERE email = ? AND is_active = 1
+        `).bind(normalizedEmail).first();
+
+        if (!user) {
+            return utils.errorResponse('用户不存在或已被禁用');
+        }
+
+        const emailService = new EmailVerificationService(env);
+
+        // 验证邮箱验证码
+        try {
+            const verifyResult = await emailService.verifyCode(
+                normalizedEmail, verificationCode, 'forgot_password', user.id
+            );
+
+            if (!verifyResult.success) {
+                return utils.errorResponse('验证码无效或已过期');
+            }
+        } catch (error) {
+            return utils.errorResponse(error.message);
+        }
+
+        // 更新密码
+        const newPasswordHash = await utils.hashPassword(newPassword);
+        await env.DB.prepare(`
+            UPDATE users SET 
+                password_hash = ?, 
+                updated_at = ? 
+            WHERE id = ?
+        `).bind(newPasswordHash, Date.now(), user.id).run();
+
+        // 清除所有会话（强制重新登录）
+        await env.DB.prepare(`
+            DELETE FROM user_sessions WHERE user_id = ?
+        `).bind(user.id).run();
+
+        await utils.logUserAction(env, user.id, 'password_reset', { 
+            method: 'email_verification',
+            forced_relogin: true
+        }, request);
+
+        return utils.successResponse({ 
+            message: '密码重置成功，请使用新密码登录',
+            requiresLogin: true
+        });
+
+    } catch (error) {
+        console.error('密码重置失败:', error);
+        return utils.errorResponse('密码重置失败，请稍后重试', 500);
     }
 }
 
@@ -217,7 +426,64 @@ export async function authChangePasswordHandler(request, env) {
     }
 }
 
-// 发送密码重置验证码
+// 发送注册验证码
+export async function authSendRegistrationCodeHandler(request, env) {
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { email } = body;
+
+        if (!email || !emailVerificationUtils.isValidEmail(email)) {
+            return utils.errorResponse('请输入有效的邮箱地址');
+        }
+
+        const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
+
+        // 检查邮箱是否已注册
+        const existingUser = await env.DB.prepare(`
+            SELECT id FROM users WHERE email = ?
+        `).bind(normalizedEmail).first();
+
+        if (existingUser) {
+            return utils.errorResponse('该邮箱已被注册');
+        }
+
+        // 检查临时邮箱
+        if (emailVerificationUtils.isTempEmail(normalizedEmail)) {
+            return utils.errorResponse('不支持临时邮箱，请使用常用邮箱');
+        }
+
+        const emailService = new EmailVerificationService(env);
+        const ipAddress = utils.getClientIP(request);
+
+        // 检查发送频率限制
+        await emailService.checkEmailRateLimit(normalizedEmail, ipAddress);
+
+        // 创建验证记录
+        const verification = await emailService.createEmailVerification(
+            normalizedEmail, 'registration', null, { ipAddress }
+        );
+
+        // 发送验证邮件
+        await emailService.sendVerificationEmail(
+            normalizedEmail, 
+            verification.code, 
+            'registration',
+            { username: '新用户' }
+        );
+
+        return utils.successResponse({
+            message: `验证码已发送到 ${emailVerificationUtils.maskEmail(normalizedEmail)}`,
+            maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail),
+            expiresAt: verification.expiresAt
+        });
+
+    } catch (error) {
+        console.error('发送验证码失败:', error);
+        return utils.errorResponse(error.message || '验证码发送失败');
+    }
+}
+
+// 发送密码重置验证码（已登录用户）
 export async function authSendPasswordResetCodeHandler(request, env) {
     try {
         const user = await authenticate(request, env);
@@ -576,89 +842,6 @@ export async function authSendAccountDeleteCodeHandler(request, env) {
     }
 }
 
-// 原有的处理器保持不变
-export async function authLoginHandler(request, env) {
-    try {
-        const body = await request.json().catch(() => ({}));
-        const { username, password } = body;
-
-        const errors = utils.validateInput({ username, password }, {
-            username: { required: true, maxLength: 50 },
-            password: { required: true, maxLength: 50 }
-        });
-
-        if (errors.length > 0) {
-            return utils.errorResponse(errors[0], 400);
-        }
-
-        const user = await env.DB.prepare(`
-            SELECT * FROM users WHERE username = ? OR email = ?
-        `).bind(username, username).first();
-
-        if (!user) {
-            return utils.errorResponse('用户名或密码错误', 401);
-        }
-
-        const passwordHash = await utils.hashPassword(password);
-        if (passwordHash !== user.password_hash) {
-            return utils.errorResponse('用户名或密码错误', 401);
-        }
-
-        const jwtSecret = env.JWT_SECRET;
-        if (!jwtSecret) {
-            console.error('JWT_SECRET 环境变量未设置');
-            return utils.errorResponse('服务器配置错误', 500);
-        }
-
-        const expiryDays = parseInt(env.JWT_EXPIRY_DAYS || '30');
-        const expirySeconds = expiryDays * 24 * 60 * 60;
-
-        const payload = {
-            userId: user.id,
-            username: user.username,
-            iat: Math.floor(Date.now() / 1000),
-            exp: Math.floor(Date.now() / 1000) + expirySeconds
-        };
-
-        const token = await utils.generateJWT(payload, jwtSecret);
-        const tokenHash = await utils.hashPassword(token);
-
-        await env.DB.prepare(`
-            DELETE FROM user_sessions WHERE user_id = ? AND expires_at < ?
-        `).bind(user.id, Date.now()).run();
-
-        const sessionId = utils.generateId();
-        const expiresAt = Date.now() + (expirySeconds * 1000);
-
-        await env.DB.prepare(`
-            INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, last_activity)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `).bind(sessionId, user.id, tokenHash, expiresAt, Date.now(), Date.now()).run();
-
-        await utils.logUserAction(env, user.id, 'login', { 
-            loginMethod: 'password',
-            sessionId 
-        }, request);
-
-        return utils.successResponse({
-            message: '登录成功',
-            token,
-            user: {
-                id: user.id,
-                username: user.username,
-                email: user.email,
-                emailVerified: Boolean(user.email_verified),
-                permissions: JSON.parse(user.permissions || '[]'),
-                settings: JSON.parse(user.settings || '{}')
-            }
-        });
-
-    } catch (error) {
-        console.error('登录失败:', error);
-        return utils.errorResponse('登录失败，请稍后重试', 500);
-    }
-}
-
 // 其他原有处理器保持不变...
 export async function authVerifyTokenHandler(request, env) {
     try {
@@ -774,6 +957,8 @@ export async function authLogoutHandler(request, env) {
         await env.DB.prepare(`
             DELETE FROM user_sessions WHERE token_hash = ?
         `).bind(tokenHash).run();
+
+        await utils.logUserAction(env, user.id, 'logout', {}, request);
     }
     return utils.successResponse({ message: '退出成功' });
 }

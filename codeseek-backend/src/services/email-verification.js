@@ -1,4 +1,4 @@
-// src/services/email-verification.js - 邮箱验证核心服务
+// src/services/email-verification.js - 增强版本，支持忘记密码功能
 import { utils } from '../utils.js';
 
 export class EmailVerificationService {
@@ -15,7 +15,7 @@ export class EmailVerificationService {
         return Math.floor(100000 + Math.random() * 900000).toString();
     }
 
-    // 检查邮箱发送频率限制
+    // 检查邮件发送频率限制
     async checkEmailRateLimit(email, ipAddress) {
         const emailHash = await utils.hashPassword(email);
         const now = Date.now();
@@ -129,16 +129,15 @@ export class EmailVerificationService {
         if (!this.resendApiKey) {
             throw new Error('邮件服务未配置');
         }
-		
-		    // 使用映射后的模板类型
-			// 获取邮件模板
-    templateType = this.getTemplateType(templateType);;
-    const template = await this.getEmailTemplate(templateType);
-    
-    if (!template) {
-        throw new Error(`邮件模板不存在: ${templateType}`);
-    }
-
+        
+        // 使用映射后的模板类型
+        // 获取邮件模板
+        templateType = this.getTemplateType(templateType);
+        const template = await this.getEmailTemplate(templateType);
+        
+        if (!template) {
+            throw new Error(`邮件模板不存在: ${templateType}`);
+        }
 
         // 准备模板变量
         const vars = {
@@ -379,18 +378,78 @@ export class EmailVerificationService {
             period: timeRange
         };
     }
-	
-	// 在 sendVerificationEmail 方法中，添加类型映射函数
-getTemplateType(verificationType) {
-    const mapping = {
-        'registration': 'registration',
-        'password_reset': 'password_reset',
-        'email_change_old': 'email_change',
-        'email_change_new': 'email_change', 
-        'account_delete': 'account_delete'
-    };
-    return mapping[verificationType] || verificationType;
-}
+    
+    // 在 sendVerificationEmail 方法中，添加类型映射函数
+    getTemplateType(verificationType) {
+        const mapping = {
+            'registration': 'registration',
+            'password_reset': 'password_reset',
+            'forgot_password': 'password_reset',  // 新增：忘记密码映射到密码重置模板
+            'email_change_old': 'email_change',
+            'email_change_new': 'email_change', 
+            'account_delete': 'account_delete'
+        };
+        return mapping[verificationType] || verificationType;
+    }
+
+    // 新增：检查用户是否存在且激活（用于忘记密码功能）
+    async getUserByEmail(email) {
+        const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
+        return await this.env.DB.prepare(`
+            SELECT id, username, email, is_active 
+            FROM users 
+            WHERE email = ?
+        `).bind(normalizedEmail).first();
+    }
+
+    // 新增：创建忘记密码验证记录的辅助方法
+    async createForgotPasswordVerification(email, ipAddress) {
+        const user = await this.getUserByEmail(email);
+        if (!user || !user.is_active) {
+            // 为了安全，不透露用户是否存在
+            return null;
+        }
+
+        const verification = await this.createEmailVerification(
+            email, 'forgot_password', user.id, { 
+                ipAddress,
+                requestedAt: Date.now()
+            }
+        );
+
+        return {
+            verification,
+            user
+        };
+    }
+
+    // 新增：验证忘记密码验证码并获取用户信息
+    async verifyForgotPasswordCode(email, verificationCode) {
+        const user = await this.getUserByEmail(email);
+        if (!user || !user.is_active) {
+            throw new Error('用户不存在或已被禁用');
+        }
+
+        const result = await this.verifyCode(email, verificationCode, 'forgot_password', user.id);
+        
+        return {
+            ...result,
+            userId: user.id,
+            username: user.username
+        };
+    }
+
+    // 新增：清理旧的验证记录（避免数据库过大）
+    async cleanupOldVerifications(daysOld = 7) {
+        const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
+        
+        const deleted = await this.env.DB.prepare(`
+            DELETE FROM email_verifications 
+            WHERE created_at < ? AND status IN ('used', 'expired', 'failed')
+        `).bind(cutoffTime).run();
+
+        return deleted.changes || 0;
+    }
 }
 
 // 邮箱验证工具函数
@@ -406,7 +465,10 @@ export const emailVerificationUtils = {
         const tempDomains = [
             '10minutemail.com', 'guerrillamail.com', 'tempmail.org',
             'temp-mail.org', 'throwaway.email', 'mailinator.com',
-            'yopmail.com', 'maildrop.cc'
+            'yopmail.com', 'maildrop.cc', 'tempail.com', '10min.email',
+            'sharklasers.com', 'guerrillamailblock.com', 'pokemail.net',
+            'spam4.me', 'bccto.me', 'chacuo.net', 'dispostable.com',
+            'tempinbox.com', 'mohmal.com', 'emailondeck.com'
         ];
         
         const domain = email.split('@')[1]?.toLowerCase();
@@ -426,5 +488,27 @@ export const emailVerificationUtils = {
         }
         const masked = localPart[0] + '*'.repeat(localPart.length - 2) + localPart[localPart.length - 1];
         return `${masked}@${domain}`;
+    },
+
+    // 验证验证码格式
+    isValidVerificationCode(code) {
+        return /^\d{6}$/.test(code);
+    },
+
+    // 检查邮箱域名是否可信
+    isTrustedEmailDomain(email) {
+        const trustedDomains = [
+            'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com',
+            'qq.com', '163.com', '126.com', 'sina.com', 'sohu.com',
+            'foxmail.com', '139.com', 'yeah.net'
+        ];
+        
+        const domain = email.split('@')[1]?.toLowerCase();
+        return trustedDomains.includes(domain);
+    },
+
+    // 生成安全的邮箱链接（用于邮件中的链接）
+    generateSecureEmailLink(baseUrl, action, token) {
+        return `${baseUrl}/email/${action}?token=${encodeURIComponent(token)}`;
     }
 };
