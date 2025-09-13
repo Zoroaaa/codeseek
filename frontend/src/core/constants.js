@@ -297,7 +297,7 @@ export const APP_CONSTANTS = {
       isBuiltin: true,
       priority: 3,
       isActive: true,
-      supportsDetailExtraction: tfalserue,
+      supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
       supportedFeatures: []
