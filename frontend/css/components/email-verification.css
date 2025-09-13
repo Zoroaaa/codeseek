@@ -1,0 +1,755 @@
+/* src/css/components/email-verification.css - 邮箱验证相关样式 */
+
+/* ===============================================
+ * 邮箱验证模态框基础样式
+ * =============================================== */
+
+.verification-modal {
+    max-width: 480px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.verification-modal .modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem 2rem;
+    border-radius: 12px 12px 0 0;
+    position: relative;
+}
+
+.verification-modal .modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.verification-modal .modal-close {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.verification-modal .modal-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.verification-modal .modal-body {
+    padding: 2rem;
+}
+
+/* ===============================================
+ * 验证步骤样式
+ * =============================================== */
+
+.verification-step {
+    text-align: center;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+}
+
+.verification-step.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.verification-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.verification-text {
+    font-size: 1rem;
+    color: #4a5568;
+    line-height: 1.6;
+    margin: 0 0 2rem;
+}
+
+.verification-text strong {
+    color: #2d3748;
+    font-weight: 600;
+}
+
+/* ===============================================
+ * 验证码输入样式
+ * =============================================== */
+
+.verification-code-input {
+    margin: 2rem 0;
+}
+
+.verification-code-input input {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.5rem;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    letter-spacing: 0.5rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f7fafc;
+    transition: all 0.2s ease;
+}
+
+.verification-code-input input:focus {
+    border-color: #667eea;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    outline: none;
+}
+
+.verification-code-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 1rem 0;
+}
+
+.verification-code-group input {
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 1.25rem;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    letter-spacing: 0.25rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.verification-code-group input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    outline: none;
+}
+
+.verification-code-group .btn {
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+    min-width: 100px;
+}
+
+/* ===============================================
+ * 验证计时器样式
+ * =============================================== */
+
+.verification-timer {
+    margin: 1rem 0;
+    padding: 0.5rem;
+    background: #f7fafc;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    color: #718096;
+    text-align: center;
+}
+
+.verification-timer.warning {
+    background: #fef5e7;
+    color: #c05621;
+}
+
+.verification-timer.danger {
+    background: #fed7d7;
+    color: #c53030;
+}
+
+/* ===============================================
+ * 验证操作按钮样式
+ * =============================================== */
+
+.verification-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 2rem;
+}
+
+.verification-actions .btn {
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.verification-actions .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ===============================================
+ * 邮箱更改步骤指示器
+ * =============================================== */
+
+.email-change-steps {
+    margin-bottom: 2rem;
+}
+
+.step-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.step {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #a0aec0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    background: #667eea;
+    color: white;
+    transform: scale(1.1);
+}
+
+.step-line {
+    width: 60px;
+    height: 2px;
+    background: #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.step.active + .step-line {
+    background: #667eea;
+}
+
+.step-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #718096;
+}
+
+/* ===============================================
+ * 邮箱更改步骤内容
+ * =============================================== */
+
+.email-change-step {
+    display: none;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: all 0.3s ease;
+}
+
+.email-change-step.active {
+    display: block;
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* ===============================================
+ * 表单样式
+ * =============================================== */
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #2d3748;
+    font-size: 0.875rem;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.form-group input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    outline: none;
+}
+
+.form-group input:disabled {
+    background: #f7fafc;
+    color: #a0aec0;
+    cursor: not-allowed;
+}
+
+.form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 2rem;
+}
+
+/* ===============================================
+ * 验证信息样式
+ * =============================================== */
+
+.verification-info {
+    background: #ebf8ff;
+    border: 1px solid #bee3f8;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+    color: #2c5282;
+}
+
+.verification-info p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.verification-divider {
+    margin: 2rem 0 1rem;
+    text-align: center;
+    position: relative;
+}
+
+.verification-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #e2e8f0;
+}
+
+.verification-divider span {
+    background: white;
+    padding: 0 1rem;
+    font-size: 0.75rem;
+    color: #718096;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ===============================================
+ * 成功状态样式
+ * =============================================== */
+
+.verification-success {
+    text-align: center;
+    padding: 2rem 0;
+}
+
+.success-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+    animation: successPulse 0.6s ease-out;
+}
+
+@keyframes successPulse {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.verification-success h4 {
+    color: #2d3748;
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.verification-success p {
+    color: #4a5568;
+    line-height: 1.6;
+    margin: 0 0 2rem;
+}
+
+/* ===============================================
+ * 危险操作样式（账户删除）
+ * =============================================== */
+
+.danger-modal .modal-header {
+    background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+}
+
+.danger-warning {
+    background: #fed7d7;
+    border: 1px solid #feb2b2;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.warning-icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 1rem;
+    background: #e53e3e;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.danger-warning h4 {
+    color: #c53030;
+    margin: 0 0 1rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.danger-warning p {
+    color: #742a2a;
+    margin: 0 0 1rem;
+    line-height: 1.5;
+}
+
+.danger-warning ul {
+    color: #742a2a;
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.danger-warning li {
+    margin-bottom: 0.5rem;
+}
+
+.delete-confirmation {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.confirmation-text {
+    background: #f7fafc;
+    border: 2px dashed #cbd5e0;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: #2d3748;
+    text-align: center;
+}
+
+/* ===============================================
+ * 按钮样式
+ * =============================================== */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    min-height: 44px;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: #f7fafc;
+    color: #4a5568;
+    border: 1px solid #e2e8f0;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #edf2f7;
+    border-color: #cbd5e0;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+    box-shadow: 0 4px 12px rgba(245, 101, 101, 0.4);
+}
+
+.btn-full {
+    width: 100%;
+}
+
+/* ===============================================
+ * 响应式设计
+ * =============================================== */
+
+@media (max-width: 768px) {
+    .verification-modal {
+        margin: 1rem;
+        max-width: none;
+        width: calc(100% - 2rem);
+    }
+
+    .verification-modal .modal-header {
+        padding: 1rem 1.5rem;
+    }
+
+    .verification-modal .modal-body {
+        padding: 1.5rem;
+    }
+
+    .verification-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5rem;
+    }
+
+    .verification-code-input input {
+        font-size: 1.25rem;
+        letter-spacing: 0.25rem;
+    }
+
+    .verification-code-group {
+        flex-direction: column;
+    }
+
+    .verification-code-group input {
+        margin-bottom: 0.5rem;
+    }
+
+    .step-labels {
+        font-size: 0.7rem;
+    }
+
+    .step-labels span {
+        max-width: 80px;
+        text-align: center;
+        word-break: break-word;
+    }
+}
+
+@media (max-width: 480px) {
+    .verification-modal .modal-header h3 {
+        font-size: 1.1rem;
+    }
+
+    .verification-text {
+        font-size: 0.9rem;
+    }
+
+    .form-group label {
+        font-size: 0.8rem;
+    }
+
+    .btn {
+        padding: 0.65rem 1.25rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* ===============================================
+ * 动画效果
+ * =============================================== */
+
+.modal-overlay {
+    animation: fadeInOverlay 0.3s ease-out;
+}
+
+.verification-modal {
+    animation: slideInModal 0.3s ease-out;
+}
+
+@keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInModal {
+    from { 
+        opacity: 0; 
+        transform: translateY(-30px) scale(0.95);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ===============================================
+ * 加载状态样式
+ * =============================================== */
+
+.btn.loading {
+    position: relative;
+    color: transparent;
+}
+
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    color: inherit;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===============================================
+ * 工具提示样式
+ * =============================================== */
+
+.tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.tooltip::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2d3748;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    z-index: 1000;
+}
+
+.tooltip:hover::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-4px);
+}
+
+/* ===============================================
+ * 深色主题支持（可选）
+ * =============================================== */
+
+@media (prefers-color-scheme: dark) {
+    .verification-modal {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+
+    .verification-text {
+        color: #cbd5e0;
+    }
+
+    .verification-text strong {
+        color: #f7fafc;
+    }
+
+    .form-group input {
+        background: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+
+    .form-group input:focus {
+        background: #2d3748;
+        border-color: #667eea;
+    }
+
+    .verification-code-input input {
+        background: #4a5568;
+        color: #e2e8f0;
+    }
+
+    .verification-code-input input:focus {
+        background: #2d3748;
+    }
+
+    .verification-timer {
+        background: #4a5568;
+        color: #cbd5e0;
+    }
+
+    .verification-info {
+        background: #2c5282;
+        border-color: #3182ce;
+        color: #bee3f8;
+    }
+
+    .btn-secondary {
+        background: #4a5568;
+        color: #e2e8f0;
+        border-color: #718096;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: #718096;
+        border-color: #a0aec0;
+    }
+}

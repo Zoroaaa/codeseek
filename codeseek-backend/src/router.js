@@ -1,4 +1,4 @@
-// src/router.js - 更新版本：添加详情提取配置管理API路由
+// src/router.js - 添加邮箱验证路由的更新版本
 import { utils } from './utils.js';
 
 // 导入所有处理器
@@ -9,7 +9,14 @@ import {
     authRefreshTokenHandler,
     authChangePasswordHandler,
     authLogoutHandler,
-    authDeleteAccountHandler
+    authDeleteAccountHandler,
+    // 新增的邮箱验证处理器
+    authSendRegistrationCodeHandler,
+    authSendPasswordResetCodeHandler,
+    authRequestEmailChangeHandler,
+    authSendEmailChangeCodeHandler,
+    authVerifyEmailChangeCodeHandler,
+    authSendAccountDeleteCodeHandler
 } from './handlers/auth.js';
 
 import {
@@ -52,7 +59,6 @@ import {
     defaultHandler
 } from './handlers/system.js';
 
-// 导入详情提取处理器（包括新的配置管理API）
 import {
     extractSingleDetailHandler,
     extractBatchDetailsHandler,
@@ -62,8 +68,8 @@ import {
     deleteDetailCacheHandler,
     getDetailExtractionConfigHandler,
     updateDetailExtractionConfigHandler,
-    resetDetailExtractionConfigHandler,        // 新增
-    applyConfigPresetHandler,                   // 新增
+    resetDetailExtractionConfigHandler,
+    applyConfigPresetHandler,
     getDetailExtractionStatsHandler
 } from './handlers/detail.js';
 
@@ -189,26 +195,54 @@ export class Router {
         // 健康检查
         this.get('/api/health', healthCheckHandler);
 
-        // 认证相关路由
+        // ===============================================
+        // 认证相关路由（更新版本，包含邮箱验证）
+        // ===============================================
+        
+        // 基础认证
         this.post('/api/auth/register', authRegisterHandler);
         this.post('/api/auth/login', authLoginHandler);
         this.post('/api/auth/verify-token', authVerifyTokenHandler);
         this.post('/api/auth/refresh', authRefreshTokenHandler);
-        this.put('/api/auth/change-password', authChangePasswordHandler);
         this.post('/api/auth/logout', authLogoutHandler);
+        
+        // 密码管理（集成邮箱验证）
+        this.put('/api/auth/change-password', authChangePasswordHandler);
+        this.post('/api/auth/send-password-reset-code', authSendPasswordResetCodeHandler);
+        
+        // 账户删除（集成邮箱验证）
         this.post('/api/auth/delete-account', authDeleteAccountHandler);
+        this.post('/api/auth/send-account-delete-code', authSendAccountDeleteCodeHandler);
 
+        // ===============================================
+        // 邮箱验证相关路由（新增）
+        // ===============================================
+        
+        // 注册邮箱验证
+        this.post('/api/auth/send-registration-code', authSendRegistrationCodeHandler);
+        
+        // 邮箱更改流程
+        this.post('/api/auth/request-email-change', authRequestEmailChangeHandler);
+        this.post('/api/auth/send-email-change-code', authSendEmailChangeCodeHandler);
+        this.post('/api/auth/verify-email-change-code', authVerifyEmailChangeCodeHandler);
+
+        // ===============================================
         // 标签管理API
+        // ===============================================
         this.get('/api/community/tags', communityGetTagsHandler);
         this.post('/api/community/tags', communityCreateTagHandler);
         this.put('/api/community/tags/:id', communityUpdateTagHandler);
         this.delete('/api/community/tags/:id', communityDeleteTagHandler);
 
+        // ===============================================
         // 搜索源状态检查
+        // ===============================================
         this.post('/api/source-status/check', sourceStatusCheckHandler);
         this.get('/api/source-status/history', sourceStatusHistoryHandler);
 
+        // ===============================================
         // 社区搜索源相关API
+        // ===============================================
         this.get('/api/community/sources', communityGetSourcesHandler);
         this.post('/api/community/sources', communityCreateSourceHandler);
         this.get('/api/community/sources/:id', communityGetSourceDetailHandler);
@@ -223,7 +257,9 @@ export class Router {
         this.get('/api/community/user/stats', communityUserStatsHandler);
         this.get('/api/community/search', communitySearchHandler);
 
-        // ================== 详情提取相关API路由 ==================
+        // ===============================================
+        // 详情提取相关API路由
+        // ===============================================
         
         // 基础详情提取功能
         this.post('/api/detail/extract-single', extractSingleDetailHandler);
@@ -236,50 +272,51 @@ export class Router {
         this.delete('/api/detail/cache/clear', clearDetailCacheHandler);
         this.delete('/api/detail/cache/delete', deleteDetailCacheHandler);
         
-        // ================== 配置管理相关API路由（新增） ==================
-        
-        // 配置CRUD操作
-        this.get('/api/detail/config', getDetailExtractionConfigHandler);          // 获取用户配置
-        this.put('/api/detail/config', updateDetailExtractionConfigHandler);       // 更新用户配置
-        this.post('/api/detail/config/reset', resetDetailExtractionConfigHandler); // 重置为默认配置
-        
-        // 配置预设操作
-        this.post('/api/detail/config/preset', applyConfigPresetHandler);          // 应用配置预设
-        
-        // 配置验证（可选，如果需要单独的验证端点）
-        // this.post('/api/detail/config/validate', validateDetailConfigHandler);
-        
-        // 配置导入导出（可选，如果需要）
-        // this.post('/api/detail/config/import', importDetailConfigHandler);
-        // this.get('/api/detail/config/export', exportDetailConfigHandler);
+        // 配置管理相关API路由
+        this.get('/api/detail/config', getDetailExtractionConfigHandler);
+        this.put('/api/detail/config', updateDetailExtractionConfigHandler);
+        this.post('/api/detail/config/reset', resetDetailExtractionConfigHandler);
+        this.post('/api/detail/config/preset', applyConfigPresetHandler);
 
-        // ================== 其他API路由 ==================
-
+        // ===============================================
         // 用户设置
+        // ===============================================
         this.get('/api/user/settings', userGetSettingsHandler);
         this.put('/api/user/settings', userUpdateSettingsHandler);
 
+        // ===============================================
         // 搜索源管理
+        // ===============================================
         this.get('/api/search-sources', getSearchSourcesHandler);
 
+        // ===============================================
         // 收藏相关
+        // ===============================================
         this.post('/api/user/favorites', userSyncFavoritesHandler);
         this.get('/api/user/favorites', userGetFavoritesHandler);
 
+        // ===============================================
         // 搜索历史
+        // ===============================================
         this.post('/api/user/search-history', userSaveSearchHistoryHandler);
         this.get('/api/user/search-history', userGetSearchHistoryHandler);
         this.delete('/api/user/search-history/:id', userDeleteSearchHistoryHandler);
         this.delete('/api/user/search-history', userClearSearchHistoryHandler);
 
+        // ===============================================
         // 搜索统计
+        // ===============================================
         this.get('/api/user/search-stats', userGetSearchStatsHandler);
 
+        // ===============================================
         // 其他API
+        // ===============================================
         this.post('/api/actions/record', recordActionHandler);
         this.get('/api/config', getConfigHandler);
 
+        // ===============================================
         // 默认处理器
+        // ===============================================
         this.get('/*', defaultHandler);
     }
 }

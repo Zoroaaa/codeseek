@@ -1,4 +1,4 @@
-// 主应用入口 - 集成统一搜索组件和配置管理架构，新增邮箱验证功能支持
+// 主应用入口 - 集成统一搜索组件和配置管理架构
 import { APP_CONSTANTS } from '../../core/constants.js';
 import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
@@ -11,9 +11,6 @@ import detailCardManager from '../../components/detail-card.js';
 import detailAPIService from '../../services/detail-api.js';
 import favoritesManager from '../../components/favorites.js';
 import apiService from '../../services/api.js';
-// 🆕 导入邮箱验证服务和UI组件
-import emailVerificationService from '../../services/email-verification-service.js';
-import { emailVerificationUI } from '../../components/email-verification-ui.js';
 
 class MagnetSearchApp {
   constructor() {
@@ -72,9 +69,6 @@ class MagnetSearchApp {
       // 初始化主题（仅从localStorage读取主题设置）
       themeManager.init();
       
-      // 🆕 初始化邮箱验证服务
-      await this.initEmailVerificationService();
-      
       // 检查认证状态
       await this.checkAuthStatus();
       
@@ -120,31 +114,6 @@ class MagnetSearchApp {
     }
   }
 
-  // 🆕 初始化邮箱验证服务
-  async initEmailVerificationService() {
-    try {
-      console.log('🔐 初始化邮箱验证服务...');
-      
-      // 邮箱验证服务已经通过导入自动初始化
-      // 这里可以进行一些额外的配置或检查
-      
-      // 验证服务可用性
-      if (emailVerificationService && emailVerificationUI) {
-        console.log('✅ 邮箱验证服务初始化成功');
-        
-        // 设置全局访问
-        window.emailVerificationService = emailVerificationService;
-        window.emailVerificationUI = emailVerificationUI;
-      } else {
-        console.warn('⚠️ 邮箱验证服务初始化不完整');
-      }
-      
-    } catch (error) {
-      console.error('❌ 邮箱验证服务初始化失败:', error);
-      this.performanceMetrics.errorCount++;
-    }
-  }
-
   // 从constants.js加载内置数据
   loadBuiltinData() {
     try {
@@ -171,7 +140,7 @@ class MagnetSearchApp {
     } catch (error) {
       console.error('加载内置数据失败:', error);
       this.performanceMetrics.errorCount++;
-      // 使用空数组作为备份
+      // 使用空数组作为后备
       this.allSearchSources = [];
       this.allCategories = [];
     }
@@ -602,7 +571,7 @@ class MagnetSearchApp {
     // 如果没有可显示的搜索源，显示提示
     if (sources.length === 0) {
       sitesSection.innerHTML = `
-        <h2>🌐 资源站点导航</h2>
+        <h2>🌍 资源站点导航</h2>
         <div class="empty-state">
           <p>暂无可用的搜索源</p>
           <p>请在个人中心搜索源管理页面添加搜索源</p>
@@ -617,11 +586,11 @@ class MagnetSearchApp {
 
     // 生成HTML
     let navigationHTML = `
-      <h2>🌐 资源站点导航</h2>
+      <h2>🌍 资源站点导航</h2>
       ${this.detailExtractionAvailable ? `
         <div class="detail-extraction-notice">
           <span class="notice-icon">✨</span>
-          <span>标有 <strong>📋</strong> 的站点支持详情提取功能</span>
+          <span>标有 <strong>🔋</strong> 的站点支持详情提取功能</span>
           ${!this.detailExtractionEnabled ? `
             <button onclick="window.app.enableDetailExtraction()" class="enable-detail-btn">启用详情提取</button>
           ` : ''}
@@ -684,7 +653,7 @@ class MagnetSearchApp {
             <strong>${source.icon || '🔍'} ${source.name}</strong>
             <div class="site-badges">
               ${source.isCustom ? '<span class="custom-badge">自定义</span>' : ''}
-              ${supportsDetailExtraction ? '<span class="detail-support-badge">📋</span>' : ''}
+              ${supportsDetailExtraction ? '<span class="detail-support-badge">🔋</span>' : ''}
               <span class="status-badge ${statusClass}">${statusText}</span>
             </div>
           </div>
@@ -837,72 +806,6 @@ class MagnetSearchApp {
     document.addEventListener('searchResultsRendered', () => {
       this.performanceMetrics.searchCount++;
     });
-
-    // 🆕 绑定邮箱验证相关事件
-    this.bindEmailVerificationEvents();
-  }
-
-  // 🆕 绑定邮箱验证相关事件
-  bindEmailVerificationEvents() {
-    // 监听邮箱更改成功事件
-    window.addEventListener('emailChanged', (event) => {
-      console.log('用户邮箱已更改:', event.detail);
-      if (this.currentUser) {
-        this.currentUser.email = event.detail.newEmail;
-        this.updateUserUI();
-      }
-    });
-
-    // 监听账户删除事件
-    window.addEventListener('accountDeleted', () => {
-      console.log('用户账户已删除');
-      this.handleAccountDeleted();
-    });
-
-    // 监听验证码过期事件
-    window.addEventListener('verificationExpired', (event) => {
-      console.log('验证码已过期:', event.detail);
-      showToast('验证码已过期，请重新获取', 'warning');
-    });
-  }
-
-  // 🆕 处理账户删除
-  async handleAccountDeleted() {
-    try {
-      // 清除当前用户信息
-      this.currentUser = null;
-      
-      // 清除本地存储
-      localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-      localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.USER_INFO);
-      
-      // 重置应用状态
-      this.detailExtractionEnabled = false;
-      this.detailExtractionAvailable = false;
-      this.updateDetailExtractionUI(false);
-      
-      // 清空搜索管理器数据
-      if (unifiedSearchManager.isInitialized) {
-        await unifiedSearchManager.cleanup();
-      }
-      
-      // 清空收藏管理器数据
-      if (favoritesManager.isInitialized) {
-        favoritesManager.favorites = [];
-        favoritesManager.renderFavorites();
-      }
-      
-      showToast('账户已删除，正在跳转...', 'info');
-      
-      // 跳转到主页
-      setTimeout(() => {
-        window.location.href = './index.html';
-      }, 2000);
-      
-    } catch (error) {
-      console.error('处理账户删除失败:', error);
-      this.performanceMetrics.errorCount++;
-    }
   }
 
   // 修改：用户登录后更新站点导航
@@ -962,7 +865,6 @@ class MagnetSearchApp {
     const closeBtns = document.querySelectorAll('.close');
     const showRegister = document.getElementById('showRegister');
     const showLogin = document.getElementById('showLogin');
-    const showPasswordReset = document.getElementById('showPasswordReset'); // 🆕
 
     if (loginBtn) loginBtn.addEventListener('click', () => this.showLoginModal());
     if (showRegister) showRegister.addEventListener('click', (e) => {
@@ -972,13 +874,6 @@ class MagnetSearchApp {
     if (showLogin) showLogin.addEventListener('click', (e) => {
       e.preventDefault();
       this.showLoginModal();
-    });
-    
-    // 🆕 忘记密码链接
-    if (showPasswordReset) showPasswordReset.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.getElementById('loginModal').style.display = 'none';
-      emailVerificationUI.showPasswordResetModal();
     });
 
     closeBtns.forEach(btn => {
@@ -1114,7 +1009,7 @@ class MagnetSearchApp {
     if (registerModal) registerModal.style.display = 'none';
   }
 
-  // 🆕 修改处理注册 - 集成邮箱验证
+  // 处理注册
   async handleRegister(event) {
     event.preventDefault();
     
@@ -1125,7 +1020,10 @@ class MagnetSearchApp {
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.classList.add('submitting');
-      submitBtn.textContent = '注册中...';
+      const span = document.createElement('span');
+      span.textContent = '注册中...';
+      submitBtn.innerHTML = '';
+      submitBtn.appendChild(span);
     }
     
     const username = document.getElementById('regUsername')?.value.trim();
@@ -1146,39 +1044,22 @@ class MagnetSearchApp {
       return;
     }
 
-    if (password.length < 6) {
-      showToast('密码长度至少6个字符', 'error');
-      this.resetSubmitButton(submitBtn);
-      return;
-    }
-
-    // 邮箱格式验证
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      showToast('请输入有效的邮箱地址', 'error');
-      this.resetSubmitButton(submitBtn);
-      return;
-    }
-
     try {
-      // 🆕 使用邮箱验证流程
-      // 先关闭注册模态框
-      this.closeModals();
+      const result = await authManager.register(username, email, password);
       
-      // 存储注册数据供验证时使用
-      emailVerificationUI.verificationData = {
-        username,
-        email,
-        password
-      };
-      
-      // 显示邮箱验证模态框
-      emailVerificationUI.showRegistrationVerificationModal(email);
-      
+      if (result.success) {
+        showToast('注册成功，请登录', 'success');
+        this.showLoginModal();
+        
+        // 清空注册表单
+        document.getElementById('registerForm').reset();
+        
+        // 预填用户名到登录表单
+        const loginUsername = document.getElementById('loginUsername');
+        if (loginUsername) loginUsername.value = username;
+      }
     } catch (error) {
-      console.error('注册流程启动失败:', error);
-      showToast('注册失败: ' + error.message, 'error');
-      this.resetSubmitButton(submitBtn);
+      console.error('注册失败:', error);
       this.performanceMetrics.errorCount++;
     } finally {
       this.resetSubmitButton(submitBtn);
@@ -1190,7 +1071,7 @@ class MagnetSearchApp {
     if (submitBtn) {
       submitBtn.disabled = false;
       submitBtn.classList.remove('submitting');
-      submitBtn.textContent = '注册并验证邮箱';
+      submitBtn.textContent = '注册';
     }
   }
 

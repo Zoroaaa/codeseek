@@ -18,8 +18,6 @@
     <link rel="stylesheet" href="css/components/loading.css">
     <link rel="stylesheet" href="css/components/search.css">
 	<link rel="stylesheet" href="css/components/detail-card.css">
-    <!-- 🆕 新增：邮箱验证样式 -->
-    <link rel="stylesheet" href="css/components/email-verification.css">
     <!-- 搜索配置管理样式 -->
     <link rel="stylesheet" href="css/components/search-config.css">
     <link rel="stylesheet" href="css/components/status.css">
@@ -285,13 +283,12 @@
                 <button type="submit" class="submit-btn">登录</button>
                 <div class="form-links">
                     <a href="#" id="showRegister">还没有账号？注册</a>
-                    <a href="#" id="showPasswordReset">忘记密码？</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- 🆕 更新注册模态框 - 集成邮箱验证 -->
+    <!-- 注册模态框 -->
     <div id="registerModal" class="modal" aria-labelledby="register-title" role="dialog">
         <div class="modal-content">
             <span class="close" aria-label="关闭">&times;</span>
@@ -336,7 +333,7 @@
                         maxlength="50"
                     >
                 </div>
-                <button type="submit" class="submit-btn">注册并验证邮箱</button>
+                <button type="submit" class="submit-btn">注册</button>
                 <div class="form-links">
                     <a href="#" id="showLogin">已有账号？登录</a>
                 </div>
@@ -365,8 +362,6 @@
     <script type="module">
         // 现在使用更新后的服务架构初始化应用
         import MagnetSearchApp from './src/pages/main/main.js';
-        // 🆕 导入邮箱验证UI组件
-        import { emailVerificationUI } from './src/components/email-verification-ui.js';
         
         // 全局导航函数（保持向后兼容）
         window.navigateToDashboard = function() {
@@ -408,18 +403,6 @@
             }
         };
 
-        // 🆕 邮箱验证相关全局函数
-        window.emailVerificationUI = emailVerificationUI;
-        
-        // 显示邮箱验证相关模态框的全局函数
-        window.showRegistrationVerificationModal = function(email) {
-            emailVerificationUI.showRegistrationVerificationModal(email);
-        };
-        
-        window.showPasswordResetModal = function() {
-            emailVerificationUI.showPasswordResetModal();
-        };
-
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('🚀 开始初始化应用...');
@@ -435,9 +418,6 @@
                 
                 // 创建使用统一搜索组件的应用实例
                 window.app = new MagnetSearchApp();
-                
-                // 🆕 初始化邮箱验证UI
-                initEmailVerificationIntegration();
                 
                 // 初始化配置管理UI
                 initConfigManagementUI();
@@ -463,78 +443,6 @@
                 document.body.insertBefore(errorDiv, document.body.firstChild);
             }
         });
-
-        // 🆕 初始化邮箱验证集成
-        function initEmailVerificationIntegration() {
-            console.log('🔐 初始化邮箱验证集成...');
-            
-            // 修改注册表单提交处理
-            const registerForm = document.getElementById('registerForm');
-            if (registerForm) {
-                registerForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    const username = document.getElementById('regUsername').value.trim();
-                    const email = document.getElementById('regEmail').value.trim();
-                    const password = document.getElementById('regPassword').value;
-                    const confirmPassword = document.getElementById('regConfirmPassword').value;
-                    
-                    // 客户端验证
-                    if (!username || !email || !password || !confirmPassword) {
-                        showToast('请填写所有字段', 'error');
-                        return;
-                    }
-                    
-                    if (password !== confirmPassword) {
-                        showToast('两次输入的密码不一致', 'error');
-                        return;
-                    }
-                    
-                    if (password.length < 6) {
-                        showToast('密码长度至少6个字符', 'error');
-                        return;
-                    }
-                    
-                    // 邮箱格式验证
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    if (!emailRegex.test(email)) {
-                        showToast('请输入有效的邮箱地址', 'error');
-                        return;
-                    }
-                    
-                    try {
-                        // 关闭注册模态框
-                        document.getElementById('registerModal').style.display = 'none';
-                        
-                        // 存储注册数据供验证时使用
-                        emailVerificationUI.verificationData = {
-                            username,
-                            email,
-                            password
-                        };
-                        
-                        // 显示邮箱验证模态框
-                        emailVerificationUI.showRegistrationVerificationModal(email);
-                        
-                    } catch (error) {
-                        console.error('注册流程启动失败:', error);
-                        showToast('注册失败: ' + error.message, 'error');
-                    }
-                });
-            }
-            
-            // 添加密码重置链接处理
-            const showPasswordResetLink = document.getElementById('showPasswordReset');
-            if (showPasswordResetLink) {
-                showPasswordResetLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    document.getElementById('loginModal').style.display = 'none';
-                    emailVerificationUI.showPasswordResetModal();
-                });
-            }
-            
-            console.log('✅ 邮箱验证集成完成');
-        }
 
         // 初始化配置管理UI
         function initConfigManagementUI() {
@@ -660,7 +568,7 @@
                 setTimeout(() => {
                     if (window.servicesManager) {
                         window.servicesManager.performHealthCheck().then(status => {
-                            console.log('🩺 服务健康检查结果:', status);
+                            console.log('🏥 服务健康检查结果:', status);
                         }).catch(console.error);
                     }
                 }, 2000);

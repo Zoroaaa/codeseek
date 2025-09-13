@@ -324,11 +324,11 @@ export async function userSaveSearchHistoryHandler(request, env) {
         const historyId = utils.generateId();
         const now = timestamp || Date.now();
 
-        await env.DB.prepare(`
-            INSERT INTO user_search_history (id, user_id, query, source, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        `).bind(historyId, user.id, trimmedQuery, source || 'unknown', now).run();
-
+		await env.DB.prepare(`
+            INSERT INTO user_search_history (id, user_id, query, source, results_count, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(historyId, user.id, trimmedQuery, source || 'unknown', resultCount || 0, now).run();
+		
         await utils.logUserAction(env, user.id, 'search', { query: trimmedQuery, source }, request);
 
         return utils.successResponse({ 

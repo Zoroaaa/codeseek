@@ -96,32 +96,18 @@ export async function communityCreateTagHandler(request, env) {
         
         const validColor = color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#3b82f6';
         
-        try {
-            const existingTag = await env.DB.prepare(`
-                SELECT id FROM community_source_tags WHERE LOWER(tag_name) = LOWER(?)
-            `).bind(trimmedName).first();
-            
-            if (existingTag) {
-                return utils.errorResponse('标签名称已存在，请使用其他名称', 400);
-            }
-        } catch (columnError) {
-            console.warn('标签重复检查查询失败，可能是列名问题:', columnError.message);
-            try {
-                const existingTag2 = await env.DB.prepare(`
-                    SELECT id FROM community_source_tags WHERE LOWER(name) = LOWER(?)
-                `).bind(trimmedName).first();
-                
-                if (existingTag2) {
-                    return utils.errorResponse('标签名称已存在，请使用其他名称', 400);
-                }
-            } catch (secondError) {
-                console.error('标签重复检查完全失败:', secondError.message);
-            }
+        // 移除try-catch，直接使用正确的字段名
+        const existingTag = await env.DB.prepare(`
+            SELECT id FROM community_source_tags WHERE LOWER(tag_name) = LOWER(?)
+        `).bind(trimmedName).first();
+        
+        if (existingTag) {
+            return utils.errorResponse('标签名称已存在，请使用其他名称', 400);
         }
         
         const userTagCount = await env.DB.prepare(`
             SELECT COUNT(*) as count FROM community_source_tags 
-            WHERE created_by = ? AND (tag_active = 1 OR is_active = 1)
+            WHERE created_by = ? AND tag_active = 1
         `).bind(user.id).first().catch(() => ({ count: 0 }));
         
         const maxTagsPerUser = parseInt(env.MAX_TAGS_PER_USER || '50');
@@ -132,39 +118,16 @@ export async function communityCreateTagHandler(request, env) {
         const tagId = utils.generateId();
         const now = Date.now();
         
-        try {
-            await env.DB.prepare(`
-                INSERT INTO community_source_tags (
-                    id, tag_name, tag_description, tag_color, usage_count, 
-                    is_official, tag_active, created_by, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).bind(
-                tagId, trimmedName, description?.trim() || '', validColor, 0, 
-                0, 1, user.id, now, now
-            ).run();
-        } catch (insertError) {
-            console.warn('使用新列名插入失败，尝试旧列名:', insertError.message);
-            
-            try {
-                await env.DB.prepare(`
-                    INSERT INTO community_source_tags (
-                        id, name, description, color, usage_count, 
-                        is_official, is_active, created_by, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                `).bind(
-                    tagId, trimmedName, description?.trim() || '', validColor, 0, 
-                    0, 1, user.id, now, now
-                ).run();
-            } catch (fallbackError) {
-                console.error('两种列名结构都失败:', fallbackError.message);
-                
-                if (fallbackError.message.includes('UNIQUE constraint')) {
-                    return utils.errorResponse('标签名称已存在，请使用其他名称', 400);
-                }
-                
-                throw fallbackError;
-            }
-        }
+        // 移除try-catch，直接使用正确的字段名
+        await env.DB.prepare(`
+            INSERT INTO community_source_tags (
+                id, tag_name, tag_description, tag_color, usage_count, 
+                is_official, tag_active, created_by, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+            tagId, trimmedName, description?.trim() || '', validColor, 0, 
+            0, 1, user.id, now, now
+        ).run();
         
         await utils.logUserAction(env, user.id, 'tag_created', {
             tagId,
@@ -193,12 +156,10 @@ export async function communityCreateTagHandler(request, env) {
         console.error('创建标签失败:', error);
         
         let errorMessage = '创建标签失败';
-        if (error.message.includes('ambiguous column name')) {
-            errorMessage = '数据库列名冲突，请联系管理员更新数据库架构';
+        if (error.message.includes('UNIQUE constraint')) {
+            errorMessage = '标签名称已存在，请使用其他名称';
         } else if (error.message.includes('SQLITE_ERROR')) {
             errorMessage = 'SQLite数据库错误，请检查服务器状态';
-        } else if (error.message.includes('UNIQUE constraint')) {
-            errorMessage = '标签名称已存在，请使用其他名称';
         } else {
             errorMessage += ': ' + error.message;
         }
@@ -324,8 +285,6 @@ export async function communityUpdateTagHandler(request, env) {
         let errorMessage = '更新标签失败';
         if (error.message.includes('UNIQUE constraint')) {
             errorMessage = '标签名称已存在，请使用其他名称';
-        } else if (error.message.includes('ambiguous column name')) {
-            errorMessage = '数据库结构正在更新中，请稍后重试';
         } else {
             errorMessage += ': ' + error.message;
         }
@@ -490,57 +449,23 @@ export async function communityGetSourcesHandler(request, env) {
         const uniqueTagIds = [...new Set(allTagIds)];
         let tagMap = new Map();
         
-        if (uniqueTagIds.length > 0) {
-            try {
-                const tagQuery = `
-                    SELECT id, tag_name as name, tag_color as color, is_official 
-                    FROM community_source_tags 
-                    WHERE id IN (${uniqueTagIds.map(() => '?').join(',')}) AND tag_active = 1
-                `;
-                const tagResult = await env.DB.prepare(tagQuery).bind(...uniqueTagIds).all();
-                
-                tagResult.results.forEach(tag => {
-                    tagMap.set(tag.id, {
-                        id: tag.id,
-                        name: tag.name,
-                        color: tag.color,
-                        isOfficial: Boolean(tag.is_official)
-                    });
-                });
-                
-            } catch (columnError) {
-                console.warn('使用新列名查询标签失败，尝试旧列名:', columnError.message);
-                
-                try {
-                    const tagQueryOld = `
-                        SELECT id, name, color, is_official 
-                        FROM community_source_tags 
-                        WHERE id IN (${uniqueTagIds.map(() => '?').join(',')}) AND is_active = 1
-                    `;
-                    const tagResultOld = await env.DB.prepare(tagQueryOld).bind(...uniqueTagIds).all();
-                    
-                    tagResultOld.results.forEach(tag => {
-                        tagMap.set(tag.id, {
-                            id: tag.id,
-                            name: tag.name,
-                            color: tag.color,
-                            isOfficial: Boolean(tag.is_official)
-                        });
-                    });
-                    
-                } catch (fallbackError) {
-                    console.error('标签查询完全失败:', fallbackError.message);
-                    uniqueTagIds.forEach(tagId => {
-                        tagMap.set(tagId, {
-                            id: tagId,
-                            name: `标签-${tagId.slice(0, 8)}`,
-                            color: '#3b82f6',
-                            isOfficial: false
-                        });
-                    });
-                }
-            }
-        }
+    if (uniqueTagIds.length > 0) {
+    const tagQuery = `
+        SELECT id, tag_name as name, tag_color as color, is_official 
+        FROM community_source_tags 
+        WHERE id IN (${uniqueTagIds.map(() => '?').join(',')}) AND tag_active = 1
+    `;
+    const tagResult = await env.DB.prepare(tagQuery).bind(...uniqueTagIds).all();
+    
+    tagResult.results.forEach(tag => {
+        tagMap.set(tag.id, {
+            id: tag.id,
+            name: tag.name,
+            color: tag.color,
+            isOfficial: Boolean(tag.is_official)
+        });
+    });
+}
         
         const sources = result.results.map(source => {
             let sourceTags = [];
@@ -663,19 +588,19 @@ export async function communityCreateSourceHandler(request, env) {
         }
         
         let processedTagIds = [];
-        if (Array.isArray(tags) && tags.length > 0) {
-            const validTags = tags.slice(0, 10);
-            
-            if (validTags.length > 0) {
-                const tagQuery = `
-                    SELECT id FROM community_source_tags 
-                    WHERE id IN (${validTags.map(() => '?').join(',')}) 
-                    AND tag_active = 1
-                `;
-                const tagResult = await env.DB.prepare(tagQuery).bind(...validTags).all();
-                processedTagIds = tagResult.results.map(tag => tag.id);
-            }
-        }
+if (Array.isArray(tags) && tags.length > 0) {
+    const validTags = tags.slice(0, 10);
+    
+    if (validTags.length > 0) {
+        const tagQuery = `
+            SELECT id FROM community_source_tags 
+            WHERE id IN (${validTags.map(() => '?').join(',')}) 
+            AND tag_active = 1
+        `;
+        const tagResult = await env.DB.prepare(tagQuery).bind(...validTags).all();
+        processedTagIds = tagResult.results.map(tag => tag.id);
+    }
+}
         
         const sourceId = utils.generateId();
         const now = Date.now();
@@ -779,58 +704,24 @@ export async function communityGetSourceDetailHandler(request, env) {
         let tagDetails = [];
         const tagIds = sourceResult.tags ? JSON.parse(sourceResult.tags) : [];
         
-        if (tagIds.length > 0) {
-            try {
-                const tagQuery = `
-                    SELECT id, tag_name as name, tag_description as description, 
-                           tag_color as color, is_official, usage_count 
-                    FROM community_source_tags 
-                    WHERE id IN (${tagIds.map(() => '?').join(',')}) AND tag_active = 1
-                `;
-                const tagResult = await env.DB.prepare(tagQuery).bind(...tagIds).all();
-                
-                tagDetails = tagResult.results.map(tag => ({
-                    id: tag.id,
-                    name: tag.name,
-                    description: tag.description,
-                    color: tag.color,
-                    isOfficial: Boolean(tag.is_official),
-                    usageCount: tag.usage_count || 0
-                }));
-                
-            } catch (columnError) {
-                console.warn('标签查询使用新列名失败，尝试旧列名:', columnError.message);
-                
-                try {
-                    const tagQueryOld = `
-                        SELECT id, name, description, color, is_official, usage_count 
-                        FROM community_source_tags 
-                        WHERE id IN (${tagIds.map(() => '?').join(',')}) AND is_active = 1
-                    `;
-                    const tagResultOld = await env.DB.prepare(tagQueryOld).bind(...tagIds).all();
-                    
-                    tagDetails = tagResultOld.results.map(tag => ({
-                        id: tag.id,
-                        name: tag.name,
-                        description: tag.description,
-                        color: tag.color,
-                        isOfficial: Boolean(tag.is_official),
-                        usageCount: tag.usage_count || 0
-                    }));
-                    
-                } catch (fallbackError) {
-                    console.error('标签查询完全失败:', fallbackError.message);
-                    tagDetails = tagIds.map(tagId => ({
-                        id: tagId,
-                        name: `标签-${tagId.slice(0, 8)}`,
-                        description: '',
-                        color: '#3b82f6',
-                        isOfficial: false,
-                        usageCount: 0
-                    }));
-                }
-            }
-        }
+if (tagIds.length > 0) {
+    const tagQuery = `
+        SELECT id, tag_name as name, tag_description as description, 
+               tag_color as color, is_official, usage_count 
+        FROM community_source_tags 
+        WHERE id IN (${tagIds.map(() => '?').join(',')}) AND tag_active = 1
+    `;
+    const tagResult = await env.DB.prepare(tagQuery).bind(...tagIds).all();
+    
+    tagDetails = tagResult.results.map(tag => ({
+        id: tag.id,
+        name: tag.name,
+        description: tag.description,
+        color: tag.color,
+        isOfficial: Boolean(tag.is_official),
+        usageCount: tag.usage_count || 0
+    }));
+}
         
         const source = {
             id: sourceResult.id,
@@ -903,19 +794,19 @@ export async function communityUpdateSourceHandler(request, env) {
         }
 
         let processedTagIds = [];
-        if (Array.isArray(tags)) {
-            const validTags = tags.slice(0, 10).filter(tagId => tagId && typeof tagId === 'string');
-            
-            if (validTags.length > 0) {
-                const tagQuery = `
-                    SELECT id FROM community_source_tags 
-                    WHERE id IN (${validTags.map(() => '?').join(',')}) 
-                    AND tag_active = 1
-                `;
-                const tagResult = await env.DB.prepare(tagQuery).bind(...validTags).all();
-                processedTagIds = tagResult.results.map(tag => tag.id);
-            }
-        }
+if (Array.isArray(tags)) {
+    const validTags = tags.slice(0, 10).filter(tagId => tagId && typeof tagId === 'string');
+    
+    if (validTags.length > 0) {
+        const tagQuery = `
+            SELECT id FROM community_source_tags 
+            WHERE id IN (${validTags.map(() => '?').join(',')}) 
+            AND tag_active = 1
+        `;
+        const tagResult = await env.DB.prepare(tagQuery).bind(...validTags).all();
+        processedTagIds = tagResult.results.map(tag => tag.id);
+    }
+}
 
         const now = Date.now();
         

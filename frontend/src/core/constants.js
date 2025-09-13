@@ -125,9 +125,8 @@ export const APP_CONSTANTS = {
 
   // 支持详情提取的搜索源 - 保持不变
   DETAIL_EXTRACTION_SOURCES: [
-    'javbus', 'javdb', 'javlibrary', 'jable', 'javmost', 
-    'missav', 'javhdporn', 'javgg', 'av01', 'sukebei',
-    'javguru', 'javhihi'
+    'javbus', 'javdb', 'jable', 'javmost', 
+    'javgg',  'sukebei','javguru'
   ],
 
   // 详情提取源能力映射 - 保持不变
@@ -153,17 +152,7 @@ export const APP_CONSTANTS = {
       rating: true,
       tags: true,
       quality: 'good'
-    },
-    'javlibrary': {
-      screenshots: true,
-      downloadLinks: false,
-      magnetLinks: false,
-      actresses: true,
-      metadata: true,
-      description: false,
-      rating: true,
-      tags: true,
-      quality: 'good'
+    }
     },
     'jable': {
       screenshots: true,
@@ -186,17 +175,7 @@ export const APP_CONSTANTS = {
       rating: false,
       tags: false,
       quality: 'fair'
-    },
-    'missav': {
-      screenshots: true,
-      downloadLinks: false,
-      magnetLinks: false,
-      actresses: true,
-      metadata: true,
-      description: false,
-      rating: false,
-      tags: false,
-      quality: 'fair'
+    }
     },
     'sukebei': {
       screenshots: false,
@@ -318,10 +297,10 @@ export const APP_CONSTANTS = {
       isBuiltin: true,
       priority: 3,
       isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'good',
-      averageExtractionTime: 4000,
-      supportedFeatures: ['screenshots', 'actresses', 'metadata', 'rating', 'tags']
+      supportsDetailExtraction: tfalserue,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
     },
     {
       id: 'javfinder',
@@ -380,10 +359,10 @@ export const APP_CONSTANTS = {
       isBuiltin: true,
       priority: 3,
       isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'fair',
-      averageExtractionTime: 5000,
-      supportedFeatures: ['screenshots', 'actresses', 'metadata']
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
     },
     {
       id: 'av01',
@@ -395,10 +374,10 @@ export const APP_CONSTANTS = {
       isBuiltin: true,
       priority: 4,
       isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'good',
-      averageExtractionTime: 3000,
-      supportedFeatures: ['screenshots', 'actresses', 'metadata', 'description']
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
     },
     {
       id: 'missav',
@@ -410,10 +389,10 @@ export const APP_CONSTANTS = {
       isBuiltin: true,
       priority: 5,
       isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'fair',
-      averageExtractionTime: 4000,
-      supportedFeatures: ['screenshots', 'actresses', 'metadata']
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
     },
     {
       id: 'javhdporn',
@@ -425,10 +404,10 @@ export const APP_CONSTANTS = {
       isBuiltin: true,
       priority: 6,
       isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'good',
-      averageExtractionTime: 3500,
-      supportedFeatures: ['screenshots', 'downloadLinks', 'actresses', 'metadata']
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
     },
     {
       id: 'javgg',

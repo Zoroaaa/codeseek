@@ -18,8 +18,6 @@
     <link rel="stylesheet" href="css/components/search.css">
     <link rel="stylesheet" href="css/components/status.css">
 	<link rel="stylesheet" href="css/components/search-status.css">
-    <!-- 🆕 新增：邮箱验证样式 -->
-    <link rel="stylesheet" href="css/components/email-verification.css">
 	
 	<!-- Dashboard功能模块样式 -->
     <link rel="stylesheet" href="css/pages/dashboard/sources-management.css">
@@ -133,7 +131,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">🔍</div>
+                        <div class="stat-icon">📁</div>
                         <div class="stat-info">
                             <div class="stat-number" id="totalSources">0</div>
                             <div class="stat-label">搜索源数量</div>
@@ -159,7 +157,7 @@
                         <span>查看收藏</span>
                     </button>
                     <button class="action-btn" data-action="sources">
-                        <span class="btn-icon">🔍</span>
+                        <span class="btn-icon">📁</span>
                         <span>管理搜索源</span>
                     </button>
                     <button class="action-btn" data-action="export">
@@ -598,7 +596,7 @@
 </div>
             </div>
 
-            <!-- 🆕 更新系统设置标签页 - 集成邮箱验证功能 -->
+            <!-- 系统设置标签页 -->
             <div id="settings" class="tab-content">
                 <div class="tab-header">
                     <h1>系统设置</h1>
@@ -733,36 +731,14 @@
                         </div>
                     </div>
 
-                    <!-- 🆕 账户安全设置区域 -->
+                    <!-- 账户操作区域 -->
                     <div class="settings-section">
-                        <h3>🔐 账户安全</h3>
-                        <div class="setting-item">
-                            <label>当前邮箱</label>
-                            <div class="setting-control">
-                                <input type="email" id="currentEmailDisplay" disabled readonly>
-                                <button class="btn-secondary" onclick="emailVerificationUI.showEmailChangeModal()">更改邮箱</button>
-                            </div>
-                            <span class="setting-desc">更改邮箱需要验证新旧邮箱地址</span>
-                        </div>
-                        <div class="setting-item">
-                            <label>密码安全</label>
-                            <div class="setting-control">
-                                <button class="btn-warning" onclick="emailVerificationUI.showPasswordResetModal()">修改密码</button>
-                                <span class="setting-desc">修改密码需要验证当前密码和邮箱验证码</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 🆕 账户操作区域 - 集成邮箱验证 -->
-                    <div class="settings-section">
-                        <h3>危险操作</h3>
+                        <h3>账户操作</h3>
                         <div class="dangerous-actions">
+                            <button class="btn-warning" id="changePasswordBtn">修改密码</button>
                             <button class="btn-danger" id="clearAllDataBtn">清空所有数据</button>
-                            <button class="btn-danger" onclick="emailVerificationUI.showAccountDeleteModal()">删除账户</button>
+                            <button class="btn-danger" id="deleteAccountBtn">删除账户</button>
                         </div>
-                        <p class="danger-warning">
-                            ⚠️ 这些操作将永久删除您的数据，且无法恢复。删除账户需要邮箱验证码确认。
-                        </p>
                     </div>
 
                     <!-- 保存设置区域 -->
@@ -831,7 +807,7 @@
         </div>
     </main>
 
-    <!-- 🆕 修改密码模态框 - 已由邮箱验证UI处理，这里保留为兼容性 -->
+    <!-- 模态框 -->
     <div id="passwordModal" class="modal" aria-labelledby="password-title" role="dialog">
         <div class="modal-content">
             <span class="close" aria-label="关闭">&times;</span>
@@ -863,8 +839,6 @@
     <script type="module">
         // 修正导入路径
         import DashboardApp from './src/pages/dashboard/dashboard-app.js';
-        // 🆕 导入邮箱验证UI组件
-        import { emailVerificationUI } from './src/components/email-verification-ui.js';
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', () => {
@@ -885,9 +859,6 @@
                 window.app = new DashboardApp();
                 console.log('DashboardApp实例已创建');
                 
-                // 🆕 初始化邮箱验证集成
-                initEmailVerificationIntegration();
-                
                 // 绑定所有按钮事件
                 bindButtonEvents();
                 
@@ -896,62 +867,6 @@
                 alert('系统初始化失败，请刷新页面重试');
             }
         });
-
-        // 🆕 初始化邮箱验证集成
-        function initEmailVerificationIntegration() {
-            console.log('🔐 初始化邮箱验证集成...');
-            
-            // 使邮箱验证UI组件全局可用
-            window.emailVerificationUI = emailVerificationUI;
-            
-            // 监听用户邮箱更改成功事件
-            window.addEventListener('emailChanged', (event) => {
-                console.log('邮箱已更改:', event.detail);
-                // 更新设置页面中的当前邮箱显示
-                const currentEmailDisplay = document.getElementById('currentEmailDisplay');
-                if (currentEmailDisplay) {
-                    currentEmailDisplay.value = event.detail.newEmail;
-                }
-                // 可以触发用户信息刷新
-                if (window.app && window.app.updateUserInfo) {
-                    window.app.updateUserInfo();
-                }
-            });
-            
-            // 监听账户删除事件
-            window.addEventListener('accountDeleted', () => {
-                console.log('账户已删除，准备跳转到主页');
-                // 清除本地数据并跳转
-                setTimeout(() => {
-                    window.location.href = './index.html';
-                }, 2000);
-            });
-            
-            // 初始化时设置当前邮箱显示
-            setTimeout(() => {
-                const currentUser = window.app && window.app.getCurrentUser();
-                if (currentUser && currentUser.email) {
-                    const currentEmailDisplay = document.getElementById('currentEmailDisplay');
-                    if (currentEmailDisplay) {
-                        // 显示脱敏邮箱
-                        currentEmailDisplay.value = maskEmail(currentUser.email);
-                    }
-                }
-            }, 1000);
-            
-            console.log('✅ 邮箱验证集成完成');
-        }
-        
-        // 邮箱脱敏显示
-        function maskEmail(email) {
-            if (!email) return '';
-            const [localPart, domain] = email.split('@');
-            if (localPart.length <= 2) {
-                return `${localPart[0]}***@${domain}`;
-            }
-            const masked = localPart[0] + '*'.repeat(localPart.length - 2) + localPart[localPart.length - 1];
-            return `${masked}@${domain}`;
-        }
 
         // 绑定按钮事件的函数
         function bindButtonEvents() {
@@ -977,7 +892,9 @@
                 const settingsButtons = {
                     'saveSettingsBtn': () => window.app.saveSettings(),
                     'resetSettingsBtn': () => window.app.resetSettings(),
+                    'changePasswordBtn': () => window.app.changePassword(),
                     'clearAllDataBtn': () => window.app.clearAllData(),
+                    'deleteAccountBtn': () => window.app.deleteAccount(),
                     
                     // 收藏相关
                     'syncFavoritesBtn': () => window.app.syncFavorites(),
