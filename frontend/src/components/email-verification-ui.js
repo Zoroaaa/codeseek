@@ -171,7 +171,6 @@ export class EmailVerificationUI {
             }
         }
     }
-}
 
     // 重新发送注册验证码
     async resendRegistrationCode() {
