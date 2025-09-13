@@ -93,7 +93,7 @@ class AuthManager {
       
       if (response.success && response.user && response.token) {
         this.setAuth(response.user, response.token);
-        showToast(`欢迎回来，${response.user.identifier}！`, 'success');
+        showToast(`欢迎回来，${response.user.username}！`, 'success');
         return { success: true, user: response.user };
       } else {
         throw new Error(response.message || '登录失败');
