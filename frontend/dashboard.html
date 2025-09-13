@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="css/components/search.css">
     <link rel="stylesheet" href="css/components/status.css">
 	<link rel="stylesheet" href="css/components/search-status.css">
-    <!-- 🆕 新增：邮箱验证样式 -->
+    <!-- 新增：邮箱验证样式 -->
     <link rel="stylesheet" href="css/components/email-verification.css">
 	
 	<!-- Dashboard功能模块样式 -->
@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="css/pages/dashboard/categories-management.css">
     <link rel="stylesheet" href="css/pages/dashboard/community.css">
     
-    <!-- 仪表板专用样式 -->
+    <!-- 仪表盘专用样式 -->
     <link rel="stylesheet" href="css/pages/dashboard/dashboard.css">
     
     <!-- 工具样式 -->
@@ -83,7 +83,7 @@
                 </div>
                 <!-- 新增：搜索源管理独立页面 -->
                 <div class="menu-item" data-tab="sources">
-                    <span class="menu-icon">🔍</span>
+                    <span class="menu-icon">🔗</span>
                     <span class="menu-text">搜索源管理</span>
                 </div>
                 <!-- 新增：分类管理独立页面 -->
@@ -91,7 +91,7 @@
                     <span class="menu-icon">📂</span>
                     <span class="menu-text">分类管理</span>
                 </div>
-                <!-- 🆕 新增：社区标签页 -->
+                <!-- 新增：社区标签页 -->
                 <div class="menu-item" data-tab="community">
                     <span class="menu-icon">👥</span>
                     <span class="menu-text">搜索源社区</span>
@@ -133,7 +133,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">🔍</div>
+                        <div class="stat-icon">🔗</div>
                         <div class="stat-info">
                             <div class="stat-number" id="totalSources">0</div>
                             <div class="stat-label">搜索源数量</div>
@@ -159,7 +159,7 @@
                         <span>查看收藏</span>
                     </button>
                     <button class="action-btn" data-action="sources">
-                        <span class="btn-icon">🔍</span>
+                        <span class="btn-icon">🔗</span>
                         <span>管理搜索源</span>
                     </button>
                     <button class="action-btn" data-action="export">
@@ -393,7 +393,7 @@
                 </div>
             </div>
 
-            <!-- 🆕 完善的搜索源社区标签页 -->
+            <!-- 搜索源社区标签页 -->
             <div id="community" class="tab-content">
                 <div class="tab-header">
                     <h1>搜索源社区</h1>
@@ -438,9 +438,9 @@
         <span class="stat-desc">获得点赞</span>
       </div>
     </div>
-    <!-- 🆕 新增浏览量统计栏目 -->
+    <!-- 新增浏览量统计栏目 -->
     <div class="stat-item">
-      <span class="stat-icon">👁</span>
+      <span class="stat-icon">👀</span>
       <div class="stat-info">
         <span class="stat-value" id="userViewsCount">0</span>
         <span class="stat-desc">总浏览量</span>
@@ -456,12 +456,12 @@
   </div>
 </div>
 
-<!-- 🆕 标签管理区域 -->
+<!-- 标签管理区域 -->
 <div class="tag-management-section">
   <div class="tag-management-header">
     <h3>🏷️ 标签管理</h3>
     <div class="tag-management-actions">
-      <!-- 🆕 新增管理标签按钮 -->
+      <!-- 新增管理标签按钮 -->
       <button class="tag-manage-btn" id="tagManageBtn">
         <span>⚙️</span>
         <span>管理标签</span>
@@ -511,7 +511,7 @@
         <option value="rating_score-desc">评分最高</option>
         <option value="download_count-desc">下载最多</option>
         <option value="like_count-desc">点赞最多</option>
-        <option value="view_count-desc">浏览最多</option> <!-- 🆕 新增按浏览量排序 -->
+        <option value="view_count-desc">浏览最多</option> <!-- 新增按浏览量排序 -->
       </select>
     </div>
     <div class="filter-group">
@@ -591,14 +591,14 @@
       社区规则
     </a>
   </p>
-  <!-- 🆕 数据库状态指示器 -->
+  <!-- 数据库状态指示器 -->
   <div class="db-status-indicator" id="dbStatusIndicator" style="margin-top: 0.5rem; font-size: 0.75rem;">
     <span id="dbStatus" style="color: var(--success-color);">✅ 数据库连接正常</span>
   </div>
 </div>
             </div>
 
-            <!-- 🆕 更新系统设置标签页 - 集成邮箱验证功能 -->
+            <!-- 更新系统设置标签页 - 集成邮箱验证功能 -->
             <div id="settings" class="tab-content">
                 <div class="tab-header">
                     <h1>系统设置</h1>
@@ -639,7 +639,7 @@
                         </div>
                     </div>
 
-                    <!-- 🆕 新增：搜索源状态检查设置 -->
+                    <!-- 新增：搜索源状态检查设置 -->
                     <div class="settings-section status-check-settings">
                         <h4>🔍 搜索源状态检查</h4>
                         <p style="margin-bottom: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
@@ -733,7 +733,7 @@
                         </div>
                     </div>
 
-                    <!-- 🆕 账户安全设置区域 -->
+                    <!-- 🔐 账户安全设置区域 - 移除旧密码修改模态框，使用邮箱验证 -->
                     <div class="settings-section">
                         <h3>🔐 账户安全</h3>
                         <div class="setting-item">
@@ -753,7 +753,7 @@
                         </div>
                     </div>
 
-                    <!-- 🆕 账户操作区域 - 集成邮箱验证 -->
+                    <!-- 🚨 账户操作区域 - 集成邮箱验证 -->
                     <div class="settings-section">
                         <h3>危险操作</h3>
                         <div class="dangerous-actions">
@@ -831,26 +831,6 @@
         </div>
     </main>
 
-    <!-- 🆕 修改密码模态框 - 已由邮箱验证UI处理，这里保留为兼容性 -->
-    <div id="passwordModal" class="modal" aria-labelledby="password-title" role="dialog">
-        <div class="modal-content">
-            <span class="close" aria-label="关闭">&times;</span>
-            <h2 id="password-title">修改密码</h2>
-            <form id="passwordForm" novalidate>
-                <div class="form-group">
-                    <input type="password" id="currentPassword" placeholder="当前密码" required autocomplete="current-password">
-                </div>
-                <div class="form-group">
-                    <input type="password" id="newPassword" placeholder="新密码" required autocomplete="new-password">
-                </div>
-                <div class="form-group">
-                    <input type="password" id="confirmNewPassword" placeholder="确认新密码" required autocomplete="new-password">
-                </div>
-                <button type="submit" class="submit-btn">修改密码</button>
-            </form>
-        </div>
-    </div>
-
     <!-- Toast通知 -->
     <div id="toast" class="toast" role="alert" aria-live="polite"></div>
 
@@ -912,7 +892,7 @@
                 if (currentEmailDisplay) {
                     currentEmailDisplay.value = event.detail.newEmail;
                 }
-                // 可以触发用户信息刷新
+                // 可以触发用户信息更新
                 if (window.app && window.app.updateUserInfo) {
                     window.app.updateUserInfo();
                 }

@@ -132,7 +132,7 @@ export class EmailVerificationService {
 		
 		    // 使用映射后的模板类型
 			// 获取邮件模板
-    const templateType = this.getTemplateType(verificationType);
+    templateType = this.getTemplateType(templateType);;
     const template = await this.getEmailTemplate(templateType);
     
     if (!template) {
