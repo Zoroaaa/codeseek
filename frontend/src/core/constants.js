@@ -185,6 +185,7 @@ export const APP_CONSTANTS = {
       rating: false,
       tags: true,
       quality: 'fair'
+  }
   },
 
   // 搜索源分类定义 - 保持不变，增强详情提取支持标识
