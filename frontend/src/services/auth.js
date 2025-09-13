@@ -85,15 +85,15 @@ class AuthManager {
   }
 
   // 登录
-  async login(username, password) {
+  async login(identifier, password) {
     try {
       showLoading(true);
       
-      const response = await apiService.login(username, password);
+      const response = await apiService.login(identifier, password);
       
       if (response.success && response.user && response.token) {
         this.setAuth(response.user, response.token);
-        showToast(`欢迎回来，${response.user.username}！`, 'success');
+        showToast(`欢迎回来，${response.user.identifier}！`, 'success');
         return { success: true, user: response.user };
       } else {
         throw new Error(response.message || '登录失败');
