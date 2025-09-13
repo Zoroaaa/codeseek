@@ -53,22 +53,45 @@ class EmailVerificationService {
     }
 
     // 验证注册验证码（在注册时调用）
-    async verifyRegistrationCode(email, code) {
-        try {
-            const response = await apiService.register(email.username || '', email, email.password || '', code);
-            
-            if (response.success) {
-                // 清除待验证状态
-                this.clearVerification('registration');
-                return response;
-            } else {
-                throw new Error(response.message || '验证失败');
-            }
-        } catch (error) {
-            console.error('注册验证失败:', error);
-            throw error;
+async verifyRegistrationCode(registrationData, code) {
+    try {
+        if (!registrationData || !registrationData.username || !registrationData.email || !registrationData.password) {
+            throw new Error('注册数据不完整');
         }
+
+        if (!this.validateVerificationCode(code)) {
+            throw new Error('验证码格式错误');
+        }
+
+        showLoading(true);
+        
+        // 调用注册API，包含验证码
+        const response = await apiService.request('/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+                username: registrationData.username,
+                email: registrationData.email,
+                password: registrationData.password,
+                verificationCode: code
+            })
+        });
+        
+        if (response.success) {
+            // 清除待验证状态
+            this.clearVerification('registration');
+            showToast('注册成功！', 'success');
+            return { success: true, user: response.user };
+        } else {
+            throw new Error(response.message || '注册验证失败');
+        }
+    } catch (error) {
+        console.error('注册验证失败:', error);
+        showToast(error.message || '注册验证失败，请重试', 'error');
+        throw error;
+    } finally {
+        showLoading(false);
     }
+}
 
     // 发送密码重置验证码
     async sendPasswordResetCode() {

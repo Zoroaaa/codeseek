@@ -30,9 +30,9 @@ EMAIL_RATE_LIMIT_PER_HOUR = "5"           # 每小时最大发送邮件数
 EMAIL_RATE_LIMIT_PER_DAY = "20"           # 每天最大发送邮件数
 
 # 邮件发送配置
-DEFAULT_FROM_EMAIL = "noreply@codeseek.pp.ua"  # 发件人邮箱
+DEFAULT_FROM_EMAIL = "noreply@tempemail.pp.ua"  # 发件人邮箱
 DEFAULT_FROM_NAME = "磁力快搜"              # 发件人姓名
-SITE_URL = "https://codeseek.pp.ua"        # 站点URL（用于邮件模板）
+SITE_URL = "https://tempemail.pp.ua"        # 站点URL（用于邮件模板）
 
 # JWT配置（现有）
 JWT_EXPIRY_DAYS = "30"
