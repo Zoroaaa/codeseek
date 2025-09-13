@@ -152,7 +152,6 @@ export const APP_CONSTANTS = {
       rating: true,
       tags: true,
       quality: 'good'
-    }
     },
     'jable': {
       screenshots: true,
@@ -175,7 +174,6 @@ export const APP_CONSTANTS = {
       rating: false,
       tags: false,
       quality: 'fair'
-    }
     },
     'sukebei': {
       screenshots: false,
@@ -187,7 +185,6 @@ export const APP_CONSTANTS = {
       rating: false,
       tags: true,
       quality: 'fair'
-    }
   },
 
   // 搜索源分类定义 - 保持不变，增强详情提取支持标识
