@@ -1,6 +1,35 @@
 /* src/css/components/email-verification.css - 邮箱验证相关样式 - 支持忘记密码功能 */
 
 /* ===============================================
+ * 🆕 模态框覆盖层和居中样式（修复定位问题）
+ * =============================================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+    box-sizing: border-box;
+    animation: fadeInOverlay 0.3s ease-out;
+}
+
+/* 确保模态框始终居中 */
+.modal-overlay .verification-modal {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    margin: auto;
+}
+
+/* ===============================================
  * 邮箱验证模态框基础样式
  * =============================================== */
 
@@ -9,6 +38,10 @@
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideInModal 0.3s ease-out;
 }
 
 .verification-modal .modal-header {
@@ -446,6 +479,7 @@
     border-radius: 6px;
     font-size: 0.875rem;
     transition: all 0.2s ease;
+    box-sizing: border-box;
 }
 
 .form-group input:focus {
@@ -678,6 +712,7 @@
     text-decoration: none;
     transition: all 0.2s ease;
     min-height: 44px;
+    box-sizing: border-box;
 }
 
 .btn:disabled {
@@ -810,10 +845,15 @@
  * =============================================== */
 
 @media (max-width: 768px) {
+    .modal-overlay {
+        padding: 0.5rem;
+    }
+    
     .verification-modal {
-        margin: 1rem;
+        margin: 0;
         max-width: none;
-        width: calc(100% - 2rem);
+        width: 100%;
+        max-height: 95vh;
     }
 
     .verification-modal .modal-header {
@@ -907,14 +947,6 @@
 /* ===============================================
  * 动画效果
  * =============================================== */
-
-.modal-overlay {
-    animation: fadeInOverlay 0.3s ease-out;
-}
-
-.verification-modal {
-    animation: slideInModal 0.3s ease-out;
-}
 
 @keyframes fadeInOverlay {
     from { opacity: 0; }
@@ -1083,5 +1115,43 @@
         background: #742a2a;
         color: #feb2b2;
         border-color: #9b2c2c;
+    }
+}
+
+/* ===============================================
+ * 🆕 兼容性修复和额外优化
+ * =============================================== */
+
+/* 确保模态框在所有浏览器中都能正常居中 */
+.modal-overlay {
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    -webkit-box-pack: center;
+    -ms-flex-pack: center;
+}
+
+/* 修复iOS Safari中的滚动问题 */
+.verification-modal {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 防止模态框内容被选中 */
+.verification-modal .modal-header {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* 确保按钮在触摸设备上有足够的点击区域 */
+@media (pointer: coarse) {
+    .btn {
+        min-height: 48px;
+        padding: 0.875rem 1.5rem;
+    }
+    
+    .verification-modal .modal-close {
+        width: 40px;
+        height: 40px;
     }
 }
