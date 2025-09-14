@@ -1,4 +1,4 @@
-// src/components/email-verification-ui.js - 更新版本，新增忘记密码UI功能
+// src/components/email-verification-ui.js - 增强版本，支持智能状态恢复
 import emailVerificationService from '../services/email-verification-service.js';
 import { showToast, showModal, hideModal } from '../utils/dom.js';
 import authManager from '../services/auth.js';
@@ -9,6 +9,7 @@ export class EmailVerificationUI {
         this.currentStep = 1;
         this.verificationData = {};
         this.countdownIntervals = new Map();
+        this.stateRestorationEnabled = true; // 启用状态恢复功能
         
         this.bindEvents();
     }
@@ -36,8 +37,8 @@ export class EmailVerificationUI {
         });
     }
 
-    // 🆕 新增：显示忘记密码模态框
-    showForgotPasswordModal() {
+    // 🆕 新增：智能显示忘记密码模态框（支持状态恢复）
+    async showForgotPasswordModal(email = null) {
         // 清理可能存在的模态框，避免重复ID
         this.hideForgotPasswordModal();
         
@@ -63,7 +64,8 @@ export class EmailVerificationUI {
                                            id="forgotPasswordEmail" 
                                            placeholder="请输入注册邮箱" 
                                            required 
-                                           autocomplete="email">
+                                           autocomplete="email"
+                                           value="${email || ''}">
                                 </div>
                                 <button type="submit" class="btn btn-primary btn-full" id="sendForgotCodeBtn">
                                     发送验证码
@@ -158,9 +160,61 @@ export class EmailVerificationUI {
         `;
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // 🆕 尝试恢复验证状态
+        if (email && this.stateRestorationEnabled) {
+            try {
+                const restoration = await emailVerificationService.autoRestoreVerificationState(
+                    email, 'forgot_password'
+                );
+                
+                if (restoration.shouldRestore) {
+                    console.log('恢复忘记密码验证状态:', restoration.state);
+                    this.restoreForgotPasswordState(restoration.state, email);
+                }
+            } catch (error) {
+                console.warn('恢复忘记密码状态失败:', error);
+            }
+        }
     }
 
-    // 🆕 新增：提交忘记密码邮箱
+    // 🆕 新增：恢复忘记密码验证状态
+    restoreForgotPasswordState(state, email) {
+        this.verificationData.forgotPasswordEmail = email;
+        
+        // 切换到验证码输入步骤
+        this.showForgotPasswordStep(2);
+        
+        // 设置邮箱掩码显示
+        document.getElementById('forgotPasswordMaskedEmail').textContent = state.email;
+        
+        // 启动倒计时显示
+        document.getElementById('forgotPasswordTimer').style.display = 'block';
+        
+        // 设置重新发送按钮状态
+        const resendBtn = document.getElementById('resendForgotCodeBtn');
+        if (resendBtn) {
+            resendBtn.disabled = !state.canResend;
+            if (state.canResend) {
+                resendBtn.textContent = '重新发送验证码';
+            } else {
+                resendBtn.textContent = '发送中...';
+            }
+        }
+
+        // 聚焦到验证码输入框
+        setTimeout(() => {
+            const codeInput = document.getElementById('forgotPasswordCode');
+            if (codeInput) {
+                codeInput.focus();
+            }
+        }, 100);
+
+        // 显示状态恢复提示
+        showToast('已恢复验证状态，请输入验证码', 'info');
+    }
+
+    // 🆕 新增：智能提交忘记密码邮箱（支持状态检查）
     async submitForgotPasswordEmail(event) {
         event.preventDefault();
         
@@ -179,13 +233,25 @@ export class EmailVerificationUI {
             // 存储邮箱地址供后续使用
             this.verificationData.forgotPasswordEmail = email;
 
-            const result = await emailVerificationService.sendForgotPasswordCode(email);
+            // 🆕 使用智能发送验证码（会先检查状态）
+            const result = await emailVerificationService.smartSendVerificationCode(
+                email, 'forgot_password'
+            );
             
             if (result.success) {
-                // 切换到步骤2
-                this.showForgotPasswordStep(2);
-                document.getElementById('forgotPasswordMaskedEmail').textContent = result.maskedEmail;
-                document.getElementById('forgotPasswordTimer').style.display = 'block';
+                if (result.hasPendingCode) {
+                    // 存在有效验证码，直接切换到步骤2
+                    this.showForgotPasswordStep(2);
+                    document.getElementById('forgotPasswordMaskedEmail').textContent = result.existingVerification?.email || email;
+                    document.getElementById('forgotPasswordTimer').style.display = 'block';
+                    
+                    showToast('检测到有效验证码，请直接输入', 'info');
+                } else if (result.newCodeSent) {
+                    // 发送了新验证码
+                    this.showForgotPasswordStep(2);
+                    document.getElementById('forgotPasswordMaskedEmail').textContent = result.maskedEmail;
+                    document.getElementById('forgotPasswordTimer').style.display = 'block';
+                }
                 
                 // 聚焦到验证码输入框
                 setTimeout(() => {
@@ -202,7 +268,7 @@ export class EmailVerificationUI {
         }
     }
 
-    // 🆕 新增：重新发送忘记密码验证码
+    // 🆕 新增：重新发送忘记密码验证码（智能版本）
     async resendForgotPasswordCode() {
         const email = this.verificationData.forgotPasswordEmail;
         if (!email) {
@@ -216,7 +282,10 @@ export class EmailVerificationUI {
             btn.disabled = true;
             btn.textContent = '发送中...';
 
-            await emailVerificationService.sendForgotPasswordCode(email);
+            // 强制发送新验证码
+            await emailVerificationService.smartSendVerificationCode(
+                email, 'forgot_password', true
+            );
             
             // 重新启动倒计时
             document.getElementById('forgotPasswordTimer').style.display = 'block';
@@ -231,7 +300,7 @@ export class EmailVerificationUI {
         }
     }
 
-    // 🆕 新增：提交密码重置
+    // 提交密码重置
     async submitPasswordReset(event) {
         event.preventDefault();
         
@@ -280,7 +349,7 @@ export class EmailVerificationUI {
         }
     }
 
-    // 🆕 新增：返回邮箱输入步骤
+    // 返回邮箱输入步骤
     goBackToEmailInput() {
         this.showForgotPasswordStep(1);
         
@@ -296,7 +365,7 @@ export class EmailVerificationUI {
         emailVerificationService.clearVerification('forgot_password');
     }
 
-    // 🆕 新增：重定向到登录
+    // 重定向到登录
     redirectToLogin() {
         this.hideForgotPasswordModal();
         
@@ -324,7 +393,7 @@ export class EmailVerificationUI {
         showToast('请使用新密码登录', 'info');
     }
 
-    // 🆕 新增：显示忘记密码的指定步骤
+    // 显示忘记密码的指定步骤
     showForgotPasswordStep(stepNumber) {
         // 隐藏所有步骤
         document.querySelectorAll('#forgotPasswordModal .verification-step').forEach(step => {
@@ -340,7 +409,7 @@ export class EmailVerificationUI {
         }
     }
 
-    // 🆕 新增：隐藏忘记密码模态框
+    // 隐藏忘记密码模态框
     hideForgotPasswordModal() {
         const modal = document.getElementById('forgotPasswordModal');
         if (modal) {
@@ -352,8 +421,8 @@ export class EmailVerificationUI {
         emailVerificationService.clearVerification('forgot_password');
     }
 
-    // 显示注册验证码模态框
-    showRegistrationVerificationModal(email = null) {
+    // 🆕 新增：智能显示注册验证码模态框（支持状态恢复）
+    async showRegistrationVerificationModal(email = null) {
         const targetEmail = email || this.verificationData?.email;
         if (!targetEmail) {
             showToast('缺少邮箱地址信息', 'error');
@@ -421,9 +490,51 @@ export class EmailVerificationUI {
         `;
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // 🆕 尝试恢复验证状态
+        if (this.stateRestorationEnabled) {
+            try {
+                const restoration = await emailVerificationService.autoRestoreVerificationState(
+                    targetEmail, 'registration'
+                );
+                
+                if (restoration.shouldRestore) {
+                    console.log('恢复注册验证状态:', restoration.state);
+                    this.restoreRegistrationState(restoration.state);
+                }
+            } catch (error) {
+                console.warn('恢复注册状态失败:', error);
+            }
+        }
     }
 
-    // 发送注册验证码
+    // 🆕 新增：恢复注册验证状态
+    restoreRegistrationState(state) {
+        // 切换到验证码输入步骤
+        this.showStep('step-enter-code');
+        
+        // 设置邮箱掩码显示
+        document.getElementById('maskedEmailDisplay').textContent = state.email;
+        
+        // 启动倒计时显示
+        document.getElementById('registrationTimer').style.display = 'block';
+        
+        // 设置重新发送按钮状态
+        const resendBtn = document.getElementById('resendRegistrationCodeBtn');
+        if (resendBtn) {
+            resendBtn.disabled = !state.canResend;
+        }
+
+        // 聚焦到验证码输入框
+        setTimeout(() => {
+            document.getElementById('registrationVerificationCode').focus();
+        }, 100);
+
+        // 显示状态恢复提示
+        showToast('已恢复验证状态，请输入验证码', 'info');
+    }
+
+    // 🆕 新增：智能发送注册验证码
     async sendRegistrationCode() {
         try {
             const email = this.verificationData?.email;
@@ -435,11 +546,21 @@ export class EmailVerificationUI {
             btn.disabled = true;
             btn.textContent = '发送中...';
 
-            const result = await emailVerificationService.sendRegistrationCode(email);
+            // 使用智能发送验证码
+            const result = await emailVerificationService.smartSendVerificationCode(
+                email, 'registration'
+            );
             
             if (result.success) {
                 this.showStep('step-enter-code');
-                document.getElementById('maskedEmailDisplay').textContent = result.maskedEmail;
+                
+                if (result.hasPendingCode) {
+                    document.getElementById('maskedEmailDisplay').textContent = result.existingVerification?.email || email;
+                    showToast('检测到有效验证码，请直接输入', 'info');
+                } else {
+                    document.getElementById('maskedEmailDisplay').textContent = result.maskedEmail;
+                }
+                
                 document.getElementById('registrationTimer').style.display = 'block';
                 
                 setTimeout(() => {
@@ -458,7 +579,30 @@ export class EmailVerificationUI {
 
     // 重新发送注册验证码
     async resendRegistrationCode() {
-        await this.sendRegistrationCode(this.verificationData.email);
+        const email = this.verificationData?.email;
+        if (!email) {
+            showToast('邮箱地址信息丢失', 'error');
+            return;
+        }
+
+        try {
+            const btn = document.getElementById('resendRegistrationCodeBtn');
+            btn.disabled = true;
+            btn.textContent = '发送中...';
+
+            // 强制发送新验证码
+            await emailVerificationService.smartSendVerificationCode(
+                email, 'registration', true
+            );
+            
+        } catch (error) {
+            console.error('重新发送验证码失败:', error);
+            const btn = document.getElementById('resendRegistrationCodeBtn');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '重新发送验证码';
+            }
+        }
     }
 
     // 完成注册（带验证码）
@@ -502,8 +646,8 @@ export class EmailVerificationUI {
         }
     }
 
-    // 显示密码重置验证模态框（已登录用户）
-    showPasswordResetModal() {
+    // 🆕 新增：智能显示密码重置验证模态框（已登录用户）
+    async showPasswordResetModal() {
         const user = authManager.getCurrentUser();
         if (!user) {
             showToast('请先登录', 'error');
@@ -579,7 +723,54 @@ export class EmailVerificationUI {
                 document.getElementById('passwordVerificationSection').style.display = 'block';
             }
         });
+
+        // 🆕 尝试恢复验证状态
+        if (this.stateRestorationEnabled) {
+            try {
+                const userStatus = await emailVerificationService.getUserVerificationStatus();
+                const passwordResetVerification = userStatus.pendingVerifications?.find(
+                    v => v.verificationType === 'password_reset'
+                );
+                
+                if (passwordResetVerification) {
+                    console.log('恢复密码重置验证状态:', passwordResetVerification);
+                    this.restorePasswordResetState(passwordResetVerification);
+                }
+            } catch (error) {
+                console.warn('恢复密码重置状态失败:', error);
+            }
+        }
     }
+
+    // 🆕 新增：恢复密码重置验证状态
+    restorePasswordResetState(state) {
+        // 显示验证部分
+        document.getElementById('passwordVerificationSection').style.display = 'block';
+        
+        // 启动倒计时显示
+        document.getElementById('passwordResetTimer').style.display = 'block';
+        
+        // 设置获取验证码按钮状态
+        const sendBtn = document.getElementById('sendPasswordCodeBtn');
+        if (sendBtn) {
+            sendBtn.disabled = !state.canResend;
+            if (state.canResend) {
+                sendBtn.textContent = '获取验证码';
+            } else {
+                sendBtn.textContent = '发送中...';
+            }
+        }
+
+        // 聚焦到验证码输入框
+        setTimeout(() => {
+            document.getElementById('passwordResetCode').focus();
+        }, 100);
+
+        // 显示状态恢复提示
+        showToast('检测到验证码发送记录，请输入验证码', 'info');
+    }
+
+    // 其他方法保持不变，但添加智能发送支持...
 
     // 发送密码重置验证码（已登录用户）
     async sendPasswordResetCode() {
@@ -588,6 +779,7 @@ export class EmailVerificationUI {
             btn.disabled = true;
             btn.textContent = '发送中...';
 
+            // 使用传统方法发送（已登录用户场景）
             await emailVerificationService.sendPasswordResetCode();
             
             document.getElementById('passwordResetTimer').style.display = 'block';
@@ -964,27 +1156,6 @@ export class EmailVerificationUI {
         }
     }
 
-    showEmailChangeStep(stepNumber) {
-        document.querySelectorAll('.step').forEach((step, index) => {
-            if (index + 1 <= stepNumber) {
-                step.classList.add('active');
-            } else {
-                step.classList.remove('active');
-            }
-        });
-
-        document.querySelectorAll('.email-change-step').forEach(step => {
-            step.classList.remove('active');
-            step.style.display = 'none';
-        });
-        
-        const targetStep = document.getElementById(`emailChangeStep${stepNumber}`);
-        if (targetStep) {
-            targetStep.classList.add('active');
-            targetStep.style.display = 'block';
-        }
-    }
-
     formatCodeInput(input) {
         const formatted = emailVerificationService.formatVerificationCode(input.value);
         input.value = formatted;
@@ -1104,19 +1275,14 @@ export class EmailVerificationUI {
 
     handleAccountDeleted() {
         showToast('账户已删除', 'info');
-        localStorage.clear();
-        sessionStorage.clear();
     }
 
+    // 获取注册数据的辅助方法
     getRegistrationData() {
         if (this.verificationData && 
             this.verificationData.username && 
             this.verificationData.email && 
             this.verificationData.password) {
-            console.log('从verificationData获取注册数据:', {
-                username: this.verificationData.username,
-                email: this.verificationData.email
-            });
             return this.verificationData;
         }
 
@@ -1132,7 +1298,6 @@ export class EmailVerificationUI {
             };
             
             if (data.username && data.email && data.password) {
-                console.log('从DOM获取到注册数据:', { username: data.username, email: data.email });
                 return data;
             }
         }
@@ -1147,10 +1312,10 @@ export class EmailVerificationUI {
             email: email.trim(),
             password: password
         };
-        console.log('已设置注册数据:', { username, email });
     }
 
-    startRegistrationWithVerification(registrationForm) {
+    // 🆕 新增：智能启动注册验证流程
+    async startRegistrationWithVerification(registrationForm) {
         try {
             let registrationData;
             
@@ -1176,7 +1341,8 @@ export class EmailVerificationUI {
                 registrationData.password
             );
 
-            this.showRegistrationVerificationModal(registrationData.email);
+            // 显示验证模态框（会自动检查状态）
+            await this.showRegistrationVerificationModal(registrationData.email);
 
         } catch (error) {
             console.error('启动注册验证流程失败:', error);
@@ -1218,10 +1384,6 @@ export class EmailVerificationUI {
     hideAccountDeleteModal() {
         const modal = document.getElementById('accountDeleteModal');
         if (modal) modal.remove();
-    }
-
-    goBackToStep1() {
-        this.showEmailChangeStep(1);
     }
 }
 

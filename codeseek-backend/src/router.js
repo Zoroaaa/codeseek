@@ -1,4 +1,4 @@
-// src/router.js - 增强版本，添加忘记密码路由
+// src/router.js - 增强版本，添加验证状态检查路由
 import { utils } from './utils.js';
 
 // 导入所有处理器
@@ -17,9 +17,13 @@ import {
     authSendEmailChangeCodeHandler,
     authVerifyEmailChangeCodeHandler,
     authSendAccountDeleteCodeHandler,
-    // 新增：忘记密码处理器
+    // 忘记密码处理器
     authForgotPasswordHandler,
-    authResetPasswordHandler
+    authResetPasswordHandler,
+    // 🆕 新增：验证状态检查处理器
+    authCheckVerificationStatusHandler,
+    authGetUserVerificationStatusHandler,
+    authSmartSendVerificationCodeHandler
 } from './handlers/auth.js';
 
 import {
@@ -213,13 +217,24 @@ export class Router {
         this.put('/api/auth/change-password', authChangePasswordHandler);
         this.post('/api/auth/send-password-reset-code', authSendPasswordResetCodeHandler);
         
-        // 新增：忘记密码功能
+        // 忘记密码功能
         this.post('/api/auth/forgot-password', authForgotPasswordHandler);
         this.post('/api/auth/reset-password', authResetPasswordHandler);
         
         // 账户删除（集成邮箱验证）
         this.post('/api/auth/delete-account', authDeleteAccountHandler);
         this.post('/api/auth/send-account-delete-code', authSendAccountDeleteCodeHandler);
+
+        // ===============================================
+        // 🆕 新增：邮箱验证状态检查和智能发送
+        // ===============================================
+        
+        // 检查验证状态
+        this.get('/api/auth/verification-status', authCheckVerificationStatusHandler);
+        this.get('/api/auth/user-verification-status', authGetUserVerificationStatusHandler);
+        
+        // 智能验证码发送（会先检查是否已有待验证码）
+        this.post('/api/auth/smart-send-code', authSmartSendVerificationCodeHandler);
 
         // ===============================================
         // 邮箱验证相关路由

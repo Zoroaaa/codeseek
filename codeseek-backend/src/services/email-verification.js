@@ -1,4 +1,4 @@
-// src/services/email-verification.js - 增强版本，支持忘记密码功能
+// src/services/email-verification.js - 增强版本，支持验证状态检查和恢复
 import { utils } from '../utils.js';
 
 export class EmailVerificationService {
@@ -10,6 +10,157 @@ export class EmailVerificationService {
         this.siteUrl = env.SITE_URL || 'https://codeseek.pp.ua';
     }
 
+    // 🆕 新增：检查用户是否有待验证的验证码
+    async getPendingVerification(email, verificationType, userId = null) {
+        const emailHash = await utils.hashPassword(email);
+        const now = Date.now();
+
+        const verification = await this.env.DB.prepare(`
+            SELECT * FROM email_verifications 
+            WHERE email_hash = ? AND verification_type = ?
+            AND status = 'pending' AND expires_at > ?
+            ${userId ? 'AND user_id = ?' : 'AND user_id IS NULL'}
+            ORDER BY created_at DESC LIMIT 1
+        `).bind(emailHash, verificationType, now, ...(userId ? [userId] : [])).first();
+
+        if (!verification) {
+            return null;
+        }
+
+        const remainingTime = verification.expires_at - now;
+        const canResend = remainingTime <= 60000; // 剩余时间少于1分钟时允许重新发送
+
+        return {
+            id: verification.id,
+            email: emailVerificationUtils.maskEmail(email),
+            verificationType,
+            expiresAt: verification.expires_at,
+            remainingTime,
+            canResend,
+            attemptCount: verification.attempt_count,
+            maxAttempts: verification.max_attempts,
+            createdAt: verification.created_at,
+            metadata: JSON.parse(verification.metadata || '{}')
+        };
+    }
+
+    // 🆕 新增：获取用户所有待验证的验证码状态
+    async getUserPendingVerifications(userId) {
+        const now = Date.now();
+
+        const verifications = await this.env.DB.prepare(`
+            SELECT * FROM email_verifications 
+            WHERE user_id = ? AND status = 'pending' AND expires_at > ?
+            ORDER BY created_at DESC
+        `).bind(userId, now).all();
+
+        return verifications.results.map(verification => ({
+            id: verification.id,
+            email: emailVerificationUtils.maskEmail(verification.email),
+            verificationType: verification.verification_type,
+            expiresAt: verification.expires_at,
+            remainingTime: verification.expires_at - now,
+            canResend: (verification.expires_at - now) <= 60000,
+            attemptCount: verification.attempt_count,
+            maxAttempts: verification.max_attempts,
+            createdAt: verification.created_at,
+            metadata: JSON.parse(verification.metadata || '{}')
+        }));
+    }
+
+    // 🆕 新增：检查邮箱更改请求状态
+    async getPendingEmailChangeRequest(userId) {
+        const now = Date.now();
+
+        const request = await this.env.DB.prepare(`
+            SELECT * FROM email_change_requests 
+            WHERE user_id = ? AND status = 'pending' AND expires_at > ?
+            ORDER BY created_at DESC LIMIT 1
+        `).bind(userId, now).first();
+
+        if (!request) {
+            return null;
+        }
+
+        // 检查相关的验证码状态
+        const oldEmailVerification = await this.getPendingVerification(
+            request.old_email, 'email_change_old', userId
+        );
+        const newEmailVerification = await this.getPendingVerification(
+            request.new_email, 'email_change_new', userId
+        );
+
+        return {
+            id: request.id,
+            oldEmail: emailVerificationUtils.maskEmail(request.old_email),
+            newEmail: emailVerificationUtils.maskEmail(request.new_email),
+            oldEmailVerified: Boolean(request.old_email_verified),
+            newEmailVerified: Boolean(request.new_email_verified),
+            expiresAt: request.expires_at,
+            remainingTime: request.expires_at - now,
+            createdAt: request.created_at,
+            verifications: {
+                oldEmail: oldEmailVerification,
+                newEmail: newEmailVerification
+            }
+        };
+    }
+
+    // 🆕 新增：智能获取验证状态（根据验证类型自动判断）
+    async getVerificationStatus(email, verificationType, userId = null) {
+        // 对于邮箱更改，需要特殊处理
+        if (verificationType.includes('email_change') && userId) {
+            return await this.getPendingEmailChangeRequest(userId);
+        }
+
+        // 其他类型的验证直接查询
+        return await this.getPendingVerification(email, verificationType, userId);
+    }
+
+    // 🆕 新增：检查是否可以重新发送验证码
+    async canResendVerification(email, verificationType, userId = null) {
+        const pending = await this.getPendingVerification(email, verificationType, userId);
+        
+        if (!pending) {
+            return { canResend: true, reason: 'no_pending_verification' };
+        }
+
+        const timeSinceCreated = Date.now() - pending.createdAt;
+        const minResendInterval = 60000; // 1分钟最小间隔
+
+        if (timeSinceCreated < minResendInterval) {
+            return {
+                canResend: false,
+                reason: 'too_soon',
+                waitTime: minResendInterval - timeSinceCreated,
+                remainingTime: pending.remainingTime
+            };
+        }
+
+        return {
+            canResend: true,
+            reason: 'can_resend',
+            existingVerification: pending
+        };
+    }
+
+    // 🆕 新增：根据验证状态生成前端状态数据
+    async getVerificationStateForFrontend(email, verificationType, userId = null, additionalData = {}) {
+        const status = await this.getVerificationStatus(email, verificationType, userId);
+        const canResend = await this.canResendVerification(email, verificationType, userId);
+
+        return {
+            hasPendingVerification: !!status,
+            verificationStatus: status,
+            canResend: canResend.canResend,
+            resendReason: canResend.reason,
+            waitTime: canResend.waitTime,
+            ...additionalData
+        };
+    }
+
+    // 现有方法保持不变，添加一些优化...
+
     // 生成6位数字验证码
     generateVerificationCode() {
         return Math.floor(100000 + Math.random() * 900000).toString();
@@ -19,8 +170,8 @@ export class EmailVerificationService {
     async checkEmailRateLimit(email, ipAddress) {
         const emailHash = await utils.hashPassword(email);
         const now = Date.now();
-        const oneHourAgo = now - 3600000; // 1小时前
-        const oneDayAgo = now - 86400000; // 1天前
+        const oneHourAgo = now - 3600000; 
+        const oneDayAgo = now - 86400000; 
 
         // 检查每小时限制
         const hourlyCount = await this.env.DB.prepare(`
@@ -49,11 +200,19 @@ export class EmailVerificationService {
         return true;
     }
 
-    // 创建邮箱验证记录
+    // 创建邮箱验证记录（优化版本，先清理相同类型的待验证记录）
     async createEmailVerification(email, verificationType, userId = null, metadata = {}) {
+        // 先清理该邮箱该类型的待验证记录，避免重复
+        const emailHash = await utils.hashPassword(email);
+        await this.env.DB.prepare(`
+            UPDATE email_verifications 
+            SET status = 'expired'
+            WHERE email_hash = ? AND verification_type = ? AND status = 'pending'
+            ${userId ? 'AND user_id = ?' : 'AND user_id IS NULL'}
+        `).bind(emailHash, verificationType, ...(userId ? [userId] : [])).run();
+
         const verificationCode = this.generateVerificationCode();
         const codeHash = await utils.hashPassword(verificationCode);
-        const emailHash = await utils.hashPassword(email);
         const expiryTime = Date.now() + parseInt(this.env.VERIFICATION_CODE_EXPIRY || '900000'); // 15分钟
 
         const verificationId = utils.generateId();
@@ -131,7 +290,6 @@ export class EmailVerificationService {
         }
         
         // 使用映射后的模板类型
-        // 获取邮件模板
         templateType = this.getTemplateType(templateType);
         const template = await this.getEmailTemplate(templateType);
         
