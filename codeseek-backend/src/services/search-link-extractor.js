@@ -20,10 +20,6 @@ export class SearchLinkExtractorService {
     const { sourceType, baseUrl, searchKeyword } = options;
     
     console.log(`=== 开始提取详情链接 (根据实际数据优化) ===`);
-    console.log(`源类型: ${sourceType}`);
-    console.log(`基础URL: ${baseUrl}`);
-    console.log(`搜索关键词: ${searchKeyword}`);
-    console.log(`HTML长度: ${htmlContent.length}`);
 
     try {
       const doc = cloudflareHTMLParser.parseFromString(htmlContent);
@@ -63,23 +59,19 @@ export class SearchLinkExtractorService {
    * JavBus专用详情链接提取 - 根据实际数据 /IPX-156
    */
   extractJavBusDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
-    console.log('=== JavBus专用提取开始 ===');
     const detailLinks = [];
     
     try {
       // JavBus特有的movie-box结构
       const movieBoxes = doc.querySelectorAll('.movie-box');
-      console.log(`找到 ${movieBoxes.length} 个movie-box`);
       
       movieBoxes.forEach((box, index) => {
-        console.log(`\n--- 处理movie-box ${index + 1} ---`);
         
         // 查找链接
         const link = box.querySelector('a[href]') || box;
         if (!link) return;
         
         const href = link.getAttribute('href');
-        console.log(`movie-box链接: ${href}`);
         
         if (!href || href === '#' || href.startsWith('javascript')) return;
         
@@ -87,25 +79,21 @@ export class SearchLinkExtractorService {
         
         // 验证域名一致性 - 支持子域名
         if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) {
-          console.log(`跳过不同域名: ${fullUrl}`);
           return;
         }
         
         // JavBus详情页必须是番号路径：/IPX-156
         if (!/\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i.test(fullUrl)) {
-          console.log(`跳过非详情页: ${fullUrl}`);
           return;
         }
         
         // 避免搜索页面
         if (extractionValidator.containsSearchIndicators(fullUrl)) {
-          console.log(`跳过搜索页: ${fullUrl}`);
           return;
         }
         
         // 确保不是与搜索URL相同
         if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) {
-          console.log(`跳过相同URL: ${fullUrl}`);
           return;
         }
         
@@ -118,9 +106,6 @@ export class SearchLinkExtractorService {
         const score = this.calculateMatchScore(title, code, searchKeyword);
         
         console.log(`找到JavBus详情: ${fullUrl}`);
-        console.log(`  标题: ${title}`);
-        console.log(`  番号: ${code}`);
-        console.log(`  分数: ${score}`);
         
         detailLinks.push({
           url: fullUrl,
@@ -177,7 +162,6 @@ export class SearchLinkExtractorService {
    * JavDB专用详情链接提取 - 根据实际数据 /v/KkZ97
    */
   extractJavDBDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
-    console.log('=== JavDB专用提取开始 ===');
     const detailLinks = [];
     
     try {
@@ -201,25 +185,21 @@ export class SearchLinkExtractorService {
           
           // 验证域名一致性 - 支持子域名
           if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) {
-            console.log(`跳过不同域名: ${fullUrl}`);
             return;
           }
           
           // 确保不是搜索URL本身
           if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) {
-            console.log(`跳过相同URL: ${fullUrl}`);
             return;
           }
           
           // JavDB详情页格式验证：/v/xxxx
           if (!/\/v\/[a-zA-Z0-9]+/.test(href)) {
-            console.log(`跳过非详情格式: ${fullUrl}`);
             return;
           }
           
           // 避免搜索页面
           if (extractionValidator.containsSearchIndicators(fullUrl)) {
-            console.log(`跳过搜索页: ${fullUrl}`);
             return;
           }
           
@@ -256,7 +236,6 @@ export class SearchLinkExtractorService {
    * Jable专用详情链接提取 - 根据实际数据 /videos/ipx-156/
    */
   extractJableDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
-    console.log('=== Jable专用提取开始 ===');
     const detailLinks = [];
     
     try {
@@ -279,7 +258,6 @@ export class SearchLinkExtractorService {
           // Jable严格域名检查 - 必须是jable.tv域名
           const linkDomain = extractionValidator.extractDomain(fullUrl);
           if (linkDomain !== 'jable.tv') {
-            console.log(`跳过非Jable域名: ${linkDomain}`);
             return;
           }
           
@@ -321,7 +299,6 @@ export class SearchLinkExtractorService {
    * JavGG专用详情链接提取 - 根据实际数据 /jav/ipx-156-reduce-mosaic/
    */
   extractJavGGDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
-    console.log('=== JavGG专用提取开始 ===');
     const detailLinks = [];
     
     try {
@@ -344,25 +321,21 @@ export class SearchLinkExtractorService {
           
           // 验证域名一致性
           if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) {
-            console.log(`跳过不同域名: ${fullUrl}`);
             return;
           }
           
           // 确保不是搜索URL本身
           if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) {
-            console.log(`跳过相同URL: ${fullUrl}`);
             return;
           }
           
           // JavGG详情页格式验证：/jav/xxx
           if (!/\/jav\/[a-z0-9\-]+/i.test(fullUrl)) {
-            console.log(`跳过非详情格式: ${fullUrl}`);
             return;
           }
           
           // 避免搜索页面
           if (extractionValidator.containsSearchIndicators(fullUrl)) {
-            console.log(`跳过搜索页: ${fullUrl}`);
             return;
           }
           
@@ -373,9 +346,6 @@ export class SearchLinkExtractorService {
           const score = this.calculateMatchScore(title, code, searchKeyword);
           
           console.log(`找到JavGG详情: ${fullUrl}`);
-          console.log(`  标题: ${title}`);
-          console.log(`  番号: ${code}`);
-          console.log(`  分数: ${score}`);
           
           detailLinks.push({
             url: fullUrl,
@@ -404,7 +374,6 @@ export class SearchLinkExtractorService {
    * JavMost专用详情链接提取 - 根据实际数据 /IPX-156/ （支持子域名）
    */
   extractJavMostDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
-    console.log('=== JavMost专用提取开始 ===');
     const detailLinks = [];
     
     try {
@@ -427,7 +396,6 @@ export class SearchLinkExtractorService {
           // JavMost支持子域名检查（重要：www5.javmost.com）
           const linkDomain = extractionValidator.extractDomain(fullUrl);
           if (!extractionValidator.isDomainOrSubdomain(linkDomain, 'javmost.com')) {
-            console.log(`跳过非JavMost域名: ${linkDomain}`);
             return;
           }
           
@@ -469,7 +437,6 @@ export class SearchLinkExtractorService {
    * Sukebei专用详情链接提取 - 根据实际数据 /view/3403743
    */
   extractSukebeiDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
-    console.log('=== Sukebei专用提取开始 ===');
     const detailLinks = [];
     
     try {
@@ -526,7 +493,6 @@ export class SearchLinkExtractorService {
    * JavGuru专用详情链接提取 - 根据实际数据 /268681/ipx-156-sana-matsunaga...
    */
   extractJavGuruDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
-    console.log('=== JavGuru专用提取开始 ===');
     const detailLinks = [];
     
     try {
@@ -599,10 +565,8 @@ export class SearchLinkExtractorService {
         
         // 尝试每个选择器配置
         for (const selectorConfig of searchPageRules.detailLinkSelectors) {
-          console.log(`\n--- 尝试选择器: ${selectorConfig.selector} ---`);
           
           const links = doc.querySelectorAll(selectorConfig.selector);
-          console.log(`找到 ${links.length} 个候选链接元素`);
 
           for (const linkElement of links) {
             let href = linkElement.getAttribute('href');
@@ -643,9 +607,7 @@ export class SearchLinkExtractorService {
               detailLinks.push(detailLink);
               
               console.log(`✅ 成功添加详情链接: ${fullUrl}`);
-              console.log(`  标题: ${linkInfo.title}`);
-              console.log(`  番号: ${linkInfo.code}`);
-              console.log(`  匹配分数: ${linkInfo.score}`);
+
             }
           }
 
@@ -790,7 +752,6 @@ export class SearchLinkExtractorService {
           pattern.test && pattern.test(urlDomain)
         );
         if (!domainMatches) {
-          console.log(`⌐ 域名不匹配模式: ${urlDomain}`);
           return false;
         }
       } else if (selectorConfig.strictDomainCheck !== false) {
@@ -804,13 +765,11 @@ export class SearchLinkExtractorService {
     
     // 2. 确保不是搜索URL本身
     if (extractionValidator.normalizeUrl(url) === extractionValidator.normalizeUrl(baseUrl)) {
-      console.log(`⌐ 与搜索URL相同: ${url}`);
       return false;
     }
     
     // 3. 检查搜索指示器
     if (extractionValidator.containsSearchIndicators(url)) {
-      console.log(`⌐ 包含搜索指示器: ${url}`);
       return false;
     }
     
