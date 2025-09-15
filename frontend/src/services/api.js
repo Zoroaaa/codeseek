@@ -3,28 +3,90 @@ import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 
 class APIService {
-  constructor() {
-    this.baseURL = this.getAPIBaseURL();
-    this.token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-    this.maxRetries = 3;
-    this.retryDelay = 1000;
+constructor() {
+  // 获取基础URL并进行验证
+  this.baseURL = this.getAPIBaseURL();
+  
+  // 严格验证baseURL - 防止undefined污染
+  if (!this.baseURL || 
+      typeof this.baseURL !== 'string' || 
+      this.baseURL.includes('undefined') || 
+      this.baseURL.includes('null') ||
+      this.baseURL.trim() === '') {
+    
+    console.error('[API] 检测到无效的baseURL:', this.baseURL);
+    
+    // 应急处理：根据当前环境设置正确的URL
+    const isLocal = window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1';
+    
+    this.baseURL = isLocal ? 'http://localhost:8787' : 'https://backend.codeseek.pp.ua';
+    console.log('[API] 已应急修复baseURL为:', this.baseURL);
   }
+  
+  this.token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+  this.maxRetries = 3;
+  this.retryDelay = 1000;
+  
+  // 输出最终配置用于调试
+  console.log('[API] APIService 初始化完成, baseURL:', this.baseURL);
+}
+
+validateAndFixBaseURL() {
+  if (!this.baseURL || 
+      typeof this.baseURL !== 'string' || 
+      this.baseURL.includes('undefined') || 
+      this.baseURL.includes('null')) {
+    
+    console.warn('[API] 检测到baseURL问题，重新获取:', this.baseURL);
+    this.baseURL = this.getAPIBaseURL();
+    
+    // 如果仍然有问题，使用硬编码备用
+    if (!this.baseURL || this.baseURL.includes('undefined')) {
+      const isLocal = window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1';
+      this.baseURL = isLocal ? 'http://localhost:8787' : 'https://backend.codeseek.pp.ua';
+      console.log('[API] 已使用备用URL:', this.baseURL);
+    }
+  }
+  return this.baseURL;
+}
 
   // 从环境变量或配置获取API基础URL
-  getAPIBaseURL() {
-    if (window.API_CONFIG && window.API_CONFIG.BASE_URL) {
-      return window.API_CONFIG.BASE_URL;
+getAPIBaseURL() {
+  // 1. 优先检查 window.API_CONFIG（如果存在且有效）
+  if (window.API_CONFIG && window.API_CONFIG.BASE_URL) {
+    const baseUrl = window.API_CONFIG.BASE_URL;
+    // 严格检查是否包含 "undefined" 字符串
+    if (typeof baseUrl === 'string' && 
+        baseUrl.trim() && 
+        !baseUrl.includes('undefined') && 
+        !baseUrl.includes('null')) {
+      console.log('[API] 使用 API_CONFIG.BASE_URL:', baseUrl);
+      return baseUrl;
+    } else {
+      console.warn('[API] API_CONFIG.BASE_URL 无效:', baseUrl);
     }
-    
-    const isDev = window.location.hostname === 'localhost' || 
-                 window.location.hostname === '127.0.0.1';
-    
-    if (isDev) {
-      return window.API_CONFIG?.DEV_URL || 'http://localhost:8787';
-    }
-    
-    return window.API_CONFIG?.PROD_URL || 'https://backend.codeseek.pp.ua';
   }
+  
+  // 2. 检测当前环境
+  const isDev = window.location.hostname === 'localhost' || 
+               window.location.hostname === '127.0.0.1' ||
+               window.location.hostname.includes('.local') ||
+               window.location.port !== '';
+  
+  // 3. 根据环境返回对应的URL
+  if (isDev) {
+    const devUrl = (window.API_CONFIG && window.API_CONFIG.DEV_URL) || 'http://localhost:8787';
+    console.log('[API] 开发环境，使用:', devUrl);
+    return devUrl;
+  } else {
+    // 生产环境 - 硬编码确保不会出错
+    const prodUrl = 'https://backend.codeseek.pp.ua';
+    console.log('[API] 生产环境，使用:', prodUrl);
+    return prodUrl;
+  }
+}
 
   setToken(token) {
     this.token = token;
@@ -36,11 +98,23 @@ class APIService {
   }
 
   async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers
-    };
+ // 在每次请求前验证baseURL
+  this.validateAndFixBaseURL();
+  
+  const url = `${this.baseURL}${endpoint}`;
+  
+  // 额外验证最终URL
+  if (url.includes('undefined') || url.includes('null')) {
+    console.error('[API] 检测到无效URL:', url);
+    throw new Error('API URL配置错误，请检查配置');
+  }
+  
+  console.log('[API] 请求URL:', url); // 调试日志
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
