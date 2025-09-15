@@ -1,5 +1,5 @@
-// src/services/detail-config-api.js - 适配后端新架构的详情提取配置API服务
-// 与后端 detail.js 配置管理处理器完全对接，支持模块化解析器架构
+// src/services/detail-config-api.js - 详情提取配置API服务
+// 与后端 detail.js 配置管理处理器完全对接
 
 import apiService from './api.js';
 import authManager from './auth.js';
@@ -17,7 +17,6 @@ export class DetailConfigAPI {
     this.configCache = null;
     this.cacheExpiration = 5 * 60 * 1000; // 5分钟本地缓存
     this.lastCacheTime = 0;
-    this.version = '2.0.0'; // 架构升级版本
   }
 
   /**
@@ -27,7 +26,13 @@ export class DetailConfigAPI {
   async getUserConfig(useCache = true) {
     if (!authManager.isAuthenticated()) {
       console.warn('用户未认证，返回默认配置');
-      return this.getDefaultConfigResponse();
+      return {
+        config: { ...DEFAULT_USER_CONFIG },
+        metadata: this.getDefaultMetadata(),
+        presets: CONFIG_PRESETS,
+        usage: this.getDefaultUsageStats(),
+        isDefault: true
+      };
     }
 
     // 检查本地缓存
@@ -37,14 +42,13 @@ export class DetailConfigAPI {
     }
 
     try {
-      console.log('从服务器获取用户配置 (新架构)');
+      console.log('从服务器获取用户配置');
       const response = await apiService.request(DETAIL_CONFIG_ENDPOINTS.GET_CONFIG);
 
       if (!response.success) {
         throw new Error(response.message || '获取配置失败');
       }
 
-      // 适配后端新架构响应格式
       const configData = {
         config: response.config || { ...DEFAULT_USER_CONFIG },
         metadata: response.metadata || this.getDefaultMetadata(),
@@ -55,14 +59,7 @@ export class DetailConfigAPI {
           rules: CONFIG_VALIDATION_RULES,
           supportedSources: []
         },
-        systemLimits: response.systemLimits || CONFIG_VALIDATION_RULES,
-        // 🆕 新架构特有数据
-        supportedSites: response.supportedSites || [],
-        parserStats: response.parserStats || {},
-        serviceInfo: response.serviceInfo || {
-          version: '2.0.0',
-          architecture: 'modular_parsers'
-        }
+        systemLimits: response.systemLimits || CONFIG_VALIDATION_RULES
       };
 
       // 更新本地缓存
@@ -75,7 +72,11 @@ export class DetailConfigAPI {
       
       // 返回默认配置作为降级方案
       return {
-        ...this.getDefaultConfigResponse(),
+        config: { ...DEFAULT_USER_CONFIG },
+        metadata: this.getDefaultMetadata(),
+        presets: CONFIG_PRESETS,
+        usage: this.getDefaultUsageStats(),
+        isDefault: true,
         error: error.message
       };
     }
@@ -106,7 +107,7 @@ export class DetailConfigAPI {
         throw new Error(`配置验证失败: ${validation.errors.join(', ')}`);
       }
 
-      console.log('更新用户配置 (新架构):', { config, validateOnly, preset });
+      console.log('更新用户配置:', { config, validateOnly, preset });
 
       const requestData = {
         config,
@@ -140,11 +141,7 @@ export class DetailConfigAPI {
         warnings: Array.isArray(resultData.warnings) ? resultData.warnings : [],
         optimizations: Array.isArray(resultData.optimizations) ? resultData.optimizations : [],
         message: resultData.message || (validateOnly ? '配置验证通过' : '配置更新成功'),
-        config: validateOnly ? null : (resultData.config || config),
-        // 🆕 新架构返回的额外信息
-        affectedParsers: resultData.affectedParsers || [],
-        performanceImpact: resultData.performanceImpact || 'neutral',
-        recommendations: resultData.recommendations || []
+        config: validateOnly ? null : (resultData.config || config)
       };
 
     } catch (error) {
@@ -163,7 +160,7 @@ export class DetailConfigAPI {
     }
 
     try {
-      console.log('重置用户配置为默认值 (新架构)');
+      console.log('重置用户配置为默认值');
 
       const response = await apiService.request(DETAIL_CONFIG_ENDPOINTS.RESET_CONFIG, {
         method: 'POST'
@@ -178,13 +175,7 @@ export class DetailConfigAPI {
 
       return {
         message: '配置已重置为默认值',
-        config: response.config || { ...DEFAULT_USER_CONFIG },
-        // 🆕 新架构返回的重置信息
-        resetInfo: response.resetInfo || {
-          resetAt: Date.now(),
-          previousConfig: null,
-          resetsCount: 1
-        }
+        config: response.config || { ...DEFAULT_USER_CONFIG }
       };
 
     } catch (error) {
@@ -211,7 +202,7 @@ export class DetailConfigAPI {
     }
 
     try {
-      console.log(`应用配置预设 (新架构): ${presetName}`);
+      console.log(`应用配置预设: ${presetName}`);
 
       const response = await apiService.request(DETAIL_CONFIG_ENDPOINTS.APPLY_PRESET, {
         method: 'POST',
@@ -231,13 +222,7 @@ export class DetailConfigAPI {
         message: `已应用 ${presetInfo.name} 配置预设`,
         preset: presetName,
         config: response.config || presetInfo.config,
-        description: response.description || presetInfo.description,
-        // 🆕 新架构返回的预设应用信息
-        presetInfo: response.presetInfo || {
-          appliedAt: Date.now(),
-          previousPreset: null,
-          optimizations: []
-        }
+        description: response.description || presetInfo.description
       };
 
     } catch (error) {
@@ -247,230 +232,7 @@ export class DetailConfigAPI {
   }
 
   /**
-   * 🆕 获取支持的站点信息 - 新架构端点
-   * 对应后端 getSupportedSitesHandler
-   */
-  async getSupportedSites() {
-    try {
-      console.log('获取支持的站点信息 (新架构)');
-
-      const response = await apiService.request(DETAIL_CONFIG_ENDPOINTS.GET_SUPPORTED_SITES);
-
-      if (!response.success) {
-        throw new Error(response.message || '获取支持站点失败');
-      }
-
-      const sitesData = response.data || response;
-
-      return {
-        sites: sitesData.sites || [],
-        metadata: sitesData.metadata || {
-          architecture: 'modular_parsers',
-          totalSites: 0,
-          dataStructureVersion: '2.0'
-        },
-        // 站点能力映射
-        capabilities: this.buildSiteCapabilitiesMap(sitesData.sites || []),
-        // 解析器统计
-        parserStats: sitesData.parserStats || {},
-        lastUpdated: Date.now()
-      };
-
-    } catch (error) {
-      console.error('获取支持站点失败:', error);
-      // 返回默认数据
-      return {
-        sites: [],
-        metadata: {
-          architecture: 'modular_parsers',
-          totalSites: 0,
-          error: error.message
-        },
-        capabilities: {},
-        parserStats: {},
-        lastUpdated: Date.now()
-      };
-    }
-  }
-
-  /**
-   * 🆕 验证解析器状态 - 新架构端点
-   * 对应后端 validateParserHandler
-   */
-  async validateParser(sourceType) {
-    if (!sourceType) {
-      throw new Error('源类型不能为空');
-    }
-
-    try {
-      console.log(`验证解析器状态 (新架构): ${sourceType}`);
-
-      const params = new URLSearchParams({ sourceType });
-      const response = await apiService.request(`${DETAIL_CONFIG_ENDPOINTS.VALIDATE_PARSER}?${params}`);
-
-      if (!response.success) {
-        throw new Error(response.message || '验证解析器失败');
-      }
-
-      const validationData = response.data || response;
-
-      return {
-        sourceType,
-        validation: validationData.validation || {
-          isValid: false,
-          errors: ['验证失败'],
-          features: []
-        },
-        metadata: validationData.metadata || {
-          architecture: 'modular_parsers',
-          timestamp: Date.now()
-        },
-        // 解析器详细信息
-        parserInfo: validationData.parserInfo || {},
-        // 性能指标
-        performance: validationData.performance || {},
-        // 建议和优化
-        suggestions: validationData.suggestions || []
-      };
-
-    } catch (error) {
-      console.error('验证解析器失败:', error);
-      return {
-        sourceType,
-        validation: {
-          isValid: false,
-          errors: [error.message],
-          features: []
-        },
-        metadata: {
-          architecture: 'modular_parsers',
-          timestamp: Date.now(),
-          error: error.message
-        },
-        parserInfo: {},
-        performance: {},
-        suggestions: []
-      };
-    }
-  }
-
-  /**
-   * 🆕 获取服务统计信息 - 新架构端点
-   * 对应后端 getServiceStatsHandler
-   */
-  async getServiceStats() {
-    if (!authManager.isAuthenticated()) {
-      throw new Error('用户未认证');
-    }
-
-    try {
-      console.log('获取服务统计信息 (新架构)');
-
-      const response = await apiService.request(DETAIL_CONFIG_ENDPOINTS.SERVICE_STATS);
-
-      if (!response.success) {
-        throw new Error(response.message || '获取服务统计失败');
-      }
-
-      const statsData = response.data || response;
-
-      return {
-        stats: statsData.stats || this.getDefaultServiceStats(),
-        timestamp: statsData.timestamp || Date.now(),
-        // 🆕 新架构特有统计
-        parserFactory: statsData.parserFactory || {},
-        supportedSites: statsData.supportedSites || [],
-        serviceInfo: statsData.serviceInfo || {
-          version: '2.0.0',
-          architecture: 'modular_parsers'
-        },
-        // 性能指标
-        performance: statsData.performance || {},
-        // 健康状态
-        health: statsData.health || { status: 'unknown' }
-      };
-
-    } catch (error) {
-      console.error('获取服务统计失败:', error);
-      return {
-        stats: this.getDefaultServiceStats(),
-        timestamp: Date.now(),
-        error: error.message,
-        parserFactory: {},
-        supportedSites: [],
-        serviceInfo: {
-          version: '2.0.0',
-          architecture: 'modular_parsers',
-          error: error.message
-        },
-        performance: {},
-        health: { status: 'error', error: error.message }
-      };
-    }
-  }
-
-  /**
-   * 🆕 重新加载解析器 - 新架构端点（管理员功能）
-   * 对应后端 reloadParserHandler
-   */
-  async reloadParser(sourceType) {
-    if (!authManager.isAuthenticated()) {
-      throw new Error('用户未认证');
-    }
-
-    if (!sourceType) {
-      throw new Error('源类型不能为空');
-    }
-
-    try {
-      console.log(`重新加载解析器 (新架构): ${sourceType}`);
-
-      const response = await apiService.request(DETAIL_CONFIG_ENDPOINTS.RELOAD_PARSER, {
-        method: 'POST',
-        body: JSON.stringify({ sourceType })
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '重载解析器失败');
-      }
-
-      const reloadData = response.data || response;
-
-      return {
-        success: reloadData.success !== false,
-        sourceType,
-        message: reloadData.message || `${sourceType} 解析器重载成功`,
-        // 🆕 重载详细信息
-        reloadInfo: reloadData.reloadInfo || {
-          reloadedAt: Date.now(),
-          previousVersion: null,
-          newVersion: null
-        },
-        // 重载后的验证结果
-        validation: reloadData.validation || {},
-        // 性能对比
-        performanceComparison: reloadData.performanceComparison || {}
-      };
-
-    } catch (error) {
-      console.error('重载解析器失败:', error);
-      return {
-        success: false,
-        sourceType,
-        message: `${sourceType} 解析器重载失败: ${error.message}`,
-        error: error.message,
-        reloadInfo: {
-          reloadedAt: Date.now(),
-          error: error.message
-        },
-        validation: {},
-        performanceComparison: {}
-      };
-    }
-  }
-
-  /**
-   * 验证配置数据 - 增强版本，支持新架构
+   * 验证配置数据
    */
   validateConfig(config) {
     const errors = [];
@@ -573,11 +335,6 @@ export class DetailConfigAPI {
       warnings.push('设置了重试次数但未启用重试功能');
     }
 
-    // 🆕 新架构特有验证
-    if (config.enableConcurrentExtraction && config.maxConcurrentExtractions === 1) {
-      warnings.push('启用并发提取但并发数为1，建议增加并发数或关闭并发功能');
-    }
-
     return {
       valid: errors.length === 0,
       errors,
@@ -586,7 +343,7 @@ export class DetailConfigAPI {
   }
 
   /**
-   * 比较两个配置并检测变更 - 增强版本
+   * 比较两个配置并检测变更
    */
   async getConfigComparison(newConfig) {
     try {
@@ -597,11 +354,7 @@ export class DetailConfigAPI {
         changes: detectConfigChanges(currentConfig, newConfig),
         isSignificant: this.isSignificantChange(currentConfig, newConfig),
         performanceImpact: this.assessPerformanceImpact(currentConfig, newConfig),
-        recommendations: this.generateRecommendations(newConfig),
-        // 🆕 新架构增强分析
-        parserImpact: this.assessParserImpact(currentConfig, newConfig),
-        securityImpact: this.assessSecurityImpact(currentConfig, newConfig),
-        compatibilityCheck: this.checkCompatibility(newConfig)
+        recommendations: this.generateRecommendations(newConfig)
       };
     } catch (error) {
       console.error('配置比较失败:', error);
@@ -609,162 +362,10 @@ export class DetailConfigAPI {
         changes: { changed: [], added: [], removed: [] },
         isSignificant: false,
         performanceImpact: 'unknown',
-        recommendations: [],
-        parserImpact: 'unknown',
-        securityImpact: 'safe',
-        compatibilityCheck: { compatible: true, issues: [] }
+        recommendations: []
       };
     }
   }
-
-  // ===================== 新架构特有方法 =====================
-
-  /**
-   * 构建站点能力映射
-   */
-  buildSiteCapabilitiesMap(sites) {
-    const capabilities = {};
-    
-    sites.forEach(site => {
-      if (site.sourceType && site.siteInfo) {
-        capabilities[site.sourceType] = {
-          features: site.siteInfo.features || [],
-          quality: site.siteInfo.quality || 'unknown',
-          performance: site.siteInfo.performance || {},
-          limitations: site.siteInfo.limitations || [],
-          lastValidated: site.siteInfo.lastValidated || null
-        };
-      }
-    });
-    
-    return capabilities;
-  }
-
-  /**
-   * 评估解析器影响
-   */
-  assessParserImpact(oldConfig, newConfig) {
-    const significantParserFields = [
-      'enableStrictDomainCheck',
-      'enableSpamFilter',
-      'validateImageUrls',
-      'validateDownloadLinks'
-    ];
-    
-    const hasParserChanges = significantParserFields.some(field => 
-      oldConfig[field] !== newConfig[field]
-    );
-    
-    if (hasParserChanges) {
-      return 'moderate';
-    }
-    
-    return 'minimal';
-  }
-
-  /**
-   * 评估安全影响
-   */
-  assessSecurityImpact(oldConfig, newConfig) {
-    const securityFields = [
-      'enableStrictDomainCheck',
-      'enableSpamFilter',
-      'validateImageUrls',
-      'validateDownloadLinks'
-    ];
-    
-    const securityChanges = securityFields.filter(field => 
-      oldConfig[field] !== newConfig[field]
-    );
-    
-    const hasSecurityReduction = securityChanges.some(field => 
-      oldConfig[field] === true && newConfig[field] === false
-    );
-    
-    if (hasSecurityReduction) {
-      return 'reduced';
-    }
-    
-    const hasSecurityEnhancement = securityChanges.some(field => 
-      oldConfig[field] === false && newConfig[field] === true
-    );
-    
-    if (hasSecurityEnhancement) {
-      return 'enhanced';
-    }
-    
-    return 'safe';
-  }
-
-  /**
-   * 检查兼容性
-   */
-  checkCompatibility(config) {
-    const issues = [];
-    
-    // 检查新架构兼容性
-    if (config.enableDetailExtraction && !config.enableCache) {
-      issues.push({
-        type: 'performance',
-        message: '禁用缓存可能导致新架构性能下降',
-        severity: 'warning'
-      });
-    }
-    
-    if (config.maxConcurrentExtractions > 5) {
-      issues.push({
-        type: 'resource',
-        message: '并发数过高可能导致资源耗尽',
-        severity: 'warning'
-      });
-    }
-    
-    return {
-      compatible: issues.filter(i => i.severity === 'error').length === 0,
-      issues
-    };
-  }
-
-  /**
-   * 获取默认服务统计
-   */
-  getDefaultServiceStats() {
-    return {
-      parserFactory: {
-        supportedSites: 0,
-        cachedParsers: 0,
-        supportedSitesList: [],
-        cachedParsersList: []
-      },
-      supportedSites: [],
-      serviceInfo: {
-        version: '2.0.0',
-        architecture: 'modular_parsers',
-        features: []
-      }
-    };
-  }
-
-  /**
-   * 获取默认配置响应
-   */
-  getDefaultConfigResponse() {
-    return {
-      config: { ...DEFAULT_USER_CONFIG },
-      metadata: this.getDefaultMetadata(),
-      presets: CONFIG_PRESETS,
-      usage: this.getDefaultUsageStats(),
-      isDefault: true,
-      supportedSites: [],
-      parserStats: {},
-      serviceInfo: {
-        version: '2.0.0',
-        architecture: 'modular_parsers'
-      }
-    };
-  }
-
-  // ===================== 保持向后兼容的方法 =====================
 
   /**
    * 判断是否为重大配置变更
@@ -869,15 +470,6 @@ export class DetailConfigAPI {
       });
     }
     
-    // 🆕 新架构特有建议
-    if (config.enableConcurrentExtraction && config.maxConcurrentExtractions > 3 && config.extractionTimeout < 10000) {
-      recommendations.push({
-        type: 'optimization',
-        message: '高并发配合短超时可能导致频繁失败',
-        suggestion: '建议适当增加超时时间或降低并发数'
-      });
-    }
-    
     return recommendations;
   }
 
@@ -918,8 +510,7 @@ export class DetailConfigAPI {
       supportedSources: [],
       systemLimits: CONFIG_VALIDATION_RULES,
       lastUpdated: Date.now(),
-      version: '2.0.0',
-      architecture: 'modular_parsers'
+      version: '1.0.0'
     };
   }
 
@@ -976,79 +567,44 @@ export class DetailConfigAPI {
   }
 
   /**
-   * 检查服务健康状态 - 适配新架构
+   * 检查服务健康状态
    */
   async checkServiceHealth() {
     try {
       const startTime = Date.now();
-      
-      // 🆕 使用新架构的健康检查端点
-      const [configHealth, sitesHealth, statsHealth] = await Promise.allSettled([
-        this.getUserConfig(false), // 强制从服务器获取
-        this.getSupportedSites(),
-        this.getServiceStats()
-      ]);
-      
+      await this.getUserConfig(false); // 强制从服务器获取
       const responseTime = Date.now() - startTime;
       
       return {
-        healthy: configHealth.status === 'fulfilled',
+        healthy: true,
         responseTime,
         lastCheck: Date.now(),
-        cacheStatus: this.isConfigCacheValid() ? 'valid' : 'expired',
-        // 🆕 新架构健康状态
-        components: {
-          config: configHealth.status === 'fulfilled',
-          sites: sitesHealth.status === 'fulfilled',
-          stats: statsHealth.status === 'fulfilled'
-        },
-        architecture: '2.0.0',
-        features: {
-          modularParsers: true,
-          dynamicConfiguration: true,
-          enhancedValidation: true
-        }
+        cacheStatus: this.isConfigCacheValid() ? 'valid' : 'expired'
       };
     } catch (error) {
       return {
         healthy: false,
         error: error.message,
         lastCheck: Date.now(),
-        cacheStatus: 'unavailable',
-        components: {
-          config: false,
-          sites: false,
-          stats: false
-        },
-        architecture: '2.0.0'
+        cacheStatus: 'unavailable'
       };
     }
   }
 
   /**
-   * 导出当前配置 - 增强版本
+   * 导出当前配置
    */
   async exportConfig(format = 'json') {
     try {
-      const [configData, sitesData, statsData] = await Promise.all([
-        this.getUserConfig(),
-        this.getSupportedSites().catch(() => ({ sites: [] })),
-        this.getServiceStats().catch(() => ({ stats: {} }))
-      ]);
-      
+      const configData = await this.getUserConfig();
       const exportData = {
         config: configData.config,
         metadata: {
           exportedAt: Date.now(),
           exportedBy: authManager.getCurrentUser()?.username || 'unknown',
-          version: '2.0.0',
-          architecture: 'modular_parsers',
+          version: '1.0.0',
           source: 'detail-config-api'
-        },
-        // 🆕 新架构导出数据
-        supportedSites: sitesData.sites || [],
-        serviceStats: statsData.stats || {},
-        validation: configData.validation || {}
+        }
       };
 
       switch (format) {
@@ -1070,34 +626,7 @@ export class DetailConfigAPI {
    */
   reset() {
     this.clearConfigCache();
-    console.log('详情配置API服务已重置 (新架构 v2.0.0)');
-  }
-
-  /**
-   * 获取服务信息
-   */
-  getServiceInfo() {
-    return {
-      version: this.version,
-      architecture: 'modular_parsers',
-      features: {
-        dynamicConfiguration: true,
-        presetManagement: true,
-        parserValidation: true,
-        serviceStats: true,
-        parserReload: true,
-        enhancedValidation: true,
-        securityAssessment: true,
-        compatibilityCheck: true
-      },
-      endpoints: DETAIL_CONFIG_ENDPOINTS,
-      cacheInfo: {
-        enabled: true,
-        expiration: this.cacheExpiration,
-        isValid: this.isConfigCacheValid(),
-        lastUpdate: this.lastCacheTime
-      }
-    };
+    console.log('详情配置API服务已重置');
   }
 }
 

@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">磁力快搜 - 专业版 v2.0</title>
-    <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索，详情提取 - 新架构v2.0.0">
+    <title id="page-title">磁力快搜 - 专业版</title>
+    <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索，详情提取">
 	
     <!-- 核心样式 - 必须最先引入 -->
     <link rel="stylesheet" href="css/core/variables.css">
@@ -18,14 +18,12 @@
     <link rel="stylesheet" href="css/components/loading.css">
     <link rel="stylesheet" href="css/components/search.css">
 	<link rel="stylesheet" href="css/components/detail-card.css">
-    <!-- 新架构样式 -->
+    <!-- 🆕 邮箱验证样式 -->
     <link rel="stylesheet" href="css/components/email-verification.css">
+    <!-- 搜索配置管理样式 -->
     <link rel="stylesheet" href="css/components/search-config.css">
     <link rel="stylesheet" href="css/components/status.css">
     <link rel="stylesheet" href="css/components/search-status.css">
-    <link rel="stylesheet" href="css/components/architecture-indicators.css">
-    <link rel="stylesheet" href="css/components/service-monitoring.css">
-    <link rel="stylesheet" href="css/components/parser-management.css">
     
     <!-- 主页专用样式 -->
     <link rel="stylesheet" href="css/pages/main.css">
@@ -38,13 +36,9 @@
 	
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
     
-    <!-- 新架构meta标签 -->
+    <!-- 搜索与详情提取配置支持的meta标签 -->
     <meta name="search-config-management-supported" content="true">
     <meta name="unified-search-architecture" content="true">
-    <meta name="architecture-version" content="2.0.0">
-    <meta name="modular-parsers-supported" content="true">
-    <meta name="dynamic-configuration-supported" content="true">
-    <meta name="service-health-monitoring" content="true">
 </head>
 <body>
     <!-- 导航栏 -->
@@ -54,40 +48,19 @@
                 <a href="./index.html">
                     <img src="images/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
                     <span class="brand-text" id="brand-text">磁力快搜</span>
-                    <span class="architecture-badge" title="新架构v2.0.0">🏗️ v2.0</span>
                 </a>
             </div>
             <div class="nav-menu">
-                <!-- 架构状态指示器 -->
-                <div id="architectureStatus" class="architecture-status" title="架构状态">
-                    <span class="status-icon">🏗️</span>
-                    <span class="status-text">模块化解析器</span>
-                </div>
-                
-                <!-- 服务健康监控 -->
-                <div id="serviceHealthIndicator" class="service-health-indicator" title="服务健康状态">
-                    <span class="health-icon">💚</span>
-                    <span class="health-text">服务正常</span>
-                </div>
-                
                 <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
-                
                 <!-- 配置管理按钮 -->
                 <button id="configManagementBtn" class="config-management-btn" title="搜索与详情提取配置" style="display:none;">
                     ⚙️
                 </button>
-                
-                <!-- 解析器管理按钮 -->
-                <button id="parserManagementBtn" class="parser-management-btn" title="解析器管理" style="display:none;">
-                    🔧
-                </button>
-                
                 <!-- 详情提取服务状态指示器 -->
                 <div id="detailServiceStatus" class="service-status" title="详情提取服务状态" style="display:none;">
                     <span class="status-icon">⚠️</span>
                     <span class="status-text">详情提取: 检查中</span>
                 </div>
-                
                 <div id="userMenu" class="user-menu">
                     <button id="loginBtn" class="login-btn">登录</button>
                     <div id="userInfo" class="user-info" style="display:none;">
@@ -96,9 +69,8 @@
                             <button class="dropdown-btn" title="用户菜单">▼</button>
                             <div class="dropdown-content">
                                 <a href="#" onclick="navigateToDashboard(); return false;">个人中心</a>
+                                <!-- 配置管理入口 -->
                                 <a href="#" onclick="window.openConfigManagement && window.openConfigManagement(); return false;">配置管理</a>
-                                <a href="#" onclick="window.openParserManagement && window.openParserManagement(); return false;">解析器管理</a>
-                                <a href="#" onclick="window.openPerformanceMonitor && window.openPerformanceMonitor(); return false;">性能监控</a>
                                 <a href="#" id="logoutBtn">退出登录</a>
                             </div>
                         </div>
@@ -112,11 +84,8 @@
     <main class="main-content" style="display:none;">
         <!-- Hero区域 -->
         <section class="hero">
-            <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版 v2.0</h1>
-            <p class="hero-subtitle">
-                智能搜索，云端同步，极致体验 | 模块化解析器架构 | 完善的详情提取服务支持
-                <span class="architecture-info">🏗️ 新架构 | 🔧 模块化解析器 | 📊 智能监控</span>
-            </p>
+            <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
+            <p class="hero-subtitle">智能搜索，云端同步，极致体验 | 完善的详情提取服务支持</p>
             
             <!-- 搜索框 -->
             <div class="search-container">
@@ -125,7 +94,7 @@
                         type="text" 
                         id="searchInput" 
                         class="search-input" 
-                        placeholder="请输入番号或关键词 - 支持模块化解析器" 
+                        placeholder="请输入番号或关键词" 
                         autocomplete="off"
                         maxlength="100"
                     >
@@ -137,83 +106,28 @@
                         <span>搜索</span>
                     </button>
                 </div>
-                
-                <!-- 搜索建议下拉框 -->
-                <div id="searchSuggestions" class="search-suggestions" style="display:none;">
-                    <!-- 由SearchSuggestionManager动态生成 -->
-                </div>
-            </div>
-            
-            <!-- 详情提取状态指示器 -->
-            <div id="detailExtractionIndicator" class="detail-extraction-indicator" style="display:none;">
-                <span class="indicator-icon">✅</span>
-                <span class="indicator-text">详情提取: 已启用</span>
-                <span class="architecture-badge">v2.0</span>
             </div>
         </section>
 
         <!-- 快速提示 -->
         <section id="quickTips" class="quick-tips" style="display:none;">
             <div class="tips-content">
-                <h3>💡 搜索技巧 - 新架构功能</h3>
+                <h3>💡 搜索技巧</h3>
                 <ul>
                     <li>输入完整番号获得最精确结果</li>
                     <li>使用空格分隔多个关键词</li>
                     <li>登录后可享受云端同步服务</li>
-                    <li>支持详情提取的站点会显示 📋 标识</li>
+                    <li>支持详情提取的站点会显示 🔋 标识</li>
                     <li>详情提取包含高清小图、演员信息、下载链接等</li>
                     <li>在配置管理中可自定义搜索和提取选项</li>
-                    <li>🆕 新架构支持模块化解析器，提升解析准确性</li>
-                    <li>🆕 智能缓存和错误重试机制</li>
-                    <li>🆕 实时服务健康监控</li>
                 </ul>
-            </div>
-        </section>
-
-        <!-- 架构信息面板 -->
-        <section id="architectureInfo" class="architecture-info-panel" style="display:none;">
-            <div class="panel-header">
-                <h3>🏗️ 架构信息 v2.0.0</h3>
-                <button class="panel-close" onclick="this.closest('.architecture-info-panel').style.display='none'">×</button>
-            </div>
-            <div class="architecture-features">
-                <div class="feature-item">
-                    <span class="feature-icon">🔧</span>
-                    <span class="feature-name">模块化解析器</span>
-                    <span class="feature-status" id="modularParsersStatus">已启用</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">📊</span>
-                    <span class="feature-name">统一数据结构</span>
-                    <span class="feature-status" id="unifiedDataStatus">已启用</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">⚙️</span>
-                    <span class="feature-name">动态配置管理</span>
-                    <span class="feature-status" id="dynamicConfigStatus">已启用</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">🛡️</span>
-                    <span class="feature-name">增强错误处理</span>
-                    <span class="feature-status" id="errorHandlingStatus">已启用</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">💚</span>
-                    <span class="feature-name">服务健康监控</span>
-                    <span class="feature-status" id="healthMonitoringStatus">已启用</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">🧠</span>
-                    <span class="feature-name">智能缓存</span>
-                    <span class="feature-status" id="intelligentCachingStatus">已启用</span>
-                </div>
             </div>
         </section>
 
         <!-- 搜索配置管理区域 -->
         <section id="searchConfigSection" class="search-config-section" style="display:none;">
             <div class="section-header">
-                <h2>⚙️ 搜索与详情提取配置 - v2.0</h2>
+                <h2>⚙️ 搜索与详情提取配置</h2>
                 <div class="section-actions">
                     <button id="showConfigBtn" class="config-btn" title="显示配置管理界面">
                         <span class="btn-icon">⚙️</span>
@@ -223,70 +137,11 @@
                         <span class="btn-icon">🔽</span>
                         <span class="btn-text">收起配置</span>
                     </button>
-                    <button id="configHelpBtn" class="help-btn" title="配置帮助">
-                        <span class="btn-icon">❓</span>
-                        <span class="btn-text">帮助</span>
-                    </button>
                 </div>
             </div>
             <!-- 配置管理UI容器 - 由SearchConfigManager动态渲染 -->
             <div id="searchConfigContainer" class="search-config-container" style="display:none;">
                 <!-- 内容将通过SearchConfigManager的initConfigUI方法动态生成 -->
-            </div>
-        </section>
-
-        <!-- 解析器管理区域 -->
-        <section id="parserManagementSection" class="parser-management-section" style="display:none;">
-            <div class="section-header">
-                <h2>🔧 解析器管理</h2>
-                <div class="section-actions">
-                    <button id="refreshParsersBtn" class="action-btn" title="刷新解析器列表">
-                        <span class="btn-icon">🔄</span>
-                        <span class="btn-text">刷新</span>
-                    </button>
-                    <button id="validateAllParsersBtn" class="action-btn" title="验证所有解析器">
-                        <span class="btn-icon">✅</span>
-                        <span class="btn-text">验证全部</span>
-                    </button>
-                </div>
-            </div>
-            <div id="parsersList" class="parsers-list">
-                <!-- 解析器列表将动态生成 -->
-            </div>
-        </section>
-
-        <!-- 性能监控面板 -->
-        <section id="performanceMonitor" class="performance-monitor" style="display:none;">
-            <div class="section-header">
-                <h2>📊 性能监控</h2>
-                <div class="section-actions">
-                    <button id="refreshMetricsBtn" class="action-btn" title="刷新性能指标">
-                        <span class="btn-icon">🔄</span>
-                        <span class="btn-text">刷新</span>
-                    </button>
-                    <button id="exportMetricsBtn" class="action-btn" title="导出性能数据">
-                        <span class="btn-icon">💾</span>
-                        <span class="btn-text">导出</span>
-                    </button>
-                </div>
-            </div>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <h4>搜索性能</h4>
-                    <div class="metric-value" id="searchPerformance">计算中...</div>
-                </div>
-                <div class="metric-card">
-                    <h4>提取性能</h4>
-                    <div class="metric-value" id="extractionPerformance">计算中...</div>
-                </div>
-                <div class="metric-card">
-                    <h4>缓存效率</h4>
-                    <div class="metric-value" id="cacheEfficiency">计算中...</div>
-                </div>
-                <div class="metric-card">
-                    <h4>解析器状态</h4>
-                    <div class="metric-value" id="parserStatus">检查中...</div>
-                </div>
             </div>
         </section>
 
@@ -300,7 +155,6 @@
             <div class="progress-header">
                 <span class="progress-title">正在提取详情信息</span>
                 <span class="progress-stats">0 / 0</span>
-                <span class="architecture-label">架构 v2.0</span>
                 <button class="progress-close" onclick="this.closest('.extraction-progress-container').style.display='none'">×</button>
             </div>
             <div class="progress-bar">
@@ -308,11 +162,7 @@
             </div>
             <div class="progress-message">正在处理搜索结果...</div>
             <div class="progress-details">
-                <small>
-                    平均用时: <span class="avg-time">计算中...</span> | 
-                    成功率: <span class="success-rate">计算中...</span> | 
-                    解析器: <span class="active-parsers">检查中...</span>
-                </small>
+                <small>平均用时: <span class="avg-time">计算中...</span> | 成功率: <span class="success-rate">计算中...</span></small>
             </div>
         </section>
 
@@ -325,13 +175,7 @@
         <section id="historySection" class="history-section" style="display:none;">
             <div class="section-header">
                 <h2>🕒 搜索历史</h2>
-                <div class="section-actions">
-                    <button id="clearHistoryBtn" class="clear-btn">清空历史</button>
-                    <button id="exportHistoryBtn" class="action-btn" title="导出搜索历史">
-                        <span class="btn-icon">💾</span>
-                        <span class="btn-text">导出</span>
-                    </button>
-                </div>
+                <button id="clearHistoryBtn" class="clear-btn">清空历史</button>
             </div>
             <div id="historyList" class="history-list"></div>
         </section>
@@ -343,7 +187,7 @@
                 <div class="section-actions">
                     <!-- 详情提取控制按钮 -->
                     <button id="batchExtractBtn" class="action-btn detail-action-btn" style="display:none;" title="批量提取当前搜索结果的详情信息">
-                        <span class="btn-icon">📋</span>
+                        <span class="btn-icon">🔋</span>
                         <span class="btn-text">批量提取</span>
                     </button>
                     <button id="refreshStatsBtn" class="action-btn stats-btn" style="display:none;" title="刷新详情提取统计">
@@ -374,10 +218,6 @@
                     <span class="stats-item">
                         <span class="stats-label">缓存命中:</span>
                         <span class="stats-value" id="cacheHitRate">0%</span>
-                    </span>
-                    <span class="stats-item architecture-stat">
-                        <span class="stats-label">架构:</span>
-                        <span class="stats-value">模块化解析器 v2.0</span>
                     </span>
                 </div>
             </div>
@@ -411,7 +251,7 @@
         <section id="sitesSection" class="sites-section">
             <!-- 内容将通过JavaScript动态加载 -->
             <div class="loading-sites">
-                <p>正在加载站点导航（新架构支持）...</p>
+                <p>正在加载站点导航...</p>
             </div>
         </section>
     </main>
@@ -445,13 +285,14 @@
                 <button type="submit" class="submit-btn">登录</button>
                 <div class="form-links">
                     <a href="#" id="showRegister">还没有账号？注册</a>
+                    <!-- 🆕 更新忘记密码链接 -->
                     <a href="#" id="showForgotPassword">忘记密码？</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- 注册模态框 - 集成邮箱验证 -->
+    <!-- 🆕 更新注册模态框 - 集成邮箱验证 -->
     <div id="registerModal" class="modal" aria-labelledby="register-title" role="dialog">
         <div class="modal-content">
             <span class="close" aria-label="关闭">&times;</span>
@@ -504,52 +345,18 @@
         </div>
     </div>
 
-    <!-- 邮箱验证模态框容器 -->
-    <div id="emailVerificationModals">
-        <!-- 邮箱验证相关模态框将由emailVerificationUI动态创建 -->
-    </div>
-
-    <!-- 配置帮助模态框 -->
-    <div id="configHelpModal" class="modal" style="display:none;">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>⚙️ 配置管理帮助</h2>
-            <div class="help-content">
-                <h3>新架构v2.0.0功能说明</h3>
-                <div class="help-section">
-                    <h4>🔧 模块化解析器</h4>
-                    <p>每个站点使用独立的解析器模块，提高解析准确性和维护性。</p>
-                </div>
-                <div class="help-section">
-                    <h4>📊 统一数据结构</h4>
-                    <p>标准化的数据格式确保所有解析结果的一致性。</p>
-                </div>
-                <div class="help-section">
-                    <h4>⚙️ 动态配置管理</h4>
-                    <p>支持实时配置更新，无需重启服务。</p>
-                </div>
-                <div class="help-section">
-                    <h4>💚 服务健康监控</h4>
-                    <p>实时监控各服务组件的健康状态。</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Toast通知 -->
     <div id="toast" class="toast" role="alert" aria-live="polite"></div>
 
     <!-- Loading -->
     <div id="loading" class="loading" style="display:none;" aria-label="加载中">
         <div class="spinner"></div>
-        <div class="loading-text">新架构正在处理中...</div>
     </div>
 
     <!-- 连接状态指示器 -->
     <div id="connectionStatus" class="connection-status" style="display:none;">
         <span class="status-indicator"></span>
         <span class="status-text">检查连接...</span>
-        <span class="architecture-info">v2.0</span>
     </div>
 
     <!-- 图片预览模态框容器 -->
@@ -559,7 +366,7 @@
     <script type="module">
         // 现在使用更新后的服务架构初始化应用
         import MagnetSearchApp from './src/pages/main/main.js';
-        // 导入邮箱验证UI组件
+        // 🆕 导入邮箱验证UI组件
         import { emailVerificationUI } from './src/components/email-verification-ui.js';
         
         // 全局导航函数（保持向后兼容）
@@ -588,32 +395,6 @@
             }
         };
 
-        // 解析器管理功能
-        window.openParserManagement = function() {
-            const parserSection = document.getElementById('parserManagementSection');
-            if (parserSection) {
-                parserSection.style.display = 'block';
-                parserSection.scrollIntoView({ behavior: 'smooth' });
-                // 加载解析器列表
-                if (window.app && window.app.loadParsersList) {
-                    window.app.loadParsersList();
-                }
-            }
-        };
-
-        // 性能监控功能
-        window.openPerformanceMonitor = function() {
-            const monitorSection = document.getElementById('performanceMonitor');
-            if (monitorSection) {
-                monitorSection.style.display = 'block';
-                monitorSection.scrollIntoView({ behavior: 'smooth' });
-                // 刷新性能指标
-                if (window.app && window.app.refreshPerformanceMetrics) {
-                    window.app.refreshPerformanceMetrics();
-                }
-            }
-        };
-
         // 批量提取详情 - 使用统一搜索管理器
         window.batchExtractDetails = function() {
             if (window.app && window.app.batchExtractDetails) {
@@ -628,7 +409,7 @@
             }
         };
 
-        // 邮箱验证相关全局函数
+        // 🆕 邮箱验证相关全局函数
         window.emailVerificationUI = emailVerificationUI;
         
         // 显示邮箱验证相关模态框的全局函数
@@ -640,39 +421,34 @@
             emailVerificationUI.showPasswordResetModal();
         };
 
+        // 🆕 显示忘记密码模态框的全局函数
         window.showForgotPasswordModal = function() {
             emailVerificationUI.showForgotPasswordModal();
         };
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', async () => {
-            console.log('🚀 开始初始化应用（新架构v2.0.0）...');
+            console.log('🚀 开始初始化应用...');
 
             try {
                 // 更新页面标题与品牌名称
                 if (window.API_CONFIG) {
                     const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
-                    document.getElementById('page-title').textContent = `${appName} - 专业版 v2.0`;
+                    document.getElementById('page-title').textContent = `${appName} - 专业版`;
                     document.getElementById('brand-text').textContent = appName;
-                    document.getElementById('hero-title').textContent = `${appName} - 专业版 v2.0`;
+                    document.getElementById('hero-title').textContent = `${appName} - 专业版`;
                 }
                 
                 // 创建使用统一搜索组件的应用实例
                 window.app = new MagnetSearchApp();
                 
-                // 初始化邮箱验证UI
+                // 🆕 初始化邮箱验证UI
                 initEmailVerificationIntegration();
                 
                 // 初始化配置管理UI
                 initConfigManagementUI();
                 
-                // 初始化新架构UI组件
-                initArchitectureUI();
-                
-                // 初始化性能监控
-                initPerformanceMonitoring();
-                
-                console.log('✅ 应用初始化完成（新架构v2.0.0）');
+                console.log('✅ 应用初始化完成');
                 
             } catch (error) {
                 console.error('❌ 应用初始化失败:', error);
@@ -684,7 +460,7 @@
                     <div style="background: #fee; border: 1px solid #f00; padding: 1rem; margin: 1rem; border-radius: 4px;">
                         <h3>⚠️ 应用初始化失败</h3>
                         <p>错误信息：${error.message}</p>
-                        <p>新架构v2.0.0可能需要特定的服务支持，请刷新页面重试，或联系技术支持。</p>
+                        <p>请刷新页面重试，或联系技术支持。</p>
                         <button onclick="window.location.reload()" style="padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
                             刷新页面
                         </button>
@@ -694,7 +470,7 @@
             }
         });
 
-        // 初始化邮箱验证集成
+        // 🆕 初始化邮箱验证集成
         function initEmailVerificationIntegration() {
             console.log('📧 初始化邮箱验证集成...');
             
@@ -753,10 +529,20 @@
                 });
             }
             
-            // 添加忘记密码链接处理
+            // 🆕 添加忘记密码链接处理（更新的ID）
             const showForgotPasswordLink = document.getElementById('showForgotPassword');
             if (showForgotPasswordLink) {
                 showForgotPasswordLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.getElementById('loginModal').style.display = 'none';
+                    emailVerificationUI.showForgotPasswordModal();
+                });
+            }
+            
+            // 保持向后兼容的旧ID处理
+            const showPasswordResetLink = document.getElementById('showPasswordReset');
+            if (showPasswordResetLink) {
+                showPasswordResetLink.addEventListener('click', (e) => {
                     e.preventDefault();
                     document.getElementById('loginModal').style.display = 'none';
                     emailVerificationUI.showForgotPasswordModal();
@@ -811,14 +597,6 @@
                 });
             }
 
-            // 配置帮助按钮
-            const configHelpBtn = document.getElementById('configHelpBtn');
-            if (configHelpBtn) {
-                configHelpBtn.addEventListener('click', () => {
-                    document.getElementById('configHelpModal').style.display = 'block';
-                });
-            }
-
             // 批量提取按钮
             const batchExtractBtn = document.getElementById('batchExtractBtn');
             if (batchExtractBtn) {
@@ -836,58 +614,9 @@
             document.addEventListener('detailConfigSaved', handleDetailConfigSaved);
         }
 
-        // 初始化新架构UI组件
-        function initArchitectureUI() {
-            // 解析器管理按钮
-            const parserManagementBtn = document.getElementById('parserManagementBtn');
-            if (parserManagementBtn) {
-                parserManagementBtn.addEventListener('click', window.openParserManagement);
-            }
-
-            // 架构状态点击事件
-            const architectureStatus = document.getElementById('architectureStatus');
-            if (architectureStatus) {
-                architectureStatus.addEventListener('click', () => {
-                    const architectureInfo = document.getElementById('architectureInfo');
-                    if (architectureInfo) {
-                        architectureInfo.style.display = architectureInfo.style.display === 'none' ? 'block' : 'none';
-                    }
-                });
-            }
-
-            // 监听架构升级事件
-            document.addEventListener('architectureUpgraded', (event) => {
-                console.log('检测到架构升级:', event.detail);
-                updateArchitectureIndicators(event.detail);
-            });
-        }
-
-        // 初始化性能监控
-        function initPerformanceMonitoring() {
-            // 刷新性能指标按钮
-            const refreshMetricsBtn = document.getElementById('refreshMetricsBtn');
-            if (refreshMetricsBtn) {
-                refreshMetricsBtn.addEventListener('click', () => {
-                    if (window.app && window.app.refreshPerformanceMetrics) {
-                        window.app.refreshPerformanceMetrics();
-                    }
-                });
-            }
-
-            // 导出性能数据按钮
-            const exportMetricsBtn = document.getElementById('exportMetricsBtn');
-            if (exportMetricsBtn) {
-                exportMetricsBtn.addEventListener('click', () => {
-                    if (window.app && window.app.exportPerformanceMetrics) {
-                        window.app.exportPerformanceMetrics();
-                    }
-                });
-            }
-        }
-
         // 处理搜索配置变更
         function handleSearchConfigChanged(event) {
-            console.log('搜索配置已变更（新架构）:', event.detail);
+            console.log('搜索配置已变更:', event.detail);
             
             // 更新UI状态
             updateConfigRelatedUI(event.detail.config);
@@ -895,10 +624,10 @@
 
         // 处理详情配置保存
         function handleDetailConfigSaved(event) {
-            console.log('详情配置已保存（新架构）:', event.detail);
+            console.log('详情配置已保存:', event.detail);
             
             // 可以在这里添加保存后的处理逻辑
-            showToast('配置已保存并生效（新架构v2.0）', 'success');
+            showToast('配置已保存并生效', 'success');
         }
 
         // 更新配置相关UI
@@ -909,19 +638,11 @@
                 configManagementBtn.style.display = 'inline-block';
             }
             
-            // 根据配置更新其他UI元素 
+            // 根据配置更新其他UI元素
             if (config.enableDetailExtraction) {
-                console.log('详情提取功能已启用（新架构）');
+                // 可以在这里添加详情提取启用后的UI更新逻辑
+                console.log('详情提取功能已启用');
             }
-        }
-
-        // 更新架构指示器
-        function updateArchitectureIndicators(architectureDetail) {
-            const indicators = document.querySelectorAll('.architecture-badge');
-            indicators.forEach(indicator => {
-                indicator.textContent = `🏗️ v${architectureDetail.version}`;
-                indicator.title = `新架构v${architectureDetail.version} - ${Object.keys(architectureDetail.features).length}个特性`;
-            });
         }
 
         // 显示Toast通知的简单实现
@@ -955,23 +676,12 @@
                 setTimeout(() => {
                     if (window.servicesManager) {
                         window.servicesManager.performHealthCheck().then(status => {
-                            console.log('🩺 服务健康检查结果（新架构v2.0）:', status);
+                            console.log('🩺 服务健康检查结果:', status);
                         }).catch(console.error);
                     }
                 }, 2000);
             });
         }
-
-        // 新架构特性检测
-        window.addEventListener('load', () => {
-            console.log('🏗️ 新架构v2.0.0特性检测:');
-            console.log('- 模块化解析器: ✅');
-            console.log('- 统一数据结构: ✅');
-            console.log('- 动态配置管理: ✅');
-            console.log('- 增强错误处理: ✅');
-            console.log('- 服务健康监控: ✅');
-            console.log('- 智能缓存: ✅');
-        });
     </script>
 </body>
 </html>

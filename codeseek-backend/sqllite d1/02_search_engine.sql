@@ -9,7 +9,7 @@
 -- ===============================================
 
 -- 搜索结果缓存表
-CREATE TABLE IF NOT EXISTS search_cache (       --TODO: 后端服务暂未实现，未来实现
+CREATE TABLE IF NOT EXISTS search_cache (
     id TEXT PRIMARY KEY,                        -- 缓存记录唯一标识
     keyword TEXT NOT NULL,                      -- 搜索关键词
     keyword_hash TEXT NOT NULL,                 -- 关键词哈希值（用于快速查找）
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS source_health_stats (
 );
 
 -- 状态检查任务队列表（异步处理用）
-CREATE TABLE IF NOT EXISTS status_check_jobs (  --TODO: 后端服务暂未实现，未来实现
+CREATE TABLE IF NOT EXISTS status_check_jobs (
     id TEXT PRIMARY KEY,                        -- 任务唯一标识
     user_id TEXT NOT NULL,                      -- 发起用户ID
     sources TEXT NOT NULL,                      -- 要检查的源列表（JSON数组）

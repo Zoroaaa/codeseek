@@ -1,5 +1,5 @@
-// src/services/detail-api.js - 适配后端新架构的详情提取API服务
-// 与后端 DetailExtractionService 和模块化解析器架构完全对接
+// src/services/detail-api.js - 集成用户配置服务的详情提取API
+// 与后端 detail.js 处理器完全对接，支持动态配置
 
 import apiService from './api.js';
 import authManager from './auth.js';
@@ -8,7 +8,7 @@ import {
   DETAIL_EXTRACTION_STATUS,
   DEFAULT_USER_CONFIG 
 } from '../core/detail-config.js';
-import { APP_CONSTANTS } from '../core/constants.js';
+import { APP_CONSTANTS  } from '../core/constants.js';
 
 class DetailAPIService {
   constructor() {
@@ -18,32 +18,21 @@ class DetailAPIService {
     this.progressCallbacks = new Map();
     this.extractionQueue = new Map();
     this.retryDelays = [1000, 2000, 5000]; // 重试延迟时间
-    this.version = '2.0.0'; // 架构升级版本
     
     // 状态常量 - 与后端同步
     this.EXTRACTION_STATUS = DETAIL_EXTRACTION_STATUS;
     
-    // 支持的源类型 - 与后端SUPPORTED_SOURCE_TYPES同步
-    this.SUPPORTED_SOURCES = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES;
+    // 支持的源类型
+    this.SUPPORTED_SOURCES = [
+      'javbus', 'javdb', 'jable', 'javgg', 'javmost', 'sukebei', 'javguru'
+    ];
     
-    // API端点 - 适配新架构
-    this.ENDPOINTS = {
-      EXTRACT_SINGLE: '/api/detail/extract-single',
-      EXTRACT_BATCH: '/api/detail/extract-batch',
-      SUPPORTED_SITES: '/api/detail/supported-sites',
-      VALIDATE_PARSER: '/api/detail/validate-parser',
-      SERVICE_STATS: '/api/detail/service-stats',
-      RELOAD_PARSER: '/api/detail/reload-parser',
-      HISTORY: '/api/detail/history',
-      CACHE_STATS: '/api/detail/cache/stats',
-      CACHE_CLEAR: '/api/detail/cache/clear',
-      CACHE_DELETE: '/api/detail/cache/delete',
-      STATS: '/api/detail/stats'
-    };
+    // 系统限制 - 从 constants.js 获取
+    this.LIMITS = APP_CONSTANTS.LIMITS;
   }
 
   /**
-   * 获取用户配置并应用到API调用选项 - 动态配置版本
+   * 获取用户配置并应用到API调用选项
    */
   async getConfigAwareOptions(overrides = {}) {
     try {
@@ -101,8 +90,7 @@ class DetailAPIService {
   }
 
   /**
-   * 提取单个搜索结果的详情信息 - 新架构版本
-   * 对应后端 extractSingleDetailHandler
+   * 提取单个搜索结果的详情信息 - 配置感知版本
    */
   async extractSingleDetail(searchResult, options = {}) {
     if (!searchResult || !searchResult.url) {
@@ -123,7 +111,7 @@ class DetailAPIService {
         }
       }
 
-      // 构建与后端完全匹配的请求数据 - 适配新架构
+      // 构建与后端完全匹配的请求数据
       const requestData = {
         searchResult: {
           url: searchResult.url,
@@ -136,10 +124,10 @@ class DetailAPIService {
         options: configOptions
       };
 
-      console.log(`开始提取详情 (新架构): ${searchResult.title}`);
+      console.log(`开始提取详情: ${searchResult.title}`);
       console.log('使用配置:', configOptions);
 
-      const response = await apiService.request(this.ENDPOINTS.EXTRACT_SINGLE, {
+      const response = await apiService.request('/api/detail/extract-single', {
         method: 'POST',
         body: JSON.stringify(requestData),
         timeout: configOptions.timeout
@@ -149,7 +137,7 @@ class DetailAPIService {
         throw new Error(response.message || '详情提取失败');
       }
 
-      // 处理后端响应 - 适配新架构响应格式
+      // 处理后端响应 - 匹配buildSuccessResponse结构
       const result = this.processExtractionResponse(response, searchResult);
 
       // 本地缓存成功的结果
@@ -157,7 +145,7 @@ class DetailAPIService {
         this.setToLocalCache(cacheKey, result);
       }
 
-      console.log(`详情提取完成 (新架构): ${searchResult.title} (状态: ${result.extractionStatus})`);
+      console.log(`详情提取完成: ${searchResult.title} (状态: ${result.extractionStatus})`);
       return result;
 
     } catch (error) {
@@ -167,8 +155,7 @@ class DetailAPIService {
   }
 
   /**
-   * 批量提取搜索结果的详情信息 - 新架构版本
-   * 对应后端 extractBatchDetailsHandler
+   * 批量提取搜索结果的详情信息 - 配置感知版本
    */
   async extractBatchDetails(searchResults, options = {}) {
     // 输入验证 - 与后端validateBatchInput匹配
@@ -184,7 +171,7 @@ class DetailAPIService {
       // 生成批次ID用于进度跟踪
       const batchId = this.generateBatchId();
       
-      // 构建与后端完全匹配的请求数据 - 适配新架构
+      // 构建与后端完全匹配的请求数据
       const requestData = {
         searchResults: searchResults.map(result => ({
           url: result.url,
@@ -200,7 +187,7 @@ class DetailAPIService {
         }
       };
 
-      console.log(`开始批量提取 ${searchResults.length} 个结果的详情 (新架构)`);
+      console.log(`开始批量提取 ${searchResults.length} 个结果的详情`);
       console.log('批量提取配置:', configOptions);
 
       // 设置进度回调
@@ -208,7 +195,7 @@ class DetailAPIService {
         this.progressCallbacks.set(batchId, options.onProgress);
       }
 
-      const response = await apiService.request(this.ENDPOINTS.EXTRACT_BATCH, {
+      const response = await apiService.request('/api/detail/extract-batch', {
         method: 'POST',
         body: JSON.stringify(requestData),
         timeout: configOptions.timeout * 2 // 批量请求给更长超时时间
@@ -221,207 +208,12 @@ class DetailAPIService {
         throw new Error(response.message || '批量详情提取失败');
       }
 
-      // 处理批量响应 - 适配新架构响应格式
+      // 处理批量响应 - 匹配buildBatchSuccessResponse结构
       return this.processBatchResponse(response, searchResults, options);
 
     } catch (error) {
       console.error('批量详情提取失败:', error);
       throw error;
-    }
-  }
-
-  /**
-   * 🆕 获取支持的站点信息 - 新架构端点
-   * 对应后端 getSupportedSitesHandler
-   */
-  async getSupportedSites() {
-    try {
-      console.log('获取支持的站点信息 (新架构)');
-
-      const response = await apiService.request(this.ENDPOINTS.SUPPORTED_SITES);
-
-      if (!response.success) {
-        throw new Error(response.message || '获取支持站点失败');
-      }
-
-      const sitesData = response.data || response;
-
-      return {
-        sites: sitesData.sites || [],
-        metadata: sitesData.metadata || {
-          architecture: 'modular_parsers',
-          totalSites: 0,
-          dataStructureVersion: '2.0'
-        },
-        // 站点详细信息
-        siteDetails: this.buildSiteDetailsMap(sitesData.sites || []),
-        // 解析器信息
-        parsersInfo: sitesData.parsersInfo || [],
-        lastUpdated: Date.now()
-      };
-
-    } catch (error) {
-      console.error('获取支持站点失败:', error);
-      return {
-        sites: [],
-        metadata: {
-          architecture: 'modular_parsers',
-          totalSites: 0,
-          error: error.message
-        },
-        siteDetails: {},
-        parsersInfo: [],
-        lastUpdated: Date.now()
-      };
-    }
-  }
-
-  /**
-   * 🆕 验证解析器状态 - 新架构端点
-   * 对应后端 validateParserHandler
-   */
-  async validateParser(sourceType) {
-    if (!sourceType) {
-      throw new Error('源类型不能为空');
-    }
-
-    if (!authManager.isAuthenticated()) {
-      throw new Error('用户未认证');
-    }
-
-    try {
-      console.log(`验证解析器状态 (新架构): ${sourceType}`);
-
-      const params = new URLSearchParams({ sourceType });
-      const response = await apiService.request(`${this.ENDPOINTS.VALIDATE_PARSER}?${params}`);
-
-      if (!response.success) {
-        throw new Error(response.message || '验证解析器失败');
-      }
-
-      const validationData = response.data || response;
-
-      return {
-        sourceType,
-        validation: validationData.validation || {
-          isValid: false,
-          errors: ['验证失败'],
-          features: []
-        },
-        metadata: validationData.metadata || {
-          architecture: 'modular_parsers',
-          timestamp: Date.now()
-        }
-      };
-
-    } catch (error) {
-      console.error('验证解析器失败:', error);
-      return {
-        sourceType,
-        validation: {
-          isValid: false,
-          errors: [error.message],
-          features: []
-        },
-        metadata: {
-          architecture: 'modular_parsers',
-          timestamp: Date.now(),
-          error: error.message
-        }
-      };
-    }
-  }
-
-  /**
-   * 🆕 获取服务统计信息 - 新架构端点
-   * 对应后端 getServiceStatsHandler
-   */
-  async getServiceStats() {
-    if (!authManager.isAuthenticated()) {
-      throw new Error('用户未认证');
-    }
-
-    try {
-      console.log('获取服务统计信息 (新架构)');
-
-      const response = await apiService.request(this.ENDPOINTS.SERVICE_STATS);
-
-      if (!response.success) {
-        throw new Error(response.message || '获取服务统计失败');
-      }
-
-      const statsData = response.data || response;
-
-      return {
-        stats: statsData.stats || this.getDefaultServiceStats(),
-        timestamp: statsData.timestamp || Date.now(),
-        // 🆕 新架构特有统计
-        parserFactory: statsData.parserFactory || {},
-        supportedSites: statsData.supportedSites || [],
-        serviceInfo: statsData.serviceInfo || {
-          version: '2.0.0',
-          architecture: 'modular_parsers'
-        }
-      };
-
-    } catch (error) {
-      console.error('获取服务统计失败:', error);
-      return {
-        stats: this.getDefaultServiceStats(),
-        timestamp: Date.now(),
-        error: error.message,
-        parserFactory: {},
-        supportedSites: [],
-        serviceInfo: {
-          version: '2.0.0',
-          architecture: 'modular_parsers',
-          error: error.message
-        }
-      };
-    }
-  }
-
-  /**
-   * 🆕 重新加载解析器 - 新架构端点（管理员功能）
-   * 对应后端 reloadParserHandler
-   */
-  async reloadParser(sourceType) {
-    if (!authManager.isAuthenticated()) {
-      throw new Error('用户未认证');
-    }
-
-    if (!sourceType) {
-      throw new Error('源类型不能为空');
-    }
-
-    try {
-      console.log(`重新加载解析器 (新架构): ${sourceType}`);
-
-      const response = await apiService.request(this.ENDPOINTS.RELOAD_PARSER, {
-        method: 'POST',
-        body: JSON.stringify({ sourceType })
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || '重载解析器失败');
-      }
-
-      const reloadData = response.data || response;
-
-      return {
-        success: reloadData.success !== false,
-        sourceType,
-        message: reloadData.message || `${sourceType} 解析器重载成功`
-      };
-
-    } catch (error) {
-      console.error('重载解析器失败:', error);
-      return {
-        success: false,
-        sourceType,
-        message: `${sourceType} 解析器重载失败: ${error.message}`,
-        error: error.message
-      };
     }
   }
 
@@ -457,8 +249,7 @@ class DetailAPIService {
   }
 
   /**
-   * 获取详情提取历史 - 保持兼容性
-   * 对应后端 getDetailExtractionHistoryHandler
+   * 获取详情提取历史 - 与后端getDetailExtractionHistoryHandler匹配
    */
   async getExtractionHistory(options = {}) {
     if (!authManager.isAuthenticated()) {
@@ -478,7 +269,7 @@ class DetailAPIService {
       if (options.sortBy) params.append('sortBy', options.sortBy);
       if (options.sortOrder) params.append('sortOrder', options.sortOrder);
 
-      const endpoint = `${this.ENDPOINTS.HISTORY}${params.toString() ? `?${params.toString()}` : ''}`;
+      const endpoint = `/api/detail/history${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await apiService.request(endpoint);
 
       if (!response.success) {
@@ -494,8 +285,7 @@ class DetailAPIService {
   }
 
   /**
-   * 获取详情缓存统计 - 保持兼容性
-   * 对应后端 getDetailCacheStatsHandler
+   * 获取详情缓存统计 - 与后端getDetailCacheStatsHandler匹配
    */
   async getCacheStats() {
     if (!authManager.isAuthenticated()) {
@@ -503,7 +293,7 @@ class DetailAPIService {
     }
 
     try {
-      const response = await apiService.request(this.ENDPOINTS.CACHE_STATS);
+      const response = await apiService.request('/api/detail/cache/stats');
 
       if (!response.success) {
         throw new Error(response.message || '获取缓存统计失败');
@@ -527,8 +317,7 @@ class DetailAPIService {
   }
 
   /**
-   * 清理详情缓存 - 保持兼容性
-   * 对应后端 clearDetailCacheHandler
+   * 清理详情缓存 - 与后端clearDetailCacheHandler匹配
    */
   async clearCache(operation = 'expired', options = {}) {
     if (!authManager.isAuthenticated()) {
@@ -556,7 +345,7 @@ class DetailAPIService {
         if (options.maxSize) params.append('maxSize', options.maxSize.toString());
       }
 
-      const response = await apiService.request(`${this.ENDPOINTS.CACHE_CLEAR}?${params.toString()}`, {
+      const response = await apiService.request(`/api/detail/cache/clear?${params.toString()}`, {
         method: 'DELETE'
       });
 
@@ -576,8 +365,7 @@ class DetailAPIService {
   }
 
   /**
-   * 删除特定URL的详情缓存 - 保持兼容性
-   * 对应后端 deleteDetailCacheHandler
+   * 删除特定URL的详情缓存 - 与后端deleteDetailCacheHandler匹配
    */
   async deleteCache(urls) {
     if (!authManager.isAuthenticated()) {
@@ -591,7 +379,7 @@ class DetailAPIService {
     }
 
     try {
-      const response = await apiService.request(this.ENDPOINTS.CACHE_DELETE, {
+      const response = await apiService.request('/api/detail/cache/delete', {
         method: 'DELETE',
         body: JSON.stringify({ 
           url: urlsArray.length === 1 ? urlsArray[0] : undefined,
@@ -629,8 +417,7 @@ class DetailAPIService {
   }
 
   /**
-   * 获取详情提取统计信息 - 保持兼容性
-   * 对应后端 getDetailExtractionStatsHandler
+   * 获取详情提取统计信息 - 与后端getDetailExtractionStatsHandler匹配
    */
   async getStats() {
     if (!authManager.isAuthenticated()) {
@@ -638,7 +425,7 @@ class DetailAPIService {
     }
 
     try {
-      const response = await apiService.request(this.ENDPOINTS.STATS);
+      const response = await apiService.request('/api/detail/stats');
 
       if (!response.success) {
         throw new Error(response.message || '获取统计失败');
@@ -666,25 +453,24 @@ class DetailAPIService {
   // ===================== 响应处理方法 =====================
 
   /**
-   * 处理单个提取响应 - 适配新架构
+   * 处理单个提取响应
    */
   processExtractionResponse(response, originalResult) {
     const data = response.data || response;
     const detailInfo = data.detailInfo || data;
     const metadata = data.metadata || {};
 
-    console.log('处理提取响应 (新架构):', {
+    console.log('处理提取响应:', {
       originalId: originalResult.id,
       originalTitle: originalResult.title,
       responseTitle: detailInfo.title,
-      extractionStatus: detailInfo.extractionStatus,
-      architecture: metadata.architecture || 'modular_parsers'
+      extractionStatus: detailInfo.extractionStatus
     });
 
-    // 🆕 适配新架构的ParsedData格式
+    // 与后端buildSuccessResponse结构保持一致
     return {
       // 关键修复：确保原始ID被正确保留并优先使用
-      id: originalResult.id,
+      id: originalResult.id,  // 明确设置为原始搜索结果的ID
       originalId: originalResult.id,
       
       // 从原始搜索结果继承的基础信息
@@ -703,16 +489,12 @@ class DetailAPIService {
       searchUrl: detailInfo.searchUrl || originalResult.url,
       url: detailInfo.detailUrl || originalResult.url, // 兼容性字段
       
-      // 🆕 新架构数据结构 - 适配ParsedData格式
-      cover: detailInfo.cover || detailInfo.coverImage || '',
-      coverImage: detailInfo.cover || detailInfo.coverImage || '', // 兼容性
+      // 媒体信息
+      coverImage: detailInfo.coverImage || '',
       screenshots: Array.isArray(detailInfo.screenshots) ? detailInfo.screenshots : [],
       
-      // 演员信息 - 支持actors和actresses字段
-      actors: Array.isArray(detailInfo.actors) ? detailInfo.actors : 
-              (Array.isArray(detailInfo.actresses) ? detailInfo.actresses : []),
-      actresses: Array.isArray(detailInfo.actresses) ? detailInfo.actresses :
-                 (Array.isArray(detailInfo.actors) ? detailInfo.actors : []), // 兼容性
+      // 演员信息
+      actresses: Array.isArray(detailInfo.actresses) ? detailInfo.actresses : [],
       director: detailInfo.director || '',
       studio: detailInfo.studio || '',
       label: detailInfo.label || '',
@@ -727,15 +509,13 @@ class DetailAPIService {
       fileSize: detailInfo.fileSize || '',
       resolution: detailInfo.resolution || '',
       
-      // 下载信息 - 支持新架构的链接格式
-      downloadLinks: this.processDownloadLinks(detailInfo.downloadLinks || detailInfo.links),
-      magnetLinks: this.processMagnetLinks(detailInfo.magnetLinks || detailInfo.links),
-      links: detailInfo.links || [], // 新架构统一链接格式
+      // 下载信息
+      downloadLinks: Array.isArray(detailInfo.downloadLinks) ? detailInfo.downloadLinks : [],
+      magnetLinks: Array.isArray(detailInfo.magnetLinks) ? detailInfo.magnetLinks : [],
       
       // 其他信息
       description: detailInfo.description || '',
-      tags: this.processTags(detailInfo.tags || detailInfo.genres),
-      genres: detailInfo.genres || detailInfo.tags || [], // 兼容性
+      tags: Array.isArray(detailInfo.tags) ? detailInfo.tags : [],
       rating: typeof detailInfo.rating === 'number' ? detailInfo.rating : 0,
       
       // 提取元数据
@@ -744,25 +524,18 @@ class DetailAPIService {
       extractedAt: detailInfo.extractedAt || Date.now(),
       fromCache: metadata.fromCache || detailInfo.extractionStatus === this.EXTRACTION_STATUS.CACHED,
       retryCount: metadata.retryCount || 0,
-      cacheKey: metadata.cacheKey || null,
-      
-      // 🆕 新架构元数据
-      architecture: metadata.architecture || 'modular_parsers',
-      dataStructureVersion: metadata.dataStructureVersion || '2.0',
-      parser: metadata.parser || detailInfo.sourceType,
-      configApplied: metadata.configApplied || false
+      cacheKey: metadata.cacheKey || null
     };
   }
 
   /**
-   * 处理批量响应 - 适配新架构
+   * 处理批量响应
    */
   processBatchResponse(response, originalResults, options) {
     const data = response.data || response;
     const results = data.results || [];
     const stats = data.stats || {};
     const summary = data.summary || {};
-    const metadata = data.metadata || {};
 
     // 本地缓存成功的结果
     if (options.useLocalCache !== false) {
@@ -785,10 +558,7 @@ class DetailAPIService {
         extractionStatus: result.extractionStatus || this.EXTRACTION_STATUS.ERROR,
         extractionTime: result.extractionTime || 0,
         extractedAt: result.extractedAt || Date.now(),
-        fromCache: result.extractionStatus === this.EXTRACTION_STATUS.CACHED,
-        // 🆕 新架构标识
-        architecture: metadata.architecture || 'modular_parsers',
-        dataStructureVersion: metadata.dataStructureVersion || '2.0'
+        fromCache: result.extractionStatus === this.EXTRACTION_STATUS.CACHED
       })),
       stats: {
         total: stats.total || results.length,
@@ -813,60 +583,8 @@ class DetailAPIService {
         failed: summary.failed || 0,
         cached: summary.cached || 0,
         message: summary.message || `批量详情提取完成: ${results.length} 个结果`
-      },
-      // 🆕 新架构元数据
-      metadata: {
-        architecture: metadata.architecture || 'modular_parsers',
-        dataStructureVersion: metadata.dataStructureVersion || '2.0',
-        batchSize: metadata.batchSize || originalResults.length,
-        maxConcurrency: metadata.maxConcurrency || 1
       }
     };
-  }
-
-  /**
-   * 🆕 处理下载链接 - 适配新架构链接格式
-   */
-  processDownloadLinks(links) {
-    if (!Array.isArray(links)) return [];
-    
-    return links
-      .filter(link => link.type === 'download' || link.type === 'http' || link.type === 'https')
-      .map(link => ({
-        url: link.url,
-        name: link.name || '下载链接',
-        size: link.size || '',
-        quality: link.quality || '',
-        type: link.type || 'download'
-      }));
-  }
-
-  /**
-   * 🆕 处理磁力链接 - 适配新架构链接格式
-   */
-  processMagnetLinks(links) {
-    if (!Array.isArray(links)) return [];
-    
-    return links
-      .filter(link => link.type === 'magnet')
-      .map(link => ({
-        magnet: link.url,
-        url: link.url, // 兼容性
-        name: link.name || '磁力链接',
-        size: link.size || '',
-        seeders: link.seeders || 0,
-        leechers: link.leechers || 0
-      }));
-  }
-
-  /**
-   * 🆕 处理标签 - 适配新架构标签格式
-   */
-  processTags(tags) {
-    if (!Array.isArray(tags)) return [];
-    
-    return tags.filter(tag => tag && tag.trim())
-               .map(tag => typeof tag === 'string' ? tag.trim() : tag.name || '');
   }
 
   /**
@@ -882,55 +600,7 @@ class DetailAPIService {
       extractedAt: Date.now(),
       fromCache: false,
       retryable: ['TimeoutError', 'NetworkError'].includes(error.name),
-      suggestions: this.generateErrorSuggestions(error.name, error.message),
-      // 🆕 新架构错误信息
-      architecture: 'modular_parsers',
-      dataStructureVersion: '2.0'
-    };
-  }
-
-  // ===================== 新架构特有方法 =====================
-
-  /**
-   * 构建站点详细信息映射
-   */
-  buildSiteDetailsMap(sites) {
-    const siteDetails = {};
-    
-    sites.forEach(site => {
-      if (site.sourceType) {
-        siteDetails[site.sourceType] = {
-          className: site.className || 'UnknownParser',
-          siteInfo: site.siteInfo || {},
-          isActive: site.isActive !== false,
-          features: site.siteInfo?.features || [],
-          performance: site.siteInfo?.performance || {},
-          lastValidated: site.siteInfo?.lastValidated || null,
-          error: site.error || null
-        };
-      }
-    });
-    
-    return siteDetails;
-  }
-
-  /**
-   * 获取默认服务统计
-   */
-  getDefaultServiceStats() {
-    return {
-      parserFactory: {
-        supportedSites: 0,
-        cachedParsers: 0,
-        supportedSitesList: [],
-        cachedParsersList: []
-      },
-      supportedSites: [],
-      serviceInfo: {
-        version: '2.0.0',
-        architecture: 'modular_parsers',
-        features: []
-      }
+      suggestions: this.generateErrorSuggestions(error.name, error.message)
     };
   }
 
@@ -947,12 +617,10 @@ class DetailAPIService {
       };
     }
     
-    // 系统级限制检查
-    const maxBatchSize = 20; // 与后端CONFIG.DETAIL_EXTRACTION.MAX_BATCH_SIZE同步
-    if (searchResults.length > maxBatchSize) {
+    if (searchResults.length > this.LIMITS.MAX_BATCH_SIZE) {
       return {
         valid: false,
-        message: `批量处理数量不能超过 ${maxBatchSize} 个`
+        message: `批量处理数量不能超过 ${this.LIMITS.MAX_BATCH_SIZE} 个`
       };
     }
     
@@ -981,6 +649,16 @@ class DetailAPIService {
   }
 
   /**
+   * 验证超时时间
+   */
+  validateTimeout(timeout) {
+    const timeoutNum = Number(timeout);
+    if (isNaN(timeoutNum)) return this.LIMITS.DEFAULT_TIMEOUT;
+    
+    return Math.min(Math.max(timeoutNum, this.LIMITS.MIN_TIMEOUT), this.LIMITS.MAX_TIMEOUT);
+  }
+
+  /**
    * 推断源类型
    */
   inferSourceType(url) {
@@ -989,7 +667,7 @@ class DetailAPIService {
     const urlLower = url.toLowerCase();
     
     for (const sourceType of this.SUPPORTED_SOURCES) {
-      if (sourceType !== 'generic' && urlLower.includes(sourceType)) {
+      if (urlLower.includes(sourceType)) {
         return sourceType;
       }
     }
@@ -1017,181 +695,9 @@ class DetailAPIService {
       ...cached,
       fromCache: true,
       extractionStatus: this.EXTRACTION_STATUS.CACHED,
-      extractedAt: cached.extractedAt || Date.now(),
-      // 🆕 新架构缓存标识
-      architecture: cached.architecture || 'modular_parsers',
-      dataStructureVersion: cached.dataStructureVersion || '2.0'
+      extractedAt: cached.extractedAt || Date.now()
     };
   }
-
-  // ===================== 本地缓存管理 =====================
-
-  /**
-   * 生成缓存键
-   */
-  generateCacheKey(url) {
-    if (!url) return '';
-    try {
-      return 'detail_v2_' + btoa(encodeURIComponent(url)).substring(0, 16);
-    } catch (error) {
-      return 'detail_v2_' + url.replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
-    }
-  }
-
-  /**
-   * 生成批次ID
-   */
-  generateBatchId() {
-    return 'batch_v2_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
-
-  /**
-   * 从本地缓存获取数据
-   */
-  getFromLocalCache(key) {
-    if (!key) return null;
-    
-    const cached = this.requestCache.get(key);
-    if (!cached) return null;
-
-    if (Date.now() > cached.expiresAt) {
-      this.requestCache.delete(key);
-      return null;
-    }
-
-    cached.lastAccessed = Date.now();
-    return cached.data;
-  }
-
-  /**
-   * 设置本地缓存
-   */
-  setToLocalCache(key, data) {
-    if (!key || !data) return;
-
-    if (this.requestCache.size >= this.maxCacheSize) {
-      const oldestKey = this.findOldestCacheKey();
-      if (oldestKey) {
-        this.requestCache.delete(oldestKey);
-      }
-    }
-
-    this.requestCache.set(key, {
-      data,
-      expiresAt: Date.now() + this.cacheExpiration,
-      lastAccessed: Date.now(),
-      createdAt: Date.now(),
-      version: '2.0' // 新架构版本标识
-    });
-  }
-
-  /**
-   * 查找最旧的缓存键
-   */
-  findOldestCacheKey() {
-    let oldestKey = null;
-    let oldestTime = Date.now();
-
-    for (const [key, cached] of this.requestCache) {
-      if (cached.lastAccessed < oldestTime) {
-        oldestTime = cached.lastAccessed;
-        oldestKey = key;
-      }
-    }
-
-    return oldestKey;
-  }
-
-  /**
-   * 从本地缓存移除数据
-   */
-  removeFromLocalCache(key) {
-    if (key) {
-      this.requestCache.delete(key);
-    }
-  }
-
-  /**
-   * 清空本地缓存
-   */
-  clearLocalCache() {
-    this.requestCache.clear();
-    console.log('本地详情缓存已清空 (v2.0)');
-  }
-
-  /**
-   * 获取本地缓存统计
-   */
-  getLocalCacheStats() {
-    const now = Date.now();
-    let expiredCount = 0;
-    let totalSize = 0;
-    let v2Count = 0;
-
-    for (const [key, cached] of this.requestCache) {
-      if (now > cached.expiresAt) {
-        expiredCount++;
-      }
-      if (cached.version === '2.0') {
-        v2Count++;
-      }
-      totalSize += JSON.stringify(cached.data).length;
-    }
-
-    return {
-      totalItems: this.requestCache.size,
-      expiredItems: expiredCount,
-      maxSize: this.maxCacheSize,
-      totalSize,
-      averageSize: this.requestCache.size > 0 ? Math.round(totalSize / this.requestCache.size) : 0,
-      // 🆕 新架构统计
-      v2Items: v2Count,
-      version: '2.0'
-    };
-  }
-
-  /**
-   * 处理本地缓存清理
-   */
-  handleLocalCacheClear(operation, options) {
-    switch (operation) {
-      case 'all':
-        this.clearLocalCache();
-        break;
-      case 'expired':
-        this.cleanupLocalExpiredCache();
-        break;
-      case 'lru':
-        if (options.count) {
-          const keys = Array.from(this.requestCache.keys()).slice(0, options.count);
-          keys.forEach(key => this.requestCache.delete(key));
-        }
-        break;
-    }
-  }
-
-  /**
-   * 清理本地过期缓存
-   */
-  cleanupLocalExpiredCache() {
-    const now = Date.now();
-    let cleanedCount = 0;
-
-    for (const [key, cached] of this.requestCache) {
-      if (now > cached.expiresAt) {
-        this.requestCache.delete(key);
-        cleanedCount++;
-      }
-    }
-
-    if (cleanedCount > 0) {
-      console.log(`清理了 ${cleanedCount} 个本地过期缓存项 (v2.0)`);
-    }
-
-    return cleanedCount;
-  }
-
-  // ===================== 保持向后兼容的方法 =====================
 
   /**
    * 增强历史数据
@@ -1234,6 +740,174 @@ class DetailAPIService {
     };
   }
 
+  // ===================== 本地缓存管理 =====================
+
+  /**
+   * 生成缓存键
+   */
+  generateCacheKey(url) {
+    if (!url) return '';
+    try {
+      return 'detail_' + btoa(encodeURIComponent(url)).substring(0, 16);
+    } catch (error) {
+      return 'detail_' + url.replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
+    }
+  }
+
+  /**
+   * 生成批次ID
+   */
+  generateBatchId() {
+    return 'batch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  /**
+   * 从本地缓存获取数据
+   */
+  getFromLocalCache(key) {
+    if (!key) return null;
+    
+    const cached = this.requestCache.get(key);
+    if (!cached) return null;
+
+    if (Date.now() > cached.expiresAt) {
+      this.requestCache.delete(key);
+      return null;
+    }
+
+    cached.lastAccessed = Date.now();
+    return cached.data;
+  }
+
+  /**
+   * 设置本地缓存
+   */
+  setToLocalCache(key, data) {
+    if (!key || !data) return;
+
+    if (this.requestCache.size >= this.maxCacheSize) {
+      const oldestKey = this.findOldestCacheKey();
+      if (oldestKey) {
+        this.requestCache.delete(oldestKey);
+      }
+    }
+
+    this.requestCache.set(key, {
+      data,
+      expiresAt: Date.now() + this.cacheExpiration,
+      lastAccessed: Date.now(),
+      createdAt: Date.now()
+    });
+  }
+
+  /**
+   * 查找最旧的缓存键
+   */
+  findOldestCacheKey() {
+    let oldestKey = null;
+    let oldestTime = Date.now();
+
+    for (const [key, cached] of this.requestCache) {
+      if (cached.lastAccessed < oldestTime) {
+        oldestTime = cached.lastAccessed;
+        oldestKey = key;
+      }
+    }
+
+    return oldestKey;
+  }
+
+  /**
+   * 从本地缓存移除数据
+   */
+  removeFromLocalCache(key) {
+    if (key) {
+      this.requestCache.delete(key);
+    }
+  }
+
+  /**
+   * 清空本地缓存
+   */
+  clearLocalCache() {
+    this.requestCache.clear();
+    console.log('本地详情缓存已清空');
+  }
+
+  /**
+   * 获取本地缓存统计
+   */
+  getLocalCacheStats() {
+    const now = Date.now();
+    let expiredCount = 0;
+    let totalSize = 0;
+
+    for (const [key, cached] of this.requestCache) {
+      if (now > cached.expiresAt) {
+        expiredCount++;
+      }
+      totalSize += JSON.stringify(cached.data).length;
+    }
+
+    return {
+      totalItems: this.requestCache.size,
+      expiredItems: expiredCount,
+      maxSize: this.maxCacheSize,
+      totalSize,
+      averageSize: this.requestCache.size > 0 ? Math.round(totalSize / this.requestCache.size) : 0
+    };
+  }
+
+  /**
+   * 清理本地过期缓存
+   */
+  cleanupLocalExpiredCache() {
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    for (const [key, cached] of this.requestCache) {
+      if (now > cached.expiresAt) {
+        this.requestCache.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`清理了 ${cleanedCount} 个本地过期缓存项`);
+    }
+
+    return cleanedCount;
+  }
+
+  /**
+   * 处理本地缓存清理
+   */
+  handleLocalCacheClear(operation, options) {
+    switch (operation) {
+      case 'all':
+        this.clearLocalCache();
+        break;
+      case 'expired':
+        this.cleanupLocalExpiredCache();
+        break;
+      case 'lru':
+        if (options.count) {
+          const keys = Array.from(this.requestCache.keys()).slice(0, options.count);
+          keys.forEach(key => this.requestCache.delete(key));
+        }
+        break;
+    }
+  }
+
+  // ===================== 默认数据和工具方法 =====================
+
+  /**
+   * 延迟函数
+   */
+  async delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   /**
    * 生成错误建议
    */
@@ -1260,14 +934,11 @@ class DetailAPIService {
         break;
       default:
         suggestions.push('请重试操作');
-        suggestions.push('如果问题持续，请联系支持');
         break;
     }
     
     return suggestions;
   }
-
-  // ===================== 默认数据和工具方法 =====================
 
   /**
    * 获取相对时间
@@ -1293,7 +964,7 @@ class DetailAPIService {
       [this.EXTRACTION_STATUS.CACHED]: { text: '缓存', color: 'blue', icon: '⚡' },
       [this.EXTRACTION_STATUS.PARTIAL]: { text: '部分', color: 'yellow', icon: '⚠' },
       [this.EXTRACTION_STATUS.ERROR]: { text: '失败', color: 'red', icon: '✗' },
-      [this.EXTRACTION_STATUS.TIMEOUT]: { text: '超时', color: 'orange', icon: 'ⱱ' }
+      [this.EXTRACTION_STATUS.TIMEOUT]: { text: '超时', color: 'orange', icon: '⏱' }
     };
     
     return badges[status] || { text: '未知', color: 'gray', icon: '?' };
@@ -1330,28 +1001,41 @@ class DetailAPIService {
     return 'unknown';
   }
 
-  // 获取默认统计数据的方法保持不变...
+  /**
+   * 获取默认全局统计
+   */
   getDefaultGlobalStats() {
     return {
       totalItems: 0,
       expiredItems: 0,
       totalSize: 0,
       averageSize: 0,
-      hitRate: 0
+      hitRate: 0,
+      oldestItem: null,
+      newestItem: null,
+      mostAccessed: null
     };
   }
 
+  /**
+   * 获取默认用户统计
+   */
   getDefaultUserStats() {
     return {
       totalExtractions: 0,
       successfulExtractions: 0,
-      cachedExtractions: 0,
-      averageTime: 0,
+      failedExtractions: 0,
       successRate: 0,
-      cacheHitRate: 0
+      cacheItems: 0,
+      averageSize: 0,
+      totalAccess: 0,
+      hitRate: 0
     };
   }
 
+  /**
+   * 获取默认效率统计
+   */
   getDefaultEfficiencyStats() {
     return {
       hitRate: 0,
@@ -1361,6 +1045,9 @@ class DetailAPIService {
     };
   }
 
+  /**
+   * 获取默认性能统计
+   */
   getDefaultPerformanceStats() {
     return {
       averageTime: 0,
@@ -1369,6 +1056,9 @@ class DetailAPIService {
     };
   }
 
+  /**
+   * 获取默认趋势统计
+   */
   getDefaultTrendStats() {
     return {
       daily: [],
@@ -1377,6 +1067,9 @@ class DetailAPIService {
     };
   }
 
+  /**
+   * 获取默认摘要
+   */
   getDefaultSummary() {
     return {
       totalExtractions: 0,
@@ -1385,6 +1078,9 @@ class DetailAPIService {
     };
   }
 
+  /**
+   * 获取默认缓存统计
+   */
   getDefaultCacheStats() {
     return {
       global: this.getDefaultGlobalStats(),
@@ -1396,6 +1092,9 @@ class DetailAPIService {
     };
   }
 
+  /**
+   * 获取默认统计响应
+   */
   getDefaultStatsResponse() {
     return {
       user: this.getDefaultUserStats(),
@@ -1410,56 +1109,111 @@ class DetailAPIService {
   }
 
   /**
-   * 检查服务健康状态 - 新架构版本
+   * 验证提取结果
+   */
+  validateExtractionResult(result) {
+    if (!result || typeof result !== 'object') {
+      return { valid: false, error: '结果数据无效' };
+    }
+
+    const requiredFields = ['extractionStatus', 'extractedAt'];
+    const missingFields = requiredFields.filter(field => !(field in result));
+    
+    if (missingFields.length > 0) {
+      return { 
+        valid: false, 
+        error: `缺少必需字段: ${missingFields.join(', ')}` 
+      };
+    }
+
+    const validStatuses = Object.values(this.EXTRACTION_STATUS);
+    if (!validStatuses.includes(result.extractionStatus)) {
+      return { 
+        valid: false, 
+        error: `无效的提取状态: ${result.extractionStatus}` 
+      };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * 格式化批量结果用于显示
+   */
+  formatBatchResultsForDisplay(results, options = {}) {
+    const { 
+      includeErrors = true, 
+      sortBy = 'extractionTime',
+      maxResults = null 
+    } = options;
+
+    let filteredResults = includeErrors ? results : 
+      results.filter(r => r.extractionStatus === this.EXTRACTION_STATUS.SUCCESS || 
+                         r.extractionStatus === this.EXTRACTION_STATUS.CACHED);
+
+    // 排序
+    if (sortBy === 'extractionTime') {
+      filteredResults.sort((a, b) => (a.extractionTime || 0) - (b.extractionTime || 0));
+    } else if (sortBy === 'title') {
+      filteredResults.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    }
+
+    // 限制数量
+    if (maxResults && filteredResults.length > maxResults) {
+      filteredResults = filteredResults.slice(0, maxResults);
+    }
+
+    return filteredResults.map(result => ({
+      ...result,
+      displayTitle: result.title || result.code || '未知标题',
+      statusInfo: this.getStatusBadge(result.extractionStatus),
+      performanceInfo: this.getPerformanceRating(result.extractionTime),
+      qualityInfo: this.getEstimatedQuality(result),
+      formattedTime: this.formatExtractionTime(result.extractionTime)
+    }));
+  }
+
+  /**
+   * 格式化提取时间
+   */
+  formatExtractionTime(timeMs) {
+    if (!timeMs || timeMs === 0) return '0ms';
+    
+    if (timeMs < 1000) return `${timeMs}ms`;
+    if (timeMs < 60000) return `${(timeMs / 1000).toFixed(1)}s`;
+    return `${(timeMs / 60000).toFixed(1)}min`;
+  }
+
+  /**
+   * 检查服务健康状态
    */
   async checkServiceHealth() {
     try {
       const startTime = Date.now();
       
-      // 🆕 使用新架构端点进行健康检查
-      const [statsHealth, sitesHealth, configHealth] = await Promise.allSettled([
-        this.getServiceStats(),
-        this.getSupportedSites(),
-        detailConfigAPI.checkServiceHealth()
-      ]);
+      // 尝试一个简单的API调用来检查服务状态
+      const response = await apiService.request('/api/detail/stats', {
+        timeout: 5000
+      });
       
       const responseTime = Date.now() - startTime;
       
       return {
-        healthy: statsHealth.status === 'fulfilled',
+        healthy: response.success,
         responseTime,
         timestamp: Date.now(),
-        version: this.version,
-        architecture: 'modular_parsers',
-        components: {
-          stats: statsHealth.status === 'fulfilled',
-          sites: sitesHealth.status === 'fulfilled',
-          config: configHealth.status === 'fulfilled' && configHealth.value?.healthy
-        },
         localCache: {
           size: this.requestCache.size,
           maxSize: this.maxCacheSize,
           hitRate: this.calculateLocalCacheHitRate()
         },
-        features: {
-          modularParsers: true,
-          dynamicConfiguration: true,
-          enhancedCaching: true,
-          unifiedDataStructure: true
-        }
+        configService: await detailConfigAPI.checkServiceHealth()
       };
     } catch (error) {
       return {
         healthy: false,
         error: error.message,
         timestamp: Date.now(),
-        version: this.version,
-        architecture: 'modular_parsers',
-        components: {
-          stats: false,
-          sites: false,
-          config: false
-        },
         localCache: {
           size: this.requestCache.size,
           maxSize: this.maxCacheSize
@@ -1488,14 +1242,12 @@ class DetailAPIService {
   }
 
   /**
-   * 导出服务状态 - 新架构版本
+   * 导出服务状态
    */
   exportServiceStatus() {
     return {
       type: 'detail-api-service',
-      version: this.version,
-      architecture: 'modular_parsers',
-      endpoints: this.ENDPOINTS,
+      version: '3.0.0',
       localCacheStats: this.getLocalCacheStats(),
       cacheExpiration: this.cacheExpiration,
       maxCacheSize: this.maxCacheSize,
@@ -1503,28 +1255,24 @@ class DetailAPIService {
       extractionQueue: this.extractionQueue.size,
       retryDelays: this.retryDelays,
       supportedSources: this.SUPPORTED_SOURCES,
+      limits: this.LIMITS,
       timestamp: Date.now(),
       features: {
-        modularParsers: true,
-        dynamicConfiguration: true,
-        unifiedDataStructure: true,
         enhancedErrorHandling: true,
         improvedCaching: true,
         batchProcessing: true,
-        configAwareProcessing: true,
+        configAwareProcessing: true, // 新增：配置感知处理
         progressTracking: true,
         retryMechanism: true,
         statisticsReporting: true,
         backendSync: true,
-        parserValidation: true,
-        serviceStats: true,
-        parserReload: true
+        dynamicConfiguration: true // 新增：动态配置功能
       }
     };
   }
 
   /**
-   * 重置服务状态 - 新架构版本
+   * 重置服务状态
    */
   resetService() {
     this.clearLocalCache();
@@ -1534,28 +1282,108 @@ class DetailAPIService {
     // 重置配置服务
     detailConfigAPI.reset();
     
-    console.log(`详情提取服务已重置 (${this.version})`);
+    console.log('详情提取服务已重置');
   }
 
   /**
-   * 获取服务信息 - 新架构版本
+   * 获取服务配置信息
    */
   getServiceInfo() {
     return {
-      version: this.version,
-      architecture: 'modular_parsers',
       supportedSources: this.SUPPORTED_SOURCES,
+      limits: this.LIMITS,
       extractionStatuses: this.EXTRACTION_STATUS,
-      endpoints: this.ENDPOINTS,
       cacheStats: this.getLocalCacheStats(),
+      version: '3.0.0',
       configService: {
         available: true,
-        version: detailConfigAPI.version,
         cached: detailConfigAPI.isConfigCacheValid(),
         lastUpdate: detailConfigAPI.lastCacheTime
-      },
-      features: this.exportServiceStatus().features
+      }
     };
+  }
+
+  /**
+   * 获取当前生效的配置摘要
+   */
+  async getEffectiveConfigSummary() {
+    try {
+      const configData = await detailConfigAPI.getUserConfig();
+      const config = configData.config;
+      
+      return {
+        extractionEnabled: config.enableDetailExtraction,
+        autoExtraction: config.autoExtractDetails,
+        timeout: config.extractionTimeout,
+        batchSize: config.extractionBatchSize,
+        concurrency: config.enableConcurrentExtraction ? config.maxConcurrentExtractions : 1,
+        cacheEnabled: config.enableCache,
+        localCacheEnabled: config.enableLocalCache,
+        retryEnabled: config.enableRetry,
+        maxRetries: config.maxRetryAttempts,
+        isDefault: configData.isDefault,
+        lastUpdated: Date.now()
+      };
+    } catch (error) {
+      console.error('获取生效配置摘要失败:', error);
+      return {
+        extractionEnabled: DEFAULT_USER_CONFIG.enableDetailExtraction,
+        autoExtraction: DEFAULT_USER_CONFIG.autoExtractDetails,
+        timeout: DEFAULT_USER_CONFIG.extractionTimeout,
+        batchSize: DEFAULT_USER_CONFIG.extractionBatchSize,
+        concurrency: DEFAULT_USER_CONFIG.maxConcurrentExtractions,
+        cacheEnabled: DEFAULT_USER_CONFIG.enableCache,
+        localCacheEnabled: DEFAULT_USER_CONFIG.enableLocalCache,
+        retryEnabled: DEFAULT_USER_CONFIG.enableRetry,
+        maxRetries: DEFAULT_USER_CONFIG.maxRetryAttempts,
+        isDefault: true,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * 预加载用户配置（用于优化性能）
+   */
+  async preloadUserConfig() {
+    if (authManager.isAuthenticated()) {
+      try {
+        await detailConfigAPI.getUserConfig();
+        console.log('用户配置预加载完成');
+        return true;
+      } catch (error) {
+        console.warn('用户配置预加载失败:', error);
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 监听配置变更（如果需要实时更新）
+   */
+  onConfigChange(callback) {
+    if (typeof callback === 'function') {
+      // 简单的配置变更监听机制
+      this.configChangeCallback = callback;
+      
+      // 当配置更新时调用回调
+      const originalUpdateConfig = detailConfigAPI.updateUserConfig.bind(detailConfigAPI);
+      detailConfigAPI.updateUserConfig = async (...args) => {
+        const result = await originalUpdateConfig(...args);
+        if (result.valid && this.configChangeCallback) {
+          this.configChangeCallback(result.config);
+        }
+        return result;
+      };
+    }
+  }
+
+  /**
+   * 移除配置变更监听
+   */
+  offConfigChange() {
+    this.configChangeCallback = null;
   }
 }
 

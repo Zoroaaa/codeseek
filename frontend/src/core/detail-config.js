@@ -1,18 +1,13 @@
-// src/core/detail-config.js - 与后端 DetailConfigService 完全同步的详情提取配置
-// 版本 2.0.0 - 适配模块化解析器架构
+// src/core/detail-config.js - 详情提取配置常量和默认值
+// 与后端 detail-config-service.js 完全同步
 
-// 详情提取配置API端点 - 与后端router.js完全匹配
+// 详情提取配置API端点
 export const DETAIL_CONFIG_ENDPOINTS = {
   GET_CONFIG: '/api/detail/config',
   UPDATE_CONFIG: '/api/detail/config', 
   RESET_CONFIG: '/api/detail/config/reset',
   APPLY_PRESET: '/api/detail/config/preset',
-  VALIDATE_CONFIG: '/api/detail/config/validate', // 可选验证端点
-  // 🆕 新架构端点
-  GET_SUPPORTED_SITES: '/api/detail/supported-sites',
-  VALIDATE_PARSER: '/api/detail/validate-parser',
-  SERVICE_STATS: '/api/detail/service-stats',
-  RELOAD_PARSER: '/api/detail/reload-parser'
+  VALIDATE_CONFIG: '/api/detail/config/validate' // 可选验证端点
 };
 
 // 配置预设类型 - 与后端同步
@@ -23,7 +18,7 @@ export const DETAIL_CONFIG_PRESETS = {
   QUALITY: 'quality'
 };
 
-// 详情提取状态 - 与后端 constants.js DETAIL_EXTRACTION_STATUS 同步
+// 详情提取状态 - 与后端 constants.js 同步
 export const DETAIL_EXTRACTION_STATUS = {
   SUCCESS: 'success',
   ERROR: 'error',
@@ -32,7 +27,7 @@ export const DETAIL_EXTRACTION_STATUS = {
   PARTIAL: 'partial'
 };
 
-// 配置验证规则 - 与后端 constants.js SYSTEM_VALIDATION 完全同步
+// 配置验证规则 - 与后端 SYSTEM_VALIDATION 同步
 export const CONFIG_VALIDATION_RULES = {
   extractionTimeout: {
     min: 5000,   // 5秒
@@ -72,7 +67,7 @@ export const CONFIG_VALIDATION_RULES = {
   }
 };
 
-// 默认用户配置 - 与后端 DetailConfigService.getDefaultUserConfig() 完全同步
+// 默认用户配置 - 与后端 DetailConfigService.getDefaultUserConfig() 同步
 export const DEFAULT_USER_CONFIG = {
   // 基础功能开关
   enableDetailExtraction: true,
@@ -134,7 +129,7 @@ export const DEFAULT_USER_CONFIG = {
   validateDownloadLinks: true
 };
 
-// 配置字段组定义 - 与后端 DetailConfigService.getConfigMetadata() 同步
+// 配置字段组定义 - 用于前端表单渲染
 export const CONFIG_FIELD_GROUPS = [
   {
     id: 'basic',
@@ -398,7 +393,7 @@ export const CONFIG_FIELD_GROUPS = [
   }
 ];
 
-// 配置预设定义 - 与后端 DetailConfigService.getConfigPresets() 完全同步
+// 配置预设定义 - 与后端预设完全同步
 export const CONFIG_PRESETS = {
   conservative: {
     name: '保守模式',
@@ -467,36 +462,6 @@ export const CONFIG_PRESETS = {
   }
 };
 
-// 🆕 新架构支持的站点类型 - 与后端 SUPPORTED_SOURCE_TYPES 同步
-export const SUPPORTED_SOURCE_TYPES = {
-  javbus: 'javbus',
-  javdb: 'javdb', 
-  jable: 'jable',
-  javmost: 'javmost',
-  javgg: 'javgg',
-  sukebei: 'sukebei',
-  javguru: 'javguru',
-  generic: 'generic'
-};
-
-// 🆕 新架构功能特性
-export const ARCHITECTURE_FEATURES = {
-  MODULAR_PARSERS: 'modular_parsers',
-  UNIFIED_DATA_STRUCTURE: 'unified_data_structure', 
-  INTELLIGENT_CACHING: 'intelligent_caching',
-  DYNAMIC_CONFIGURATION: 'dynamic_configuration',
-  PARSER_VALIDATION: 'parser_validation',
-  SERVICE_MONITORING: 'service_monitoring'
-};
-
-// 🆕 服务状态枚举
-export const SERVICE_STATUS = {
-  HEALTHY: 'healthy',
-  DEGRADED: 'degraded',
-  ERROR: 'error',
-  MAINTENANCE: 'maintenance'
-};
-
 // 配置变更检测辅助函数
 export function detectConfigChanges(oldConfig, newConfig) {
   const changes = {
@@ -540,216 +505,7 @@ export function resetToPreset(presetName) {
   return { ...CONFIG_PRESETS[presetName].config };
 }
 
-// 🆕 配置验证辅助函数 - 与后端 DetailConfigService.validateConfig 匹配
-export function validateConfigLocally(config) {
-  const errors = [];
-  const warnings = [];
-
-  if (!config || typeof config !== 'object') {
-    errors.push('配置数据必须是对象格式');
-    return { valid: false, errors, warnings };
-  }
-
-  // 验证提取超时时间
-  if (config.extractionTimeout !== undefined) {
-    const timeout = Number(config.extractionTimeout);
-    if (isNaN(timeout) || 
-        timeout < CONFIG_VALIDATION_RULES.extractionTimeout.min || 
-        timeout > CONFIG_VALIDATION_RULES.extractionTimeout.max) {
-      errors.push(`提取超时时间必须在 ${CONFIG_VALIDATION_RULES.extractionTimeout.min}-${CONFIG_VALIDATION_RULES.extractionTimeout.max}ms 之间`);
-    }
-    if (timeout > 20000) {
-      warnings.push('超时时间设置过长可能影响用户体验');
-    }
-  }
-
-  // 验证缓存时长
-  if (config.cacheDuration !== undefined) {
-    const duration = Number(config.cacheDuration);
-    if (isNaN(duration) || 
-        duration < CONFIG_VALIDATION_RULES.cacheDuration.min || 
-        duration > CONFIG_VALIDATION_RULES.cacheDuration.max) {
-      errors.push(`缓存时长必须在 ${CONFIG_VALIDATION_RULES.cacheDuration.min}-${CONFIG_VALIDATION_RULES.cacheDuration.max}ms 之间`);
-    }
-  }
-
-  // 验证批量大小
-  if (config.extractionBatchSize !== undefined) {
-    const batchSize = Number(config.extractionBatchSize);
-    if (isNaN(batchSize) || 
-        batchSize < CONFIG_VALIDATION_RULES.extractionBatchSize.min || 
-        batchSize > CONFIG_VALIDATION_RULES.extractionBatchSize.max) {
-      errors.push(`批量大小必须在 ${CONFIG_VALIDATION_RULES.extractionBatchSize.min}-${CONFIG_VALIDATION_RULES.extractionBatchSize.max} 之间`);
-    }
-    if (batchSize > 10) {
-      warnings.push('批量大小过大可能导致请求阻塞');
-    }
-  }
-
-  // 验证依赖关系
-  if (config.autoExtractDetails && !config.enableDetailExtraction) {
-    errors.push('启用自动提取需要先启用详情提取功能');
-  }
-  
-  if (config.enableLocalCache && !config.enableCache) {
-    errors.push('启用本地缓存需要先启用缓存功能');
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-    warnings
-  };
-}
-
-// 🆕 配置性能影响评估
-export function assessConfigPerformanceImpact(oldConfig, newConfig) {
-  let impact = 0;
-  
-  // 超时时间影响
-  if (newConfig.extractionTimeout > oldConfig.extractionTimeout) {
-    impact -= 1; // 更慢
-  } else if (newConfig.extractionTimeout < oldConfig.extractionTimeout) {
-    impact += 1; // 更快，但可能更多失败
-  }
-  
-  // 并发数影响
-  if (newConfig.maxConcurrentExtractions > oldConfig.maxConcurrentExtractions) {
-    impact += 2; // 显著提升性能
-  } else if (newConfig.maxConcurrentExtractions < oldConfig.maxConcurrentExtractions) {
-    impact -= 2; // 显著降低性能
-  }
-  
-  // 缓存影响
-  if (newConfig.enableCache && !oldConfig.enableCache) {
-    impact += 3; // 缓存带来显著性能提升
-  } else if (!newConfig.enableCache && oldConfig.enableCache) {
-    impact -= 3; // 禁用缓存显著影响性能
-  }
-  
-  if (impact > 2) return 'positive';
-  if (impact < -2) return 'negative';
-  return 'neutral';
-}
-
-// 🆕 配置建议生成器
-export function generateConfigRecommendations(config) {
-  const recommendations = [];
-  
-  if (config.extractionTimeout > 20000) {
-    recommendations.push({
-      type: 'warning',
-      message: '超时时间过长可能影响用户体验',
-      suggestion: '建议设置为15秒以下'
-    });
-  }
-  
-  if (config.extractionBatchSize > 5) {
-    recommendations.push({
-      type: 'warning',
-      message: '批量大小过大可能导致请求阻塞',
-      suggestion: '建议设置为3-5之间'
-    });
-  }
-  
-  if (!config.enableCache) {
-    recommendations.push({
-      type: 'performance',
-      message: '禁用缓存会显著影响性能',
-      suggestion: '建议启用缓存以提高响应速度'
-    });
-  }
-  
-  if (config.maxConcurrentExtractions === 1 && config.enableConcurrentExtraction) {
-    recommendations.push({
-      type: 'optimization',
-      message: '并发数设置为1时建议关闭并发提取',
-      suggestion: '要么增加并发数，要么关闭并发功能'
-    });
-  }
-  
-  if (config.autoExtractDetails && config.maxAutoExtractions > 8) {
-    recommendations.push({
-      type: 'warning',
-      message: '自动提取数量过多可能影响页面加载',
-      suggestion: '建议设置为5个以下'
-    });
-  }
-  
-  return recommendations;
-}
-
-// 🆕 配置格式化工具
-export function formatConfigForDisplay(config) {
-  return {
-    ...config,
-    extractionTimeoutDisplay: `${Math.round(config.extractionTimeout / 1000)}秒`,
-    cacheDurationDisplay: `${Math.round(config.cacheDuration / (1000 * 60 * 60))}小时`,
-    extractionTimeoutSeconds: Math.round(config.extractionTimeout / 1000),
-    cacheDurationHours: Math.round(config.cacheDuration / (1000 * 60 * 60))
-  };
-}
-
-// 🆕 配置兼容性检查
-export function checkConfigCompatibility(config) {
-  const issues = [];
-  
-  // 检查新架构兼容性
-  if (config.enableDetailExtraction && !config.enableCache) {
-    issues.push({
-      type: 'performance',
-      message: '禁用缓存可能导致新架构性能下降',
-      severity: 'warning'
-    });
-  }
-  
-  if (config.maxConcurrentExtractions > 5) {
-    issues.push({
-      type: 'resource',
-      message: '并发数过高可能导致资源耗尽',
-      severity: 'warning'
-    });
-  }
-  
-  // 检查解析器兼容性
-  if (config.enableStrictDomainCheck === false && config.enableSpamFilter === false) {
-    issues.push({
-      type: 'security',
-      message: '同时禁用域名检查和垃圾过滤可能存在安全风险',
-      severity: 'error'
-    });
-  }
-  
-  return {
-    compatible: issues.filter(i => i.severity === 'error').length === 0,
-    issues
-  };
-}
-
-// 🆕 架构信息
-export const ARCHITECTURE_INFO = {
-  version: '2.0.0',
-  codename: 'modular_parsers',
-  releaseDate: '2024-12-15',
-  features: Object.values(ARCHITECTURE_FEATURES),
-  compatibility: {
-    backwardCompatible: true,
-    apiVersion: '2.0',
-    minBackendVersion: '2.0.0'
-  },
-  improvements: [
-    '模块化解析器架构',
-    '统一数据结构(ParsedData)',
-    '智能缓存策略',
-    '动态配置管理',
-    '解析器验证机制',
-    '服务状态监控',
-    '增强的错误处理',
-    '性能优化算法'
-  ]
-};
-
-// 导出所有常量和函数
+// 导出所有常量
 export default {
   DETAIL_CONFIG_ENDPOINTS,
   DETAIL_CONFIG_PRESETS,
@@ -758,16 +514,7 @@ export default {
   DEFAULT_USER_CONFIG,
   CONFIG_FIELD_GROUPS,
   CONFIG_PRESETS,
-  SUPPORTED_SOURCE_TYPES,
-  ARCHITECTURE_FEATURES,
-  SERVICE_STATUS,
-  ARCHITECTURE_INFO,
   detectConfigChanges,
   mergeConfigs,
-  resetToPreset,
-  validateConfigLocally,
-  assessConfigPerformanceImpact,
-  generateConfigRecommendations,
-  formatConfigForDisplay,
-  checkConfigCompatibility
+  resetToPreset
 };

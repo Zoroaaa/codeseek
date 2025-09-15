@@ -1,400 +1,189 @@
 // src/components/search/DetailExtractionManager.js - 详情提取管理子组件
-// 版本 2.0.0 - 适配后端架构升级：支持模块化解析器和动态配置管理
-
 import { APP_CONSTANTS } from '../../core/constants.js';
-import { 
-  DETAIL_EXTRACTION_STATUS, 
-  ARCHITECTURE_FEATURES, 
-  SERVICE_STATUS,
-  DEFAULT_USER_CONFIG 
-} from '../../core/detail-config.js';
 import { showToast, showLoading } from '../../utils/dom.js';
-import { escapeHtml, formatRelativeTime } from '../../utils/format.js';
+import { escapeHtml } from '../../utils/format.js';
 import detailAPIService from '../../services/detail-api.js';
-import detailConfigAPI from '../../services/detail-config-api.js';
 import detailCardManager from '../detail-card.js';
 import authManager from '../../services/auth.js';
 import apiService from '../../services/api.js';
 
 export class DetailExtractionManager {
   constructor() {
-    // 基础状态
     this.extractionInProgress = false;
     this.extractionQueue = [];
-    this.config = {}; // 用户配置
-    this.version = '2.0.0'; // 新架构版本
-    
-    // 🆕 新架构特性支持
-    this.architectureFeatures = Object.values(ARCHITECTURE_FEATURES);
-    this.serviceHealth = {
-      status: SERVICE_STATUS.HEALTHY,
-      lastCheck: 0,
-      configService: false,
-      extractionService: false
-    };
-    
-    // 🆕 配置管理
-    this.configManager = null;
-    this.configCache = null;
-    this.configLastUpdate = 0;
-    this.configCacheExpiration = 5 * 60 * 1000; // 5分钟配置缓存
-    
-    // 统计信息 - 增强版本
+	this.config = {}; // 添加配置属性
     this.extractionStats = {
       totalExtractions: 0,
       successfulExtractions: 0,
       failedExtractions: 0,
-      partialExtractions: 0,
       cacheHits: 0,
-      averageTime: 0,
-      totalTime: 0,
-      // 🆕 新架构统计
-      modularParserExtractions: 0,
-      unifiedDataExtractions: 0,
-      configAwareExtractions: 0,
-      retrySuccessCount: 0
+      averageTime: 0
     };
-    
-    // 进度回调和洞察
     this.progressCallbacks = new Map();
     this.extractionInsights = [];
-    
-    // 🆕 性能监控
-    this.performanceMetrics = {
-      extractionTimes: [],
-      parserPerformance: new Map(),
-      configFetchTimes: [],
-      errorPatterns: new Map()
-    };
   }
 
   /**
-   * 初始化详情提取管理器 - 适配新架构v2.0.0
+   * 初始化详情提取管理器
    */
   async init() {
     try {
-      console.log(`初始化详情提取管理器 (新架构 v${this.version})`);
-      
-      // 🆕 初始化配置服务连接
-      await this.initConfigService();
-      
       // 初始化详情卡片管理器
       await detailCardManager.init();
       
-      // 🆕 检查新架构服务健康状态
-      await this.checkArchitectureHealth();
+      // 检查详情API服务健康状态
+      await this.checkDetailServiceHealth();
       
-      // 🆕 设置配置监听器
-      this.setupConfigListeners();
-      
-      // 暴露全局方法 - 增强版本
-      this.exposeGlobalMethods();
-      
-      console.log(`详情提取管理器初始化完成 (新架构 v${this.version})`);
-      console.log('支持的新架构特性:', this.architectureFeatures);
-      
+      console.log('详情提取管理器初始化完成');
     } catch (error) {
       console.error('详情提取管理器初始化失败:', error);
-      // 启动降级模式
-      await this.initFallbackMode();
     }
   }
-
-  /**
-   * 🆕 初始化配置服务连接
+  
+    /**
+   * 更新配置 - 新增方法
    */
-  async initConfigService() {
-    try {
-      this.configManager = detailConfigAPI;
-      
-      // 获取初始配置
-      const configData = await this.configManager.getUserConfig();
-      this.updateConfigCache(configData);
-      
-      this.serviceHealth.configService = true;
-      console.log('配置服务连接成功 (新架构)', {
-        version: configData.serviceInfo?.version,
-        architecture: configData.serviceInfo?.architecture,
-        supportedSites: configData.supportedSites?.length || 0
-      });
-      
-    } catch (error) {
-      console.warn('配置服务连接失败，使用默认配置:', error);
-      this.configCache = {
-        config: { ...DEFAULT_USER_CONFIG },
-        metadata: {
-          architecture: 'modular_parsers',
-          version: '2.0.0',
-          isDefault: true,
-          fallbackMode: true
-        }
-      };
-      this.serviceHealth.configService = false;
-    }
-  }
-
-  /**
-   * 🆕 检查新架构服务健康状态
-   */
-  async checkArchitectureHealth() {
-    try {
-      const startTime = performance.now();
-      
-      // 检查详情API服务健康状态
-      const extractionHealth = await detailAPIService.checkServiceHealth();
-      
-      // 检查配置API服务健康状态
-      const configHealth = await this.configManager?.checkServiceHealth();
-      
-      const healthCheckTime = performance.now() - startTime;
-      
-      this.serviceHealth = {
-        status: (extractionHealth.healthy && configHealth?.healthy) ? 
-                 SERVICE_STATUS.HEALTHY : SERVICE_STATUS.DEGRADED,
-        lastCheck: Date.now(),
-        extractionService: extractionHealth.healthy,
-        configService: configHealth?.healthy || false,
-        responseTime: healthCheckTime,
-        version: this.version,
-        architecture: 'modular_parsers',
-        features: {
-          extractionAPI: extractionHealth.healthy,
-          configAPI: configHealth?.healthy || false,
-          localCache: extractionHealth.localCache?.size >= 0,
-          modularParsers: extractionHealth.features?.modularParsers || false
-        }
-      };
-      
-      console.log('新架构服务健康检查完成:', this.serviceHealth);
-      
-      // 更新UI状态指示器
-      this.updateServiceStatusIndicators();
-      
-      // 触发服务状态变更事件
-      document.dispatchEvent(new CustomEvent('detailServiceStatusChanged', {
-        detail: this.serviceHealth
-      }));
-      
-    } catch (error) {
-      console.error('架构服务健康检查失败:', error);
-      this.serviceHealth.status = SERVICE_STATUS.ERROR;
-      this.serviceHealth.error = error.message;
-      this.updateServiceStatusIndicators();
-    }
-  }
-
-  /**
-   * 🆕 设置配置监听器
-   */
-  setupConfigListeners() {
-    // 监听配置变更事件
-    document.addEventListener('detailConfigChanged', async (event) => {
-      const { config } = event.detail;
-      console.log('检测到详情配置变更，更新本地配置 (新架构)', config);
-      await this.handleConfigUpdate(config);
-    });
-    
-    // 监听配置保存事件
-    document.addEventListener('detailConfigSaved', async (event) => {
-      console.log('检测到详情配置保存事件，刷新配置缓存');
-      await this.refreshConfig();
-    });
-    
-    // 监听架构升级事件
-    document.addEventListener('architectureUpgraded', async (event) => {
-      const { version, features } = event.detail;
-      console.log(`检测到架构升级: ${this.version} -> ${version}`, features);
-      await this.handleArchitectureUpgrade(version, features);
-    });
-  }
-
-  /**
-   * 获取有效配置 - 适配新架构动态配置
-   */
-  async getEffectiveConfig(overrides = {}) {
-    try {
-      // 检查配置缓存有效性
-      if (this.isConfigCacheExpired()) {
-        await this.refreshConfig();
-      }
-      
-      const baseConfig = this.configCache?.config || { ...DEFAULT_USER_CONFIG };
-      const effectiveConfig = {
-        ...baseConfig,
-        ...this.config, // 合并实例配置
-        ...overrides    // 合并覆盖配置
-      };
-      
-      // 🆕 添加新架构标识
-      effectiveConfig._architecture = 'modular_parsers';
-      effectiveConfig._version = '2.0.0';
-      effectiveConfig._configSource = this.configCache?.metadata?.isDefault ? 'default' : 'user';
-      effectiveConfig._timestamp = Date.now();
-      
-      return effectiveConfig;
-      
-    } catch (error) {
-      console.error('获取有效配置失败，使用默认配置:', error);
-      return {
-        ...DEFAULT_USER_CONFIG,
-        ...overrides,
-        _architecture: 'modular_parsers',
-        _version: '2.0.0',
-        _configSource: 'fallback'
-      };
-    }
-  }
-
-  /**
-   * 更新配置 - 增强版本
-   */
-  async updateConfig(config) {
+  updateConfig(config) {
     if (!config || typeof config !== 'object') {
       console.warn('DetailExtractionManager: 无效的配置对象');
       return;
     }
 
-    const oldConfig = { ...this.config };
-    
     // 合并配置
     this.config = { ...this.config, ...config };
     
-    console.log('DetailExtractionManager: 配置已更新 (新架构)', {
-      oldConfig: Object.keys(oldConfig).length,
-      newConfig: Object.keys(this.config).length,
-      architecture: this.config._architecture || 'modular_parsers'
-    });
+    console.log('DetailExtractionManager: 配置已更新', this.config);
     
-    // 处理配置更新
-    await this.handleConfigUpdate(this.config, oldConfig);
+    // 根据配置更新功能状态
+    this.handleConfigUpdate();
   }
 
   /**
-   * 🆕 处理配置更新
+   * 处理配置更新 - 新增方法
    */
-  async handleConfigUpdate(newConfig, oldConfig = {}) {
-    try {
-      // 检查详情提取功能状态变化
-      const wasEnabled = this.isExtractionEnabled;
+handleConfigUpdate() {
+  // 检查详情提取是否被启用
+  if (this.config.enableDetailExtraction !== undefined) {
+    const wasEnabled = this.isExtractionEnabled; // 保存之前的状态
+    
+    // 不需要手动设置 isExtractionEnabled，因为它是 getter，会自动计算
+    // this.isExtractionEnabled = this.config.enableDetailExtraction; // 删除这行
+    
+    // 直接比较当前状态和之前状态
+    const isNowEnabled = this.isExtractionEnabled; // 这会重新计算当前状态
+    
+    if (wasEnabled !== isNowEnabled) {
+      console.log(`详情提取功能${isNowEnabled ? '已启用' : '已禁用'}`);
       
-      // 更新本地配置
-      if (newConfig !== this.config) {
-        this.config = { ...this.config, ...newConfig };
-      }
-      
-      const isNowEnabled = this.isExtractionEnabled;
-      
-      if (wasEnabled !== isNowEnabled) {
-        console.log(`详情提取功能${isNowEnabled ? '已启用' : '已禁用'} (新架构)`);
-        
-        // 触发状态变更事件
-        document.dispatchEvent(new CustomEvent('detailExtractionStateChanged', {
-          detail: { 
-            enabled: isNowEnabled, 
-            architecture: 'modular_parsers',
-            configSource: this.config._configSource || 'unknown'
-          }
-        }));
-      }
-      
-      // 🆕 检查关键配置变更
-      const criticalChanges = this.detectCriticalConfigChanges(oldConfig, newConfig);
-      if (criticalChanges.length > 0) {
-        console.log('检测到关键配置变更:', criticalChanges);
-        await this.handleCriticalConfigChanges(criticalChanges);
-      }
-      
-      // 🆕 更新性能监控配置
-      this.updatePerformanceMonitoring(newConfig);
-      
-    } catch (error) {
-      console.error('处理配置更新失败:', error);
+      // 触发状态变更事件
+      document.dispatchEvent(new CustomEvent('detailExtractionStateChanged', {
+        detail: { enabled: isNowEnabled }
+      }));
     }
   }
 
+  // 更新批处理大小
+  if (this.config.extractionBatchSize) {
+    this.batchSize = this.config.extractionBatchSize;
+  }
+
+  // 更新超时设置
+  if (this.config.extractionTimeout) {
+    this.timeout = this.config.extractionTimeout;
+  }
+
+  // 更新重试设置
+  if (this.config.enableRetry !== undefined) {
+    this.retryEnabled = this.config.enableRetry;
+  }
+
+  // 更新缓存设置
+  if (this.config.enableCache !== undefined) {
+    this.cacheEnabled = this.config.enableCache;
+  }
+}
+
   /**
-   * 🆕 检测关键配置变更
+   * 获取当前配置 - 新增方法
    */
-  detectCriticalConfigChanges(oldConfig, newConfig) {
-    const criticalFields = [
-      'enableDetailExtraction',
-      'extractionTimeout', 
-      'extractionBatchSize',
-      'maxConcurrentExtractions',
-      'enableCache',
-      'enableRetry'
-    ];
-    
-    const changes = [];
-    criticalFields.forEach(field => {
-      if (oldConfig[field] !== newConfig[field]) {
-        changes.push({
-          field,
-          oldValue: oldConfig[field],
-          newValue: newConfig[field]
-        });
-      }
-    });
-    
-    return changes;
+  getConfig() {
+    return { ...this.config };
   }
 
   /**
-   * 🆕 处理关键配置变更
+   * 处理配置变更 - 新增方法（别名方法，兼容不同调用方式）
    */
-  async handleCriticalConfigChanges(changes) {
-    for (const change of changes) {
-      switch (change.field) {
-        case 'enableDetailExtraction':
-          await this.toggleExtractionFeature(change.newValue);
-          break;
-        case 'extractionTimeout':
-          this.updateTimeoutSettings(change.newValue);
-          break;
-        case 'extractionBatchSize':
-          this.updateBatchSettings(change.newValue);
-          break;
-        case 'enableCache':
-          await this.toggleCacheFeature(change.newValue);
-          break;
-      }
-    }
+  handleConfigChange(config) {
+    this.updateConfig(config);
   }
 
   /**
-   * 检查详情提取是否可用 - 新架构版本
+   * 检查详情提取是否启用 - 新增方法
    */
   get isExtractionEnabled() {
-    return this.config.enableDetailExtraction && 
-           authManager.isAuthenticated() && 
-           this.serviceHealth.extractionService;
+    return this.config.enableDetailExtraction && authManager.isAuthenticated();
   }
 
   /**
-   * 判断是否应该使用详情提取 - 增强版本
+   * 检查详情提取服务健康状态
+   */
+  async checkDetailServiceHealth() {
+    try {
+      if (!authManager.isAuthenticated()) {
+        console.log('用户未登录，跳过详情服务健康检查');
+        return;
+      }
+      
+      const healthCheck = await detailAPIService.checkServiceHealth();
+      
+      if (healthCheck.healthy) {
+        console.log(`详情提取服务健康检查通过 (响应时间: ${healthCheck.responseTime}ms)`);
+        this.updateServiceStatus(true, healthCheck);
+      } else {
+        console.warn('详情提取服务健康检查失败:', healthCheck.error);
+        this.updateServiceStatus(false, healthCheck);
+      }
+    } catch (error) {
+      console.warn('详情服务健康检查异常:', error);
+      this.updateServiceStatus(false, { error: error.message });
+    }
+  }
+
+  /**
+   * 更新服务状态指示器
+   */
+  updateServiceStatus(isHealthy, healthData) {
+    const statusIndicator = document.getElementById('detailServiceStatus');
+    if (statusIndicator) {
+      statusIndicator.className = `service-status ${isHealthy ? 'healthy' : 'unhealthy'}`;
+      statusIndicator.innerHTML = `
+        <span class="status-icon">${isHealthy ? '✅' : '⚠️'}</span>
+        <span class="status-text">详情提取: ${isHealthy ? '正常' : '异常'}</span>
+        ${healthData.responseTime ? `<small>${healthData.responseTime}ms</small>` : ''}
+      `;
+      statusIndicator.title = isHealthy ? 
+        `详情提取服务运行正常\n响应时间: ${healthData.responseTime}ms\n缓存命中率: ${healthData.localCache?.hitRate || 0}%` :
+        `详情提取服务异常: ${healthData.error || '未知错误'}`;
+    }
+  }
+
+  /**
+   * 判断是否应该使用详情提取
    */
   shouldUseDetailExtraction(config) {
-    const effectiveConfig = config || this.config;
-    return effectiveConfig.enableDetailExtraction && 
-           authManager.isAuthenticated() && 
-           this.serviceHealth.status !== SERVICE_STATUS.ERROR;
+    return config.enableDetailExtraction && authManager.isAuthenticated();
   }
 
   /**
-   * 判断是否应该提取详情 - 适配新架构
+   * 判断是否应该提取详情
    */
   shouldExtractDetail(result) {
     if (!result || !result.source) return false;
-    
-    // 🆕 检查新架构支持的源类型
-    const supportedSources = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || 
-                            this.configCache?.supportedSites?.map(s => s.sourceType) || [];
-    
-    return supportedSources.includes(result.source);
+    return APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES?.includes(result.source) || false;
   }
 
   /**
-   * 处理详情提取 - 主入口 (新架构适配版本)
+   * 处理详情提取 - 主入口
    */
   async handleDetailExtraction(searchResults, keyword, config) {
     if (this.extractionInProgress) {
@@ -404,25 +193,20 @@ export class DetailExtractionManager {
 
     try {
       this.extractionInProgress = true;
-      const startTime = performance.now();
       
-      console.log(`=== 开始详情提取流程 (新架构 v${this.version}) ===`);
+      console.log(`=== 开始详情提取流程 ===`);
       console.log(`搜索结果数量: ${searchResults.length}`);
       console.log(`关键词: ${keyword}`);
-      
-      // 🆕 获取配置感知的有效配置
-      const effectiveConfig = await this.getEffectiveConfig(config);
-      console.log(`使用配置 (${effectiveConfig._configSource}):`, effectiveConfig);
+      console.log(`配置:`, config);
       
       // 确定要提取详情的结果
-      const resultsToExtract = this.selectResultsForExtraction(searchResults, effectiveConfig);
+      const resultsToExtract = this.selectResultsForExtraction(searchResults, config);
       
       if (resultsToExtract.length === 0) {
         console.log('没有需要提取详情的结果');
         this.showExtractionInsight('no_results', { 
           total: searchResults.length,
-          keyword,
-          architecture: 'modular_parsers'
+          keyword 
         });
         return;
       }
@@ -430,26 +214,18 @@ export class DetailExtractionManager {
       console.log(`筛选出 ${resultsToExtract.length} 个结果进行详情提取`);
 
       // 显示提取进度
-      if (effectiveConfig.showExtractionProgress) {
-        this.showExtractionProgress(resultsToExtract.length, keyword);
+      if (config.showExtractionProgress) {
+        this.showExtractionProgress(resultsToExtract.length);
       }
 
-      // 🆕 执行新架构详情提取
-      const extractionResult = await this.executeNewArchitectureExtraction(
-        resultsToExtract, 
-        keyword, 
-        effectiveConfig
-      );
+      // 执行详情提取
+      const extractionResult = await this.executeDetailExtraction(resultsToExtract, keyword, config);
       
       // 处理提取结果
-      await this.processExtractionResults(extractionResult, resultsToExtract, effectiveConfig);
+      await this.processExtractionResults(extractionResult, resultsToExtract, config);
       
       // 更新统计信息
       this.updateExtractionStats(extractionResult);
-      
-      // 🆕 记录新架构性能指标
-      const totalTime = performance.now() - startTime;
-      this.recordArchitecturePerformance(extractionResult, totalTime);
       
       // 显示提取洞察
       this.showExtractionInsights(extractionResult, keyword);
@@ -459,13 +235,8 @@ export class DetailExtractionManager {
       showToast('详情提取失败: ' + error.message, 'error');
       this.showExtractionInsight('error', { 
         error: error.message,
-        keyword,
-        architecture: 'modular_parsers'
+        keyword 
       });
-      
-      // 🆕 记录错误模式
-      this.recordErrorPattern(error);
-      
     } finally {
       this.extractionInProgress = false;
       this.hideExtractionProgress();
@@ -473,83 +244,165 @@ export class DetailExtractionManager {
   }
 
   /**
-   * 🆕 执行新架构详情提取
+   * 选择要提取详情的结果
    */
-  async executeNewArchitectureExtraction(results, keyword, config) {
+  selectResultsForExtraction(searchResults, config) {
+    // 过滤支持详情提取的结果
+    const supportedResults = searchResults.filter(result => 
+      this.shouldExtractDetail(result)
+    );
+    
+    console.log(`支持详情提取的结果: ${supportedResults.length}/${searchResults.length}`);
+    
+    if (config.autoExtractDetails) {
+      // 自动提取模式：取前N个结果
+      const selected = supportedResults.slice(0, config.maxAutoExtractions);
+      console.log(`自动提取模式，选择前 ${selected.length} 个结果`);
+      return selected;
+    } else {
+      // 手动模式：返回所有支持的结果，让用户选择
+      console.log(`手动提取模式，返回所有 ${supportedResults.length} 个支持的结果`);
+      return supportedResults;
+    }
+  }
+
+  /**
+   * 执行详情提取
+   */
+  async executeDetailExtraction(results, keyword, config) {
     const startTime = Date.now();
     
     try {
       // 生成批次ID用于进度跟踪
       const batchId = this.generateBatchId();
       
-      console.log(`=== 执行新架构详情提取 ===`);
+      console.log(`=== 开始详情提取流程 ===`);
       console.log(`搜索结果数量: ${results.length}`);
       console.log(`关键词: ${keyword}`);
       console.log(`批次ID: ${batchId}`);
-      console.log(`架构版本: ${config._architecture || 'modular_parsers'}`);
       
-      // 🆕 构建ID映射表，确保结果能正确对应
-      const resultMappings = this.buildResultMappings(results);
-      console.log(`构建了 ${resultMappings.size} 个结果映射`);
-      
-      // 🆕 设置新架构进度回调
-      const progressCallback = (progress) => {
-        this.handleNewArchitectureProgress(progress, config);
-      };
-
-      // 🆕 使用新架构API执行批量详情提取
-      const extractionOptions = this.buildNewArchitectureOptions(config, {
-        batchId,
-        onProgress: progressCallback,
-        architecture: 'modular_parsers',
-        dataStructureVersion: '2.0'
+      // 构建ID映射表，确保结果能正确对应
+      const resultIdMap = new Map();
+      const resultUrlMap = new Map();
+      results.forEach(result => {
+        if (result.id) {
+          resultIdMap.set(result.url, result.id);
+          resultUrlMap.set(result.id, result);
+          console.log(`ID映射: ${result.id} -> ${result.url} (${result.title})`);
+        }
       });
 
-      const extractionResult = await detailAPIService.extractBatchDetails(
-        results, 
-        extractionOptions
-      );
+      console.log(`构建了 ${resultIdMap.size} 个ID映射`);
+      
+      // 设置进度回调
+      const progressCallback = (progress) => {
+        if (config.showExtractionProgress) {
+          this.updateExtractionProgress(progress.current, progress.total, progress.item);
+        }
+        
+        // 记录详细进度信息
+        console.log(`详情提取进度 [${progress.current}/${progress.total}]: ${progress.item} - ${progress.status}`);
+        
+        if (progress.error) {
+          console.warn(`提取错误 [${progress.item}]:`, progress.error);
+        }
+      };
 
-      // 🆕 处理新架构返回结果，确保ID正确映射
+      // 使用detailAPIService执行批量详情提取
+      const extractionResult = await detailAPIService.extractBatchDetails(results, {
+        enableCache: config.enableCache,
+        timeout: config.extractionTimeout,
+        enableRetry: config.enableRetry,
+        maxRetries: config.maxRetryAttempts,
+        maxConcurrency: config.extractionBatchSize,
+        progressInterval: 1000,
+        stopOnError: false,
+        strictValidation: config.strictValidation,
+        batchId,
+        onProgress: progressCallback
+      });
+
+      // 关键修复：处理返回结果，确保ID正确映射
       if (extractionResult.results) {
-        console.log(`=== 处理新架构返回结果 ===`);
+        console.log(`=== 修复返回结果的ID映射 ===`);
         
         extractionResult.results.forEach((result, index) => {
-          // 确保每个结果都有正确的ID和架构信息
-          result = this.enhanceResultWithArchitectureInfo(result, index, results, resultMappings);
+          // 确保每个结果都有正确的ID
+          let finalId = result.id;
+          
+          // 如果后端返回的结果没有id，通过多种方式找回原始id
+          if (!finalId) {
+            // 方法1：通过searchUrl或originalUrl找回ID
+            if (result.searchUrl) {
+              finalId = resultIdMap.get(result.searchUrl);
+            }
+            
+            if (!finalId && result.originalUrl) {
+              finalId = resultIdMap.get(result.originalUrl);
+            }
+            
+            // 方法2：通过url字段找回ID
+            if (!finalId && result.url) {
+              finalId = resultIdMap.get(result.url);
+            }
+            
+            // 方法3：通过索引对应原始结果
+            if (!finalId && index < results.length) {
+              finalId = results[index].id;
+            }
+            
+            // 方法4：生成临时ID
+            if (!finalId) {
+              finalId = `temp_${Date.now()}_${index}`;
+              console.warn(`无法找回原始ID，生成临时ID: ${finalId}`);
+            }
+            
+            result.id = finalId;
+          }
+          
+          // 确保原始搜索结果信息被保留
+          const originalResult = resultUrlMap.get(finalId) || results.find(r => r.id === finalId);
+          if (originalResult) {
+            result.originalId = originalResult.id;
+            result.originalTitle = originalResult.title || result.title;
+            result.originalSource = originalResult.source;
+            result.originalUrl = originalResult.url;
+            
+            // 如果标题为空，使用原始标题
+            if (!result.title || result.title === '未知标题') {
+              result.title = originalResult.title || result.title;
+            }
+          }
+          
+          console.log(`结果ID映射完成: ${finalId} -> ${result.title} (${result.extractionStatus})`);
         });
       }
 
       const totalTime = Date.now() - startTime;
       
-      console.log(`=== 新架构批量详情提取完成 ===`);
+      console.log(`=== 批量详情提取完成 ===`);
       console.log(`总用时: ${totalTime}ms`);
       console.log(`处理结果: ${extractionResult.results?.length || 0} 个`);
-      console.log(`架构统计:`, extractionResult.metadata);
+      console.log(`统计信息:`, extractionResult.stats);
       
       return {
         ...extractionResult,
         totalTime,
         keyword,
-        batchId,
-        architecture: 'modular_parsers',
-        configApplied: config
+        batchId
       };
 
     } catch (error) {
       const totalTime = Date.now() - startTime;
-      console.error('新架构批量详情提取失败:', error);
+      console.error('批量详情提取失败:', error);
       
-      // 🆕 构建新架构错误响应
+      // 构建错误响应，确保每个结果都有正确的ID
       const errorResults = results.map(result => ({
-        ...result,
-        extractionStatus: DETAIL_EXTRACTION_STATUS.ERROR,
+        ...result, // 保留原始结果的所有字段，包括ID
+        extractionStatus: 'error',
         extractionError: error.message,
         extractionTime: 0,
-        extractedAt: Date.now(),
-        architecture: 'modular_parsers',
-        dataStructureVersion: '2.0',
-        errorType: error.name || 'UnknownError'
+        extractedAt: Date.now()
       }));
       
       return {
@@ -559,7 +412,6 @@ export class DetailExtractionManager {
           successful: 0,
           failed: results.length,
           cached: 0,
-          partial: 0,
           totalTime,
           averageTime: 0,
           successRate: 0,
@@ -569,171 +421,26 @@ export class DetailExtractionManager {
           processed: results.length,
           successful: 0,
           failed: results.length,
-          message: `新架构批量详情提取失败: ${error.message}`
+          message: `批量详情提取失败: ${error.message}`
         },
         totalTime,
         keyword,
-        error: error.message,
-        architecture: 'modular_parsers'
+        error: error.message
       };
     }
   }
 
   /**
-   * 🆕 构建结果映射表
-   */
-  buildResultMappings(results) {
-    const mappings = new Map();
-    
-    results.forEach((result, index) => {
-      // 多种映射方式确保能找到正确的结果
-      if (result.id) {
-        mappings.set(result.id, { result, index });
-        mappings.set(result.url, { result, index, byUrl: true });
-      }
-    });
-    
-    return mappings;
-  }
-
-  /**
-   * 🆕 增强结果与架构信息
-   */
-  enhanceResultWithArchitectureInfo(result, index, originalResults, mappings) {
-    // 确保结果有正确的ID
-    let finalId = result.id;
-    
-    if (!finalId) {
-      // 通过多种方式找回原始ID
-      if (result.searchUrl || result.originalUrl) {
-        const mapping = mappings.get(result.searchUrl) || mappings.get(result.originalUrl);
-        if (mapping) {
-          finalId = mapping.result.id;
-        }
-      }
-      
-      // 通过索引对应原始结果
-      if (!finalId && index < originalResults.length) {
-        finalId = originalResults[index].id;
-      }
-      
-      // 生成临时ID
-      if (!finalId) {
-        finalId = `temp_v2_${Date.now()}_${index}`;
-        console.warn(`无法找回原始ID，生成临时ID: ${finalId}`);
-      }
-      
-      result.id = finalId;
-    }
-    
-    // 🆕 添加新架构信息
-    result.architecture = result.architecture || 'modular_parsers';
-    result.dataStructureVersion = result.dataStructureVersion || '2.0';
-    result.configApplied = result.configApplied || true;
-    
-    // 确保原始搜索结果信息被保留
-    const originalResult = mappings.get(finalId)?.result || originalResults[index];
-    if (originalResult) {
-      result.originalId = originalResult.id;
-      result.originalTitle = originalResult.title || result.title;
-      result.originalSource = originalResult.source;
-      result.originalUrl = originalResult.url;
-      
-      if (!result.title || result.title === '未知标题') {
-        result.title = originalResult.title || result.title;
-      }
-    }
-    
-    console.log(`结果架构信息增强完成: ${finalId} -> ${result.title} (${result.extractionStatus})`);
-    return result;
-  }
-
-  /**
-   * 🆕 构建新架构选项
-   */
-  buildNewArchitectureOptions(config, additionalOptions = {}) {
-    return {
-      // 基础选项
-      enableCache: config.enableCache,
-      timeout: config.extractionTimeout,
-      enableRetry: config.enableRetry,
-      maxRetries: config.maxRetryAttempts,
-      
-      // 🆕 新架构选项
-      architecture: 'modular_parsers',
-      dataStructureVersion: '2.0',
-      useModularParsers: true,
-      enableUnifiedDataStructure: true,
-      enableConfigAwareExtraction: true,
-      
-      // 内容控制
-      maxDownloadLinks: config.maxDownloadLinks,
-      maxMagnetLinks: config.maxMagnetLinks,
-      maxScreenshots: config.maxScreenshots,
-      
-      // 质量控制
-      strictValidation: config.enableStrictDomainCheck,
-      requireMinimumData: config.requireMinimumData,
-      validateImageUrls: config.validateImageUrls,
-      validateDownloadLinks: config.validateDownloadLinks,
-      
-      // 过滤选项
-      enableContentFilter: config.enableContentFilter,
-      contentFilterKeywords: config.contentFilterKeywords,
-      enableSpamFilter: config.enableSpamFilter,
-      
-      // 性能选项
-      maxConcurrency: config.maxConcurrentExtractions,
-      enableSmartBatching: config.enableSmartBatching,
-      
-      // 其他选项
-      sourceType: config.sourceType || null,
-      preferOriginalSources: config.preferOriginalSources,
-      enableAutoCodeExtraction: config.enableAutoCodeExtraction,
-      
-      ...additionalOptions
-    };
-  }
-
-  /**
-   * 🆕 处理新架构进度
-   */
-  handleNewArchitectureProgress(progress, config) {
-    if (config.showExtractionProgress) {
-      this.updateExtractionProgress(
-        progress.current, 
-        progress.total, 
-        progress.item,
-        progress.architecture || 'modular_parsers'
-      );
-    }
-    
-    // 记录详细进度信息
-    console.log(`新架构详情提取进度 [${progress.current}/${progress.total}]: ${progress.item} - ${progress.status}`);
-    
-    if (progress.error) {
-      console.warn(`提取错误 [${progress.item}]:`, progress.error);
-    }
-    
-    // 🆕 记录解析器性能
-    if (progress.parser && progress.extractionTime) {
-      this.recordParserPerformance(progress.parser, progress.extractionTime, progress.status === 'success');
-    }
-  }
-
-  /**
-   * 处理提取结果 - 增强新架构支持
+   * 处理提取结果
    */
   async processExtractionResults(extractionResult, originalResults, config) {
-    const { results, stats, metadata } = extractionResult;
+    const { results, stats } = extractionResult;
     
-    console.log(`=== 处理新架构详情提取结果 ===`);
+    console.log(`=== 处理详情提取结果 ===`);
     console.log(`结果数量: ${results?.length || 0}`);
     console.log(`成功: ${stats?.successful || 0}`);
     console.log(`失败: ${stats?.failed || 0}`);
     console.log(`缓存命中: ${stats?.cached || 0}`);
-    console.log(`部分成功: ${stats?.partial || 0}`);
-    console.log(`架构信息:`, metadata);
     
     if (!results || results.length === 0) {
       console.warn('没有详情提取结果需要处理');
@@ -749,81 +456,69 @@ export class DetailExtractionManager {
       }
     }
 
-    // 🆕 处理新架构特有的结果
-    await this.processArchitectureSpecificResults(extractionResult, config);
-
     // 显示批量处理完成提示
     const successCount = stats?.successful || 0;
     const cachedCount = stats?.cached || 0;
-    const partialCount = stats?.partial || 0;
-    const totalProcessed = successCount + cachedCount + partialCount;
+    const totalProcessed = successCount + cachedCount;
     
     if (totalProcessed > 0) {
-      const architectureInfo = metadata?.architecture ? ` (${metadata.architecture})` : '';
       showToast(
-        `详情提取完成${architectureInfo}: ${totalProcessed} 个成功 (${successCount} 新提取, ${cachedCount} 缓存, ${partialCount} 部分)`,
+        `详情提取完成: ${totalProcessed} 个成功 (${successCount} 新提取, ${cachedCount} 缓存)`,
         'success',
-        6000
+        5000
       );
     } else {
       showToast('详情提取完成，但没有成功获取到详细信息', 'warning');
     }
 
-    // 🆕 触发新架构提取完成事件
+    // 触发提取完成事件
     document.dispatchEvent(new CustomEvent('detailExtractionCompleted', {
       detail: { 
         results, 
         stats, 
-        metadata,
-        keyword: extractionResult.keyword,
-        architecture: 'modular_parsers',
-        version: this.version
+        keyword: extractionResult.keyword 
       }
     }));
   }
 
   /**
-   * 🆕 处理架构特有的结果
-   */
-  async processArchitectureSpecificResults(extractionResult, config) {
-    const { metadata, stats } = extractionResult;
-    
-    // 更新架构统计
-    if (metadata) {
-      this.extractionStats.modularParserExtractions += metadata.modularParserResults || 0;
-      this.extractionStats.unifiedDataExtractions += metadata.unifiedDataResults || 0;
-      this.extractionStats.configAwareExtractions += metadata.configAwareResults || 0;
-    }
-    
-    // 处理解析器统计信息
-    if (metadata?.parserStats) {
-      for (const [parser, parserStats] of Object.entries(metadata.parserStats)) {
-        this.recordParserPerformance(parser, parserStats.averageTime, parserStats.successRate > 0.8);
-      }
-    }
-    
-    // 🆕 检查是否需要重新加载解析器
-    if (stats?.failed > stats?.successful && stats?.total > 5) {
-      console.warn('检测到大量提取失败，可能需要检查解析器状态');
-      await this.checkParserStatus();
-    }
-  }
-
-  /**
-   * 处理单个提取结果 - 适配新架构
+   * 处理单个提取结果
    */
   async handleSingleExtractionResult(result, config) {
     try {
-      console.log(`=== 处理单个新架构提取结果 ===`);
+      console.log(`=== 处理单个提取结果 ===`);
       console.log(`结果ID: ${result.id}`);
       console.log(`标题: ${result.title}`);
       console.log(`源类型: ${result.sourceType}`);
       console.log(`提取状态: ${result.extractionStatus}`);
-      console.log(`架构: ${result.architecture || 'unknown'}`);
-      console.log(`数据版本: ${result.dataStructureVersion || 'unknown'}`);
       
-      // 🆕 多种方式查找对应的DOM容器
-      const resultContainer = this.findResultContainer(result);
+      // 尝试多种方式找到对应的DOM容器
+      let resultContainer = null;
+      
+      // 方式1：使用data-result-id属性
+      if (result.id) {
+        resultContainer = document.querySelector(`[data-result-id="${result.id}"]`);
+        if (resultContainer) {
+          console.log(`通过data-result-id找到容器: ${result.id}`);
+        }
+      }
+      
+      // 方式2：使用data-id属性（备选）
+      if (!resultContainer && result.id) {
+        resultContainer = document.querySelector(`[data-id="${result.id}"]`);
+        if (resultContainer) {
+          console.log(`通过data-id找到容器: ${result.id}`);
+        }
+      }
+      
+      // 方式3：使用originalId（如果存在）
+      if (!resultContainer && result.originalId) {
+        resultContainer = document.querySelector(`[data-result-id="${result.originalId}"]`) ||
+                         document.querySelector(`[data-id="${result.originalId}"]`);
+        if (resultContainer) {
+          console.log(`通过originalId找到容器: ${result.originalId}`);
+        }
+      }
       
       if (!resultContainer) {
         console.error('完全找不到结果容器，详细信息:', {
@@ -831,16 +526,13 @@ export class DetailExtractionManager {
           originalId: result.originalId,
           title: result.title,
           url: result.originalUrl || result.searchUrl,
-          extractionStatus: result.extractionStatus,
-          architecture: result.architecture
+          extractionStatus: result.extractionStatus
         });
         return;
       }
 
       // 处理提取结果
-      if (result.extractionStatus === DETAIL_EXTRACTION_STATUS.SUCCESS || 
-          result.extractionStatus === DETAIL_EXTRACTION_STATUS.CACHED ||
-          result.extractionStatus === DETAIL_EXTRACTION_STATUS.PARTIAL) {
+      if (result.extractionStatus === 'success' || result.extractionStatus === 'cached') {
         await this.processSuccessfulExtraction(resultContainer, result, config);
       } else {
         await this.processFailedExtraction(resultContainer, result);
@@ -850,64 +542,18 @@ export class DetailExtractionManager {
       console.error('处理提取结果失败:', error, {
         resultId: result.id,
         title: result.title,
-        extractionStatus: result.extractionStatus,
-        architecture: result.architecture
+        extractionStatus: result.extractionStatus
       });
     }
   }
 
   /**
-   * 🆕 查找结果容器 - 增强版本
-   */
-  findResultContainer(result) {
-    // 方式1：使用data-result-id属性
-    if (result.id) {
-      let container = document.querySelector(`[data-result-id="${result.id}"]`);
-      if (container) {
-        console.log(`通过data-result-id找到容器: ${result.id}`);
-        return container;
-      }
-    }
-    
-    // 方式2：使用data-id属性（备选）
-    if (result.id) {
-      let container = document.querySelector(`[data-id="${result.id}"]`);
-      if (container) {
-        console.log(`通过data-id找到容器: ${result.id}`);
-        return container;
-      }
-    }
-    
-    // 方式3：使用originalId（如果存在）
-    if (result.originalId) {
-      let container = document.querySelector(`[data-result-id="${result.originalId}"]`) ||
-                    document.querySelector(`[data-id="${result.originalId}"]`);
-      if (container) {
-        console.log(`通过originalId找到容器: ${result.originalId}`);
-        return container;
-      }
-    }
-    
-    // 方式4：通过URL匹配
-    if (result.originalUrl || result.searchUrl) {
-      const url = result.originalUrl || result.searchUrl;
-      let container = document.querySelector(`[data-url="${url}"]`);
-      if (container) {
-        console.log(`通过URL找到容器: ${url}`);
-        return container;
-      }
-    }
-    
-    return null;
-  }
-
-  /**
-   * 处理成功的提取结果 - 适配新架构
+   * 处理成功的提取结果
    */
   async processSuccessfulExtraction(resultContainer, result, config) {
     try {
-      // 🆕 使用新架构详情卡片管理器创建卡片
-      const detailCardOptions = {
+      // 创建详情卡片
+      const detailCardHTML = detailCardManager.createDetailCardHTML(result, result, {
         compactMode: config.compactMode,
         showScreenshots: config.showScreenshots,
         showDownloadLinks: config.showDownloadLinks,
@@ -915,33 +561,21 @@ export class DetailExtractionManager {
         showActressInfo: config.showActressInfo,
         enableImagePreview: config.enableImagePreview,
         enableContentFilter: config.enableContentFilter,
-        contentFilterKeywords: config.contentFilterKeywords,
-        // 🆕 新架构选项
-        architecture: result.architecture || 'modular_parsers',
-        dataStructureVersion: result.dataStructureVersion || '2.0',
-        parserInfo: result.parser || result.sourceType
-      };
+        contentFilterKeywords: config.contentFilterKeywords
+      });
 
-      // 使用新架构API创建详情卡片
-      await detailCardManager.renderDetailCard(
-        { 
-          url: result.originalUrl || result.searchUrl || result.url,
-          title: result.originalTitle || result.title,
-          source: result.originalSource || result.sourceType,
-          id: result.originalId || result.id
-        },
-        result,
-        this.getOrCreateDetailContainer(resultContainer),
-        detailCardOptions
-      );
+      // 插入详情卡片
+      const detailContainer = this.getOrCreateDetailContainer(resultContainer);
+      detailContainer.innerHTML = detailCardHTML;
+      detailContainer.style.display = 'block';
 
       // 添加展开/收起功能
-      this.addDetailToggleButton(resultContainer, result);
+      this.addDetailToggleButton(resultContainer);
       
-      // 🆕 添加新架构特有的控件
-      this.addArchitectureControls(resultContainer, result);
+      // 添加详情卡片事件绑定
+      this.bindDetailCardEvents(detailContainer, result);
 
-      console.log(`新架构详情卡片创建成功: ${result.title} (${result.extractionStatus}, ${result.architecture})`);
+      console.log(`详情卡片创建成功: ${result.title} (${result.extractionStatus})`);
       
     } catch (error) {
       console.error('处理成功提取结果失败:', error);
@@ -950,99 +584,15 @@ export class DetailExtractionManager {
   }
 
   /**
-   * 🆕 添加架构控件
+   * 处理失败的提取结果
    */
-  addArchitectureControls(resultContainer, result) {
-    if (result.architecture !== 'modular_parsers') return;
-    
-    const actionsContainer = resultContainer.querySelector('.result-actions');
-    if (!actionsContainer) return;
-
-    // 解析器信息按钮
-    if (result.parser && result.parser !== 'generic') {
-      const parserBtn = document.createElement('button');
-      parserBtn.className = 'action-btn parser-info-btn';
-      parserBtn.innerHTML = `
-        <span class="btn-icon">🔧</span>
-        <span class="btn-text">${result.parser.toUpperCase()}</span>
-      `;
-      parserBtn.title = `解析器: ${result.parser}`;
-      parserBtn.addEventListener('click', () => {
-        this.showParserInfo(result.parser, result);
-      });
-      
-      actionsContainer.appendChild(parserBtn);
-    }
-
-    // 架构信息指示器
-    if (result.dataStructureVersion === '2.0') {
-      const archIndicator = document.createElement('span');
-      archIndicator.className = 'architecture-indicator';
-      archIndicator.innerHTML = '🏗️ v2.0';
-      archIndicator.title = '新架构数据结构';
-      
-      actionsContainer.appendChild(archIndicator);
-    }
+  async processFailedExtraction(resultContainer, result) {
+    // 显示提取失败状态
+    this.showExtractionError(resultContainer, result.extractionError, result);
   }
 
   /**
-   * 🆕 显示解析器信息
-   */
-  async showParserInfo(parser, result) {
-    try {
-      showToast('正在获取解析器信息...', 'info');
-      
-      const parserValidation = await this.configManager?.validateParser(parser);
-      
-      const infoModal = document.createElement('div');
-      infoModal.className = 'parser-info-modal';
-      infoModal.innerHTML = `
-        <div class="modal-backdrop" onclick="this.parentElement.remove()">
-          <div class="modal-content" onclick="event.stopPropagation()">
-            <div class="modal-header">
-              <h3>解析器信息: ${escapeHtml(parser.toUpperCase())}</h3>
-              <button class="modal-close" onclick="this.closest('.parser-info-modal').remove()">×</button>
-            </div>
-            <div class="modal-body">
-              <div class="parser-details">
-                <div class="detail-row">
-                  <strong>架构版本:</strong> ${result.architecture || 'unknown'}
-                </div>
-                <div class="detail-row">
-                  <strong>数据结构:</strong> v${result.dataStructureVersion || 'unknown'}
-                </div>
-                <div class="detail-row">
-                  <strong>提取状态:</strong> ${this.getStatusText(result.extractionStatus)}
-                </div>
-                <div class="detail-row">
-                  <strong>提取时间:</strong> ${result.extractionTime || 0}ms
-                </div>
-                ${parserValidation ? `
-                  <div class="detail-row">
-                    <strong>解析器状态:</strong> ${parserValidation.validation.isValid ? '✅ 正常' : '❌ 异常'}
-                  </div>
-                  ${parserValidation.validation.features?.length > 0 ? `
-                    <div class="detail-row">
-                      <strong>支持特性:</strong> ${parserValidation.validation.features.join(', ')}
-                    </div>
-                  ` : ''}
-                ` : ''}
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(infoModal);
-      
-    } catch (error) {
-      console.error('获取解析器信息失败:', error);
-      showToast('获取解析器信息失败', 'error');
-    }
-  }
-
-  /**
-   * 提取单个详情 - 适配新架构
+   * 提取单个详情
    */
   async extractSingleDetail(resultId, currentResults, config) {
     const result = currentResults.find(r => r.id === resultId);
@@ -1060,38 +610,27 @@ export class DetailExtractionManager {
       showLoading(true);
       showToast('正在提取详情...', 'info');
       
-      // 🆕 使用新架构API提取单个详情
-      const effectiveConfig = await this.getEffectiveConfig(config);
-      const extractionOptions = this.buildNewArchitectureOptions(effectiveConfig, {
-        singleExtraction: true,
-        sourceType: result.source
+      const extractedDetail = await detailAPIService.extractSingleDetail(result, {
+        enableCache: config.enableCache,
+        timeout: config.extractionTimeout,
+        enableRetry: config.enableRetry,
+        maxRetries: config.maxRetryAttempts,
+        strictValidation: config.strictValidation
       });
-      
-      const extractedDetail = await detailAPIService.extractSingleDetail(result, extractionOptions);
 
-      // 🆕 增强结果与架构信息
-      const enhancedResult = {
+      await this.handleSingleExtractionResult({
         ...result,
-        ...extractedDetail,
-        architecture: extractedDetail.architecture || 'modular_parsers',
-        dataStructureVersion: extractedDetail.dataStructureVersion || '2.0'
-      };
-
-      await this.handleSingleExtractionResult(enhancedResult, effectiveConfig);
+        ...extractedDetail
+      }, config);
 
       // 更新统计
       this.updateExtractionStats({
         stats: {
           total: 1,
-          successful: extractedDetail.extractionStatus === DETAIL_EXTRACTION_STATUS.SUCCESS ? 1 : 0,
-          failed: extractedDetail.extractionStatus === DETAIL_EXTRACTION_STATUS.ERROR ? 1 : 0,
-          cached: extractedDetail.extractionStatus === DETAIL_EXTRACTION_STATUS.CACHED ? 1 : 0,
-          partial: extractedDetail.extractionStatus === DETAIL_EXTRACTION_STATUS.PARTIAL ? 1 : 0,
+          successful: extractedDetail.extractionStatus === 'success' ? 1 : 0,
+          failed: extractedDetail.extractionStatus === 'error' ? 1 : 0,
+          cached: extractedDetail.extractionStatus === 'cached' ? 1 : 0,
           averageTime: extractedDetail.extractionTime || 0
-        },
-        metadata: {
-          architecture: 'modular_parsers',
-          singleExtraction: true
         }
       });
 
@@ -1106,7 +645,7 @@ export class DetailExtractionManager {
   }
 
   /**
-   * 重试详情提取 - 增强新架构支持
+   * 重试详情提取
    */
   async retryExtraction(resultId, currentResults, config) {
     const result = currentResults.find(r => r.id === resultId);
@@ -1118,32 +657,18 @@ export class DetailExtractionManager {
     try {
       showToast('正在重试详情提取...', 'info');
       
-      // 🆕 使用新架构API重试提取
-      const effectiveConfig = await this.getEffectiveConfig(config);
-      const retryOptions = this.buildNewArchitectureOptions(effectiveConfig, {
+      const extractedDetail = await detailAPIService.extractSingleDetail(result, {
         enableCache: false,
         useLocalCache: false,
         enableRetry: true,
-        retryAttempt: true,
-        maxRetries: effectiveConfig.maxRetryAttempts
+        maxRetries: config.maxRetryAttempts,
+        timeout: config.extractionTimeout
       });
-      
-      const extractedDetail = await detailAPIService.extractSingleDetail(result, retryOptions);
 
-      const enhancedResult = {
+      await this.handleSingleExtractionResult({
         ...result,
-        ...extractedDetail,
-        architecture: extractedDetail.architecture || 'modular_parsers',
-        dataStructureVersion: extractedDetail.dataStructureVersion || '2.0',
-        isRetry: true
-      };
-
-      await this.handleSingleExtractionResult(enhancedResult, effectiveConfig);
-
-      // 🆕 更新重试统计
-      if (extractedDetail.extractionStatus === DETAIL_EXTRACTION_STATUS.SUCCESS) {
-        this.extractionStats.retrySuccessCount++;
-      }
+        ...extractedDetail
+      }, config);
 
       showToast('详情提取成功', 'success');
 
@@ -1153,218 +678,348 @@ export class DetailExtractionManager {
     }
   }
 
-  // ===================== 🆕 新架构特有方法 =====================
+  // ===================== 辅助方法 =====================
 
   /**
-   * 🆕 检查解析器状态
+   * 获取或创建详情容器
    */
-  async checkParserStatus() {
-    try {
-      if (!this.configManager) return;
-      
-      const supportedSites = await this.configManager.getSupportedSites();
-      
-      let healthyParsers = 0;
-      let totalParsers = 0;
-      
-      for (const site of supportedSites.sites || []) {
-        totalParsers++;
-        if (site.isActive && !site.error) {
-          healthyParsers++;
-        }
-      }
-      
-      const healthRate = totalParsers > 0 ? (healthyParsers / totalParsers) : 0;
-      
-      if (healthRate < 0.5) {
-        console.warn(`解析器健康率较低: ${(healthRate * 100).toFixed(1)}% (${healthyParsers}/${totalParsers})`);
-        showToast(`部分解析器可能存在问题，建议检查服务状态`, 'warning', 8000);
-      }
-      
-    } catch (error) {
-      console.error('检查解析器状态失败:', error);
+  getOrCreateDetailContainer(resultContainer) {
+    let detailContainer = resultContainer.querySelector('.result-detail-container');
+    
+    if (!detailContainer) {
+      detailContainer = document.createElement('div');
+      detailContainer.className = 'result-detail-container';
+      detailContainer.style.display = 'none';
+      resultContainer.appendChild(detailContainer);
     }
+    
+    return detailContainer;
   }
 
   /**
-   * 🆕 记录架构性能
+   * 添加详情展开/收起按钮
    */
-  recordArchitecturePerformance(extractionResult, totalTime) {
-    const { stats, metadata } = extractionResult;
+  addDetailToggleButton(resultContainer) {
+    const actionsContainer = resultContainer.querySelector('.result-actions');
+    if (!actionsContainer) return;
+
+    // 检查是否已存在按钮
+    if (actionsContainer.querySelector('.detail-toggle-btn')) return;
+
+    const toggleButton = document.createElement('button');
+    toggleButton.className = 'action-btn detail-toggle-btn';
+    toggleButton.innerHTML = `
+      <span class="btn-icon">📋</span>
+      <span class="btn-text">查看详情</span>
+    `;
     
-    // 记录提取时间
-    this.performanceMetrics.extractionTimes.push(totalTime);
-    if (this.performanceMetrics.extractionTimes.length > 100) {
-      this.performanceMetrics.extractionTimes.shift();
-    }
-    
-    // 记录解析器性能
-    if (metadata?.parserStats) {
-      for (const [parser, parserStats] of Object.entries(metadata.parserStats)) {
-        this.recordParserPerformance(parser, parserStats.averageTime, parserStats.successRate > 0.8);
-      }
-    }
-    
-    // 记录配置获取时间
-    const configFetchTime = performance.now();
-    this.getEffectiveConfig().then(() => {
-      const fetchTime = performance.now() - configFetchTime;
-      this.performanceMetrics.configFetchTimes.push(fetchTime);
-      if (this.performanceMetrics.configFetchTimes.length > 50) {
-        this.performanceMetrics.configFetchTimes.shift();
-      }
+    toggleButton.addEventListener('click', () => {
+      const resultId = resultContainer.dataset.resultId || resultContainer.dataset.id;
+      this.toggleDetailDisplay(resultId);
     });
+
+    actionsContainer.appendChild(toggleButton);
   }
 
   /**
-   * 🆕 记录解析器性能
+   * 切换详情显示状态
    */
-  recordParserPerformance(parser, extractionTime, success) {
-    if (!this.performanceMetrics.parserPerformance.has(parser)) {
-      this.performanceMetrics.parserPerformance.set(parser, {
-        totalCalls: 0,
-        totalTime: 0,
-        successCount: 0,
-        averageTime: 0,
-        successRate: 0
+  toggleDetailDisplay(resultId) {
+    const resultContainer = document.querySelector(`[data-result-id="${resultId}"], [data-id="${resultId}"]`);
+    if (!resultContainer) return;
+
+    const detailContainer = resultContainer.querySelector('.result-detail-container');
+    const toggleBtn = resultContainer.querySelector('.detail-toggle-btn');
+    
+    if (!detailContainer || !toggleBtn) return;
+
+    const isVisible = detailContainer.style.display !== 'none';
+    
+    detailContainer.style.display = isVisible ? 'none' : 'block';
+    
+    const btnText = toggleBtn.querySelector('.btn-text');
+    const btnIcon = toggleBtn.querySelector('.btn-icon');
+    
+    if (btnText) {
+      btnText.textContent = isVisible ? '查看详情' : '隐藏详情';
+    }
+    
+    if (btnIcon) {
+      btnIcon.textContent = isVisible ? '📋' : '📄';
+    }
+
+    // 添加动画效果
+    if (!isVisible) {
+      detailContainer.style.opacity = '0';
+      detailContainer.style.transform = 'translateY(-10px)';
+      
+      requestAnimationFrame(() => {
+        detailContainer.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        detailContainer.style.opacity = '1';
+        detailContainer.style.transform = 'translateY(0)';
       });
     }
-    
-    const stats = this.performanceMetrics.parserPerformance.get(parser);
-    stats.totalCalls++;
-    stats.totalTime += extractionTime;
-    stats.averageTime = stats.totalTime / stats.totalCalls;
-    
-    if (success) {
-      stats.successCount++;
-    }
-    
-    stats.successRate = stats.successCount / stats.totalCalls;
   }
 
   /**
-   * 🆕 记录错误模式
+   * 绑定详情卡片事件
    */
-  recordErrorPattern(error) {
-    const errorType = error.name || 'UnknownError';
-    const errorPattern = this.performanceMetrics.errorPatterns.get(errorType) || {
-      count: 0,
-      messages: [],
-      lastOccurrence: 0
-    };
-    
-    errorPattern.count++;
-    errorPattern.lastOccurrence = Date.now();
-    
-    if (errorPattern.messages.length < 5) {
-      errorPattern.messages.push(error.message);
-    }
-    
-    this.performanceMetrics.errorPatterns.set(errorType, errorPattern);
-  }
+  bindDetailCardEvents(detailContainer, result) {
+    // 下载链接点击事件
+    const downloadLinks = detailContainer.querySelectorAll('.download-link');
+    downloadLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        this.handleDownloadLinkClick(e, result);
+      });
+    });
 
-  /**
-   * 🆕 刷新配置
-   */
-  async refreshConfig() {
-    try {
-      console.log('刷新详情提取配置 (新架构)');
-      const configData = await this.configManager.getUserConfig(false); // 强制从服务器获取
-      this.updateConfigCache(configData);
-      
-      // 合并到本地配置
-      this.config = { ...this.config, ...configData.config };
-      
-      console.log('配置刷新完成 (新架构)', this.config);
-      
-    } catch (error) {
-      console.error('刷新配置失败:', error);
-      throw error;
-    }
-  }
+    // 磁力链接点击事件
+    const magnetLinks = detailContainer.querySelectorAll('.magnet-link');
+    magnetLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        this.handleMagnetLinkClick(e, result);
+      });
+    });
 
-  /**
-   * 🆕 处理架构升级
-   */
-  async handleArchitectureUpgrade(version, features) {
-    if (version !== this.version) {
-      console.log(`升级到新架构版本: ${this.version} -> ${version}`);
-      this.version = version;
-      this.architectureFeatures = [...this.architectureFeatures, ...features];
-      
-      // 重新初始化以适配新架构
-      await this.reinitializeForNewArchitecture();
-      
-      showToast(`已升级到新架构 v${version}`, 'success');
-    }
-  }
+    // 图片预览事件
+    const images = detailContainer.querySelectorAll('.preview-image');
+    images.forEach(img => {
+      img.addEventListener('click', (e) => {
+        this.handleImagePreview(e, result);
+      });
+    });
 
-  /**
-   * 🆕 为新架构重新初始化
-   */
-  async reinitializeForNewArchitecture() {
-    try {
-      // 刷新配置以适配新架构
-      await this.refreshConfig();
-      
-      // 重新检查服务健康状态
-      await this.checkArchitectureHealth();
-      
-      // 更新UI指示器
-      this.updateArchitectureIndicators();
-      
-    } catch (error) {
-      console.error('新架构初始化失败:', error);
-    }
-  }
-
-  /**
-   * 🆕 更新架构指示器
-   */
-  updateArchitectureIndicators() {
-    const indicators = document.querySelectorAll('.architecture-indicator');
-    indicators.forEach(indicator => {
-      indicator.innerHTML = `🏗️ v${this.version}`;
-      indicator.title = `新架构版本: ${this.version}`;
+    // 演员信息点击事件
+    const actresses = detailContainer.querySelectorAll('.actress-link');
+    actresses.forEach(actress => {
+      actress.addEventListener('click', (e) => {
+        this.handleActressClick(e, result);
+      });
     });
   }
 
   /**
-   * 🆕 启动降级模式
+   * 处理下载链接点击
    */
-  async initFallbackMode() {
-    console.warn('启动详情提取降级模式');
-    this.config = { ...DEFAULT_USER_CONFIG };
-    this.serviceHealth.status = SERVICE_STATUS.DEGRADED;
-    this.serviceHealth.extractionService = false;
-    this.serviceHealth.configService = false;
+  handleDownloadLinkClick(event, result) {
+    const link = event.currentTarget;
+    const url = link.dataset.url;
+    const name = link.dataset.name || '下载链接';
     
-    showToast('详情提取服务启动降级模式，部分功能可能不可用', 'warning', 8000);
+    if (url) {
+      // 记录用户行为
+      if (authManager.isAuthenticated()) {
+        apiService.recordAction('download_click', { 
+          url, 
+          name, 
+          sourceResult: result.url,
+          extractionId: result.id 
+        }).catch(console.error);
+      }
+      
+      // 复制链接到剪贴板
+      this.copyToClipboard(url).then(() => {
+        showToast(`下载链接已复制: ${name}`, 'success');
+      });
+    }
   }
 
-  // ===================== 配置缓存管理 =====================
-
   /**
-   * 🆕 检查配置缓存是否过期
+   * 处理磁力链接点击
    */
-  isConfigCacheExpired() {
-    return !this.configCache || (Date.now() - this.configLastUpdate) > this.configCacheExpiration;
+  handleMagnetLinkClick(event, result) {
+    const link = event.currentTarget;
+    const magnet = link.dataset.magnet;
+    const name = link.dataset.name || '磁力链接';
+    
+    if (magnet) {
+      // 记录用户行为
+      if (authManager.isAuthenticated()) {
+        apiService.recordAction('magnet_click', { 
+          magnet: magnet.substring(0, 50), // 只记录前50个字符
+          name, 
+          sourceResult: result.url,
+          extractionId: result.id 
+        }).catch(console.error);
+      }
+      
+      // 复制磁力链接到剪贴板
+      this.copyToClipboard(magnet).then(() => {
+        showToast(`磁力链接已复制: ${name}`, 'success');
+      });
+    }
   }
 
   /**
-   * 🆕 更新配置缓存
+   * 处理图片预览
    */
-  updateConfigCache(configData) {
-    this.configCache = configData;
-    this.configLastUpdate = Date.now();
+  handleImagePreview(event, result) {
+    const img = event.currentTarget;
+    const src = img.src || img.dataset.src;
+    
+    if (src) {
+      // 记录用户行为
+      if (authManager.isAuthenticated()) {
+        apiService.recordAction('image_preview', { 
+          imageUrl: src,
+          sourceResult: result.url,
+          extractionId: result.id 
+        }).catch(console.error);
+      }
+      
+      // 显示图片预览
+      this.showImagePreview(src, result);
+    }
   }
 
-  // ===================== 进度管理 - 增强新架构支持 =====================
+  /**
+   * 处理演员点击
+   */
+  handleActressClick(event, result) {
+    const actress = event.currentTarget;
+    const name = actress.dataset.name;
+    const profileUrl = actress.dataset.profileUrl;
+    
+    if (name) {
+      // 记录用户行为
+      if (authManager.isAuthenticated()) {
+        apiService.recordAction('actress_click', { 
+          actressName: name,
+          profileUrl,
+          sourceResult: result.url,
+          extractionId: result.id 
+        }).catch(console.error);
+      }
+      
+      // 触发演员搜索事件
+      document.dispatchEvent(new CustomEvent('actressSearchRequested', {
+        detail: { name, profileUrl }
+      }));
+    }
+  }
 
   /**
-   * 显示提取进度 - 增强新架构支持
+   * 显示图片预览
    */
-  showExtractionProgress(total, keyword) {
+  showImagePreview(src, result) {
+    // 创建图片预览模态框
+    const modal = document.createElement('div');
+    modal.className = 'image-preview-modal';
+    modal.innerHTML = `
+      <div class="image-preview-backdrop" onclick="this.parentElement.remove()">
+        <div class="image-preview-container">
+          <img src="${escapeHtml(src)}" alt="预览图片" class="preview-image-large">
+          <button class="close-preview" onclick="this.closest('.image-preview-modal').remove()">×</button>
+          <div class="image-info">
+            <small>来源: ${escapeHtml(result.title || result.url)}</small>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // 添加键盘事件
+    const handleKeydown = (e) => {
+      if (e.key === 'Escape') {
+        modal.remove();
+        document.removeEventListener('keydown', handleKeydown);
+      }
+    };
+    document.addEventListener('keydown', handleKeydown);
+  }
+
+  /**
+   * 复制到剪贴板
+   */
+  async copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (error) {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        throw new Error('复制失败');
+      }
+      document.body.removeChild(textArea);
+    }
+  }
+
+  /**
+   * 显示提取错误
+   */
+  showExtractionError(resultContainer, error, result) {
+    const detailContainer = this.getOrCreateDetailContainer(resultContainer);
+
+    // 生成错误建议
+    const suggestions = this.generateErrorSuggestions(error, result);
+
+    detailContainer.innerHTML = `
+      <div class="extraction-error">
+        <div class="error-icon">⚠</div>
+        <div class="error-content">
+          <div class="error-message">
+            <strong>详情提取失败</strong>
+            <small>${escapeHtml(error || '未知错误')}</small>
+          </div>
+          ${suggestions.length > 0 ? `
+            <div class="error-suggestions">
+              <strong>建议:</strong>
+              <ul>
+                ${suggestions.map(suggestion => `<li>${escapeHtml(suggestion)}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+        </div>
+        <div class="error-actions">
+          <button class="retry-btn" onclick="window.detailExtractionManager?.retryExtraction('${result.id}')">
+            重试
+          </button>
+        </div>
+      </div>
+    `;
+    
+    detailContainer.style.display = 'block';
+    this.addDetailToggleButton(resultContainer);
+  }
+
+  /**
+   * 生成错误建议
+   */
+  generateErrorSuggestions(error, result) {
+    const suggestions = [];
+    const errorLower = (error || '').toLowerCase();
+    
+    if (errorLower.includes('timeout') || errorLower.includes('超时')) {
+      suggestions.push('网络连接较慢，建议稍后重试');
+      suggestions.push('可以在设置中增加提取超时时间');
+    } else if (errorLower.includes('network') || errorLower.includes('网络')) {
+      suggestions.push('检查网络连接状态');
+      suggestions.push('目标网站可能暂时无法访问');
+    } else if (errorLower.includes('parse') || errorLower.includes('解析')) {
+      suggestions.push('目标页面结构可能已变更');
+      suggestions.push('尝试直接访问页面查看内容');
+    } else if (errorLower.includes('validation') || errorLower.includes('验证')) {
+      suggestions.push('URL格式可能有问题');
+      suggestions.push('确保搜索结果来源有效');
+    } else {
+      suggestions.push('请稍后重试');
+      suggestions.push('如问题持续存在，请联系支持');
+    }
+    
+    return suggestions;
+  }
+
+  // ===================== 进度管理 =====================
+
+  /**
+   * 显示提取进度
+   */
+  showExtractionProgress(total) {
     let progressContainer = document.getElementById('extraction-progress');
     
     if (!progressContainer) {
@@ -1380,23 +1035,16 @@ export class DetailExtractionManager {
 
     progressContainer.innerHTML = `
       <div class="progress-header">
-        <span class="progress-title">正在提取详情信息 (新架构 v${this.version})</span>
+        <span class="progress-title">正在提取详情信息</span>
         <span class="progress-stats">0 / ${total}</span>
         <button class="progress-close" onclick="this.closest('.extraction-progress-container').style.display='none'">×</button>
       </div>
       <div class="progress-bar">
         <div class="progress-fill" style="width: 0%"></div>
       </div>
-      <div class="progress-message">正在处理搜索结果: ${escapeHtml(keyword)}</div>
+      <div class="progress-message">正在处理搜索结果...</div>
       <div class="progress-details">
-        <small>
-          架构: <span class="arch-info">模块化解析器</span> | 
-          平均用时: <span class="avg-time">计算中...</span> | 
-          成功率: <span class="success-rate">计算中...</span>
-        </small>
-      </div>
-      <div class="progress-architecture">
-        <span class="architecture-badge">🏗️ v${this.version}</span>
+        <small>平均用时: <span class="avg-time">计算中...</span> | 成功率: <span class="success-rate">计算中...</span></small>
       </div>
     `;
 
@@ -1404,9 +1052,9 @@ export class DetailExtractionManager {
   }
 
   /**
-   * 更新提取进度 - 增强新架构支持
+   * 更新提取进度
    */
-  updateExtractionProgress(processed, total, currentItem, architecture) {
+  updateExtractionProgress(processed, total, currentItem) {
     const progressContainer = document.getElementById('extraction-progress');
     if (!progressContainer) return;
 
@@ -1425,37 +1073,61 @@ export class DetailExtractionManager {
 
     if (progressMessage) {
       if (processed === total) {
-        progressMessage.textContent = `详情提取完成 (${architecture || 'modular_parsers'})!`;
+        progressMessage.textContent = '详情提取完成！';
       } else {
         progressMessage.textContent = `正在处理: ${currentItem || '搜索结果'}`;
       }
-    }
-
-    // 🆕 更新架构信息
-    const archInfo = progressContainer.querySelector('.arch-info');
-    if (archInfo && architecture) {
-      archInfo.textContent = architecture === 'modular_parsers' ? '模块化解析器' : architecture;
     }
 
     // 更新详细信息
     this.updateProgressDetails(processed, total);
   }
 
-  // ===================== 统计和洞察 - 增强新架构支持 =====================
+  /**
+   * 更新进度详细信息
+   */
+  updateProgressDetails(processed, total) {
+    const progressContainer = document.getElementById('extraction-progress');
+    if (!progressContainer || this.extractionStats.totalExtractions === 0) return;
+
+    const avgTimeElement = progressContainer.querySelector('.avg-time');
+    const successRateElement = progressContainer.querySelector('.success-rate');
+
+    if (avgTimeElement && this.extractionStats.averageTime > 0) {
+      avgTimeElement.textContent = `${Math.round(this.extractionStats.averageTime)}ms`;
+    }
+
+    if (successRateElement && this.extractionStats.totalExtractions > 0) {
+      const rate = (this.extractionStats.successfulExtractions / this.extractionStats.totalExtractions * 100).toFixed(1);
+      successRateElement.textContent = `${rate}%`;
+    }
+  }
 
   /**
-   * 更新提取统计信息 - 增强新架构支持
+   * 隐藏提取进度
+   */
+  hideExtractionProgress() {
+    const progressContainer = document.getElementById('extraction-progress');
+    if (progressContainer) {
+      setTimeout(() => {
+        progressContainer.style.display = 'none';
+      }, 3000);
+    }
+  }
+
+  // ===================== 统计和洞察 =====================
+
+  /**
+   * 更新提取统计信息
    */
   updateExtractionStats(extractionResult) {
-    const { stats, metadata } = extractionResult;
+    const { stats } = extractionResult;
     
     if (stats) {
       this.extractionStats.totalExtractions += stats.total || 0;
       this.extractionStats.successfulExtractions += stats.successful || 0;
       this.extractionStats.failedExtractions += stats.failed || 0;
-      this.extractionStats.partialExtractions += stats.partial || 0;
       this.extractionStats.cacheHits += stats.cached || 0;
-      this.extractionStats.totalTime += stats.totalTime || 0;
       
       // 更新平均时间
       if (stats.averageTime) {
@@ -1463,32 +1135,15 @@ export class DetailExtractionManager {
           (this.extractionStats.averageTime + stats.averageTime) / 2;
       }
     }
-    
-    // 🆕 更新新架构统计
-    if (metadata) {
-      this.extractionStats.modularParserExtractions += metadata.modularParserResults || 0;
-      this.extractionStats.unifiedDataExtractions += metadata.unifiedDataResults || 0;
-      this.extractionStats.configAwareExtractions += metadata.configAwareResults || 0;
-    }
   }
 
   /**
-   * 显示提取洞察 - 增强新架构支持
+   * 显示提取洞察
    */
   showExtractionInsights(extractionResult, keyword) {
-    const { stats, results, metadata } = extractionResult;
+    const { stats, results } = extractionResult;
     
     const insights = [];
-    
-    // 🆕 架构性能洞察
-    if (metadata?.architecture === 'modular_parsers') {
-      insights.push({
-        type: 'architecture',
-        icon: '🏗️',
-        message: `使用新架构模块化解析器处理`,
-        level: 'info'
-      });
-    }
     
     // 性能洞察
     if (stats && stats.averageTime) {
@@ -1519,26 +1174,10 @@ export class DetailExtractionManager {
       });
     }
     
-    // 🆕 解析器性能洞察
-    if (metadata?.parserStats) {
-      const topParser = Object.entries(metadata.parserStats)
-        .sort(([,a], [,b]) => b.successRate - a.successRate)[0];
-      
-      if (topParser && topParser[1].successRate > 0.9) {
-        insights.push({
-          type: 'parser',
-          icon: '🔧',
-          message: `${topParser[0]} 解析器表现优秀 (成功率 ${(topParser[1].successRate * 100).toFixed(1)}%)`,
-          level: 'success'
-        });
-      }
-    }
-    
     // 内容洞察
     if (results && results.length > 0) {
       const withScreenshots = results.filter(r => r.screenshots && r.screenshots.length > 0).length;
       const withDownloads = results.filter(r => r.downloadLinks && r.downloadLinks.length > 0).length;
-      const withUnifiedData = results.filter(r => r.dataStructureVersion === '2.0').length;
       
       if (withScreenshots > 0) {
         insights.push({
@@ -1557,373 +1196,15 @@ export class DetailExtractionManager {
           level: 'info'
         });
       }
-      
-      // 🆕 数据结构洞察
-      if (withUnifiedData > 0) {
-        insights.push({
-          type: 'data',
-          icon: '📊',
-          message: `${withUnifiedData} 个结果使用统一数据结构 v2.0`,
-          level: 'info'
-        });
-      }
     }
     
     // 显示洞察
     this.displayInsights(insights);
   }
 
-  // ===================== 工具方法 - 保持兼容和增强 =====================
-
   /**
-   * 获取状态文本 - 适配新架构状态
+   * 显示单个提取洞察
    */
-  getStatusText(status) {
-    const statusTexts = {
-      [DETAIL_EXTRACTION_STATUS.SUCCESS]: '提取成功',
-      [DETAIL_EXTRACTION_STATUS.CACHED]: '缓存数据',
-      [DETAIL_EXTRACTION_STATUS.ERROR]: '提取失败',
-      [DETAIL_EXTRACTION_STATUS.PARTIAL]: '部分成功',
-      [DETAIL_EXTRACTION_STATUS.TIMEOUT]: '提取超时',
-      'unknown': '未知状态'
-    };
-    return statusTexts[status] || '未知状态';
-  }
-
-  /**
-   * 🆕 更新服务状态指示器
-   */
-  updateServiceStatusIndicators() {
-    const statusIndicator = document.getElementById('detailServiceStatus');
-    if (statusIndicator) {
-      const isHealthy = this.serviceHealth.status === SERVICE_STATUS.HEALTHY;
-      statusIndicator.className = `service-status ${isHealthy ? 'healthy' : 'unhealthy'}`;
-      statusIndicator.innerHTML = `
-        <span class="status-icon">${isHealthy ? '✅' : '⚠️'}</span>
-        <span class="status-text">详情提取: ${isHealthy ? '正常' : '异常'}</span>
-        <small class="architecture-info">v${this.version}</small>
-        ${this.serviceHealth.responseTime ? `<small>${Math.round(this.serviceHealth.responseTime)}ms</small>` : ''}
-      `;
-      statusIndicator.title = isHealthy ? 
-        `详情提取服务运行正常\n架构版本: ${this.version}\n响应时间: ${this.serviceHealth.responseTime}ms\n配置服务: ${this.serviceHealth.configService ? '正常' : '异常'}` :
-        `详情提取服务异常: ${this.serviceHealth.error || '未知错误'}\n架构版本: ${this.version}`;
-    }
-  }
-
-  /**
-   * 🆕 暴露全局方法 - 增强新架构支持
-   */
-  exposeGlobalMethods() {
-    window.detailExtractionManager = {
-      // 现有方法保持不变
-      extractSingleDetail: (resultId, currentResults, config) => 
-        this.extractSingleDetail(resultId, currentResults, config),
-      retryExtraction: (resultId, currentResults, config) => 
-        this.retryExtraction(resultId, currentResults, config),
-      toggleDetailDisplay: (resultId) => this.toggleDetailDisplay(resultId),
-      getExtractionStats: () => this.getExtractionStats(),
-      resetExtractionStats: () => this.resetExtractionStats(),
-      getExtractionCapabilities: (config) => this.getExtractionCapabilities(config),
-      
-      // 🆕 新架构方法
-      getArchitectureInfo: () => ({
-        version: this.version,
-        features: this.architectureFeatures,
-        serviceHealth: this.serviceHealth
-      }),
-      refreshConfig: () => this.refreshConfig(),
-      checkArchitectureHealth: () => this.checkArchitectureHealth(),
-      getPerformanceMetrics: () => ({
-        ...this.performanceMetrics,
-        extractionStats: this.extractionStats
-      }),
-      validateParser: (parser) => this.configManager?.validateParser(parser),
-      checkParserStatus: () => this.checkParserStatus(),
-      
-      // 配置管理
-      getEffectiveConfig: (overrides) => this.getEffectiveConfig(overrides),
-      updateConfig: (config) => this.updateConfig(config),
-      
-      // 服务状态
-      isExtractionEnabled: () => this.isExtractionEnabled,
-      getServiceHealth: () => this.serviceHealth
-    };
-  }
-
-  /**
-   * 获取提取统计 - 增强新架构信息
-   */
-  getExtractionStats() {
-    return {
-      ...this.extractionStats,
-      architecture: {
-        version: this.version,
-        features: this.architectureFeatures,
-        serviceHealth: this.serviceHealth
-      },
-      performance: {
-        averageExtractionTime: this.performanceMetrics.extractionTimes.length > 0 ?
-          this.performanceMetrics.extractionTimes.reduce((a, b) => a + b, 0) / this.performanceMetrics.extractionTimes.length : 0,
-        parserPerformance: Object.fromEntries(this.performanceMetrics.parserPerformance),
-        errorPatterns: Object.fromEntries(this.performanceMetrics.errorPatterns)
-      }
-    };
-  }
-
-  /**
-   * 获取提取能力信息 - 增强新架构信息
-   */
-  getExtractionCapabilities(config) {
-    const effectiveConfig = config || this.config;
-    
-    return {
-      enabled: effectiveConfig.enableDetailExtraction,
-      authenticated: authManager.isAuthenticated(),
-      serviceHealthy: this.serviceHealth.status === SERVICE_STATUS.HEALTHY,
-      supportedSources: APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || [],
-      
-      // 基础配置
-      maxAutoExtractions: effectiveConfig.maxAutoExtractions,
-      batchSize: effectiveConfig.extractionBatchSize,
-      timeout: effectiveConfig.extractionTimeout,
-      caching: effectiveConfig.enableCache,
-      retry: effectiveConfig.enableRetry,
-      
-      // 🆕 新架构能力
-      architecture: this.version,
-      features: this.architectureFeatures,
-      modularParsers: this.serviceHealth.features?.modularParsers || false,
-      unifiedDataStructure: true,
-      configService: this.serviceHealth.configService,
-      
-      // 运行时状态
-      currentQueue: this.extractionQueue.length,
-      inProgress: this.extractionInProgress,
-      
-      // 性能信息
-      averageTime: this.extractionStats.averageTime,
-      successRate: this.extractionStats.totalExtractions > 0 ? 
-        (this.extractionStats.successfulExtractions / this.extractionStats.totalExtractions * 100).toFixed(1) : 0
-    };
-  }
-
-  /**
-   * 清理资源 - 增强新架构支持
-   */
-  cleanup() {
-    this.extractionQueue = [];
-    this.progressCallbacks.clear();
-    this.extractionInsights = [];
-    this.extractionInProgress = false;
-    
-    // 🆕 清理新架构资源
-    this.configCache = null;
-    this.configLastUpdate = 0;
-    this.performanceMetrics.parserPerformance.clear();
-    this.performanceMetrics.errorPatterns.clear();
-    
-    // 清理DOM元素
-    const progressContainer = document.getElementById('extraction-progress');
-    if (progressContainer) {
-      progressContainer.remove();
-    }
-
-    const insightsContainer = document.getElementById('extractionInsights');
-    if (insightsContainer) {
-      insightsContainer.remove();
-    }
-    
-    // 清理全局方法
-    if (window.detailExtractionManager) {
-      delete window.detailExtractionManager;
-    }
-    
-    console.log(`详情提取管理器资源已清理 (新架构 v${this.version})`);
-  }
-
-  // ===================== 其他辅助方法保持不变 =====================
-  // [保留原有的辅助方法如 selectResultsForExtraction, getOrCreateDetailContainer, 
-  //  addDetailToggleButton, toggleDetailDisplay, generateBatchId, 等等...]
-
-  selectResultsForExtraction(searchResults, config) {
-    const supportedResults = searchResults.filter(result => 
-      this.shouldExtractDetail(result)
-    );
-    
-    console.log(`支持详情提取的结果: ${supportedResults.length}/${searchResults.length}`);
-    
-    if (config.autoExtractDetails) {
-      const selected = supportedResults.slice(0, config.maxAutoExtractions);
-      console.log(`自动提取模式，选择前 ${selected.length} 个结果`);
-      return selected;
-    } else {
-      console.log(`手动提取模式，返回所有 ${supportedResults.length} 个支持的结果`);
-      return supportedResults;
-    }
-  }
-
-  getOrCreateDetailContainer(resultContainer) {
-    let detailContainer = resultContainer.querySelector('.result-detail-container');
-    
-    if (!detailContainer) {
-      detailContainer = document.createElement('div');
-      detailContainer.className = 'result-detail-container';
-      detailContainer.style.display = 'none';
-      resultContainer.appendChild(detailContainer);
-    }
-    
-    return detailContainer;
-  }
-
-  addDetailToggleButton(resultContainer, result) {
-    const actionsContainer = resultContainer.querySelector('.result-actions');
-    if (!actionsContainer) return;
-
-    if (actionsContainer.querySelector('.detail-toggle-btn')) return;
-
-    const toggleButton = document.createElement('button');
-    toggleButton.className = 'action-btn detail-toggle-btn';
-    toggleButton.innerHTML = `
-      <span class="btn-icon">📋</span>
-      <span class="btn-text">查看详情</span>
-    `;
-    
-    toggleButton.addEventListener('click', () => {
-      const resultId = resultContainer.dataset.resultId || resultContainer.dataset.id;
-      this.toggleDetailDisplay(resultId);
-    });
-
-    actionsContainer.appendChild(toggleButton);
-  }
-
-  toggleDetailDisplay(resultId) {
-    const resultContainer = document.querySelector(`[data-result-id="${resultId}"], [data-id="${resultId}"]`);
-    if (!resultContainer) return;
-
-    const detailContainer = resultContainer.querySelector('.result-detail-container');
-    const toggleBtn = resultContainer.querySelector('.detail-toggle-btn');
-    
-    if (!detailContainer || !toggleBtn) return;
-
-    const isVisible = detailContainer.style.display !== 'none';
-    
-    detailContainer.style.display = isVisible ? 'none' : 'block';
-    
-    const btnText = toggleBtn.querySelector('.btn-text');
-    const btnIcon = toggleBtn.querySelector('.btn-icon');
-    
-    if (btnText) {
-      btnText.textContent = isVisible ? '查看详情' : '隐藏详情';
-    }
-    
-    if (btnIcon) {
-      btnIcon.textContent = isVisible ? '📋' : '📄';
-    }
-
-    if (!isVisible) {
-      detailContainer.style.opacity = '0';
-      detailContainer.style.transform = 'translateY(-10px)';
-      
-      requestAnimationFrame(() => {
-        detailContainer.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-        detailContainer.style.opacity = '1';
-        detailContainer.style.transform = 'translateY(0)';
-      });
-    }
-  }
-
-  generateBatchId() {
-    return 'batch_v2_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
-
-  processFailedExtraction(resultContainer, result) {
-    this.showExtractionError(resultContainer, result.extractionError || '未知错误', result);
-  }
-
-  showExtractionError(resultContainer, error, result) {
-    const detailContainer = this.getOrCreateDetailContainer(resultContainer);
-
-    const suggestions = this.generateErrorSuggestions(error, result);
-
-    detailContainer.innerHTML = `
-      <div class="extraction-error">
-        <div class="error-icon">⚠️</div>
-        <div class="error-content">
-          <div class="error-message">
-            <strong>详情提取失败</strong>
-            <small>${escapeHtml(error || '未知错误')}</small>
-          </div>
-          ${suggestions.length > 0 ? `
-            <div class="error-suggestions">
-              <strong>建议:</strong>
-              <ul>
-                ${suggestions.map(suggestion => `<li>${escapeHtml(suggestion)}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-        </div>
-        <div class="error-actions">
-          <button class="retry-btn" onclick="window.detailExtractionManager?.retryExtraction('${result.id}')">
-            重试
-          </button>
-        </div>
-      </div>
-    `;
-    
-    detailContainer.style.display = 'block';
-    this.addDetailToggleButton(resultContainer, result);
-  }
-
-  generateErrorSuggestions(error, result) {
-    const suggestions = [];
-    const errorLower = (error || '').toLowerCase();
-    
-    if (errorLower.includes('timeout') || errorLower.includes('超时')) {
-      suggestions.push('网络连接较慢，建议稍后重试');
-      suggestions.push('可以在设置中增加提取超时时间');
-    } else if (errorLower.includes('network') || errorLower.includes('网络')) {
-      suggestions.push('检查网络连接状态');
-      suggestions.push('目标网站可能暂时无法访问');
-    } else if (errorLower.includes('parse') || errorLower.includes('解析')) {
-      suggestions.push('目标页面结构可能已变更');
-      suggestions.push('尝试直接访问页面查看内容');
-    } else if (errorLower.includes('validation') || errorLower.includes('验证')) {
-      suggestions.push('URL格式可能有问题');
-      suggestions.push('确保搜索结果来源有效');
-    } else {
-      suggestions.push('请稍后重试');
-      suggestions.push('如问题持续存在，请联系支持');
-    }
-    
-    return suggestions;
-  }
-
-  hideExtractionProgress() {
-    const progressContainer = document.getElementById('extraction-progress');
-    if (progressContainer) {
-      setTimeout(() => {
-        progressContainer.style.display = 'none';
-      }, 3000);
-    }
-  }
-
-  updateProgressDetails(processed, total) {
-    const progressContainer = document.getElementById('extraction-progress');
-    if (!progressContainer || this.extractionStats.totalExtractions === 0) return;
-
-    const avgTimeElement = progressContainer.querySelector('.avg-time');
-    const successRateElement = progressContainer.querySelector('.success-rate');
-
-    if (avgTimeElement && this.extractionStats.averageTime > 0) {
-      avgTimeElement.textContent = `${Math.round(this.extractionStats.averageTime)}ms`;
-    }
-
-    if (successRateElement && this.extractionStats.totalExtractions > 0) {
-      const rate = (this.extractionStats.successfulExtractions / this.extractionStats.totalExtractions * 100).toFixed(1);
-      successRateElement.textContent = `${rate}%`;
-    }
-  }
-
   showExtractionInsight(type, data) {
     const insights = [];
     
@@ -1932,7 +1213,7 @@ export class DetailExtractionManager {
         insights.push({
           type: 'info',
           icon: 'ℹ️',
-          message: `搜索到 ${data.total} 个结果，但没有支持详情提取的源 (${data.architecture})`,
+          message: `搜索到 ${data.total} 个结果，但没有支持详情提取的源`,
           level: 'info'
         });
         break;
@@ -1941,7 +1222,7 @@ export class DetailExtractionManager {
         insights.push({
           type: 'error',
           icon: '❌',
-          message: `详情提取失败: ${data.error} (${data.architecture})`,
+          message: `详情提取失败: ${data.error}`,
           level: 'error'
         });
         break;
@@ -1959,6 +1240,9 @@ export class DetailExtractionManager {
     this.displayInsights(insights);
   }
 
+  /**
+   * 显示洞察信息
+   */
   displayInsights(insights) {
     if (insights.length === 0) return;
     
@@ -1974,6 +1258,7 @@ export class DetailExtractionManager {
     
     insightsContainer.style.display = 'block';
     
+    // 自动隐藏信息类洞察
     if (insights.every(i => i.level === 'info')) {
       setTimeout(() => {
         insightsContainer.style.display = 'none';
@@ -1981,20 +1266,74 @@ export class DetailExtractionManager {
     }
   }
 
+  // ===================== 工具方法 =====================
+
+  /**
+   * 生成批次ID
+   */
+  generateBatchId() {
+    return 'batch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  /**
+   * 获取提取统计
+   */
+  getExtractionStats() {
+    return { ...this.extractionStats };
+  }
+
+  /**
+   * 重置提取统计
+   */
   resetExtractionStats() {
     this.extractionStats = {
       totalExtractions: 0,
       successfulExtractions: 0,
       failedExtractions: 0,
-      partialExtractions: 0,
       cacheHits: 0,
-      averageTime: 0,
-      totalTime: 0,
-      modularParserExtractions: 0,
-      unifiedDataExtractions: 0,
-      configAwareExtractions: 0,
-      retrySuccessCount: 0
+      averageTime: 0
     };
+  }
+
+  /**
+   * 获取提取能力信息
+   */
+  getExtractionCapabilities(config) {
+    return {
+      enabled: config.enableDetailExtraction,
+      authenticated: authManager.isAuthenticated(),
+      supportedSources: APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || [],
+      maxAutoExtractions: config.maxAutoExtractions,
+      batchSize: config.extractionBatchSize,
+      timeout: config.extractionTimeout,
+      caching: config.enableCache,
+      retry: config.enableRetry,
+      currentQueue: this.extractionQueue.length,
+      inProgress: this.extractionInProgress
+    };
+  }
+
+  /**
+   * 清理资源
+   */
+  cleanup() {
+    this.extractionQueue = [];
+    this.progressCallbacks.clear();
+    this.extractionInsights = [];
+    this.extractionInProgress = false;
+    
+    // 清理DOM元素
+    const progressContainer = document.getElementById('extraction-progress');
+    if (progressContainer) {
+      progressContainer.remove();
+    }
+
+    const insightsContainer = document.getElementById('extractionInsights');
+    if (insightsContainer) {
+      insightsContainer.remove();
+    }
+    
+    console.log('详情提取管理器资源已清理');
   }
 }
 

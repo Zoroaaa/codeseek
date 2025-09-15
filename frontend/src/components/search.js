@@ -1,5 +1,5 @@
 // src/components/search.js - 重构后的统一搜索组件（主组件集成子组件）
-// 适配新架构v2.0.0 - 专注于搜索流程编排、搜索请求回调、子组件通信、搜索状态管理
+// 专注于搜索流程编排、搜索请求协调、子组件通信、搜索状态管理
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml } from '../utils/format.js';
@@ -29,26 +29,16 @@ export class UnifiedSearchManager {
     this.isInitialized = false;
     this.statusCheckInProgress = false;
     this.lastStatusCheckKeyword = null;
-    this.version = '2.0.0'; // 新架构版本
-    
-    // 🆕 新架构特性支持
-    this.architectureFeatures = {
-      modularParsers: true,
-      unifiedDataStructure: true,
-      dynamicConfiguration: true,
-      enhancedErrorHandling: true,
-      serviceHealthMonitoring: true
-    };
   }
 
   /**
-   * 初始化统一搜索管理器 - 适配新架构v2.0.0
+   * 初始化统一搜索管理器
    */
   async init() {
     if (this.isInitialized) return;
 
     try {
-      console.log(`开始初始化统一搜索管理器 (v${this.version})...`);
+      console.log('开始初始化统一搜索管理器...');
       
       // 按顺序初始化所有子组件
       await this.configManager.init();
@@ -69,12 +59,8 @@ export class UnifiedSearchManager {
       // 暴露全局方法
       this.exposeGlobalMethods();
       
-      // 🆕 检查新架构服务健康状态
-      await this.checkArchitectureHealth();
-      
       this.isInitialized = true;
-      console.log(`统一搜索管理器初始化完成 (v${this.version})，所有子组件已就绪`);
-      console.log('支持的新架构特性:', this.architectureFeatures);
+      console.log('统一搜索管理器初始化完成，所有子组件已就绪');
     } catch (error) {
       console.error('搜索管理器初始化失败:', error);
       showToast('搜索功能初始化失败，部分功能可能不可用', 'warning');
@@ -82,36 +68,13 @@ export class UnifiedSearchManager {
   }
 
   /**
-   * 🆕 检查新架构服务健康状态
-   */
-  async checkArchitectureHealth() {
-    try {
-      // 检查详情提取服务健康状态
-      const extractionHealth = await this.extractionManager.checkDetailServiceHealth();
-      
-      // 检查配置服务健康状态
-      const configHealth = await this.configManager.checkServiceHealth();
-      
-      console.log('新架构服务健康检查完成:', {
-        extraction: extractionHealth,
-        config: configHealth,
-        architecture: 'modular_parsers',
-        version: this.version
-      });
-      
-    } catch (error) {
-      console.warn('架构服务健康检查失败:', error);
-    }
-  }
-
-  /**
-   * 设置子组件间的通信 - 增强新架构支持
+   * 设置子组件间的通信
    */
   setupComponentCommunication() {
     // 配置变更 -> 通知相关组件
     document.addEventListener('searchConfigChanged', (event) => {
       const config = event.detail.config;
-      console.log(`配置已更新 (v${this.version})，通知相关组件`);
+      console.log('配置已更新，通知相关组件');
       
       // 更新建议管理器的历史数据
       this.suggestionManager.setSearchHistory(this.historyManager.getHistory());
@@ -121,20 +84,6 @@ export class UnifiedSearchManager {
       
       // 通知结果渲染器配置更新
       this.resultsRenderer.updateConfig(config);
-    });
-
-    // 🆕 新架构配置变更事件
-    document.addEventListener('detailConfigSaved', (event) => {
-      console.log('检测到详情配置保存事件，同步更新搜索组件配置');
-      const detailConfig = event.detail.config;
-      this.configManager.updateConfigFromDetailConfig(detailConfig);
-    });
-
-    // 🆕 详情提取状态变更事件
-    document.addEventListener('detailExtractionStateChanged', (event) => {
-      const { enabled } = event.detail;
-      console.log(`详情提取功能${enabled ? '已启用' : '已禁用'} (新架构)`);
-      this.updateExtractionFeatureState(enabled);
     });
 
     // 历史搜索请求 -> 执行搜索
@@ -162,102 +111,22 @@ export class UnifiedSearchManager {
 
     // 详情提取完成 -> 更新UI
     document.addEventListener('detailExtractionCompleted', (event) => {
-      console.log('详情提取完成 (新架构):', event.detail);
-      this.handleExtractionCompleted(event.detail);
+      console.log('详情提取完成:', event.detail);
     });
 
     // 搜索结果渲染完成 -> 通知其他组件
     document.addEventListener('searchResultsRendered', (event) => {
       console.log('搜索结果渲染完成:', event.detail);
-      this.handleResultsRendered(event.detail);
     });
 
     // 搜索结果清空 -> 重置状态
     document.addEventListener('searchResultsCleared', () => {
       this.resetSearchState();
     });
-
-    // 🆕 服务状态变更事件
-    document.addEventListener('detailServiceStatusChanged', (event) => {
-      this.handleServiceStatusChange(event.detail);
-    });
   }
 
   /**
-   * 🆕 更新详情提取功能状态
-   */
-  updateExtractionFeatureState(enabled) {
-    // 更新UI指示器
-    const extractionIndicator = document.getElementById('detailExtractionIndicator');
-    if (extractionIndicator) {
-      extractionIndicator.className = `extraction-indicator ${enabled ? 'enabled' : 'disabled'}`;
-      extractionIndicator.innerHTML = `
-        <span class="indicator-icon">${enabled ? '✅' : '❌'}</span>
-        <span class="indicator-text">详情提取: ${enabled ? '已启用' : '已禁用'}</span>
-      `;
-    }
-    
-    // 更新搜索结果中的详情提取按钮状态
-    this.resultsRenderer.updateDetailExtractionButtonStates(enabled);
-  }
-
-  /**
-   * 🆕 处理详情提取完成事件
-   */
-  handleExtractionCompleted(detail) {
-    const { results, stats, keyword } = detail;
-    
-    // 更新搜索统计
-    this.updateSearchStatistics(stats);
-    
-    // 显示提取洞察
-    this.showExtractionInsights(stats, keyword);
-    
-    // 触发统计更新事件
-    document.dispatchEvent(new CustomEvent('searchStatisticsUpdated', {
-      detail: { type: 'extraction', stats, keyword }
-    }));
-  }
-
-  /**
-   * 🆕 处理搜索结果渲染完成事件
-   */
-  handleResultsRendered(detail) {
-    const { keyword, results, resultCount, statusStats } = detail;
-    
-    // 更新搜索历史（如果启用）
-    if (this.configManager.config.saveToHistory && authManager.isAuthenticated()) {
-      this.historyManager.updateSearchResultCount(keyword, resultCount);
-    }
-    
-    // 更新建议系统
-    this.suggestionManager.updateFromSearchResults(results);
-    
-    // 🆕 检查是否需要自动详情提取
-    if (this.shouldAutoExtractDetails()) {
-      setTimeout(() => {
-        this.performAutoDetailExtraction(results, keyword);
-      }, 1000);
-    }
-  }
-
-  /**
-   * 🆕 处理服务状态变更
-   */
-  handleServiceStatusChange(statusDetail) {
-    console.log('服务状态变更:', statusDetail);
-    
-    // 更新UI状态指示器
-    this.updateServiceStatusIndicators(statusDetail);
-    
-    // 如果服务状态恶化，提示用户
-    if (statusDetail.status === 'error' || statusDetail.status === 'degraded') {
-      showToast(`服务状态: ${statusDetail.message}`, 'warning', 5000);
-    }
-  }
-
-  /**
-   * 执行搜索 - 增强新架构支持
+   * 执行搜索 - 主要搜索方法
    */
   async performSearch() {
     const searchInput = document.getElementById('searchInput');
@@ -282,234 +151,50 @@ export class UnifiedSearchManager {
       this.hideQuickTips();
       this.suggestionManager.hideSearchSuggestions();
 
-      // 🆕 记录搜索开始时间（性能监控）
-      const searchStartTime = performance.now();
-
-      // 显示搜索状态检查进度（如果启用）
+      // 显示搜索状态检查进度（如果可用）
       await this.showSearchStatusIfEnabled(keyword);
 
-      // 🆕 使用新架构配置执行基础搜索
-      const effectiveConfig = this.configManager.getEffectiveConfig();
+      // 执行基础搜索
       const searchResults = await searchService.performSearch(keyword, {
-        useCache: effectiveConfig.useCache,
-        saveToHistory: effectiveConfig.saveToHistory && authManager.isAuthenticated(),
-        // 🆕 新架构选项
-        architectureVersion: this.version,
-        enableHealthCheck: effectiveConfig.enableServiceHealthCheck
+        useCache: this.configManager.config.useCache,
+        saveToHistory: this.configManager.config.saveToHistory && authManager.isAuthenticated()
       });
       
       if (!searchResults || searchResults.length === 0) {
         showToast('未找到搜索结果', 'warning');
-        this.resultsRenderer.displaySearchResults(keyword, [], effectiveConfig);
+        this.resultsRenderer.displaySearchResults(keyword, [], this.configManager.config);
         return;
       }
 
-      // 🆕 增强搜索结果（添加新架构元数据）
-      const enhancedResults = this.enhanceSearchResults(searchResults, keyword);
-
       // 显示基础搜索结果
-      this.resultsRenderer.displaySearchResults(keyword, enhancedResults, effectiveConfig);
+      this.resultsRenderer.displaySearchResults(keyword, searchResults, this.configManager.config);
       
       // 更新搜索历史
       if (authManager.isAuthenticated()) {
-        await this.historyManager.addToHistory(keyword, enhancedResults.length);
+        await this.historyManager.addToHistory(keyword);
         // 通知建议管理器更新历史
         this.suggestionManager.setSearchHistory(this.historyManager.getHistory());
       }
 
-      // 🆕 检查是否使用新架构详情提取
+      // 检查是否启用详情提取
       if (this.shouldUseDetailExtraction()) {
-        console.log(`开始新架构详情提取流程 (v${this.version})...`);
+        console.log('开始详情提取流程...');
         await this.extractionManager.handleDetailExtraction(
-          enhancedResults, 
+          searchResults, 
           keyword, 
-          effectiveConfig
+          this.configManager.config
         );
-      } else if (!authManager.isAuthenticated() && effectiveConfig.enableDetailExtraction) {
-        showToast('登录后可使用新架构详情提取功能', 'info', 3000);
+      } else if (!authManager.isAuthenticated() && this.configManager.config.enableDetailExtraction) {
+        showToast('登录后可使用详情提取功能', 'info', 3000);
       }
-
-      // 🆕 记录搜索性能
-      const searchTime = performance.now() - searchStartTime;
-      this.recordSearchPerformance(keyword, enhancedResults.length, searchTime);
 
     } catch (error) {
       console.error('搜索失败:', error);
       showToast(`搜索失败: ${error.message}`, 'error');
-      
-      // 🆕 错误上报（如果启用）
-      this.reportSearchError(keyword, error);
     } finally {
       showLoading(false);
       this.statusCheckInProgress = false;
     }
-  }
-
-  /**
-   * 🆕 增强搜索结果（添加新架构元数据）
-   */
-  enhanceSearchResults(results, keyword) {
-    return results.map(result => ({
-      ...result,
-      // 新架构元数据
-      architectureVersion: this.version,
-      searchTimestamp: Date.now(),
-      searchKeyword: keyword,
-      supportsDetailExtraction: this.shouldExtractDetailForResult(result),
-      enhancedMetadata: {
-        parserSupport: this.getParserSupportInfo(result.source),
-        qualityIndicators: this.calculateResultQuality(result),
-        extractionPriority: this.calculateExtractionPriority(result)
-      }
-    }));
-  }
-
-  /**
-   * 🆕 计算结果质量指标
-   */
-  calculateResultQuality(result) {
-    let qualityScore = 0;
-    const indicators = [];
-    
-    // 基础信息完整性
-    if (result.title && result.title.length > 5) {
-      qualityScore += 20;
-      indicators.push('title');
-    }
-    if (result.subtitle && result.subtitle.length > 10) {
-      qualityScore += 15;
-      indicators.push('subtitle');
-    }
-    if (result.url && result.url.startsWith('https://')) {
-      qualityScore += 10;
-      indicators.push('secure_url');
-    }
-    
-    // 源站信誉
-    if (APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES?.includes(result.source)) {
-      qualityScore += 30;
-      indicators.push('supported_source');
-    }
-    
-    // 时效性
-    if (result.timestamp && (Date.now() - result.timestamp) < 86400000) {
-      qualityScore += 25;
-      indicators.push('recent');
-    }
-    
-    return {
-      score: Math.min(qualityScore, 100),
-      indicators,
-      level: qualityScore >= 80 ? 'high' : qualityScore >= 50 ? 'medium' : 'low'
-    };
-  }
-
-  /**
-   * 🆕 计算提取优先级
-   */
-  calculateExtractionPriority(result) {
-    const quality = this.calculateResultQuality(result);
-    const sourceSupport = this.getParserSupportInfo(result.source);
-    
-    let priority = 0;
-    
-    // 质量权重
-    if (quality.level === 'high') priority += 3;
-    else if (quality.level === 'medium') priority += 2;
-    else priority += 1;
-    
-    // 解析器支持权重
-    if (sourceSupport.level === 'excellent') priority += 3;
-    else if (sourceSupport.level === 'good') priority += 2;
-    else priority += 1;
-    
-    // 源站优先级权重
-    if (result.source === 'javbus' || result.source === 'javdb') priority += 2;
-    else if (result.source === 'jable' || result.source === 'javmost') priority += 1;
-    
-    return {
-      score: priority,
-      level: priority >= 7 ? 'high' : priority >= 5 ? 'medium' : 'low'
-    };
-  }
-
-  /**
-   * 🆕 获取解析器支持信息
-   */
-  getParserSupportInfo(sourceType) {
-    const supportedSources = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || [];
-    
-    if (!supportedSources.includes(sourceType)) {
-      return { supported: false, level: 'none', features: [] };
-    }
-    
-    // 基于源类型返回支持信息
-    const supportInfo = {
-      javbus: { level: 'excellent', features: ['screenshots', 'downloads', 'magnets', 'metadata'] },
-      javdb: { level: 'excellent', features: ['screenshots', 'metadata', 'actors'] },
-      jable: { level: 'good', features: ['screenshots', 'metadata'] },
-      javmost: { level: 'good', features: ['screenshots', 'downloads'] },
-      javgg: { level: 'good', features: ['metadata', 'downloads'] },
-      sukebei: { level: 'fair', features: ['magnets', 'metadata'] },
-      javguru: { level: 'fair', features: ['metadata'] },
-      generic: { level: 'basic', features: ['basic_metadata'] }
-    };
-    
-    return {
-      supported: true,
-      ...supportInfo[sourceType] || supportInfo.generic
-    };
-  }
-
-  /**
-   * 判断是否应该为特定结果提取详情
-   */
-  shouldExtractDetailForResult(result) {
-    return this.shouldUseDetailExtraction() && 
-           APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES?.includes(result.source);
-  }
-
-  /**
-   * 🆕 检查是否应该自动详情提取
-   */
-  shouldAutoExtractDetails() {
-    const config = this.configManager.config;
-    return config.enableDetailExtraction && 
-           config.autoExtractDetails && 
-           authManager.isAuthenticated();
-  }
-
-  /**
-   * 🆕 执行自动详情提取
-   */
-  async performAutoDetailExtraction(results, keyword) {
-    const config = this.configManager.config;
-    
-    // 筛选支持详情提取的结果
-    const supportedResults = results.filter(result => 
-      this.shouldExtractDetailForResult(result)
-    );
-    
-    if (supportedResults.length === 0) {
-      console.log('没有支持自动详情提取的结果');
-      return;
-    }
-    
-    // 按优先级排序并限制数量
-    const prioritizedResults = supportedResults
-      .sort((a, b) => b.enhancedMetadata.extractionPriority.score - a.enhancedMetadata.extractionPriority.score)
-      .slice(0, config.maxAutoExtractions);
-    
-    console.log(`自动详情提取: 选择了 ${prioritizedResults.length} 个高优先级结果`);
-    
-    // 延迟执行以避免阻塞UI
-    setTimeout(async () => {
-      await this.extractionManager.handleDetailExtraction(
-        prioritizedResults, 
-        keyword, 
-        { ...config, autoExtraction: true }
-      );
-    }, 2000);
   }
 
   /**
@@ -619,7 +304,7 @@ export class UnifiedSearchManager {
       showToast('已在新标签页打开', 'success');
       
       if (authManager.isAuthenticated()) {
-        apiService.recordAction('visit_site', { url, source, architecture: this.version }).catch(console.error);
+        apiService.recordAction('visit_site', { url, source }).catch(console.error);
       }
     } catch (error) {
       console.error('打开链接失败:', error);
@@ -636,7 +321,7 @@ export class UnifiedSearchManager {
       showToast('已复制到剪贴板', 'success');
       
       if (authManager.isAuthenticated()) {
-        apiService.recordAction('copy_url', { url: text, architecture: this.version }).catch(console.error);
+        apiService.recordAction('copy_url', { url: text }).catch(console.error);
       }
     } catch (error) {
       const textArea = document.createElement('textarea');
@@ -767,17 +452,6 @@ export class UnifiedSearchManager {
       details.push(`数据来源: 缓存`);
     }
 
-    // 🆕 新架构信息
-    if (result.architectureVersion) {
-      details.push(`架构版本: ${result.architectureVersion}`);
-    }
-
-    if (result.enhancedMetadata) {
-      const metadata = result.enhancedMetadata;
-      details.push(`质量等级: ${metadata.qualityIndicators?.level || '未知'}`);
-      details.push(`提取优先级: ${metadata.extractionPriority?.level || '未知'}`);
-    }
-
     // 显示详情（这里简单用alert，实际项目中可以用模态框）
     alert(details.join('\n'));
   }
@@ -845,18 +519,11 @@ export class UnifiedSearchManager {
   }
 
   /**
-   * 导出搜索结果 - 增强新架构支持
+   * 导出搜索结果
    */
   async exportResults() {
     const extractionStats = this.extractionManager.getExtractionStats();
-    const searchStats = this.getSearchStatistics();
-    
-    const result = await this.resultsRenderer.exportResults({
-      ...extractionStats,
-      searchStatistics: searchStats,
-      architectureVersion: this.version,
-      exportTimestamp: Date.now()
-    });
+    const result = await this.resultsRenderer.exportResults(extractionStats);
     
     if (result.success) {
       showToast('搜索结果导出成功', 'success');
@@ -870,119 +537,6 @@ export class UnifiedSearchManager {
    */
   async clearAllHistory() {
     await this.historyManager.clearAllHistory();
-  }
-
-  // ===================== 🆕 新架构特有方法 =====================
-
-  /**
-   * 🆕 更新搜索统计
-   */
-  updateSearchStatistics(stats) {
-    // 实现搜索统计更新逻辑
-    if (!this.searchStats) {
-      this.searchStats = {
-        totalSearches: 0,
-        totalResults: 0,
-        totalExtractions: 0,
-        averageResultsPerSearch: 0,
-        averageSearchTime: 0
-      };
-    }
-    
-    // 更新统计数据
-    this.searchStats.totalSearches++;
-    this.searchStats.totalExtractions += stats.total || 0;
-    this.searchStats.totalResults += stats.successful || 0;
-  }
-
-  /**
-   * 🆕 显示提取洞察
-   */
-  showExtractionInsights(stats, keyword) {
-    if (!stats || stats.total === 0) return;
-    
-    const insights = [];
-    
-    if (stats.successRate > 80) {
-      insights.push(`提取成功率优秀 (${stats.successRate}%)`);
-    }
-    
-    if (stats.cacheHitRate > 50) {
-      insights.push(`缓存命中率良好 (${stats.cacheHitRate}%)`);
-    }
-    
-    if (stats.averageTime < 5000) {
-      insights.push(`提取速度优秀 (平均 ${stats.averageTime}ms)`);
-    }
-    
-    if (insights.length > 0) {
-      showToast(`提取洞察: ${insights.join(', ')}`, 'info', 8000);
-    }
-  }
-
-  /**
-   * 🆕 记录搜索性能
-   */
-  recordSearchPerformance(keyword, resultCount, searchTime) {
-    if (!this.performanceMetrics) {
-      this.performanceMetrics = [];
-    }
-    
-    this.performanceMetrics.push({
-      keyword,
-      resultCount,
-      searchTime,
-      timestamp: Date.now(),
-      architecture: this.version
-    });
-    
-    // 保持最近100条记录
-    if (this.performanceMetrics.length > 100) {
-      this.performanceMetrics.shift();
-    }
-    
-    console.log(`搜索性能记录: ${keyword} -> ${resultCount}个结果, 用时${searchTime.toFixed(2)}ms`);
-  }
-
-  /**
-   * 🆕 错误上报
-   */
-  reportSearchError(keyword, error) {
-    if (authManager.isAuthenticated()) {
-      apiService.recordAction('search_error', {
-        keyword,
-        errorMessage: error.message,
-        errorType: error.name,
-        architecture: this.version,
-        timestamp: Date.now()
-      }).catch(console.error);
-    }
-  }
-
-  /**
-   * 🆕 更新服务状态指示器
-   */
-  updateServiceStatusIndicators(statusDetail) {
-    const indicators = document.querySelectorAll('.service-status-indicator');
-    indicators.forEach(indicator => {
-      indicator.className = `service-status-indicator ${statusDetail.status}`;
-      indicator.innerHTML = `
-        <span class="status-dot"></span>
-        <span class="status-text">${statusDetail.message}</span>
-      `;
-    });
-  }
-
-  /**
-   * 🆕 获取搜索统计
-   */
-  getSearchStatistics() {
-    return {
-      ...this.searchStats,
-      performanceMetrics: this.performanceMetrics?.slice(-20) || [], // 最近20条性能记录
-      architecture: this.version,
-      lastUpdated: Date.now()
-    };
   }
 
   // ===================== UI控制方法 =====================
@@ -1087,61 +641,6 @@ export class UnifiedSearchManager {
       this.historyManager.loadSearchHistory();
       this.extractionManager.checkDetailServiceHealth();
     });
-
-    // 🆕 监听架构升级事件
-    document.addEventListener('architectureUpgraded', (event) => {
-      const { version, features } = event.detail;
-      console.log(`检测到架构升级: ${version}`, features);
-      this.handleArchitectureUpgrade(version, features);
-    });
-  }
-
-  /**
-   * 🆕 处理架构升级
-   */
-  async handleArchitectureUpgrade(version, features) {
-    if (version !== this.version) {
-      console.log(`升级到新架构版本: ${this.version} -> ${version}`);
-      this.version = version;
-      this.architectureFeatures = { ...this.architectureFeatures, ...features };
-      
-      // 重新初始化组件以适配新架构
-      await this.reinitializeForNewArchitecture();
-      
-      showToast(`已升级到新架构 v${version}`, 'success');
-    }
-  }
-
-  /**
-   * 🆕 为新架构重新初始化
-   */
-  async reinitializeForNewArchitecture() {
-    try {
-      // 刷新配置以适配新架构
-      await this.configManager.refreshDetailConfig();
-      
-      // 重新检查服务健康状态
-      await this.checkArchitectureHealth();
-      
-      // 更新UI指示器
-      this.updateArchitectureIndicators();
-      
-    } catch (error) {
-      console.error('新架构初始化失败:', error);
-    }
-  }
-
-  /**
-   * 🆕 更新架构指示器
-   */
-  updateArchitectureIndicators() {
-    const indicators = document.querySelectorAll('.architecture-indicator');
-    indicators.forEach(indicator => {
-      indicator.innerHTML = `
-        <span class="arch-version">v${this.version}</span>
-        <span class="arch-features">${Object.keys(this.architectureFeatures).length} 特性</span>
-      `;
-    });
   }
 
   /**
@@ -1163,7 +662,7 @@ export class UnifiedSearchManager {
   }
 
   /**
-   * 暴露全局方法 - 增强新架构支持
+   * 暴露全局方法
    */
   exposeGlobalMethods() {
     window.unifiedSearchManager = {
@@ -1219,13 +718,6 @@ export class UnifiedSearchManager {
       getExtractionStats: () => this.extractionManager.getExtractionStats(),
       resetExtractionStats: () => this.extractionManager.resetExtractionStats(),
       getResultsStats: () => this.resultsRenderer.getResultsStats(),
-      getSearchStatistics: () => this.getSearchStatistics(),
-      
-      // 🆕 新架构特有方法
-      getArchitectureVersion: () => this.version,
-      getArchitectureFeatures: () => this.architectureFeatures,
-      checkArchitectureHealth: () => this.checkArchitectureHealth(),
-      getPerformanceMetrics: () => this.performanceMetrics || [],
       
       // 服务状态
       getServiceStatus: () => this.getServiceStatus(),
@@ -1250,7 +742,7 @@ export class UnifiedSearchManager {
   // ===================== 辅助方法 =====================
 
   /**
-   * 获取服务状态 - 增强新架构信息
+   * 获取服务状态
    */
   getServiceStatus() {
     return {
@@ -1259,28 +751,15 @@ export class UnifiedSearchManager {
       currentResults: this.resultsRenderer.getCurrentResults().length,
       searchHistory: this.historyManager.getHistory().length,
       extractionStats: this.extractionManager.getExtractionStats(),
-      searchStats: this.getSearchStatistics(),
       config: this.configManager.getConfig(),
       configCacheValid: this.configManager.isConfigCacheValid(),
-      
-      // 🆕 新架构信息
-      architectureVersion: this.version,
-      architectureFeatures: this.architectureFeatures,
-      performanceMetrics: this.performanceMetrics?.length || 0,
-      
       features: {
         detailExtraction: this.configManager.config.enableDetailExtraction,
         autoExtraction: this.configManager.config.autoExtractDetails,
         caching: this.configManager.config.enableCache,
         retry: this.configManager.config.enableRetry,
-        configUI: true,
-        // 🆕 新架构特性
-        modularParsers: this.architectureFeatures.modularParsers,
-        unifiedDataStructure: this.architectureFeatures.unifiedDataStructure,
-        dynamicConfiguration: this.architectureFeatures.dynamicConfiguration,
-        serviceHealthMonitoring: this.architectureFeatures.serviceHealthMonitoring
+        configUI: true // 现在支持配置UI
       },
-      
       components: {
         configManager: 'ready',
         historyManager: 'ready',
@@ -1306,7 +785,7 @@ export class UnifiedSearchManager {
   }
 
   /**
-   * 清理资源 - 增强新架构清理
+   * 清理资源
    */
   cleanup() {
     // 清理所有子组件
@@ -1315,11 +794,6 @@ export class UnifiedSearchManager {
     this.extractionManager.cleanup();
     this.resultsRenderer.cleanup();
     this.suggestionManager.cleanup();
-    
-    // 🆕 清理新架构特有资源
-    this.performanceMetrics = [];
-    this.searchStats = null;
-    this.architectureFeatures = {};
     
     // 清理全局方法
     if (window.unifiedSearchManager) {
@@ -1339,7 +813,7 @@ export class UnifiedSearchManager {
     this.isInitialized = false;
     this.statusCheckInProgress = false;
     
-    console.log(`统一搜索管理器资源已清理 (v${this.version})`);
+    console.log('统一搜索管理器资源已清理');
   }
 }
 
