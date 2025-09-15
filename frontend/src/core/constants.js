@@ -605,6 +605,20 @@ export const APP_CONSTANTS = {
     SERVICE_STATS: '/api/detail/service-stats',
     RELOAD_PARSER: '/api/detail/reload-parser'
   }
+  
+  
+// 将 migratedConfigKeys 提取为模块级常量
+const MIGRATED_CONFIG_KEYS = [
+  'enableDetailExtraction', 
+  'autoExtractDetails', 
+  'detailExtractionTimeout',
+  'detailCacheDuration', 
+  'extractionBatchSize', 
+  'maxRetryAttempts',
+  'maxDownloadLinks', 
+  'maxMagnetLinks', 
+  'maxScreenshots'
+];
 };
 
 // 导出常用常量 - 保持向后兼容
@@ -647,14 +661,8 @@ export function getDetailConfigEndpoint(endpoint) {
 export function validateLegacySettings(settings) {
   const warnings = [];
   
-  // 检查是否使用了已迁移的详情提取配置
-  const migratedConfigKeys = [
-    'enableDetailExtraction', 'autoExtractDetails', 'detailExtractionTimeout',
-    'detailCacheDuration', 'extractionBatchSize', 'maxRetryAttempts',
-    'maxDownloadLinks', 'maxMagnetLinks', 'maxScreenshots'
-  ];
-  
-  migratedConfigKeys.forEach(key => {
+  // 使用模块级常量
+  MIGRATED_CONFIG_KEYS.forEach(key => {
     if (settings.hasOwnProperty(key)) {
       warnings.push(`配置项 ${key} 已迁移至详情提取配置管理，请使用 DetailConfigAPI 进行管理`);
     }
@@ -678,7 +686,7 @@ export const ARCHITECTURE_INFO = {
   },
   compatibility: {
     backwardCompatible: true,
-    deprecatedFields: migratedConfigKeys,
+    deprecatedFields: MIGRATED_CONFIG_KEYS, // ✅ 现在可以正常引用了
     migrationGuide: 'https://docs.example.com/migration-v2'
   }
 };
