@@ -1,4 +1,4 @@
-// 主应用入口 - 集成统一搜索组件和配置管理架构，新增邮箱验证功能支持
+// 主应用入口 - 适配新架构v2.0.0：集成统一搜索组件和配置管理架构，新增邮箱验证功能支持
 import { APP_CONSTANTS } from '../../core/constants.js';
 import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
@@ -8,7 +8,9 @@ import authManager from '../../services/auth.js';
 import themeManager from '../../services/theme.js';
 import unifiedSearchManager from '../../components/search.js';
 import detailCardManager from '../../components/detail-card.js';
+// 🆕 导入新架构的详情提取服务和配置API
 import detailAPIService from '../../services/detail-api.js';
+import detailConfigAPI from '../../services/detail-config-api.js';
 import favoritesManager from '../../components/favorites.js';
 import apiService from '../../services/api.js';
 // 🆕 导入邮箱验证服务和UI组件
@@ -20,16 +22,17 @@ class MagnetSearchApp {
     this.currentUser = null;
     this.isInitialized = false;
     this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS?.CHECKING || 'checking';
+    this.version = '2.0.0'; // 🆕 架构升级版本
     
     // 搜索源和分类管理 - 简化版本，主要通过统一搜索管理器处理
     this.allSearchSources = [];
     this.allCategories = [];
     
-    // 详情提取功能状态
+    // 🆕 新架构详情提取功能状态
     this.detailExtractionAvailable = false;
     this.detailExtractionEnabled = false;
     
-    // 详情提取统计信息 - 通过统一搜索管理器获取
+    // 🆕 新架构详情提取统计信息 - 通过新的API服务获取
     this.detailExtractionStats = {
       totalExtractions: 0,
       successfulExtractions: 0,
@@ -39,12 +42,23 @@ class MagnetSearchApp {
       lastExtraction: null
     };
     
+    // 🆕 架构特性支持
+    this.architectureFeatures = {
+      modularParsers: true,
+      unifiedDataStructure: true,
+      dynamicConfiguration: true,
+      enhancedErrorHandling: true,
+      serviceHealthMonitoring: true,
+      intelligentCaching: true
+    };
+    
     // 性能监控
     this.performanceMetrics = {
       initTime: 0,
       searchCount: 0,
       extractionCount: 0,
-      errorCount: 0
+      errorCount: 0,
+      architectureVersion: this.version
     };
     
     this.init();
@@ -55,7 +69,7 @@ class MagnetSearchApp {
     
     try {
       showLoading(true);
-      console.log('🚀 初始化磁力快搜应用...');
+      console.log(`🚀 初始化磁力快搜应用 (架构版本: ${this.version})...`);
       
       // 显示连接状态
       this.showConnectionStatus();
@@ -86,9 +100,9 @@ class MagnetSearchApp {
         document.querySelector('.main-content').style.display = 'block';
         // 已登录用户初始化组件
         await this.initComponents();
-        // 检查详情提取功能可用性
+        // 🆕 检查新架构详情提取功能可用性
         await this.checkDetailExtractionAvailability();
-        // 初始化详情提取UI
+        // 🆕 初始化新架构详情提取UI
         await this.initDetailExtractionUI();
       }
 
@@ -107,7 +121,7 @@ class MagnetSearchApp {
       this.isInitialized = true;
       this.hideConnectionStatus();
       
-      console.log(`✅ 应用初始化完成 (${Math.round(this.performanceMetrics.initTime)}ms)`);
+      console.log(`✅ 应用初始化完成 (${Math.round(this.performanceMetrics.initTime)}ms, 架构: ${this.version})`);
       
     } catch (error) {
       console.error('❌ 应用初始化失败:', error);
@@ -123,7 +137,7 @@ class MagnetSearchApp {
   // 🆕 初始化邮箱验证服务
   async initEmailVerificationService() {
     try {
-      console.log('🔐 初始化邮箱验证服务...');
+      console.log('📧 初始化邮箱验证服务...');
       
       // 邮箱验证服务已经通过导入自动初始化
       // 这里可以进行一些额外的配置或检查
@@ -177,7 +191,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 检查详情提取功能可用性 - 通过统一搜索管理器
+  // 🆕 检查新架构详情提取功能可用性 - 通过新的API服务
   async checkDetailExtractionAvailability() {
     if (!this.currentUser) {
       this.detailExtractionAvailable = false;
@@ -186,16 +200,26 @@ class MagnetSearchApp {
     }
 
     try {
-      // 通过统一搜索管理器检查详情提取服务健康状态
+      console.log('🔍 检查新架构详情提取服务健康状态...');
+      
+      // 🆕 通过新架构API服务检查详情提取服务健康状态
       const healthCheck = await detailAPIService.checkServiceHealth();
       this.detailExtractionAvailable = healthCheck.healthy;
       
       if (this.detailExtractionAvailable) {
-        // 获取当前详情提取配置和统计
-        const configSummary = await detailAPIService.getEffectiveConfigSummary();
-        this.detailExtractionEnabled = configSummary.extractionEnabled;
+        // 🆕 获取当前详情提取配置
+        const configData = await detailConfigAPI.getUserConfig();
+        this.detailExtractionEnabled = configData.config?.enableDetailExtraction || false;
         
-        // 获取统计信息
+        // 🆕 获取支持的站点信息
+        try {
+          const sitesData = await detailAPIService.getSupportedSites();
+          console.log('📋 支持的站点信息:', sitesData.metadata);
+        } catch (error) {
+          console.warn('获取支持站点信息失败:', error);
+        }
+        
+        // 🆕 获取统计信息
         try {
           const stats = await detailAPIService.getStats();
           this.updateDetailExtractionStats(stats);
@@ -211,7 +235,7 @@ class MagnetSearchApp {
       
       this.updateDetailExtractionUI(this.detailExtractionAvailable);
       
-      console.log(`详情提取功能：${this.detailExtractionAvailable ? '可用' : '不可用'}，用户设置：${this.detailExtractionEnabled ? '启用' : '禁用'}`);
+      console.log(`✨ 详情提取功能：${this.detailExtractionAvailable ? '可用' : '不可用'}，用户设置：${this.detailExtractionEnabled ? '启用' : '禁用'} (架构: ${this.version})`);
       
     } catch (error) {
       console.warn('检查详情提取功能可用性失败:', error);
@@ -220,7 +244,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 更新详情提取UI状态
+  // 🆕 更新详情提取UI状态 - 适配新架构
   updateDetailExtractionUI(available) {
     const detailToggleBtn = document.getElementById('detailExtractionToggle');
     const detailStatusSection = document.getElementById('detailExtractionStatus');
@@ -248,8 +272,8 @@ class MagnetSearchApp {
     
     if (detailStatusDescription) {
       if (available) {
-        detailStatusDescription.textContent = this.detailExtractionEnabled ? 
-          '详情提取功能已启用，可以自动获取番号的详细信息。' :
+        detailStatusDescription.innerHTML = this.detailExtractionEnabled ? 
+          `详情提取功能已启用，支持新架构解析器 (v${this.version})。` :
           '详情提取功能可用但未启用，点击上方按钮开启。';
       } else {
         detailStatusDescription.textContent = '详情提取功能当前不可用，可能需要登录或后端服务未启动。';
@@ -266,7 +290,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 初始化详情提取UI组件
+  // 🆕 初始化新架构详情提取UI组件
   async initDetailExtractionUI() {
     try {
       // 更新详情提取统计显示
@@ -285,12 +309,13 @@ class MagnetSearchApp {
     }
   }
 
-  // 绑定详情提取相关事件
+  // 🆕 绑定详情提取相关事件 - 适配新架构
   bindDetailExtractionEvents() {
-    // 监听详情配置变更事件（从统一搜索管理器发出）
+    // 监听配置变更事件（从统一搜索管理器发出）
     document.addEventListener('searchConfigChanged', (event) => {
       if (event.detail.config) {
         const config = event.detail.config;
+        console.log(`配置已更新 (v${this.version})，通知相关组件`);
         
         // 更新详情提取启用状态
         if (config.enableDetailExtraction !== this.detailExtractionEnabled) {
@@ -301,6 +326,23 @@ class MagnetSearchApp {
           this.dispatchDetailExtractionStateChanged();
         }
       }
+    });
+
+    // 🆕 新架构配置变更事件
+    document.addEventListener('detailConfigSaved', (event) => {
+      console.log('检测到详情配置保存事件，同步更新搜索组件配置');
+      const detailConfig = event.detail.config;
+      // 通过新的配置API更新配置
+      if (unifiedSearchManager.configManager) {
+        unifiedSearchManager.configManager.updateConfigFromDetailConfig(detailConfig);
+      }
+    });
+
+    // 🆕 详情提取状态变更事件
+    document.addEventListener('detailExtractionStateChanged', (event) => {
+      const { enabled } = event.detail;
+      console.log(`详情提取功能${enabled ? '已启用' : '已禁用'} (新架构 v${this.version})`);
+      this.updateExtractionFeatureState(enabled);
     });
 
     // 监听详情提取完成事件
@@ -323,16 +365,119 @@ class MagnetSearchApp {
     if (batchExtractBtn) {
       batchExtractBtn.addEventListener('click', () => this.batchExtractDetails());
     }
+
+    // 🆕 监听架构升级事件
+    document.addEventListener('architectureUpgraded', (event) => {
+      const { version, features } = event.detail;
+      console.log(`检测到架构升级: ${this.version} -> ${version}`, features);
+      this.handleArchitectureUpgrade(version, features);
+    });
+
+    // 🆕 监听服务状态变更事件
+    document.addEventListener('detailServiceStatusChanged', (event) => {
+      this.handleServiceStatusChange(event.detail);
+    });
+  }
+
+  // 🆕 更新详情提取功能状态
+  updateExtractionFeatureState(enabled) {
+    // 更新UI指示器
+    const extractionIndicator = document.getElementById('detailExtractionIndicator');
+    if (extractionIndicator) {
+      extractionIndicator.className = `extraction-indicator ${enabled ? 'enabled' : 'disabled'}`;
+      extractionIndicator.innerHTML = `
+        <span class="indicator-icon">${enabled ? '✅' : '❌'}</span>
+        <span class="indicator-text">详情提取: ${enabled ? '已启用' : '已禁用'}</span>
+        <span class="architecture-badge">v${this.version}</span>
+      `;
+    }
+    
+    // 更新搜索结果中的详情提取按钮状态
+    if (unifiedSearchManager.resultsRenderer) {
+      unifiedSearchManager.resultsRenderer.updateDetailExtractionButtonStates(enabled);
+    }
+  }
+
+  // 🆕 处理架构升级
+  async handleArchitectureUpgrade(version, features) {
+    if (version !== this.version) {
+      console.log(`🔄 升级到新架构版本: ${this.version} -> ${version}`);
+      this.version = version;
+      this.architectureFeatures = { ...this.architectureFeatures, ...features };
+      
+      // 重新初始化组件以适配新架构
+      await this.reinitializeForNewArchitecture();
+      
+      showToast(`已升级到新架构 v${version}`, 'success');
+    }
+  }
+
+  // 🆕 为新架构重新初始化
+  async reinitializeForNewArchitecture() {
+    try {
+      // 刷新配置以适配新架构
+      if (detailConfigAPI) {
+        await detailConfigAPI.clearConfigCache();
+      }
+      
+      // 重新检查服务健康状态
+      await this.checkDetailExtractionAvailability();
+      
+      // 更新UI指示器
+      this.updateArchitectureIndicators();
+      
+    } catch (error) {
+      console.error('新架构初始化失败:', error);
+    }
+  }
+
+  // 🆕 更新架构指示器
+  updateArchitectureIndicators() {
+    const indicators = document.querySelectorAll('.architecture-indicator');
+    indicators.forEach(indicator => {
+      indicator.innerHTML = `
+        <span class="arch-version">v${this.version}</span>
+        <span class="arch-features">${Object.keys(this.architectureFeatures).length} 特性</span>
+      `;
+    });
+  }
+
+  // 🆕 处理服务状态变更
+  handleServiceStatusChange(statusDetail) {
+    console.log('服务状态变更:', statusDetail);
+    
+    // 更新UI状态指示器
+    this.updateServiceStatusIndicators(statusDetail);
+    
+    // 如果服务状态恶化，提示用户
+    if (statusDetail.status === 'error' || statusDetail.status === 'degraded') {
+      showToast(`服务状态: ${statusDetail.message}`, 'warning', 5000);
+    }
+  }
+
+  // 🆕 更新服务状态指示器
+  updateServiceStatusIndicators(statusDetail) {
+    const indicators = document.querySelectorAll('.service-status-indicator');
+    indicators.forEach(indicator => {
+      indicator.className = `service-status-indicator ${statusDetail.status}`;
+      indicator.innerHTML = `
+        <span class="status-dot"></span>
+        <span class="status-text">${statusDetail.message}</span>
+      `;
+    });
   }
 
   // 触发详情提取状态变更事件
   dispatchDetailExtractionStateChanged() {
     window.dispatchEvent(new CustomEvent('detailExtractionStateChanged', {
-      detail: { enabled: this.detailExtractionEnabled }
+      detail: { 
+        enabled: this.detailExtractionEnabled,
+        architecture: this.version
+      }
     }));
   }
 
-  // 更新详情提取统计信息
+  // 🆕 更新详情提取统计信息 - 适配新架构数据格式
   updateDetailExtractionStats(stats) {
     if (stats.user) {
       this.detailExtractionStats = {
@@ -341,7 +486,11 @@ class MagnetSearchApp {
         failedExtractions: stats.user.failedExtractions || 0,
         cacheHits: stats.user.cacheItems || 0,
         averageTime: stats.performance?.averageTime || 0,
-        lastExtraction: stats.user.lastExtraction || null
+        lastExtraction: stats.user.lastExtraction || null,
+        // 🆕 新架构统计字段
+        architecture: this.version,
+        parserStats: stats.sources || [],
+        cacheHitRate: stats.cache?.efficiency?.hitRate || 0
       };
     }
   }
@@ -357,9 +506,8 @@ class MagnetSearchApp {
       const rate = Math.round((this.detailExtractionStats.successfulExtractions / this.detailExtractionStats.totalExtractions) * 100);
       
       if (supportedCount) {
-        // 通过统一搜索管理器获取支持详情提取的搜索源数量
+        // 🆕 通过新架构API获取支持详情提取的搜索源数量
         try {
-          const config = unifiedSearchManager.configManager?.getConfig() || {};
           const supportedSources = this.allSearchSources.filter(source => 
             this.supportsDetailExtraction(source.id)
           ).length;
@@ -394,12 +542,13 @@ class MagnetSearchApp {
     setTimeout(() => {
       const enable = confirm(
         '🆕 新功能提醒\n\n' +
-        '详情提取功能现已可用！\n' +
+        `详情提取功能现已可用 (架构 v${this.version})！\n` +
         '可以自动获取番号的详细信息，包括：\n' +
         '• 高清封面图片和截图\n' +
         '• 演员信息和作品详情\n' +
         '• 直接可用的下载链接\n' +
-        '• 磁力链接和种子信息\n\n' +
+        '• 磁力链接和种子信息\n' +
+        '• 模块化解析器支持\n\n' +
         '是否立即启用此功能？'
       );
 
@@ -412,7 +561,7 @@ class MagnetSearchApp {
     }, 2000);
   }
 
-  // 启用详情提取功能
+  // 🆕 启用详情提取功能 - 使用新架构配置API
   async enableDetailExtraction() {
     if (!this.detailExtractionAvailable) {
       showToast('详情提取功能当前不可用', 'warning');
@@ -420,12 +569,14 @@ class MagnetSearchApp {
     }
 
     try {
-      // 通过统一搜索管理器的配置管理器更新配置
-      if (unifiedSearchManager.configManager) {
-        await unifiedSearchManager.configManager.updateDisplayConfig({
-          enableDetailExtraction: true
-        });
-        
+      console.log('🔧 通过新架构API启用详情提取功能...');
+      
+      // 🆕 通过新的配置API更新配置
+      const result = await detailConfigAPI.updateUserConfig({
+        enableDetailExtraction: true
+      });
+      
+      if (result.valid) {
         this.detailExtractionEnabled = true;
         
         // 确保详情卡片管理器已初始化
@@ -441,7 +592,7 @@ class MagnetSearchApp {
         // 触发状态变更事件
         this.dispatchDetailExtractionStateChanged();
       } else {
-        throw new Error('配置管理器未初始化');
+        throw new Error('配置更新失败');
       }
       
     } catch (error) {
@@ -450,7 +601,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 切换详情提取功能
+  // 🆕 切换详情提取功能 - 使用新架构配置API
   async toggleDetailExtraction() {
     if (!this.currentUser) {
       showToast('请先登录后使用详情提取功能', 'error');
@@ -464,13 +615,14 @@ class MagnetSearchApp {
 
     try {
       const newState = !this.detailExtractionEnabled;
+      console.log(`🔄 切换详情提取功能到: ${newState ? '启用' : '禁用'} (新架构)`);
       
-      // 通过统一搜索管理器的配置管理器更新配置
-      if (unifiedSearchManager.configManager) {
-        await unifiedSearchManager.configManager.updateDisplayConfig({
-          enableDetailExtraction: newState
-        });
-        
+      // 🆕 通过新的配置API更新配置
+      const result = await detailConfigAPI.updateUserConfig({
+        enableDetailExtraction: newState
+      });
+      
+      if (result.valid) {
         this.detailExtractionEnabled = newState;
         
         // 如果启用，确保详情卡片管理器已初始化
@@ -485,8 +637,15 @@ class MagnetSearchApp {
         this.dispatchDetailExtractionStateChanged();
         
         showToast(`详情提取功能已${newState ? '启用' : '禁用'}`, 'success');
+        
+        // 🆕 显示配置变更的额外信息
+        if (result.warnings && result.warnings.length > 0) {
+          setTimeout(() => {
+            showToast(`配置提醒: ${result.warnings[0]}`, 'info', 3000);
+          }, 1000);
+        }
       } else {
-        throw new Error('配置管理器未初始化');
+        throw new Error('配置更新失败');
       }
       
     } catch (error) {
@@ -495,7 +654,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 批量提取详情
+  // 🆕 批量提取详情 - 使用新架构API
   async batchExtractDetails() {
     if (!this.detailExtractionEnabled) {
       showToast('请先启用详情提取功能', 'warning');
@@ -522,8 +681,9 @@ class MagnetSearchApp {
           return;
         }
 
-        // 获取当前配置
-        const config = unifiedSearchManager.configManager.getConfig();
+        // 🆕 获取当前配置 (通过新架构API)
+        const configData = await detailConfigAPI.getUserConfig();
+        const config = configData.config;
         const maxCount = Math.min(supportedResults.length, config.maxAutoExtractions || 5);
         
         const count = prompt(`发现 ${supportedResults.length} 个支持详情提取的结果\n请输入要提取的数量 (最多 ${maxCount} 个):`, maxCount.toString());
@@ -555,11 +715,24 @@ class MagnetSearchApp {
     }
   }
 
-  // 初始化站点导航 - 集成统一搜索管理器
+  // 🆕 初始化站点导航 - 集成新架构支持信息
   async initSiteNavigation() {
     try {
       // 获取所有可用的搜索源（通过统一搜索管理器）
       let searchSources = this.allSearchSources;
+      
+      // 🆕 如果可能，获取新架构的支持站点信息
+      if (this.detailExtractionAvailable) {
+        try {
+          const sitesData = await detailAPIService.getSupportedSites();
+          // 将支持站点信息合并到搜索源中
+          if (sitesData.sites && sitesData.sites.length > 0) {
+            searchSources = this.enhanceSourcesWithSiteData(searchSources, sitesData.sites);
+          }
+        } catch (error) {
+          console.warn('获取支持站点信息失败:', error);
+        }
+      }
       
       // 如果统一搜索管理器已初始化，获取其配置的搜索源
       if (unifiedSearchManager.isInitialized && unifiedSearchManager.configManager) {
@@ -586,7 +759,25 @@ class MagnetSearchApp {
     }
   }
 
-  // 渲染站点导航 - 显示所有搜索源，并标识详情提取支持
+  // 🆕 使用站点数据增强搜索源信息
+  enhanceSourcesWithSiteData(sources, sitesData) {
+    return sources.map(source => {
+      const siteData = sitesData.find(site => site.sourceType === source.id);
+      if (siteData) {
+        return {
+          ...source,
+          // 添加新架构解析器信息
+          parserInfo: siteData.siteInfo || {},
+          parserAvailable: siteData.isActive !== false,
+          parserFeatures: siteData.siteInfo?.features || [],
+          lastValidated: siteData.siteInfo?.lastValidated || null
+        };
+      }
+      return source;
+    });
+  }
+
+  // 🆕 渲染站点导航 - 增强详情提取支持标识和新架构信息
   renderSiteNavigation(sourcesToDisplay = null) {
     const sitesSection = document.getElementById('sitesSection');
     if (!sitesSection) return;
@@ -621,7 +812,7 @@ class MagnetSearchApp {
       ${this.detailExtractionAvailable ? `
         <div class="detail-extraction-notice">
           <span class="notice-icon">✨</span>
-          <span>标有 <strong>📋</strong> 的站点支持详情提取功能</span>
+          <span>标有 <strong>📋</strong> 的站点支持详情提取功能 (架构 v${this.version})</span>
           ${!this.detailExtractionEnabled ? `
             <button onclick="window.app.enableDetailExtraction()" class="enable-detail-btn">启用详情提取</button>
           ` : ''}
@@ -655,7 +846,7 @@ class MagnetSearchApp {
     sitesSection.innerHTML = navigationHTML;
   }
 
-  // 渲染单个站点项，包含启用状态和详情提取支持标识
+  // 🆕 渲染单个站点项，包含启用状态和详情提取支持标识以及新架构信息
   renderSiteItem(source) {
     // 通过统一搜索管理器检查源的启用状态
     let isEnabled = true; // 默认显示为启用，具体启用状态由搜索时判断
@@ -673,22 +864,32 @@ class MagnetSearchApp {
     const statusText = isEnabled ? '可用' : '未启用';
     const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
     
+    // 🆕 解析器状态信息
+    const parserStatus = source.parserAvailable !== false ? 'parser-available' : 'parser-unavailable';
+    const parserInfo = source.parserInfo ? `解析器: ${source.parserInfo.quality || 'unknown'}` : '';
+    
     return `
       <a href="${source.urlTemplate ? source.urlTemplate.replace('{keyword}', 'search') : '#'}" 
          target="_blank" 
-         class="site-item ${statusClass}" 
+         class="site-item ${statusClass} ${parserStatus}" 
          rel="noopener noreferrer"
-         title="${source.subtitle || source.name} - ${statusText}${supportsDetailExtraction ? ' - 支持详情提取' : ''}">
+         title="${source.subtitle || source.name} - ${statusText}${supportsDetailExtraction ? ' - 支持详情提取' : ''}${parserInfo ? ' - ' + parserInfo : ''}">
         <div class="site-info">
           <div class="site-header">
-            <strong>${source.icon || '🔍'} ${source.name}</strong>
+            <strong>${source.icon || '🔗'} ${source.name}</strong>
             <div class="site-badges">
               ${source.isCustom ? '<span class="custom-badge">自定义</span>' : ''}
               ${supportsDetailExtraction ? '<span class="detail-support-badge">📋</span>' : ''}
+              ${source.parserAvailable !== false ? `<span class="parser-badge" title="架构 v${this.version}">🔧</span>` : ''}
               <span class="status-badge ${statusClass}">${statusText}</span>
             </div>
           </div>
           <span class="site-subtitle">${source.subtitle || ''}</span>
+          ${source.parserFeatures && source.parserFeatures.length > 0 ? `
+            <div class="parser-features">
+              <small>特性: ${source.parserFeatures.slice(0, 3).join(', ')}</small>
+            </div>
+          ` : ''}
         </div>
       </a>
     `;
@@ -1035,7 +1236,7 @@ class MagnetSearchApp {
     });
   }
 
-  // 刷新详情提取统计
+  // 🆕 刷新详情提取统计 - 使用新架构API
   async refreshDetailExtractionStats() {
     try {
       if (!this.detailExtractionEnabled) return;
@@ -1294,7 +1495,8 @@ class MagnetSearchApp {
         initTime: this.performanceMetrics.initTime, // 保留初始化时间
         searchCount: 0,
         extractionCount: 0,
-        errorCount: 0
+        errorCount: 0,
+        architectureVersion: this.version
       };
       
     } catch (error) {
@@ -1337,7 +1539,7 @@ class MagnetSearchApp {
     return detailSources.includes(sourceId);
   }
 
-  // 获取应用性能统计
+  // 🆕 获取应用性能统计 - 增强版本
   getPerformanceStats() {
     const stats = {
       ...this.performanceMetrics,
@@ -1347,7 +1549,14 @@ class MagnetSearchApp {
         used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
         total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
         limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
-      } : null
+      } : null,
+      // 🆕 新架构统计
+      architecture: {
+        version: this.version,
+        features: this.architectureFeatures,
+        detailExtractionAvailable: this.detailExtractionAvailable,
+        detailExtractionEnabled: this.detailExtractionEnabled
+      }
     };
     
     // 计算错误率
@@ -1357,7 +1566,7 @@ class MagnetSearchApp {
     return stats;
   }
 
-  // 导出应用状态
+  // 🆕 导出应用状态 - 增强版本
   exportAppState() {
     return {
       isInitialized: this.isInitialized,
@@ -1370,7 +1579,18 @@ class MagnetSearchApp {
       detailExtractionStats: this.detailExtractionStats,
       performanceStats: this.getPerformanceStats(),
       timestamp: Date.now(),
-      version: APP_CONSTANTS.DEFAULT_VERSION || '3.0.0'
+      version: this.version,
+      // 🆕 新架构信息
+      architecture: {
+        version: this.version,
+        features: this.architectureFeatures,
+        componentsStatus: {
+          unifiedSearchManager: unifiedSearchManager.isInitialized,
+          detailAPIService: !!detailAPIService,
+          detailConfigAPI: !!detailConfigAPI,
+          emailVerificationService: !!emailVerificationService
+        }
+      }
     };
   }
 }
