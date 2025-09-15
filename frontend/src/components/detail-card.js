@@ -1,39 +1,64 @@
-// src/components/detail-card.js - 专注于卡片渲染和交互的详情卡片组件
-// 配置管理功能已移至SearchConfigManager，此组件专注于视觉展现和交互逻辑
+// src/components/detail-card.js - 适配后端架构升级v2.0.0：支持模块化解析器和动态配置管理
+// 版本 2.0.0 - 完全适配新架构的详情卡片组件，专注于视觉展现和交互逻辑
+
 import { escapeHtml, formatRelativeTime, formatFileSize } from '../utils/format.js';
 import { showToast } from '../utils/dom.js';
 import authManager from '../services/auth.js';
 import detailAPIService from '../services/detail-api.js';
+import detailConfigAPI from '../services/detail-config-api.js';
 import favoritesManager from './favorites.js';
 import apiService from '../services/api.js';
+import { ARCHITECTURE_FEATURES, SERVICE_STATUS } from '../core/detail-config.js';
 
 export class DetailCardManager {
   constructor() {
     this.isInitialized = false;
     this.activeCards = new Map();
     this.cardInstances = new Map();
+    this.version = '2.0.0'; // 新架构版本
     
-    // 性能监控
+    // 新架构配置管理
+    this.configManager = null;
+    this.configCache = null;
+    this.configLastUpdate = 0;
+    this.configCacheExpiration = 5 * 60 * 1000; // 5分钟配置缓存
+    
+    // 新架构服务状态
+    this.serviceHealth = {
+      status: SERVICE_STATUS.HEALTHY,
+      lastCheck: 0,
+      features: Object.values(ARCHITECTURE_FEATURES)
+    };
+    
+    // 性能监控 - 增强版本
     this.performanceMetrics = {
       renderTime: [],
       interactionCount: 0,
-      errorCount: 0
+      errorCount: 0,
+      configFetches: 0,
+      cacheHits: 0,
+      // 新架构性能指标
+      parserPerformance: new Map(),
+      dataStructureVersion: '2.0',
+      architectureMetrics: {
+        totalCards: 0,
+        modularParserCards: 0,
+        unifiedDataCards: 0
+      }
     };
-    
-    // 配置引用 - 从SearchConfigManager获取
-    this.configManager = null;
   }
 
   async init() {
     if (this.isInitialized) return;
 
     try {
-      // 获取配置管理器引用
-      this.configManager = window.searchConfigManager || window.unifiedSearchManager?.configManager;
+      console.log('初始化详情卡片管理器 (新架构 v2.0.0)');
       
-      if (!this.configManager) {
-        console.warn('配置管理器未找到，详情卡片将使用默认配置');
-      }
+      // 初始化配置服务连接
+      await this.initConfigService();
+      
+      // 检查服务健康状态
+      await this.checkServiceHealth();
       
       // 绑定全局事件
       this.bindGlobalEvents();
@@ -41,44 +66,136 @@ export class DetailCardManager {
       // 初始化性能监控
       this.initPerformanceMonitoring();
       
+      // 启动配置自动更新
+      this.startConfigAutoUpdate();
+      
       this.isInitialized = true;
-      console.log('详情卡片管理器初始化完成');
+      console.log('详情卡片管理器初始化完成 (新架构 v2.0.0)');
+      console.log('支持的新架构特性:', this.serviceHealth.features);
+      
     } catch (error) {
       console.error('详情卡片管理器初始化失败:', error);
+      // 使用降级模式
+      await this.initFallbackMode();
       throw error;
     }
   }
 
   /**
-   * 获取有效配置 - 从配置管理器获取
+   * 初始化配置服务连接 - 新架构核心功能
    */
-  getEffectiveConfig(overrides = {}) {
-    if (this.configManager) {
-      return this.configManager.getEffectiveConfig(overrides);
+  async initConfigService() {
+    try {
+      // 连接到新的配置API服务
+      this.configManager = detailConfigAPI;
+      
+      // 获取初始配置
+      const configData = await this.configManager.getUserConfig();
+      this.updateConfigCache(configData);
+      
+      console.log('配置服务连接成功 (新架构)', {
+        version: configData.serviceInfo?.version,
+        architecture: configData.serviceInfo?.architecture,
+        supportedSites: configData.supportedSites?.length || 0
+      });
+      
+      this.performanceMetrics.configFetches++;
+      
+    } catch (error) {
+      console.warn('配置服务连接失败，使用默认配置:', error);
+      // 使用默认配置作为后备
+      this.configCache = {
+        config: await this.getDefaultConfig(),
+        metadata: {
+          architecture: 'modular_parsers',
+          version: '2.0.0',
+          isDefault: true
+        }
+      };
     }
-    
-    // 配置管理器不可用时的默认配置
-    return {
-      showScreenshots: true,
-      showDownloadLinks: true,
-      showMagnetLinks: true,
-      showActressInfo: true,
-      showExtractedTags: true,
-      showRating: true,
-      showDescription: true,
-      compactMode: false,
-      enableImagePreview: true,
-      showExtractionProgress: true,
-      enableContentFilter: false,
-      contentFilterKeywords: [],
-      ...overrides
-    };
   }
 
   /**
-   * 渲染详情卡片到指定容器
+   * 检查服务健康状态
    */
-  renderDetailCard(searchResult, detailInfo, container, options = {}) {
+  async checkServiceHealth() {
+    try {
+      const healthCheck = await this.configManager.checkServiceHealth();
+      this.serviceHealth = {
+        ...this.serviceHealth,
+        ...healthCheck,
+        lastCheck: Date.now()
+      };
+      
+      if (!healthCheck.healthy) {
+        console.warn('详情提取服务健康检查失败:', healthCheck.error);
+        this.serviceHealth.status = SERVICE_STATUS.DEGRADED;
+      }
+      
+    } catch (error) {
+      console.error('服务健康检查失败:', error);
+      this.serviceHealth.status = SERVICE_STATUS.ERROR;
+      this.serviceHealth.error = error.message;
+    }
+  }
+
+  /**
+   * 启动配置自动更新
+   */
+  startConfigAutoUpdate() {
+    // 每5分钟检查配置更新
+    setInterval(async () => {
+      try {
+        if (this.isConfigCacheExpired()) {
+          await this.refreshConfig();
+        }
+      } catch (error) {
+        console.warn('配置自动更新失败:', error);
+      }
+    }, 5 * 60 * 1000);
+  }
+
+  /**
+   * 获取有效配置 - 适配新架构动态配置
+   */
+  async getEffectiveConfig(overrides = {}) {
+    try {
+      // 检查缓存有效性
+      if (this.isConfigCacheExpired()) {
+        await this.refreshConfig();
+      }
+      
+      const baseConfig = this.configCache?.config || await this.getDefaultConfig();
+      const effectiveConfig = {
+        ...baseConfig,
+        ...overrides
+      };
+      
+      this.performanceMetrics.cacheHits++;
+      
+      // 添加新架构标识
+      effectiveConfig._architecture = 'modular_parsers';
+      effectiveConfig._version = '2.0.0';
+      effectiveConfig._configSource = this.configCache?.metadata?.isDefault ? 'default' : 'user';
+      
+      return effectiveConfig;
+      
+    } catch (error) {
+      console.error('获取配置失败，使用默认配置:', error);
+      return {
+        ...(await this.getDefaultConfig()),
+        ...overrides,
+        _architecture: 'modular_parsers',
+        _version: '2.0.0',
+        _configSource: 'fallback'
+      };
+    }
+  }
+
+  /**
+   * 渲染详情卡片到指定容器 - 适配新架构数据结构
+   */
+  async renderDetailCard(searchResult, detailInfo, container, options = {}) {
     try {
       const startTime = performance.now();
       
@@ -89,8 +206,11 @@ export class DetailCardManager {
         throw new Error('未找到指定的容器元素');
       }
 
+      // 验证新架构数据结构
+      const validatedDetailInfo = this.validateAndNormalizeDetailInfo(detailInfo);
+      
       // 使用配置感知的方法生成HTML
-      const cardHTML = this.createDetailCardHTML(searchResult, detailInfo, options);
+      const cardHTML = await this.createDetailCardHTML(searchResult, validatedDetailInfo, options);
       
       if (options.append) {
         containerElement.insertAdjacentHTML('beforeend', cardHTML);
@@ -101,19 +221,20 @@ export class DetailCardManager {
       // 保存活动卡片数据
       this.activeCards.set(searchResult.url, {
         searchResult,
-        detailInfo,
+        detailInfo: validatedDetailInfo,
         container: containerElement,
         options
       });
 
       // 绑定卡片事件
-      this.bindCardEvents(searchResult.url);
+      await this.bindCardEvents(searchResult.url);
       
-      // 记录渲染性能
+      // 记录性能和架构指标
       const renderTime = performance.now() - startTime;
       this.recordPerformanceMetric('renderTime', renderTime);
+      this.updateArchitectureMetrics(validatedDetailInfo);
 
-      console.log(`详情卡片渲染完成: ${detailInfo.title || searchResult.url} (${renderTime.toFixed(2)}ms)`);
+      console.log(`详情卡片渲染完成 (新架构): ${validatedDetailInfo.title || searchResult.url} (${renderTime.toFixed(2)}ms)`);
 
     } catch (error) {
       console.error('渲染详情卡片失败:', error);
@@ -123,22 +244,180 @@ export class DetailCardManager {
   }
 
   /**
-   * 创建详情卡片HTML
+   * 验证和标准化详情信息 - 适配新架构ParsedData格式
    */
-  createDetailCardHTML(searchResult, detailInfo, options = {}) {
+  validateAndNormalizeDetailInfo(detailInfo) {
+    if (!detailInfo) {
+      throw new Error('详情信息不能为空');
+    }
+
+    // 检查新架构数据结构版本
+    const dataStructureVersion = detailInfo.dataStructureVersion || '2.0';
+    const architecture = detailInfo.architecture || 'modular_parsers';
+    
+    console.log('验证详情信息数据结构:', {
+      version: dataStructureVersion,
+      architecture: architecture,
+      hasTitle: !!detailInfo.title,
+      hasCode: !!detailInfo.code,
+      sourceType: detailInfo.sourceType
+    });
+
+    // 标准化数据结构 - 确保向后兼容
+    const normalized = {
+      // 基础信息
+      title: detailInfo.title || '未知标题',
+      code: detailInfo.code || '',
+      sourceType: detailInfo.sourceType || 'generic',
+      
+      // URL信息 - 适配新架构字段
+      detailUrl: detailInfo.detailUrl || detailInfo.detailPageUrl || detailInfo.url,
+      searchUrl: detailInfo.searchUrl || detailInfo.originalUrl,
+      
+      // 媒体信息 - 统一字段名
+      cover: detailInfo.cover || detailInfo.coverImage || '',
+      coverImage: detailInfo.cover || detailInfo.coverImage || '', // 兼容性
+      screenshots: Array.isArray(detailInfo.screenshots) ? detailInfo.screenshots : [],
+      
+      // 演员信息 - 支持actors和actresses字段
+      actors: Array.isArray(detailInfo.actors) ? detailInfo.actors : 
+              (Array.isArray(detailInfo.actresses) ? detailInfo.actresses : []),
+      actresses: Array.isArray(detailInfo.actresses) ? detailInfo.actresses :
+                 (Array.isArray(detailInfo.actors) ? detailInfo.actors : []),
+      
+      // 基本信息
+      director: detailInfo.director || '',
+      studio: detailInfo.studio || '',
+      label: detailInfo.label || '',
+      series: detailInfo.series || '',
+      releaseDate: detailInfo.releaseDate || '',
+      duration: detailInfo.duration || '',
+      
+      // 技术信息
+      quality: detailInfo.quality || '',
+      fileSize: detailInfo.fileSize || '',
+      resolution: detailInfo.resolution || '',
+      
+      // 下载信息 - 适配新架构链接格式
+      downloadLinks: this.normalizeDownloadLinks(detailInfo.downloadLinks || detailInfo.links),
+      magnetLinks: this.normalizeMagnetLinks(detailInfo.magnetLinks || detailInfo.links),
+      links: detailInfo.links || [], // 新架构统一链接格式
+      
+      // 内容信息
+      description: detailInfo.description || '',
+      tags: this.normalizeTags(detailInfo.tags || detailInfo.genres),
+      genres: detailInfo.genres || detailInfo.tags || [],
+      rating: typeof detailInfo.rating === 'number' ? detailInfo.rating : 0,
+      
+      // 提取元数据
+      extractionStatus: detailInfo.extractionStatus || 'success',
+      extractionTime: detailInfo.extractionTime || 0,
+      extractedAt: detailInfo.extractedAt || Date.now(),
+      fromCache: detailInfo.fromCache || false,
+      retryCount: detailInfo.retryCount || 0,
+      
+      // 新架构特有字段
+      architecture: architecture,
+      dataStructureVersion: dataStructureVersion,
+      parser: detailInfo.parser || detailInfo.sourceType,
+      configApplied: detailInfo.configApplied || false,
+      
+      // 解析器信息
+      parserInfo: detailInfo.parserInfo || {},
+      parserFeatures: detailInfo.parserFeatures || [],
+      
+      // 质量指标
+      qualityScore: detailInfo.qualityScore || this.calculateQualityScore(detailInfo),
+      completeness: detailInfo.completeness || this.calculateCompleteness(detailInfo)
+    };
+
+    return normalized;
+  }
+
+  /**
+   * 标准化下载链接 - 适配新架构链接格式
+   */
+  normalizeDownloadLinks(links) {
+    if (!Array.isArray(links)) return [];
+    
+    return links
+      .filter(link => link.type === 'download' || link.type === 'http' || link.type === 'https' || !link.type)
+      .map(link => ({
+        url: link.url,
+        name: link.name || '下载链接',
+        size: link.size || '',
+        quality: link.quality || '',
+        type: link.type || 'download',
+        // 新架构字段
+        verified: link.verified || false,
+        speed: link.speed || '',
+        seeds: link.seeds || 0
+      }));
+  }
+
+  /**
+   * 标准化磁力链接
+   */
+  normalizeMagnetLinks(links) {
+    if (!Array.isArray(links)) return [];
+    
+    return links
+      .filter(link => link.type === 'magnet')
+      .map(link => ({
+        magnet: link.url,
+        url: link.url, // 兼容性
+        name: link.name || '磁力链接',
+        size: link.size || '',
+        seeders: link.seeders || link.seeds || 0,
+        leechers: link.leechers || link.peers || 0,
+        quality: link.quality || '',
+        // 新架构字段
+        hash: link.hash || '',
+        trackers: link.trackers || [],
+        verified: link.verified || false
+      }));
+  }
+
+  /**
+   * 标准化标签
+   */
+  normalizeTags(tags) {
+    if (!Array.isArray(tags)) return [];
+    
+    return tags
+      .filter(tag => tag && tag.trim())
+      .map(tag => {
+        if (typeof tag === 'string') {
+          return tag.trim();
+        } else if (tag.name) {
+          return tag.name.trim();
+        } else {
+          return String(tag).trim();
+        }
+      })
+      .filter(tag => tag.length > 0);
+  }
+
+  /**
+   * 创建详情卡片HTML - 增强新架构支持
+   */
+  async createDetailCardHTML(searchResult, detailInfo, options = {}) {
     const startTime = performance.now();
     
     try {
-      const config = this.getEffectiveConfig(options);
+      const config = await this.getEffectiveConfig(options);
       const cardId = this.generateCardId(searchResult.url);
       
-      // 内容过滤处理
+      // 新架构内容过滤
       if (config.enableContentFilter && config.contentFilterKeywords.length > 0) {
         const filtered = this.applyContentFilter(detailInfo, config.contentFilterKeywords);
         if (filtered.blocked) {
           return this.createFilteredContentHTML(cardId, filtered.reason);
         }
       }
+      
+      // 新架构服务状态指示器
+      const serviceStatusHTML = this.createServiceStatusHTML();
       
       // 基本信息部分
       const basicInfoHTML = this.createBasicInfoHTML(searchResult, detailInfo);
@@ -171,25 +450,40 @@ export class DetailCardManager {
       // 状态指示器
       const statusHTML = this.createStatusHTML(detailInfo);
       
-      // 提取质量评分
+      // 质量指示器 - 新架构增强
       const qualityHTML = this.createQualityIndicatorHTML(detailInfo);
+      
+      // 解析器信息指示器
+      const parserInfoHTML = this.createParserInfoHTML(detailInfo);
 
       // 配置相关的CSS类
       const configClasses = this.generateConfigClasses(config);
+      
+      // 新架构CSS类
+      const architectureClasses = this.generateArchitectureClasses(detailInfo);
 
       const cardHTML = `
-        <div class="detail-card ${configClasses}" 
+        <div class="detail-card ${configClasses} ${architectureClasses}" 
              data-card-id="${cardId}" 
              data-url="${escapeHtml(searchResult.url)}"
              data-extraction-status="${detailInfo.extractionStatus || 'unknown'}"
              data-source-type="${detailInfo.sourceType || 'generic'}"
-             data-config-mode="${config.compactMode ? 'compact' : 'normal'}">
+             data-config-mode="${config.compactMode ? 'compact' : 'normal'}"
+             data-architecture="${detailInfo.architecture || 'modular_parsers'}"
+             data-data-version="${detailInfo.dataStructureVersion || '2.0'}"
+             data-parser="${detailInfo.parser || 'unknown'}">
+          
+          <!-- 服务状态指示器 -->
+          ${serviceStatusHTML}
           
           <!-- 状态指示器 -->
           ${statusHTML}
           
           <!-- 质量指示器 -->
           ${qualityHTML}
+          
+          <!-- 解析器信息 -->
+          ${parserInfoHTML}
           
           <!-- 卡片头部 -->
           <div class="detail-card-header">
@@ -215,15 +509,18 @@ export class DetailCardManager {
           <!-- 详细信息 - 配置控制 -->
           ${detailsHTML}
           
-          <!-- 提取信息 -->
+          <!-- 新架构元数据 -->
           <div class="detail-card-meta">
             <small class="extraction-info">
               提取来源: ${escapeHtml(detailInfo.sourceType || 'unknown')} | 
+              解析器: ${escapeHtml(detailInfo.parser || 'generic')} |
               提取时间: ${detailInfo.extractionTime ? `${detailInfo.extractionTime}ms` : '未知'} |
               ${detailInfo.fromCache ? '来自缓存' : '实时提取'} |
               ${formatRelativeTime(detailInfo.extractedAt || Date.now())}
               ${detailInfo.retryCount > 0 ? ` | 重试次数: ${detailInfo.retryCount}` : ''}
+              ${detailInfo.qualityScore ? ` | 质量评分: ${detailInfo.qualityScore}` : ''}
             </small>
+            ${this.createArchitectureIndicatorHTML(detailInfo, config)}
             ${this.createConfigIndicatorHTML(config)}
           </div>
         </div>
@@ -243,79 +540,69 @@ export class DetailCardManager {
   }
 
   /**
-   * 生成配置相关的CSS类
+   * 创建服务状态HTML
    */
-  generateConfigClasses(config) {
-    const classes = [];
+  createServiceStatusHTML() {
+    if (this.serviceHealth.status === SERVICE_STATUS.HEALTHY) {
+      return ''; // 健康状态不显示
+    }
     
-    if (config.compactMode) classes.push('compact');
-    if (!config.showScreenshots) classes.push('no-screenshots');
-    if (!config.showDownloadLinks) classes.push('no-downloads');
-    if (!config.showMagnetLinks) classes.push('no-magnets');
-    if (!config.showActressInfo) classes.push('no-actress-info');
-    if (!config.enableImagePreview) classes.push('no-image-preview');
+    const statusClass = `service-status-${this.serviceHealth.status}`;
+    const statusIcon = this.getServiceStatusIcon(this.serviceHealth.status);
+    const statusText = this.getServiceStatusText(this.serviceHealth.status);
     
-    return classes.join(' ');
-  }
-
-  /**
-   * 创建配置指示器HTML
-   */
-  createConfigIndicatorHTML(config) {
-    if (!config.compactMode) return '';
-    
-    const indicators = [];
-    if (!config.showScreenshots) indicators.push('无截图');
-    if (!config.showDownloadLinks) indicators.push('无下载');
-    if (!config.showMagnetLinks) indicators.push('无磁力');
-    if (!config.showActressInfo) indicators.push('无演员');
-    
-    return indicators.length > 0 ? `
-      <div class="config-indicators">
-        <span class="config-indicator-label">显示设置:</span>
-        ${indicators.map(ind => `<span class="config-indicator">${ind}</span>`).join('')}
+    return `
+      <div class="detail-service-status ${statusClass}">
+        <span class="status-icon">${statusIcon}</span>
+        <span class="status-text">${statusText}</span>
+        ${this.serviceHealth.error ? `<span class="status-error" title="${escapeHtml(this.serviceHealth.error)}">!</span>` : ''}
       </div>
-    ` : '';
+    `;
   }
 
   /**
-   * 重新渲染卡片
+   * 创建解析器信息HTML
    */
-  async rerenderCard(url, cardData) {
-    const cardId = this.generateCardId(url);
-    const existingCard = document.querySelector(`[data-card-id="${cardId}"]`);
-    
-    if (!existingCard) {
-      console.warn(`未找到卡片元素: ${cardId}`);
-      return;
+  createParserInfoHTML(detailInfo) {
+    if (!detailInfo.parser || detailInfo.parser === 'generic') {
+      return '';
     }
-
-    // 使用最新配置重新生成HTML
-    const newHTML = this.createDetailCardHTML(
-      cardData.searchResult, 
-      cardData.detailInfo, 
-      cardData.options
-    );
     
-    existingCard.outerHTML = newHTML;
-    this.bindCardEvents(url);
+    const parserFeatures = Array.isArray(detailInfo.parserFeatures) ? detailInfo.parserFeatures : [];
+    const hasAdvancedFeatures = parserFeatures.length > 0;
     
-    console.log(`卡片重新渲染完成: ${cardData.detailInfo.title || url}`);
+    return `
+      <div class="detail-parser-info">
+        <div class="parser-badge">
+          <span class="parser-icon">${this.getParserIcon(detailInfo.parser)}</span>
+          <span class="parser-name">${escapeHtml(detailInfo.parser.toUpperCase())}</span>
+          ${hasAdvancedFeatures ? '<span class="parser-enhanced">✨</span>' : ''}
+        </div>
+        ${hasAdvancedFeatures ? `
+          <div class="parser-features" title="解析器特性: ${parserFeatures.join(', ')}">
+            ${parserFeatures.slice(0, 3).map(feature => `<span class="feature-badge">${escapeHtml(feature)}</span>`).join('')}
+            ${parserFeatures.length > 3 ? `<span class="feature-more">+${parserFeatures.length - 3}</span>` : ''}
+          </div>
+        ` : ''}
+      </div>
+    `;
   }
 
   /**
-   * 刷新所有活动卡片
+   * 创建架构指示器HTML
    */
-  async refreshAllCards() {
-    console.log(`刷新 ${this.activeCards.size} 个活动卡片`);
-    
-    for (const [url, cardData] of this.activeCards) {
-      try {
-        await this.rerenderCard(url, cardData);
-      } catch (error) {
-        console.error(`刷新卡片失败 [${url}]:`, error);
-      }
+  createArchitectureIndicatorHTML(detailInfo, config) {
+    if (!config.compactMode && detailInfo.architecture === 'modular_parsers') {
+      return `
+        <div class="architecture-indicators">
+          <span class="architecture-badge" title="新架构 v${detailInfo.dataStructureVersion || '2.0'}">
+            🏗️ 模块化解析器
+          </span>
+          ${detailInfo.configApplied ? '<span class="config-applied-badge" title="已应用用户配置">⚙️</span>' : ''}
+        </div>
+      `;
     }
+    return '';
   }
 
   /**
@@ -357,22 +644,22 @@ export class DetailCardManager {
    * 创建媒体信息HTML - 增强配置控制
    */
   createMediaInfoHTML(detailInfo, config) {
-    if (!detailInfo.coverImage && 
+    if (!detailInfo.cover && 
         (!config.showDescription || !detailInfo.description) && 
         !this.hasMetadata(detailInfo)) {
       return '';
     }
 
-    const coverImageHTML = detailInfo.coverImage ? `
+    const coverImageHTML = detailInfo.cover ? `
       <div class="detail-cover">
-        <img src="${escapeHtml(detailInfo.coverImage)}" 
+        <img src="${escapeHtml(detailInfo.cover)}" 
              alt="封面图片" 
              class="cover-image"
              loading="lazy"
              onerror="this.style.display='none'"
-             ${config.enableImagePreview ? `onclick="window.detailCardManager.previewImage('${escapeHtml(detailInfo.coverImage)}', '${escapeHtml(detailInfo.title || '')}')"` : ''}>
+             ${config.enableImagePreview ? `onclick="window.detailCardManager.previewImage('${escapeHtml(detailInfo.cover)}', '${escapeHtml(detailInfo.title || '')}')"` : ''}>
         <div class="cover-overlay">
-          <button class="cover-download-btn" onclick="window.detailCardManager.downloadImage('${escapeHtml(detailInfo.coverImage)}', '${escapeHtml(detailInfo.code || 'cover')}')" title="下载封面">
+          <button class="cover-download-btn" onclick="window.detailCardManager.downloadImage('${escapeHtml(detailInfo.cover)}', '${escapeHtml(detailInfo.code || 'cover')}')" title="下载封面">
             ⬇️
           </button>
         </div>
@@ -406,118 +693,25 @@ export class DetailCardManager {
   }
 
   /**
-   * 创建详细信息HTML - 增强配置控制
-   */
-  createDetailsHTML(detailInfo, config) {
-    let html = '';
-    
-    // 标签信息 - 配置控制
-    if (config.showExtractedTags && detailInfo.tags && detailInfo.tags.length > 0) {
-      html += `
-        <div class="detail-tags">
-          <h4>标签:</h4>
-          <div class="tags-list">
-            ${detailInfo.tags.map(tag => `
-              <span class="tag-item" onclick="window.detailCardManager.searchByTag('${escapeHtml(tag)}')">${escapeHtml(tag)}</span>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    }
-    
-    // 评分信息 - 配置控制
-    if (config.showRating && detailInfo.rating && detailInfo.rating > 0) {
-      const stars = this.generateStarsHTML(detailInfo.rating);
-      html += `
-        <div class="detail-rating">
-          <h4>评分:</h4>
-          <div class="rating-display">
-            ${stars}
-            <span class="rating-value">${detailInfo.rating}/10</span>
-          </div>
-        </div>
-      `;
-    }
-    
-    return html ? `<div class="detail-details">${html}</div>` : '';
-  }
-
-  /**
-   * 创建操作按钮HTML
-   */
-  createActionsHTML(searchResult, detailInfo, config) {
-    const isFavorited = favoritesManager.isFavorited(searchResult.url);
-    
-    return `
-      <div class="detail-card-actions">
-        <button class="action-btn favorite-btn ${isFavorited ? 'favorited' : ''}"
-                onclick="window.detailCardManager.toggleFavorite('${escapeHtml(searchResult.url)}')"
-                title="${isFavorited ? '取消收藏' : '添加收藏'}">
-          <span class="btn-icon">${isFavorited ? '★' : '☆'}</span>
-          <span class="btn-text">${isFavorited ? '已收藏' : '收藏'}</span>
-        </button>
-        
-        <button class="action-btn share-btn"
-                onclick="window.detailCardManager.shareDetail('${escapeHtml(searchResult.url)}')"
-                title="分享详情">
-          <span class="btn-icon">🔤</span>
-          <span class="btn-text">分享</span>
-        </button>
-        
-        <button class="action-btn refresh-btn"
-                onclick="window.detailCardManager.refreshDetail('${escapeHtml(searchResult.url)}')"
-                title="刷新详情">
-          <span class="btn-icon">🔄</span>
-          <span class="btn-text">刷新</span>
-        </button>
-        
-        <button class="action-btn original-btn"
-                onclick="window.detailCardManager.openOriginal('${escapeHtml(searchResult.url)}')"
-                title="查看原页面">
-          <span class="btn-icon">🔗</span>
-          <span class="btn-text">原页面</span>
-        </button>
-        
-        <div class="action-dropdown">
-          <button class="action-btn dropdown-toggle" onclick="this.parentElement.classList.toggle('active')" title="更多操作">
-            <span class="btn-icon">⋯</span>
-          </button>
-          <div class="dropdown-menu">
-            <button onclick="window.detailCardManager.exportDetail('${escapeHtml(searchResult.url)}')" class="dropdown-item">
-              💾 导出详情
-            </button>
-            <button onclick="window.detailCardManager.reportIssue('${escapeHtml(searchResult.url)}')" class="dropdown-item">
-              🚩 报告问题
-            </button>
-            <button onclick="window.detailCardManager.copyDetailURL('${escapeHtml(searchResult.url)}')" class="dropdown-item">
-              📋 复制链接
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  /**
    * 创建演员信息HTML
    */
   createActressInfoHTML(detailInfo) {
-    if (!detailInfo.actresses || detailInfo.actresses.length === 0) {
+    if (!detailInfo.actors || detailInfo.actors.length === 0) {
       return '';
     }
 
-    const actressesHTML = detailInfo.actresses.map(actress => {
-      const name = actress.name || actress;
-      const avatarHTML = actress.avatar ? `
-        <img src="${escapeHtml(actress.avatar)}" 
+    const actorsHTML = detailInfo.actors.map(actor => {
+      const name = actor.name || actor;
+      const avatarHTML = actor.avatar ? `
+        <img src="${escapeHtml(actor.avatar)}" 
              alt="${escapeHtml(name)}" 
              class="actress-avatar"
              loading="lazy"
              onerror="this.style.display='none'">
       ` : '';
 
-      const profileLinkHTML = actress.profileUrl ? `
-        <a href="${escapeHtml(actress.profileUrl)}" 
+      const profileLinkHTML = actor.profileUrl ? `
+        <a href="${escapeHtml(actor.profileUrl)}" 
            target="_blank" 
            rel="noopener noreferrer"
            class="actress-profile-link">查看资料</a>
@@ -538,7 +732,7 @@ export class DetailCardManager {
       <div class="detail-actresses">
         <h4>演员信息:</h4>
         <div class="actresses-list">
-          ${actressesHTML}
+          ${actorsHTML}
         </div>
       </div>
     `;
@@ -557,6 +751,7 @@ export class DetailCardManager {
       const sizeInfo = link.size ? `<span class="link-size">(${escapeHtml(link.size)})</span>` : '';
       const qualityInfo = link.quality ? `<span class="link-quality">[${escapeHtml(link.quality)}]</span>` : '';
       const typeInfo = link.type ? `<span class="link-type">${this.getDownloadTypeIcon(link.type)}</span>` : '';
+      const verifiedInfo = link.verified ? `<span class="link-verified" title="已验证">✓</span>` : '';
 
       return `
         <div class="download-link-item">
@@ -569,6 +764,7 @@ export class DetailCardManager {
             <span class="link-name">${escapeHtml(name)}</span>
             ${qualityInfo}
             ${sizeInfo}
+            ${verifiedInfo}
           </a>
         </div>
       `;
@@ -601,6 +797,7 @@ export class DetailCardManager {
         </span>
       ` : '';
       const qualityInfo = link.quality ? `<span class="magnet-quality">[${escapeHtml(link.quality)}]</span>` : '';
+      const verifiedInfo = link.verified ? `<span class="magnet-verified" title="已验证">✓</span>` : '';
 
       return `
         <div class="magnet-link-item">
@@ -609,6 +806,7 @@ export class DetailCardManager {
             <span class="magnet-name">${escapeHtml(name)}</span>
             ${qualityInfo}
             ${sizeInfo}
+            ${verifiedInfo}
           </div>
           
           ${seedInfo ? `<div class="magnet-stats">${seedInfo}</div>` : ''}
@@ -682,6 +880,104 @@ export class DetailCardManager {
   }
 
   /**
+   * 创建详细信息HTML - 增强配置控制
+   */
+  createDetailsHTML(detailInfo, config) {
+    let html = '';
+    
+    // 标签信息 - 配置控制
+    if (config.showExtractedTags && detailInfo.tags && detailInfo.tags.length > 0) {
+      html += `
+        <div class="detail-tags">
+          <h4>标签:</h4>
+          <div class="tags-list">
+            ${detailInfo.tags.map(tag => `
+              <span class="tag-item" onclick="window.detailCardManager.searchByTag('${escapeHtml(tag)}')">${escapeHtml(tag)}</span>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+    
+    // 评分信息 - 配置控制
+    if (config.showRating && detailInfo.rating && detailInfo.rating > 0) {
+      const stars = this.generateStarsHTML(detailInfo.rating);
+      html += `
+        <div class="detail-rating">
+          <h4>评分:</h4>
+          <div class="rating-display">
+            ${stars}
+            <span class="rating-value">${detailInfo.rating}/10</span>
+          </div>
+        </div>
+      `;
+    }
+    
+    return html ? `<div class="detail-details">${html}</div>` : '';
+  }
+
+  /**
+   * 创建操作按钮HTML
+   */
+  createActionsHTML(searchResult, detailInfo, config) {
+    const isFavorited = favoritesManager.isFavorited(searchResult.url);
+    
+    return `
+      <div class="detail-card-actions">
+        <button class="action-btn favorite-btn ${isFavorited ? 'favorited' : ''}"
+                onclick="window.detailCardManager.toggleFavorite('${escapeHtml(searchResult.url)}')"
+                title="${isFavorited ? '取消收藏' : '添加收藏'}">
+          <span class="btn-icon">${isFavorited ? '★' : '☆'}</span>
+          <span class="btn-text">${isFavorited ? '已收藏' : '收藏'}</span>
+        </button>
+        
+        <button class="action-btn share-btn"
+                onclick="window.detailCardManager.shareDetail('${escapeHtml(searchResult.url)}')"
+                title="分享详情">
+          <span class="btn-icon">📤</span>
+          <span class="btn-text">分享</span>
+        </button>
+        
+        <button class="action-btn refresh-btn"
+                onclick="window.detailCardManager.refreshDetail('${escapeHtml(searchResult.url)}')"
+                title="刷新详情">
+          <span class="btn-icon">🔄</span>
+          <span class="btn-text">刷新</span>
+        </button>
+        
+        <button class="action-btn original-btn"
+                onclick="window.detailCardManager.openOriginal('${escapeHtml(searchResult.url)}')"
+                title="查看原页面">
+          <span class="btn-icon">🔗</span>
+          <span class="btn-text">原页面</span>
+        </button>
+        
+        <div class="action-dropdown">
+          <button class="action-btn dropdown-toggle" onclick="this.parentElement.classList.toggle('active')" title="更多操作">
+            <span class="btn-icon">⋯</span>
+          </button>
+          <div class="dropdown-menu">
+            <button onclick="window.detailCardManager.exportDetail('${escapeHtml(searchResult.url)}')" class="dropdown-item">
+              💾 导出详情
+            </button>
+            <button onclick="window.detailCardManager.reportIssue('${escapeHtml(searchResult.url)}')" class="dropdown-item">
+              🚩 报告问题
+            </button>
+            <button onclick="window.detailCardManager.copyDetailURL('${escapeHtml(searchResult.url)}')" class="dropdown-item">
+              📋 复制链接
+            </button>
+            ${detailInfo.parser !== 'generic' ? `
+              <button onclick="window.detailCardManager.validateParser('${escapeHtml(detailInfo.parser)}')" class="dropdown-item">
+                🔧 验证解析器
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
    * 创建状态HTML
    */
   createStatusHTML(detailInfo) {
@@ -695,27 +991,6 @@ export class DetailCardManager {
         <span class="status-icon">${statusIcon}</span>
         <span class="status-text">${statusText}</span>
         ${detailInfo.extractionTime ? `<span class="status-time">${detailInfo.extractionTime}ms</span>` : ''}
-      </div>
-    `;
-  }
-
-  /**
-   * 创建质量指示器HTML
-   */
-  createQualityIndicatorHTML(detailInfo) {
-    const quality = this.calculateContentQuality(detailInfo);
-    
-    if (quality.score < 50) return '';
-    
-    const qualityClass = quality.score >= 80 ? 'excellent' : quality.score >= 60 ? 'good' : 'fair';
-    
-    return `
-      <div class="detail-quality-indicator ${qualityClass}">
-        <span class="quality-score">${quality.score}</span>
-        <span class="quality-label">质量分</span>
-        <div class="quality-details" title="${quality.details.join(', ')}">
-          ${quality.indicators.map(indicator => `<span class="quality-badge">${indicator}</span>`).join('')}
-        </div>
       </div>
     `;
   }
@@ -738,7 +1013,7 @@ export class DetailCardManager {
       metadata.push({
         label: '时长',
         value: `${detailInfo.duration}分钟`,
-        icon: 'ⱕ'
+        icon: 'ⱱ'
       });
     }
 
@@ -821,9 +1096,362 @@ export class DetailCardManager {
   }
 
   /**
+   * 创建配置指示器HTML
+   */
+  createConfigIndicatorHTML(config) {
+    if (!config.compactMode) return '';
+    
+    const indicators = [];
+    if (!config.showScreenshots) indicators.push('无截图');
+    if (!config.showDownloadLinks) indicators.push('无下载');
+    if (!config.showMagnetLinks) indicators.push('无磁力');
+    if (!config.showActressInfo) indicators.push('无演员');
+    
+    return indicators.length > 0 ? `
+      <div class="config-indicators">
+        <span class="config-indicator-label">显示设置:</span>
+        ${indicators.map(ind => `<span class="config-indicator">${ind}</span>`).join('')}
+      </div>
+    ` : '';
+  }
+
+  /**
+   * 创建错误卡片HTML
+   */
+  createErrorCardHTML(searchResult, error) {
+    const cardId = this.generateCardId(searchResult.url);
+    
+    return `
+      <div class="detail-card error-card" data-card-id="${cardId}">
+        <div class="error-content">
+          <div class="error-icon">⚠️</div>
+          <div class="error-message">
+            <h4>详情卡片生成失败</h4>
+            <p>错误信息: ${escapeHtml(error.message)}</p>
+            <button class="retry-render-btn" onclick="window.detailCardManager.retryRender('${escapeHtml(searchResult.url)}')">
+              重新生成
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * 创建被过滤内容的HTML
+   */
+  createFilteredContentHTML(cardId, reason) {
+    return `
+      <div class="detail-card filtered-content" data-card-id="${cardId}">
+        <div class="filtered-notice">
+          <div class="filter-icon">🚫</div>
+          <div class="filter-message">
+            <h4>内容已被过滤</h4>
+            <p>${escapeHtml(reason)}</p>
+            <button class="show-anyway-btn" onclick="window.detailCardManager.showFilteredContent('${cardId}')">
+              仍要显示
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * 生成配置相关的CSS类 - 增强版本
+   */
+  generateConfigClasses(config) {
+    const classes = [];
+    
+    if (config.compactMode) classes.push('compact');
+    if (!config.showScreenshots) classes.push('no-screenshots');
+    if (!config.showDownloadLinks) classes.push('no-downloads');
+    if (!config.showMagnetLinks) classes.push('no-magnets');
+    if (!config.showActressInfo) classes.push('no-actress-info');
+    if (!config.enableImagePreview) classes.push('no-image-preview');
+    
+    // 新架构配置类
+    if (config._configSource) classes.push(`config-${config._configSource}`);
+    
+    return classes.join(' ');
+  }
+
+  /**
+   * 生成架构相关的CSS类
+   */
+  generateArchitectureClasses(detailInfo) {
+    const classes = [];
+    
+    if (detailInfo.architecture) {
+      classes.push(`arch-${detailInfo.architecture.replace(/_/g, '-')}`);
+    }
+    
+    if (detailInfo.dataStructureVersion) {
+      classes.push(`data-v${detailInfo.dataStructureVersion.replace(/\./g, '-')}`);
+    }
+    
+    if (detailInfo.parser && detailInfo.parser !== 'generic') {
+      classes.push(`parser-${detailInfo.parser}`);
+    }
+    
+    if (detailInfo.qualityScore) {
+      const qualityLevel = detailInfo.qualityScore >= 80 ? 'high' : 
+                          detailInfo.qualityScore >= 60 ? 'medium' : 'low';
+      classes.push(`quality-${qualityLevel}`);
+    }
+    
+    return classes.join(' ');
+  }
+
+  /**
+   * 创建质量指示器HTML - 增强新架构支持
+   */
+  createQualityIndicatorHTML(detailInfo) {
+    const quality = this.calculateContentQuality(detailInfo);
+    
+    if (quality.score < 50) return '';
+    
+    const qualityClass = quality.score >= 80 ? 'excellent' : quality.score >= 60 ? 'good' : 'fair';
+    
+    // 新架构质量指标
+    const architectureBonus = detailInfo.architecture === 'modular_parsers' ? ' 🏗️' : '';
+    const parserQuality = detailInfo.parser && detailInfo.parser !== 'generic' ? ' ⚡' : '';
+    
+    return `
+      <div class="detail-quality-indicator ${qualityClass}">
+        <span class="quality-score">${quality.score}${architectureBonus}${parserQuality}</span>
+        <span class="quality-label">质量分</span>
+        <div class="quality-details" title="${quality.details.join(', ')}">
+          ${quality.indicators.map(indicator => `<span class="quality-badge">${indicator}</span>`).join('')}
+        </div>
+        ${detailInfo.completeness ? `<div class="completeness-bar" style="width: ${detailInfo.completeness}%" title="完整度: ${detailInfo.completeness}%"></div>` : ''}
+      </div>
+    `;
+  }
+
+  /**
+   * 计算内容质量分数 - 适配新架构
+   */
+  calculateContentQuality(detailInfo) {
+    let score = 0;
+    const details = [];
+    const indicators = [];
+    
+    // 基础信息完整性 (30分)
+    if (detailInfo.title && detailInfo.title.length > 5) {
+      score += 10;
+      details.push('标题完整');
+    }
+    if (detailInfo.code) {
+      score += 10;
+      indicators.push('📋');
+      details.push('有番号');
+    }
+    if (detailInfo.description && detailInfo.description.length > 20) {
+      score += 10;
+      details.push('有描述');
+    }
+    
+    // 媒体内容丰富度 (40分)
+    if (detailInfo.cover) {
+      score += 15;
+      indicators.push('🖼️');
+      details.push('有封面');
+    }
+    if (detailInfo.screenshots && detailInfo.screenshots.length > 0) {
+      score += 15;
+      indicators.push('📸');
+      details.push(`${detailInfo.screenshots.length}张截图`);
+    }
+    if (detailInfo.actors && detailInfo.actors.length > 0) {
+      score += 10;
+      indicators.push('👥');
+      details.push(`${detailInfo.actors.length}位演员`);
+    }
+    
+    // 下载资源可用性 (20分)
+    const downloadCount = (detailInfo.downloadLinks || []).length;
+    const magnetCount = (detailInfo.magnetLinks || []).length;
+    
+    if (downloadCount > 0) {
+      score += 10;
+      indicators.push('⬇️');
+      details.push(`${downloadCount}个下载链接`);
+    }
+    if (magnetCount > 0) {
+      score += 10;
+      indicators.push('🧲');
+      details.push(`${magnetCount}个磁力链接`);
+    }
+    
+    // 元数据完整性 (10分)
+    const metaFields = ['releaseDate', 'duration', 'studio', 'director'].filter(field => detailInfo[field]);
+    if (metaFields.length > 0) {
+      score += Math.min(metaFields.length * 2.5, 10);
+      details.push(`${metaFields.length}项元数据`);
+    }
+    
+    // 新架构奖励分 (最多10分)
+    if (detailInfo.architecture === 'modular_parsers') {
+      score += 5;
+      details.push('新架构解析');
+      indicators.push('🏗️');
+    }
+    
+    if (detailInfo.parser && detailInfo.parser !== 'generic') {
+      score += 3;
+      details.push('专用解析器');
+      indicators.push('⚡');
+    }
+    
+    if (detailInfo.configApplied) {
+      score += 2;
+      details.push('应用用户配置');
+    }
+    
+    return {
+      score: Math.min(Math.round(score), 100), // 最高100分
+      details,
+      indicators
+    };
+  }
+
+  /**
+   * 计算完整度
+   */
+  calculateCompleteness(detailInfo) {
+    const fields = [
+      'title', 'code', 'description', 'cover', 'releaseDate', 
+      'duration', 'studio', 'director', 'actors', 'screenshots',
+      'downloadLinks', 'magnetLinks', 'tags', 'quality'
+    ];
+    
+    let filledFields = 0;
+    fields.forEach(field => {
+      const value = detailInfo[field];
+      if (value) {
+        if (Array.isArray(value) && value.length > 0) {
+          filledFields++;
+        } else if (typeof value === 'string' && value.trim()) {
+          filledFields++;
+        } else if (typeof value === 'number' && value > 0) {
+          filledFields++;
+        }
+      }
+    });
+    
+    return Math.round((filledFields / fields.length) * 100);
+  }
+
+  /**
+   * 计算质量评分
+   */
+  calculateQualityScore(detailInfo) {
+    // 基于现有的 calculateContentQuality 方法
+    const quality = this.calculateContentQuality(detailInfo);
+    return quality.score;
+  }
+
+  /**
+   * 更新架构指标
+   */
+  updateArchitectureMetrics(detailInfo) {
+    const metrics = this.performanceMetrics.architectureMetrics;
+    
+    metrics.totalCards++;
+    
+    if (detailInfo.architecture === 'modular_parsers') {
+      metrics.modularParserCards++;
+    }
+    
+    if (detailInfo.dataStructureVersion === '2.0') {
+      metrics.unifiedDataCards++;
+    }
+    
+    // 记录解析器性能
+    if (detailInfo.parser && detailInfo.extractionTime) {
+      const parser = detailInfo.parser;
+      if (!this.performanceMetrics.parserPerformance.has(parser)) {
+        this.performanceMetrics.parserPerformance.set(parser, {
+          count: 0,
+          totalTime: 0,
+          averageTime: 0,
+          successCount: 0
+        });
+      }
+      
+      const parserStats = this.performanceMetrics.parserPerformance.get(parser);
+      parserStats.count++;
+      parserStats.totalTime += detailInfo.extractionTime;
+      parserStats.averageTime = parserStats.totalTime / parserStats.count;
+      
+      if (detailInfo.extractionStatus === 'success') {
+        parserStats.successCount++;
+      }
+    }
+  }
+
+  /**
+   * 重新渲染卡片 - 适配新架构
+   */
+  async rerenderCard(url, cardData) {
+    const cardId = this.generateCardId(url);
+    const existingCard = document.querySelector(`[data-card-id="${cardId}"]`);
+    
+    if (!existingCard) {
+      console.warn(`未找到卡片元素: ${cardId}`);
+      return;
+    }
+
+    try {
+      // 重新验证数据结构
+      const validatedDetailInfo = this.validateAndNormalizeDetailInfo(cardData.detailInfo);
+      
+      // 使用最新配置重新生成HTML
+      const newHTML = await this.createDetailCardHTML(
+        cardData.searchResult, 
+        validatedDetailInfo, 
+        cardData.options
+      );
+      
+      existingCard.outerHTML = newHTML;
+      await this.bindCardEvents(url);
+      
+      console.log(`卡片重新渲染完成 (新架构): ${validatedDetailInfo.title || url}`);
+      
+    } catch (error) {
+      console.error('重新渲染卡片失败:', error);
+      // 显示错误卡片
+      existingCard.outerHTML = this.createErrorCardHTML(cardData.searchResult, error);
+    }
+  }
+
+  /**
+   * 刷新所有活动卡片 - 增强新架构支持
+   */
+  async refreshAllCards() {
+    console.log(`刷新 ${this.activeCards.size} 个活动卡片 (新架构)`);
+    
+    // 先刷新配置
+    await this.refreshConfig();
+    
+    const refreshPromises = [];
+    for (const [url, cardData] of this.activeCards) {
+      refreshPromises.push(
+        this.rerenderCard(url, cardData).catch(error => {
+          console.error(`刷新卡片失败 [${url}]:`, error);
+        })
+      );
+    }
+    
+    await Promise.all(refreshPromises);
+    console.log('所有卡片刷新完成 (新架构)');
+  }
+
+  /**
    * 绑定卡片事件
    */
-  bindCardEvents(url) {
+  async bindCardEvents(url) {
     const cardId = this.generateCardId(url);
     const card = document.querySelector(`[data-card-id="${cardId}"]`);
     if (!card) return;
@@ -881,11 +1509,12 @@ export class DetailCardManager {
   }
 
   /**
-   * 绑定全局事件
+   * 绑定全局事件 - 增强新架构支持
    */
   bindGlobalEvents() {
     // 暴露全局方法
     window.detailCardManager = {
+      // 现有方法保持不变
       toggleFavorite: (url) => this.toggleFavorite(url),
       shareDetail: (url) => this.shareDetail(url),
       refreshDetail: (url) => this.refreshDetail(url),
@@ -907,7 +1536,15 @@ export class DetailCardManager {
       retryRender: (url) => this.retryRender(url),
       searchByTag: (tag) => this.searchByTag(tag),
       getPerformanceStats: () => this.getPerformanceStats(),
-      refreshAllCards: () => this.refreshAllCards()
+      refreshAllCards: () => this.refreshAllCards(),
+      
+      // 新架构方法
+      refreshConfig: () => this.refreshConfig(),
+      checkServiceHealth: () => this.checkServiceHealth(),
+      getArchitectureInfo: () => this.getArchitectureInfo(),
+      validateParser: (sourceType) => this.validateParser(sourceType),
+      getParserStats: () => this.getParserStats(),
+      exportServiceStatus: () => this.exportServiceStatus()
     };
 
     // 监听收藏变化事件
@@ -915,10 +1552,16 @@ export class DetailCardManager {
       this.updateAllFavoriteButtons();
     });
 
-    // 监听配置变更 - 从SearchConfigManager
-    document.addEventListener('searchConfigChanged', () => {
-      console.log('配置变更，刷新所有卡片');
-      this.refreshAllCards();
+    // 监听配置变更 - 新架构
+    document.addEventListener('detailConfigChanged', async (event) => {
+      console.log('详情配置变更，刷新所有卡片 (新架构)', event.detail);
+      await this.refreshAllCards();
+    });
+    
+    // 监听服务状态变更
+    document.addEventListener('detailServiceStatusChanged', (event) => {
+      this.serviceHealth = { ...this.serviceHealth, ...event.detail };
+      this.updateServiceStatusIndicators();
     });
   }
 
@@ -996,7 +1639,7 @@ export class DetailCardManager {
   }
 
   /**
-   * 刷新详情
+   * 刷新详情 - 适配新架构
    */
   async refreshDetail(url) {
     try {
@@ -1010,6 +1653,7 @@ export class DetailCardManager {
 
       showToast('正在刷新详情...', 'info');
 
+      // 使用新架构API删除缓存
       await detailAPIService.deleteCache(url);
       
       const detailInfo = await detailAPIService.extractSingleDetail(result.searchResult, {
@@ -1017,12 +1661,18 @@ export class DetailCardManager {
         useLocalCache: false
       });
 
+      // 验证新架构数据结构
+      const validatedDetailInfo = this.validateAndNormalizeDetailInfo(detailInfo);
+
       this.activeCards.set(url, {
         ...result,
-        detailInfo
+        detailInfo: validatedDetailInfo
       });
 
-      this.renderDetailCard(result.searchResult, detailInfo, result.container, result.options);
+      await this.rerenderCard(url, {
+        ...result,
+        detailInfo: validatedDetailInfo
+      });
       
       showToast('详情刷新成功', 'success');
 
@@ -1311,7 +1961,8 @@ export class DetailCardManager {
         ...result.detailInfo,
         exportTime: new Date().toISOString(),
         sourceUrl: url,
-        version: '1.0.0'
+        version: '2.0.0',
+        architecture: 'modular_parsers'
       };
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
@@ -1355,7 +2006,8 @@ export class DetailCardManager {
           sourceType: result.detailInfo.sourceType,
           extractionStatus: result.detailInfo.extractionStatus,
           reason: reason.trim(),
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          architecture: 'modular_parsers'
         });
 
         showToast('问题报告已提交，谢谢您的反馈', 'success');
@@ -1403,14 +2055,14 @@ export class DetailCardManager {
         return;
       }
 
-      const newHTML = this.createDetailCardHTML(result.searchResult, result.detailInfo, result.options);
+      const newHTML = await this.createDetailCardHTML(result.searchResult, result.detailInfo, result.options);
       
       const cardId = this.generateCardId(url);
       const existingCard = document.querySelector(`[data-card-id="${cardId}"]`);
       
       if (existingCard) {
         existingCard.outerHTML = newHTML;
-        this.bindCardEvents(url);
+        await this.bindCardEvents(url);
         showToast('卡片重新生成成功', 'success');
       }
 
@@ -1438,13 +2090,263 @@ export class DetailCardManager {
     }
   }
 
+  /**
+   * 复制到剪贴板
+   */
+  async copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        return true;
+      } catch (err) {
+        throw new Error('复制失败');
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    }
+  }
+
+  // ===================== 新架构特有方法 =====================
+
+  /**
+   * 刷新配置
+   */
+  async refreshConfig() {
+    try {
+      console.log('刷新配置 (新架构)');
+      const configData = await this.configManager.getUserConfig(false); // 强制从服务器获取
+      this.updateConfigCache(configData);
+      this.performanceMetrics.configFetches++;
+      
+      // 触发配置更新事件
+      document.dispatchEvent(new CustomEvent('detailConfigUpdated', {
+        detail: { configData, timestamp: Date.now() }
+      }));
+      
+    } catch (error) {
+      console.error('刷新配置失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 验证解析器状态
+   */
+  async validateParser(sourceType) {
+    try {
+      const validation = await this.configManager.validateParser(sourceType);
+      showToast(`解析器 ${sourceType} 验证${validation.validation.isValid ? '成功' : '失败'}`, 
+                validation.validation.isValid ? 'success' : 'error');
+      return validation;
+    } catch (error) {
+      console.error('验证解析器失败:', error);
+      showToast(`验证解析器失败: ${error.message}`, 'error');
+      throw error;
+    }
+  }
+
+  /**
+   * 获取解析器统计
+   */
+  getParserStats() {
+    const stats = {};
+    
+    for (const [parser, metrics] of this.performanceMetrics.parserPerformance) {
+      stats[parser] = {
+        ...metrics,
+        successRate: metrics.count > 0 ? (metrics.successCount / metrics.count * 100).toFixed(1) : 0
+      };
+    }
+    
+    return {
+      parsers: stats,
+      totalCards: this.performanceMetrics.architectureMetrics.totalCards,
+      modularParserCards: this.performanceMetrics.architectureMetrics.modularParserCards,
+      architecture: 'modular_parsers',
+      version: this.version
+    };
+  }
+
+  /**
+   * 获取架构信息
+   */
+  getArchitectureInfo() {
+    return {
+      version: this.version,
+      architecture: 'modular_parsers',
+      features: this.serviceHealth.features,
+      serviceStatus: this.serviceHealth.status,
+      configManager: {
+        available: !!this.configManager,
+        version: this.configManager?.version || 'unknown',
+        cacheValid: this.isConfigCacheValid()
+      },
+      performance: this.performanceMetrics.architectureMetrics,
+      lastHealthCheck: this.serviceHealth.lastCheck
+    };
+  }
+
+  /**
+   * 更新服务状态指示器
+   */
+  updateServiceStatusIndicators() {
+    const cards = document.querySelectorAll('.detail-card');
+    cards.forEach(card => {
+      const statusIndicator = card.querySelector('.detail-service-status');
+      if (statusIndicator) {
+        const newStatusHTML = this.createServiceStatusHTML();
+        if (newStatusHTML) {
+          statusIndicator.outerHTML = newStatusHTML;
+        } else {
+          statusIndicator.remove();
+        }
+      }
+    });
+  }
+
+  // ===================== 配置缓存管理 =====================
+
+  /**
+   * 检查配置缓存是否过期
+   */
+  isConfigCacheExpired() {
+    return !this.configCache || (Date.now() - this.configLastUpdate) > this.configCacheExpiration;
+  }
+
+  /**
+   * 更新配置缓存
+   */
+  updateConfigCache(configData) {
+    this.configCache = configData;
+    this.configLastUpdate = Date.now();
+  }
+
+  /**
+   * 获取默认配置
+   */
+  async getDefaultConfig() {
+    return {
+      showScreenshots: true,
+      showDownloadLinks: true,
+      showMagnetLinks: true,
+      showActressInfo: true,
+      showExtractedTags: true,
+      showRating: true,
+      showDescription: true,
+      compactMode: false,
+      enableImagePreview: true,
+      showExtractionProgress: true,
+      enableContentFilter: false,
+      contentFilterKeywords: []
+    };
+  }
+
+  /**
+   * 降级模式初始化
+   */
+  async initFallbackMode() {
+    console.warn('启动降级模式');
+    this.configCache = {
+      config: await this.getDefaultConfig(),
+      metadata: {
+        architecture: 'fallback',
+        version: '2.0.0',
+        isDefault: true,
+        fallbackMode: true
+      }
+    };
+    this.serviceHealth.status = SERVICE_STATUS.DEGRADED;
+  }
+
   // ===================== 工具方法 =====================
+
+  /**
+   * 更新收藏按钮状态
+   */
+  updateFavoriteButton(url) {
+    const cardId = this.generateCardId(url);
+    const card = document.querySelector(`[data-card-id="${cardId}"]`);
+    if (!card) return;
+
+    const favoriteBtn = card.querySelector('.favorite-btn');
+    if (!favoriteBtn) return;
+
+    const isFavorited = favoritesManager.isFavorited(url);
+    
+    favoriteBtn.classList.toggle('favorited', isFavorited);
+    favoriteBtn.title = isFavorited ? '取消收藏' : '添加收藏';
+    
+    const icon = favoriteBtn.querySelector('.btn-icon');
+    const text = favoriteBtn.querySelector('.btn-text');
+    
+    if (icon) icon.textContent = isFavorited ? '★' : '☆';
+    if (text) text.textContent = isFavorited ? '已收藏' : '收藏';
+  }
+
+  /**
+   * 更新所有收藏按钮状态
+   */
+  updateAllFavoriteButtons() {
+    for (const url of this.activeCards.keys()) {
+      this.updateFavoriteButton(url);
+    }
+  }
 
   /**
    * 生成卡片ID
    */
   generateCardId(url) {
     return 'detail_card_' + btoa(encodeURIComponent(url)).substring(0, 16);
+  }
+
+  /**
+   * 获取解析器图标
+   */
+  getParserIcon(parser) {
+    const icons = {
+      'javbus': '🎬',
+      'javdb': '📚',
+      'jable': '📺',
+      'javmost': '🎦',
+      'javgg': '⚡',
+      'sukebei': '🌙',
+      'javguru': '🎭',
+      'generic': '📄'
+    };
+    return icons[parser] || icons.generic;
+  }
+
+  /**
+   * 获取服务状态图标
+   */
+  getServiceStatusIcon(status) {
+    const icons = {
+      [SERVICE_STATUS.HEALTHY]: '✅',
+      [SERVICE_STATUS.DEGRADED]: '⚠️',
+      [SERVICE_STATUS.ERROR]: '❌',
+      [SERVICE_STATUS.MAINTENANCE]: '🔧'
+    };
+    return icons[status] || '❓';
+  }
+
+  /**
+   * 获取服务状态文本
+   */
+  getServiceStatusText(status) {
+    const texts = {
+      [SERVICE_STATUS.HEALTHY]: '服务正常',
+      [SERVICE_STATUS.DEGRADED]: '服务降级',
+      [SERVICE_STATUS.ERROR]: '服务异常',
+      [SERVICE_STATUS.MAINTENANCE]: '维护中'
+    };
+    return texts[status] || '状态未知';
   }
 
   /**
@@ -1488,7 +2390,7 @@ export class DetailCardManager {
       'cached': '💾',
       'error': '❌',
       'partial': '⚠️',
-      'timeout': 'ⱕ',
+      'timeout': 'ⱱ',
       'unknown': '❓'
     };
     return statusIcons[status] || '❓';
@@ -1537,29 +2439,6 @@ export class DetailCardManager {
   }
 
   /**
-   * 复制到剪贴板
-   */
-  async copyToClipboard(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch (error) {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        return true;
-      } catch (err) {
-        throw new Error('复制失败');
-      } finally {
-        document.body.removeChild(textArea);
-      }
-    }
-  }
-
-  /**
    * 检查是否有元数据
    */
   hasMetadata(detailInfo) {
@@ -1575,7 +2454,7 @@ export class DetailCardManager {
       detailInfo.title,
       detailInfo.description,
       ...(detailInfo.tags || []),
-      ...(detailInfo.actresses || []).map(a => a.name || a)
+      ...(detailInfo.actors || []).map(a => a.name || a)
     ].filter(Boolean);
     
     const content = checkFields.join(' ').toLowerCase();
@@ -1594,149 +2473,19 @@ export class DetailCardManager {
   }
 
   /**
-   * 创建被过滤内容的HTML
+   * 记录性能指标
    */
-  createFilteredContentHTML(cardId, reason) {
-    return `
-      <div class="detail-card filtered-content" data-card-id="${cardId}">
-        <div class="filtered-notice">
-          <div class="filter-icon">🚫</div>
-          <div class="filter-message">
-            <h4>内容已被过滤</h4>
-            <p>${escapeHtml(reason)}</p>
-            <button class="show-anyway-btn" onclick="window.detailCardManager.showFilteredContent('${cardId}')">
-              仍要显示
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  /**
-   * 计算内容质量分数
-   */
-  calculateContentQuality(detailInfo) {
-    let score = 0;
-    const details = [];
-    const indicators = [];
-    
-    // 基础信息完整性 (30分)
-    if (detailInfo.title && detailInfo.title.length > 5) {
-      score += 10;
-      details.push('标题完整');
-    }
-    if (detailInfo.code) {
-      score += 10;
-      indicators.push('📋');
-      details.push('有番号');
-    }
-    if (detailInfo.description && detailInfo.description.length > 20) {
-      score += 10;
-      details.push('有描述');
+  recordPerformanceMetric(metric, value) {
+    if (!this.performanceMetrics[metric]) {
+      this.performanceMetrics[metric] = [];
     }
     
-    // 媒体内容丰富度 (40分)
-    if (detailInfo.coverImage) {
-      score += 15;
-      indicators.push('🖼️');
-      details.push('有封面');
-    }
-    if (detailInfo.screenshots && detailInfo.screenshots.length > 0) {
-      score += 15;
-      indicators.push('📸');
-      details.push(`${detailInfo.screenshots.length}张截图`);
-    }
-    if (detailInfo.actresses && detailInfo.actresses.length > 0) {
-      score += 10;
-      indicators.push('👥');
-      details.push(`${detailInfo.actresses.length}位演员`);
-    }
+    this.performanceMetrics[metric].push(value);
     
-    // 下载资源可用性 (20分)
-    const downloadCount = (detailInfo.downloadLinks || []).length;
-    const magnetCount = (detailInfo.magnetLinks || []).length;
-    
-    if (downloadCount > 0) {
-      score += 10;
-      indicators.push('⬇️');
-      details.push(`${downloadCount}个下载链接`);
-    }
-    if (magnetCount > 0) {
-      score += 10;
-      indicators.push('🧲');
-      details.push(`${magnetCount}个磁力链接`);
-    }
-    
-    // 元数据完整性 (10分)
-    const metaFields = ['releaseDate', 'duration', 'studio', 'director'].filter(field => detailInfo[field]);
-    if (metaFields.length > 0) {
-      score += Math.min(metaFields.length * 2.5, 10);
-      details.push(`${metaFields.length}项元数据`);
-    }
-    
-    return {
-      score: Math.round(score),
-      details,
-      indicators
-    };
-  }
-
-  /**
-   * 创建错误卡片HTML
-   */
-  createErrorCardHTML(searchResult, error) {
-    const cardId = this.generateCardId(searchResult.url);
-    
-    return `
-      <div class="detail-card error-card" data-card-id="${cardId}">
-        <div class="error-content">
-          <div class="error-icon">⚠️</div>
-          <div class="error-message">
-            <h4>详情卡片生成失败</h4>
-            <p>错误信息: ${escapeHtml(error.message)}</p>
-            <button class="retry-render-btn" onclick="window.detailCardManager.retryRender('${escapeHtml(searchResult.url)}')">
-              重新生成
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  /**
-   * 更新收藏按钮状态
-   */
-  updateFavoriteButton(url) {
-    const cardId = this.generateCardId(url);
-    const card = document.querySelector(`[data-card-id="${cardId}"]`);
-    if (!card) return;
-
-    const favoriteBtn = card.querySelector('.favorite-btn');
-    if (!favoriteBtn) return;
-
-    const isFavorited = favoritesManager.isFavorited(url);
-    
-    favoriteBtn.classList.toggle('favorited', isFavorited);
-    favoriteBtn.title = isFavorited ? '取消收藏' : '添加收藏';
-    
-    const icon = favoriteBtn.querySelector('.btn-icon');
-    const text = favoriteBtn.querySelector('.btn-text');
-    
-    if (icon) icon.textContent = isFavorited ? '★' : '☆';
-    if (text) text.textContent = isFavorited ? '已收藏' : '收藏';
-  }
-
-  /**
-   * 更新所有收藏按钮状态
-   */
-  updateAllFavoriteButtons() {
-    for (const url of this.activeCards.keys()) {
-      this.updateFavoriteButton(url);
+    if (this.performanceMetrics[metric].length > 100) {
+      this.performanceMetrics[metric].shift();
     }
   }
-
-  // ===================== 性能监控方法 =====================
 
   /**
    * 初始化性能监控
@@ -1756,22 +2505,7 @@ export class DetailCardManager {
   }
 
   /**
-   * 记录性能指标
-   */
-  recordPerformanceMetric(metric, value) {
-    if (!this.performanceMetrics[metric]) {
-      this.performanceMetrics[metric] = [];
-    }
-    
-    this.performanceMetrics[metric].push(value);
-    
-    if (this.performanceMetrics[metric].length > 100) {
-      this.performanceMetrics[metric].shift();
-    }
-  }
-
-  /**
-   * 获取性能统计
+   * 获取性能统计 - 增强新架构指标
    */
   getPerformanceStats() {
     const stats = {};
@@ -1792,65 +2526,130 @@ export class DetailCardManager {
     return {
       ...stats,
       activeCardsCount: this.activeCards.size,
-      configManagerAvailable: !!this.configManager
+      configManagerAvailable: !!this.configManager,
+      serviceHealth: this.serviceHealth,
+      // 新架构性能指标
+      architectureMetrics: this.performanceMetrics.architectureMetrics,
+      parserPerformance: this.getParserStats(),
+      configCacheHitRate: this.performanceMetrics.configFetches > 0 ? 
+        (this.performanceMetrics.cacheHits / this.performanceMetrics.configFetches * 100).toFixed(1) : 0
+    };
+  }
+
+  /**
+   * 导出服务状态 - 增强新架构信息
+   */
+  exportServiceStatus() {
+    return {
+      type: 'detail-card-manager',
+      version: this.version,
+      architecture: 'modular_parsers',
+      serviceHealth: this.serviceHealth,
+      performanceMetrics: {
+        ...this.performanceMetrics,
+        parserPerformance: Object.fromEntries(this.performanceMetrics.parserPerformance)
+      },
+      configStatus: {
+        hasConfigManager: !!this.configManager,
+        cacheValid: this.isConfigCacheValid(),
+        lastUpdate: this.configLastUpdate,
+        configSource: this.configCache?.metadata?._configSource || 'unknown'
+      },
+      activeCards: this.activeCards.size,
+      timestamp: Date.now(),
+      features: {
+        modularParsers: true,
+        dynamicConfiguration: true,
+        unifiedDataStructure: true,
+        enhancedQualityIndicators: true,
+        parserValidation: true,
+        serviceHealthMonitoring: true,
+        configurationCaching: true,
+        architectureMetrics: true
+      }
     };
   }
 
   // ===================== 生命周期方法 =====================
 
   /**
-   * 清理资源
+   * 清理资源 - 增强新架构清理
    */
   cleanup() {
     this.activeCards.clear();
     this.cardInstances.clear();
     
+    // 清理新架构资源
+    this.configCache = null;
+    this.configLastUpdate = 0;
+    this.performanceMetrics.parserPerformance.clear();
+    
     this.performanceMetrics = {
       renderTime: [],
       interactionCount: 0,
-      errorCount: 0
+      errorCount: 0,
+      configFetches: 0,
+      cacheHits: 0,
+      parserPerformance: new Map(),
+      dataStructureVersion: '2.0',
+      architectureMetrics: {
+        totalCards: 0,
+        modularParserCards: 0,
+        unifiedDataCards: 0
+      }
     };
     
     if (window.detailCardManager) {
       delete window.detailCardManager;
     }
     
-    console.log('详情卡片管理器已清理');
+    console.log('详情卡片管理器已清理 (新架构 v2.0.0)');
   }
 
   /**
-   * 获取服务状态
+   * 获取服务状态 - 增强新架构信息
    */
   getServiceStatus() {
     return {
       isInitialized: this.isInitialized,
       activeCardsCount: this.activeCards.size,
       configManagerAvailable: !!this.configManager,
+      configCacheValid: this.isConfigCacheValid(),
+      serviceHealth: this.serviceHealth,
       performanceStats: this.getPerformanceStats(),
-      version: '2.0.0',
+      version: this.version,
+      architecture: 'modular_parsers',
       features: {
         configIntegration: true,
         performanceMonitoring: true,
         imagePreview: true,
         galleryMode: true,
         contentFiltering: true,
-        qualityIndicators: true
+        qualityIndicators: true,
+        // 新架构特性
+        modularParsers: true,
+        dynamicConfiguration: true,
+        unifiedDataStructure: true,
+        parserValidation: true,
+        serviceHealthMonitoring: true,
+        enhancedErrorHandling: true,
+        architectureMetrics: true
       }
     };
   }
 
   /**
-   * 重新初始化
+   * 重新初始化 - 适配新架构
    */
   async reinitialize() {
-    console.log('重新初始化详情卡片管理器...');
+    console.log('重新初始化详情卡片管理器 (新架构 v2.0.0)...');
     
     this.cleanup();
     this.isInitialized = false;
     
     await this.init();
     
-    console.log('详情卡片管理器重新初始化完成');
+    console.log('详情卡片管理器重新初始化完成 (新架构 v2.0.0)');
   }
 }
 
