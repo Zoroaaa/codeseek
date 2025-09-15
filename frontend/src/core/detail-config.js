@@ -9,7 +9,7 @@ export const DETAIL_CONFIG_ENDPOINTS = {
   APPLY_PRESET: '/api/detail/config/preset',
   VALIDATE_CONFIG: '/api/detail/config/validate', // 可选验证端点
   // 🆕 新架构端点
-  SUPPORTED_SITES: '/api/detail/supported-sites',
+  GET_SUPPORTED_SITES: '/api/detail/supported-sites',
   VALIDATE_PARSER: '/api/detail/validate-parser',
   SERVICE_STATS: '/api/detail/service-stats',
   RELOAD_PARSER: '/api/detail/reload-parser'
