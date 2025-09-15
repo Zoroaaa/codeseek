@@ -1,6 +1,19 @@
 // src/core/constants.js - 适配后端架构升级：移除详情提取硬编码配置，保持其他功能完整
 // 详情提取配置已完全迁移至 detail-config.js，由 detail-config-api.js 动态管理
 
+
+// 将 migratedConfigKeys 提取为模块级常量
+const MIGRATED_CONFIG_KEYS = [
+  'enableDetailExtraction', 
+  'autoExtractDetails', 
+  'detailExtractionTimeout',
+  'detailCacheDuration', 
+  'extractionBatchSize', 
+  'maxRetryAttempts',
+  'maxDownloadLinks', 
+  'maxMagnetLinks', 
+  'maxScreenshots'
+];
 export const APP_CONSTANTS = {
   // 应用信息 - 保持不变
   APP_NAME: '磁力快搜',
@@ -605,20 +618,7 @@ export const APP_CONSTANTS = {
     SERVICE_STATS: '/api/detail/service-stats',
     RELOAD_PARSER: '/api/detail/reload-parser'
   }
-  
-  
-// 将 migratedConfigKeys 提取为模块级常量
-const MIGRATED_CONFIG_KEYS = [
-  'enableDetailExtraction', 
-  'autoExtractDetails', 
-  'detailExtractionTimeout',
-  'detailCacheDuration', 
-  'extractionBatchSize', 
-  'maxRetryAttempts',
-  'maxDownloadLinks', 
-  'maxMagnetLinks', 
-  'maxScreenshots'
-];
+ 
 };
 
 // 导出常用常量 - 保持向后兼容
