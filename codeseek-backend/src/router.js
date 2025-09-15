@@ -1,4 +1,4 @@
-// src/router.js - 增强版本，添加验证状态检查路由
+// src/router.js - 增强版本，添加新架构API路由和验证状态检查
 import { utils } from './utils.js';
 
 // 导入所有处理器
@@ -66,18 +66,32 @@ import {
     defaultHandler
 } from './handlers/system.js';
 
+// 🆕 新架构：详情提取处理器 - 集成新旧架构
 import {
-    extractSingleDetailHandler,
-    extractBatchDetailsHandler,
+    // 核心详情提取API（已适配新架构）
+    extractSingleDetailHandler,           // 🔄 已升级：使用模块化解析器
+    extractBatchDetailsHandler,           // 🔄 已升级：使用模块化解析器
+    
+    // 🆕 新架构专用API
+    getSupportedSitesHandler,             // 🆕 获取支持的站点信息
+    validateParserHandler,                // 🆕 验证解析器状态
+    getServiceStatsHandler,               // 🆕 获取服务统计信息
+    reloadParserHandler,                  // 🆕 重新加载解析器
+    
+    // 历史记录和统计（保持兼容）
     getDetailExtractionHistoryHandler,
+    getDetailExtractionStatsHandler,
+    
+    // 缓存管理（保持兼容）
     getDetailCacheStatsHandler,
     clearDetailCacheHandler,
     deleteDetailCacheHandler,
+    
+    // 配置管理（保持兼容，集成新预设功能）
     getDetailExtractionConfigHandler,
     updateDetailExtractionConfigHandler,
     resetDetailExtractionConfigHandler,
-    applyConfigPresetHandler,
-    getDetailExtractionStatsHandler
+    applyConfigPresetHandler              // 🔄 已升级：支持预设配置
 } from './handlers/detail.js';
 
 export class Router {
@@ -280,25 +294,51 @@ export class Router {
         this.get('/api/community/search', communitySearchHandler);
 
         // ===============================================
-        // 详情提取相关API路由
+        // 🔄🆕 详情提取相关API路由 - 新架构版本
         // ===============================================
         
-        // 基础详情提取功能
-        this.post('/api/detail/extract-single', extractSingleDetailHandler);
-        this.post('/api/detail/extract-batch', extractBatchDetailsHandler);
+        // 📌 核心功能API（已升级到新架构，保持向后兼容）
+        this.post('/api/detail/extract-single', extractSingleDetailHandler);      // 🔄 已升级：使用模块化解析器
+        this.post('/api/detail/extract-batch', extractBatchDetailsHandler);       // 🔄 已升级：使用模块化解析器
+        
+        // 📌 历史记录和统计（保持兼容）
         this.get('/api/detail/history', getDetailExtractionHistoryHandler);
         this.get('/api/detail/stats', getDetailExtractionStatsHandler);
         
-        // 缓存管理
+        // 📌 缓存管理（保持兼容）
         this.get('/api/detail/cache/stats', getDetailCacheStatsHandler);
         this.delete('/api/detail/cache/clear', clearDetailCacheHandler);
         this.delete('/api/detail/cache/delete', deleteDetailCacheHandler);
         
-        // 配置管理相关API路由
+        // 📌 配置管理（已升级，新增预设功能）
         this.get('/api/detail/config', getDetailExtractionConfigHandler);
         this.put('/api/detail/config', updateDetailExtractionConfigHandler);
         this.post('/api/detail/config/reset', resetDetailExtractionConfigHandler);
-        this.post('/api/detail/config/preset', applyConfigPresetHandler);
+        this.post('/api/detail/config/preset', applyConfigPresetHandler);         // 🔄 已升级：支持预设配置
+        
+        // ===============================================
+        // 🆕 新架构专用API路由 - 模块化解析器管理
+        // ===============================================
+        
+        // 🆕 获取支持的站点信息
+        // GET /api/detail/supported-sites
+        // 返回所有支持的站点解析器信息，包括功能特性和状态
+        this.get('/api/detail/supported-sites', getSupportedSitesHandler);
+        
+        // 🆕 验证解析器状态
+        // GET /api/detail/validate-parser?sourceType=javbus
+        // 验证指定解析器的工作状态和功能完整性
+        this.get('/api/detail/validate-parser', validateParserHandler);
+        
+        // 🆕 获取服务统计信息
+        // GET /api/detail/service-stats
+        // 获取详情提取服务的运行统计和性能指标
+        this.get('/api/detail/service-stats', getServiceStatsHandler);
+        
+        // 🆕 重新加载解析器
+        // POST /api/detail/reload-parser
+        // 热重载指定的解析器，用于动态更新解析规则
+        this.post('/api/detail/reload-parser', reloadParserHandler);
 
         // ===============================================
         // 用户设置
@@ -342,3 +382,41 @@ export class Router {
         this.get('/*', defaultHandler);
     }
 }
+
+/*
+🔄 API 更新说明：
+
+📌 核心API升级（保持向后兼容）：
+   - extractSingleDetailHandler: 已升级使用模块化解析器，支持统一数据结构
+   - extractBatchDetailsHandler: 已升级使用模块化解析器，支持并发优化
+   - applyConfigPresetHandler: 新增预设配置功能
+
+🆕 新增API端点：
+   - GET /api/detail/supported-sites: 获取所有支持站点的解析器信息
+   - GET /api/detail/validate-parser: 验证指定解析器的状态和功能
+   - GET /api/detail/service-stats: 获取详情提取服务的统计信息
+   - POST /api/detail/reload-parser: 动态重载解析器（管理员功能）
+
+🏗️ 架构特性：
+   - 模块化解析器：每个站点都有独立的解析器类
+   - 统一数据结构：所有解析器返回标准化的ParsedData格式
+   - 智能缓存：改进的缓存策略和管理
+   - 配置预设：预定义的配置模板，便于快速设置
+
+🔧 技术改进：
+   - 更好的错误处理和重试机制
+   - 改进的性能监控和统计
+   - 支持动态解析器管理
+   - 增强的用户配置系统
+
+📊 监控和管理：
+   - 实时解析器状态检查
+   - 详细的性能指标收集
+   - 缓存效率分析
+   - 用户行为统计
+
+🔒 向后兼容：
+   - 所有现有API端点保持不变
+   - 客户端无需修改即可使用
+   - 渐进式升级支持
+*/

@@ -7,7 +7,7 @@
 **一个现代化的磁力搜索聚合平台**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/yourusername/magnet-search)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/yourusername/magnet-search)
 [![Cloudflare](https://img.shields.io/badge/Powered%20by-Cloudflare-orange.svg)](https://www.cloudflare.com/)
 
 </div>
@@ -30,40 +30,123 @@
 - **样式**: CSS3 + 响应式设计
 - **存储**: LocalStorage + IndexedDB
 - **部署**: Cloudflare Pages
+- **版本**: v1.4.0
 
 ### 后端技术栈
 - **运行时**: Cloudflare Workers
 - **数据库**: Cloudflare D1 (SQLite)
 - **认证**: JWT Token
 - **API**: RESTful 风格
+- **版本**: v2.1.0
 
 ### 项目结构
 ```
 磁力快搜/
 ├── 📁 codeseek-backend/         # 后端代码 (Cloudflare Workers)
+│   ├── 📁 .github/workflows/   # CI/CD工作流
+│   ├── 📁 .wrangler/           # Wrangler本地配置
 │   ├── 📁 src/                 # 源代码目录
 │   │   ├── 📁 config/          # 配置文件
-│   │   ├── 📁 constants.js     # 常量定义
+│   │   │   └── 📄 parser-rules.js   # 解析规则配置
+│   │   ├── 📄 constants.js     # 常量定义
 │   │   ├── 📁 handlers/        # API处理器
-│   │   ├── 📁 index.js         # 主入口文件
-│   │   ├── 📁 middleware.js    # 中间件
-│   │   ├── 📁 router.js        # 路由管理
+│   │   │   ├── 📄 auth.js              # 认证处理
+│   │   │   ├── 📄 favorites.js         # 收藏管理
+│   │   │   ├── 📄 search.js            # 搜索处理
+│   │   │   ├── 📄 search-history.js    # 搜索历史
+│   │   │   ├── 📄 search-sources.js    # 搜索源管理
+│   │   │   └── 📄 user.js              # 用户管理
+│   │   ├── 📄 index.js         # 主入口文件
+│   │   ├── 📄 middleware.js    # 中间件
+│   │   ├── 📄 router.js        # 路由管理
 │   │   ├── 📁 services/        # 服务层
-│   │   └── 📁 utils.js         # 工具函数
-│   ├── 📄 schema.sql           # 数据库结构
+│   │   │   ├── 📄 cache-manager.js        # 缓存管理
+│   │   │   ├── 📄 community-service.js     # 社区服务
+│   │   │   ├── 📄 db-service.js            # 数据库服务
+│   │   │   ├── 📄 email-verification.js    # 邮箱验证服务
+│   │   │   ├── 📄 search-service.js        # 搜索服务
+│   │   │   ├── 📄 source-management.js     # 源管理服务
+│   │   │   ├── 📄 statistics-service.js    # 统计服务
+│   │   │   └── 📄 user-service.js          # 用户服务
+│   │   ├── 📄 utils.js         # 工具函数
+│   │   └── 📁 utils/           # 工具目录
+│   │       └── 📄 html-parser.js   # HTML解析工具
+│   ├── 📁 sqllite d1/          # 数据库模块化结构
+│   │   ├── 📄 00_main_schema.sql           # 主数据库架构
+│   │   ├── 📄 01_user_management.sql       # 用户管理模块
+│   │   ├── 📄 02_search_engine.sql         # 搜索引擎模块
+│   │   ├── 📄 03_community.sql             # 社区功能模块
+│   │   ├── 📄 04_detail_extraction.sql     # 详情提取模块
+│   │   ├── 📄 05_email_security.sql        # 邮箱安全模块
+│   │   ├── 📄 06_system_analytics.sql      # 系统分析模块
+│   │   └── 📄 07_initialization_data.sql   # 初始数据
 │   └── 📄 wrangler.toml        # Wrangler配置文件
 ├── 📁 frontend/                # 前端代码
 │   ├── 📁 css/                 # 样式文件
 │   │   ├── 📁 components/      # 组件样式
+│   │   │   ├── 📄 detail-card.css         # 详情卡片样式
+│   │   │   ├── 📄 email-verification.css  # 邮箱验证组件样式
+│   │   │   ├── 📄 favorites.css           # 收藏样式
+│   │   │   ├── 📄 search-status.css       # 搜索状态样式
+│   │   │   └── 📄 search.css              # 搜索样式
 │   │   ├── 📁 core/            # 核心样式
+│   │   │   ├── 📄 base.css                # 基础样式
+│   │   │   └── 📄 theme.css               # 主题样式
 │   │   ├── 📁 pages/           # 页面样式
+│   │   │   ├── 📁 dashboard/              # 仪表板样式
+│   │   │   │   ├── 📄 categories-management.css  # 分类管理样式
+│   │   │   │   ├── 📄 community.css             # 社区样式
+│   │   │   │   ├── 📄 dashboard.css             # 仪表板主样式
+│   │   │   │   └── 📄 sources-management.css    # 源管理样式
+│   │   │   └── 📄 main.css                # 主页面样式
 │   │   └── 📁 utils/           # 工具样式
+│   │       ├── 📄 accessibility.css       # 无障碍样式
+│   │       ├── 📄 animations.css          # 动画效果
+│   │       ├── 📄 responsive.css          # 响应式样式
+│   │       └── 📄 variables.css           # 变量定义
 │   ├── 📁 images/              # 静态资源
 │   ├── 📁 src/                 # ES6源码目录
 │   │   ├── 📁 components/      # UI组件
+│   │   │   ├── 📄 detail-card.js          # 详情卡片组件
+│   │   │   ├── 📄 email-verification-ui.js  # 邮箱验证UI组件
+│   │   │   ├── 📄 favorites.js            # 收藏组件
+│   │   │   ├── 📄 search.js               # 搜索组件
+│   │   │   └── 📁 search/                 # 搜索相关组件
+│   │   │       ├── 📄 DetailExtractionManager.js  # 详情提取管理器
+│   │   │       ├── 📄 SearchEngineSelector.js    # 搜索引擎选择器
+│   │   │       ├── 📄 SearchFilters.js          # 搜索过滤器
+│   │   │       ├── 📄 SearchResultsManager.js   # 搜索结果管理器
+│   │   │       └── 📄 SearchStatusManager.js    # 搜索状态管理器
 │   │   ├── 📁 core/            # 核心配置
+│   │   │   ├── 📄 config.js               # 核心配置文件
+│   │   │   ├── 📄 constants.js            # 常量定义
+│   │   │   └── 📄 detail-config.js        # 详情提取配置文件
 │   │   ├── 📁 pages/           # 页面应用
+│   │   │   ├── 📁 dashboard/              # 仪表板页面
+│   │   │   │   ├── 📄 categories-manager.js       # 分类管理器
+│   │   │   │   ├── 📄 community.js                # 社区页面
+│   │   │   │   ├── 📄 dashboard.js                # 仪表板主页面
+│   │   │   │   ├── 📄 favorites-manager.js        # 收藏管理器
+│   │   │   │   ├── 📄 search-history.js           # 搜索历史
+│   │   │   │   ├── 📄 search-stats.js             # 搜索统计
+│   │   │   │   ├── 📄 settings.js                 # 设置页面
+│   │   │   │   ├── 📄 sources-manager.js          # 源管理器
+│   │   │   │   ├── 📄 system-status.js            # 系统状态
+│   │   │   │   ├── 📄 user-profile.js             # 用户资料
+│   │   │   │   └── 📄 verification.js             # 验证页面
+│   │   │   └── 📁 main/                   # 主页面
+│   │   │       └── 📄 main.js              # 主搜索页面
 │   │   ├── 📁 services/        # 服务层
+│   │   │   ├── 📄 api.js                  # API服务
+│   │   │   ├── 📄 auth.js                 # 认证服务
+│   │   │   ├── 📄 community-sources-api.js    # 社区搜索源API
+│   │   │   ├── 📄 community-tags-api.js       # 社区标签API
+│   │   │   ├── 📄 detail-api.js            # 详情API
+│   │   │   ├── 📄 detail-config-api.js     # 详情配置API
+│   │   │   ├── 📄 email-verification-service.js  # 邮箱验证服务
+│   │   │   ├── 📄 enhanced-source-checker.js    # 增强源检查器
+│   │   │   ├── 📄 search.js               # 搜索服务
+│   │   │   └── 📄 theme.js                # 主题服务
 │   │   └── 📁 utils/           # 工具函数
 │   ├── 📄 index.html           # 主搜索页面
 │   └── 📄 dashboard.html       # 用户仪表板
@@ -132,7 +215,8 @@ wrangler deploy
 在Cloudflare Workers中设置以下环境变量：
 ```
 JWT_SECRET=your-super-secret-key
-APP_VERSION=1.3.0
+APP_VERSION=2.1.0
+FRONTEND_VERSION=1.4.0
 ENABLE_ACTION_LOGGING=true
 MAX_FAVORITES_PER_USER=1000
 MAX_HISTORY_PER_USER=1000
@@ -140,8 +224,16 @@ MAX_HISTORY_PER_USER=1000
 
 #### 数据库初始化
 ```bash
-# 运行数据库迁移
-wrangler d1 execute magnet-search-db --file=./schema.sql
+# 运行数据库迁移（按顺序执行模块化SQL文件）
+cd codeseek-backend
+wrangler d1 execute magnet-search-db --file=./sqllite\ d1/00_main_schema.sql
+wrangler d1 execute magnet-search-db --file=./sqllite\ d1/01_user_management.sql
+wrangler d1 execute magnet-search-db --file=./sqllite\ d1/02_search_engine.sql
+wrangler d1 execute magnet-search-db --file=./sqllite\ d1/03_community.sql
+wrangler d1 execute magnet-search-db --file=./sqllite\ d1/04_detail_extraction.sql
+wrangler d1 execute magnet-search-db --file=./sqllite\ d1/05_email_security.sql
+wrangler d1 execute magnet-search-db --file=./sqllite\ d1/06_system_analytics.sql
+wrangler d1 execute magnet-search-db --file=./sqllite\ d1/07_initialization_data.sql
 ```
 
 ## 🎯 核心功能
@@ -152,6 +244,7 @@ wrangler d1 execute magnet-search-db --file=./schema.sql
 - **搜索建议**: 基于历史的智能提示
 - **源管理**: 可自由启用/禁用搜索源
 - **详情提取**: 自动提取磁力链接详细信息
+- **自定义搜索引擎**: 支持添加和配置自定义搜索源
 
 ### 2. 自定义搜索源
 - **源配置**: 支持添加自定义搜索站点
@@ -181,6 +274,7 @@ wrangler d1 execute magnet-search-db --file=./schema.sql
 - **标签管理**: 创建和分享搜索标签
 - **源分享**: 社区贡献和分享搜索源
 - **用户统计**: 个人使用数据统计
+- **邮箱验证**: 增强账户安全性的邮箱验证机制
 
 ## 🔧 配置说明
 
@@ -262,6 +356,8 @@ npm run test:coverage
 - `POST /api/user/search-history` - 保存搜索记录
 - `DELETE /api/user/search-history/:id` - 删除历史记录
 - `GET /api/user/search-stats` - 获取搜索统计
+- `POST /api/user/verify-email` - 发送邮箱验证邮件
+- `GET /api/user/verify-email/:token` - 验证邮箱
 
 ### 社区接口
 - `GET /api/community/tags` - 获取标签列表
@@ -293,6 +389,22 @@ npm run test:coverage
 - 单元测试覆盖率>80%
 
 ## 📋 更新日志
+
+### 前端 v1.4.0
+- ✨ 新增邮箱验证功能
+- 🚀 优化详情提取配置管理
+- 🎨 改进主题系统和UI体验
+- 🔧 重构搜索组件架构
+- 📱 增强移动端响应式设计
+- 🐛 修复已知性能和显示问题
+
+### 后端 v2.1.0
+- ✨ 新增模块化数据库结构
+- 🚀 优化搜索源管理系统
+- 🔐 增强认证和安全机制
+- 📊 完善统计分析功能
+- 🔧 重构服务层架构
+- 📧 添加邮箱验证服务
 
 ### v1.3.0 (2024-12-19)
 - ✨ 新增自定义搜索源和分类管理
