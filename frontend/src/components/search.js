@@ -8,6 +8,7 @@ import { debounce } from '../utils/helpers.js';
 import searchService from '../services/search.js';
 import authManager from '../services/auth.js';
 import apiService from '../services/api.js';
+import favoritesManager from './favorites.js';
 
 // 导入子组件 - 使用统一的SearchConfigManager
 import SearchConfigManager from './search/SearchConfigManager.js';

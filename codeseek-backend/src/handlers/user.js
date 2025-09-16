@@ -290,7 +290,7 @@ export async function userSaveSearchHistoryHandler(request, env) {
 
     try {
         const body = await request.json().catch(() => ({}));
-        const { query, timestamp, source } = body;
+        const { query, timestamp, source, resultCount } = body;
 
         if (!query || typeof query !== 'string' || query.trim().length === 0) {
             return utils.errorResponse('搜索关键词不能为空');
