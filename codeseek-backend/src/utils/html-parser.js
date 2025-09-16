@@ -151,60 +151,271 @@ class CloudflareDocument {
     }
   }
 
-  /**
-   * JavDB 容器解析 - 根据实际数据优化
-   */
-  _parseJavDBContainers(elements) {
+/**
+ * JavDB容器解析 - 根据实际数据优化版本
+ * 主要改进：
+ * 1. 精确匹配 movie-list 结构
+ * 2. 改进 item 元素提取
+ * 3. 优化链接和标题提取
+ */
+_parseJavDBContainers(elements) {
     console.log('开始解析JavDB容器链接...');
+    console.log('HTML长度:', this.html.length);
     
-    const containerPatterns = [
-      // movie-list容器
-      /<div[^>]*class="[^"]*movie-list[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
-      // grid-item容器
-      /<div[^>]*class="[^"]*grid-item[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
-      // video-node容器
-      /<div[^>]*class="[^"]*video-node[^"]*"[^>]*>([\s\S]*?)<\/div>/gi
-    ];
+    // 方法1: 精确匹配 movie-list 容器结构
+    const movieListPattern = /<div[^>]*class="[^"]*movie-list[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+    let foundMovieList = false;
+    let match;
+    
+    while ((match = movieListPattern.exec(this.html)) !== null) {
+        foundMovieList = true;
+        const movieListContent = match[1];
+        console.log('找到movie-list容器，内容长度:', movieListContent.length);
+        
+        // 在movie-list中查找item元素
+        this._extractJavDBItemsFromContainer(movieListContent, elements);
+    }
+    
+    // 方法2: 如果没找到movie-list，尝试其他容器模式
+    if (!foundMovieList) {
+        console.log('未找到movie-list，尝试其他容器模式...');
+        
+        const containerPatterns = [
+            /<div[^>]*class="[^"]*grid-item[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+            /<div[^>]*class="[^"]*video-node[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+            /<div[^>]*class="[^"]*video-item[^"]*"[^>]*>([\s\S]*?)<\/div>/gi
+        ];
 
-    for (const pattern of containerPatterns) {
-      let match;
-      while ((match = pattern.exec(this.html)) !== null) {
-        const containerContent = match[1];
-        this._extractLinksFromContainer(containerContent, elements, 'javdb');
-      }
+        for (const pattern of containerPatterns) {
+            let containerMatch;
+            while ((containerMatch = pattern.exec(this.html)) !== null) {
+                const containerContent = containerMatch[1];
+                this._extractLinksFromContainer(containerContent, elements, 'javdb');
+            }
+        }
     }
 
-    // 如果容器匹配失败，尝试直接匹配JavDB特征链接
+    // 方法3: 如果容器匹配失败，尝试直接匹配JavDB特征链接
     if (elements.length === 0) {
-      this._parseJavDBDirectLinks(elements);
+        console.log('容器匹配失败，尝试直接链接匹配...');
+        this._parseJavDBDirectLinks(elements);
     }
 
     console.log(`JavDB解析找到 ${elements.length} 个有效链接`);
-  }
+}
 
-  /**
-   * JavDB 直接链接匹配
-   */
-  _parseJavDBDirectLinks(elements) {
+/**
+ * 从movie-list容器中提取item元素
+ * @param {string} containerContent - 容器内容
+ * @param {Array} elements - 结果数组
+ */
+_extractJavDBItemsFromContainer(containerContent, elements) {
+    console.log('开始从movie-list中提取item元素...');
+    
+    // 精确匹配 .item 元素
+    const itemPattern = /<div[^>]*class="[^"]*item[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+    let itemMatch;
+    let itemCount = 0;
+    
+    while ((itemMatch = itemPattern.exec(containerContent)) !== null) {
+        itemCount++;
+        const itemContent = itemMatch[1];
+        console.log(`处理第 ${itemCount} 个item元素，内容长度:`, itemContent.length);
+        
+        // 在item中查找链接
+        this._extractJavDBLinksFromItem(itemContent, elements, itemCount);
+    }
+    
+    console.log(`总共处理了 ${itemCount} 个item元素`);
+    
+    // 如果没找到item元素，尝试直接在容器中查找链接
+    if (itemCount === 0) {
+        console.log('未找到item元素，直接在容器中查找链接...');
+        this._extractLinksFromContainer(containerContent, elements, 'javdb');
+    }
+}
+
+/**
+ * 从单个item元素中提取链接
+ * @param {string} itemContent - item内容
+ * @param {Array} elements - 结果数组
+ * @param {number} itemIndex - item索引
+ */
+_extractJavDBLinksFromItem(itemContent, elements, itemIndex) {
+    // 查找item中的a标签链接
+    const linkPatterns = [
+        // 主要模式：带class="box"的链接
+        /<a[^>]*class="[^"]*box[^"]*"[^>]*href="([^"]+)"[^>]*title="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
+        // 备用模式：任何包含href的a标签
+        /<a[^>]*href="([^"]+)"[^>]*title="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
+        // 更宽松的模式：任何a标签
+        /<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi
+    ];
+    
+    for (const pattern of linkPatterns) {
+        let linkMatch;
+        let linkCount = 0;
+        
+        while ((linkMatch = pattern.exec(itemContent)) !== null) {
+            linkCount++;
+            const href = linkMatch[1];
+            const titleAttr = linkMatch[2] || '';  // 如果有title属性
+            const linkContent = linkMatch[3] || linkMatch[2] || '';
+            
+            console.log(`Item ${itemIndex} 找到链接 ${linkCount}:`, {
+                href,
+                titleAttr,
+                contentLength: linkContent.length
+            });
+            
+            // 验证是否为有效的JavDB详情链接
+            if (this._isValidJavDBItemLink(href, titleAttr, linkContent)) {
+                const element = this._createJavDBElement(href, titleAttr, linkContent, linkMatch[0]);
+                elements.push(element);
+                console.log(`✓ 添加JavDB链接: ${href}`);
+            } else {
+                console.log(`✗ 跳过无效链接: ${href}`);
+            }
+        }
+        
+        // 如果找到链接就停止尝试其他模式
+        if (linkCount > 0) break;
+    }
+}
+
+/**
+ * 验证JavDB item链接
+ * @param {string} href - 链接地址
+ * @param {string} titleAttr - title属性
+ * @param {string} content - 链接内容
+ * @returns {boolean} 是否有效
+ */
+_isValidJavDBItemLink(href, titleAttr, content) {
+    // 1. 基本href检查
+    if (!href || typeof href !== 'string') return false;
+    
+    // 2. 必须符合JavDB详情页格式：/v/xxxxx
+    if (!/^\/v\/[a-zA-Z0-9]+$/.test(href)) {
+        console.log(`不符合JavDB格式: ${href}`);
+        return false;
+    }
+    
+    // 3. 不能是搜索相关链接
+    const searchIndicators = ['/search', '/actors', '/makers', '/publishers'];
+    if (searchIndicators.some(indicator => href.includes(indicator))) {
+        console.log(`包含搜索指示器: ${href}`);
+        return false;
+    }
+    
+    // 4. 验证内容是否合理（至少有title或content）
+    const hasValidContent = (titleAttr && titleAttr.trim()) || 
+                           (content && content.replace(/<[^>]*>/g, '').trim());
+    
+    if (!hasValidContent) {
+        console.log(`缺少有效内容: ${href}`);
+        return false;
+    }
+    
+    return true;
+}
+
+/**
+ * 创建JavDB元素对象
+ * @param {string} href - 链接地址
+ * @param {string} titleAttr - title属性
+ * @param {string} content - 链接内容
+ * @param {string} elementHtml - 原始HTML
+ * @returns {Object} 元素对象
+ */
+_createJavDBElement(href, titleAttr, content, elementHtml) {
+    const element = new CloudflareElement(href, content, this.html, elementHtml);
+    
+    // 设置title属性
+    if (titleAttr && titleAttr.trim()) {
+        element.titleAttribute = titleAttr.trim();
+        element.extractedTitle = titleAttr.trim();
+        console.log(`设置title属性: ${titleAttr.trim()}`);
+    }
+    
+    // 提取番号
+    element.extractedCode = this._extractCodeFromJavDBContent(titleAttr, content, href);
+    
+    // 提取其他信息
+    element.extractedDate = this._extractDateFromContent(content);
+    
+    return element;
+}
+
+/**
+ * 从JavDB内容中提取番号
+ * @param {string} titleAttr - title属性
+ * @param {string} content - 内容
+ * @param {string} href - href地址
+ * @returns {string} 番号
+ */
+_extractCodeFromJavDBContent(titleAttr, content, href) {
+    const sources = [titleAttr, content, href];
+    const codePattern = /([A-Z]{2,6}-?\d{3,6})/i;
+    
+    for (const source of sources) {
+        if (source) {
+            const match = source.match(codePattern);
+            if (match) {
+                const code = match[1].toUpperCase();
+                console.log(`从 ${source.substring(0, 50)}... 提取番号: ${code}`);
+                return code;
+            }
+        }
+    }
+    
+    return '';
+}
+
+/**
+ * JavDB直接链接匹配（备用方案）
+ */
+_parseJavDBDirectLinks(elements) {
+    console.log('开始JavDB直接链接匹配...');
+    
     const directPatterns = [
-      // /v/ 格式的链接 - JavDB的实际格式
-      /<a[^>]*href="([^"]*\/v\/[a-zA-Z0-9]+[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi
+        // 最精确的模式：完整的a标签结构
+        /<a[^>]*href="(\/v\/[a-zA-Z0-9]+)"[^>]*title="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
+        // 宽松的模式：任何/v/格式的链接
+        /<a[^>]*href="(\/v\/[a-zA-Z0-9]+)"[^>]*>([\s\S]*?)<\/a>/gi
     ];
 
     for (const pattern of directPatterns) {
-      let match;
-      while ((match = pattern.exec(this.html)) !== null) {
-        const href = match[1];
-        const content = match[2];
+        let match;
+        let matchCount = 0;
         
-        if (this._isValidJavDBLink(href, content)) {
-          const element = this._createMovieElement(href, content, match[0]);
-          elements.push(element);
-          console.log(`✓ JavDB直接匹配: ${href}`);
+        while ((match = pattern.exec(this.html)) !== null && matchCount < 50) { // 限制数量防止过度处理
+            matchCount++;
+            const href = match[1];
+            const titleAttr = match[2] || '';
+            const content = match[3] || match[2] || '';
+            
+            console.log(`直接匹配 ${matchCount}: ${href}`);
+            
+            if (this._isValidJavDBItemLink(href, titleAttr, content)) {
+                const element = this._createJavDBElement(href, titleAttr, content, match[0]);
+                elements.push(element);
+                console.log(`✓ JavDB直接匹配: ${href}`);
+            }
         }
-      }
+        
+        if (matchCount > 0) {
+            console.log(`直接匹配模式找到 ${matchCount} 个链接`);
+            break;
+        }
     }
-  }
+}
+
+/**
+ * 验证JavDB链接 - 更新版本
+ */
+_isValidJavDBLink(href, content) {
+    return this._isValidJavDBItemLink(href, '', content);
+}
 
   /**
    * Jable 容器解析 - 根据实际数据优化

@@ -122,109 +122,258 @@ export class ParserRulesConfig {
       },
 
       // JavDB 解析规则 - 实际验证版本
-      javdb: {
-        searchPage: {
-          detailLinkSelectors: [
+javdb: {
+    searchPage: {
+        detailLinkSelectors: [
             {
-              // JavDB详情页格式: /v/KkZ97
-              selector: 'a[href*="/v/"]:not([href*="/search"])',
-              titleSelector: '.video-title, .title, h4',
-              mustContainCode: false,
-              strictDomainCheck: false,
-              excludeHrefs: ['/search/', '/actors/', '/makers/', '/publishers/'],
-              requirePattern: /\/v\/[a-zA-Z0-9]+/,
-              allowedDomainPatterns: [/^.*\.javdb\.com$/, /^javdb\.com$/]
+                // 主要选择器：精确匹配 .movie-list .item a 结构
+                selector: '.movie-list .item a',
+                titleAttribute: 'title',  // 优先使用title属性
+                titleSelector: '.video-title, strong',  // 备用标题选择器
+                codeSelector: 'strong, .video-number',  // 番号选择器
+                mustContainCode: false,  // 不强制要求包含番号（因为有些可能在title属性中）
+                strictDomainCheck: true,  // 严格域名检查
+                excludeHrefs: [
+                    '/search/', '/actors/', '/makers/', '/publishers/', 
+                    '/categories/', '/tags/', '?page=', '&page=',
+                    '?q=', '&q=', '/ja', '/en', '/ko'
+                ],
+                requirePattern: /^\/v\/[a-zA-Z0-9]+$/,  // 严格的JavDB详情页格式
+                allowedDomainPatterns: [
+                    /^.*\.javdb\.com$/,
+                    /^javdb\.com$/
+                ],
+                // 新增：特定的验证规则
+                customValidation: {
+                    // 必须是/v/开头的相对URL
+                    hrefPattern: /^\/v\/[a-zA-Z0-9]+$/,
+                    // title属性必须存在且不为空（优先级验证）
+                    preferTitleAttribute: true,
+                    // 允许的class属性值
+                    allowedClasses: ['box'],
+                    // 最小标题长度
+                    minTitleLength: 5
+                }
             },
             {
-              // 备用：grid-item或movie-list中的链接
-              selector: '.movie-list .item a, .grid-item a, .video-node a',
-              titleSelector: '.video-title, .title, h4',
-              codeSelector: '.video-number, .uid, .meta strong',
-              mustContainCode: false,
-              strictDomainCheck: false,
-              excludeHrefs: ['/search/', '/actors/', '/makers/', '/publishers/'],
-              allowedDomainPatterns: [/^.*\.javdb\.com$/, /^javdb\.com$/]
+                // 备用选择器1：带class="box"的链接
+                selector: '.movie-list a.box',
+                titleAttribute: 'title',
+                mustContainCode: false,
+                strictDomainCheck: true,
+                excludeHrefs: ['/search/', '/actors/', '/makers/', '/publishers/'],
+                requirePattern: /^\/v\/[a-zA-Z0-9]+$/,
+                allowedDomainPatterns: [/^.*\.javdb\.com$/, /^javdb\.com$/]
+            },
+            {
+                // 备用选择器2：任何/v/格式的链接
+                selector: 'a[href^="/v/"]',
+                titleAttribute: 'title',
+                titleSelector: '.video-title, .title, h4, strong',
+                mustContainCode: false,
+                strictDomainCheck: true,
+                excludeHrefs: ['/search/', '/actors/', '/makers/', '/publishers/'],
+                requirePattern: /^\/v\/[a-zA-Z0-9]+$/,
+                allowedDomainPatterns: [/^.*\.javdb\.com$/, /^javdb\.com$/]
+            },
+            {
+                // 备用选择器3：容器内的链接
+                selector: '.grid-item a, .video-node a, .video-item a',
+                titleSelector: '.video-title, .title, h4',
+                codeSelector: '.video-number, .uid, .meta strong',
+                mustContainCode: false,
+                strictDomainCheck: true,
+                excludeHrefs: ['/search/', '/actors/', '/makers/', '/publishers/'],
+                allowedDomainPatterns: [/^.*\.javdb\.com$/, /^javdb\.com$/]
             }
-          ]
+        ],
+        // 新增：页面级别的配置
+        pageConfig: {
+            // 容器选择器优先级
+            containerSelectors: [
+                '.movie-list',
+                '.grid-container', 
+                '.video-list',
+                '.search-results'
+            ],
+            // item选择器优先级
+            itemSelectors: [
+                '.item',
+                '.grid-item',
+                '.video-item',
+                '.movie-item'
+            ],
+            // 最大链接处理数量
+            maxLinksPerPage: 100,
+            // 调试模式
+            debugMode: false
+        }
+    },
+    detailPage: {
+        title: {
+            selector: 'h2.title, .video-title, .page-title, title',
+            transform: [
+                { type: 'replace', pattern: '\\s+', replacement: ' ' },
+                { type: 'trim' },
+                { type: 'replace', pattern: '^JavDB\\s*-\\s*', replacement: '' } // 移除JavDB前缀
+            ]
         },
-        detailPage: {
-          title: {
-            selector: 'h2.title, .video-title, title',
+        code: {
+            selector: '.first-block .value, .video-meta strong, .panel-block strong, [data-clipboard-text]',
             transform: [
-              { type: 'replace', pattern: '\\s+', replacement: ' ' },
-              { type: 'trim' }
+                { type: 'extract', pattern: '([A-Z]{2,6}-?\\d{3,6})', group: 1 },
+                { type: 'uppercase' }
+            ],
+            // 备用提取方法
+            fallbackSelectors: [
+                '.title', '.video-title', 'h1', 'h2'
             ]
-          },
-          code: {
-            selector: '.first-block .value, .video-meta strong',
+        },
+        coverImage: {
+            selector: '.video-cover img, .cover img, .poster img, .movie-poster img',
+            attribute: 'src',
+            fallback: 'data-src',
+            // 图片URL处理
             transform: [
-              { type: 'extract', pattern: '([A-Z]{2,6}-?\\d{3,6})', group: 1 },
-              { type: 'uppercase' }
+                { type: 'resolve_url' }, // 解析相对URL
+                { type: 'remove_query' }  // 移除查询参数
             ]
-          },
-          coverImage: {
-            selector: '.video-cover img, .cover img',
+        },
+        screenshots: {
+            selector: '.tile-images img, .preview-images img, .gallery img, .screenshots img',
             attribute: 'src',
-            fallback: 'data-src'
-          },
-          screenshots: {
-            selector: '.tile-images img, .preview-images img',
-            attribute: 'src',
-            fallback: 'data-src'
-          },
-          actresses: {
-            selector: '.panel-block:contains("演员") .value a, .actress-tag a',
-            extractProfile: true
-          },
-          director: {
-            selector: '.panel-block:contains("導演") .value, .director',
+            fallback: 'data-src',
+            maxCount: 20  // 限制截图数量
+        },
+        actresses: {
+            selector: '.panel-block:contains("演员") .value a, .actress-tag a, .performers a',
+            extractProfile: true,
+            // 演员信息提取配置
+            profileConfig: {
+                nameSelector: null, // 使用链接文本作为姓名
+                linkAttribute: 'href',
+                imageSelector: 'img',
+                imageAttribute: 'src'
+            }
+        },
+        director: {
+            selector: '.panel-block:contains("導演") .value, .director, .panel-block:contains("导演") .value',
             transform: [{ type: 'trim' }]
-          },
-          studio: {
-            selector: '.panel-block:contains("片商") .value, .studio',
+        },
+        studio: {
+            selector: '.panel-block:contains("片商") .value, .studio, .panel-block:contains("制作商") .value',
             transform: [{ type: 'trim' }]
-          },
-          label: {
-            selector: '.panel-block:contains("廠牌") .value, .label',
+        },
+        label: {
+            selector: '.panel-block:contains("廠牌") .value, .label, .panel-block:contains("发行商") .value',
             transform: [{ type: 'trim' }]
-          },
-          series: {
+        },
+        series: {
             selector: '.panel-block:contains("系列") .value, .series',
             transform: [{ type: 'trim' }]
-          },
-          releaseDate: {
-            selector: '.panel-block:contains("時間") .value, .release-date',
+        },
+        releaseDate: {
+            selector: '.panel-block:contains("時間") .value, .release-date, .panel-block:contains("发布日期") .value',
             transform: [
-              { type: 'extract', pattern: '(\\d{4}-\\d{2}-\\d{2})', group: 1 }
+                { type: 'extract', pattern: '(\\d{4}-\\d{2}-\\d{2})', group: 1 },
+                { type: 'extract', pattern: '(\\d{4}\\/\\d{2}\\/\\d{2})', group: 1, replacement: '$1' },
+                { type: 'replace', pattern: '\\/', replacement: '-' }
             ]
-          },
-          duration: {
-            selector: '.panel-block:contains("時長") .value, .duration',
+        },
+        duration: {
+            selector: '.panel-block:contains("時長") .value, .duration, .panel-block:contains("时长") .value',
             transform: [
-              { type: 'extract', pattern: '(\\d+)', group: 1 }
+                { type: 'extract', pattern: '(\\d+)', group: 1 }
             ]
-          },
-          description: {
-            selector: '.description, .content',
-            transform: [{ type: 'trim' }]
-          },
-          tags: {
-            selector: '.panel-block:contains("類別") .tag a, .genre-tag a',
-            excludeTexts: ['演员', '導演', '片商', '廠牌', '系列', '時間', '時長']
-          },
-          magnetLinks: {
-            selector: 'a[href^="magnet:"], .magnet-link',
+        },
+        description: {
+            selector: '.description, .content, .summary, .intro',
+            transform: [
+                { type: 'trim' },
+                { type: 'replace', pattern: '\\s+', replacement: ' ' }
+            ]
+        },
+        tags: {
+            selector: '.panel-block:contains("類別") .tag a, .genre-tag a, .category-tag a, .tags a',
+            excludeTexts: ['演員', '導演', '片商', '廠牌', '系列', '時間', '時長'],
+            // 标签处理配置
+            tagConfig: {
+                maxCount: 50,
+                minLength: 2,
+                excludePatterns: [/^\d+$/, /^[a-zA-Z]$/] // 排除纯数字和单字母
+            }
+        },
+        magnetLinks: {
+            selector: 'a[href^="magnet:"], .magnet-link, [data-clipboard-text^="magnet:"]',
+            extractSize: '.size, .file-size',
+            extractSeeders: '.seeds, .seeders',
+            extractLeechers: '.leechers, .peers',
+            // 磁力链接验证
+            validation: {
+                minHashLength: 40,
+                requireTrackers: false
+            }
+        },
+        downloadLinks: {
+            selector: 'a[href*="download"], .download-link, .download-btn',
             extractSize: '.size',
-            extractSeeders: '.seeds'
-          },
-          rating: {
-            selector: '.score, .rating',
+            extractQuality: '.quality, .resolution',
+            strictValidation: true,
+            allowedDomainPatterns: [/^.*\.javdb\.com$/, /^javdb\.com$/],
+            // 下载链接配置
+            downloadConfig: {
+                allowedExtensions: ['.torrent', '.zip', '.rar'],
+                maxFileSize: '10GB',
+                requireAuth: false
+            }
+        },
+        rating: {
+            selector: '.score, .rating, .rate, .vote-average',
             transform: [
-              { type: 'extract', pattern: '(\\d+(?:\\.\\d+)?)', group: 1 }
+                { type: 'extract', pattern: '(\\d+(?:\\.\\d+)?)', group: 1 },
+                { type: 'normalize', min: 0, max: 10 } // 标准化评分到0-10范围
             ]
-          }
+        },
+        // 新增：页面特定配置
+        pageValidation: {
+            // 页面必须包含的元素（验证是否为详情页）
+            requiredElements: [
+                '.video-cover, .cover, .poster',
+                '.panel-block, .video-meta, .movie-info'
+            ],
+            // 页面不应包含的元素（验证不是其他类型页面）
+            excludedElements: [
+                '.search-form',
+                '.pagination',
+                '.actor-grid'
+            ]
         }
-      },
+    },
+    // 新增：URL处理配置
+    urlConfig: {
+        baseUrl: 'https://javdb.com',
+        searchPath: '/search',
+        detailPathPattern: /^\/v\/[a-zA-Z0-9]+$/,
+        // URL标准化规则
+        normalization: {
+            removeTrailingSlash: true,
+            lowercaseHost: true,
+            removeDefaultPort: true
+        },
+        // 重定向处理
+        redirectHandling: {
+            maxRedirects: 3,
+            allowedRedirectDomains: ['javdb.com', '*.javdb.com']
+        }
+    },
+    // 新增：错误处理配置
+    errorHandling: {
+        retryAttempts: 3,
+        retryDelay: 1000, // 毫秒
+        fallbackSelectors: true,
+        logLevel: 'info' // 'debug', 'info', 'warn', 'error'
+    }
+},
 
       // Jable 解析规则 - 实际验证版本
       jable: {

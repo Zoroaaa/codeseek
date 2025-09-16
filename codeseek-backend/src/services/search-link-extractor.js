@@ -158,79 +158,312 @@ export class SearchLinkExtractorService {
     return uniqueLinks;
   }
 
-  /**
-   * JavDB专用详情链接提取 - 根据实际数据 /v/KkZ97
-   */
-  extractJavDBDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
+/**
+ * JavDB专用详情链接提取 - 根据实际数据优化版本
+ * 主要改进：
+ * 1. 精确匹配 .movie-list .item a 结构
+ * 2. 优化title属性提取
+ * 3. 改进URL拼接逻辑
+ * 4. 增强番号提取
+ */
+extractJavDBDetailLinks(doc, baseUrl, searchKeyword, baseDomain) {
     const detailLinks = [];
     
     try {
-      // JavDB的视频项目选择器
-      const videoSelectors = [
-        '.movie-list .item a',
-        '.grid-item a',
-        '.video-node a',
-        'a[href*="/v/"]'
-      ];
-      
-      for (const selector of videoSelectors) {
-        const links = doc.querySelectorAll(selector);
-        console.log(`选择器 ${selector} 找到 ${links.length} 个链接`);
+        console.log('=== JavDB链接提取开始 ===');
+        console.log(`基础URL: ${baseUrl}`);
+        console.log(`搜索关键词: ${searchKeyword}`);
         
-        links.forEach(link => {
-          const href = link.getAttribute('href');
-          if (!href) return;
-          
-          const fullUrl = extractionValidator.resolveRelativeUrl(href, baseUrl);
-          
-          // 验证域名一致性 - 支持子域名
-          if (!extractionValidator.isDomainOrSubdomainMatch(extractionValidator.extractDomain(fullUrl), baseDomain)) {
-            return;
-          }
-          
-          // 确保不是搜索URL本身
-          if (extractionValidator.normalizeUrl(fullUrl) === extractionValidator.normalizeUrl(baseUrl)) {
-            return;
-          }
-          
-          // JavDB详情页格式验证：/v/xxxx
-          if (!/\/v\/[a-zA-Z0-9]+/.test(href)) {
-            return;
-          }
-          
-          // 避免搜索页面
-          if (extractionValidator.containsSearchIndicators(fullUrl)) {
-            return;
-          }
-          
-          // 提取标题信息
-          const titleElement = link.querySelector('.video-title, .title, h4') || link;
-          const title = titleElement.textContent?.trim() || link.getAttribute('title') || '';
-          const code = extractionValidator.extractCodeFromText(title) || extractionValidator.extractCodeFromText(fullUrl);
-          const score = this.calculateMatchScore(title, code, searchKeyword);
-          
-          detailLinks.push({
-            url: fullUrl,
-            title: title || '未知标题',
-            code: code || '',
-            score,
-            extractedFrom: 'javdb_video'
-          });
-        });
+        // 优化的选择器，精确匹配HTML结构
+        const videoSelectors = [
+            // 主要选择器：.movie-list .item a 结构
+            '.movie-list .item a',
+            '.movie-list .item a.box',
+            // 备用选择器：其他可能的结构
+            '.grid-item a',
+            '.video-node a',
+            // 通用JavDB链接选择器
+            'a[href*="/v/"]'
+        ];
         
-        if (detailLinks.length > 0) break;
-      }
-      
+        for (const selector of videoSelectors) {
+            const links = doc.querySelectorAll(selector);
+            console.log(`选择器 ${selector} 找到 ${links.length} 个链接`);
+            
+            links.forEach((link, index) => {
+                const href = link.getAttribute('href');
+                if (!href) {
+                    console.log(`链接 ${index} 没有href属性`);
+                    return;
+                }
+                
+                // 构建完整URL - 确保正确拼接相对URL
+                const fullUrl = this.buildJavDBUrl(href, baseUrl);
+                console.log(`原始href: ${href} -> 完整URL: ${fullUrl}`);
+                
+                // 验证域名一致性
+                if (!this.isValidJavDBDomain(fullUrl, baseDomain)) {
+                    console.log(`域名不匹配，跳过: ${fullUrl}`);
+                    return;
+                }
+                
+                // 确保不是搜索URL本身
+                if (this.normalizeUrl(fullUrl) === this.normalizeUrl(baseUrl)) {
+                    console.log(`跳过搜索URL本身: ${fullUrl}`);
+                    return;
+                }
+                
+                // JavDB详情页格式验证：/v/xxxxx
+                if (!this.isValidJavDBDetailFormat(href)) {
+                    console.log(`URL格式不符合JavDB详情页格式: ${href}`);
+                    return;
+                }
+                
+                // 避免搜索页面
+                if (this.containsSearchIndicators(fullUrl)) {
+                    console.log(`包含搜索指示器，跳过: ${fullUrl}`);
+                    return;
+                }
+                
+                // 提取标题信息 - 优化版本
+                const titleInfo = this.extractJavDBTitleInfo(link);
+                const code = this.extractCodeFromJavDBLink(titleInfo.title, fullUrl);
+                const score = this.calculateMatchScore(titleInfo.title, code, searchKeyword);
+                
+                console.log(`提取到链接信息:`, {
+                    url: fullUrl,
+                    title: titleInfo.title,
+                    code: code,
+                    score: score
+                });
+                
+                detailLinks.push({
+                    url: fullUrl,
+                    title: titleInfo.title || '未知标题',
+                    code: code || '',
+                    score,
+                    extractedFrom: 'javdb_movie_list',
+                    rawHref: href,
+                    titleSource: titleInfo.source
+                });
+            });
+            
+            // 如果找到链接就停止，避免重复
+            if (detailLinks.length > 0) {
+                console.log(`使用选择器 ${selector} 找到 ${detailLinks.length} 个有效链接`);
+                break;
+            }
+        }
+        
     } catch (error) {
-      console.error('JavDB专用提取失败:', error);
+        console.error('JavDB专用提取失败:', error);
     }
     
+    // 去重和排序
     const uniqueLinks = this.removeDuplicateLinks(detailLinks);
     uniqueLinks.sort((a, b) => (b.score || 0) - (a.score || 0));
     
-    console.log(`JavDB提取完成，找到 ${uniqueLinks.length} 个有效链接`);
+    console.log(`=== JavDB提取完成，找到 ${uniqueLinks.length} 个有效链接 ===`);
     return uniqueLinks;
-  }
+}
+
+/**
+ * 构建JavDB完整URL
+ * @param {string} href - 原始href属性（可能是相对URL）
+ * @param {string} baseUrl - 基础URL
+ * @returns {string} 完整的URL
+ */
+buildJavDBUrl(href, baseUrl) {
+    if (!href) return '';
+    
+    // 如果已经是完整URL，直接返回
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+        return href;
+    }
+    
+    // 如果是相对URL，拼接基础域名
+    if (href.startsWith('/')) {
+        try {
+            const baseUrlObj = new URL(baseUrl);
+            return `${baseUrlObj.protocol}//${baseUrlObj.host}${href}`;
+        } catch (error) {
+            console.error('URL拼接失败:', error);
+            // 备用方案：直接拼接
+            const baseDomain = baseUrl.match(/https?:\/\/[^\/]+/)?.[0] || 'https://javdb.com';
+            return `${baseDomain}${href}`;
+        }
+    }
+    
+    // 其他情况，当作相对路径处理
+    try {
+        return new URL(href, baseUrl).toString();
+    } catch (error) {
+        console.error('相对URL处理失败:', error);
+        return href;
+    }
+}
+
+/**
+ * 验证JavDB域名
+ * @param {string} url - URL
+ * @param {string} baseDomain - 基础域名
+ * @returns {boolean} 是否为有效的JavDB域名
+ */
+isValidJavDBDomain(url, baseDomain) {
+    try {
+        const urlObj = new URL(url);
+        const linkDomain = urlObj.hostname.toLowerCase();
+        
+        // 支持JavDB的主域名和子域名
+        return linkDomain === 'javdb.com' || 
+               linkDomain.endsWith('.javdb.com') ||
+               linkDomain === baseDomain ||
+               linkDomain.endsWith(`.${baseDomain}`);
+    } catch (error) {
+        console.error('域名验证失败:', error);
+        return false;
+    }
+}
+
+/**
+ * 验证JavDB详情页格式
+ * @param {string} href - href属性
+ * @returns {boolean} 是否符合JavDB详情页格式
+ */
+isValidJavDBDetailFormat(href) {
+    // JavDB详情页格式：/v/xxxxx （字母数字组合）
+    return /^\/v\/[a-zA-Z0-9]+$/.test(href);
+}
+
+/**
+ * 从JavDB链接提取标题信息 - 优化版本
+ * @param {Element} linkElement - 链接元素
+ * @returns {Object} 标题信息对象
+ */
+extractJavDBTitleInfo(linkElement) {
+    let title = '';
+    let source = 'unknown';
+    
+    try {
+        // 方法1: 从title属性获取（优先级最高）
+        const titleAttr = linkElement.getAttribute('title');
+        if (titleAttr && titleAttr.trim()) {
+            title = titleAttr.trim();
+            source = 'title_attribute';
+            console.log(`从title属性提取: ${title}`);
+            return { title, source };
+        }
+        
+        // 方法2: 从子元素的.video-title类获取
+        const videoTitleElement = linkElement.querySelector('.video-title');
+        if (videoTitleElement && videoTitleElement.textContent?.trim()) {
+            title = videoTitleElement.textContent.trim();
+            source = 'video_title_class';
+            console.log(`从.video-title类提取: ${title}`);
+            return { title, source };
+        }
+        
+        // 方法3: 从strong标签获取番号
+        const strongElement = linkElement.querySelector('strong');
+        if (strongElement && strongElement.textContent?.trim()) {
+            const strongText = strongElement.textContent.trim();
+            // 检查是否包含番号格式
+            if (/[A-Z]{2,6}-?\d{3,6}/i.test(strongText)) {
+                title = strongText;
+                source = 'strong_element';
+                console.log(`从strong标签提取: ${title}`);
+                return { title, source };
+            }
+        }
+        
+        // 方法4: 从.title类获取
+        const titleElement = linkElement.querySelector('.title, h4');
+        if (titleElement && titleElement.textContent?.trim()) {
+            title = titleElement.textContent.trim();
+            source = 'title_class';
+            console.log(`从.title类提取: ${title}`);
+            return { title, source };
+        }
+        
+        // 方法5: 从img的alt属性获取
+        const imgElement = linkElement.querySelector('img');
+        if (imgElement) {
+            const altText = imgElement.getAttribute('alt');
+            if (altText && altText.trim()) {
+                title = altText.trim();
+                source = 'img_alt';
+                console.log(`从img alt属性提取: ${title}`);
+                return { title, source };
+            }
+        }
+        
+        // 方法6: 从链接的文本内容获取（清理HTML）
+        const textContent = linkElement.textContent;
+        if (textContent && textContent.trim()) {
+            title = textContent.trim().replace(/\s+/g, ' ');
+            source = 'text_content';
+            console.log(`从文本内容提取: ${title}`);
+            return { title, source };
+        }
+        
+    } catch (error) {
+        console.error('标题提取过程中出错:', error);
+    }
+    
+    return { title: title || '未知标题', source };
+}
+
+/**
+ * 从JavDB链接中提取番号
+ * @param {string} title - 标题
+ * @param {string} url - URL
+ * @returns {string} 番号
+ */
+extractCodeFromJavDBLink(title, url) {
+    const sources = [title, url];
+    const codePattern = /([A-Z]{2,6}-?\d{3,6})/i;
+    
+    for (const source of sources) {
+        if (source) {
+            const match = source.match(codePattern);
+            if (match) {
+                return match[1].toUpperCase();
+            }
+        }
+    }
+    
+    return '';
+}
+
+/**
+ * 检查是否包含搜索指示器
+ * @param {string} url - URL
+ * @returns {boolean} 是否包含搜索指示器
+ */
+containsSearchIndicators(url) {
+    const searchIndicators = [
+        '/search', '?q=', '&q=', '/actors/', '/makers/', 
+        '/publishers/', '/categories/', '/tags/', '?page=', '&page='
+    ];
+    
+    const urlLower = url.toLowerCase();
+    return searchIndicators.some(indicator => urlLower.includes(indicator));
+}
+
+/**
+ * 标准化URL（用于比较）
+ * @param {string} url - URL
+ * @returns {string} 标准化的URL
+ */
+normalizeUrl(url) {
+    try {
+        const urlObj = new URL(url);
+        // 移除尾部斜杠，转换为小写
+        return `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}${urlObj.search}`.toLowerCase().replace(/\/$/, '');
+    } catch (error) {
+        return url.toLowerCase().replace(/\/$/, '');
+    }
+}
 
   /**
    * Jable专用详情链接提取 - 根据实际数据 /videos/ipx-156/
