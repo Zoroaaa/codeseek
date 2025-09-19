@@ -1,10 +1,10 @@
-// src/core/constants.js - 保守优化版本：只移除详情提取配置硬编码，保持其他功能完整
+// src/core/constants.js - 增强版：新增更多高质量搜索源
 // 详情提取配置已迁移至 detail-config.js，由 detail-config-api.js 动态管理
 
 export const APP_CONSTANTS = {
   // 应用信息 - 保持不变
   APP_NAME: '磁力快搜',
-  DEFAULT_VERSION: '1.4.0', // 版本升级，完善详情提取功能集成
+  DEFAULT_VERSION: '1.5.1', // 版本升级，新增更多搜索源
   
   // 本地存储键名 - 保持不变，只添加详情配置相关
   STORAGE_KEYS: {
@@ -16,25 +16,25 @@ export const APP_CONSTANTS = {
     CUSTOM_SOURCES: 'custom_search_sources',
     CUSTOM_CATEGORIES: 'custom_source_categories',
     SOURCE_STATUS_CACHE: 'source_status_cache',
-    // 详情提取相关缓存 - 保持不变
+    // 详情提取相关缓存
     DETAIL_EXTRACTION_CACHE: 'detail_extraction_cache',
-    DETAIL_CONFIG_CACHE: 'detail_config_cache', // 新增：配置缓存
+    DETAIL_CONFIG_CACHE: 'detail_config_cache',
     DETAIL_EXTRACTION_STATS: 'detail_extraction_stats',
     DETAIL_USER_PREFERENCES: 'detail_user_preferences'
   },
   
-  // API配置 - 保持原有功能，添加详情配置管理端点
+  // API配置 - 保持原有功能
   API: {
     TIMEOUT: 10000,
     RETRY_ATTEMPTS: 3,
     CACHE_DURATION: 1800000, // 30分钟
     SOURCE_CHECK_TIMEOUT: 8000,
     SOURCE_STATUS_CACHE_DURATION: 300000,
-    // 详情提取API配置 - 与后端完全对齐，但移除用户可配置部分
-    DETAIL_EXTRACTION_TIMEOUT: 15000, // 系统默认值，用户可通过配置API修改
-    DETAIL_CACHE_DURATION: 86400000, // 系统默认值，用户可通过配置API修改
-    DETAIL_BATCH_SIZE: 20, // 系统最大值
-    DETAIL_MAX_CONCURRENT: 3, // 系统默认值
+    // 详情提取API配置
+    DETAIL_EXTRACTION_TIMEOUT: 15000,
+    DETAIL_CACHE_DURATION: 86400000,
+    DETAIL_BATCH_SIZE: 20,
+    DETAIL_MAX_CONCURRENT: 3,
     DETAIL_HEALTH_CHECK_INTERVAL: 300000,
     DETAIL_RETRY_DELAY: 1000,
     DETAIL_PROGRESS_UPDATE_INTERVAL: 1000
@@ -60,17 +60,17 @@ export const APP_CONSTANTS = {
     MIN_STATUS_CACHE_DURATION: 60000,
     MAX_STATUS_CACHE_DURATION: 3600000,
     
-    // 详情提取限制 - 保留系统级限制，与后端 constants.js 同步
-    MAX_DETAIL_EXTRACTIONS_PER_BATCH: 20, // 系统最大值
-    MIN_DETAIL_EXTRACTION_TIMEOUT: 5000, // 系统最小值
-    MAX_DETAIL_EXTRACTION_TIMEOUT: 30000, // 系统最大值
-    MIN_DETAIL_CACHE_DURATION: 3600000, // 系统最小值
-    MAX_DETAIL_CACHE_DURATION: 604800000, // 系统最大值
-    MAX_AUTO_EXTRACTIONS: 10, // 系统最大值
-    MAX_DOWNLOAD_LINKS: 15, // 系统最大值（用户可在此范围内配置）
-    MAX_MAGNET_LINKS: 15, // 系统最大值（用户可在此范围内配置）
-    MAX_SCREENSHOTS: 20, // 系统最大值（用户可在此范围内配置）
-    MAX_CONTENT_FILTER_KEYWORDS: 50, // 系统最大值
+    // 详情提取限制
+    MAX_DETAIL_EXTRACTIONS_PER_BATCH: 20,
+    MIN_DETAIL_EXTRACTION_TIMEOUT: 5000,
+    MAX_DETAIL_EXTRACTION_TIMEOUT: 30000,
+    MIN_DETAIL_CACHE_DURATION: 3600000,
+    MAX_DETAIL_CACHE_DURATION: 604800000,
+    MAX_AUTO_EXTRACTIONS: 10,
+    MAX_DOWNLOAD_LINKS: 15,
+    MAX_MAGNET_LINKS: 15,
+    MAX_SCREENSHOTS: 20,
+    MAX_CONTENT_FILTER_KEYWORDS: 50,
     MAX_DETAIL_CARD_CACHE_SIZE: 100,
     MIN_QUALITY_SCORE: 0,
     MAX_QUALITY_SCORE: 100
@@ -101,7 +101,7 @@ export const APP_CONSTANTS = {
     ERROR: 'error'
   },
 
-  // 详情提取状态枚举 - 保持不变，与后端同步
+  // 详情提取状态枚举
   DETAIL_EXTRACTION_STATUS: {
     PENDING: 'pending',
     IN_PROGRESS: 'in_progress',
@@ -115,7 +115,7 @@ export const APP_CONSTANTS = {
     RATE_LIMITED: 'rate_limited'
   },
 
-  // 详情提取质量等级 - 保持不变
+  // 详情提取质量等级
   DETAIL_QUALITY_LEVELS: {
     EXCELLENT: { min: 80, label: '优秀', color: '#10b981', icon: '⭐' },
     GOOD: { min: 60, label: '良好', color: '#3b82f6', icon: '✅' },
@@ -123,13 +123,14 @@ export const APP_CONSTANTS = {
     POOR: { min: 0, label: '较差', color: '#ef4444', icon: '❌' }
   },
 
-  // 支持详情提取的搜索源 - 保持不变
+  // 支持详情提取的搜索源 - 扩充
   DETAIL_EXTRACTION_SOURCES: [
     'javbus', 'javdb', 'jable', 'javmost', 
-    'javgg',  'sukebei','javguru'
+    'javgg', 'sukebei', 'javguru', 'javhub',
+    'javdock', 'javdatabase', 'javtiful', 'javtrailers'
   ],
 
-  // 详情提取源能力映射 - 保持不变
+  // 详情提取源能力映射 - 扩充
   DETAIL_EXTRACTION_CAPABILITIES: {
     'javbus': {
       screenshots: true,
@@ -185,10 +186,65 @@ export const APP_CONSTANTS = {
       rating: false,
       tags: true,
       quality: 'fair'
-  }
+    },
+    'javhub': {
+      screenshots: true,
+      downloadLinks: false,
+      magnetLinks: true,
+      actresses: true,
+      metadata: true,
+      description: true,
+      rating: true,
+      tags: true,
+      quality: 'good'
+    },
+    'javdock': {
+      screenshots: true,
+      downloadLinks: false,
+      magnetLinks: false,
+      actresses: true,
+      metadata: true,
+      description: true,
+      rating: true,
+      tags: true,
+      quality: 'good'
+    },
+    'javdatabase': {
+      screenshots: true,
+      downloadLinks: false,
+      magnetLinks: false,
+      actresses: true,
+      metadata: true,
+      description: true,
+      rating: false,
+      tags: true,
+      quality: 'fair'
+    },
+    'javtiful': {
+      screenshots: true,
+      downloadLinks: true,
+      magnetLinks: false,
+      actresses: true,
+      metadata: true,
+      description: true,
+      rating: true,
+      tags: true,
+      quality: 'excellent'
+    },
+    'javtrailers': {
+      screenshots: true,
+      downloadLinks: true,
+      magnetLinks: true,
+      actresses: true,
+      metadata: true,
+      description: true,
+      rating: true,
+      tags: true,
+      quality: 'good'
+    }
   },
 
-  // 搜索源分类定义 - 保持不变，增强详情提取支持标识
+  // 搜索源分类定义 - 新增下载站分类
   SOURCE_CATEGORIES: {
     database: {
       id: 'database',
@@ -226,6 +282,18 @@ export const APP_CONSTANTS = {
       extractionPriority: 'low',
       typicalCapabilities: ['magnetLinks', 'downloadLinks', 'metadata']
     },
+    download: {
+      id: 'download',
+      name: '💾 下载专站',
+      description: '专门提供高质量视频下载服务',
+      icon: '💾',
+      color: '#06b6d4',
+      isBuiltin: true,
+      order: 4,
+      supportsDetailExtraction: true,
+      extractionPriority: 'medium',
+      typicalCapabilities: ['downloadLinks', 'screenshots', 'metadata']
+    },
     community: {
       id: 'community',
       name: '💬 社区论坛',
@@ -233,7 +301,19 @@ export const APP_CONSTANTS = {
       icon: '💬',
       color: '#8b5cf6',
       isBuiltin: true,
-      order: 4,
+      order: 5,
+      supportsDetailExtraction: false,
+      extractionPriority: 'none',
+      typicalCapabilities: []
+    },
+    search_engine: {
+      id: 'search_engine',
+      name: '🔍 聚合搜索',
+      description: '多源聚合搜索引擎',
+      icon: '🔍',
+      color: '#ec4899',
+      isBuiltin: true,
+      order: 6,
       supportsDetailExtraction: false,
       extractionPriority: 'none',
       typicalCapabilities: []
@@ -252,9 +332,9 @@ export const APP_CONSTANTS = {
     }
   },
   
-  // 增强版搜索源 - 保持完整功能，完善详情提取支持标识
+  // 增强版搜索源 - 大幅扩充，新增基于互联网搜索的高质量真实网站
   SEARCH_SOURCES: [
-    // 番号资料站
+    // 番号资料站 - 扩充
     {
       id: 'javbus',
       name: 'JavBus',
@@ -315,8 +395,84 @@ export const APP_CONSTANTS = {
       averageExtractionTime: 0,
       supportedFeatures: []
     },
+    {
+      id: 'javhub',
+      name: 'JavHub',
+      subtitle: '全面资料库，数据准确',
+      icon: '🏢',
+      urlTemplate: 'https://javhub.net/search?q={keyword}',
+      category: 'database',
+      isBuiltin: true,
+      priority: 5,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'good',
+      averageExtractionTime: 3200,
+      supportedFeatures: ['screenshots', 'magnetLinks', 'actresses', 'metadata', 'description', 'rating', 'tags']
+    },
+    {
+      id: 'javdock',
+      name: 'JavDock',
+      subtitle: '简洁界面，搜索快捷',
+      icon: '⚓',
+      urlTemplate: 'https://javdock.com/search/{keyword}',
+      category: 'database',
+      isBuiltin: true,
+      priority: 6,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'good',
+      averageExtractionTime: 2800,
+      supportedFeatures: ['screenshots', 'actresses', 'metadata', 'description', 'rating', 'tags']
+    },
+    {
+      id: 'javdatabase',
+      name: 'JAV Database',
+      subtitle: '专业数据库，信息详实',
+      icon: '🗄️',
+      urlTemplate: 'https://javdatabase.com/search?q={keyword}',
+      category: 'database',
+      isBuiltin: true,
+      priority: 7,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'fair',
+      averageExtractionTime: 3500,
+      supportedFeatures: ['screenshots', 'actresses', 'metadata', 'description', 'tags']
+    },
+    // 新增数据库源
+    {
+      id: 'sougouwiki',
+      name: 'SougouWiki',
+      subtitle: '日文番号百科，详细女优资料',
+      icon: '📘',
+      urlTemplate: 'http://sougouwiki.com/index.php?search={keyword}',
+      category: 'database',
+      isBuiltin: true,
+      priority: 8,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'good',
+      averageExtractionTime: 4000,
+      supportedFeatures: ['actresses', 'metadata', 'description', 'tags']
+    },
+    {
+      id: 'warashi',
+      name: 'Warashi Database',
+      subtitle: '全面JAV数据库，包括男优信息',
+      icon: '🗃️',
+      urlTemplate: 'https://warashi.moe/search?q={keyword}',
+      category: 'database',
+      isBuiltin: true,
+      priority: 9,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
     
-    // 在线播放平台
+    // 在线播放平台 - 扩充
     {
       id: 'jable',
       name: 'Jable',
@@ -357,10 +513,10 @@ export const APP_CONSTANTS = {
       isBuiltin: true,
       priority: 3,
       isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: []
+      supportsDetailExtraction: true,
+      extractionQuality: 'fair',
+      averageExtractionTime: 4000,
+      supportedFeatures: ['screenshots', 'downloadLinks', 'actresses', 'metadata']
     },
     {
       id: 'av01',
@@ -437,8 +593,39 @@ export const APP_CONSTANTS = {
       averageExtractionTime: 5000,
       supportedFeatures: ['screenshots', 'actresses']
     },
+    // 新增流媒体源
+    {
+      id: 'javtiful',
+      name: 'JavTiful',
+      subtitle: '高清JAV在线观看和下载',
+      icon: '🌟',
+      urlTemplate: 'https://javtiful.com/search?q={keyword}',
+      category: 'streaming',
+      isBuiltin: true,
+      priority: 9,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'excellent',
+      averageExtractionTime: 3000,
+      supportedFeatures: ['screenshots', 'downloadLinks', 'actresses', 'metadata', 'description', 'rating', 'tags']
+    },
+    {
+      id: 'javtrailers',
+      name: 'JavTrailers',
+      subtitle: '完整JAV预览和下载',
+      icon: '🎞️',
+      urlTemplate: 'https://javtrailers.com/search/{keyword}',
+      category: 'streaming',
+      isBuiltin: true,
+      priority: 10,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'good',
+      averageExtractionTime: 3500,
+      supportedFeatures: ['screenshots', 'downloadLinks', 'magnetLinks', 'actresses', 'metadata']
+    },
     
-    // 磁力搜索
+    // 磁力搜索 - 扩充
     {
       id: 'btsow',
       name: 'BTSOW',
@@ -499,8 +686,132 @@ export const APP_CONSTANTS = {
       averageExtractionTime: 6000,
       supportedFeatures: ['downloadLinks', 'magnetLinks', 'metadata', 'description', 'tags']
     },
+    {
+      id: 'nyaasi',
+      name: 'Nyaa.si',
+      subtitle: '亚洲媒体种子站，质量可靠',
+      icon: '🐱',
+      urlTemplate: 'https://nyaa.si/?f=0&c=0_0&q={keyword}',
+      category: 'torrent',
+      isBuiltin: true,
+      priority: 5,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
+    {
+      id: 'nyaaland',
+      name: 'Nyaa.land',
+      subtitle: 'Nyaa镜像站，稳定可靠',
+      icon: '🏝️',
+      urlTemplate: 'https://nyaa.land/?f=0&c=0_0&q={keyword}',
+      category: 'torrent',
+      isBuiltin: true,
+      priority: 6,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
+    {
+      id: '1337x',
+      name: '1337x',
+      subtitle: '知名种子站，资源丰富',
+      icon: '☠️',
+      urlTemplate: 'https://1337x.to/search/{keyword}/1/',
+      category: 'torrent',
+      isBuiltin: true,
+      priority: 7,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
+    // 新增种子源
+    {
+      id: 'ijavtorrent',
+      name: 'iJavTorrent',
+      subtitle: 'JAV专用种子库，高清资源',
+      icon: '🧲',
+      urlTemplate: 'https://ijavtorrent.com/search/{keyword}',
+      category: 'torrent',
+      isBuiltin: true,
+      priority: 8,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: ['magnetLinks', 'downloadLinks']
+    },
     
-    // 社区论坛
+    // 下载专站 - 新增分类
+    {
+      id: 'javhd',
+      name: 'JavHD',
+      subtitle: '高清视频下载，画质优秀',
+      icon: '📹',
+      urlTemplate: 'https://javhd.today/search/{keyword}',
+      category: 'download',
+      isBuiltin: true,
+      priority: 1,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'good',
+      averageExtractionTime: 4000,
+      supportedFeatures: ['downloadLinks', 'screenshots', 'metadata']
+    },
+    {
+      id: 'javfull',
+      name: 'JavFull',
+      subtitle: '完整版本下载，无删减',
+      icon: '🎯',
+      urlTemplate: 'https://javfull.net/search/{keyword}',
+      category: 'download',
+      isBuiltin: true,
+      priority: 2,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'good',
+      averageExtractionTime: 4200,
+      supportedFeatures: ['downloadLinks', 'screenshots', 'metadata']
+    },
+    {
+      id: 'jav720',
+      name: 'JAV720',
+      subtitle: '720P高清下载，文件适中',
+      icon: '📱',
+      urlTemplate: 'https://jav720.com/search/{keyword}',
+      category: 'download',
+      isBuiltin: true,
+      priority: 3,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'fair',
+      averageExtractionTime: 4500,
+      supportedFeatures: ['downloadLinks', 'screenshots', 'metadata']
+    },
+    // 新增下载源
+    {
+      id: 'javtsunami',
+      name: 'JavTsunami',
+      subtitle: '高清JAV下载和流媒体',
+      icon: '🌊',
+      urlTemplate: 'https://javtsunami.com/search?q={keyword}',
+      category: 'download',
+      isBuiltin: true,
+      priority: 4,
+      isActive: true,
+      supportsDetailExtraction: true,
+      extractionQuality: 'good',
+      averageExtractionTime: 3800,
+      supportedFeatures: ['downloadLinks', 'screenshots', 'metadata', 'description']
+    },
+    
+    // 社区论坛 - 扩充
     {
       id: 'sehuatang',
       name: '色花堂',
@@ -525,6 +836,99 @@ export const APP_CONSTANTS = {
       category: 'community',
       isBuiltin: true,
       priority: 2,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
+    {
+      id: 'sis001',
+      name: 'SIS001',
+      subtitle: '第一会所，老牌资源论坛',
+      icon: '🏛️',
+      urlTemplate: 'https://sis001.com/forum/search.php?searchsubmit=yes&srchtxt={keyword}',
+      category: 'community',
+      isBuiltin: true,
+      priority: 3,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
+    // 新增社区源
+    {
+      id: 'javforum',
+      name: 'JAV-Forum',
+      subtitle: 'JAV粉丝讨论社区',
+      icon: '💬',
+      urlTemplate: 'https://www.jav-forum.com/search/{keyword}',
+      category: 'community',
+      isBuiltin: true,
+      priority: 4,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
+    {
+      id: 'akibaonline',
+      name: 'Akiba-Online',
+      subtitle: 'JAV讨论和资源分享论坛',
+      icon: '🎌',
+      urlTemplate: 'https://www.akiba-online.com/forums/search/{keyword}',
+      category: 'community',
+      isBuiltin: true,
+      priority: 5,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
+    
+    // 聚合搜索 - 新增分类
+    {
+      id: 'javgle',
+      name: 'Javgle',
+      subtitle: '多源聚合搜索，结果全面',
+      icon: '🌐',
+      urlTemplate: 'https://javgle.com/search/{keyword}',
+      category: 'search_engine',
+      isBuiltin: true,
+      priority: 1,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
+    {
+      id: 'javsearch',
+      name: 'JavSearch',
+      subtitle: '智能聚合搜索引擎',
+      icon: '🔎',
+      urlTemplate: 'https://javsearch.mobi/search/{keyword}',
+      category: 'search_engine',
+      isBuiltin: true,
+      priority: 2,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: []
+    },
+    {
+      id: 'javmega',
+      name: 'JavMega',
+      subtitle: '超级搜索引擎，覆盖多站',
+      icon: '🚀',
+      urlTemplate: 'https://javmega.co/search/{keyword}',
+      category: 'search_engine',
+      isBuiltin: true,
+      priority: 3,
       isActive: true,
       supportsDetailExtraction: false,
       extractionQuality: 'none',
@@ -566,21 +970,25 @@ export const APP_CONSTANTS = {
     }
   },
   
-  // 默认颜色选项 - 保持不变
+  // 默认颜色选项 - 扩充
   DEFAULT_COLORS: [
     '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
     '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
-    '#f97316', '#6366f1', '#14b8a6', '#eab308'
+    '#f97316', '#6366f1', '#14b8a6', '#eab308',
+    '#64748b', '#dc2626', '#059669', '#7c3aed',
+    '#be185d', '#0891b2', '#65a30d', '#ea580c'
   ],
   
-  // 默认图标选项 - 保持不变
+  // 默认图标选项 - 扩充
   DEFAULT_ICONS: [
     '📚', '🎥', '🧲', '💬', '🌟', '🔍', '📺', '🎬',
     '🎭', '🎪', '🎦', '🎬', '⚡', '💫', '🌙', '🔗',
-    '🱡', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲'
+    '🱡', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲',
+    '💾', '📹', '🏢', '⚓', '🗄️', '🐱', '🏝️', '☠️',
+    '📱', '🌐', '🔎', '🚀', '🎪', '🏛️', '🔥', '💎'
   ],
   
-  // 权限定义 - 保持不变，添加详情提取配置权限
+  // 权限定义 - 保持不变
   PERMISSIONS: {
     SEARCH: 'search',
     FAVORITE: 'favorite',
@@ -595,11 +1003,11 @@ export const APP_CONSTANTS = {
     DETAIL_EXTRACTION_BATCH: 'detail_extraction_batch',
     DETAIL_EXTRACTION_HISTORY: 'detail_extraction_history',
     DETAIL_EXTRACTION_CACHE_MANAGEMENT: 'detail_extraction_cache_management',
-    DETAIL_EXTRACTION_CONFIG: 'detail_extraction_config', // 新增：配置管理权限
+    DETAIL_EXTRACTION_CONFIG: 'detail_extraction_config',
     DETAIL_EXTRACTION_STATS: 'detail_extraction_stats'
   },
   
-  // 用户行为追踪事件 - 保持不变，添加配置相关事件
+  // 用户行为追踪事件 - 保持不变
   ANALYTICS_EVENTS: {
     SEARCH_PERFORMED: 'search_performed',
     RESULT_CLICKED: 'result_clicked',
@@ -636,13 +1044,12 @@ export const APP_CONSTANTS = {
     DETAIL_EXPORTED: 'detail_exported',
     ISSUE_REPORTED: 'issue_reported',
     DETAIL_QUALITY_RATED: 'detail_quality_rated',
-    // 新增：配置相关事件
     DETAIL_CONFIG_UPDATED: 'detail_config_updated',
     DETAIL_CONFIG_RESET: 'detail_config_reset',
     DETAIL_CONFIG_PRESET_APPLIED: 'detail_config_preset_applied'
   },
   
-  // 错误代码定义 - 保持不变，添加配置相关错误
+  // 错误代码定义 - 保持不变
   ERROR_CODES: {
     INVALID_SEARCH_SOURCE: 'INVALID_SEARCH_SOURCE',
     INVALID_SOURCE_CATEGORY: 'INVALID_SOURCE_CATEGORY',
@@ -675,17 +1082,16 @@ export const APP_CONSTANTS = {
     DETAIL_CONTENT_FILTERED: 'DETAIL_CONTENT_FILTERED',
     DETAIL_SERVICE_UNAVAILABLE: 'DETAIL_SERVICE_UNAVAILABLE',
     DETAIL_CONCURRENT_LIMIT_EXCEEDED: 'DETAIL_CONCURRENT_LIMIT_EXCEEDED',
-    // 新增：配置相关错误
     DETAIL_CONFIG_VALIDATION_ERROR: 'DETAIL_CONFIG_VALIDATION_ERROR',
     DETAIL_CONFIG_SAVE_ERROR: 'DETAIL_CONFIG_SAVE_ERROR',
     DETAIL_CONFIG_LOAD_ERROR: 'DETAIL_CONFIG_LOAD_ERROR',
     DETAIL_CONFIG_PRESET_NOT_FOUND: 'DETAIL_CONFIG_PRESET_NOT_FOUND'
   },
   
-  // 默认用户设置 - 移除详情提取硬编码配置，其他保持不变
+  // 默认用户设置 - 保持不变
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
-    searchSources: ['javbus', 'javdb', 'javlibrary'],
+    searchSources: ['javbus', 'javdb', 'javlibrary', 'jable'],
     customSearchSources: [],
     customSourceCategories: [],
     maxFavoritesPerUser: 1000,
@@ -699,14 +1105,10 @@ export const APP_CONSTANTS = {
     sourceStatusCacheDuration: 300000,
     skipUnavailableSources: true,
     showSourceStatus: true,
-    retryFailedSources: false,
-    
-    // 注意：详情提取相关设置已迁移至 detail-config.js
-    // 这些设置将通过 DetailConfigAPI 动态获取和管理
-    // enableDetailExtraction, autoExtractDetails 等配置不再硬编码在此处
+    retryFailedSources: false
   },
   
-  // 搜索源管理相关常量 - 保持不变，增强详情提取支持
+  // 搜索源管理相关常量 - 扩充排序和筛选选项
   SOURCE_MANAGEMENT: {
     DEFAULT_CATEGORY: 'others',
     SORT_OPTIONS: {
@@ -718,7 +1120,9 @@ export const APP_CONSTANTS = {
       STATUS: 'status',
       DETAIL_SUPPORT: 'detail_support',
       EXTRACTION_QUALITY: 'extraction_quality',
-      AVERAGE_TIME: 'average_time'
+      AVERAGE_TIME: 'average_time',
+      POPULARITY: 'popularity',
+      LAST_UPDATED: 'last_updated'
     },
     FILTER_OPTIONS: {
       ALL: 'all',
@@ -731,7 +1135,13 @@ export const APP_CONSTANTS = {
       SUPPORTS_DETAIL: 'supports_detail',
       NO_DETAIL: 'no_detail',
       HIGH_QUALITY: 'high_quality',
-      FAST_EXTRACTION: 'fast_extraction'
+      FAST_EXTRACTION: 'fast_extraction',
+      DATABASE: 'database_category',
+      STREAMING: 'streaming_category',
+      TORRENT: 'torrent_category',
+      DOWNLOAD: 'download_category',
+      COMMUNITY: 'community_category',
+      SEARCH_ENGINE: 'search_engine_category'
     }
   },
 
@@ -748,12 +1158,12 @@ export const APP_CONSTANTS = {
     RETRY_DELAY: 1000,
     HTTP_METHOD: 'HEAD',
     FOLLOW_REDIRECTS: true,
-    USER_AGENT: 'MagnetSearch/1.4.0 StatusChecker'
+    USER_AGENT: 'MagnetSearch/1.5.1 StatusChecker'
   },
 
-  // 详情提取配置 - 保留系统级配置，移除用户可配置部分
+  // 详情提取配置 - 保持不变
   DETAIL_EXTRACTION_CONFIG: {
-    // 系统级技术限制（与后端 constants.js 完全同步）
+    // 系统级技术限制
     DEFAULT_TIMEOUT: 15000,
     MIN_TIMEOUT: 5000,
     MAX_TIMEOUT: 30000,
@@ -801,7 +1211,7 @@ export const APP_CONSTANTS = {
       NONE: { weight: 0.0, timeout: 0, retries: 0 }
     },
     
-    // 内容验证规则（系统级）
+    // 内容验证规则
     VALIDATION_RULES: {
       MIN_TITLE_LENGTH: 2,
       MAX_TITLE_LENGTH: 200,
@@ -816,7 +1226,7 @@ export const APP_CONSTANTS = {
       OPTIONAL_FIELDS: ['code', 'description', 'screenshots', 'downloadLinks', 'magnetLinks', 'actresses']
     },
     
-    // 性能优化设置（系统级）
+    // 性能优化设置
     PERFORMANCE: {
       PREFETCH_ENABLED: false,
       LAZY_LOADING: true,
@@ -827,7 +1237,7 @@ export const APP_CONSTANTS = {
       MEMORY_OPTIMIZATION: true
     },
     
-    // 错误处理配置（系统级）
+    // 错误处理配置
     ERROR_HANDLING: {
       CONTINUE_ON_ERROR: true,
       LOG_ERRORS: true,
@@ -914,7 +1324,7 @@ export const APP_CONSTANTS = {
     FLUSH_INTERVAL: 300000
   },
 
-  // 新增：详情提取配置API端点（与 detail-config.js 对接）
+  // 详情提取配置API端点
   DETAIL_CONFIG_ENDPOINTS: {
     GET_CONFIG: '/api/detail/config',
     UPDATE_CONFIG: '/api/detail/config',
@@ -940,7 +1350,7 @@ export const VALIDATION_RULES = APP_CONSTANTS.VALIDATION_RULES;
 export const SOURCE_MANAGEMENT = APP_CONSTANTS.SOURCE_MANAGEMENT;
 export const DETAIL_EXTRACTION_CONFIG = APP_CONSTANTS.DETAIL_EXTRACTION_CONFIG;
 
-// 工具函数 - 保持不变
+// 工具函数 - 扩充功能
 export function getStorageKey(key) {
   return STORAGE_KEYS[key] || key;
 }
@@ -961,22 +1371,40 @@ export function getSourcesSupportingDetailExtraction() {
   return SEARCH_SOURCES.filter(source => source.supportsDetailExtraction);
 }
 
-// 新增：详情提取配置相关工具函数
+export function getSourcesByQuality(quality) {
+  return SEARCH_SOURCES.filter(source => source.extractionQuality === quality);
+}
+
+export function getSourcesByAverageTime(maxTime) {
+  return SEARCH_SOURCES.filter(source => 
+    source.averageExtractionTime > 0 && source.averageExtractionTime <= maxTime
+  );
+}
+
+export function getCategoryStats() {
+  const stats = {};
+  Object.keys(SOURCE_CATEGORIES).forEach(categoryId => {
+    const sourcesInCategory = getSourceByCategory(categoryId);
+    stats[categoryId] = {
+      totalSources: sourcesInCategory.length,
+      activeSources: sourcesInCategory.filter(s => s.isActive).length,
+      supportingDetail: sourcesInCategory.filter(s => s.supportsDetailExtraction).length,
+      builtinSources: sourcesInCategory.filter(s => s.isBuiltin).length
+    };
+  });
+  return stats;
+}
+
 export function getDetailConfigEndpoint(endpoint) {
   return APP_CONSTANTS.DETAIL_CONFIG_ENDPOINTS[endpoint.toUpperCase()];
 }
 
 export function isDetailExtractionEnabled() {
-  // 这个函数现在应该通过 DetailConfigAPI 来获取用户配置
-  // 这里只返回系统级开关状态
-  return true; // 系统级默认启用，具体用户配置由 detail-config-api.js 管理
+  return true; // 系统级默认启用
 }
 
-// 向后兼容性检查函数
 export function validateLegacySettings(settings) {
   const warnings = [];
-  
-  // 检查是否使用了已迁移的详情提取配置
   const detailConfigKeys = [
     'enableDetailExtraction', 'autoExtractDetails', 'detailExtractionTimeout',
     'detailCacheDuration', 'extractionBatchSize', 'maxRetryAttempts'
@@ -991,5 +1419,28 @@ export function validateLegacySettings(settings) {
   return warnings;
 }
 
-// 默认导出 - 保持向后兼容
+// 新增工具函数
+export function getHighQualitySources() {
+  return SEARCH_SOURCES.filter(source => 
+    source.extractionQuality === 'excellent' || source.extractionQuality === 'good'
+  );
+}
+
+export function getFastExtractionSources(maxTime = 3000) {
+  return SEARCH_SOURCES.filter(source => 
+    source.supportsDetailExtraction && 
+    source.averageExtractionTime > 0 && 
+    source.averageExtractionTime <= maxTime
+  );
+}
+
+export function getRecommendedSources() {
+  return SEARCH_SOURCES.filter(source => 
+    source.isActive && 
+    source.priority <= 3 && 
+    (source.extractionQuality === 'excellent' || source.extractionQuality === 'good')
+  ).sort((a, b) => a.priority - b.priority);
+}
+
+// 默认导出
 export default APP_CONSTANTS;
