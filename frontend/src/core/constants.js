@@ -1,4 +1,4 @@
-// src/core/constants.js - 优化版本：完善大类配置，确保动态管理
+// src/core/constants.js - 保守优化版本：只移除详情提取配置硬编码，保持其他功能完整
 // 详情提取配置已迁移至 detail-config.js，由 detail-config-api.js 动态管理
 
 export const APP_CONSTANTS = {
@@ -195,8 +195,7 @@ export const APP_CONSTANTS = {
     }
   },
 
-  // 🔧 大分类定义（搜索源 vs 浏览站点）- 动态管理核心配置
-  // 管理员可在此处自由增减修改大类，系统将自动适配
+  // 🔧 新增：大分类定义（搜索源 vs 浏览站点）
   MAJOR_CATEGORIES: {
     SEARCH_SOURCES: {
       id: 'search_sources',
@@ -213,25 +212,7 @@ export const APP_CONSTANTS = {
       icon: '🌐',
       requiresKeyword: false,
       order: 2
-    },
-    // 🔧 可扩展：管理员可以在这里添加更多大类
-    REFERENCE_SITES: {
-      id: 'reference_sites',
-      name: '📚 参考资料',
-      description: '提供相关信息和参考资料',
-      icon: '📚',
-      requiresKeyword: false,
-      order: 3
     }
-    // 示例：添加新大类的格式
-    // NEW_CATEGORY: {
-    //   id: 'new_category',
-    //   name: '🎯 新分类',
-    //   description: '新分类的描述',
-    //   icon: '🎯',
-    //   requiresKeyword: true/false,
-    //   order: 4
-    // }
   },
 
   // 搜索源分类定义 - 添加默认搜索配置和大分类归属
@@ -250,7 +231,7 @@ export const APP_CONSTANTS = {
       defaultSearchable: true,      // 该类别默认可搜索
       defaultSiteType: 'search',    // 该类别默认网站类型
       searchPriority: 1,            // 搜索优先级
-      majorCategory: 'search_sources' // 🔧 归属大分类
+      majorCategory: 'search_sources' // 🔧 新增：归属大分类
     },
     streaming: {
       id: 'streaming',
@@ -266,7 +247,7 @@ export const APP_CONSTANTS = {
       defaultSearchable: false,     // 默认不参与搜索
       defaultSiteType: 'browse',
       searchPriority: 5,
-      majorCategory: 'browse_sites' // 🔧 归属大分类
+      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
     },
     torrent: {
       id: 'torrent',
@@ -282,7 +263,7 @@ export const APP_CONSTANTS = {
       defaultSearchable: true,
       defaultSiteType: 'search',
       searchPriority: 3,
-      majorCategory: 'search_sources' // 🔧 归属大分类
+      majorCategory: 'search_sources' // 🔧 新增：归属大分类
     },
     community: {
       id: 'community',
@@ -298,23 +279,7 @@ export const APP_CONSTANTS = {
       defaultSearchable: false,
       defaultSiteType: 'browse',
       searchPriority: 10,
-      majorCategory: 'browse_sites' // 🔧 归属大分类
-    },
-    reference: {
-      id: 'reference',
-      name: '📖 参考资料',
-      description: '提供相关信息和学习资料',
-      icon: '📖',
-      color: '#06b6d4',
-      isBuiltin: true,
-      order: 5,
-      supportsDetailExtraction: false,
-      extractionPriority: 'none',
-      typicalCapabilities: [],
-      defaultSearchable: false,
-      defaultSiteType: 'reference',
-      searchPriority: 10,
-      majorCategory: 'reference_sites' // 🔧 新增：归属参考资料大分类
+      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
     },
     others: {
       id: 'others',
@@ -330,7 +295,7 @@ export const APP_CONSTANTS = {
       defaultSearchable: false,
       defaultSiteType: 'browse',
       searchPriority: 10,
-      majorCategory: 'browse_sites' // 🔧 归属大分类
+      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
     }
   },
   
@@ -684,46 +649,6 @@ export const APP_CONSTANTS = {
       siteType: 'browse',
       searchPriority: 99,
       requiresKeyword: false
-    },
-    
-    // 🔧 新增：参考资料站点
-    {
-      id: 'wikipedia',
-      name: 'Wikipedia',
-      subtitle: '全球知识百科，信息权威',
-      icon: '📖',
-      urlTemplate: 'https://wikipedia.org/wiki/{keyword}',
-      category: 'reference',
-      isBuiltin: true,
-      priority: 1,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: true,
-      siteType: 'reference',
-      searchPriority: 8,
-      requiresKeyword: true
-    },
-    {
-      id: 'imdb',
-      name: 'IMDb',
-      subtitle: '国际电影数据库',
-      icon: '🎭',
-      urlTemplate: 'https://www.imdb.com/find?q={keyword}',
-      category: 'reference',
-      isBuiltin: true,
-      priority: 2,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: true,
-      siteType: 'reference',
-      searchPriority: 9,
-      requiresKeyword: true
     }
   ],
   
@@ -880,7 +805,7 @@ export const APP_CONSTANTS = {
   // 默认用户设置 - 移除详情提取硬编码配置，其他保持不变
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
-    searchSources: ['javbus', 'javdb', 'javlibrary', 'btsow'],  // 默认只启用搜索类型的源
+    searchSources: ['javbus', 'javdb', 'javlibrary', 'btsow'],  // 默认只可用搜索类型的源
     customSearchSources: [],
     customSourceCategories: [],
     maxFavoritesPerUser: 1000,
@@ -933,8 +858,7 @@ export const APP_CONSTANTS = {
       SEARCHABLE: 'searchable',            // 新增：可搜索源
       BROWSE_ONLY: 'browse_only',          // 新增：仅浏览站点
       SEARCH_SOURCES: 'search_sources',    // 🔧 新增：搜索源大类
-      BROWSE_SITES: 'browse_sites',        // 🔧 新增：浏览站点大类
-      REFERENCE_SITES: 'reference_sites'   // 🔧 新增：参考资料大类
+      BROWSE_SITES: 'browse_sites'         // 🔧 新增：浏览站点大类
     }
   },
 
@@ -1206,16 +1130,6 @@ export function getMajorCategoryForSource(sourceId) {
   return category ? category.majorCategory : null;
 }
 
-// 🔧 新增：获取所有可用的大分类
-export function getAllMajorCategories() {
-  return Object.values(MAJOR_CATEGORIES).sort((a, b) => a.order - b.order);
-}
-
-// 🔧 新增：根据ID获取大分类信息
-export function getMajorCategoryById(majorCategoryId) {
-  return MAJOR_CATEGORIES[majorCategoryId] || null;
-}
-
 // 新增：详情提取配置相关工具函数
 export function getDetailConfigEndpoint(endpoint) {
   return APP_CONSTANTS.DETAIL_CONFIG_ENDPOINTS[endpoint.toUpperCase()];
@@ -1224,7 +1138,7 @@ export function getDetailConfigEndpoint(endpoint) {
 export function isDetailExtractionEnabled() {
   // 这个函数现在应该通过 DetailConfigAPI 来获取用户配置
   // 这里只返回系统级开关状态
-  return true; // 系统级默认启用，具体用户配置由 detail-config-api.js 管理
+  return true; // 系统级默认可用，具体用户配置由 detail-config-api.js 管理
 }
 
 // 🔧 新增：URL验证工具函数

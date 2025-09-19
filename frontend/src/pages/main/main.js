@@ -1,5 +1,5 @@
 // 主应用入口 - 集成统一搜索组件和配置管理架构，新增邮箱验证功能支持
-import { APP_CONSTANTS, MAJOR_CATEGORIES, getCategoriesByMajorCategory, getSourcesByMajorCategory, getAllMajorCategories } from '../../core/constants.js';
+import { APP_CONSTANTS } from '../../core/constants.js';
 import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { isDevEnv } from '../../utils/helpers.js';
@@ -555,7 +555,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 🔧 初始化站点导航 - 实现分层显示，动态引用MAJOR_CATEGORIES
+  // 🔧 初始化站点导航 - 实现分层显示
   async initSiteNavigation() {
     try {
       // 获取所有可用的搜索源（通过统一搜索管理器）
@@ -586,7 +586,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 🔧 渲染站点导航 - 分层显示搜索源和浏览站点，动态使用MAJOR_CATEGORIES
+  // 🔧 渲染站点导航 - 分层显示搜索源和浏览站点
   renderSiteNavigation(sourcesToDisplay = null) {
     const sitesSection = document.getElementById('sitesSection');
     if (!sitesSection) return;
@@ -612,8 +612,9 @@ class MagnetSearchApp {
       return;
     }
 
-    // 🔧 按大分类分组显示 - 动态获取MAJOR_CATEGORIES
-    const majorCategories = getAllMajorCategories();
+    // 🔧 分组显示
+    const searchSources = sources.filter(s => s.searchable !== false);
+    const browseSites = sources.filter(s => s.searchable === false);
     
     let navigationHTML = `
       <h2>🌐 资源站点导航</h2>
@@ -627,86 +628,30 @@ class MagnetSearchApp {
           ` : ''}
         </div>
       ` : ''}
-    `;
-
-    // 按大分类渲染各个部分
-    majorCategories.forEach(majorCategory => {
-      const categorySourcesWithSubcategories = this.getSourcesByMajorCategoryWithSubcategories(sources, majorCategory.id);
       
-      if (categorySourcesWithSubcategories.length === 0) return;
-
-      navigationHTML += `
-        <div class="major-category-section">
-          <h3 class="major-category-title">
-            ${majorCategory.icon} ${majorCategory.name}
-            <small>(${categorySourcesWithSubcategories.length}个站点)</small>
-          </h3>
-          <p class="major-category-desc">${majorCategory.description}</p>
-          
-          <div class="subcategories-container">
-            ${this.renderSubcategoriesWithSources(categorySourcesWithSubcategories, majorCategory.id)}
+      <!-- 搜索源区域 -->
+      <div class="search-sources-section">
+        <h3>🔍 搜索源 <small>(支持番号搜索)</small></h3>
+        <div class="sites-grid">
+          ${searchSources.map(source => this.renderSiteItem(source, true)).join('')}
+        </div>
+      </div>
+      
+      <!-- 浏览站点区域 -->
+      ${browseSites.length > 0 ? `
+        <div class="browse-sites-section">
+          <h3>🌐 浏览站点 <small>(仅供访问，不参与搜索)</small></h3>
+          <div class="sites-grid">
+            ${browseSites.map(source => this.renderSiteItem(source, false)).join('')}
           </div>
         </div>
-      `;
-    });
+      ` : ''}
+    `;
     
     sitesSection.innerHTML = navigationHTML;
   }
 
-  // 🔧 获取按大分类和小分类组织的源
-  getSourcesByMajorCategoryWithSubcategories(sources, majorCategoryId) {
-    // 获取属于该大分类的所有源
-    const categorySources = sources.filter(source => {
-      const category = this.allCategories.find(cat => cat.id === source.category);
-      return category && category.majorCategory === majorCategoryId;
-    });
-
-    return categorySources;
-  }
-
-  // 🔧 渲染小分类及其下的源
-  renderSubcategoriesWithSources(sources, majorCategoryId) {
-    // 按小分类分组
-    const sourcesBySubcategory = {};
-    
-    sources.forEach(source => {
-      const subcategory = this.allCategories.find(cat => cat.id === source.category);
-      if (subcategory) {
-        if (!sourcesBySubcategory[subcategory.id]) {
-          sourcesBySubcategory[subcategory.id] = {
-            category: subcategory,
-            sources: []
-          };
-        }
-        sourcesBySubcategory[subcategory.id].sources.push(source);
-      }
-    });
-
-    // 按小分类的order排序
-    const sortedSubcategories = Object.values(sourcesBySubcategory)
-      .sort((a, b) => (a.category.order || 999) - (b.category.order || 999));
-
-    return sortedSubcategories.map(({ category, sources }) => {
-      const isSearchable = majorCategoryId === 'search_sources';
-      
-      return `
-        <div class="subcategory-section">
-          <h4 class="subcategory-title">
-            ${category.icon} ${category.name}
-            <span class="source-count">${sources.length}个站点</span>
-            ${isSearchable ? '<span class="searchable-indicator">🔍 参与搜索</span>' : '<span class="browse-indicator">🌐 仅浏览</span>'}
-          </h4>
-          <p class="subcategory-desc">${category.description}</p>
-          
-          <div class="sites-grid">
-            ${sources.map(source => this.renderSiteItem(source, isSearchable)).join('')}
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 🔧 渲染单个站点项，包含启用状态和详情提取支持标识
+  // 🔧 渲染单个站点项，包含可用状态和详情提取支持标识
   renderSiteItem(source, isSearchable) {
     // 通过统一搜索管理器检查源的启用状态
     let isEnabled = true; // 默认显示为可用，具体启用状态由搜索时判断
@@ -736,18 +681,8 @@ class MagnetSearchApp {
       badges.push('<span class="detail-support-badge">📋</span>');
     }
     
-    // 🔧 根据网站类型调整URL处理
-    let siteUrl = source.urlTemplate;
-    if (source.searchable === false) {
-      // 浏览站点直接使用基础URL
-      siteUrl = siteUrl.replace('/{keyword}', '').replace('?q={keyword}&f=all', '').replace('/search/{keyword}', '');
-    } else {
-      // 搜索源移除关键词占位符以供直接访问
-      siteUrl = siteUrl.replace('{keyword}', '');
-    }
-    
     return `
-      <a href="${siteUrl}" 
+      <a href="${source.urlTemplate ? source.urlTemplate.replace('{keyword}', '') : '#'}" 
          class="site-item ${isSearchable ? 'searchable' : 'browse-only'}"
          target="_blank">
         <div class="site-info">
