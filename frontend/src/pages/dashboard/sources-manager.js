@@ -465,11 +465,11 @@ export class SourcesManager {
           </div>
           
           <div class="form-group">
-            <label for="sourceUrl">搜索URL模板 *</label>
+            <label for="sourceUrl">URL模板 *</label>
             <input type="url" name="sourceUrl" id="sourceUrl" required 
-                   placeholder="https://example.com/search?q={keyword}">
-            <small class="form-help">
-              URL中必须包含 <code>{keyword}</code> 占位符，搜索时会被替换为实际关键词
+                   placeholder="https://example.com/">
+            <small class="form-help" id="urlHelp">
+              搜索源需要包含 <code>{keyword}</code> 占位符，浏览站可以是普通网址
             </small>
           </div>
           
@@ -488,10 +488,11 @@ export class SourcesManager {
             <div class="form-group">
               <label for="siteType">网站类型</label>
               <select name="siteType" id="siteType">
-                <option value="search">搜索源</option>
-                <option value="browse">浏览站</option>
-                <option value="reference">参考站</option>
+                <option value="search">搜索源（需要关键词）</option>
+                <option value="browse">浏览站（仅访问首页）</option>
+                <option value="reference">参考站（可选关键词）</option>
               </select>
+              <small>搜索源需要{keyword}占位符，浏览站使用普通网址</small>
             </div>
             
             <div class="form-group">
@@ -558,14 +559,45 @@ export class SourcesManager {
       
       // 🔧 根据分类的默认配置自动设置
       const categorySelect = form.sourceCategory;
+      const siteTypeSelect = form.siteType;
+      const urlInput = form.sourceUrl;
+      const urlHelp = form.querySelector('#urlHelp');
+      
+      // 根据网站类型更新URL输入框提示
+      const updateUrlHelp = (siteType) => {
+        const isSearchable = form.searchable.checked;
+        if (isSearchable && (siteType === 'search' || siteType === 'reference')) {
+          urlInput.placeholder = 'https://example.com/search?q={keyword}';
+          urlHelp.innerHTML = '搜索源需要包含 <code>{keyword}</code> 占位符，搜索时会被替换为实际关键词';
+        } else {
+          urlInput.placeholder = 'https://example.com/';
+          urlHelp.innerHTML = '浏览站点使用普通网址，直接链接到网站首页';
+        }
+      };
+      
+      // 监听网站类型变化
+      siteTypeSelect.addEventListener('change', (e) => {
+        updateUrlHelp(e.target.value);
+      });
+      
+      // 监听搜索性变化
+      form.searchable.addEventListener('change', () => {
+        updateUrlHelp(siteTypeSelect.value);
+      });
+      
       categorySelect.addEventListener('change', (e) => {
         const category = this.app.getManager('categories').getCategoryById(e.target.value);
         if (category) {
           form.searchable.checked = category.defaultSearchable !== false;
           form.siteType.value = category.defaultSiteType || 'search';
           form.searchPriority.value = category.searchPriority || 5;
+          // 更新URL提示
+          updateUrlHelp(form.siteType.value);
         }
       });
+      
+      // 初始化时设置正确的提示
+      updateUrlHelp(siteTypeSelect.value);
     }
     
     this.updateSourceCategorySelect(form.sourceCategory);
@@ -650,12 +682,29 @@ export class SourcesManager {
       return { valid: false, message: '搜索源名称格式不正确' };
     }
     
-    if (!rules.URL_PATTERN.test(sourceData.urlTemplate)) {
-      return { valid: false, message: 'URL模板必须包含{keyword}占位符' };
+    // 🔧 根据网站类型选择不同的URL验证规则
+    const isSearchable = sourceData.searchable !== false;
+    const siteType = sourceData.siteType || 'search';
+    
+    if (isSearchable && (siteType === 'search' || siteType === 'reference')) {
+      // 搜索源必须包含{keyword}占位符
+      if (!rules.SEARCH_URL_PATTERN.test(sourceData.urlTemplate)) {
+        return { valid: false, message: '搜索源URL必须包含{keyword}占位符' };
+      }
+    } else {
+      // 浏览站点只需要是有效的URL
+      if (!rules.BROWSE_URL_PATTERN.test(sourceData.urlTemplate)) {
+        return { valid: false, message: 'URL格式无效' };
+      }
     }
     
     try {
-      const hostname = new URL(sourceData.urlTemplate.replace('{keyword}', 'test')).hostname;
+      // 对于包含{keyword}的URL，用测试关键词替换后验证
+      const testUrl = sourceData.urlTemplate.includes('{keyword}') 
+        ? sourceData.urlTemplate.replace('{keyword}', 'test')
+        : sourceData.urlTemplate;
+      
+      const hostname = new URL(testUrl).hostname;
       if (rules.FORBIDDEN_DOMAINS.some(domain => hostname.includes(domain))) {
         return { valid: false, message: '不允许使用该域名' };
       }

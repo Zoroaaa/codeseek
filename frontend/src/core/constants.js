@@ -360,7 +360,7 @@ export const APP_CONSTANTS = {
       name: 'Jable',
       subtitle: '高清在线观看，支持多种格式',
       icon: '📺',
-      urlTemplate: 'https://jable.tv/search/{keyword}/',
+      urlTemplate: 'https://jable.tv/',  // 浏览站点直接链接到首页
       category: 'streaming',
       isBuiltin: true,
       priority: 1,
@@ -379,7 +379,7 @@ export const APP_CONSTANTS = {
       name: 'JavMost',
       subtitle: '免费在线观看，更新及时',
       icon: '🎦',
-      urlTemplate: 'https://javmost.com/search/{keyword}/',
+      urlTemplate: 'https://javmost.com/',  // 浏览站点直接链接到首页
       category: 'streaming',
       isBuiltin: true,
       priority: 2,
@@ -398,7 +398,7 @@ export const APP_CONSTANTS = {
       name: 'JavGuru',
       subtitle: '多线路播放，观看流畅',
       icon: '🎭',
-      urlTemplate: 'https://jav.guru/?s={keyword}',
+      urlTemplate: 'https://jav.guru/',
       category: 'streaming',
       isBuiltin: true,
       priority: 3,
@@ -417,7 +417,7 @@ export const APP_CONSTANTS = {
       name: 'AV01',
       subtitle: '快速预览站点，封面大图清晰',
       icon: '🎥',
-      urlTemplate: 'https://av01.tv/search?keyword={keyword}',
+      urlTemplate: 'https://av01.tv/',
       category: 'streaming',
       isBuiltin: true,
       priority: 4,
@@ -436,7 +436,7 @@ export const APP_CONSTANTS = {
       name: 'MissAV',
       subtitle: '中文界面，封面高清，信息丰富',
       icon: '💫',
-      urlTemplate: 'https://missav.com/search/{keyword}',
+      urlTemplate: 'https://missav.com/',
       category: 'streaming',
       isBuiltin: true,
       priority: 5,
@@ -455,7 +455,7 @@ export const APP_CONSTANTS = {
       name: 'JavHD.porn',
       subtitle: '高清资源下载，质量优秀',
       icon: '🎬',
-      urlTemplate: 'https://javhd.porn/search/{keyword}',
+      urlTemplate: 'https://javhd.porn/',
       category: 'streaming',
       isBuiltin: true,
       priority: 6,
@@ -474,7 +474,7 @@ export const APP_CONSTANTS = {
       name: 'JavGG',
       subtitle: '免费观看平台，速度稳定',
       icon: '⚡',
-      urlTemplate: 'https://javgg.net/search/{keyword}',
+      urlTemplate: 'https://javgg.net/',
       category: 'streaming',
       isBuiltin: true,
       priority: 7,
@@ -493,7 +493,7 @@ export const APP_CONSTANTS = {
       name: 'JavHiHi',
       subtitle: '在线播放，无需下载',
       icon: '🎪',
-      urlTemplate: 'https://javhihi.com/search/{keyword}',
+      urlTemplate: 'https://javhihi.com/',
       category: 'streaming',
       isBuiltin: true,
       priority: 8,
@@ -592,7 +592,7 @@ export const APP_CONSTANTS = {
       name: '色花堂',
       subtitle: '综合论坛社区，资源丰富',
       icon: '🌸',
-      urlTemplate: 'https://sehuatang.org/search.php?keyword={keyword}',
+      urlTemplate: 'https://sehuatang.org/',  // 浏览站点直接链接到首页
       category: 'community',
       isBuiltin: true,
       priority: 1,
@@ -611,7 +611,7 @@ export const APP_CONSTANTS = {
       name: 'T66Y',
       subtitle: '老牌论坛，资源更新快',
       icon: '📋',
-      urlTemplate: 'https://t66y.com/search.php?keyword={keyword}',
+      urlTemplate: 'https://t66y.com/',
       category: 'community',
       isBuiltin: true,
       priority: 2,
@@ -627,11 +627,12 @@ export const APP_CONSTANTS = {
     }
   ],
   
-  // 搜索源和分类验证规则 - 保持不变
+  // 搜索源和分类验证规则 - 修改URL验证支持浏览站点
   VALIDATION_RULES: {
     SOURCE: {
       REQUIRED_FIELDS: ['name', 'urlTemplate', 'category'],
-      URL_PATTERN: /^https?:\/\/.+\{keyword\}.*/,
+      SEARCH_URL_PATTERN: /^https?:\/\/.+\{keyword\}.*/,  // 搜索源必须包含{keyword}
+      BROWSE_URL_PATTERN: /^https?:\/\/.+/,               // 浏览站点可以是任意有效URL
       NAME_PATTERN: /^[a-zA-Z0-9\u4e00-\u9fa5\s\-_.()（）]+$/,
       ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
       FORBIDDEN_DOMAINS: [

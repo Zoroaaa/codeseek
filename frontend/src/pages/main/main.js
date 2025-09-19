@@ -586,7 +586,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 🔧 渲染站点导航 - 分层显示搜索源和浏览站点
+  // 🔧 渲染站点导航 - 实现分层+分类显示
   renderSiteNavigation(sourcesToDisplay = null) {
     const sitesSection = document.getElementById('sitesSection');
     if (!sitesSection) return;
@@ -612,7 +612,7 @@ class MagnetSearchApp {
       return;
     }
 
-    // 🔧 分组显示
+    // 🔧 分组显示：先按搜索性分组，再按类别细分
     const searchSources = sources.filter(s => s.searchable !== false);
     const browseSites = sources.filter(s => s.searchable === false);
     
@@ -628,27 +628,64 @@ class MagnetSearchApp {
           ` : ''}
         </div>
       ` : ''}
-      
-      <!-- 搜索源区域 -->
-      <div class="search-sources-section">
-        <h3>🔍 搜索源 <small>(支持番号搜索)</small></h3>
-        <div class="sites-grid">
-          ${searchSources.map(source => this.renderSiteItem(source, true)).join('')}
-        </div>
-      </div>
-      
-      <!-- 浏览站点区域 -->
-      ${browseSites.length > 0 ? `
-        <div class="browse-sites-section">
-          <h3>🌐 浏览站点 <small>(仅供访问，不参与搜索)</small></h3>
-          <div class="sites-grid">
-            ${browseSites.map(source => this.renderSiteItem(source, false)).join('')}
-          </div>
-        </div>
-      ` : ''}
     `;
     
+    // 🔧 渲染搜索源区域（按类别细分）
+    if (searchSources.length > 0) {
+      navigationHTML += `
+        <div class="search-sources-section">
+          <h3>🔍 搜索源 <small>(支持番号搜索)</small></h3>
+          ${this.renderSourcesByCategory(searchSources, true)}
+        </div>
+      `;
+    }
+    
+    // 🔧 渲染浏览站点区域（按类别细分）
+    if (browseSites.length > 0) {
+      navigationHTML += `
+        <div class="browse-sites-section">
+          <h3>🌐 浏览站点 <small>(仅供访问，不参与搜索)</small></h3>
+          ${this.renderSourcesByCategory(browseSites, false)}
+        </div>
+      `;
+    }
+    
     sitesSection.innerHTML = navigationHTML;
+  }
+
+  // 🔧 新增：按类别渲染搜索源
+  renderSourcesByCategory(sources, isSearchable) {
+    // 按类别分组
+    const sourcesByCategory = this.groupSourcesByCategory(sources);
+    
+    let categoryHTML = '';
+    
+    // 按类别顺序渲染
+    this.allCategories
+      .filter(category => sourcesByCategory[category.id] && sourcesByCategory[category.id].length > 0)
+      .sort((a, b) => (a.order || 999) - (b.order || 999))
+      .forEach(category => {
+        const categorySources = sourcesByCategory[category.id];
+        const supportedCount = categorySources.filter(s => this.supportsDetailExtraction(s.id)).length;
+        
+        categoryHTML += `
+          <div class="site-subcategory">
+            <h4 class="subcategory-title">
+              <span class="category-icon">${category.icon}</span>
+              <span class="category-name">${category.name}</span>
+              <span class="category-stats">
+                ${categorySources.length}个站点
+                ${supportedCount > 0 ? `<span class="detail-support-count">（${supportedCount}个支持详情提取）</span>` : ''}
+              </span>
+            </h4>
+            <div class="sites-grid subcategory-grid">
+              ${categorySources.map(source => this.renderSiteItem(source, isSearchable)).join('')}
+            </div>
+          </div>
+        `;
+      });
+    
+    return categoryHTML;
   }
 
   // 🔧 渲染单个站点项，包含可用状态和详情提取支持标识

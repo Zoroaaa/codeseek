@@ -113,10 +113,60 @@
   gap: 1.5rem;
 }
 
-/* 🔧 新增：搜索源区域和浏览站点区域样式 */
+/* 🔧 新增：子分类样式 */
+.site-subcategory {
+  margin-bottom: 2rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  background: var(--bg-secondary);
+}
+
+.subcategory-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+
+.subcategory-title .category-icon {
+  font-size: 1.1em;
+}
+
+.subcategory-title .category-name {
+  flex: 1;
+}
+
+.subcategory-title .category-stats {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: normal;
+}
+
+.detail-support-count {
+  color: var(--success-color);
+  font-weight: 500;
+}
+
+.subcategory-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+/* 调整搜索源和浏览站点区域间距 */
 .search-sources-section,
 .browse-sites-section {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
+}
+
+.search-sources-section:last-child,
+.browse-sites-section:last-child {
+  margin-bottom: 0;
 }
 
 .search-sources-section h3,
@@ -245,43 +295,87 @@
   gap: 8px;
 }
 
-/* 🔧 新增：分类搜索配置样式 */
+/* 🔧 新增：分类卡片样式修正 */
+.category-item {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  min-height: 140px; /* 确保足够高度避免内容重叠 */
+}
+
+.category-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent-primary);
+}
+
+.category-header {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.category-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.category-info {
+  flex: 1;
+  min-width: 0; /* 防止内容溢出 */
+}
+
+.category-name {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.category-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.category-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.category-usage {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .category-search-config {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-bottom: 6px;
   flex-wrap: wrap;
-}
-
-.search-default-badge {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-weight: 500;
-}
-
-.search-default-badge.searchable {
-  background: var(--success-color);
-  color: white;
-}
-
-.search-default-badge.non-searchable {
-  background: var(--warning-color);
-  color: white;
 }
 
 .category-source-stats {
   display: flex;
-  gap: 12px;
-  margin-top: 4px;
+  gap: 8px;
+  flex-wrap: wrap;
   font-size: 11px;
   color: var(--text-secondary);
 }
 
-.stat-item {
+.category-actions {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
   display: flex;
-  align-items: center;
-  gap: 2px;
+  gap: 6px;
 }
 
 /* 🔧 新增：搜索源管理器增强样式 */
