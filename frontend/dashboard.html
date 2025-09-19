@@ -259,11 +259,11 @@
                 </div>
             </div>
 
-            <!-- 搜索源管理标签页 -->
+            <!-- 搜索源管理标签页 - 🔧 新增大类筛选选项 -->
             <div id="sources" class="tab-content">
                 <div class="tab-header">
                     <h1>搜索源管理</h1>
-                    <p>管理您的搜索源配置，启用或禁用特定搜索源</p>
+                    <p>管理您的搜索源配置，可用或禁用特定搜索源</p>
                     <div class="header-actions">
                         <button class="btn-primary" id="addCustomSourceBtn">
                             <span>➕</span>
@@ -273,16 +273,27 @@
                     </div>
                 </div>
 
-                <!-- 搜索源控制面板 -->
+                <!-- 搜索源控制面板 - 🔧 新增大类筛选 -->
                 <div class="sources-controls">
                     <div class="control-group">
                         <label>过滤条件：</label>
                         <select id="sourcesFilter">
                             <option value="all">全部搜索源</option>
-                            <option value="enabled">已启用</option>
+                            <option value="enabled">已可用</option>
                             <option value="disabled">已禁用</option>
                             <option value="builtin">内置搜索源</option>
                             <option value="custom">自定义搜索源</option>
+                            <option value="searchable">可搜索源</option>
+                            <option value="browse_only">仅浏览站点</option>
+                            <option value="supports_detail">支持详情提取</option>
+                        </select>
+                    </div>
+                    <!-- 🔧 新增：大类筛选 -->
+                    <div class="control-group">
+                        <label>按大类：</label>
+                        <select id="majorCategoryFilter">
+                            <option value="all">全部大类</option>
+                            <!-- 大类选项将动态加载 -->
                         </select>
                     </div>
                     <div class="control-group">
@@ -299,13 +310,16 @@
                             <option value="name">按名称</option>
                             <option value="category">按分类</option>
                             <option value="status">按状态</option>
+                            <option value="site_type">按网站类型</option>
+                            <option value="searchable">按可搜索性</option>
+                            <option value="major_category">按大分类</option>
                         </select>
                     </div>
                 </div>
 
                 <!-- 搜索源管理批量操作 -->
                 <div class="bulk-actions">
-                    <button class="btn-secondary" id="enableAllSourcesBtn">全部启用</button>
+                    <button class="btn-secondary" id="enableAllSourcesBtn">全部可用</button>
                     <button class="btn-secondary" id="disableAllSourcesBtn">全部禁用</button>
                     <button class="btn-warning" id="resetToDefaultsBtn">重置为默认</button>
                 </div>
@@ -324,7 +338,7 @@
                         </div>
                         <div class="stat-item">
                             <span class="stat-value" id="enabledSourcesCount">0</span>
-                            <span class="stat-desc">已启用</span>
+                            <span class="stat-desc">已可用</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-value" id="customSourcesCount">0</span>
