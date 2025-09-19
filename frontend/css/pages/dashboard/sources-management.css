@@ -1,5 +1,51 @@
 /* 搜索源管理样式 - css/components/sources-management.css */
 
+/* 搜索源筛选区域 */
+.sources-filter-section {
+  background: var(--bg-secondary);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.filter-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.filter-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.filter-group select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+/* 批量操作按钮组 */
+.bulk-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.bulk-actions .btn {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
 /* 搜索源控制面板 */
 .sources-controls {
   display: flex;
@@ -35,15 +81,6 @@
   font-size: 0.9rem;
   cursor: pointer;
   min-width: 150px;
-}
-
-/* 批量操作按钮 */
-.bulk-actions {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
-  justify-content: center;
 }
 
 /* 搜索源列表 */
@@ -100,6 +137,24 @@
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: var(--accent-primary);
+}
+
+.source-item.enabled {
+  border-left: 4px solid var(--success-color);
+}
+
+.source-item.disabled {
+  border-left: 4px solid var(--text-muted);
+  opacity: 0.7;
+}
+
+.source-item.enabled:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.source-item.disabled:hover {
+  opacity: 0.85;
 }
 
 /* 搜索源头部 */
@@ -182,6 +237,12 @@
   color: var(--text-muted);
 }
 
+.source-major-category {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
 .source-category {
   display: flex;
   align-items: center;
@@ -191,6 +252,24 @@
 .source-url {
   word-break: break-all;
   font-family: 'Courier New', monospace;
+}
+
+/* 搜索源徽章和元信息样式 */
+.source-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.source-item .source-badges .searchable-badge,
+.source-item .source-badges .site-type-badge,
+.source-item .source-badges .priority-badge,
+.source-item .source-badges .detail-support-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
 }
 
 /* 搜索源操作按钮 */
@@ -246,6 +325,110 @@
   font-size: 0.85rem;
 }
 
+/* 表单样式增强 */
+.site-config-section,
+.search-config-section {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin: 16px 0;
+  background: var(--bg-secondary);
+}
+
+.site-config-section legend,
+.search-config-section legend {
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0 8px;
+  font-size: 14px;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.form-group input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.form-help {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.form-help code {
+  background: var(--bg-tertiary);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-family: 'Courier New', monospace;
+  color: var(--accent-primary);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .sources-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .filter-controls {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .bulk-actions {
+    flex-direction: column;
+  }
+
+  .bulk-actions .btn {
+    width: 100%;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+  }
+}
+
 /* 深色主题适配 */
 [data-theme="dark"] .source-item {
   border-color: var(--border-color);
@@ -259,4 +442,15 @@
 
 [data-theme="dark"] .source-item.enabled::before {
   background: var(--gradient-primary);
+}
+
+[data-theme="dark"] .site-config-section,
+[data-theme="dark"] .search-config-section {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .sources-filter-section {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
 }

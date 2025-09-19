@@ -192,10 +192,30 @@ export const APP_CONSTANTS = {
       rating: false,
       tags: true,
       quality: 'fair'
-  }
+    }
   },
 
-  // 搜索源分类定义 - 添加默认搜索配置
+  // 🔧 新增：大分类定义（搜索源 vs 浏览站点）
+  MAJOR_CATEGORIES: {
+    SEARCH_SOURCES: {
+      id: 'search_sources',
+      name: '🔍 搜索源',
+      description: '支持番号搜索的网站',
+      icon: '🔍',
+      requiresKeyword: true,
+      order: 1
+    },
+    BROWSE_SITES: {
+      id: 'browse_sites', 
+      name: '🌐 浏览站点',
+      description: '仅供访问，不参与搜索',
+      icon: '🌐',
+      requiresKeyword: false,
+      order: 2
+    }
+  },
+
+  // 搜索源分类定义 - 添加默认搜索配置和大分类归属
   SOURCE_CATEGORIES: {
     database: {
       id: 'database',
@@ -210,7 +230,8 @@ export const APP_CONSTANTS = {
       typicalCapabilities: ['screenshots', 'actresses', 'metadata', 'rating'],
       defaultSearchable: true,      // 该类别默认可搜索
       defaultSiteType: 'search',    // 该类别默认网站类型
-      searchPriority: 1             // 搜索优先级
+      searchPriority: 1,            // 搜索优先级
+      majorCategory: 'search_sources' // 🔧 新增：归属大分类
     },
     streaming: {
       id: 'streaming',
@@ -225,7 +246,8 @@ export const APP_CONSTANTS = {
       typicalCapabilities: ['screenshots', 'downloadLinks', 'actresses', 'metadata'],
       defaultSearchable: false,     // 默认不参与搜索
       defaultSiteType: 'browse',
-      searchPriority: 5
+      searchPriority: 5,
+      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
     },
     torrent: {
       id: 'torrent',
@@ -240,7 +262,8 @@ export const APP_CONSTANTS = {
       typicalCapabilities: ['magnetLinks', 'downloadLinks', 'metadata'],
       defaultSearchable: true,
       defaultSiteType: 'search',
-      searchPriority: 3
+      searchPriority: 3,
+      majorCategory: 'search_sources' // 🔧 新增：归属大分类
     },
     community: {
       id: 'community',
@@ -255,7 +278,8 @@ export const APP_CONSTANTS = {
       typicalCapabilities: [],
       defaultSearchable: false,
       defaultSiteType: 'browse',
-      searchPriority: 10
+      searchPriority: 10,
+      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
     },
     others: {
       id: 'others',
@@ -270,11 +294,12 @@ export const APP_CONSTANTS = {
       typicalCapabilities: [],
       defaultSearchable: false,
       defaultSiteType: 'browse',
-      searchPriority: 10
+      searchPriority: 10,
+      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
     }
   },
   
-  // 增强版搜索源 - 添加网站类型配置
+  // 增强版搜索源 - 🔧 调整非搜索源的URL模板，移除搜索后缀
   SEARCH_SOURCES: [
     // 番号资料站
     {
@@ -354,13 +379,13 @@ export const APP_CONSTANTS = {
       requiresKeyword: true
     },
     
-    // 在线播放平台
+    // 在线播放平台 - 🔧 调整URL模板，移除搜索后缀
     {
       id: 'jable',
       name: 'Jable',
       subtitle: '高清在线观看，支持多种格式',
       icon: '📺',
-      urlTemplate: 'https://jable.tv/',  // 浏览站点直接链接到首页
+      urlTemplate: 'https://jable.tv', // 🔧 移除搜索后缀
       category: 'streaming',
       isBuiltin: true,
       priority: 1,
@@ -379,7 +404,7 @@ export const APP_CONSTANTS = {
       name: 'JavMost',
       subtitle: '免费在线观看，更新及时',
       icon: '🎦',
-      urlTemplate: 'https://javmost.com/',  // 浏览站点直接链接到首页
+      urlTemplate: 'https://javmost.com', // 🔧 移除搜索后缀
       category: 'streaming',
       isBuiltin: true,
       priority: 2,
@@ -398,7 +423,7 @@ export const APP_CONSTANTS = {
       name: 'JavGuru',
       subtitle: '多线路播放，观看流畅',
       icon: '🎭',
-      urlTemplate: 'https://jav.guru/',
+      urlTemplate: 'https://jav.guru', // 🔧 移除搜索后缀
       category: 'streaming',
       isBuiltin: true,
       priority: 3,
@@ -417,7 +442,7 @@ export const APP_CONSTANTS = {
       name: 'AV01',
       subtitle: '快速预览站点，封面大图清晰',
       icon: '🎥',
-      urlTemplate: 'https://av01.tv/',
+      urlTemplate: 'https://av01.tv', // 🔧 移除搜索后缀
       category: 'streaming',
       isBuiltin: true,
       priority: 4,
@@ -436,7 +461,7 @@ export const APP_CONSTANTS = {
       name: 'MissAV',
       subtitle: '中文界面，封面高清，信息丰富',
       icon: '💫',
-      urlTemplate: 'https://missav.com/',
+      urlTemplate: 'https://missav.com', // 🔧 移除搜索后缀
       category: 'streaming',
       isBuiltin: true,
       priority: 5,
@@ -455,7 +480,7 @@ export const APP_CONSTANTS = {
       name: 'JavHD.porn',
       subtitle: '高清资源下载，质量优秀',
       icon: '🎬',
-      urlTemplate: 'https://javhd.porn/',
+      urlTemplate: 'https://javhd.porn', // 🔧 移除搜索后缀
       category: 'streaming',
       isBuiltin: true,
       priority: 6,
@@ -474,7 +499,7 @@ export const APP_CONSTANTS = {
       name: 'JavGG',
       subtitle: '免费观看平台，速度稳定',
       icon: '⚡',
-      urlTemplate: 'https://javgg.net/',
+      urlTemplate: 'https://javgg.net', // 🔧 移除搜索后缀
       category: 'streaming',
       isBuiltin: true,
       priority: 7,
@@ -493,7 +518,7 @@ export const APP_CONSTANTS = {
       name: 'JavHiHi',
       subtitle: '在线播放，无需下载',
       icon: '🎪',
-      urlTemplate: 'https://javhihi.com/',
+      urlTemplate: 'https://javhihi.com', // 🔧 移除搜索后缀
       category: 'streaming',
       isBuiltin: true,
       priority: 8,
@@ -551,7 +576,7 @@ export const APP_CONSTANTS = {
       id: 'torrentkitty',
       name: 'TorrentKitty',
       subtitle: '种子搜索引擎，下载资源丰富',
-      icon: '🱡',
+      icon: '🐱',
       urlTemplate: 'https://www.torrentkitty.tv/search/{keyword}',
       category: 'torrent',
       isBuiltin: true,
@@ -586,13 +611,13 @@ export const APP_CONSTANTS = {
       requiresKeyword: true
     },
     
-    // 社区论坛 - 不参与搜索
+    // 社区论坛 - 🔧 调整URL模板，移除搜索后缀
     {
       id: 'sehuatang',
       name: '色花堂',
       subtitle: '综合论坛社区，资源丰富',
       icon: '🌸',
-      urlTemplate: 'https://sehuatang.org/',  // 浏览站点直接链接到首页
+      urlTemplate: 'https://sehuatang.org', // 🔧 移除搜索后缀
       category: 'community',
       isBuiltin: true,
       priority: 1,
@@ -611,7 +636,7 @@ export const APP_CONSTANTS = {
       name: 'T66Y',
       subtitle: '老牌论坛，资源更新快',
       icon: '📋',
-      urlTemplate: 'https://t66y.com/',
+      urlTemplate: 'https://t66y.com', // 🔧 移除搜索后缀
       category: 'community',
       isBuiltin: true,
       priority: 2,
@@ -627,12 +652,12 @@ export const APP_CONSTANTS = {
     }
   ],
   
-  // 搜索源和分类验证规则 - 修改URL验证支持浏览站点
+  // 搜索源和分类验证规则 - 🔧 调整URL验证规则
   VALIDATION_RULES: {
     SOURCE: {
       REQUIRED_FIELDS: ['name', 'urlTemplate', 'category'],
-      SEARCH_URL_PATTERN: /^https?:\/\/.+\{keyword\}.*/,  // 搜索源必须包含{keyword}
-      BROWSE_URL_PATTERN: /^https?:\/\/.+/,               // 浏览站点可以是任意有效URL
+      URL_PATTERN: /^https?:\/\/.+/, // 🔧 修改：不强制要求{keyword}
+      SEARCH_URL_PATTERN: /^https?:\/\/.+\{keyword\}.*/, // 🔧 新增：搜索源URL验证
       NAME_PATTERN: /^[a-zA-Z0-9\u4e00-\u9fa5\s\-_.()（）]+$/,
       ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
       FORBIDDEN_DOMAINS: [
@@ -672,7 +697,7 @@ export const APP_CONSTANTS = {
   DEFAULT_ICONS: [
     '📚', '🎥', '🧲', '💬', '🌟', '🔍', '📺', '🎬',
     '🎭', '🎪', '🎦', '🎬', '⚡', '💫', '🌙', '🔗',
-    '🱡', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲'
+    '🐱', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲'
   ],
   
   // 权限定义 - 保持不变，添加详情提取配置权限
@@ -780,7 +805,7 @@ export const APP_CONSTANTS = {
   // 默认用户设置 - 移除详情提取硬编码配置，其他保持不变
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
-    searchSources: ['javbus', 'javdb', 'javlibrary', 'btsow'],  // 默认只启用搜索类型的源
+    searchSources: ['javbus', 'javdb', 'javlibrary', 'btsow'],  // 默认只可用搜索类型的源
     customSearchSources: [],
     customSourceCategories: [],
     maxFavoritesPerUser: 1000,
@@ -815,7 +840,8 @@ export const APP_CONSTANTS = {
       EXTRACTION_QUALITY: 'extraction_quality',
       AVERAGE_TIME: 'average_time',
       SITE_TYPE: 'site_type',              // 新增：按网站类型排序
-      SEARCHABLE: 'searchable'             // 新增：按可搜索性排序
+      SEARCHABLE: 'searchable',            // 新增：按可搜索性排序
+      MAJOR_CATEGORY: 'major_category'     // 🔧 新增：按大分类排序
     },
     FILTER_OPTIONS: {
       ALL: 'all',
@@ -830,7 +856,9 @@ export const APP_CONSTANTS = {
       HIGH_QUALITY: 'high_quality',
       FAST_EXTRACTION: 'fast_extraction',
       SEARCHABLE: 'searchable',            // 新增：可搜索源
-      BROWSE_ONLY: 'browse_only'           // 新增：仅浏览站点
+      BROWSE_ONLY: 'browse_only',          // 新增：仅浏览站点
+      SEARCH_SOURCES: 'search_sources',    // 🔧 新增：搜索源大类
+      BROWSE_SITES: 'browse_sites'         // 🔧 新增：浏览站点大类
     }
   },
 
@@ -1039,6 +1067,7 @@ export const VALIDATION_RULES = APP_CONSTANTS.VALIDATION_RULES;
 export const SOURCE_MANAGEMENT = APP_CONSTANTS.SOURCE_MANAGEMENT;
 export const DETAIL_EXTRACTION_CONFIG = APP_CONSTANTS.DETAIL_EXTRACTION_CONFIG;
 export const SITE_TYPES = APP_CONSTANTS.SITE_TYPES; // 新增导出
+export const MAJOR_CATEGORIES = APP_CONSTANTS.MAJOR_CATEGORIES; // 🔧 新增导出
 
 // 工具函数 - 保持不变
 export function getStorageKey(key) {
@@ -1079,6 +1108,28 @@ export function isSearchableSource(sourceId) {
   return source ? source.searchable !== false : false;
 }
 
+// 🔧 新增：大分类相关工具函数
+export function getSourcesByMajorCategory(majorCategoryId) {
+  return SEARCH_SOURCES.filter(source => {
+    const category = SOURCE_CATEGORIES[source.category];
+    return category && category.majorCategory === majorCategoryId;
+  });
+}
+
+export function getCategoriesByMajorCategory(majorCategoryId) {
+  return Object.values(SOURCE_CATEGORIES).filter(category => 
+    category.majorCategory === majorCategoryId
+  );
+}
+
+export function getMajorCategoryForSource(sourceId) {
+  const source = SEARCH_SOURCES.find(s => s.id === sourceId);
+  if (!source) return null;
+  
+  const category = SOURCE_CATEGORIES[source.category];
+  return category ? category.majorCategory : null;
+}
+
 // 新增：详情提取配置相关工具函数
 export function getDetailConfigEndpoint(endpoint) {
   return APP_CONSTANTS.DETAIL_CONFIG_ENDPOINTS[endpoint.toUpperCase()];
@@ -1087,7 +1138,20 @@ export function getDetailConfigEndpoint(endpoint) {
 export function isDetailExtractionEnabled() {
   // 这个函数现在应该通过 DetailConfigAPI 来获取用户配置
   // 这里只返回系统级开关状态
-  return true; // 系统级默认启用，具体用户配置由 detail-config-api.js 管理
+  return true; // 系统级默认可用，具体用户配置由 detail-config-api.js 管理
+}
+
+// 🔧 新增：URL验证工具函数
+export function validateSourceUrl(url, isSearchable) {
+  const rules = VALIDATION_RULES.SOURCE;
+  
+  if (isSearchable) {
+    // 搜索源必须包含{keyword}
+    return rules.SEARCH_URL_PATTERN.test(url);
+  } else {
+    // 浏览站点只需要是有效URL
+    return rules.URL_PATTERN.test(url);
+  }
 }
 
 // 向后兼容性检查函数

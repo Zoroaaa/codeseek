@@ -1,5 +1,5 @@
 // 分类管理器
-import { APP_CONSTANTS } from '../../core/constants.js';
+import { APP_CONSTANTS, MAJOR_CATEGORIES } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
 import apiService from '../../services/api.js';
@@ -92,13 +92,28 @@ export class CategoriesManager {
       return;
     }
 
-    builtinCategoriesList.innerHTML = `
-      <div class="categories-grid">
-        ${this.builtinCategories
-          .sort((a, b) => (a.order || 999) - (b.order || 999))
-          .map(category => this.renderCategoryItem(category)).join('')}
-      </div>
-    `;
+    // 🔧 按大分类分组显示内置分类
+    const categoriesByMajor = this.groupCategoriesByMajorCategory(this.builtinCategories);
+    
+    let html = '';
+    Object.values(MAJOR_CATEGORIES).sort((a, b) => a.order - b.order).forEach(majorCategory => {
+      const categories = categoriesByMajor[majorCategory.id] || [];
+      if (categories.length === 0) return;
+      
+      html += `
+        <div class="major-category-group">
+          <h4 class="major-category-header">
+            ${majorCategory.icon} ${majorCategory.name}
+            <span class="category-count">(${categories.length}个)</span>
+          </h4>
+          <div class="categories-grid">
+            ${categories.map(category => this.renderCategoryItem(category)).join('')}
+          </div>
+        </div>
+      `;
+    });
+
+    builtinCategoriesList.innerHTML = html;
   }
 
   renderCustomCategories() {
@@ -123,6 +138,26 @@ export class CategoriesManager {
     `;
   }
 
+  // 🔧 新增：按大分类分组
+  groupCategoriesByMajorCategory(categories) {
+    const grouped = {};
+    
+    categories.forEach(category => {
+      const majorCategoryId = category.majorCategory || 'others';
+      if (!grouped[majorCategoryId]) {
+        grouped[majorCategoryId] = [];
+      }
+      grouped[majorCategoryId].push(category);
+    });
+    
+    // 对每个组内的分类按order排序
+    Object.keys(grouped).forEach(key => {
+      grouped[key].sort((a, b) => (a.order || 999) - (b.order || 999));
+    });
+    
+    return grouped;
+  }
+
   renderCategoryItem(category) {
     const sourcesManager = this.app.getManager('sources');
     const allSources = sourcesManager ? sourcesManager.getAllSearchSources() : [];
@@ -141,6 +176,11 @@ export class CategoriesManager {
       s.category === category.id && s.searchable === false
     ).length;
     
+    // 🔧 获取大分类信息
+    const majorCategoryInfo = MAJOR_CATEGORIES[category.majorCategory];
+    const majorCategoryLabel = majorCategoryInfo ? 
+      `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
+    
     return `
       <div class="category-item ${category.isCustom ? 'custom' : 'builtin'}" data-category-id="${category.id}">
         <div class="category-header">
@@ -148,12 +188,23 @@ export class CategoriesManager {
           <div class="category-info">
             <div class="category-name">${escapeHtml(category.name)}</div>
             <div class="category-description">${escapeHtml(category.description || '')}</div>
+            
             <div class="category-meta">
-              <span class="category-usage">
-                ${enabledSourceCount}/${sourceCount} 个搜索源已启用
-              </span>
-              ${category.isCustom ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
+              <div class="category-stats">
+                <span class="category-usage">
+                  ${enabledSourceCount}/${sourceCount} 个搜索源已可用
+                </span>
+                ${category.isCustom ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
+              </div>
+              
+              <!-- 🔧 显示大分类归属 -->
+              ${!category.isCustom ? `
+                <div class="major-category-info">
+                  <span class="major-category-label">归属：${majorCategoryLabel}</span>
+                </div>
+              ` : ''}
             </div>
+            
             <!-- 🔧 新增：搜索配置信息 -->
             ${category.isBuiltin ? `
               <div class="category-search-config">
@@ -163,6 +214,7 @@ export class CategoriesManager {
                 <span class="site-type-badge">${this.getSiteTypeLabel(category.defaultSiteType)}</span>
                 ${category.searchPriority ? `<span class="priority-badge">优先级: ${category.searchPriority}</span>` : ''}
               </div>
+              
               <div class="category-source-stats">
                 ${searchableSources > 0 ? `<span class="stat-item">🔍 ${searchableSources}个搜索源</span>` : ''}
                 ${browseSources > 0 ? `<span class="stat-item">🌐 ${browseSources}个浏览站</span>` : ''}
@@ -170,6 +222,7 @@ export class CategoriesManager {
             ` : ''}
           </div>
         </div>
+        
         <div class="category-actions">
           <button class="action-btn view-btn" onclick="app.getManager('categories').viewCategorySources('${category.id}')" title="查看搜索源">
             查看源
@@ -256,49 +309,53 @@ export class CategoriesManager {
     modal.id = 'customCategoryModal';
     modal.className = 'modal';
     modal.innerHTML = `
-      <div class="modal-content">
+      <div class="modal-content custom-category-modal-content">
         <span class="close">&times;</span>
         <h2>添加自定义分类</h2>
-        <form id="customCategoryForm">
+        <form id="customCategoryForm" class="custom-category-form">
           <input type="hidden" name="categoryId">
           
-          <div class="form-row">
-            <div class="form-group">
-              <label for="categoryName">分类名称 *</label>
-              <input type="text" name="categoryName" id="categoryName" required maxlength="30" 
-                     placeholder="例如：我的分类">
+          <div class="form-section basic-info">
+            <h3>基本信息</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="categoryName">分类名称 *</label>
+                <input type="text" name="categoryName" id="categoryName" required maxlength="30" 
+                       placeholder="例如：我的分类">
+              </div>
+              
+              <div class="form-group">
+                <label for="categoryIcon">图标 *</label>
+                <select name="categoryIcon" id="categoryIcon" required>
+                  ${APP_CONSTANTS.DEFAULT_ICONS.map(icon => `
+                    <option value="${icon}">${icon}</option>
+                  `).join('')}
+                </select>
+              </div>
             </div>
             
             <div class="form-group">
-              <label for="categoryIcon">图标 *</label>
-              <select name="categoryIcon" id="categoryIcon" required>
-                ${APP_CONSTANTS.DEFAULT_ICONS.map(icon => `
-                  <option value="${icon}">${icon}</option>
+              <label for="categoryDescription">分类描述</label>
+              <input type="text" name="categoryDescription" id="categoryDescription" maxlength="100" 
+                     placeholder="例如：专门的搜索资源分类">
+            </div>
+            
+            <div class="form-group">
+              <label for="categoryColor">分类颜色</label>
+              <select name="categoryColor" id="categoryColor">
+                ${APP_CONSTANTS.DEFAULT_COLORS.map(color => `
+                  <option value="${color}" style="background-color: ${color}; color: white;">
+                    ${color}
+                  </option>
                 `).join('')}
               </select>
             </div>
           </div>
           
-          <div class="form-group">
-            <label for="categoryDescription">分类描述</label>
-            <input type="text" name="categoryDescription" id="categoryDescription" maxlength="100" 
-                   placeholder="例如：专门的搜索资源分类">
-          </div>
-          
-          <div class="form-group">
-            <label for="categoryColor">分类颜色</label>
-            <select name="categoryColor" id="categoryColor">
-              ${APP_CONSTANTS.DEFAULT_COLORS.map(color => `
-                <option value="${color}" style="background-color: ${color}; color: white;">
-                  ${color}
-                </option>
-              `).join('')}
-            </select>
-          </div>
-          
           <!-- 🔧 新增：搜索配置部分 -->
-          <fieldset class="search-config-section">
-            <legend>搜索配置</legend>
+          <div class="form-section search-config">
+            <h3>搜索配置</h3>
+            <p class="section-description">设置该分类下网站的默认行为</p>
             
             <div class="form-group">
               <label>
@@ -322,7 +379,7 @@ export class CategoriesManager {
                      min="1" max="10" value="5">
               <small>数字越小优先级越高</small>
             </div>
-          </fieldset>
+          </div>
           
           <div class="form-actions">
             <button type="button" class="btn-secondary" onclick="app.closeModals()">取消</button>

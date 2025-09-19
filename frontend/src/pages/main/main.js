@@ -1,5 +1,5 @@
 // 主应用入口 - 集成统一搜索组件和配置管理架构，新增邮箱验证功能支持
-import { APP_CONSTANTS } from '../../core/constants.js';
+import { APP_CONSTANTS, MAJOR_CATEGORIES, getCategoriesByMajorCategory, getSourcesByMajorCategory } from '../../core/constants.js';
 import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { isDevEnv } from '../../utils/helpers.js';
@@ -203,7 +203,7 @@ class MagnetSearchApp {
           console.warn('获取详情提取统计失败:', error);
         }
         
-        // 如果后端支持但用户未启用，显示提示
+        // 如果后端支持但用户未可用，显示提示
         if (this.detailExtractionAvailable && !this.detailExtractionEnabled) {
           this.showDetailExtractionNotification();
         }
@@ -211,7 +211,7 @@ class MagnetSearchApp {
       
       this.updateDetailExtractionUI(this.detailExtractionAvailable);
       
-      console.log(`详情提取功能：${this.detailExtractionAvailable ? '可用' : '不可用'}，用户设置：${this.detailExtractionEnabled ? '启用' : '禁用'}`);
+      console.log(`详情提取功能：${this.detailExtractionAvailable ? '可用' : '不可用'}，用户设置：${this.detailExtractionEnabled ? '可用' : '禁用'}`);
       
     } catch (error) {
       console.warn('检查详情提取功能可用性失败:', error);
@@ -232,7 +232,7 @@ class MagnetSearchApp {
     if (detailToggleBtn) {
       detailToggleBtn.style.display = available ? 'inline-block' : 'none';
       detailToggleBtn.classList.toggle('active', this.detailExtractionEnabled);
-      detailToggleBtn.title = this.detailExtractionEnabled ? '禁用详情提取' : '启用详情提取';
+      detailToggleBtn.title = this.detailExtractionEnabled ? '禁用详情提取' : '可用详情提取';
     }
     
     if (detailStatusSection) {
@@ -241,7 +241,7 @@ class MagnetSearchApp {
     
     if (detailStatusBadge) {
       detailStatusBadge.textContent = available ? 
-        (this.detailExtractionEnabled ? '已启用' : '未启用') : '不可用';
+        (this.detailExtractionEnabled ? '已可用' : '未可用') : '不可用';
       detailStatusBadge.className = `status-badge ${available ? 
         (this.detailExtractionEnabled ? 'enabled' : 'disabled') : 'unavailable'}`;
     }
@@ -249,8 +249,8 @@ class MagnetSearchApp {
     if (detailStatusDescription) {
       if (available) {
         detailStatusDescription.textContent = this.detailExtractionEnabled ? 
-          '详情提取功能已启用，可以自动获取番号的详细信息。' :
-          '详情提取功能可用但未启用，点击上方按钮开启。';
+          '详情提取功能已可用，可以自动获取番号的详细信息。' :
+          '详情提取功能可用但未可用，点击上方按钮开启。';
       } else {
         detailStatusDescription.textContent = '详情提取功能当前不可用，可能需要登录或后端服务未启动。';
       }
@@ -275,7 +275,7 @@ class MagnetSearchApp {
       // 绑定详情提取相关事件
       this.bindDetailExtractionEvents();
       
-      // 如果用户已启用详情提取，确保详情卡片管理器已初始化
+      // 如果用户已可用详情提取，确保详情卡片管理器已初始化
       if (this.detailExtractionEnabled && !detailCardManager.isInitialized) {
         await detailCardManager.init();
       }
@@ -292,7 +292,7 @@ class MagnetSearchApp {
       if (event.detail.config) {
         const config = event.detail.config;
         
-        // 更新详情提取启用状态
+        // 更新详情提取可用状态
         if (config.enableDetailExtraction !== this.detailExtractionEnabled) {
           this.detailExtractionEnabled = config.enableDetailExtraction;
           this.updateDetailExtractionUI(this.detailExtractionAvailable);
@@ -400,7 +400,7 @@ class MagnetSearchApp {
         '• 演员信息和作品详情\n' +
         '• 直接可用的下载链接\n' +
         '• 磁力链接和种子信息\n\n' +
-        '是否立即启用此功能？'
+        '是否立即可用此功能？'
       );
 
       if (enable) {
@@ -412,7 +412,7 @@ class MagnetSearchApp {
     }, 2000);
   }
 
-  // 启用详情提取功能
+  // 可用详情提取功能
   async enableDetailExtraction() {
     if (!this.detailExtractionAvailable) {
       showToast('详情提取功能当前不可用', 'warning');
@@ -436,7 +436,7 @@ class MagnetSearchApp {
         // 更新UI
         this.updateDetailExtractionUI(this.detailExtractionAvailable);
         
-        showToast('详情提取功能已启用！', 'success');
+        showToast('详情提取功能已可用！', 'success');
         
         // 触发状态变更事件
         this.dispatchDetailExtractionStateChanged();
@@ -445,8 +445,8 @@ class MagnetSearchApp {
       }
       
     } catch (error) {
-      console.error('启用详情提取功能失败:', error);
-      showToast('启用详情提取功能失败: ' + error.message, 'error');
+      console.error('可用详情提取功能失败:', error);
+      showToast('可用详情提取功能失败: ' + error.message, 'error');
     }
   }
 
@@ -473,7 +473,7 @@ class MagnetSearchApp {
         
         this.detailExtractionEnabled = newState;
         
-        // 如果启用，确保详情卡片管理器已初始化
+        // 如果可用，确保详情卡片管理器已初始化
         if (newState && !detailCardManager.isInitialized) {
           await detailCardManager.init();
         }
@@ -484,7 +484,7 @@ class MagnetSearchApp {
         // 触发状态变更事件
         this.dispatchDetailExtractionStateChanged();
         
-        showToast(`详情提取功能已${newState ? '启用' : '禁用'}`, 'success');
+        showToast(`详情提取功能已${newState ? '可用' : '禁用'}`, 'success');
       } else {
         throw new Error('配置管理器未初始化');
       }
@@ -498,7 +498,7 @@ class MagnetSearchApp {
   // 批量提取详情
   async batchExtractDetails() {
     if (!this.detailExtractionEnabled) {
-      showToast('请先启用详情提取功能', 'warning');
+      showToast('请先可用详情提取功能', 'warning');
       return;
     }
 
@@ -586,7 +586,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 🔧 渲染站点导航 - 实现分层+分类显示
+  // 🔧 渲染站点导航 - 分层显示搜索源和浏览站点
   renderSiteNavigation(sourcesToDisplay = null) {
     const sitesSection = document.getElementById('sitesSection');
     if (!sitesSection) return;
@@ -612,9 +612,8 @@ class MagnetSearchApp {
       return;
     }
 
-    // 🔧 分组显示：先按搜索性分组，再按类别细分
-    const searchSources = sources.filter(s => s.searchable !== false);
-    const browseSites = sources.filter(s => s.searchable === false);
+    // 🔧 按大分类分组显示
+    const majorCategories = Object.values(MAJOR_CATEGORIES).sort((a, b) => a.order - b.order);
     
     let navigationHTML = `
       <h2>🌐 资源站点导航</h2>
@@ -624,74 +623,93 @@ class MagnetSearchApp {
           <span class="notice-icon">✨</span>
           <span>标有 <strong>📋</strong> 的站点支持详情提取功能</span>
           ${!this.detailExtractionEnabled ? `
-            <button onclick="window.app.enableDetailExtraction()" class="enable-detail-btn">启用详情提取</button>
+            <button onclick="window.app.enableDetailExtraction()" class="enable-detail-btn">可用详情提取</button>
           ` : ''}
         </div>
       ` : ''}
     `;
-    
-    // 🔧 渲染搜索源区域（按类别细分）
-    if (searchSources.length > 0) {
+
+    // 按大分类渲染各个部分
+    majorCategories.forEach(majorCategory => {
+      const categorySourcesWithSubcategories = this.getSourcesByMajorCategoryWithSubcategories(sources, majorCategory.id);
+      
+      if (categorySourcesWithSubcategories.length === 0) return;
+
       navigationHTML += `
-        <div class="search-sources-section">
-          <h3>🔍 搜索源 <small>(支持番号搜索)</small></h3>
-          ${this.renderSourcesByCategory(searchSources, true)}
+        <div class="major-category-section">
+          <h3 class="major-category-title">
+            ${majorCategory.icon} ${majorCategory.name}
+            <small>(${categorySourcesWithSubcategories.length}个站点)</small>
+          </h3>
+          <p class="major-category-desc">${majorCategory.description}</p>
+          
+          <div class="subcategories-container">
+            ${this.renderSubcategoriesWithSources(categorySourcesWithSubcategories, majorCategory.id)}
+          </div>
         </div>
       `;
-    }
-    
-    // 🔧 渲染浏览站点区域（按类别细分）
-    if (browseSites.length > 0) {
-      navigationHTML += `
-        <div class="browse-sites-section">
-          <h3>🌐 浏览站点 <small>(仅供访问，不参与搜索)</small></h3>
-          ${this.renderSourcesByCategory(browseSites, false)}
-        </div>
-      `;
-    }
+    });
     
     sitesSection.innerHTML = navigationHTML;
   }
 
-  // 🔧 新增：按类别渲染搜索源
-  renderSourcesByCategory(sources, isSearchable) {
-    // 按类别分组
-    const sourcesByCategory = this.groupSourcesByCategory(sources);
+  // 🔧 新增：获取按大分类和小分类组织的源
+  getSourcesByMajorCategoryWithSubcategories(sources, majorCategoryId) {
+    // 获取属于该大分类的所有源
+    const categorySources = sources.filter(source => {
+      const category = this.allCategories.find(cat => cat.id === source.category);
+      return category && category.majorCategory === majorCategoryId;
+    });
+
+    return categorySources;
+  }
+
+  // 🔧 新增：渲染小分类及其下的源
+  renderSubcategoriesWithSources(sources, majorCategoryId) {
+    // 按小分类分组
+    const sourcesBySubcategory = {};
     
-    let categoryHTML = '';
-    
-    // 按类别顺序渲染
-    this.allCategories
-      .filter(category => sourcesByCategory[category.id] && sourcesByCategory[category.id].length > 0)
-      .sort((a, b) => (a.order || 999) - (b.order || 999))
-      .forEach(category => {
-        const categorySources = sourcesByCategory[category.id];
-        const supportedCount = categorySources.filter(s => this.supportsDetailExtraction(s.id)).length;
-        
-        categoryHTML += `
-          <div class="site-subcategory">
-            <h4 class="subcategory-title">
-              <span class="category-icon">${category.icon}</span>
-              <span class="category-name">${category.name}</span>
-              <span class="category-stats">
-                ${categorySources.length}个站点
-                ${supportedCount > 0 ? `<span class="detail-support-count">（${supportedCount}个支持详情提取）</span>` : ''}
-              </span>
-            </h4>
-            <div class="sites-grid subcategory-grid">
-              ${categorySources.map(source => this.renderSiteItem(source, isSearchable)).join('')}
-            </div>
+    sources.forEach(source => {
+      const subcategory = this.allCategories.find(cat => cat.id === source.category);
+      if (subcategory) {
+        if (!sourcesBySubcategory[subcategory.id]) {
+          sourcesBySubcategory[subcategory.id] = {
+            category: subcategory,
+            sources: []
+          };
+        }
+        sourcesBySubcategory[subcategory.id].sources.push(source);
+      }
+    });
+
+    // 按小分类的order排序
+    const sortedSubcategories = Object.values(sourcesBySubcategory)
+      .sort((a, b) => (a.category.order || 999) - (b.category.order || 999));
+
+    return sortedSubcategories.map(({ category, sources }) => {
+      const isSearchable = majorCategoryId === 'search_sources';
+      
+      return `
+        <div class="subcategory-section">
+          <h4 class="subcategory-title">
+            ${category.icon} ${category.name}
+            <span class="source-count">${sources.length}个站点</span>
+            ${isSearchable ? '<span class="searchable-indicator">🔍 参与搜索</span>' : '<span class="browse-indicator">🌐 仅浏览</span>'}
+          </h4>
+          <p class="subcategory-desc">${category.description}</p>
+          
+          <div class="sites-grid">
+            ${sources.map(source => this.renderSiteItem(source, isSearchable)).join('')}
           </div>
-        `;
-      });
-    
-    return categoryHTML;
+        </div>
+      `;
+    }).join('');
   }
 
   // 🔧 渲染单个站点项，包含可用状态和详情提取支持标识
   renderSiteItem(source, isSearchable) {
-    // 通过统一搜索管理器检查源的启用状态
-    let isEnabled = true; // 默认显示为可用，具体启用状态由搜索时判断
+    // 通过统一搜索管理器检查源的可用状态
+    let isEnabled = true; // 默认显示为可用，具体可用状态由搜索时判断
     
     try {
       if (unifiedSearchManager.isInitialized && unifiedSearchManager.configManager) {
@@ -699,11 +717,11 @@ class MagnetSearchApp {
         // 这里可以添加检查逻辑，当前简化处理
       }
     } catch (error) {
-      console.warn('检查搜索源启用状态失败:', error);
+      console.warn('检查搜索源可用状态失败:', error);
     }
 
     const statusClass = isEnabled ? 'enabled' : 'disabled';
-    const statusText = isEnabled ? '可用' : '未启用';
+    const statusText = isEnabled ? '可用' : '未可用';
     const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
     
     const badges = [];
@@ -718,8 +736,18 @@ class MagnetSearchApp {
       badges.push('<span class="detail-support-badge">📋</span>');
     }
     
+    // 🔧 根据网站类型调整URL处理
+    let siteUrl = source.urlTemplate;
+    if (source.searchable === false) {
+      // 浏览站点直接使用基础URL
+      siteUrl = siteUrl.replace('/{keyword}', '').replace('?q={keyword}&f=all', '').replace('/search/{keyword}', '');
+    } else {
+      // 搜索源移除关键词占位符以供直接访问
+      siteUrl = siteUrl.replace('{keyword}', '');
+    }
+    
     return `
-      <a href="${source.urlTemplate ? source.urlTemplate.replace('{keyword}', '') : '#'}" 
+      <a href="${siteUrl}" 
          class="site-item ${isSearchable ? 'searchable' : 'browse-only'}"
          target="_blank">
         <div class="site-info">
