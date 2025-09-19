@@ -15,7 +15,7 @@ export class SourcesManager {
   }
 
   async init() {
-    console.log('🔍 初始化搜索源管理器');
+    console.log('🔧 初始化搜索源管理器');
     this.loadBuiltinData();
     this.bindEvents();
   }
@@ -163,6 +163,12 @@ export class SourcesManager {
             return source.isBuiltin;
           case 'custom':
             return source.isCustom;
+          case 'searchable':  // 🔧 新增：可搜索源
+            return source.searchable !== false;
+          case 'browse_only': // 🔧 新增：仅浏览站点
+            return source.searchable === false;
+          case 'supports_detail':
+            return this.supportsDetailExtraction(source.id);
           default:
             return true;
         }
@@ -209,6 +215,14 @@ export class SourcesManager {
           const statusA = this.enabledSources.includes(a.id) ? 0 : 1;
           const statusB = this.enabledSources.includes(b.id) ? 0 : 1;
           return statusA - statusB;
+        case 'site_type':  // 🔧 新增：按网站类型排序
+          const siteTypeA = a.siteType || 'search';
+          const siteTypeB = b.siteType || 'search';
+          return siteTypeA.localeCompare(siteTypeB);
+        case 'searchable': // 🔧 新增：按可搜索性排序
+          const searchableA = a.searchable !== false ? 0 : 1;
+          const searchableB = b.searchable !== false ? 0 : 1;
+          return searchableA - searchableB;
         case 'priority':
         default:
           if (a.isBuiltin && b.isBuiltin) {
@@ -224,6 +238,17 @@ export class SourcesManager {
   renderSourceItem(source) {
     const category = this.getCategoryById(source.category);
     const isEnabled = this.enabledSources.includes(source.id);
+    const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
+    
+    // 🔧 网站类型标识
+    const siteTypeLabel = {
+      'search': '搜索源',
+      'browse': '浏览站',
+      'reference': '参考站'
+    }[source.siteType || 'search'];
+    
+    const searchableIcon = source.searchable === false ? '🚫' : '🔍';
+    const searchableTitle = source.searchable === false ? '不参与搜索' : '参与搜索';
     
     return `
       <div class="source-item ${isEnabled ? 'enabled' : 'disabled'}" data-source-id="${source.id}">
@@ -244,6 +269,15 @@ export class SourcesManager {
                 <span>分类：${category ? `${category.icon} ${category.name}` : '未知分类'}</span>
               </div>
               <div class="source-url">${escapeHtml(source.urlTemplate)}</div>
+            </div>
+            <!-- 🔧 新增：网站类型标识 -->
+            <div class="source-badges">
+              <span class="searchable-badge" title="${searchableTitle}">
+                ${searchableIcon}
+              </span>
+              <span class="site-type-badge">${siteTypeLabel}</span>
+              ${source.searchPriority ? `<span class="priority-badge">优先级: ${source.searchPriority}</span>` : ''}
+              ${supportsDetailExtraction ? '<span class="detail-support-badge">支持详情提取</span>' : ''}
             </div>
           </div>
         </div>
@@ -439,6 +473,42 @@ export class SourcesManager {
             </small>
           </div>
           
+          <!-- 🔧 新增：网站类型配置 -->
+          <fieldset class="site-config-section">
+            <legend>网站类型配置</legend>
+            
+            <div class="form-group">
+              <label>
+                <input type="checkbox" name="searchable" id="searchable" checked>
+                参与番号搜索
+              </label>
+              <small>取消勾选后，搜索时不会显示该网站</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="siteType">网站类型</label>
+              <select name="siteType" id="siteType">
+                <option value="search">搜索源</option>
+                <option value="browse">浏览站</option>
+                <option value="reference">参考站</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="searchPriority">搜索优先级</label>
+              <input type="number" name="searchPriority" id="searchPriority" 
+                     min="1" max="10" value="5">
+              <small>数字越小优先级越高</small>
+            </div>
+            
+            <div class="form-group">
+              <label>
+                <input type="checkbox" name="requiresKeyword" id="requiresKeyword" checked>
+                需要搜索关键词
+              </label>
+            </div>
+          </fieldset>
+          
           <div class="form-actions">
             <button type="button" class="btn-secondary" onclick="app.closeModals()">取消</button>
             <button type="submit" class="btn-primary">添加搜索源</button>
@@ -455,27 +525,47 @@ export class SourcesManager {
     return modal;
   }
 
+  // 🔧 修改 populateCustomSourceForm - 自动设置默认值
   populateCustomSourceForm(modal, source) {
     const form = modal.querySelector('#customSourceForm');
     if (!form) return;
 
     if (source) {
-      // 编辑模式
+      // 编辑模式 - 加载现有值
       form.sourceId.value = source.id;
       form.sourceName.value = source.name;
       form.sourceSubtitle.value = source.subtitle || '';
       form.sourceIcon.value = source.icon || '🔍';
       form.sourceUrl.value = source.urlTemplate;
       form.sourceCategory.value = source.category || 'others';
+      form.searchable.checked = source.searchable !== false;
+      form.siteType.value = source.siteType || 'search';
+      form.searchPriority.value = source.searchPriority || 5;
+      form.requiresKeyword.checked = source.requiresKeyword !== false;
       modal.querySelector('h2').textContent = '编辑自定义搜索源';
       modal.querySelector('[type="submit"]').textContent = '更新搜索源';
     } else {
-      // 新增模式
+      // 新增模式 - 根据分类设置默认值
       form.reset();
       form.sourceIcon.value = '🔍';
       form.sourceCategory.value = 'others';
+      form.searchable.checked = true;
+      form.siteType.value = 'search';
+      form.searchPriority.value = 5;
+      form.requiresKeyword.checked = true;
       modal.querySelector('h2').textContent = '添加自定义搜索源';
       modal.querySelector('[type="submit"]').textContent = '添加搜索源';
+      
+      // 🔧 根据分类的默认配置自动设置
+      const categorySelect = form.sourceCategory;
+      categorySelect.addEventListener('change', (e) => {
+        const category = this.app.getManager('categories').getCategoryById(e.target.value);
+        if (category) {
+          form.searchable.checked = category.defaultSearchable !== false;
+          form.siteType.value = category.defaultSiteType || 'search';
+          form.searchPriority.value = category.searchPriority || 5;
+        }
+      });
     }
     
     this.updateSourceCategorySelect(form.sourceCategory);
@@ -508,7 +598,12 @@ export class SourcesManager {
       subtitle: formData.get('sourceSubtitle').trim(),
       icon: formData.get('sourceIcon').trim() || '🔍',
       urlTemplate: formData.get('sourceUrl').trim(),
-      category: formData.get('sourceCategory')
+      category: formData.get('sourceCategory'),
+      // 🔧 新增：网站类型配置
+      searchable: formData.get('searchable') === 'on',
+      siteType: formData.get('siteType') || 'search',
+      searchPriority: parseInt(formData.get('searchPriority')) || 5,
+      requiresKeyword: formData.get('requiresKeyword') === 'on'
     };
     
     const validation = this.validateCustomSource(sourceData);
@@ -733,6 +828,12 @@ export class SourcesManager {
 
   resetEditingState() {
     this.editingCustomSource = null;
+  }
+
+  // 🔧 新增：检查搜索源是否支持详情提取
+  supportsDetailExtraction(sourceId) {
+    const detailSources = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || [];
+    return detailSources.includes(sourceId);
   }
 
   // 辅助方法

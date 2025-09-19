@@ -84,6 +84,21 @@
   opacity: 0.85;
 }
 
+/* 🔧 新增：搜索源和浏览站点区别样式 */
+.site-item.searchable {
+  border-left: 4px solid var(--success-color);
+}
+
+.site-item.browse-only {
+  border-left: 4px solid var(--warning-color);
+  opacity: 0.8;
+  border-style: dashed;
+}
+
+.site-item.browse-only:hover {
+  opacity: 0.9;
+}
+
 /* 站点列表网格布局 */
 .site-list {
   display: grid;
@@ -98,6 +113,126 @@
   gap: 1.5rem;
 }
 
+/* 🔧 新增：搜索源区域和浏览站点区域样式 */
+.search-sources-section,
+.browse-sites-section {
+  margin-bottom: 2rem;
+}
+
+.search-sources-section h3,
+.browse-sites-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-sources-section h3 {
+  color: var(--success-color);
+}
+
+.browse-sites-section h3 {
+  color: var(--warning-color);
+}
+
+/* 🔧 新增：详情提取通知样式 */
+.detail-extraction-notice {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.detail-extraction-notice .notice-icon {
+  font-size: 1.2em;
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+.detail-extraction-notice .enable-detail-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.detail-extraction-notice .enable-detail-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.1); }
+}
+
+/* 🔧 新增：徽章样式 */
+.non-searchable-badge {
+  background: #6b7280;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.priority-badge {
+  background: #f59e0b;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.site-type-badge {
+  background: #3b82f6;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.detail-support-badge {
+  background: #10b981;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.searchable-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.searchable-badge[title*="参与搜索"] {
+  background: var(--success-color);
+  color: white;
+}
+
+.searchable-badge[title*="不参与搜索"] {
+  background: var(--error-color);
+  color: white;
+}
+
 /* 分类标题样式 */
 .site-category h3 {
   font-size: 16px;
@@ -108,6 +243,166 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 🔧 新增：分类搜索配置样式 */
+.category-search-config {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.search-default-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.search-default-badge.searchable {
+  background: var(--success-color);
+  color: white;
+}
+
+.search-default-badge.non-searchable {
+  background: var(--warning-color);
+  color: white;
+}
+
+.category-source-stats {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 🔧 新增：搜索源管理器增强样式 */
+.source-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.source-item .source-badges .searchable-badge,
+.source-item .source-badges .site-type-badge,
+.source-item .source-badges .priority-badge,
+.source-item .source-badges .detail-support-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+/* 🔧 新增：表单样式增强 */
+.site-config-section,
+.search-config-section {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin: 16px 0;
+  background: var(--bg-secondary);
+}
+
+.site-config-section legend,
+.search-config-section legend {
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0 8px;
+  font-size: 14px;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.form-group input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.form-help {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.form-help code {
+  background: var(--bg-tertiary);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-family: 'Courier New', monospace;
+  color: var(--accent-primary);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 🔧 新增：源管理器筛选区域 */
+.sources-filter-section {
+  background: var(--bg-secondary);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.filter-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.filter-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.filter-group select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
 }
 
 /* 空状态样式 */
@@ -126,6 +421,66 @@
 .empty-history-state p {
   font-size: 1rem;
   margin-bottom: 1rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--border-color);
+}
+
+.empty-state span {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+.empty-state .btn-primary {
+  margin-top: 1rem;
+}
+
+/* 🔧 新增：源项目状态指示器 */
+.source-item {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.source-item.enabled {
+  border-left: 4px solid var(--success-color);
+}
+
+.source-item.disabled {
+  border-left: 4px solid var(--text-muted);
+  opacity: 0.7;
+}
+
+.source-item.enabled:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.source-item.disabled:hover {
+  opacity: 0.85;
+}
+
+/* 🔧 新增：批量操作按钮组 */
+.bulk-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.bulk-actions .btn {
+  font-size: 12px;
+  padding: 6px 12px;
 }
 
 /* 响应式布局 */
@@ -149,6 +504,38 @@
   .site-badges {
     align-self: flex-end;
   }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .filter-controls {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .bulk-actions {
+    flex-direction: column;
+  }
+
+  .bulk-actions .btn {
+    width: 100%;
+  }
+
+  .detail-extraction-notice {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -165,9 +552,145 @@
   .site-item {
     padding: 1rem;
   }
+
+  .search-sources-section h3,
+  .browse-sites-section h3 {
+    font-size: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .category-search-config {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .category-source-stats {
+    flex-direction: column;
+    gap: 4px;
+  }
 }
 
 /* 深色模式适配 */
 [data-theme="dark"] .site-item.disabled {
   background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .site-item.browse-only {
+  background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .detail-extraction-notice {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+[data-theme="dark"] .site-config-section,
+[data-theme="dark"] .search-config-section {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .sources-filter-section {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .empty-state {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+/* 🔧 新增：动画效果 */
+.site-item,
+.category-item,
+.source-item {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.site-badges > *,
+.source-badges > * {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 🔧 新增：搜索优先级指示器 */
+.priority-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warning-color);
+}
+
+.priority-indicator.high-priority {
+  background: var(--error-color);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.priority-indicator.medium-priority {
+  background: var(--warning-color);
+}
+
+.priority-indicator.low-priority {
+  background: var(--info-color);
+}
+
+/* 🔧 新增：状态指示灯 */
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.status-indicator.available {
+  background: var(--success-color);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+
+.status-indicator.unavailable {
+  background: var(--error-color);
+}
+
+.status-indicator.timeout {
+  background: var(--warning-color);
+}
+
+.status-indicator.checking {
+  background: var(--info-color);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
 }

@@ -14,7 +14,7 @@ export class CategoriesManager {
   }
 
   async init() {
-    console.log('📁 初始化分类管理器');
+    console.log('🏷️ 初始化分类管理器');
     this.loadBuiltinData();
     this.bindEvents();
   }
@@ -133,6 +133,14 @@ export class CategoriesManager {
       s.category === category.id && enabledSources.includes(s.id)
     ).length;
     
+    // 🔧 新增：搜索源类型统计
+    const searchableSources = allSources.filter(s => 
+      s.category === category.id && s.searchable !== false
+    ).length;
+    const browseSources = allSources.filter(s => 
+      s.category === category.id && s.searchable === false
+    ).length;
+    
     return `
       <div class="category-item ${category.isCustom ? 'custom' : 'builtin'}" data-category-id="${category.id}">
         <div class="category-header">
@@ -146,6 +154,20 @@ export class CategoriesManager {
               </span>
               ${category.isCustom ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
             </div>
+            <!-- 🔧 新增：搜索配置信息 -->
+            ${category.isBuiltin ? `
+              <div class="category-search-config">
+                <span class="search-default-badge ${category.defaultSearchable ? 'searchable' : 'non-searchable'}">
+                  ${category.defaultSearchable ? '🔍 默认可搜索' : '🌐 默认仅浏览'}
+                </span>
+                <span class="site-type-badge">${this.getSiteTypeLabel(category.defaultSiteType)}</span>
+                ${category.searchPriority ? `<span class="priority-badge">优先级: ${category.searchPriority}</span>` : ''}
+              </div>
+              <div class="category-source-stats">
+                ${searchableSources > 0 ? `<span class="stat-item">🔍 ${searchableSources}个搜索源</span>` : ''}
+                ${browseSources > 0 ? `<span class="stat-item">🌐 ${browseSources}个浏览站</span>` : ''}
+              </div>
+            ` : ''}
           </div>
         </div>
         <div class="category-actions">
@@ -163,6 +185,16 @@ export class CategoriesManager {
         </div>
       </div>
     `;
+  }
+
+  // 🔧 新增：获取网站类型标签
+  getSiteTypeLabel(siteType) {
+    const labels = {
+      'search': '搜索源',
+      'browse': '浏览站',
+      'reference': '参考站'
+    };
+    return labels[siteType] || '搜索源';
   }
 
   updateCategoriesStats() {
@@ -264,6 +296,34 @@ export class CategoriesManager {
             </select>
           </div>
           
+          <!-- 🔧 新增：搜索配置部分 -->
+          <fieldset class="search-config-section">
+            <legend>搜索配置</legend>
+            
+            <div class="form-group">
+              <label>
+                <input type="checkbox" name="defaultSearchable" id="defaultSearchable" checked>
+                该分类下的网站默认参与搜索
+              </label>
+            </div>
+            
+            <div class="form-group">
+              <label for="defaultSiteType">默认网站类型</label>
+              <select name="defaultSiteType" id="defaultSiteType">
+                <option value="search">搜索源（需要关键词）</option>
+                <option value="browse">浏览站（仅供访问）</option>
+                <option value="reference">参考站（可选关键词）</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="searchPriority">搜索优先级 (1-10)</label>
+              <input type="number" name="searchPriority" id="searchPriority" 
+                     min="1" max="10" value="5">
+              <small>数字越小优先级越高</small>
+            </div>
+          </fieldset>
+          
           <div class="form-actions">
             <button type="button" class="btn-secondary" onclick="app.closeModals()">取消</button>
             <button type="submit" class="btn-primary">添加分类</button>
@@ -291,6 +351,10 @@ export class CategoriesManager {
       form.categoryDescription.value = category.description || '';
       form.categoryIcon.value = category.icon || '🌟';
       form.categoryColor.value = category.color || '#6b7280';
+      // 🔧 加载搜索配置
+      form.defaultSearchable.checked = category.defaultSearchable !== false;
+      form.defaultSiteType.value = category.defaultSiteType || 'search';
+      form.searchPriority.value = category.searchPriority || 5;
       modal.querySelector('h2').textContent = '编辑自定义分类';
       modal.querySelector('[type="submit"]').textContent = '更新分类';
     } else {
@@ -298,11 +362,16 @@ export class CategoriesManager {
       form.reset();
       form.categoryIcon.value = '🌟';
       form.categoryColor.value = '#6b7280';
+      // 🔧 设置搜索配置默认值
+      form.defaultSearchable.checked = true;
+      form.defaultSiteType.value = 'search';
+      form.searchPriority.value = 5;
       modal.querySelector('h2').textContent = '添加自定义分类';
       modal.querySelector('[type="submit"]').textContent = '添加分类';
     }
   }
 
+  // 🔧 修改 handleCustomCategorySubmit 方法
   async handleCustomCategorySubmit(event) {
     event.preventDefault();
     
@@ -314,7 +383,11 @@ export class CategoriesManager {
       name: formData.get('categoryName').trim(),
       description: formData.get('categoryDescription').trim(),
       icon: formData.get('categoryIcon'),
-      color: formData.get('categoryColor')
+      color: formData.get('categoryColor'),
+      // 🔧 新增：搜索配置字段
+      defaultSearchable: formData.get('defaultSearchable') === 'on',
+      defaultSiteType: formData.get('defaultSiteType') || 'search',
+      searchPriority: parseInt(formData.get('searchPriority')) || 5
     };
     
     const validation = this.validateCustomCategory(categoryData);

@@ -39,6 +39,13 @@ export const APP_CONSTANTS = {
     DETAIL_RETRY_DELAY: 1000,
     DETAIL_PROGRESS_UPDATE_INTERVAL: 1000
   },
+
+  // 网站类型定义
+  SITE_TYPES: {
+    SEARCH: 'search',       // 真正的搜索源（需要关键词）
+    BROWSE: 'browse',       // 浏览型网站（不需要关键词）  
+    REFERENCE: 'reference'  // 参考资料站（可选关键词）
+  },
   
   // 用户限制 - 保持不变
   LIMITS: {
@@ -188,7 +195,7 @@ export const APP_CONSTANTS = {
   }
   },
 
-  // 搜索源分类定义 - 保持不变，增强详情提取支持标识
+  // 搜索源分类定义 - 添加默认搜索配置
   SOURCE_CATEGORIES: {
     database: {
       id: 'database',
@@ -200,7 +207,10 @@ export const APP_CONSTANTS = {
       order: 1,
       supportsDetailExtraction: true,
       extractionPriority: 'high',
-      typicalCapabilities: ['screenshots', 'actresses', 'metadata', 'rating']
+      typicalCapabilities: ['screenshots', 'actresses', 'metadata', 'rating'],
+      defaultSearchable: true,      // 该类别默认可搜索
+      defaultSiteType: 'search',    // 该类别默认网站类型
+      searchPriority: 1             // 搜索优先级
     },
     streaming: {
       id: 'streaming',
@@ -212,7 +222,10 @@ export const APP_CONSTANTS = {
       order: 2,
       supportsDetailExtraction: true,
       extractionPriority: 'medium',
-      typicalCapabilities: ['screenshots', 'downloadLinks', 'actresses', 'metadata']
+      typicalCapabilities: ['screenshots', 'downloadLinks', 'actresses', 'metadata'],
+      defaultSearchable: false,     // 默认不参与搜索
+      defaultSiteType: 'browse',
+      searchPriority: 5
     },
     torrent: {
       id: 'torrent',
@@ -224,7 +237,10 @@ export const APP_CONSTANTS = {
       order: 3,
       supportsDetailExtraction: true,
       extractionPriority: 'low',
-      typicalCapabilities: ['magnetLinks', 'downloadLinks', 'metadata']
+      typicalCapabilities: ['magnetLinks', 'downloadLinks', 'metadata'],
+      defaultSearchable: true,
+      defaultSiteType: 'search',
+      searchPriority: 3
     },
     community: {
       id: 'community',
@@ -236,7 +252,10 @@ export const APP_CONSTANTS = {
       order: 4,
       supportsDetailExtraction: false,
       extractionPriority: 'none',
-      typicalCapabilities: []
+      typicalCapabilities: [],
+      defaultSearchable: false,
+      defaultSiteType: 'browse',
+      searchPriority: 10
     },
     others: {
       id: 'others',
@@ -248,11 +267,14 @@ export const APP_CONSTANTS = {
       order: 99,
       supportsDetailExtraction: false,
       extractionPriority: 'none',
-      typicalCapabilities: []
+      typicalCapabilities: [],
+      defaultSearchable: false,
+      defaultSiteType: 'browse',
+      searchPriority: 10
     }
   },
   
-  // 增强版搜索源 - 保持完整功能，完善详情提取支持标识
+  // 增强版搜索源 - 添加网站类型配置
   SEARCH_SOURCES: [
     // 番号资料站
     {
@@ -268,7 +290,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: true,
       extractionQuality: 'excellent',
       averageExtractionTime: 3000,
-      supportedFeatures: ['screenshots', 'downloadLinks', 'magnetLinks', 'actresses', 'metadata', 'description', 'rating', 'tags']
+      supportedFeatures: ['screenshots', 'downloadLinks', 'magnetLinks', 'actresses', 'metadata', 'description', 'rating', 'tags'],
+      searchable: true,         // 是否参与搜索
+      siteType: 'search',       // 网站类型
+      searchPriority: 1,        // 搜索优先级 (1-10)
+      requiresKeyword: true     // 是否需要关键词
     },
     {
       id: 'javdb',
@@ -283,7 +309,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: true,
       extractionQuality: 'good',
       averageExtractionTime: 2500,
-      supportedFeatures: ['screenshots', 'magnetLinks', 'actresses', 'metadata', 'description', 'rating', 'tags']
+      supportedFeatures: ['screenshots', 'magnetLinks', 'actresses', 'metadata', 'description', 'rating', 'tags'],
+      searchable: true,
+      siteType: 'search',
+      searchPriority: 2,
+      requiresKeyword: true
     },
     {
       id: 'javlibrary',
@@ -298,7 +328,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: true,
+      siteType: 'search',
+      searchPriority: 3,
+      requiresKeyword: true
     },
     {
       id: 'javfinder',
@@ -313,7 +347,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: true,
+      siteType: 'search',
+      searchPriority: 4,
+      requiresKeyword: true
     },
     
     // 在线播放平台
@@ -330,7 +368,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: true,
       extractionQuality: 'good',
       averageExtractionTime: 3500,
-      supportedFeatures: ['screenshots', 'downloadLinks', 'actresses', 'metadata', 'description', 'tags']
+      supportedFeatures: ['screenshots', 'downloadLinks', 'actresses', 'metadata', 'description', 'tags'],
+      searchable: false,        // 播放平台默认不参与搜索
+      siteType: 'browse',
+      searchPriority: 5,
+      requiresKeyword: false
     },
     {
       id: 'javmost',
@@ -345,7 +387,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: true,
       extractionQuality: 'fair',
       averageExtractionTime: 4500,
-      supportedFeatures: ['screenshots', 'downloadLinks', 'magnetLinks', 'actresses', 'metadata', 'description']
+      supportedFeatures: ['screenshots', 'downloadLinks', 'magnetLinks', 'actresses', 'metadata', 'description'],
+      searchable: false,
+      siteType: 'browse',
+      searchPriority: 6,
+      requiresKeyword: false
     },
     {
       id: 'javguru',
@@ -360,7 +406,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: false,
+      siteType: 'browse',
+      searchPriority: 7,
+      requiresKeyword: false
     },
     {
       id: 'av01',
@@ -375,7 +425,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: false,
+      siteType: 'browse',
+      searchPriority: 8,
+      requiresKeyword: false
     },
     {
       id: 'missav',
@@ -390,7 +444,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: false,
+      siteType: 'browse',
+      searchPriority: 9,
+      requiresKeyword: false
     },
     {
       id: 'javhdporn',
@@ -405,7 +463,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: false,
+      siteType: 'browse',
+      searchPriority: 10,
+      requiresKeyword: false
     },
     {
       id: 'javgg',
@@ -420,7 +482,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: true,
       extractionQuality: 'fair',
       averageExtractionTime: 4500,
-      supportedFeatures: ['screenshots', 'actresses', 'metadata']
+      supportedFeatures: ['screenshots', 'actresses', 'metadata'],
+      searchable: false,
+      siteType: 'browse',
+      searchPriority: 11,
+      requiresKeyword: false
     },
     {
       id: 'javhihi',
@@ -435,7 +501,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: true,
       extractionQuality: 'fair',
       averageExtractionTime: 5000,
-      supportedFeatures: ['screenshots', 'actresses']
+      supportedFeatures: ['screenshots', 'actresses'],
+      searchable: false,
+      siteType: 'browse',
+      searchPriority: 12,
+      requiresKeyword: false
     },
     
     // 磁力搜索
@@ -452,7 +522,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: true,
+      siteType: 'search',
+      searchPriority: 2,
+      requiresKeyword: true
     },
     {
       id: 'magnetdl',
@@ -467,7 +541,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: true,
+      siteType: 'search',
+      searchPriority: 3,
+      requiresKeyword: true
     },
     {
       id: 'torrentkitty',
@@ -482,7 +560,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: true,
+      siteType: 'search',
+      searchPriority: 4,
+      requiresKeyword: true
     },
     {
       id: 'sukebei',
@@ -497,10 +579,14 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: true,
       extractionQuality: 'fair',
       averageExtractionTime: 6000,
-      supportedFeatures: ['downloadLinks', 'magnetLinks', 'metadata', 'description', 'tags']
+      supportedFeatures: ['downloadLinks', 'magnetLinks', 'metadata', 'description', 'tags'],
+      searchable: true,
+      siteType: 'search',
+      searchPriority: 5,
+      requiresKeyword: true
     },
     
-    // 社区论坛
+    // 社区论坛 - 不参与搜索
     {
       id: 'sehuatang',
       name: '色花堂',
@@ -514,7 +600,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: false,        // 不参与搜索
+      siteType: 'browse',
+      searchPriority: 99,
+      requiresKeyword: false
     },
     {
       id: 't66y',
@@ -529,7 +619,11 @@ export const APP_CONSTANTS = {
       supportsDetailExtraction: false,
       extractionQuality: 'none',
       averageExtractionTime: 0,
-      supportedFeatures: []
+      supportedFeatures: [],
+      searchable: false,        // 不参与搜索
+      siteType: 'browse',
+      searchPriority: 99,
+      requiresKeyword: false
     }
   ],
   
@@ -685,7 +779,7 @@ export const APP_CONSTANTS = {
   // 默认用户设置 - 移除详情提取硬编码配置，其他保持不变
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
-    searchSources: ['javbus', 'javdb', 'javlibrary'],
+    searchSources: ['javbus', 'javdb', 'javlibrary', 'btsow'],  // 默认只启用搜索类型的源
     customSearchSources: [],
     customSourceCategories: [],
     maxFavoritesPerUser: 1000,
@@ -718,7 +812,9 @@ export const APP_CONSTANTS = {
       STATUS: 'status',
       DETAIL_SUPPORT: 'detail_support',
       EXTRACTION_QUALITY: 'extraction_quality',
-      AVERAGE_TIME: 'average_time'
+      AVERAGE_TIME: 'average_time',
+      SITE_TYPE: 'site_type',              // 新增：按网站类型排序
+      SEARCHABLE: 'searchable'             // 新增：按可搜索性排序
     },
     FILTER_OPTIONS: {
       ALL: 'all',
@@ -731,7 +827,9 @@ export const APP_CONSTANTS = {
       SUPPORTS_DETAIL: 'supports_detail',
       NO_DETAIL: 'no_detail',
       HIGH_QUALITY: 'high_quality',
-      FAST_EXTRACTION: 'fast_extraction'
+      FAST_EXTRACTION: 'fast_extraction',
+      SEARCHABLE: 'searchable',            // 新增：可搜索源
+      BROWSE_ONLY: 'browse_only'           // 新增：仅浏览站点
     }
   },
 
@@ -939,6 +1037,7 @@ export const ANALYTICS_EVENTS = APP_CONSTANTS.ANALYTICS_EVENTS;
 export const VALIDATION_RULES = APP_CONSTANTS.VALIDATION_RULES;
 export const SOURCE_MANAGEMENT = APP_CONSTANTS.SOURCE_MANAGEMENT;
 export const DETAIL_EXTRACTION_CONFIG = APP_CONSTANTS.DETAIL_EXTRACTION_CONFIG;
+export const SITE_TYPES = APP_CONSTANTS.SITE_TYPES; // 新增导出
 
 // 工具函数 - 保持不变
 export function getStorageKey(key) {
@@ -959,6 +1058,24 @@ export function getSourceByCategory(category) {
 
 export function getSourcesSupportingDetailExtraction() {
   return SEARCH_SOURCES.filter(source => source.supportsDetailExtraction);
+}
+
+// 新增：网站类型相关工具函数
+export function getSearchableSources() {
+  return SEARCH_SOURCES.filter(source => source.searchable !== false);
+}
+
+export function getBrowseOnlySources() {
+  return SEARCH_SOURCES.filter(source => source.searchable === false);
+}
+
+export function getSourcesBySiteType(siteType) {
+  return SEARCH_SOURCES.filter(source => source.siteType === siteType);
+}
+
+export function isSearchableSource(sourceId) {
+  const source = SEARCH_SOURCES.find(s => s.id === sourceId);
+  return source ? source.searchable !== false : false;
 }
 
 // 新增：详情提取配置相关工具函数

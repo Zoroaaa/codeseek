@@ -123,7 +123,7 @@ class MagnetSearchApp {
   // 🆕 初始化邮箱验证服务
   async initEmailVerificationService() {
     try {
-      console.log('🔐 初始化邮箱验证服务...');
+      console.log('📧 初始化邮箱验证服务...');
       
       // 邮箱验证服务已经通过导入自动初始化
       // 这里可以进行一些额外的配置或检查
@@ -555,7 +555,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 初始化站点导航 - 集成统一搜索管理器
+  // 🔧 初始化站点导航 - 实现分层显示
   async initSiteNavigation() {
     try {
       // 获取所有可用的搜索源（通过统一搜索管理器）
@@ -586,7 +586,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 渲染站点导航 - 显示所有搜索源，并标识详情提取支持
+  // 🔧 渲染站点导航 - 分层显示搜索源和浏览站点
   renderSiteNavigation(sourcesToDisplay = null) {
     const sitesSection = document.getElementById('sitesSection');
     if (!sitesSection) return;
@@ -612,12 +612,13 @@ class MagnetSearchApp {
       return;
     }
 
-    // 按分类组织搜索源
-    const sourcesByCategory = this.groupSourcesByCategory(sources);
-
-    // 生成HTML
+    // 🔧 分组显示
+    const searchSources = sources.filter(s => s.searchable !== false);
+    const browseSites = sources.filter(s => s.searchable === false);
+    
     let navigationHTML = `
       <h2>🌐 资源站点导航</h2>
+      
       ${this.detailExtractionAvailable ? `
         <div class="detail-extraction-notice">
           <span class="notice-icon">✨</span>
@@ -627,38 +628,33 @@ class MagnetSearchApp {
           ` : ''}
         </div>
       ` : ''}
-      <div class="sites-grid">
+      
+      <!-- 搜索源区域 -->
+      <div class="search-sources-section">
+        <h3>🔍 搜索源 <small>(支持番号搜索)</small></h3>
+        <div class="sites-grid">
+          ${searchSources.map(source => this.renderSiteItem(source, true)).join('')}
+        </div>
+      </div>
+      
+      <!-- 浏览站点区域 -->
+      ${browseSites.length > 0 ? `
+        <div class="browse-sites-section">
+          <h3>🌐 浏览站点 <small>(仅供访问，不参与搜索)</small></h3>
+          <div class="sites-grid">
+            ${browseSites.map(source => this.renderSiteItem(source, false)).join('')}
+          </div>
+        </div>
+      ` : ''}
     `;
     
-    // 按分类顺序渲染
-    this.allCategories
-      .filter(category => sourcesByCategory[category.id] && sourcesByCategory[category.id].length > 0)
-      .sort((a, b) => (a.order || 999) - (b.order || 999))
-      .forEach(category => {
-        const categorySources = sourcesByCategory[category.id];
-        const supportedCount = categorySources.filter(s => this.supportsDetailExtraction(s.id)).length;
-        
-        navigationHTML += `
-          <div class="site-category">
-            <h3 style="color: ${category.color || '#6b7280'}">
-              ${category.icon} ${category.name}
-              ${supportedCount > 0 ? `<span class="detail-support-count">(${supportedCount}个支持详情提取)</span>` : ''}
-            </h3>
-            <div class="site-list">
-              ${categorySources.map(source => this.renderSiteItem(source)).join('')}
-            </div>
-          </div>
-        `;
-      });
-    
-    navigationHTML += '</div>';
     sitesSection.innerHTML = navigationHTML;
   }
 
-  // 渲染单个站点项，包含启用状态和详情提取支持标识
-  renderSiteItem(source) {
+  // 🔧 渲染单个站点项，包含可用状态和详情提取支持标识
+  renderSiteItem(source, isSearchable) {
     // 通过统一搜索管理器检查源的启用状态
-    let isEnabled = true; // 默认显示为启用，具体启用状态由搜索时判断
+    let isEnabled = true; // 默认显示为可用，具体启用状态由搜索时判断
     
     try {
       if (unifiedSearchManager.isInitialized && unifiedSearchManager.configManager) {
@@ -673,18 +669,28 @@ class MagnetSearchApp {
     const statusText = isEnabled ? '可用' : '未启用';
     const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
     
+    const badges = [];
+    
+    if (!isSearchable) {
+      badges.push('<span class="non-searchable-badge">仅浏览</span>');
+    } else if (source.searchPriority && source.searchPriority <= 3) {
+      badges.push('<span class="priority-badge">优先</span>');
+    }
+    
+    if (supportsDetailExtraction) {
+      badges.push('<span class="detail-support-badge">📋</span>');
+    }
+    
     return `
-      <a href="${source.urlTemplate ? source.urlTemplate.replace('{keyword}', 'search') : '#'}" 
-         target="_blank" 
-         class="site-item ${statusClass}" 
-         rel="noopener noreferrer"
-         title="${source.subtitle || source.name} - ${statusText}${supportsDetailExtraction ? ' - 支持详情提取' : ''}">
+      <a href="${source.urlTemplate ? source.urlTemplate.replace('{keyword}', '') : '#'}" 
+         class="site-item ${isSearchable ? 'searchable' : 'browse-only'}"
+         target="_blank">
         <div class="site-info">
           <div class="site-header">
-            <strong>${source.icon || '🔍'} ${source.name}</strong>
+            <strong>${source.icon || '📄'} ${source.name}</strong>
             <div class="site-badges">
               ${source.isCustom ? '<span class="custom-badge">自定义</span>' : ''}
-              ${supportsDetailExtraction ? '<span class="detail-support-badge">📋</span>' : ''}
+              ${badges.join('')}
               <span class="status-badge ${statusClass}">${statusText}</span>
             </div>
           </div>
@@ -692,33 +698,6 @@ class MagnetSearchApp {
         </div>
       </a>
     `;
-  }
-
-  // 按分类组织搜索源
-  groupSourcesByCategory(sources) {
-    const grouped = {};
-    
-    sources.forEach(source => {
-      const categoryId = source.category || 'others';
-      if (!grouped[categoryId]) {
-        grouped[categoryId] = [];
-      }
-      grouped[categoryId].push(source);
-    });
-    
-    // 按优先级排序每个分类内的搜索源
-    Object.keys(grouped).forEach(categoryId => {
-      grouped[categoryId].sort((a, b) => {
-        if (a.isBuiltin && b.isBuiltin) {
-          return (a.priority || 999) - (b.priority || 999);
-        }
-        if (a.isBuiltin && !b.isBuiltin) return -1;
-        if (!a.isBuiltin && b.isBuiltin) return 1;
-        return (b.createdAt || 0) - (a.createdAt || 0);
-      });
-    });
-    
-    return grouped;
   }
 
   // 初始化组件

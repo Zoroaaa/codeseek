@@ -112,15 +112,27 @@ class SearchService {
     console.log('用户设置缓存已清除');
   }
   
-  // 获取用户可用的搜索源
-  async getEnabledSearchSources() {
+  // 🔧 新增：获取启用的搜索源（支持搜索过滤）
+  async getEnabledSearchSources(options = {}) {
+    const { 
+      includeNonSearchable = false,  // 是否包含非搜索源
+      keyword = ''                   // 搜索关键词（用于智能判断）
+    } = options;
+
     try {
       // 如果用户未登录，使用默认搜索源
       if (!authManager.isAuthenticated()) {
-        const defaultSources = ['javbus', 'javdb', 'javlibrary'];
-        return APP_CONSTANTS.SEARCH_SOURCES.filter(
+        const defaultSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
+        let sources = APP_CONSTANTS.SEARCH_SOURCES.filter(
           source => defaultSources.includes(source.id)
         );
+        
+        // 过滤搜索源
+        if (!includeNonSearchable) {
+          sources = sources.filter(source => source.searchable !== false);
+        }
+        
+        return this.applySortingAndFiltering(sources, keyword);
       }
 
       // 获取用户设置
@@ -129,13 +141,19 @@ class SearchService {
         userSettings = await this.getUserSettings();
       } catch (error) {
         console.error('获取用户设置失败，使用默认搜索源:', error);
-        const defaultSources = ['javbus', 'javdb', 'javlibrary'];
-        return APP_CONSTANTS.SEARCH_SOURCES.filter(
+        const defaultSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
+        let sources = APP_CONSTANTS.SEARCH_SOURCES.filter(
           source => defaultSources.includes(source.id)
         );
+        
+        if (!includeNonSearchable) {
+          sources = sources.filter(source => source.searchable !== false);
+        }
+        
+        return this.applySortingAndFiltering(sources, keyword);
       }
 
-      const enabledSources = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary'];
+      const enabledSources = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary', 'btsow'];
       
       // 验证搜索源ID的有效性
       const validSources = enabledSources.filter(sourceId => 
@@ -144,10 +162,16 @@ class SearchService {
       
       if (validSources.length === 0) {
         console.warn('用户设置的搜索源无效，使用默认源');
-        const defaultSources = ['javbus', 'javdb', 'javlibrary'];
-        return APP_CONSTANTS.SEARCH_SOURCES.filter(
+        const defaultSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
+        let sources = APP_CONSTANTS.SEARCH_SOURCES.filter(
           source => defaultSources.includes(source.id)
         );
+        
+        if (!includeNonSearchable) {
+          sources = sources.filter(source => source.searchable !== false);
+        }
+        
+        return this.applySortingAndFiltering(sources, keyword);
       }
       
       // 合并内置搜索源和自定义搜索源
@@ -160,14 +184,58 @@ class SearchService {
         source => validSources.includes(source.id)
       );
 
-      return [...builtinSources, ...enabledCustomSources];
+      let sources = [...builtinSources, ...enabledCustomSources];
+      
+      // 🔧 如果不包含非搜索源，过滤掉 searchable: false 的源
+      if (!includeNonSearchable) {
+        sources = sources.filter(source => source.searchable !== false);
+      }
+      
+      return this.applySortingAndFiltering(sources, keyword);
+      
     } catch (error) {
       console.error('获取搜索源配置失败:', error);
-      const defaultSources = ['javbus', 'javdb', 'javlibrary'];
-      return APP_CONSTANTS.SEARCH_SOURCES.filter(
+      const defaultSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
+      let sources = APP_CONSTANTS.SEARCH_SOURCES.filter(
         source => defaultSources.includes(source.id)
       );
+      
+      if (!includeNonSearchable) {
+        sources = sources.filter(source => source.searchable !== false);
+      }
+      
+      return this.applySortingAndFiltering(sources, keyword);
     }
+  }
+
+  // 🔧 新增：应用排序和过滤逻辑
+  applySortingAndFiltering(sources, keyword) {
+    // 根据搜索优先级排序
+    sources.sort((a, b) => {
+      const priorityA = a.searchPriority || 99;
+      const priorityB = b.searchPriority || 99;
+      return priorityA - priorityB;
+    });
+    
+    // 🔧 智能模式：如果关键词不像番号，调整源的优先级
+    if (keyword && !this.looksLikeProductCode(keyword)) {
+      // 对于普通关键词，优先使用通用搜索引擎
+      sources = sources.sort((a, b) => {
+        // 如果源支持通用搜索，提升优先级
+        if (a.supportsGeneralSearch && !b.supportsGeneralSearch) return -1;
+        if (!a.supportsGeneralSearch && b.supportsGeneralSearch) return 1;
+        return 0;
+      });
+    }
+    
+    return sources;
+  }
+
+  // 🔧 新增：判断是否像番号的辅助方法
+  looksLikeProductCode(keyword) {
+    // 番号通常格式: ABC-123, MIMK-186 等
+    const productCodePattern = /^[A-Z]{2,6}-?\d{3,6}$/i;
+    return productCodePattern.test(keyword.trim());
   }
 
   // 构建搜索结果 - 使用后端状态检查
@@ -177,10 +245,13 @@ class SearchService {
     const { checkStatus = false, userSettings = null } = options;
     
     try {
-      // 获取用户可用的搜索源
-      const enabledSources = await this.getEnabledSearchSources();
+      // 🔧 获取搜索源时，根据关键词类型决定
+      const enabledSources = await this.getEnabledSearchSources({
+        includeNonSearchable: false,  // 搜索时不包含浏览站
+        keyword: keyword
+      });
       
-      console.log(`使用 ${enabledSources.length} 个搜索源:`, enabledSources.map(s => s.name));
+      console.log(`使用 ${enabledSources.length} 个搜索源进行搜索:`, enabledSources.map(s => s.name));
       
       // 🔧 如果启用了状态检查，使用后端检查器
       let sourcesWithStatus = enabledSources;
@@ -216,7 +287,7 @@ class SearchService {
       console.error('构建搜索结果失败:', error);
       // 增强错误处理：如果获取搜索源失败，使用默认源
       const defaultSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
-        source => ['javbus', 'javdb', 'javlibrary'].includes(source.id)
+        source => ['javbus', 'javdb', 'javlibrary', 'btsow'].includes(source.id) && source.searchable !== false
       );
       
       return this.buildResultsFromSources(defaultSources, keyword, encodedKeyword, timestamp);
