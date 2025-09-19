@@ -1,5 +1,5 @@
 // 主应用入口 - 集成统一搜索组件和配置管理架构，新增邮箱验证功能支持
-import { APP_CONSTANTS, MAJOR_CATEGORIES, getCategoriesByMajorCategory, getSourcesByMajorCategory } from '../../core/constants.js';
+import { APP_CONSTANTS, MAJOR_CATEGORIES, getCategoriesByMajorCategory, getSourcesByMajorCategory, getSiteTypeLabel } from '../../core/constants.js';
 import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { isDevEnv } from '../../utils/helpers.js';
@@ -555,7 +555,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 🔧 初始化站点导航 - 实现分层显示
+  // 🔧 优化：初始化站点导航 - 确保使用constants.js中的MAJOR_CATEGORIES
   async initSiteNavigation() {
     try {
       // 获取所有可用的搜索源（通过统一搜索管理器）
@@ -586,7 +586,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 🔧 渲染站点导航 - 分层显示搜索源和浏览站点
+  // 🔧 优化：渲染站点导航 - 完全基于constants.js中的MAJOR_CATEGORIES配置
   renderSiteNavigation(sourcesToDisplay = null) {
     const sitesSection = document.getElementById('sitesSection');
     if (!sitesSection) return;
@@ -612,7 +612,7 @@ class MagnetSearchApp {
       return;
     }
 
-    // 🔧 按大分类分组显示
+    // 🔧 确保使用constants.js中的MAJOR_CATEGORIES进行分层显示
     const majorCategories = Object.values(MAJOR_CATEGORIES).sort((a, b) => a.order - b.order);
     
     let navigationHTML = `
@@ -629,7 +629,7 @@ class MagnetSearchApp {
       ` : ''}
     `;
 
-    // 按大分类渲染各个部分
+    // 🔧 完全按constants.js中的MAJOR_CATEGORIES渲染各个部分
     majorCategories.forEach(majorCategory => {
       const categorySourcesWithSubcategories = this.getSourcesByMajorCategoryWithSubcategories(sources, majorCategory.id);
       
@@ -653,7 +653,7 @@ class MagnetSearchApp {
     sitesSection.innerHTML = navigationHTML;
   }
 
-  // 🔧 新增：获取按大分类和小分类组织的源
+  // 🔧 获取按大分类和小分类组织的源
   getSourcesByMajorCategoryWithSubcategories(sources, majorCategoryId) {
     // 获取属于该大分类的所有源
     const categorySources = sources.filter(source => {
@@ -664,7 +664,7 @@ class MagnetSearchApp {
     return categorySources;
   }
 
-  // 🔧 新增：渲染小分类及其下的源
+  // 🔧 渲染小分类及其下的源
   renderSubcategoriesWithSources(sources, majorCategoryId) {
     // 按小分类分组
     const sourcesBySubcategory = {};
@@ -687,7 +687,9 @@ class MagnetSearchApp {
       .sort((a, b) => (a.category.order || 999) - (b.category.order || 999));
 
     return sortedSubcategories.map(({ category, sources }) => {
-      const isSearchable = majorCategoryId === 'search_sources';
+      // 🔧 根据大分类确定是否为搜索源
+      const majorCategory = MAJOR_CATEGORIES[majorCategoryId];
+      const isSearchable = majorCategory && majorCategory.requiresKeyword;
       
       return `
         <div class="subcategory-section">

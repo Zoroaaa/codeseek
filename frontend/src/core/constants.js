@@ -195,7 +195,7 @@ export const APP_CONSTANTS = {
     }
   },
 
-  // 🔧 新增：大分类定义（搜索源 vs 浏览站点）
+  // 🔧 新增：大分类定义（搜索源 vs 浏览站点），支持动态管理
   MAJOR_CATEGORIES: {
     SEARCH_SOURCES: {
       id: 'search_sources',
@@ -203,7 +203,10 @@ export const APP_CONSTANTS = {
       description: '支持番号搜索的网站',
       icon: '🔍',
       requiresKeyword: true,
-      order: 1
+      order: 1,
+      // 🔧 新增：网站类型映射
+      supportedSiteTypes: ['search'],
+      defaultSiteType: 'search'
     },
     BROWSE_SITES: {
       id: 'browse_sites', 
@@ -211,7 +214,22 @@ export const APP_CONSTANTS = {
       description: '仅供访问，不参与搜索',
       icon: '🌐',
       requiresKeyword: false,
-      order: 2
+      order: 2,
+      // 🔧 新增：网站类型映射
+      supportedSiteTypes: ['browse', 'reference'],
+      defaultSiteType: 'browse'
+    },
+    // 🔧 新增：第三个大类以支持完整的功能
+    REFERENCE_RESOURCES: {
+      id: 'reference_resources',
+      name: '📚 参考资源',
+      description: '信息查询和参考类站点',
+      icon: '📚',
+      requiresKeyword: false,
+      order: 3,
+      // 🔧 新增：网站类型映射
+      supportedSiteTypes: ['reference', 'browse'],
+      defaultSiteType: 'reference'
     }
   },
 
@@ -231,7 +249,7 @@ export const APP_CONSTANTS = {
       defaultSearchable: true,      // 该类别默认可搜索
       defaultSiteType: 'search',    // 该类别默认网站类型
       searchPriority: 1,            // 搜索优先级
-      majorCategory: 'search_sources' // 🔧 新增：归属大分类
+      majorCategory: 'search_sources' // 🔧 归属大分类
     },
     streaming: {
       id: 'streaming',
@@ -247,7 +265,7 @@ export const APP_CONSTANTS = {
       defaultSearchable: false,     // 默认不参与搜索
       defaultSiteType: 'browse',
       searchPriority: 5,
-      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
+      majorCategory: 'browse_sites' // 🔧 归属大分类
     },
     torrent: {
       id: 'torrent',
@@ -263,7 +281,7 @@ export const APP_CONSTANTS = {
       defaultSearchable: true,
       defaultSiteType: 'search',
       searchPriority: 3,
-      majorCategory: 'search_sources' // 🔧 新增：归属大分类
+      majorCategory: 'search_sources' // 🔧 归属大分类
     },
     community: {
       id: 'community',
@@ -279,7 +297,23 @@ export const APP_CONSTANTS = {
       defaultSearchable: false,
       defaultSiteType: 'browse',
       searchPriority: 10,
-      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
+      majorCategory: 'browse_sites' // 🔧 归属大分类
+    },
+    reference: {
+      id: 'reference',
+      name: '📖 参考查询',
+      description: '信息查询和参考资料站点',
+      icon: '📖',
+      color: '#06b6d4',
+      isBuiltin: true,
+      order: 5,
+      supportsDetailExtraction: false,
+      extractionPriority: 'none',
+      typicalCapabilities: [],
+      defaultSearchable: false,
+      defaultSiteType: 'reference',
+      searchPriority: 8,
+      majorCategory: 'reference_resources' // 🔧 归属新的大分类
     },
     others: {
       id: 'others',
@@ -295,7 +329,7 @@ export const APP_CONSTANTS = {
       defaultSearchable: false,
       defaultSiteType: 'browse',
       searchPriority: 10,
-      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
+      majorCategory: 'browse_sites' // 🔧 归属大分类
     }
   },
   
@@ -649,6 +683,46 @@ export const APP_CONSTANTS = {
       siteType: 'browse',
       searchPriority: 99,
       requiresKeyword: false
+    },
+    
+    // 🔧 新增：参考资源类
+    {
+      id: 'wikijav',
+      name: 'WikiJAV',
+      subtitle: '番号信息百科，数据完整',
+      icon: '📖',
+      urlTemplate: 'https://wikijav.com/search/{keyword}',
+      category: 'reference',
+      isBuiltin: true,
+      priority: 1,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: [],
+      searchable: true,
+      siteType: 'reference',
+      searchPriority: 6,
+      requiresKeyword: true
+    },
+    {
+      id: 'javinfo',
+      name: 'JavInfo',
+      subtitle: '番号信息查询，演员资料',
+      icon: '📄',
+      urlTemplate: 'https://javinfo.net', // 参考类可以不需要搜索
+      category: 'reference',
+      isBuiltin: true,
+      priority: 2,
+      isActive: true,
+      supportsDetailExtraction: false,
+      extractionQuality: 'none',
+      averageExtractionTime: 0,
+      supportedFeatures: [],
+      searchable: false,
+      siteType: 'reference',
+      searchPriority: 99,
+      requiresKeyword: false
     }
   ],
   
@@ -697,7 +771,8 @@ export const APP_CONSTANTS = {
   DEFAULT_ICONS: [
     '📚', '🎥', '🧲', '💬', '🌟', '🔍', '📺', '🎬',
     '🎭', '🎪', '🎦', '🎬', '⚡', '💫', '🌙', '🔗',
-    '🐱', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲'
+    '🐱', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲',
+    '📖', '📄', '📊', '📈', '📉', '📌', '📍', '🏷️'
   ],
   
   // 权限定义 - 保持不变，添加详情提取配置权限
@@ -858,7 +933,8 @@ export const APP_CONSTANTS = {
       SEARCHABLE: 'searchable',            // 新增：可搜索源
       BROWSE_ONLY: 'browse_only',          // 新增：仅浏览站点
       SEARCH_SOURCES: 'search_sources',    // 🔧 新增：搜索源大类
-      BROWSE_SITES: 'browse_sites'         // 🔧 新增：浏览站点大类
+      BROWSE_SITES: 'browse_sites',        // 🔧 新增：浏览站点大类
+      REFERENCE_RESOURCES: 'reference_resources' // 🔧 新增：参考资源大类
     }
   },
 
@@ -1130,6 +1206,18 @@ export function getMajorCategoryForSource(sourceId) {
   return category ? category.majorCategory : null;
 }
 
+// 🔧 新增：根据大分类获取支持的网站类型
+export function getSupportedSiteTypesByMajorCategory(majorCategoryId) {
+  const majorCategory = MAJOR_CATEGORIES[majorCategoryId];
+  return majorCategory ? majorCategory.supportedSiteTypes : [];
+}
+
+// 🔧 新增：获取大分类的默认网站类型
+export function getDefaultSiteTypeForMajorCategory(majorCategoryId) {
+  const majorCategory = MAJOR_CATEGORIES[majorCategoryId];
+  return majorCategory ? majorCategory.defaultSiteType : 'search';
+}
+
 // 新增：详情提取配置相关工具函数
 export function getDetailConfigEndpoint(endpoint) {
   return APP_CONSTANTS.DETAIL_CONFIG_ENDPOINTS[endpoint.toUpperCase()];
@@ -1152,6 +1240,16 @@ export function validateSourceUrl(url, isSearchable) {
     // 浏览站点只需要是有效URL
     return rules.URL_PATTERN.test(url);
   }
+}
+
+// 🔧 新增：获取网站类型标签
+export function getSiteTypeLabel(siteType) {
+  const labels = {
+    [SITE_TYPES.SEARCH]: '搜索源',
+    [SITE_TYPES.BROWSE]: '浏览站',
+    [SITE_TYPES.REFERENCE]: '参考站'
+  };
+  return labels[siteType] || '搜索源';
 }
 
 // 向后兼容性检查函数
