@@ -1,5 +1,5 @@
-// 搜索源管理器
-import { APP_CONSTANTS, MAJOR_CATEGORIES, validateSourceUrl, getSiteTypeLabel, getSupportedSiteTypesByMajorCategory, getDefaultSiteTypeForMajorCategory } from '../../core/constants.js';
+// 搜索源管理器 - 完全引用constants.js中的MAJOR_CATEGORIES配置
+import { APP_CONSTANTS, MAJOR_CATEGORIES, validateSourceUrl, getAllMajorCategories, getMajorCategoryById } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
 import apiService from '../../services/api.js';
@@ -28,7 +28,7 @@ export class SourcesManager {
     try {
       await this.loadUserSearchSettings();
       this.updateCategoryFilterOptions();
-      this.updateMajorCategoryFilterOptions(); // 🔧 确保使用constants.js中的MAJOR_CATEGORIES
+      this.updateMajorCategoryFilterOptions(); // 🔧 动态获取大类筛选选项
       this.renderSourcesList();
       this.updateSourcesStats();
     } catch (error) {
@@ -70,7 +70,7 @@ export class SourcesManager {
         ...this.customSearchSources.map(s => ({ ...s, isBuiltin: false, isCustom: true }))
       ];
       
-      console.log(`用户设置：可用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源`);
+      console.log(`用户设置：启用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源`);
       
     } catch (error) {
       console.warn('加载用户搜索源设置失败，使用默认设置:', error);
@@ -87,7 +87,7 @@ export class SourcesManager {
       addCustomSourceBtn.addEventListener('click', () => this.showCustomSourceModal());
     }
 
-    // 🔧 搜索源筛选和排序 - 确保包含所有大类筛选
+    // 🔧 搜索源筛选和排序 - 包括动态大类筛选
     const sourcesFilter = document.getElementById('sourcesFilter');
     const categoryFilter = document.getElementById('categoryFilter');
     const majorCategoryFilter = document.getElementById('majorCategoryFilter'); // 🔧 大类筛选
@@ -99,7 +99,7 @@ export class SourcesManager {
     if (categoryFilter) {
       categoryFilter.addEventListener('change', () => this.filterAndSortSources());
     }
-    if (majorCategoryFilter) { // 🔧 确保大类筛选正常工作
+    if (majorCategoryFilter) { // 🔧 大类筛选事件
       majorCategoryFilter.addEventListener('change', () => this.filterAndSortSources());
     }
     if (sourcesSort) {
@@ -145,14 +145,13 @@ export class SourcesManager {
     `;
   }
 
-  // 🔧 优化：确保使用constants.js中的MAJOR_CATEGORIES动态生成大类筛选选项
+  // 🔧 动态更新大类筛选选项 - 完全引用constants.js
   updateMajorCategoryFilterOptions() {
     const majorCategoryFilter = document.getElementById('majorCategoryFilter');
     if (!majorCategoryFilter) return;
 
-    // 🔧 从constants.js中动态获取所有大分类
-    const majorCategories = Object.values(MAJOR_CATEGORIES)
-      .sort((a, b) => a.order - b.order);
+    // 🔧 从constants.js动态获取所有大类
+    const majorCategories = getAllMajorCategories();
 
     const majorCategoriesHTML = majorCategories.map(majorCategory => `
       <option value="${majorCategory.id}">${majorCategory.icon} ${majorCategory.name}</option>
@@ -200,7 +199,7 @@ export class SourcesManager {
       });
     }
 
-    // 🔧 大类筛选 - 确保使用constants.js配置
+    // 🔧 大类筛选 - 动态引用constants.js配置
     if (majorCategoryFilter !== 'all') {
       filteredSources = filteredSources.filter(source => {
         const category = this.getCategoryById(source.category);
@@ -256,7 +255,7 @@ export class SourcesManager {
           const searchableA = a.searchable !== false ? 0 : 1;
           const searchableB = b.searchable !== false ? 0 : 1;
           return searchableA - searchableB;
-        case 'major_category': // 🔧 按大分类排序
+        case 'major_category': // 🔧 按大分类排序 - 动态引用constants.js
           const majorCatA = this.getMajorCategoryForSource(a.id) || 'zzz';
           const majorCatB = this.getMajorCategoryForSource(b.id) || 'zzz';
           return majorCatA.localeCompare(majorCatB);
@@ -274,19 +273,24 @@ export class SourcesManager {
 
   renderSourceItem(source) {
     const category = this.getCategoryById(source.category);
-    const majorCategory = this.getMajorCategoryForSource(source.id);
+    const majorCategoryId = this.getMajorCategoryForSource(source.id);
     const isEnabled = this.enabledSources.includes(source.id);
     const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
     
-    // 🔧 使用constants.js中的工具函数获取网站类型标签
-    const siteTypeLabel = getSiteTypeLabel(source.siteType);
+    // 🔧 网站类型标识
+    const siteTypeLabel = {
+      'search': '搜索源',
+      'browse': '浏览站',
+      'reference': '参考站'
+    }[source.siteType || 'search'];
     
     const searchableIcon = source.searchable === false ? '🚫' : '🔍';
     const searchableTitle = source.searchable === false ? '不参与搜索' : '参与搜索';
     
-    // 🔧 优化：使用constants.js中的MAJOR_CATEGORIES动态获取大分类信息
-    const majorCategoryInfo = MAJOR_CATEGORIES[majorCategory];
-    const majorCategoryLabel = majorCategoryInfo ? `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
+    // 🔧 大分类显示 - 动态获取大分类信息
+    const majorCategoryInfo = getMajorCategoryById(majorCategoryId);
+    const majorCategoryLabel = majorCategoryInfo ? 
+      `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
     
     return `
       <div class="source-item ${isEnabled ? 'enabled' : 'disabled'}" data-source-id="${source.id}">
@@ -363,7 +367,7 @@ export class SourcesManager {
       await this.saveSearchSourcesSettings();
       this.updateSourcesStats();
       
-      showToast(`搜索源已${enabled ? '可用' : '禁用'}`, 'success', 2000);
+      showToast(`搜索源已${enabled ? '启用' : '禁用'}`, 'success', 2000);
       
     } catch (error) {
       console.error('切换搜索源状态失败:', error);
@@ -378,9 +382,9 @@ export class SourcesManager {
       await this.saveSearchSourcesSettings();
       this.renderSourcesList();
       this.updateSourcesStats();
-      showToast('已可用所有搜索源', 'success');
+      showToast('已启用所有搜索源', 'success');
     } catch (error) {
-      console.error('可用所有搜索源失败:', error);
+      console.error('启用所有搜索源失败:', error);
       showToast('操作失败: ' + error.message, 'error');
     }
   }
@@ -485,25 +489,10 @@ export class SourcesManager {
     }, 100);
   }
 
-  // 🔧 优化createCustomSourceModal方法，确保使用constants.js中的配置
   createCustomSourceModal() {
     const modal = document.createElement('div');
     modal.id = 'customSourceModal';
     modal.className = 'modal';
-    
-    // 🔧 动态生成大分类选项
-    const majorCategoryOptions = Object.values(MAJOR_CATEGORIES)
-      .sort((a, b) => a.order - b.order)
-      .map(majorCategory => `
-        <option value="${majorCategory.id}">${majorCategory.icon} ${majorCategory.name}</option>
-      `).join('');
-    
-    // 🔧 动态生成网站类型选项
-    const siteTypeOptions = Object.entries(APP_CONSTANTS.SITE_TYPES)
-      .map(([key, value]) => `
-        <option value="${value}">${getSiteTypeLabel(value)}</option>
-      `).join('');
-    
     modal.innerHTML = `
       <div class="modal-content">
         <span class="close">&times;</span>
@@ -531,19 +520,10 @@ export class SourcesManager {
                    placeholder="例如：专业的搜索引擎">
           </div>
           
-          <!-- 🔧 新增：大分类选择 -->
-          <div class="form-group">
-            <label for="majorCategorySelect">所属大类 *</label>
-            <select name="majorCategorySelect" id="majorCategorySelect" required>
-              ${majorCategoryOptions}
-            </select>
-            <small class="form-help">选择网站所属的主要分类</small>
-          </div>
-          
           <div class="form-group">
             <label for="sourceCategory">搜索源分类 *</label>
             <select name="sourceCategory" id="sourceCategory" required>
-              <!-- 分类选项将根据大分类动态生成 -->
+              <!-- 分类选项将动态生成 -->
             </select>
           </div>
           
@@ -556,7 +536,7 @@ export class SourcesManager {
             </small>
           </div>
           
-          <!-- 🔧 优化：网站类型配置 -->
+          <!-- 🔧 网站类型配置 -->
           <fieldset class="site-config-section">
             <legend>网站类型配置</legend>
             
@@ -571,7 +551,9 @@ export class SourcesManager {
             <div class="form-group">
               <label for="siteType">网站类型</label>
               <select name="siteType" id="siteType">
-                ${siteTypeOptions}
+                <option value="search">搜索源</option>
+                <option value="browse">浏览站</option>
+                <option value="reference">参考站</option>
               </select>
             </div>
             
@@ -602,21 +584,6 @@ export class SourcesManager {
     if (form) {
       form.addEventListener('submit', (e) => this.handleCustomSourceSubmit(e));
       
-      // 🔧 大分类变化时动态更新小分类选项
-      const majorCategorySelect = form.querySelector('#majorCategorySelect');
-      const categorySelect = form.querySelector('#sourceCategory');
-      
-      if (majorCategorySelect && categorySelect) {
-        majorCategorySelect.addEventListener('change', (e) => {
-          this.updateCategorySelectByMajorCategory(categorySelect, e.target.value);
-        });
-        
-        // 初始化时设置第一个大分类的小分类
-        if (majorCategorySelect.value) {
-          this.updateCategorySelectByMajorCategory(categorySelect, majorCategorySelect.value);
-        }
-      }
-      
       // 🔧 监听搜索类型变化，动态调整URL验证提示
       const searchableCheckbox = form.querySelector('#searchable');
       const urlInput = form.querySelector('#sourceUrl');
@@ -638,47 +605,6 @@ export class SourcesManager {
     return modal;
   }
 
-  // 🔧 新增：根据大分类更新小分类选项
-  updateCategorySelectByMajorCategory(categorySelect, majorCategoryId) {
-    if (!categorySelect) return;
-    
-    const categoriesManager = this.app.getManager('categories');
-    if (!categoriesManager) return;
-    
-    const allCategories = categoriesManager.getAllCategories();
-    const filteredCategories = allCategories.filter(category => 
-      category.majorCategory === majorCategoryId
-    );
-    
-    const categoriesHTML = filteredCategories
-      .sort((a, b) => (a.order || 999) - (b.order || 999))
-      .map(category => `
-        <option value="${category.id}">${category.icon} ${category.name}</option>
-      `).join('');
-    
-    categorySelect.innerHTML = categoriesHTML;
-    
-    // 🔧 根据大分类自动设置默认的网站类型配置
-    const majorCategory = MAJOR_CATEGORIES[majorCategoryId];
-    if (majorCategory) {
-      const form = categorySelect.closest('form');
-      if (form) {
-        const searchableCheckbox = form.querySelector('#searchable');
-        const siteTypeSelect = form.querySelector('#siteType');
-        
-        if (searchableCheckbox) {
-          searchableCheckbox.checked = majorCategory.requiresKeyword;
-          // 触发变化事件来更新URL提示
-          searchableCheckbox.dispatchEvent(new Event('change'));
-        }
-        
-        if (siteTypeSelect) {
-          siteTypeSelect.value = majorCategory.defaultSiteType;
-        }
-      }
-    }
-  }
-
   // 🔧 修改 populateCustomSourceForm - 自动设置默认值
   populateCustomSourceForm(modal, source) {
     const form = modal.querySelector('#customSourceForm');
@@ -696,38 +622,36 @@ export class SourcesManager {
       form.siteType.value = source.siteType || 'search';
       form.searchPriority.value = source.searchPriority || 5;
       form.requiresKeyword.checked = source.requiresKeyword !== false;
-      
-      // 🔧 设置大分类
-      const category = this.getCategoryById(source.category);
-      if (category && form.majorCategorySelect) {
-        form.majorCategorySelect.value = category.majorCategory;
-        this.updateCategorySelectByMajorCategory(form.sourceCategory, category.majorCategory);
-        form.sourceCategory.value = source.category;
-      }
-      
       modal.querySelector('h2').textContent = '编辑自定义搜索源';
       modal.querySelector('[type="submit"]').textContent = '更新搜索源';
     } else {
       // 新增模式 - 根据分类设置默认值
       form.reset();
       form.sourceIcon.value = '🔍';
+      form.sourceCategory.value = 'others';
       form.searchable.checked = true;
       form.siteType.value = 'search';
       form.searchPriority.value = 5;
       form.requiresKeyword.checked = true;
-      
-      // 🔧 设置默认大分类为第一个（搜索源）
-      const firstMajorCategory = Object.values(MAJOR_CATEGORIES)
-        .sort((a, b) => a.order - b.order)[0];
-      
-      if (firstMajorCategory && form.majorCategorySelect) {
-        form.majorCategorySelect.value = firstMajorCategory.id;
-        this.updateCategorySelectByMajorCategory(form.sourceCategory, firstMajorCategory.id);
-      }
-      
       modal.querySelector('h2').textContent = '添加自定义搜索源';
       modal.querySelector('[type="submit"]').textContent = '添加搜索源';
+      
+      // 🔧 根据分类的默认配置自动设置
+      const categorySelect = form.sourceCategory;
+      categorySelect.addEventListener('change', (e) => {
+        const category = this.app.getManager('categories').getCategoryById(e.target.value);
+        if (category) {
+          form.searchable.checked = category.defaultSearchable !== false;
+          form.siteType.value = category.defaultSiteType || 'search';
+          form.searchPriority.value = category.searchPriority || 5;
+          
+          // 触发搜索类型变化事件来更新URL提示
+          form.searchable.dispatchEvent(new Event('change'));
+        }
+      });
     }
+    
+    this.updateSourceCategorySelect(form.sourceCategory);
     
     // 触发一次搜索类型变化事件来设置正确的提示文本
     if (form.searchable) {
@@ -1010,7 +934,7 @@ export class SourcesManager {
     return detailSources.includes(sourceId);
   }
 
-  // 🔧 获取源的大分类
+  // 🔧 获取源的大分类 - 动态引用constants.js
   getMajorCategoryForSource(sourceId) {
     const source = this.getSourceById(sourceId);
     if (!source) return null;

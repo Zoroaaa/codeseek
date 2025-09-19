@@ -1,5 +1,5 @@
-// 分类管理器
-import { APP_CONSTANTS, MAJOR_CATEGORIES, getSiteTypeLabel, getSupportedSiteTypesByMajorCategory, getDefaultSiteTypeForMajorCategory } from '../../core/constants.js';
+// 分类管理器 - 完全引用constants.js中的MAJOR_CATEGORIES配置
+import { APP_CONSTANTS, MAJOR_CATEGORIES, getAllMajorCategories, getMajorCategoryById } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
 import apiService from '../../services/api.js';
@@ -14,7 +14,7 @@ export class CategoriesManager {
   }
 
   async init() {
-    console.log('�️ 初始化分类管理器');
+    console.log('🏷️ 初始化分类管理器');
     this.loadBuiltinData();
     this.bindEvents();
   }
@@ -83,6 +83,7 @@ export class CategoriesManager {
     }
   }
 
+  // 🔧 按大分类分组显示内置分类 - 完全引用constants.js配置
   renderBuiltinCategories() {
     const builtinCategoriesList = document.getElementById('builtinCategoriesList');
     if (!builtinCategoriesList) return;
@@ -92,12 +93,14 @@ export class CategoriesManager {
       return;
     }
 
-    // 🔧 确保使用constants.js中的MAJOR_CATEGORIES进行分组显示
+    // 🔧 按大分类分组显示内置分类 - 动态获取MAJOR_CATEGORIES
     const categoriesByMajor = this.groupCategoriesByMajorCategory(this.builtinCategories);
     
     let html = '';
-    // 🔧 动态获取所有大分类并按order排序
-    Object.values(MAJOR_CATEGORIES).sort((a, b) => a.order - b.order).forEach(majorCategory => {
+    // 🔧 动态获取所有大分类并按顺序显示
+    const majorCategories = getAllMajorCategories();
+    
+    majorCategories.forEach(majorCategory => {
       const categories = categoriesByMajor[majorCategory.id] || [];
       if (categories.length === 0) return;
       
@@ -139,7 +142,7 @@ export class CategoriesManager {
     `;
   }
 
-  // 🔧 按大分类分组 - 确保使用constants.js配置
+  // 🔧 按大分类分组 - 动态引用constants.js配置
   groupCategoriesByMajorCategory(categories) {
     const grouped = {};
     
@@ -177,8 +180,8 @@ export class CategoriesManager {
       s.category === category.id && s.searchable === false
     ).length;
     
-    // 🔧 确保使用constants.js中的MAJOR_CATEGORIES获取大分类信息
-    const majorCategoryInfo = MAJOR_CATEGORIES[category.majorCategory];
+    // 🔧 获取大分类信息 - 动态引用constants.js
+    const majorCategoryInfo = getMajorCategoryById(category.majorCategory);
     const majorCategoryLabel = majorCategoryInfo ? 
       `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
     
@@ -193,12 +196,12 @@ export class CategoriesManager {
             <div class="category-meta">
               <div class="category-stats">
                 <span class="category-usage">
-                  ${enabledSourceCount}/${sourceCount} 个搜索源已可用
+                  ${enabledSourceCount}/${sourceCount} 个搜索源已启用
                 </span>
                 ${category.isCustom ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
               </div>
               
-              <!-- 🔧 显示大分类归属 -->
+              <!-- 🔧 显示大分类归属 - 动态获取 -->
               ${!category.isCustom ? `
                 <div class="major-category-info">
                   <span class="major-category-label">归属：${majorCategoryLabel}</span>
@@ -212,7 +215,7 @@ export class CategoriesManager {
                 <span class="search-default-badge ${category.defaultSearchable ? 'searchable' : 'non-searchable'}">
                   ${category.defaultSearchable ? '🔍 默认可搜索' : '🌐 默认仅浏览'}
                 </span>
-                <span class="site-type-badge">${getSiteTypeLabel(category.defaultSiteType)}</span>
+                <span class="site-type-badge">${this.getSiteTypeLabel(category.defaultSiteType)}</span>
                 ${category.searchPriority ? `<span class="priority-badge">优先级: ${category.searchPriority}</span>` : ''}
               </div>
               
@@ -239,6 +242,16 @@ export class CategoriesManager {
         </div>
       </div>
     `;
+  }
+
+  // 🔧 获取网站类型标签
+  getSiteTypeLabel(siteType) {
+    const labels = {
+      'search': '搜索源',
+      'browse': '浏览站',
+      'reference': '参考站'
+    };
+    return labels[siteType] || '搜索源';
   }
 
   updateCategoriesStats() {
@@ -295,25 +308,18 @@ export class CategoriesManager {
     }, 100);
   }
 
-  // 🔧 优化createCustomCategoryModal方法，确保使用constants.js中的配置
+  // 🔧 创建自定义分类模态框 - 动态生成大分类选项
   createCustomCategoryModal() {
     const modal = document.createElement('div');
     modal.id = 'customCategoryModal';
     modal.className = 'modal';
     
-    // 🔧 动态生成大分类选项
-    const majorCategoryOptions = Object.values(MAJOR_CATEGORIES)
-      .sort((a, b) => a.order - b.order)
-      .map(majorCategory => `
-        <option value="${majorCategory.id}">${majorCategory.icon} ${majorCategory.name}</option>
-      `).join('');
-    
-    // 🔧 动态生成网站类型选项
-    const siteTypeOptions = Object.entries(APP_CONSTANTS.SITE_TYPES)
-      .map(([key, value]) => `
-        <option value="${value}">${getSiteTypeLabel(value)}</option>
-      `).join('');
-    
+    // 🔧 动态获取所有大分类选项
+    const majorCategories = getAllMajorCategories();
+    const majorCategoryOptions = majorCategories.map(majorCategory => `
+      <option value="${majorCategory.id}">${majorCategory.icon} ${majorCategory.name}</option>
+    `).join('');
+
     modal.innerHTML = `
       <div class="modal-content custom-category-modal-content">
         <span class="close">&times;</span>
@@ -346,27 +352,26 @@ export class CategoriesManager {
                      placeholder="例如：专门的搜索资源分类">
             </div>
             
-            <div class="form-group">
-              <label for="categoryColor">分类颜色</label>
-              <select name="categoryColor" id="categoryColor">
-                ${APP_CONSTANTS.DEFAULT_COLORS.map(color => `
-                  <option value="${color}" style="background-color: ${color}; color: white;">
-                    ${color}
-                  </option>
-                `).join('')}
-              </select>
-            </div>
-          </div>
-          
-          <!-- 🔧 新增：大分类选择 -->
-          <div class="form-section major-category-section">
-            <h3>大分类归属</h3>
-            <div class="form-group">
-              <label for="majorCategory">所属大类 *</label>
-              <select name="majorCategory" id="majorCategory" required>
-                ${majorCategoryOptions}
-              </select>
-              <small class="form-help">选择该分类所属的主要类别</small>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="categoryColor">分类颜色</label>
+                <select name="categoryColor" id="categoryColor">
+                  ${APP_CONSTANTS.DEFAULT_COLORS.map(color => `
+                    <option value="${color}" style="background-color: ${color}; color: white;">
+                      ${color}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+              
+              <!-- 🔧 大分类选择 - 动态生成选项 -->
+              <div class="form-group">
+                <label for="majorCategory">所属大分类 *</label>
+                <select name="majorCategory" id="majorCategory" required>
+                  ${majorCategoryOptions}
+                </select>
+                <small>选择该分类归属的大分类</small>
+              </div>
             </div>
           </div>
           
@@ -385,7 +390,9 @@ export class CategoriesManager {
             <div class="form-group">
               <label for="defaultSiteType">默认网站类型</label>
               <select name="defaultSiteType" id="defaultSiteType">
-                ${siteTypeOptions}
+                <option value="search">搜索源（需要关键词）</option>
+                <option value="browse">浏览站（仅供访问）</option>
+                <option value="reference">参考站（可选关键词）</option>
               </select>
             </div>
             
@@ -409,20 +416,21 @@ export class CategoriesManager {
     if (form) {
       form.addEventListener('submit', (e) => this.handleCustomCategorySubmit(e));
       
-      // 🔧 监听大分类变化，自动设置默认配置
+      // 🔧 监听大分类选择变化，自动调整默认配置
       const majorCategorySelect = form.querySelector('#majorCategory');
       const defaultSearchableCheckbox = form.querySelector('#defaultSearchable');
       const defaultSiteTypeSelect = form.querySelector('#defaultSiteType');
+      const searchPriorityInput = form.querySelector('#searchPriority');
       
-      if (majorCategorySelect) {
+      if (majorCategorySelect && defaultSearchableCheckbox && defaultSiteTypeSelect) {
         majorCategorySelect.addEventListener('change', (e) => {
-          const majorCategoryId = e.target.value;
-          const majorCategory = MAJOR_CATEGORIES[majorCategoryId];
-          
-          if (majorCategory && defaultSearchableCheckbox && defaultSiteTypeSelect) {
-            // 根据大分类自动设置默认值
-            defaultSearchableCheckbox.checked = majorCategory.requiresKeyword;
-            defaultSiteTypeSelect.value = majorCategory.defaultSiteType;
+          const selectedMajorCategory = getMajorCategoryById(e.target.value);
+          if (selectedMajorCategory) {
+            // 根据大分类的特征自动设置默认值
+            const isSearchCategory = selectedMajorCategory.requiresKeyword;
+            defaultSearchableCheckbox.checked = isSearchCategory;
+            defaultSiteTypeSelect.value = isSearchCategory ? 'search' : 'browse';
+            searchPriorityInput.value = isSearchCategory ? '3' : '8';
           }
         });
       }
@@ -431,7 +439,7 @@ export class CategoriesManager {
     return modal;
   }
 
-  // 🔧 优化populateCustomCategoryForm方法
+  // 🔧 填充自定义分类表单 - 支持大分类设置
   populateCustomCategoryForm(modal, category) {
     const form = modal.querySelector('#customCategoryForm');
     if (!form) return;
@@ -443,15 +451,11 @@ export class CategoriesManager {
       form.categoryDescription.value = category.description || '';
       form.categoryIcon.value = category.icon || '🌟';
       form.categoryColor.value = category.color || '#6b7280';
-      
-      // 🔧 加载大分类和搜索配置
-      if (form.majorCategory) {
-        form.majorCategory.value = category.majorCategory || 'browse_sites';
-      }
+      form.majorCategory.value = category.majorCategory || 'browse_sites'; // 🔧 大分类设置
+      // 🔧 加载搜索配置
       form.defaultSearchable.checked = category.defaultSearchable !== false;
       form.defaultSiteType.value = category.defaultSiteType || 'search';
       form.searchPriority.value = category.searchPriority || 5;
-      
       modal.querySelector('h2').textContent = '编辑自定义分类';
       modal.querySelector('[type="submit"]').textContent = '更新分类';
     } else {
@@ -459,27 +463,17 @@ export class CategoriesManager {
       form.reset();
       form.categoryIcon.value = '🌟';
       form.categoryColor.value = '#6b7280';
-      
-      // 🔧 设置默认大分类和搜索配置
-      const firstMajorCategory = Object.values(MAJOR_CATEGORIES)
-        .sort((a, b) => a.order - b.order)[0];
-      
-      if (firstMajorCategory && form.majorCategory) {
-        form.majorCategory.value = firstMajorCategory.id;
-        form.defaultSearchable.checked = firstMajorCategory.requiresKeyword;
-        form.defaultSiteType.value = firstMajorCategory.defaultSiteType;
-      } else {
-        form.defaultSearchable.checked = true;
-        form.defaultSiteType.value = 'search';
-      }
+      form.majorCategory.value = 'browse_sites'; // 🔧 默认大分类
+      // 🔧 设置搜索配置默认值
+      form.defaultSearchable.checked = true;
+      form.defaultSiteType.value = 'search';
       form.searchPriority.value = 5;
-      
       modal.querySelector('h2').textContent = '添加自定义分类';
       modal.querySelector('[type="submit"]').textContent = '添加分类';
     }
   }
 
-  // 🔧 修改 handleCustomCategorySubmit 方法，支持大分类设置
+  // 🔧 处理自定义分类提交 - 包含大分类处理
   async handleCustomCategorySubmit(event) {
     event.preventDefault();
     
@@ -492,8 +486,7 @@ export class CategoriesManager {
       description: formData.get('categoryDescription').trim(),
       icon: formData.get('categoryIcon'),
       color: formData.get('categoryColor'),
-      // 🔧 新增：大分类归属
-      majorCategory: formData.get('majorCategory'),
+      majorCategory: formData.get('majorCategory'), // 🔧 大分类字段
       // 🔧 搜索配置字段
       defaultSearchable: formData.get('defaultSearchable') === 'on',
       defaultSiteType: formData.get('defaultSiteType') || 'search',
@@ -529,7 +522,7 @@ export class CategoriesManager {
     }
   }
 
-  // 🔧 优化验证函数，支持大分类验证
+  // 🔧 验证自定义分类 - 包含大分类验证
   validateCustomCategory(categoryData) {
     const rules = APP_CONSTANTS.VALIDATION_RULES.CATEGORY;
     
@@ -550,8 +543,11 @@ export class CategoriesManager {
     }
     
     // 🔧 验证大分类是否存在
-    if (categoryData.majorCategory && !MAJOR_CATEGORIES[categoryData.majorCategory]) {
-      return { valid: false, message: '选择的大分类不存在' };
+    if (categoryData.majorCategory) {
+      const majorCategoryInfo = getMajorCategoryById(categoryData.majorCategory);
+      if (!majorCategoryInfo) {
+        return { valid: false, message: '选择的大分类不存在' };
+      }
     }
     
     if (!categoryData.id) {
@@ -575,6 +571,7 @@ export class CategoriesManager {
       .substring(0, 15) + '_' + Date.now().toString(36);
   }
 
+  // 🔧 添加自定义分类 - 包含大分类设置
   async addCustomCategory(categoryData) {
     categoryData.id = this.generateCategoryId(categoryData.name);
     categoryData.createdAt = Date.now();
@@ -582,19 +579,31 @@ export class CategoriesManager {
     categoryData.isBuiltin = false;
     categoryData.order = 50; // 自定义分类排序权重
     
+    // 🔧 确保大分类设置正确
+    if (!categoryData.majorCategory) {
+      categoryData.majorCategory = 'browse_sites'; // 默认归属浏览站点
+    }
+    
     this.customCategories.push(categoryData);
     this.allCategories.push({ ...categoryData, isCustom: true, isBuiltin: false });
     
     await this.saveCustomCategories();
   }
 
+  // 🔧 更新自定义分类 - 包含大分类更新
   async updateCustomCategory(categoryData) {
     const index = this.customCategories.findIndex(c => c.id === categoryData.id);
     if (index === -1) {
       throw new Error('未找到要更新的分类');
     }
     
-    this.customCategories[index] = { ...this.customCategories[index], ...categoryData };
+    // 🔧 保留原有字段，更新新字段
+    this.customCategories[index] = { 
+      ...this.customCategories[index], 
+      ...categoryData,
+      // 确保大分类字段正确设置
+      majorCategory: categoryData.majorCategory || this.customCategories[index].majorCategory || 'browse_sites'
+    };
     
     const allIndex = this.allCategories.findIndex(c => c.id === categoryData.id);
     if (allIndex !== -1) {
@@ -673,8 +682,9 @@ export class CategoriesManager {
       const data = {
         builtinCategories: this.builtinCategories,
         customCategories: this.customCategories,
+        majorCategories: MAJOR_CATEGORIES, // 🔧 包含大分类配置
         exportTime: new Date().toISOString(),
-        version: window.API_CONFIG?.APP_VERSION || '1.3.0'
+        version: window.API_CONFIG?.APP_VERSION || '1.4.0'
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -716,6 +726,39 @@ export class CategoriesManager {
 
   getBuiltinCategories() {
     return this.builtinCategories;
+  }
+
+  // 🔧 新增：获取按大分类分组的分类
+  getCategoriesByMajorCategory(majorCategoryId) {
+    return this.allCategories.filter(category => category.majorCategory === majorCategoryId);
+  }
+
+  // 🔧 新增：获取大分类统计信息
+  getMajorCategoryStats() {
+    const stats = {};
+    const majorCategories = getAllMajorCategories();
+    
+    majorCategories.forEach(majorCategory => {
+      const categories = this.getCategoriesByMajorCategory(majorCategory.id);
+      const sourcesManager = this.app.getManager('sources');
+      const allSources = sourcesManager ? sourcesManager.getAllSearchSources() : [];
+      
+      const sourcesInMajorCategory = allSources.filter(source => {
+        const category = this.getCategoryById(source.category);
+        return category && category.majorCategory === majorCategory.id;
+      });
+      
+      stats[majorCategory.id] = {
+        name: majorCategory.name,
+        icon: majorCategory.icon,
+        categoriesCount: categories.length,
+        sourcesCount: sourcesInMajorCategory.length,
+        builtinCategories: categories.filter(c => c.isBuiltin).length,
+        customCategories: categories.filter(c => c.isCustom).length
+      };
+    });
+    
+    return stats;
   }
 }
 

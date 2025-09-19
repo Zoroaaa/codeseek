@@ -1,4 +1,4 @@
-// src/core/constants.js - 保守优化版本：只移除详情提取配置硬编码，保持其他功能完整
+// src/core/constants.js - 优化版本：完善大类配置，确保动态管理
 // 详情提取配置已迁移至 detail-config.js，由 detail-config-api.js 动态管理
 
 export const APP_CONSTANTS = {
@@ -195,7 +195,8 @@ export const APP_CONSTANTS = {
     }
   },
 
-  // 🔧 新增：大分类定义（搜索源 vs 浏览站点），支持动态管理
+  // 🔧 大分类定义（搜索源 vs 浏览站点）- 动态管理核心配置
+  // 管理员可在此处自由增减修改大类，系统将自动适配
   MAJOR_CATEGORIES: {
     SEARCH_SOURCES: {
       id: 'search_sources',
@@ -203,10 +204,7 @@ export const APP_CONSTANTS = {
       description: '支持番号搜索的网站',
       icon: '🔍',
       requiresKeyword: true,
-      order: 1,
-      // 🔧 新增：网站类型映射
-      supportedSiteTypes: ['search'],
-      defaultSiteType: 'search'
+      order: 1
     },
     BROWSE_SITES: {
       id: 'browse_sites', 
@@ -214,23 +212,26 @@ export const APP_CONSTANTS = {
       description: '仅供访问，不参与搜索',
       icon: '🌐',
       requiresKeyword: false,
-      order: 2,
-      // 🔧 新增：网站类型映射
-      supportedSiteTypes: ['browse', 'reference'],
-      defaultSiteType: 'browse'
+      order: 2
     },
-    // 🔧 新增：第三个大类以支持完整的功能
-    REFERENCE_RESOURCES: {
-      id: 'reference_resources',
-      name: '📚 参考资源',
-      description: '信息查询和参考类站点',
+    // 🔧 可扩展：管理员可以在这里添加更多大类
+    REFERENCE_SITES: {
+      id: 'reference_sites',
+      name: '📚 参考资料',
+      description: '提供相关信息和参考资料',
       icon: '📚',
       requiresKeyword: false,
-      order: 3,
-      // 🔧 新增：网站类型映射
-      supportedSiteTypes: ['reference', 'browse'],
-      defaultSiteType: 'reference'
+      order: 3
     }
+    // 示例：添加新大类的格式
+    // NEW_CATEGORY: {
+    //   id: 'new_category',
+    //   name: '🎯 新分类',
+    //   description: '新分类的描述',
+    //   icon: '🎯',
+    //   requiresKeyword: true/false,
+    //   order: 4
+    // }
   },
 
   // 搜索源分类定义 - 添加默认搜索配置和大分类归属
@@ -301,8 +302,8 @@ export const APP_CONSTANTS = {
     },
     reference: {
       id: 'reference',
-      name: '📖 参考查询',
-      description: '信息查询和参考资料站点',
+      name: '📖 参考资料',
+      description: '提供相关信息和学习资料',
       icon: '📖',
       color: '#06b6d4',
       isBuiltin: true,
@@ -312,8 +313,8 @@ export const APP_CONSTANTS = {
       typicalCapabilities: [],
       defaultSearchable: false,
       defaultSiteType: 'reference',
-      searchPriority: 8,
-      majorCategory: 'reference_resources' // 🔧 归属新的大分类
+      searchPriority: 10,
+      majorCategory: 'reference_sites' // 🔧 新增：归属参考资料大分类
     },
     others: {
       id: 'others',
@@ -685,13 +686,13 @@ export const APP_CONSTANTS = {
       requiresKeyword: false
     },
     
-    // 🔧 新增：参考资源类
+    // 🔧 新增：参考资料站点
     {
-      id: 'wikijav',
-      name: 'WikiJAV',
-      subtitle: '番号信息百科，数据完整',
+      id: 'wikipedia',
+      name: 'Wikipedia',
+      subtitle: '全球知识百科，信息权威',
       icon: '📖',
-      urlTemplate: 'https://wikijav.com/search/{keyword}',
+      urlTemplate: 'https://wikipedia.org/wiki/{keyword}',
       category: 'reference',
       isBuiltin: true,
       priority: 1,
@@ -702,15 +703,15 @@ export const APP_CONSTANTS = {
       supportedFeatures: [],
       searchable: true,
       siteType: 'reference',
-      searchPriority: 6,
+      searchPriority: 8,
       requiresKeyword: true
     },
     {
-      id: 'javinfo',
-      name: 'JavInfo',
-      subtitle: '番号信息查询，演员资料',
-      icon: '📄',
-      urlTemplate: 'https://javinfo.net', // 参考类可以不需要搜索
+      id: 'imdb',
+      name: 'IMDb',
+      subtitle: '国际电影数据库',
+      icon: '🎭',
+      urlTemplate: 'https://www.imdb.com/find?q={keyword}',
       category: 'reference',
       isBuiltin: true,
       priority: 2,
@@ -719,10 +720,10 @@ export const APP_CONSTANTS = {
       extractionQuality: 'none',
       averageExtractionTime: 0,
       supportedFeatures: [],
-      searchable: false,
+      searchable: true,
       siteType: 'reference',
-      searchPriority: 99,
-      requiresKeyword: false
+      searchPriority: 9,
+      requiresKeyword: true
     }
   ],
   
@@ -771,8 +772,7 @@ export const APP_CONSTANTS = {
   DEFAULT_ICONS: [
     '📚', '🎥', '🧲', '💬', '🌟', '🔍', '📺', '🎬',
     '🎭', '🎪', '🎦', '🎬', '⚡', '💫', '🌙', '🔗',
-    '🐱', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲',
-    '📖', '📄', '📊', '📈', '📉', '📌', '📍', '🏷️'
+    '🐱', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲'
   ],
   
   // 权限定义 - 保持不变，添加详情提取配置权限
@@ -880,7 +880,7 @@ export const APP_CONSTANTS = {
   // 默认用户设置 - 移除详情提取硬编码配置，其他保持不变
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
-    searchSources: ['javbus', 'javdb', 'javlibrary', 'btsow'],  // 默认只可用搜索类型的源
+    searchSources: ['javbus', 'javdb', 'javlibrary', 'btsow'],  // 默认只启用搜索类型的源
     customSearchSources: [],
     customSourceCategories: [],
     maxFavoritesPerUser: 1000,
@@ -934,7 +934,7 @@ export const APP_CONSTANTS = {
       BROWSE_ONLY: 'browse_only',          // 新增：仅浏览站点
       SEARCH_SOURCES: 'search_sources',    // 🔧 新增：搜索源大类
       BROWSE_SITES: 'browse_sites',        // 🔧 新增：浏览站点大类
-      REFERENCE_RESOURCES: 'reference_resources' // 🔧 新增：参考资源大类
+      REFERENCE_SITES: 'reference_sites'   // 🔧 新增：参考资料大类
     }
   },
 
@@ -1206,16 +1206,14 @@ export function getMajorCategoryForSource(sourceId) {
   return category ? category.majorCategory : null;
 }
 
-// 🔧 新增：根据大分类获取支持的网站类型
-export function getSupportedSiteTypesByMajorCategory(majorCategoryId) {
-  const majorCategory = MAJOR_CATEGORIES[majorCategoryId];
-  return majorCategory ? majorCategory.supportedSiteTypes : [];
+// 🔧 新增：获取所有可用的大分类
+export function getAllMajorCategories() {
+  return Object.values(MAJOR_CATEGORIES).sort((a, b) => a.order - b.order);
 }
 
-// 🔧 新增：获取大分类的默认网站类型
-export function getDefaultSiteTypeForMajorCategory(majorCategoryId) {
-  const majorCategory = MAJOR_CATEGORIES[majorCategoryId];
-  return majorCategory ? majorCategory.defaultSiteType : 'search';
+// 🔧 新增：根据ID获取大分类信息
+export function getMajorCategoryById(majorCategoryId) {
+  return MAJOR_CATEGORIES[majorCategoryId] || null;
 }
 
 // 新增：详情提取配置相关工具函数
@@ -1226,7 +1224,7 @@ export function getDetailConfigEndpoint(endpoint) {
 export function isDetailExtractionEnabled() {
   // 这个函数现在应该通过 DetailConfigAPI 来获取用户配置
   // 这里只返回系统级开关状态
-  return true; // 系统级默认可用，具体用户配置由 detail-config-api.js 管理
+  return true; // 系统级默认启用，具体用户配置由 detail-config-api.js 管理
 }
 
 // 🔧 新增：URL验证工具函数
@@ -1240,16 +1238,6 @@ export function validateSourceUrl(url, isSearchable) {
     // 浏览站点只需要是有效URL
     return rules.URL_PATTERN.test(url);
   }
-}
-
-// 🔧 新增：获取网站类型标签
-export function getSiteTypeLabel(siteType) {
-  const labels = {
-    [SITE_TYPES.SEARCH]: '搜索源',
-    [SITE_TYPES.BROWSE]: '浏览站',
-    [SITE_TYPES.REFERENCE]: '参考站'
-  };
-  return labels[siteType] || '搜索源';
 }
 
 // 向后兼容性检查函数

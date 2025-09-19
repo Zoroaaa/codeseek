@@ -1,5 +1,5 @@
 // 搜索服务模块 - 集成后端版搜索源状态检查功能（修改版：支持不可用结果排序显示）
-import { APP_CONSTANTS, MAJOR_CATEGORIES, getCategoriesByMajorCategory, getSourcesByMajorCategory } from '../core/constants.js';
+import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
 import { showToast } from '../utils/dom.js';
@@ -112,12 +112,11 @@ class SearchService {
     console.log('用户设置缓存已清除');
   }
   
-  // 🔧 优化：获取可用的搜索源（确保使用constants.js中的MAJOR_CATEGORIES）
+  // 🔧 新增：获取启用的搜索源（支持搜索过滤）
   async getEnabledSearchSources(options = {}) {
     const { 
       includeNonSearchable = false,  // 是否包含非搜索源
-      keyword = '',                   // 搜索关键词（用于智能判断）
-      filterByMajorCategory = null    // 🔧 新增：按大分类筛选
+      keyword = ''                   // 搜索关键词（用于智能判断）
     } = options;
 
     try {
@@ -131,11 +130,6 @@ class SearchService {
         // 过滤搜索源
         if (!includeNonSearchable) {
           sources = sources.filter(source => source.searchable !== false);
-        }
-        
-        // 🔧 按大分类筛选
-        if (filterByMajorCategory) {
-          sources = this.filterSourcesByMajorCategory(sources, filterByMajorCategory);
         }
         
         return this.applySortingAndFiltering(sources, keyword);
@@ -154,10 +148,6 @@ class SearchService {
         
         if (!includeNonSearchable) {
           sources = sources.filter(source => source.searchable !== false);
-        }
-        
-        if (filterByMajorCategory) {
-          sources = this.filterSourcesByMajorCategory(sources, filterByMajorCategory);
         }
         
         return this.applySortingAndFiltering(sources, keyword);
@@ -181,10 +171,6 @@ class SearchService {
           sources = sources.filter(source => source.searchable !== false);
         }
         
-        if (filterByMajorCategory) {
-          sources = this.filterSourcesByMajorCategory(sources, filterByMajorCategory);
-        }
-        
         return this.applySortingAndFiltering(sources, keyword);
       }
       
@@ -205,11 +191,6 @@ class SearchService {
         sources = sources.filter(source => source.searchable !== false);
       }
       
-      // 🔧 按大分类筛选
-      if (filterByMajorCategory) {
-        sources = this.filterSourcesByMajorCategory(sources, filterByMajorCategory);
-      }
-      
       return this.applySortingAndFiltering(sources, keyword);
       
     } catch (error) {
@@ -223,28 +204,11 @@ class SearchService {
         sources = sources.filter(source => source.searchable !== false);
       }
       
-      if (filterByMajorCategory) {
-        sources = this.filterSourcesByMajorCategory(sources, filterByMajorCategory);
-      }
-      
       return this.applySortingAndFiltering(sources, keyword);
     }
   }
 
-  // 🔧 新增：按大分类筛选搜索源
-  filterSourcesByMajorCategory(sources, majorCategoryId) {
-    if (!majorCategoryId || !MAJOR_CATEGORIES[majorCategoryId]) {
-      return sources; // 如果大分类不存在，返回原始源列表
-    }
-    
-    return sources.filter(source => {
-      // 从source.category获取小分类，然后查找其所属的大分类
-      const sourceCategory = APP_CONSTANTS.SOURCE_CATEGORIES[source.category];
-      return sourceCategory && sourceCategory.majorCategory === majorCategoryId;
-    });
-  }
-
-  // 🔧 应用排序和过滤逻辑
+  // 🔧 新增：应用排序和过滤逻辑
   applySortingAndFiltering(sources, keyword) {
     // 根据搜索优先级排序
     sources.sort((a, b) => {
@@ -267,7 +231,7 @@ class SearchService {
     return sources;
   }
 
-  // 🔧 判断是否像番号的辅助方法
+  // 🔧 新增：判断是否像番号的辅助方法
   looksLikeProductCode(keyword) {
     // 番号通常格式: ABC-123, MIMK-186 等
     const productCodePattern = /^[A-Z]{2,6}-?\d{3,6}$/i;
@@ -278,19 +242,18 @@ class SearchService {
   async buildSearchResults(keyword, options = {}) {
     const encodedKeyword = encodeURIComponent(keyword);
     const timestamp = Date.now();
-    const { checkStatus = false, userSettings = null, filterByMajorCategory = null } = options;
+    const { checkStatus = false, userSettings = null } = options;
     
     try {
       // 🔧 获取搜索源时，根据关键词类型决定
       const enabledSources = await this.getEnabledSearchSources({
         includeNonSearchable: false,  // 搜索时不包含浏览站
-        keyword: keyword,
-        filterByMajorCategory: filterByMajorCategory // 🔧 支持按大分类筛选
+        keyword: keyword
       });
       
       console.log(`使用 ${enabledSources.length} 个搜索源进行搜索:`, enabledSources.map(s => s.name));
       
-      // 🔧 如果可用了状态检查，使用后端检查器
+      // 🔧 如果启用了状态检查，使用后端检查器
       let sourcesWithStatus = enabledSources;
       if (checkStatus && userSettings) {
         console.log('开始后端状态检查...');
@@ -531,32 +494,6 @@ class SearchService {
     };
     
     return statusTexts[status] || '未知';
-  }
-
-  // 🔧 新增：获取所有可用大分类的搜索源
-  async getSourcesByMajorCategories() {
-    try {
-      const result = {};
-      
-      // 🔧 遍历constants.js中定义的所有大分类
-      for (const [majorCategoryId, majorCategory] of Object.entries(MAJOR_CATEGORIES)) {
-        const sources = await this.getEnabledSearchSources({
-          includeNonSearchable: false, // 只包含搜索源
-          filterByMajorCategory: majorCategoryId
-        });
-        
-        result[majorCategoryId] = {
-          category: majorCategory,
-          sources: sources,
-          count: sources.length
-        };
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('获取按大分类分组的搜索源失败:', error);
-      return {};
-    }
   }
 
   // 🔧 使用后端API手动检查所有搜索源状态
