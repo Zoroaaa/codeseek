@@ -82,11 +82,11 @@
 
 .categories-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 1.5rem;
 }
 
-/* 分类项目样式 - 修复样式挤压问题 */
+/* 分类项目样式 - 修复样式挤压问题，确保自定义分类显示完整 */
 .category-item {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -95,7 +95,7 @@
   transition: all 0.2s ease-in-out;
   position: relative;
   overflow: hidden;
-  min-height: 200px;
+  min-height: 280px; /* 增加最小高度确保完整显示 */
   display: flex;
   flex-direction: column;
 }
@@ -126,7 +126,7 @@
   display: flex;
   align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem; /* 减少底部边距 */
   flex-shrink: 0;
 }
 
@@ -161,7 +161,7 @@
   margin: 0;
 }
 
-/* 分类元信息 - 重新组织布局 */
+/* 分类元信息 - 重新组织布局，确保自定义分类显示完整 */
 .category-meta {
   display: flex;
   flex-direction: column;
@@ -183,6 +183,27 @@
   font-weight: 500;
 }
 
+/* 徽章样式统一 */
+.custom-badge,
+.builtin-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: white;
+}
+
+.custom-badge {
+  background: var(--accent-primary);
+}
+
+.builtin-badge {
+  background: var(--info-color);
+}
+
+/* 大类信息显示 - 确保所有分类都显示 */
 .major-category-info {
   margin-top: 0.5rem;
 }
@@ -190,13 +211,14 @@
 .major-category-label {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 12px;
   font-size: 11px;
   font-weight: 500;
+  display: inline-block;
 }
 
-/* 搜索配置显示区域 */
+/* 搜索配置显示区域 - 确保所有分类都显示 */
 .category-search-config {
   display: flex;
   gap: 8px;
@@ -206,26 +228,25 @@
 
 .search-default-badge {
   font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 3px;
+  padding: 3px 8px;
+  border-radius: 4px;
   font-weight: 500;
+  color: white;
 }
 
 .search-default-badge.searchable {
   background: var(--success-color);
-  color: white;
 }
 
 .search-default-badge.non-searchable {
   background: var(--warning-color);
-  color: white;
 }
 
 .site-type-badge {
   background: #3b82f6;
   color: white;
-  padding: 2px 6px;
-  border-radius: 3px;
+  padding: 3px 8px;
+  border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
 }
@@ -233,8 +254,8 @@
 .priority-badge {
   background: #f59e0b;
   color: white;
-  padding: 2px 6px;
-  border-radius: 3px;
+  padding: 3px 8px;
+  border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
 }
@@ -242,7 +263,7 @@
 .category-source-stats {
   display: flex;
   gap: 12px;
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 11px;
   color: var(--text-secondary);
   flex-wrap: wrap;
@@ -251,7 +272,7 @@
 .stat-item {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
 }
 
 /* 分类操作按钮 - 改善布局 */
@@ -443,6 +464,27 @@
   font-weight: 600;
 }
 
+/* 空状态样式 */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--text-secondary);
+}
+
+.empty-state span {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  margin-bottom: 1.5rem;
+  font-size: 1.1rem;
+}
+
+.empty-state button {
+  margin-top: 1rem;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .categories-grid {
@@ -457,7 +499,7 @@
 
   .category-item {
     padding: 1rem;
-    min-height: auto;
+    min-height: 250px; /* 移动端适当减小最小高度 */
   }
 
   .category-header {
@@ -527,6 +569,7 @@
 
   .category-item {
     padding: 0.75rem;
+    min-height: 220px;
   }
 
   .category-name {

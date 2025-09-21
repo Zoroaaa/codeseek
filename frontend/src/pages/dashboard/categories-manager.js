@@ -1,4 +1,4 @@
-// 分类管理器 - 修复版本:解决分类显示和大类关联问题
+// 分类管理器 - 修复版本:解决分类显示和大类关联问题，确保自定义分类显示完整信息
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
@@ -167,7 +167,7 @@ export class CategoriesManager {
       .forEach(majorCategory => {
         const categories = categoriesByMajor[majorCategory.id] || [];
         
-        console.log(`📁 大类 ${majorCategory.id} (${majorCategory.name}) 包含 ${categories.length} 个分类`);
+        console.log(`🔍 大类 ${majorCategory.id} (${majorCategory.name}) 包含 ${categories.length} 个分类`);
         
         if (categories.length === 0) return;
         
@@ -206,11 +206,44 @@ export class CategoriesManager {
       return;
     }
 
-    customCategoriesList.innerHTML = `
-      <div class="categories-grid">
-        ${this.customCategories.map(category => this.renderCategoryItem(category)).join('')}
-      </div>
-    `;
+    // 🔴 修复: 自定义分类也按大类分组显示
+    const categoriesByMajor = this.groupCategoriesByMajorCategory(this.customCategories);
+    console.log('🎨 自定义分类按大类分组:', categoriesByMajor);
+    
+    let html = '';
+    
+    // 遍历所有大类，显示该大类下的自定义分类
+    this.majorCategories
+      .sort((a, b) => (a.order || 999) - (b.order || 999))
+      .forEach(majorCategory => {
+        const categories = categoriesByMajor[majorCategory.id] || [];
+        
+        if (categories.length === 0) return;
+        
+        html += `
+          <div class="major-category-group">
+            <h4 class="major-category-header">
+              ${majorCategory.icon} ${majorCategory.name}
+              <span class="category-count">(${categories.length}个自定义)</span>
+            </h4>
+            <div class="categories-grid">
+              ${categories.map(category => this.renderCategoryItem(category)).join('')}
+            </div>
+          </div>
+        `;
+      });
+
+    if (html) {
+      customCategoriesList.innerHTML = html;
+    } else {
+      customCategoriesList.innerHTML = `
+        <div class="empty-state">
+          <span style="font-size: 3rem;">🎨</span>
+          <p>暂无自定义分类</p>
+          <button class="btn-primary" onclick="app.getManager('categories').showCustomCategoryModal()">添加自定义分类</button>
+        </div>
+      `;
+    }
   }
 
   groupCategoriesByMajorCategory(categories) {
@@ -233,7 +266,7 @@ export class CategoriesManager {
     return grouped;
   }
 
-  // 🔴 修复:正确渲染分类项目
+  // 🔴 修复:确保自定义分类显示完整信息，与内置分类样式一致
   renderCategoryItem(category) {
     const sourcesManager = this.app.getManager('sources');
     const allSources = sourcesManager ? sourcesManager.getAllSearchSources() : [];
@@ -285,27 +318,25 @@ export class CategoriesManager {
                 ${isCustomCategory ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
               </div>
               
-              ${!isCustomCategory ? `
-                <div class="major-category-info">
-                  <span class="major-category-label">归属: ${majorCategoryLabel}</span>
-                </div>
-              ` : ''}
+              <!-- 🔴 修复: 所有分类都显示大类信息 -->
+              <div class="major-category-info">
+                <span class="major-category-label">归属: ${majorCategoryLabel}</span>
+              </div>
             </div>
             
-            ${!isCustomCategory ? `
-              <div class="category-search-config">
-                <span class="search-default-badge ${category.defaultSearchable ? 'searchable' : 'non-searchable'}">
-                  ${category.defaultSearchable ? '🔍 默认可搜索' : '🌐 默认仅浏览'}
-                </span>
-                <span class="site-type-badge">${this.getSiteTypeLabel(category.defaultSiteType)}</span>
-                ${category.searchPriority ? `<span class="priority-badge">优先级: ${category.searchPriority}</span>` : ''}
-              </div>
-              
-              <div class="category-source-stats">
-                ${searchableSources > 0 ? `<span class="stat-item">🔍 ${searchableSources}个搜索源</span>` : ''}
-                ${browseSources > 0 ? `<span class="stat-item">🌐 ${browseSources}个浏览站</span>` : ''}
-              </div>
-            ` : ''}
+            <!-- 🔴 修复: 所有分类都显示搜索配置信息 -->
+            <div class="category-search-config">
+              <span class="search-default-badge ${category.defaultSearchable ? 'searchable' : 'non-searchable'}">
+                ${category.defaultSearchable ? '🔍 默认可搜索' : '🌐 默认仅浏览'}
+              </span>
+              <span class="site-type-badge">${this.getSiteTypeLabel(category.defaultSiteType)}</span>
+              ${category.searchPriority ? `<span class="priority-badge">优先级: ${category.searchPriority}</span>` : ''}
+            </div>
+            
+            <div class="category-source-stats">
+              ${searchableSources > 0 ? `<span class="stat-item">🔍 ${searchableSources}个搜索源</span>` : ''}
+              ${browseSources > 0 ? `<span class="stat-item">🌐 ${browseSources}个浏览站</span>` : ''}
+            </div>
           </div>
         </div>
         
