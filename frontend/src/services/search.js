@@ -1,4 +1,4 @@
-// 搜索服务模块 - 集成后端版搜索源状态检查功能（修改版：支持不可用结果排序显示）
+// src/services/search.js - 优化版本：完全集成新的搜索源管理API，修复前后端匹配问题
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
@@ -6,12 +6,18 @@ import { showToast } from '../utils/dom.js';
 import apiService from './api.js';
 import authManager from './auth.js';
 import backendSourceChecker from './enhanced-source-checker.js';
+import searchSourcesAPI from './search-sources-api.js';
 
 class SearchService {
   constructor() {
     this.searchCache = new Map();
     this.cacheExpiration = APP_CONSTANTS.API.CACHE_DURATION;
     this.userSettings = null;
+    
+    // 搜索源缓存
+    this.sourcesCache = null;
+    this.sourcesCacheTimestamp = 0;
+    this.sourcesCacheExpiry = 300000; // 5分钟缓存
     
     // 状态检查统计
     this.checkStats = {
@@ -112,7 +118,7 @@ class SearchService {
     console.log('用户设置缓存已清除');
   }
   
-  // 🔧 新增：获取启用的搜索源（支持搜索过滤）
+  // 获取可用的搜索源（通过API动态获取）
   async getEnabledSearchSources(options = {}) {
     const { 
       includeNonSearchable = false,  // 是否包含非搜索源
@@ -120,107 +126,122 @@ class SearchService {
     } = options;
 
     try {
-      // 如果用户未登录，使用默认搜索源
+      // 检查缓存
+      if (this.sourcesCache && 
+          Date.now() - this.sourcesCacheTimestamp < this.sourcesCacheExpiry) {
+        console.log('使用搜索源缓存');
+        return this.filterAndSortSources(this.sourcesCache, includeNonSearchable, keyword);
+      }
+
+      // 如果用户未登录，使用系统默认配置
       if (!authManager.isAuthenticated()) {
-        const defaultSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
-        let sources = APP_CONSTANTS.SEARCH_SOURCES.filter(
-          source => defaultSources.includes(source.id)
-        );
-        
-        // 过滤搜索源
-        if (!includeNonSearchable) {
-          sources = sources.filter(source => source.searchable !== false);
-        }
-        
-        return this.applySortingAndFiltering(sources, keyword);
+        console.log('用户未登录，使用系统默认搜索源');
+        const defaultSources = await this.getSystemDefaultSources();
+        return this.filterAndSortSources(defaultSources, includeNonSearchable, keyword);
       }
 
-      // 获取用户设置
-      let userSettings;
+      // 获取用户的搜索源配置
+      let sources;
       try {
-        userSettings = await this.getUserSettings();
+        sources = await searchSourcesAPI.getSearchSources({
+          includeSystem: true,
+          enabledOnly: true
+        });
+        console.log(`从API获取到 ${sources.length} 个已可用的搜索源`);
       } catch (error) {
-        console.error('获取用户设置失败，使用默认搜索源:', error);
-        const defaultSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
-        let sources = APP_CONSTANTS.SEARCH_SOURCES.filter(
-          source => defaultSources.includes(source.id)
-        );
-        
-        if (!includeNonSearchable) {
-          sources = sources.filter(source => source.searchable !== false);
-        }
-        
-        return this.applySortingAndFiltering(sources, keyword);
+        console.error('获取用户搜索源失败，使用系统默认:', error);
+        const defaultSources = await this.getSystemDefaultSources();
+        return this.filterAndSortSources(defaultSources, includeNonSearchable, keyword);
       }
 
-      const enabledSources = userSettings.searchSources || ['javbus', 'javdb', 'javlibrary', 'btsow'];
+      // 缓存搜索源
+      this.sourcesCache = sources;
+      this.sourcesCacheTimestamp = Date.now();
       
-      // 验证搜索源ID的有效性
-      const validSources = enabledSources.filter(sourceId => 
-        APP_CONSTANTS.SEARCH_SOURCES.some(source => source.id === sourceId)
-      );
-      
-      if (validSources.length === 0) {
-        console.warn('用户设置的搜索源无效，使用默认源');
-        const defaultSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
-        let sources = APP_CONSTANTS.SEARCH_SOURCES.filter(
-          source => defaultSources.includes(source.id)
-        );
-        
-        if (!includeNonSearchable) {
-          sources = sources.filter(source => source.searchable !== false);
-        }
-        
-        return this.applySortingAndFiltering(sources, keyword);
-      }
-      
-      // 合并内置搜索源和自定义搜索源
-      const builtinSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
-        source => validSources.includes(source.id)
-      );
-      
-      const customSources = userSettings.customSearchSources || [];
-      const enabledCustomSources = customSources.filter(
-        source => validSources.includes(source.id)
-      );
-
-      let sources = [...builtinSources, ...enabledCustomSources];
-      
-      // 🔧 如果不包含非搜索源，过滤掉 searchable: false 的源
-      if (!includeNonSearchable) {
-        sources = sources.filter(source => source.searchable !== false);
-      }
-      
-      return this.applySortingAndFiltering(sources, keyword);
+      return this.filterAndSortSources(sources, includeNonSearchable, keyword);
       
     } catch (error) {
       console.error('获取搜索源配置失败:', error);
-      const defaultSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
-      let sources = APP_CONSTANTS.SEARCH_SOURCES.filter(
-        source => defaultSources.includes(source.id)
-      );
-      
-      if (!includeNonSearchable) {
-        sources = sources.filter(source => source.searchable !== false);
-      }
-      
-      return this.applySortingAndFiltering(sources, keyword);
+      // 最终回退：使用硬编码的默认源
+      const fallbackSources = await this.getFallbackSources();
+      return this.filterAndSortSources(fallbackSources, includeNonSearchable, keyword);
     }
   }
 
-  // 🔧 新增：应用排序和过滤逻辑
-  applySortingAndFiltering(sources, keyword) {
+  // 获取系统默认搜索源
+  async getSystemDefaultSources() {
+    try {
+      // 从搜索源API获取系统默认配置
+      const allSources = await searchSourcesAPI.getSearchSources({
+        includeSystem: true,
+        searchable: true
+      });
+      
+      // 返回默认推荐的搜索源
+      const defaultSourceIds = ['javbus', 'javdb', 'javlibrary', 'btsow'];
+      return allSources.filter(source => defaultSourceIds.includes(source.id));
+    } catch (error) {
+      console.error('获取系统默认搜索源失败:', error);
+      return this.getFallbackSources();
+    }
+  }
+
+  // 获取回退搜索源（硬编码最小集合）
+  async getFallbackSources() {
+    // 最小可用搜索源集合，仅用于紧急情况
+    return [
+      {
+        id: 'javbus',
+        name: 'JavBus',
+        subtitle: '番号+磁力一体站，信息完善',
+        icon: '🎬',
+        urlTemplate: 'https://www.javbus.com/search/{keyword}',
+        searchable: true,
+        siteType: 'search',
+        searchPriority: 1,
+        requiresKeyword: true,
+        isSystem: true,
+        userEnabled: true
+      },
+      {
+        id: 'javdb',
+        name: 'JavDB',
+        subtitle: '极简风格番号资料站，轻量快速',
+        icon: '📚',
+        urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
+        searchable: true,
+        siteType: 'search',
+        searchPriority: 2,
+        requiresKeyword: true,
+        isSystem: true,
+        userEnabled: true
+      }
+    ];
+  }
+
+  // 过滤和排序搜索源
+  filterAndSortSources(sources, includeNonSearchable, keyword) {
+    let filteredSources = [...sources];
+    
+    // 如果不包含非搜索源，过滤掉 searchable: false 的源
+    if (!includeNonSearchable) {
+      filteredSources = filteredSources.filter(source => source.searchable !== false);
+    }
+    
+    // 只保留可用的搜索源
+    filteredSources = filteredSources.filter(source => source.userEnabled !== false);
+    
     // 根据搜索优先级排序
-    sources.sort((a, b) => {
-      const priorityA = a.searchPriority || 99;
-      const priorityB = b.searchPriority || 99;
+    filteredSources.sort((a, b) => {
+      const priorityA = a.searchPriority || a.priority || 99;
+      const priorityB = b.searchPriority || b.priority || 99;
       return priorityA - priorityB;
     });
     
-    // 🔧 智能模式：如果关键词不像番号，调整源的优先级
+    // 智能模式：如果关键词不像番号，调整源的优先级
     if (keyword && !this.looksLikeProductCode(keyword)) {
       // 对于普通关键词，优先使用通用搜索引擎
-      sources = sources.sort((a, b) => {
+      filteredSources = filteredSources.sort((a, b) => {
         // 如果源支持通用搜索，提升优先级
         if (a.supportsGeneralSearch && !b.supportsGeneralSearch) return -1;
         if (!a.supportsGeneralSearch && b.supportsGeneralSearch) return 1;
@@ -228,24 +249,24 @@ class SearchService {
       });
     }
     
-    return sources;
+    return filteredSources;
   }
 
-  // 🔧 新增：判断是否像番号的辅助方法
+  // 判断是否像番号的辅助方法
   looksLikeProductCode(keyword) {
     // 番号通常格式: ABC-123, MIMK-186 等
     const productCodePattern = /^[A-Z]{2,6}-?\d{3,6}$/i;
     return productCodePattern.test(keyword.trim());
   }
 
-  // 构建搜索结果 - 使用后端状态检查
+  // 构建搜索结果 - 使用新的搜索源API
   async buildSearchResults(keyword, options = {}) {
     const encodedKeyword = encodeURIComponent(keyword);
     const timestamp = Date.now();
     const { checkStatus = false, userSettings = null } = options;
     
     try {
-      // 🔧 获取搜索源时，根据关键词类型决定
+      // 获取搜索源时，根据关键词类型决定
       const enabledSources = await this.getEnabledSearchSources({
         includeNonSearchable: false,  // 搜索时不包含浏览站
         keyword: keyword
@@ -253,7 +274,7 @@ class SearchService {
       
       console.log(`使用 ${enabledSources.length} 个搜索源进行搜索:`, enabledSources.map(s => s.name));
       
-      // 🔧 如果启用了状态检查，使用后端检查器
+      // 如果可用了状态检查，使用后端检查器
       let sourcesWithStatus = enabledSources;
       if (checkStatus && userSettings) {
         console.log('开始后端状态检查...');
@@ -264,7 +285,7 @@ class SearchService {
           const checkResults = await backendSourceChecker.checkMultipleSources(
             enabledSources, 
             userSettings,
-            keyword // 🔧 传入实际关键词进行精确内容匹配
+            keyword // 传入实际关键词进行精确内容匹配
           );
           
           // 处理检查结果
@@ -285,16 +306,14 @@ class SearchService {
       
     } catch (error) {
       console.error('构建搜索结果失败:', error);
-      // 增强错误处理：如果获取搜索源失败，使用默认源
-      const defaultSources = APP_CONSTANTS.SEARCH_SOURCES.filter(
-        source => ['javbus', 'javdb', 'javlibrary', 'btsow'].includes(source.id) && source.searchable !== false
-      );
+      // 增强错误处理：如果获取搜索源失败，使用回退源
+      const fallbackSources = await this.getFallbackSources();
       
-      return this.buildResultsFromSources(defaultSources, keyword, encodedKeyword, timestamp);
+      return this.buildResultsFromSources(fallbackSources, keyword, encodedKeyword, timestamp);
     }
   }
 
-  // 🔧 修改处理状态检查结果方法 - 不再过滤不可用源，而是保留所有源
+  // 处理状态检查结果方法 - 不再过滤不可用源，而是保留所有源
   processStatusCheckResults(originalSources, checkResults, userSettings) {
     const sourcesMap = new Map(originalSources.map(s => [s.id, s]));
     const processedSources = [];
@@ -310,7 +329,7 @@ class SearchService {
         ...originalSource,
         status: result.status,
         statusText: this.getStatusText(result.status),
-        errorMessage: result.error || null, // 🔧 新增：保存错误信息
+        errorMessage: result.error || null,
         lastChecked: result.lastChecked,
         responseTime: result.responseTime || 0,
         availabilityScore: result.availabilityScore || 0,
@@ -318,11 +337,10 @@ class SearchService {
         contentMatch: result.contentMatch || false,
         qualityScore: result.qualityScore || 0,
         fromCache: result.fromCache || false,
-        // 🔧 新增：添加不可用原因的详细信息
         unavailableReason: this.getUnavailableReason(result)
       };
       
-      // 🔧 修改：不再根据skipUnavailableSources过滤，保留所有源
+      // 修改：不再根据skipUnavailableSources过滤，保留所有源
       processedSources.push(processedSource);
     });
     
@@ -332,11 +350,11 @@ class SearchService {
     
     console.log(`状态检查完成: ${availableCount}/${checkResults.length} 个搜索源可用`);
     
-    // 🔧 新增：按状态排序 - 可用的源在前，不可用的在后
+    // 按状态排序 - 可用的源在前，不可用的在后
     return this.sortSourcesByAvailability(processedSources);
   }
 
-  // 🔧 新增：根据可用性排序搜索源
+  // 根据可用性排序搜索源
   sortSourcesByAvailability(sources) {
     return sources.sort((a, b) => {
       // 优先级：可用 > 未知 > 超时 > 不可用 > 错误
@@ -369,7 +387,7 @@ class SearchService {
     });
   }
 
-  // 🔧 新增：获取不可用原因的详细描述
+  // 获取不可用原因的详细描述
   getUnavailableReason(result) {
     if (result.status === APP_CONSTANTS.SOURCE_STATUS.AVAILABLE) {
       return null;
@@ -434,8 +452,8 @@ class SearchService {
       if (source.status) {
         result.status = source.status;
         result.statusText = source.statusText;
-        result.errorMessage = source.errorMessage; // 🔧 新增错误信息
-        result.unavailableReason = source.unavailableReason; // 🔧 新增不可用原因
+        result.errorMessage = source.errorMessage;
+        result.unavailableReason = source.unavailableReason;
         result.lastChecked = source.lastChecked;
         result.responseTime = source.responseTime;
         result.availabilityScore = source.availabilityScore;
@@ -496,7 +514,7 @@ class SearchService {
     return statusTexts[status] || '未知';
   }
 
-  // 🔧 使用后端API手动检查所有搜索源状态
+  // 使用后端API手动检查所有搜索源状态
   async checkAllSourcesStatus() {
     try {
       const userSettings = await this.getUserSettings();
@@ -504,7 +522,7 @@ class SearchService {
       
       console.log('手动检查所有搜索源状态...');
       
-      // 🔧 使用后端检查器
+      // 使用后端检查器
       const checkResults = await backendSourceChecker.checkMultipleSources(
         enabledSources, 
         userSettings
@@ -530,7 +548,7 @@ class SearchService {
           name: source.name,
           status: result.status,
           statusText: this.getStatusText(result.status),
-          unavailableReason: this.getUnavailableReason(result), // 🔧 新增不可用原因
+          unavailableReason: this.getUnavailableReason(result),
           lastChecked: result.lastChecked,
           responseTime: result.responseTime || 0,
           availabilityScore: result.availabilityScore || 0,
@@ -593,7 +611,7 @@ class SearchService {
       
       const userSettings = await this.getUserSettings();
       
-      // 🔧 使用后端检查器
+      // 使用后端检查器
       const result = await backendSourceChecker.checkSourceStatus(source, userSettings);
       
       return {
@@ -601,7 +619,7 @@ class SearchService {
         name: source.name,
         status: result.status,
         statusText: this.getStatusText(result.status),
-        unavailableReason: this.getUnavailableReason(result), // 🔧 新增不可用原因
+        unavailableReason: this.getUnavailableReason(result),
         lastChecked: result.lastChecked,
         responseTime: result.responseTime || 0,
         availabilityScore: result.availabilityScore || 0,
@@ -614,6 +632,15 @@ class SearchService {
       console.error(`检查搜索源 ${sourceId} 状态失败:`, error);
       throw error;
     }
+  }
+
+  // 清除搜索源缓存
+  clearSourcesCache() {
+    this.sourcesCache = null;
+    this.sourcesCacheTimestamp = 0;
+    // 同时清除搜索源API的缓存
+    searchSourcesAPI.clearCache();
+    console.log('搜索源缓存已清除');
   }
 
   // 清除搜索源状态缓存
@@ -696,6 +723,7 @@ class SearchService {
   // 清理所有缓存
   clearAllCache() {
     this.searchCache.clear();
+    this.clearSourcesCache();
     this.clearSourceStatusCache();
     console.log('所有缓存已清理');
   }
@@ -706,6 +734,11 @@ class SearchService {
       searchCache: {
         size: this.searchCache.size,
         items: []
+      },
+      sourcesCache: {
+        size: this.sourcesCache ? this.sourcesCache.length : 0,
+        timestamp: this.sourcesCacheTimestamp,
+        expired: Date.now() - this.sourcesCacheTimestamp > this.sourcesCacheExpiry
       }
     };
     
@@ -735,20 +768,48 @@ class SearchService {
     }
   }
 
+  // 预热搜索源缓存
+  async warmupSourcesCache() {
+    try {
+      console.log('开始预热搜索源缓存...');
+      await this.getEnabledSearchSources();
+      console.log('搜索源缓存预热完成');
+    } catch (error) {
+      console.error('搜索源缓存预热失败:', error);
+    }
+  }
+
   // 导出搜索服务状态
   exportServiceStatus() {
     return {
-      type: 'backend-integrated-search-service',
+      type: 'optimized-api-search-service',
       cacheStats: this.getCacheStats(),
       checkStats: this.getStatusCheckStats(),
       userSettings: this.userSettings,
+      sourcesCache: {
+        size: this.sourcesCache ? this.sourcesCache.length : 0,
+        timestamp: this.sourcesCacheTimestamp,
+        expired: Date.now() - this.sourcesCacheTimestamp > this.sourcesCacheExpiry
+      },
       timestamp: Date.now(),
-      version: '2.1.0' // 🔧 更新版本号
+      version: '2.3.1' // 更新版本号
     };
+  }
+
+  // 获取搜索源管理器实例（用于UI组件）
+  getSearchSourcesAPI() {
+    return searchSourcesAPI;
+  }
+
+  // 刷新搜索源配置
+  async refreshSearchSources() {
+    this.clearSourcesCache();
+    this.clearUserSettingsCache();
+    console.log('搜索源配置已刷新');
   }
 }
 
-// 搜索历史管理器
+// 搜索历史管理器（保持不变）
 export class SearchHistoryManager {
   constructor() {
     this.maxHistorySize = APP_CONSTANTS.LIMITS.MAX_HISTORY;

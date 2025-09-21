@@ -1,4 +1,4 @@
-// src/handlers/system.js - 系统相关路由处理器
+// src/handlers/system.js - 系统相关路由处理器（已移除搜索源管理功能）
 import { utils } from '../utils.js';
 import { authenticate } from '../middleware.js';
 import { 
@@ -147,43 +147,6 @@ export async function sourceStatusHistoryHandler(request, env) {
     }
 }
 
-// ===================== 搜索源管理相关 =====================
-
-// 获取搜索源
-export async function getSearchSourcesHandler(request, env) {
-    try {
-        let customSources = [];
-        let customCategories = [];
-        
-        const user = await authenticate(request, env);
-        if (user) {
-            try {
-                const userRecord = await env.DB.prepare(`
-                    SELECT settings FROM users WHERE id = ?
-                `).bind(user.id).first();
-
-                if (userRecord) {
-                    const settings = JSON.parse(userRecord.settings || '{}');
-                    customSources = settings.customSearchSources || [];
-                    customCategories = settings.customSourceCategories || [];
-                }
-            } catch (error) {
-                console.warn('获取用户自定义搜索源失败:', error);
-            }
-        }
-
-        return utils.successResponse({
-            customSources,
-            customCategories,
-            message: 'Built-in sources should be loaded from frontend constants'
-        });
-
-    } catch (error) {
-        console.error('获取搜索源失败:', error);
-        return utils.errorResponse('获取搜索源失败', 500);
-    }
-}
-
 // ===================== 系统配置相关 =====================
 
 // 获取配置
@@ -250,3 +213,13 @@ export function defaultHandler(request) {
     const url = new URL(request.url);
     return utils.errorResponse(`API路径不存在: ${url.pathname}`, 404);
 }
+
+// ===================== 说明 =====================
+// 已移除的搜索源管理功能：
+// - getSearchSourcesHandler: 该功能现在通过独立的搜索源管理API (/api/search-sources/sources) 处理
+// 
+// 保留的功能：
+// - 搜索源状态检查相关功能（因为这是系统级别的状态检查服务，不是搜索源管理）
+// - 系统配置获取
+// - 行为记录
+// - 健康检查

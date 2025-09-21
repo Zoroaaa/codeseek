@@ -1,8 +1,9 @@
-// 分类管理器
+// 分类管理器 - 完全集成新的搜索源分类管理API
 import { APP_CONSTANTS, MAJOR_CATEGORIES } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
-import apiService from '../../services/api.js';
+// 🔴 导入新的搜索源管理API
+import searchSourcesAPI from '../../services/search-sources-api.js';
 
 export class CategoriesManager {
   constructor(dashboardApp) {
@@ -53,23 +54,29 @@ export class CategoriesManager {
     }
   }
 
+  // 🔴 使用新API加载用户分类设置
   async loadUserCategorySettings() {
     if (!this.app.getCurrentUser()) return;
     
     try {
-      const userSettings = await apiService.getUserSettings();
-      this.customCategories = userSettings.customSourceCategories || [];
+      console.log('📡 从新API加载分类数据...');
       
-      // 合并内置和自定义数据
-      this.allCategories = [
-        ...this.builtinCategories,
-        ...this.customCategories.map(c => ({ ...c, isBuiltin: false, isCustom: true }))
-      ];
+      // 🔴 使用新的搜索源管理API获取所有分类
+      const allCategories = await searchSourcesAPI.getSourceCategories({
+        includeSystem: true
+      });
       
-      console.log(`分类设置：${this.builtinCategories.length} 个内置分类，${this.customCategories.length} 个自定义分类`);
+      // 分离内置和自定义分类
+      this.builtinCategories = allCategories.filter(c => c.isSystem || c.isBuiltin);
+      this.customCategories = allCategories.filter(c => c.isCustom || !c.isSystem);
+      
+      // 合并所有分类
+      this.allCategories = allCategories;
+      
+      console.log(`✅ 已加载 ${this.allCategories.length} 个分类 (${this.builtinCategories.length} 内置, ${this.customCategories.length} 自定义)`);
       
     } catch (error) {
-      console.warn('加载用户分类设置失败，使用默认设置:', error);
+      console.warn('⚠️ 从API加载分类失败,使用默认设置:', error);
       this.customCategories = [];
       this.allCategories = [...this.builtinCategories];
     }
@@ -92,7 +99,7 @@ export class CategoriesManager {
       return;
     }
 
-    // 🔧 按大分类分组显示内置分类
+    // 按大分类分组显示内置分类
     const categoriesByMajor = this.groupCategoriesByMajorCategory(this.builtinCategories);
     
     let html = '';
@@ -138,7 +145,6 @@ export class CategoriesManager {
     `;
   }
 
-  // 🔧 新增：按大分类分组
   groupCategoriesByMajorCategory(categories) {
     const grouped = {};
     
@@ -168,7 +174,7 @@ export class CategoriesManager {
       s.category === category.id && enabledSources.includes(s.id)
     ).length;
     
-    // 🔧 新增：搜索源类型统计
+    // 搜索源类型统计
     const searchableSources = allSources.filter(s => 
       s.category === category.id && s.searchable !== false
     ).length;
@@ -176,7 +182,7 @@ export class CategoriesManager {
       s.category === category.id && s.searchable === false
     ).length;
     
-    // 🔧 获取大分类信息
+    // 获取大分类信息
     const majorCategoryInfo = MAJOR_CATEGORIES[category.majorCategory];
     const majorCategoryLabel = majorCategoryInfo ? 
       `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
@@ -192,20 +198,18 @@ export class CategoriesManager {
             <div class="category-meta">
               <div class="category-stats">
                 <span class="category-usage">
-                  ${enabledSourceCount}/${sourceCount} 个搜索源已可用
+                  ${enabledSourceCount}/${sourceCount} 个搜索源已启用
                 </span>
                 ${category.isCustom ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
               </div>
               
-              <!-- 🔧 显示大分类归属 -->
               ${!category.isCustom ? `
                 <div class="major-category-info">
-                  <span class="major-category-label">归属：${majorCategoryLabel}</span>
+                  <span class="major-category-label">归属:${majorCategoryLabel}</span>
                 </div>
               ` : ''}
             </div>
             
-            <!-- 🔧 新增：搜索配置信息 -->
             ${category.isBuiltin ? `
               <div class="category-search-config">
                 <span class="search-default-badge ${category.defaultSearchable ? 'searchable' : 'non-searchable'}">
@@ -240,7 +244,6 @@ export class CategoriesManager {
     `;
   }
 
-  // 🔧 新增：获取网站类型标签
   getSiteTypeLabel(siteType) {
     const labels = {
       'search': '搜索源',
@@ -321,7 +324,7 @@ export class CategoriesManager {
               <div class="form-group">
                 <label for="categoryName">分类名称 *</label>
                 <input type="text" name="categoryName" id="categoryName" required maxlength="30" 
-                       placeholder="例如：我的分类">
+                       placeholder="例如:我的分类">
               </div>
               
               <div class="form-group">
@@ -337,7 +340,7 @@ export class CategoriesManager {
             <div class="form-group">
               <label for="categoryDescription">分类描述</label>
               <input type="text" name="categoryDescription" id="categoryDescription" maxlength="100" 
-                     placeholder="例如：专门的搜索资源分类">
+                     placeholder="例如:专门的搜索资源分类">
             </div>
             
             <div class="form-group">
@@ -352,7 +355,6 @@ export class CategoriesManager {
             </div>
           </div>
           
-          <!-- 🔧 新增：搜索配置部分 -->
           <div class="form-section search-config">
             <h3>搜索配置</h3>
             <p class="section-description">设置该分类下网站的默认行为</p>
@@ -367,9 +369,9 @@ export class CategoriesManager {
             <div class="form-group">
               <label for="defaultSiteType">默认网站类型</label>
               <select name="defaultSiteType" id="defaultSiteType">
-                <option value="search">搜索源（需要关键词）</option>
-                <option value="browse">浏览站（仅供访问）</option>
-                <option value="reference">参考站（可选关键词）</option>
+                <option value="search">搜索源(需要关键词)</option>
+                <option value="browse">浏览站(仅供访问)</option>
+                <option value="reference">参考站(可选关键词)</option>
               </select>
             </div>
             
@@ -402,24 +404,20 @@ export class CategoriesManager {
     if (!form) return;
 
     if (category) {
-      // 编辑模式
       form.categoryId.value = category.id;
       form.categoryName.value = category.name;
       form.categoryDescription.value = category.description || '';
       form.categoryIcon.value = category.icon || '🌟';
       form.categoryColor.value = category.color || '#6b7280';
-      // 🔧 加载搜索配置
       form.defaultSearchable.checked = category.defaultSearchable !== false;
       form.defaultSiteType.value = category.defaultSiteType || 'search';
       form.searchPriority.value = category.searchPriority || 5;
       modal.querySelector('h2').textContent = '编辑自定义分类';
       modal.querySelector('[type="submit"]').textContent = '更新分类';
     } else {
-      // 新增模式
       form.reset();
       form.categoryIcon.value = '🌟';
       form.categoryColor.value = '#6b7280';
-      // 🔧 设置搜索配置默认值
       form.defaultSearchable.checked = true;
       form.defaultSiteType.value = 'search';
       form.searchPriority.value = 5;
@@ -428,7 +426,7 @@ export class CategoriesManager {
     }
   }
 
-  // 🔧 修改 handleCustomCategorySubmit 方法
+  // 🔴 使用新API保存自定义分类
   async handleCustomCategorySubmit(event) {
     event.preventDefault();
     
@@ -441,7 +439,6 @@ export class CategoriesManager {
       description: formData.get('categoryDescription').trim(),
       icon: formData.get('categoryIcon'),
       color: formData.get('categoryColor'),
-      // 🔧 新增：搜索配置字段
       defaultSearchable: formData.get('defaultSearchable') === 'on',
       defaultSiteType: formData.get('defaultSiteType') || 'search',
       searchPriority: parseInt(formData.get('searchPriority')) || 5
@@ -457,10 +454,14 @@ export class CategoriesManager {
       showLoading(true);
       
       if (this.editingCustomCategory && categoryData.id) {
-        await this.updateCustomCategory(categoryData);
+        // 🔴 使用新API更新
+        await searchSourcesAPI.updateSourceCategory(categoryData.id, categoryData);
         showToast('自定义分类更新成功', 'success');
       } else {
-        await this.addCustomCategory(categoryData);
+        // 🔴 使用新API创建
+        // 需要添加majorCategoryId,默认为'others'
+        categoryData.majorCategoryId = 'others';
+        await searchSourcesAPI.createSourceCategory(categoryData);
         showToast('自定义分类添加成功', 'success');
       }
       
@@ -479,10 +480,13 @@ export class CategoriesManager {
   validateCustomCategory(categoryData) {
     const rules = APP_CONSTANTS.VALIDATION_RULES.CATEGORY;
     
-    const requiredFieldsForValidation = rules.REQUIRED_FIELDS.filter(field => field !== 'id');
+    // 注意:创建时不需要majorCategoryId验证,因为会使用默认值
+    const requiredFields = categoryData.id ? 
+      rules.REQUIRED_FIELDS.filter(f => f !== 'id') : 
+      ['name', 'icon'];
     
-    for (const field of requiredFieldsForValidation) {
-      if (!categoryData[field] || categoryData[field].trim() === '') {
+    for (const field of requiredFields) {
+      if (!categoryData[field] || (typeof categoryData[field] === 'string' && categoryData[field].trim() === '')) {
         return { valid: false, message: `${field} 是必需的` };
       }
     }
@@ -495,54 +499,11 @@ export class CategoriesManager {
       return { valid: false, message: '颜色格式不正确' };
     }
     
-    if (!categoryData.id) {
-      const generatedId = this.generateCategoryId(categoryData.name);
-      if (this.allCategories.some(c => c.id === generatedId)) {
-        return { valid: false, message: '分类名称已存在，请使用不同的名称' };
-      }
-    }
-    
     if (!categoryData.id && this.customCategories.length >= APP_CONSTANTS.LIMITS.MAX_CUSTOM_CATEGORIES) {
       return { valid: false, message: `最多只能创建 ${APP_CONSTANTS.LIMITS.MAX_CUSTOM_CATEGORIES} 个自定义分类` };
     }
     
     return { valid: true };
-  }
-
-  generateCategoryId(name) {
-    return name.toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 15) + '_' + Date.now().toString(36);
-  }
-
-  async addCustomCategory(categoryData) {
-    categoryData.id = this.generateCategoryId(categoryData.name);
-    categoryData.createdAt = Date.now();
-    categoryData.isCustom = true;
-    categoryData.isBuiltin = false;
-    categoryData.order = 50; // 自定义分类排序权重
-    
-    this.customCategories.push(categoryData);
-    this.allCategories.push({ ...categoryData, isCustom: true, isBuiltin: false });
-    
-    await this.saveCustomCategories();
-  }
-
-  async updateCustomCategory(categoryData) {
-    const index = this.customCategories.findIndex(c => c.id === categoryData.id);
-    if (index === -1) {
-      throw new Error('未找到要更新的分类');
-    }
-    
-    this.customCategories[index] = { ...this.customCategories[index], ...categoryData };
-    
-    const allIndex = this.allCategories.findIndex(c => c.id === categoryData.id);
-    if (allIndex !== -1) {
-      this.allCategories[allIndex] = { ...this.allCategories[allIndex], ...categoryData };
-    }
-    
-    await this.saveCustomCategories();
   }
 
   editCustomCategory(categoryId) {
@@ -555,6 +516,7 @@ export class CategoriesManager {
     this.showCustomCategoryModal(category);
   }
 
+  // 🔴 使用新API删除自定义分类
   async deleteCustomCategory(categoryId) {
     const category = this.customCategories.find(c => c.id === categoryId);
     if (!category) {
@@ -568,21 +530,23 @@ export class CategoriesManager {
     const sourcesUsingCategory = allSources.filter(s => s.category === categoryId);
     
     if (sourcesUsingCategory.length > 0) {
-      showToast(`无法删除分类"${category.name}"，因为有 ${sourcesUsingCategory.length} 个搜索源正在使用此分类`, 'error');
+      showToast(`无法删除分类"${category.name}",因为有 ${sourcesUsingCategory.length} 个搜索源正在使用此分类`, 'error');
       return;
     }
     
-    if (!confirm(`确定要删除自定义分类"${category.name}"吗？此操作不可撤销。`)) {
+    if (!confirm(`确定要删除自定义分类"${category.name}"吗?此操作不可撤销。`)) {
       return;
     }
     
     try {
       showLoading(true);
       
+      // 🔴 使用新API删除
+      await searchSourcesAPI.deleteSourceCategory(categoryId);
+      
       this.customCategories = this.customCategories.filter(c => c.id !== categoryId);
       this.allCategories = this.allCategories.filter(c => c.id !== categoryId);
       
-      await this.saveCustomCategories();
       await this.loadTabData();
       
       showToast('自定义分类删除成功', 'success');
@@ -595,30 +559,21 @@ export class CategoriesManager {
     }
   }
 
-  async saveCustomCategories() {
-    const sourcesManager = this.app.getManager('sources');
-    const customSources = sourcesManager ? sourcesManager.customSearchSources : [];
-    const enabledSources = sourcesManager ? sourcesManager.enabledSources : [];
-    
-    const settings = {
-      customSourceCategories: this.customCategories,
-      customSearchSources: customSources,
-      searchSources: enabledSources
-    };
-    
-    await apiService.updateUserSettings(settings);
-  }
-
+  // 🔴 使用新API导出分类
   async exportCategories() {
     try {
-      const data = {
+      // 🔴 使用新API导出
+      const exportData = await searchSourcesAPI.exportUserSearchSources();
+      
+      // 只导出分类部分
+      const categoriesData = {
         builtinCategories: this.builtinCategories,
         customCategories: this.customCategories,
-        exportTime: new Date().toISOString(),
-        version: window.API_CONFIG?.APP_VERSION || '1.3.0'
+        exportTime: exportData.exportTime,
+        version: exportData.version
       };
 
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
+      const blob = new Blob([JSON.stringify(categoriesData, null, 2)], {
         type: 'application/json'
       });
 

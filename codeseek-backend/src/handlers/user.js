@@ -1,4 +1,4 @@
-// src/handlers/user.js - 用户相关路由处理器
+// src/handlers/user.js - 用户相关路由处理器（已移除搜索源管理功能）
 import { utils } from '../utils.js';
 import { authenticate } from '../middleware.js';
 
@@ -27,15 +27,15 @@ export async function userGetSettingsHandler(request, env) {
                 maxFavoritesPerUser: settings.maxFavoritesPerUser || 1000,
                 allowAnalytics: settings.allowAnalytics !== false,
                 searchSuggestions: settings.searchSuggestions !== false,
-                searchSources: settings.searchSources || ['javbus', 'javdb', 'javlibrary'],
-                customSearchSources: settings.customSearchSources || [],
-                customSourceCategories: settings.customSourceCategories || [],
+                // 移除了 searchSources, customSearchSources, customSourceCategories 相关设置
+                // 这些现在通过独立的搜索源管理API处理
                 checkSourceStatus: settings.checkSourceStatus,
                 sourceStatusCheckTimeout: settings.sourceStatusCheckTimeout,
                 sourceStatusCacheDuration: settings.sourceStatusCacheDuration, 
                 skipUnavailableSources: settings.skipUnavailableSources,
                 showSourceStatus: settings.showSourceStatus,
                 retryFailedSources: settings.retryFailedSources,
+                // 保留其他用户个人设置
                 ...settings
             }
         });
@@ -61,6 +61,7 @@ export async function userUpdateSettingsHandler(request, env) {
             return utils.errorResponse('设置数据格式错误');
         }
 
+        // 移除了搜索源相关的设置字段，这些现在通过独立的搜索源管理API处理
         const allowedSettings = [
             'theme', 
             'autoSync', 
@@ -69,9 +70,7 @@ export async function userUpdateSettingsHandler(request, env) {
             'maxFavoritesPerUser',
             'allowAnalytics',
             'searchSuggestions',
-            'searchSources',
-            'customSearchSources',
-            'customSourceCategories',
+            // 移除了: 'searchSources', 'customSearchSources', 'customSourceCategories'
             'checkSourceStatus',
             'sourceStatusCheckTimeout',
             'sourceStatusCacheDuration', 
@@ -88,6 +87,7 @@ export async function userUpdateSettingsHandler(request, env) {
             }
         });
 
+        // 验证状态检查相关设置
         if (filteredSettings.hasOwnProperty('sourceStatusCheckTimeout')) {
             const timeout = Number(filteredSettings.sourceStatusCheckTimeout);
             if (timeout < 1000 || timeout > 30000) {
@@ -104,77 +104,14 @@ export async function userUpdateSettingsHandler(request, env) {
             filteredSettings.sourceStatusCacheDuration = cacheDuration;
         }
         
+        // 验证布尔值设置
         ['checkSourceStatus', 'skipUnavailableSources', 'showSourceStatus', 'retryFailedSources'].forEach(key => {
             if (filteredSettings.hasOwnProperty(key)) {
                 filteredSettings[key] = Boolean(filteredSettings[key]);
             }
         });
 
-        if (filteredSettings.searchSources) {
-            if (!Array.isArray(filteredSettings.searchSources)) {
-                return utils.errorResponse('搜索源格式错误：必须是数组');
-            }
-            
-            if (filteredSettings.searchSources.length === 0) {
-                return utils.errorResponse('至少需要选择一个搜索源');
-            }
-        }
-
-        if (filteredSettings.customSearchSources) {
-            if (!Array.isArray(filteredSettings.customSearchSources)) {
-                return utils.errorResponse('自定义搜索源格式错误：必须是数组');
-            }
-            
-            const invalidCustomSources = filteredSettings.customSearchSources.filter(source => 
-                !source || 
-                !source.id || 
-                !source.name || 
-                !source.urlTemplate ||
-                !source.category ||
-                typeof source.id !== 'string' || 
-                typeof source.name !== 'string' || 
-                typeof source.urlTemplate !== 'string' ||
-                typeof source.category !== 'string'
-            );
-            
-            if (invalidCustomSources.length > 0) {
-                return utils.errorResponse('自定义搜索源格式错误：缺少必需字段或格式不正确');
-            }
-        }
-
-        if (filteredSettings.customSourceCategories) {
-            if (!Array.isArray(filteredSettings.customSourceCategories)) {
-                return utils.errorResponse('自定义分类格式错误：必须是数组');
-            }
-            
-            const invalidCategories = filteredSettings.customSourceCategories.filter(category => 
-                !category || 
-                !category.id || 
-                !category.name || 
-                !category.icon ||
-                typeof category.id !== 'string' || 
-                typeof category.name !== 'string' || 
-                typeof category.icon !== 'string'
-            );
-            
-            if (invalidCategories.length > 0) {
-                return utils.errorResponse('自定义分类格式错误：缺少必需字段或格式不正确');
-            }
-            
-            const categoryIds = filteredSettings.customSourceCategories.map(c => c.id);
-            const duplicateIds = categoryIds.filter((id, index) => categoryIds.indexOf(id) !== index);
-            
-            if (duplicateIds.length > 0) {
-                return utils.errorResponse(`自定义分类ID重复: ${duplicateIds.join(', ')}`);
-            }
-            
-            const categoryNames = filteredSettings.customSourceCategories.map(c => c.name);
-            const duplicateNames = categoryNames.filter((name, index) => categoryNames.indexOf(name) !== index);
-            
-            if (duplicateNames.length > 0) {
-                return utils.errorResponse(`自定义分类名称重复: ${duplicateNames.join(', ')}`);
-            }
-        }
+        // 移除了搜索源相关的验证逻辑
 
         const userRecord = await env.DB.prepare(`
             SELECT settings FROM users WHERE id = ?
@@ -189,8 +126,7 @@ export async function userUpdateSettingsHandler(request, env) {
 
         await utils.logUserAction(env, user.id, 'settings_update', {
             changedFields: Object.keys(filteredSettings),
-            hasCustomSources: !!(filteredSettings.customSearchSources && filteredSettings.customSearchSources.length > 0),
-            hasCustomCategories: !!(filteredSettings.customSourceCategories && filteredSettings.customSourceCategories.length > 0),
+            // 移除了搜索源相关的行为记录
             checkSourceStatusChanged: filteredSettings.hasOwnProperty('checkSourceStatus')
         }, request);
 
@@ -324,11 +260,11 @@ export async function userSaveSearchHistoryHandler(request, env) {
         const historyId = utils.generateId();
         const now = timestamp || Date.now();
 
-		await env.DB.prepare(`
+        await env.DB.prepare(`
             INSERT INTO user_search_history (id, user_id, query, source, results_count, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
         `).bind(historyId, user.id, trimmedQuery, source || 'unknown', resultCount || 0, now).run();
-		
+        
         await utils.logUserAction(env, user.id, 'search', { query: trimmedQuery, source }, request);
 
         return utils.successResponse({ 

@@ -1,43 +1,48 @@
-// src/core/constants.js - 保守优化版本：只移除详情提取配置硬编码，保持其他功能完整
-// 详情提取配置已迁移至 detail-config.js，由 detail-config-api.js 动态管理
-
+// src/core/constants.js - 优化版本：增强验证规则，完善搜索源管理配置
 export const APP_CONSTANTS = {
-  // 应用信息 - 保持不变
+  // 应用信息
   APP_NAME: '磁力快搜',
-  DEFAULT_VERSION: '1.4.0', // 版本升级，完善详情提取功能集成
+  DEFAULT_VERSION: '2.3.1', // 版本升级，完成前后端匹配优化
   
-  // 本地存储键名 - 保持不变，只添加详情配置相关
+  // 本地存储键名
   STORAGE_KEYS: {
     AUTH_TOKEN: 'auth_token',
     CURRENT_USER: 'current_user',
     THEME: 'theme',
     APP_VERSION: 'app_version',
     API_CONFIG: 'api_config',
-    CUSTOM_SOURCES: 'custom_search_sources',
-    CUSTOM_CATEGORIES: 'custom_source_categories',
     SOURCE_STATUS_CACHE: 'source_status_cache',
-    // 详情提取相关缓存 - 保持不变
+    // 详情提取相关缓存
     DETAIL_EXTRACTION_CACHE: 'detail_extraction_cache',
-    DETAIL_CONFIG_CACHE: 'detail_config_cache', // 新增：配置缓存
+    DETAIL_CONFIG_CACHE: 'detail_config_cache',
     DETAIL_EXTRACTION_STATS: 'detail_extraction_stats',
     DETAIL_USER_PREFERENCES: 'detail_user_preferences'
   },
   
-  // API配置 - 保持原有功能，添加详情配置管理端点
+  // API配置
   API: {
     TIMEOUT: 10000,
     RETRY_ATTEMPTS: 3,
     CACHE_DURATION: 1800000, // 30分钟
     SOURCE_CHECK_TIMEOUT: 8000,
     SOURCE_STATUS_CACHE_DURATION: 300000,
-    // 详情提取API配置 - 与后端完全对齐，但移除用户可配置部分
-    DETAIL_EXTRACTION_TIMEOUT: 15000, // 系统默认值，用户可通过配置API修改
-    DETAIL_CACHE_DURATION: 86400000, // 系统默认值，用户可通过配置API修改
-    DETAIL_BATCH_SIZE: 20, // 系统最大值
-    DETAIL_MAX_CONCURRENT: 3, // 系统默认值
+    // 详情提取API配置
+    DETAIL_EXTRACTION_TIMEOUT: 15000,
+    DETAIL_CACHE_DURATION: 86400000,
+    DETAIL_BATCH_SIZE: 20,
+    DETAIL_MAX_CONCURRENT: 3,
     DETAIL_HEALTH_CHECK_INTERVAL: 300000,
     DETAIL_RETRY_DELAY: 1000,
-    DETAIL_PROGRESS_UPDATE_INTERVAL: 1000
+    DETAIL_PROGRESS_UPDATE_INTERVAL: 1000,
+    // 搜索源管理API端点
+    SEARCH_SOURCES: {
+      MAJOR_CATEGORIES: '/api/search-sources/major-categories',
+      CATEGORIES: '/api/search-sources/categories', 
+      SOURCES: '/api/search-sources/sources',
+      USER_CONFIGS: '/api/search-sources/user-configs',
+      STATS: '/api/search-sources/stats',
+      EXPORT: '/api/search-sources/export'
+    }
   },
 
   // 网站类型定义
@@ -47,7 +52,7 @@ export const APP_CONSTANTS = {
     REFERENCE: 'reference'  // 参考资料站（可选关键词）
   },
   
-  // 用户限制 - 保持不变
+  // 用户限制
   LIMITS: {
     MAX_FAVORITES: 1000,
     MAX_HISTORY: 1000,
@@ -66,31 +71,30 @@ export const APP_CONSTANTS = {
     MAX_SOURCE_CHECK_TIMEOUT: 30000,
     MIN_STATUS_CACHE_DURATION: 60000,
     MAX_STATUS_CACHE_DURATION: 3600000,
-    
-    // 详情提取限制 - 保留系统级限制，与后端 constants.js 同步
-    MAX_DETAIL_EXTRACTIONS_PER_BATCH: 20, // 系统最大值
-    MIN_DETAIL_EXTRACTION_TIMEOUT: 5000, // 系统最小值
-    MAX_DETAIL_EXTRACTION_TIMEOUT: 30000, // 系统最大值
-    MIN_DETAIL_CACHE_DURATION: 3600000, // 系统最小值
-    MAX_DETAIL_CACHE_DURATION: 604800000, // 系统最大值
-    MAX_AUTO_EXTRACTIONS: 10, // 系统最大值
-    MAX_DOWNLOAD_LINKS: 15, // 系统最大值（用户可在此范围内配置）
-    MAX_MAGNET_LINKS: 15, // 系统最大值（用户可在此范围内配置）
-    MAX_SCREENSHOTS: 20, // 系统最大值（用户可在此范围内配置）
-    MAX_CONTENT_FILTER_KEYWORDS: 50, // 系统最大值
+    // 详情提取限制
+    MAX_DETAIL_EXTRACTIONS_PER_BATCH: 20,
+    MIN_DETAIL_EXTRACTION_TIMEOUT: 5000,
+    MAX_DETAIL_EXTRACTION_TIMEOUT: 30000,
+    MIN_DETAIL_CACHE_DURATION: 3600000,
+    MAX_DETAIL_CACHE_DURATION: 604800000,
+    MAX_AUTO_EXTRACTIONS: 10,
+    MAX_DOWNLOAD_LINKS: 15,
+    MAX_MAGNET_LINKS: 15,
+    MAX_SCREENSHOTS: 20,
+    MAX_CONTENT_FILTER_KEYWORDS: 50,
     MAX_DETAIL_CARD_CACHE_SIZE: 100,
     MIN_QUALITY_SCORE: 0,
     MAX_QUALITY_SCORE: 100
   },
   
-  // 主题选项 - 保持不变
+  // 主题选项
   THEMES: {
     LIGHT: 'light',
     DARK: 'dark',
     AUTO: 'auto'
   },
   
-  // 连接状态 - 保持不变
+  // 连接状态
   CONNECTION_STATUS: {
     CHECKING: 'checking',
     CONNECTED: 'connected',
@@ -98,7 +102,7 @@ export const APP_CONSTANTS = {
     ERROR: 'error'
   },
   
-  // 搜索源状态枚举 - 保持不变
+  // 搜索源状态枚举
   SOURCE_STATUS: {
     UNKNOWN: 'unknown',
     CHECKING: 'checking',
@@ -108,7 +112,7 @@ export const APP_CONSTANTS = {
     ERROR: 'error'
   },
 
-  // 详情提取状态枚举 - 保持不变，与后端同步
+  // 详情提取状态枚举
   DETAIL_EXTRACTION_STATUS: {
     PENDING: 'pending',
     IN_PROGRESS: 'in_progress',
@@ -122,7 +126,7 @@ export const APP_CONSTANTS = {
     RATE_LIMITED: 'rate_limited'
   },
 
-  // 详情提取质量等级 - 保持不变
+  // 详情提取质量等级
   DETAIL_QUALITY_LEVELS: {
     EXCELLENT: { min: 80, label: '优秀', color: '#10b981', icon: '⭐' },
     GOOD: { min: 60, label: '良好', color: '#3b82f6', icon: '✅' },
@@ -130,13 +134,13 @@ export const APP_CONSTANTS = {
     POOR: { min: 0, label: '较差', color: '#ef4444', icon: '❌' }
   },
 
-  // 支持详情提取的搜索源 - 保持不变
+  // 支持详情提取的搜索源
   DETAIL_EXTRACTION_SOURCES: [
     'javbus', 'javdb', 'jable', 'javmost', 
     'javgg',  'sukebei','javguru'
   ],
 
-  // 详情提取源能力映射 - 保持不变
+  // 详情提取源能力映射
   DETAIL_EXTRACTION_CAPABILITIES: {
     'javbus': {
       screenshots: true,
@@ -195,482 +199,53 @@ export const APP_CONSTANTS = {
     }
   },
 
-  // 🔧 新增：大分类定义（搜索源 vs 浏览站点）
-  MAJOR_CATEGORIES: {
-    SEARCH_SOURCES: {
-      id: 'search_sources',
-      name: '🔍 搜索源',
-      description: '支持番号搜索的网站',
-      icon: '🔍',
-      requiresKeyword: true,
-      order: 1
-    },
-    BROWSE_SITES: {
-      id: 'browse_sites', 
-      name: '🌐 浏览站点',
-      description: '仅供访问，不参与搜索',
-      icon: '🌐',
-      requiresKeyword: false,
-      order: 2
-    }
-  },
-
-  // 搜索源分类定义 - 添加默认搜索配置和大分类归属
-  SOURCE_CATEGORIES: {
-    database: {
-      id: 'database',
-      name: '📚 番号资料站',
-      description: '提供详细的番号信息、封面和演员资料',
-      icon: '📚',
-      color: '#3b82f6',
-      isBuiltin: true,
-      order: 1,
-      supportsDetailExtraction: true,
-      extractionPriority: 'high',
-      typicalCapabilities: ['screenshots', 'actresses', 'metadata', 'rating'],
-      defaultSearchable: true,      // 该类别默认可搜索
-      defaultSiteType: 'search',    // 该类别默认网站类型
-      searchPriority: 1,            // 搜索优先级
-      majorCategory: 'search_sources' // 🔧 新增：归属大分类
-    },
-    streaming: {
-      id: 'streaming',
-      name: '🎥 在线播放平台',
-      description: '提供在线观看和下载服务',
-      icon: '🎥',
-      color: '#10b981',
-      isBuiltin: true,
-      order: 2,
-      supportsDetailExtraction: true,
-      extractionPriority: 'medium',
-      typicalCapabilities: ['screenshots', 'downloadLinks', 'actresses', 'metadata'],
-      defaultSearchable: false,     // 默认不参与搜索
-      defaultSiteType: 'browse',
-      searchPriority: 5,
-      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
-    },
-    torrent: {
-      id: 'torrent',
-      name: '🧲 磁力搜索',
-      description: '提供磁力链接和种子文件',
-      icon: '🧲',
-      color: '#f59e0b',
-      isBuiltin: true,
-      order: 3,
-      supportsDetailExtraction: true,
-      extractionPriority: 'low',
-      typicalCapabilities: ['magnetLinks', 'downloadLinks', 'metadata'],
-      defaultSearchable: true,
-      defaultSiteType: 'search',
-      searchPriority: 3,
-      majorCategory: 'search_sources' // 🔧 新增：归属大分类
-    },
-    community: {
-      id: 'community',
-      name: '💬 社区论坛',
-      description: '用户交流讨论和资源分享',
-      icon: '💬',
-      color: '#8b5cf6',
-      isBuiltin: true,
-      order: 4,
-      supportsDetailExtraction: false,
-      extractionPriority: 'none',
-      typicalCapabilities: [],
-      defaultSearchable: false,
-      defaultSiteType: 'browse',
-      searchPriority: 10,
-      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
-    },
-    others: {
-      id: 'others',
-      name: '🌟 其他资源',
-      description: '其他类型的搜索资源',
-      icon: '🌟',
-      color: '#6b7280',
-      isBuiltin: true,
-      order: 99,
-      supportsDetailExtraction: false,
-      extractionPriority: 'none',
-      typicalCapabilities: [],
-      defaultSearchable: false,
-      defaultSiteType: 'browse',
-      searchPriority: 10,
-      majorCategory: 'browse_sites' // 🔧 新增：归属大分类
-    }
-  },
-  
-  // 增强版搜索源 - 🔧 调整非搜索源的URL模板，移除搜索后缀
-  SEARCH_SOURCES: [
-    // 番号资料站
-    {
-      id: 'javbus',
-      name: 'JavBus',
-      subtitle: '番号+磁力一体站，信息完善',
-      icon: '🎬',
-      urlTemplate: 'https://www.javbus.com/search/{keyword}',
-      category: 'database',
-      isBuiltin: true,
-      priority: 1,
-      isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'excellent',
-      averageExtractionTime: 3000,
-      supportedFeatures: ['screenshots', 'downloadLinks', 'magnetLinks', 'actresses', 'metadata', 'description', 'rating', 'tags'],
-      searchable: true,         // 是否参与搜索
-      siteType: 'search',       // 网站类型
-      searchPriority: 1,        // 搜索优先级 (1-10)
-      requiresKeyword: true     // 是否需要关键词
-    },
-    {
-      id: 'javdb',
-      name: 'JavDB',
-      subtitle: '极简风格番号资料站，轻量快速',
-      icon: '📚',
-      urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
-      category: 'database',
-      isBuiltin: true,
-      priority: 2,
-      isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'good',
-      averageExtractionTime: 2500,
-      supportedFeatures: ['screenshots', 'magnetLinks', 'actresses', 'metadata', 'description', 'rating', 'tags'],
-      searchable: true,
-      siteType: 'search',
-      searchPriority: 2,
-      requiresKeyword: true
-    },
-    {
-      id: 'javlibrary',
-      name: 'JavLibrary',
-      subtitle: '评论活跃，女优搜索详尽',
-      icon: '📖',
-      urlTemplate: 'https://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}',
-      category: 'database',
-      isBuiltin: true,
-      priority: 3,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: true,
-      siteType: 'search',
-      searchPriority: 3,
-      requiresKeyword: true
-    },
-    {
-      id: 'javfinder',
-      name: 'JavFinder',
-      subtitle: '智能搜索引擎，结果精准',
-      icon: '🔍',
-      urlTemplate: 'https://javfinder.is/search/{keyword}',
-      category: 'database',
-      isBuiltin: true,
-      priority: 4,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: true,
-      siteType: 'search',
-      searchPriority: 4,
-      requiresKeyword: true
-    },
-    
-    // 在线播放平台 - 🔧 调整URL模板，移除搜索后缀
-    {
-      id: 'jable',
-      name: 'Jable',
-      subtitle: '高清在线观看，支持多种格式',
-      icon: '📺',
-      urlTemplate: 'https://jable.tv', // 🔧 移除搜索后缀
-      category: 'streaming',
-      isBuiltin: true,
-      priority: 1,
-      isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'good',
-      averageExtractionTime: 3500,
-      supportedFeatures: ['screenshots', 'downloadLinks', 'actresses', 'metadata', 'description', 'tags'],
-      searchable: false,        // 播放平台默认不参与搜索
-      siteType: 'browse',
-      searchPriority: 5,
-      requiresKeyword: false
-    },
-    {
-      id: 'javmost',
-      name: 'JavMost',
-      subtitle: '免费在线观看，更新及时',
-      icon: '🎦',
-      urlTemplate: 'https://javmost.com', // 🔧 移除搜索后缀
-      category: 'streaming',
-      isBuiltin: true,
-      priority: 2,
-      isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'fair',
-      averageExtractionTime: 4500,
-      supportedFeatures: ['screenshots', 'downloadLinks', 'magnetLinks', 'actresses', 'metadata', 'description'],
-      searchable: false,
-      siteType: 'browse',
-      searchPriority: 6,
-      requiresKeyword: false
-    },
-    {
-      id: 'javguru',
-      name: 'JavGuru',
-      subtitle: '多线路播放，观看流畅',
-      icon: '🎭',
-      urlTemplate: 'https://jav.guru', // 🔧 移除搜索后缀
-      category: 'streaming',
-      isBuiltin: true,
-      priority: 3,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: false,
-      siteType: 'browse',
-      searchPriority: 7,
-      requiresKeyword: false
-    },
-    {
-      id: 'av01',
-      name: 'AV01',
-      subtitle: '快速预览站点，封面大图清晰',
-      icon: '🎥',
-      urlTemplate: 'https://av01.tv', // 🔧 移除搜索后缀
-      category: 'streaming',
-      isBuiltin: true,
-      priority: 4,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: false,
-      siteType: 'browse',
-      searchPriority: 8,
-      requiresKeyword: false
-    },
-    {
-      id: 'missav',
-      name: 'MissAV',
-      subtitle: '中文界面，封面高清，信息丰富',
-      icon: '💫',
-      urlTemplate: 'https://missav.com', // 🔧 移除搜索后缀
-      category: 'streaming',
-      isBuiltin: true,
-      priority: 5,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: false,
-      siteType: 'browse',
-      searchPriority: 9,
-      requiresKeyword: false
-    },
-    {
-      id: 'javhdporn',
-      name: 'JavHD.porn',
-      subtitle: '高清资源下载，质量优秀',
-      icon: '🎬',
-      urlTemplate: 'https://javhd.porn', // 🔧 移除搜索后缀
-      category: 'streaming',
-      isBuiltin: true,
-      priority: 6,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: false,
-      siteType: 'browse',
-      searchPriority: 10,
-      requiresKeyword: false
-    },
-    {
-      id: 'javgg',
-      name: 'JavGG',
-      subtitle: '免费观看平台，速度稳定',
-      icon: '⚡',
-      urlTemplate: 'https://javgg.net', // 🔧 移除搜索后缀
-      category: 'streaming',
-      isBuiltin: true,
-      priority: 7,
-      isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'fair',
-      averageExtractionTime: 4500,
-      supportedFeatures: ['screenshots', 'actresses', 'metadata'],
-      searchable: false,
-      siteType: 'browse',
-      searchPriority: 11,
-      requiresKeyword: false
-    },
-    {
-      id: 'javhihi',
-      name: 'JavHiHi',
-      subtitle: '在线播放，无需下载',
-      icon: '🎪',
-      urlTemplate: 'https://javhihi.com', // 🔧 移除搜索后缀
-      category: 'streaming',
-      isBuiltin: true,
-      priority: 8,
-      isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'fair',
-      averageExtractionTime: 5000,
-      supportedFeatures: ['screenshots', 'actresses'],
-      searchable: false,
-      siteType: 'browse',
-      searchPriority: 12,
-      requiresKeyword: false
-    },
-    
-    // 磁力搜索
-    {
-      id: 'btsow',
-      name: 'BTSOW',
-      subtitle: '中文磁力搜索引擎，番号资源丰富',
-      icon: '🧲',
-      urlTemplate: 'https://btsow.com/search/{keyword}',
-      category: 'torrent',
-      isBuiltin: true,
-      priority: 1,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: true,
-      siteType: 'search',
-      searchPriority: 2,
-      requiresKeyword: true
-    },
-    {
-      id: 'magnetdl',
-      name: 'MagnetDL',
-      subtitle: '磁力链接搜索，资源覆盖全面',
-      icon: '🔗',
-      urlTemplate: 'https://www.magnetdl.com/search/?q={keyword}',
-      category: 'torrent',
-      isBuiltin: true,
-      priority: 2,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: true,
-      siteType: 'search',
-      searchPriority: 3,
-      requiresKeyword: true
-    },
-    {
-      id: 'torrentkitty',
-      name: 'TorrentKitty',
-      subtitle: '种子搜索引擎，下载资源丰富',
-      icon: '🐱',
-      urlTemplate: 'https://www.torrentkitty.tv/search/{keyword}',
-      category: 'torrent',
-      isBuiltin: true,
-      priority: 3,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: true,
-      siteType: 'search',
-      searchPriority: 4,
-      requiresKeyword: true
-    },
-    {
-      id: 'sukebei',
-      name: 'Sukebei',
-      subtitle: '成人内容种子站，资源全面',
-      icon: '🌙',
-      urlTemplate: 'https://sukebei.nyaa.si/?q={keyword}',
-      category: 'torrent',
-      isBuiltin: true,
-      priority: 4,
-      isActive: true,
-      supportsDetailExtraction: true,
-      extractionQuality: 'fair',
-      averageExtractionTime: 6000,
-      supportedFeatures: ['downloadLinks', 'magnetLinks', 'metadata', 'description', 'tags'],
-      searchable: true,
-      siteType: 'search',
-      searchPriority: 5,
-      requiresKeyword: true
-    },
-    
-    // 社区论坛 - 🔧 调整URL模板，移除搜索后缀
-    {
-      id: 'sehuatang',
-      name: '色花堂',
-      subtitle: '综合论坛社区，资源丰富',
-      icon: '🌸',
-      urlTemplate: 'https://sehuatang.org', // 🔧 移除搜索后缀
-      category: 'community',
-      isBuiltin: true,
-      priority: 1,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: false,        // 不参与搜索
-      siteType: 'browse',
-      searchPriority: 99,
-      requiresKeyword: false
-    },
-    {
-      id: 't66y',
-      name: 'T66Y',
-      subtitle: '老牌论坛，资源更新快',
-      icon: '📋',
-      urlTemplate: 'https://t66y.com', // 🔧 移除搜索后缀
-      category: 'community',
-      isBuiltin: true,
-      priority: 2,
-      isActive: true,
-      supportsDetailExtraction: false,
-      extractionQuality: 'none',
-      averageExtractionTime: 0,
-      supportedFeatures: [],
-      searchable: false,        // 不参与搜索
-      siteType: 'browse',
-      searchPriority: 99,
-      requiresKeyword: false
-    }
-  ],
-  
-  // 搜索源和分类验证规则 - 🔧 调整URL验证规则
+  // 搜索源和分类验证规则 - 增强版本
   VALIDATION_RULES: {
     SOURCE: {
-      REQUIRED_FIELDS: ['name', 'urlTemplate', 'category'],
-      URL_PATTERN: /^https?:\/\/.+/, // 🔧 修改：不强制要求{keyword}
-      SEARCH_URL_PATTERN: /^https?:\/\/.+\{keyword\}.*/, // 🔧 新增：搜索源URL验证
+      REQUIRED_FIELDS: ['name', 'urlTemplate', 'categoryId'],
+      URL_PATTERN: /^https?:\/\/.+/, // 基础URL验证
+      SEARCH_URL_PATTERN: /^https?:\/\/.+\{keyword\}.*/, // 搜索源URL验证
       NAME_PATTERN: /^[a-zA-Z0-9\u4e00-\u9fa5\s\-_.()（）]+$/,
       ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
       FORBIDDEN_DOMAINS: [
         'localhost', '127.0.0.1', '0.0.0.0',
         'file://', 'javascript:', 'data:', 'vbscript:'
-      ]
+      ],
+      // 新增：更详细的验证规则
+      HOMEPAGE_URL_PATTERN: /^https?:\/\/.+/,
+      SUBTITLE_MAX_LENGTH: 100,
+      DESCRIPTION_MAX_LENGTH: 200,
+      PRIORITY_RANGE: { min: 1, max: 10 },
+      SUPPORTED_SITE_TYPES: ['search', 'browse', 'reference'],
+      SUPPORTED_EXTRACTION_QUALITIES: ['excellent', 'good', 'fair', 'poor', 'none']
     },
     CATEGORY: {
+      REQUIRED_FIELDS: ['name', 'icon', 'majorCategoryId'],
+      NAME_PATTERN: /^[a-zA-Z0-9\u4e00-\u9fa5\s\-_.()（）]+$/,
+      ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
+      ICON_PATTERN: /^[\u{1F000}-\u{1F9FF}]|^[\u{2600}-\u{26FF}]|^[\u{2700}-\u{27BF}]/u,
+      COLOR_PATTERN: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/,
+      // 新增：分类特定验证
+      DESCRIPTION_MAX_LENGTH: 100,
+      PRIORITY_RANGE: { min: 1, max: 10 },
+      SUPPORTED_SITE_TYPES: ['search', 'browse', 'reference'],
+      SUPPORTED_EXTRACTION_PRIORITIES: ['high', 'medium', 'low', 'none']
+    },
+    MAJOR_CATEGORY: {
       REQUIRED_FIELDS: ['name', 'icon'],
       NAME_PATTERN: /^[a-zA-Z0-9\u4e00-\u9fa5\s\-_.()（）]+$/,
       ID_PATTERN: /^[a-zA-Z0-9_-]+$/,
       ICON_PATTERN: /^[\u{1F000}-\u{1F9FF}]|^[\u{2600}-\u{26FF}]|^[\u{2700}-\u{27BF}]/u,
-      COLOR_PATTERN: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
+      COLOR_PATTERN: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/,
+      // 新增：大类特定验证
+      DESCRIPTION_MAX_LENGTH: 100
+    },
+    USER_CONFIG: {
+      PRIORITY_RANGE: { min: 1, max: 10 },
+      CUSTOM_NAME_MAX_LENGTH: 50,
+      CUSTOM_SUBTITLE_MAX_LENGTH: 100,
+      NOTES_MAX_LENGTH: 500,
+      ICON_PATTERN: /^[\u{1F000}-\u{1F9FF}]|^[\u{2600}-\u{26FF}]|^[\u{2700}-\u{27BF}]/u
     },
     DETAIL_EXTRACTION: {
       MIN_TITLE_LENGTH: 2,
@@ -686,21 +261,21 @@ export const APP_CONSTANTS = {
     }
   },
   
-  // 默认颜色选项 - 保持不变
+  // 默认颜色选项
   DEFAULT_COLORS: [
     '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
     '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
     '#f97316', '#6366f1', '#14b8a6', '#eab308'
   ],
   
-  // 默认图标选项 - 保持不变
+  // 默认图标选项
   DEFAULT_ICONS: [
     '📚', '🎥', '🧲', '💬', '🌟', '🔍', '📺', '🎬',
     '🎭', '🎪', '🎦', '🎬', '⚡', '💫', '🌙', '🔗',
     '🐱', '🌸', '📋', '🎯', '🎨', '🎵', '🎮', '🎲'
   ],
   
-  // 权限定义 - 保持不变，添加详情提取配置权限
+  // 权限定义
   PERMISSIONS: {
     SEARCH: 'search',
     FAVORITE: 'favorite',
@@ -708,6 +283,7 @@ export const APP_CONSTANTS = {
     SYNC: 'sync',
     CUSTOM_SOURCES: 'custom_sources',
     CUSTOM_CATEGORIES: 'custom_categories',
+    SEARCH_SOURCE_MANAGEMENT: 'search_source_management',
     ADMIN: 'admin',
     PREMIUM: 'premium',
     // 详情提取权限
@@ -715,28 +291,35 @@ export const APP_CONSTANTS = {
     DETAIL_EXTRACTION_BATCH: 'detail_extraction_batch',
     DETAIL_EXTRACTION_HISTORY: 'detail_extraction_history',
     DETAIL_EXTRACTION_CACHE_MANAGEMENT: 'detail_extraction_cache_management',
-    DETAIL_EXTRACTION_CONFIG: 'detail_extraction_config', // 新增：配置管理权限
+    DETAIL_EXTRACTION_CONFIG: 'detail_extraction_config',
     DETAIL_EXTRACTION_STATS: 'detail_extraction_stats'
   },
   
-  // 用户行为追踪事件 - 保持不变，添加配置相关事件
+  // 用户行为追踪事件
   ANALYTICS_EVENTS: {
     SEARCH_PERFORMED: 'search_performed',
     RESULT_CLICKED: 'result_clicked',
     FAVORITE_ADDED: 'favorite_added',
     FAVORITE_REMOVED: 'favorite_removed',
-    CUSTOM_SOURCE_ADDED: 'custom_source_added',
-    CUSTOM_SOURCE_EDITED: 'custom_source_edited',
-    CUSTOM_SOURCE_DELETED: 'custom_source_deleted',
-    CUSTOM_CATEGORY_ADDED: 'custom_category_added',
-    CUSTOM_CATEGORY_EDITED: 'custom_category_edited',
-    CUSTOM_CATEGORY_DELETED: 'custom_category_deleted',
     SETTINGS_UPDATED: 'settings_updated',
     DATA_EXPORTED: 'data_exported',
     HISTORY_CLEARED: 'history_cleared',
     SOURCE_STATUS_CHECK_STARTED: 'source_status_check_started',
     SOURCE_STATUS_CHECK_COMPLETED: 'source_status_check_completed',
     SOURCE_STATUS_CHECK_FAILED: 'source_status_check_failed',
+    
+    // 搜索源管理相关事件
+    MAJOR_CATEGORY_CREATED: 'major_category_created',
+    MAJOR_CATEGORY_UPDATED: 'major_category_updated',
+    MAJOR_CATEGORY_DELETED: 'major_category_deleted',
+    SOURCE_CATEGORY_CREATED: 'source_category_created',
+    SOURCE_CATEGORY_UPDATED: 'source_category_updated',
+    SOURCE_CATEGORY_DELETED: 'source_category_deleted',
+    CUSTOM_SOURCE_ADDED: 'custom_source_added',
+    CUSTOM_SOURCE_EDITED: 'custom_source_edited',
+    CUSTOM_SOURCE_DELETED: 'custom_source_deleted',
+    USER_SOURCE_CONFIG_UPDATED: 'user_source_config_updated',
+    SEARCH_SOURCES_EXPORTED: 'search_sources_exported',
     
     // 详情提取相关事件
     DETAIL_EXTRACTION_STARTED: 'detail_extraction_started',
@@ -756,14 +339,15 @@ export const APP_CONSTANTS = {
     DETAIL_EXPORTED: 'detail_exported',
     ISSUE_REPORTED: 'issue_reported',
     DETAIL_QUALITY_RATED: 'detail_quality_rated',
-    // 新增：配置相关事件
     DETAIL_CONFIG_UPDATED: 'detail_config_updated',
     DETAIL_CONFIG_RESET: 'detail_config_reset',
     DETAIL_CONFIG_PRESET_APPLIED: 'detail_config_preset_applied'
   },
   
-  // 错误代码定义 - 保持不变，添加配置相关错误
+  // 错误代码定义
   ERROR_CODES: {
+    // 搜索源管理错误代码
+    INVALID_MAJOR_CATEGORY: 'INVALID_MAJOR_CATEGORY',
     INVALID_SEARCH_SOURCE: 'INVALID_SEARCH_SOURCE',
     INVALID_SOURCE_CATEGORY: 'INVALID_SOURCE_CATEGORY',
     MAX_CUSTOM_SOURCES_REACHED: 'MAX_CUSTOM_SOURCES_REACHED',
@@ -772,16 +356,19 @@ export const APP_CONSTANTS = {
     DUPLICATE_SOURCE_NAME: 'DUPLICATE_SOURCE_NAME',
     DUPLICATE_CATEGORY_ID: 'DUPLICATE_CATEGORY_ID',
     DUPLICATE_CATEGORY_NAME: 'DUPLICATE_CATEGORY_NAME',
+    DUPLICATE_MAJOR_CATEGORY_NAME: 'DUPLICATE_MAJOR_CATEGORY_NAME',
     INVALID_URL_TEMPLATE: 'INVALID_URL_TEMPLATE',
     FORBIDDEN_DOMAIN: 'FORBIDDEN_DOMAIN',
     SOURCE_NOT_FOUND: 'SOURCE_NOT_FOUND',
     CATEGORY_NOT_FOUND: 'CATEGORY_NOT_FOUND',
+    MAJOR_CATEGORY_NOT_FOUND: 'MAJOR_CATEGORY_NOT_FOUND',
     CATEGORY_IN_USE: 'CATEGORY_IN_USE',
+    MAJOR_CATEGORY_IN_USE: 'MAJOR_CATEGORY_IN_USE',
     SOURCE_STATUS_CHECK_TIMEOUT: 'SOURCE_STATUS_CHECK_TIMEOUT',
     SOURCE_STATUS_CHECK_ERROR: 'SOURCE_STATUS_CHECK_ERROR',
     SOURCE_STATUS_CACHE_EXPIRED: 'SOURCE_STATUS_CACHE_EXPIRED',
     
-    // 详情提取错误代码
+    // 详情提取错误代码 
     DETAIL_EXTRACTION_TIMEOUT: 'DETAIL_EXTRACTION_TIMEOUT',
     DETAIL_EXTRACTION_ERROR: 'DETAIL_EXTRACTION_ERROR',
     DETAIL_EXTRACTION_UNSUPPORTED_SOURCE: 'DETAIL_EXTRACTION_UNSUPPORTED_SOURCE',
@@ -795,19 +382,15 @@ export const APP_CONSTANTS = {
     DETAIL_CONTENT_FILTERED: 'DETAIL_CONTENT_FILTERED',
     DETAIL_SERVICE_UNAVAILABLE: 'DETAIL_SERVICE_UNAVAILABLE',
     DETAIL_CONCURRENT_LIMIT_EXCEEDED: 'DETAIL_CONCURRENT_LIMIT_EXCEEDED',
-    // 新增：配置相关错误
     DETAIL_CONFIG_VALIDATION_ERROR: 'DETAIL_CONFIG_VALIDATION_ERROR',
     DETAIL_CONFIG_SAVE_ERROR: 'DETAIL_CONFIG_SAVE_ERROR',
     DETAIL_CONFIG_LOAD_ERROR: 'DETAIL_CONFIG_LOAD_ERROR',
     DETAIL_CONFIG_PRESET_NOT_FOUND: 'DETAIL_CONFIG_PRESET_NOT_FOUND'
   },
   
-  // 默认用户设置 - 移除详情提取硬编码配置，其他保持不变
+  // 默认用户设置
   DEFAULT_USER_SETTINGS: {
     theme: 'auto',
-    searchSources: ['javbus', 'javdb', 'javlibrary', 'btsow'],  // 默认只可用搜索类型的源
-    customSearchSources: [],
-    customSourceCategories: [],
     maxFavoritesPerUser: 1000,
     maxHistoryPerUser: 1000,
     allowAnalytics: true,
@@ -819,29 +402,25 @@ export const APP_CONSTANTS = {
     sourceStatusCacheDuration: 300000,
     skipUnavailableSources: true,
     showSourceStatus: true,
-    retryFailedSources: false,
-    
-    // 注意：详情提取相关设置已迁移至 detail-config.js
-    // 这些设置将通过 DetailConfigAPI 动态获取和管理
-    // enableDetailExtraction, autoExtractDetails 等配置不再硬编码在此处
+    retryFailedSources: false
   },
   
-  // 搜索源管理相关常量 - 保持不变，增强详情提取支持
+  // 搜索源管理相关常量
   SOURCE_MANAGEMENT: {
     DEFAULT_CATEGORY: 'others',
     SORT_OPTIONS: {
       NAME_ASC: 'name_asc',
       NAME_DESC: 'name_desc',
       CATEGORY: 'category',
+      MAJOR_CATEGORY: 'major_category',
       PRIORITY: 'priority',
       CREATED_DATE: 'created_date',
       STATUS: 'status',
       DETAIL_SUPPORT: 'detail_support',
       EXTRACTION_QUALITY: 'extraction_quality',
       AVERAGE_TIME: 'average_time',
-      SITE_TYPE: 'site_type',              // 新增：按网站类型排序
-      SEARCHABLE: 'searchable',            // 新增：按可搜索性排序
-      MAJOR_CATEGORY: 'major_category'     // 🔧 新增：按大分类排序
+      SITE_TYPE: 'site_type',
+      SEARCHABLE: 'searchable'
     },
     FILTER_OPTIONS: {
       ALL: 'all',
@@ -855,14 +434,14 @@ export const APP_CONSTANTS = {
       NO_DETAIL: 'no_detail',
       HIGH_QUALITY: 'high_quality',
       FAST_EXTRACTION: 'fast_extraction',
-      SEARCHABLE: 'searchable',            // 新增：可搜索源
-      BROWSE_ONLY: 'browse_only',          // 新增：仅浏览站点
-      SEARCH_SOURCES: 'search_sources',    // 🔧 新增：搜索源大类
-      BROWSE_SITES: 'browse_sites'         // 🔧 新增：浏览站点大类
+      SEARCHABLE: 'searchable',
+      BROWSE_ONLY: 'browse_only',
+      SEARCH_SOURCES: 'search_sources',
+      BROWSE_SITES: 'browse_sites'
     }
   },
 
-  // 搜索源状态检查配置 - 保持不变
+  // 搜索源状态检查配置
   SOURCE_STATUS_CHECK: {
     DEFAULT_TIMEOUT: 8000,
     MIN_TIMEOUT: 1000,
@@ -875,12 +454,12 @@ export const APP_CONSTANTS = {
     RETRY_DELAY: 1000,
     HTTP_METHOD: 'HEAD',
     FOLLOW_REDIRECTS: true,
-    USER_AGENT: 'MagnetSearch/1.4.0 StatusChecker'
+    USER_AGENT: 'MagnetSearch/2.3.1 StatusChecker'
   },
 
-  // 详情提取配置 - 保留系统级配置，移除用户可配置部分
+  // 详情提取配置
   DETAIL_EXTRACTION_CONFIG: {
-    // 系统级技术限制（与后端 constants.js 完全同步）
+    // 系统级技术限制
     DEFAULT_TIMEOUT: 15000,
     MIN_TIMEOUT: 5000,
     MAX_TIMEOUT: 30000,
@@ -965,7 +544,7 @@ export const APP_CONSTANTS = {
     }
   },
 
-  // UI配置常量 - 保持不变
+  // UI配置常量
   UI_CONFIG: {
     DETAIL_CARD: {
       ANIMATION_DURATION: 300,
@@ -1002,7 +581,7 @@ export const APP_CONSTANTS = {
     }
   },
 
-  // 缓存策略配置 - 保持不变
+  // 缓存策略配置
   CACHE_STRATEGY: {
     LOCAL_CACHE: {
       MAX_SIZE: 100,
@@ -1026,7 +605,7 @@ export const APP_CONSTANTS = {
     }
   },
 
-  // 性能监控配置 - 保持不变
+  // 性能监控配置
   PERFORMANCE_MONITORING: {
     ENABLED: true,
     METRICS: {
@@ -1041,7 +620,7 @@ export const APP_CONSTANTS = {
     FLUSH_INTERVAL: 300000
   },
 
-  // 新增：详情提取配置API端点（与 detail-config.js 对接）
+  // 详情提取配置API端点
   DETAIL_CONFIG_ENDPOINTS: {
     GET_CONFIG: '/api/detail/config',
     UPDATE_CONFIG: '/api/detail/config',
@@ -1050,11 +629,9 @@ export const APP_CONSTANTS = {
   }
 };
 
-// 导出常用常量 - 保持向后兼容
+// 导出常用常量
 export const STORAGE_KEYS = APP_CONSTANTS.STORAGE_KEYS;
 export const THEMES = APP_CONSTANTS.THEMES;
-export const SOURCE_CATEGORIES = APP_CONSTANTS.SOURCE_CATEGORIES;
-export const SEARCH_SOURCES = APP_CONSTANTS.SEARCH_SOURCES;
 export const DETAIL_EXTRACTION_SOURCES = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES;
 export const DETAIL_EXTRACTION_CAPABILITIES = APP_CONSTANTS.DETAIL_EXTRACTION_CAPABILITIES;
 export const DETAIL_EXTRACTION_STATUS = APP_CONSTANTS.DETAIL_EXTRACTION_STATUS;
@@ -1066,10 +643,9 @@ export const ANALYTICS_EVENTS = APP_CONSTANTS.ANALYTICS_EVENTS;
 export const VALIDATION_RULES = APP_CONSTANTS.VALIDATION_RULES;
 export const SOURCE_MANAGEMENT = APP_CONSTANTS.SOURCE_MANAGEMENT;
 export const DETAIL_EXTRACTION_CONFIG = APP_CONSTANTS.DETAIL_EXTRACTION_CONFIG;
-export const SITE_TYPES = APP_CONSTANTS.SITE_TYPES; // 新增导出
-export const MAJOR_CATEGORIES = APP_CONSTANTS.MAJOR_CATEGORIES; // 🔧 新增导出
+export const SITE_TYPES = APP_CONSTANTS.SITE_TYPES;
 
-// 工具函数 - 保持不变
+// 工具函数
 export function getStorageKey(key) {
   return STORAGE_KEYS[key] || key;
 }
@@ -1082,66 +658,7 @@ export function getDetailExtractionCapabilities(sourceId) {
   return DETAIL_EXTRACTION_CAPABILITIES[sourceId] || null;
 }
 
-export function getSourceByCategory(category) {
-  return SEARCH_SOURCES.filter(source => source.category === category);
-}
-
-export function getSourcesSupportingDetailExtraction() {
-  return SEARCH_SOURCES.filter(source => source.supportsDetailExtraction);
-}
-
-// 新增：网站类型相关工具函数
-export function getSearchableSources() {
-  return SEARCH_SOURCES.filter(source => source.searchable !== false);
-}
-
-export function getBrowseOnlySources() {
-  return SEARCH_SOURCES.filter(source => source.searchable === false);
-}
-
-export function getSourcesBySiteType(siteType) {
-  return SEARCH_SOURCES.filter(source => source.siteType === siteType);
-}
-
-export function isSearchableSource(sourceId) {
-  const source = SEARCH_SOURCES.find(s => s.id === sourceId);
-  return source ? source.searchable !== false : false;
-}
-
-// 🔧 新增：大分类相关工具函数
-export function getSourcesByMajorCategory(majorCategoryId) {
-  return SEARCH_SOURCES.filter(source => {
-    const category = SOURCE_CATEGORIES[source.category];
-    return category && category.majorCategory === majorCategoryId;
-  });
-}
-
-export function getCategoriesByMajorCategory(majorCategoryId) {
-  return Object.values(SOURCE_CATEGORIES).filter(category => 
-    category.majorCategory === majorCategoryId
-  );
-}
-
-export function getMajorCategoryForSource(sourceId) {
-  const source = SEARCH_SOURCES.find(s => s.id === sourceId);
-  if (!source) return null;
-  
-  const category = SOURCE_CATEGORIES[source.category];
-  return category ? category.majorCategory : null;
-}
-
-// 新增：详情提取配置相关工具函数
-export function getDetailConfigEndpoint(endpoint) {
-  return APP_CONSTANTS.DETAIL_CONFIG_ENDPOINTS[endpoint.toUpperCase()];
-}
-
-export function isDetailExtractionEnabled() {
-  // 这个函数现在应该通过 DetailConfigAPI 来获取用户配置
-  // 这里只返回系统级开关状态
-  return true; // 系统级默认可用，具体用户配置由 detail-config-api.js 管理
-}
-
-// 🔧 新增：URL验证工具函数
+// URL验证工具函数
 export function validateSourceUrl(url, isSearchable) {
   const rules = VALIDATION_RULES.SOURCE;
   
@@ -1152,6 +669,167 @@ export function validateSourceUrl(url, isSearchable) {
     // 浏览站点只需要是有效URL
     return rules.URL_PATTERN.test(url);
   }
+}
+
+// 验证搜索源数据
+export function validateSearchSourceData(data) {
+  const errors = [];
+  const rules = VALIDATION_RULES.SOURCE;
+  
+  // 验证必填字段
+  for (const field of rules.REQUIRED_FIELDS) {
+    if (!data[field] || (typeof data[field] === 'string' && data[field].trim().length === 0)) {
+      errors.push(`${field} 是必填字段`);
+    }
+  }
+  
+  // 验证名称格式
+  if (data.name && !rules.NAME_PATTERN.test(data.name)) {
+    errors.push('名称包含无效字符');
+  }
+  
+  // 验证名称长度
+  if (data.name && data.name.length > APP_CONSTANTS.LIMITS.MAX_SOURCE_NAME_LENGTH) {
+    errors.push(`名称不能超过${APP_CONSTANTS.LIMITS.MAX_SOURCE_NAME_LENGTH}个字符`);
+  }
+  
+  // 验证URL格式
+  if (data.urlTemplate && !rules.URL_PATTERN.test(data.urlTemplate)) {
+    errors.push('URL格式不正确');
+  }
+  
+  // 验证搜索源URL
+  if (data.searchable && data.urlTemplate && !rules.SEARCH_URL_PATTERN.test(data.urlTemplate)) {
+    errors.push('搜索源的URL模板必须包含{keyword}占位符');
+  }
+  
+  // 验证副标题长度
+  if (data.subtitle && data.subtitle.length > rules.SUBTITLE_MAX_LENGTH) {
+    errors.push(`副标题不能超过${rules.SUBTITLE_MAX_LENGTH}个字符`);
+  }
+  
+  // 验证描述长度
+  if (data.description && data.description.length > rules.DESCRIPTION_MAX_LENGTH) {
+    errors.push(`描述不能超过${rules.DESCRIPTION_MAX_LENGTH}个字符`);
+  }
+  
+  // 验证优先级范围
+  if (data.searchPriority && (data.searchPriority < rules.PRIORITY_RANGE.min || data.searchPriority > rules.PRIORITY_RANGE.max)) {
+    errors.push(`搜索优先级必须在${rules.PRIORITY_RANGE.min}-${rules.PRIORITY_RANGE.max}之间`);
+  }
+  
+  // 验证网站类型
+  if (data.siteType && !rules.SUPPORTED_SITE_TYPES.includes(data.siteType)) {
+    errors.push(`网站类型必须是${rules.SUPPORTED_SITE_TYPES.join('、')}之一`);
+  }
+  
+  // 验证提取质量
+  if (data.extractionQuality && !rules.SUPPORTED_EXTRACTION_QUALITIES.includes(data.extractionQuality)) {
+    errors.push(`提取质量必须是${rules.SUPPORTED_EXTRACTION_QUALITIES.join('、')}之一`);
+  }
+  
+  // 验证禁用域名
+  if (data.urlTemplate) {
+    for (const forbidden of rules.FORBIDDEN_DOMAINS) {
+      if (data.urlTemplate.includes(forbidden)) {
+        errors.push(`URL不能包含禁用域名：${forbidden}`);
+        break;
+      }
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+// 验证分类数据
+export function validateCategoryData(data) {
+  const errors = [];
+  const rules = VALIDATION_RULES.CATEGORY;
+  
+  // 验证必填字段
+  for (const field of rules.REQUIRED_FIELDS) {
+    if (!data[field] || (typeof data[field] === 'string' && data[field].trim().length === 0)) {
+      errors.push(`${field} 是必填字段`);
+    }
+  }
+  
+  // 验证名称格式
+  if (data.name && !rules.NAME_PATTERN.test(data.name)) {
+    errors.push('名称包含无效字符');
+  }
+  
+  // 验证名称长度
+  if (data.name && data.name.length > APP_CONSTANTS.LIMITS.MAX_CATEGORY_NAME_LENGTH) {
+    errors.push(`名称不能超过${APP_CONSTANTS.LIMITS.MAX_CATEGORY_NAME_LENGTH}个字符`);
+  }
+  
+  // 验证描述长度
+  if (data.description && data.description.length > rules.DESCRIPTION_MAX_LENGTH) {
+    errors.push(`描述不能超过${rules.DESCRIPTION_MAX_LENGTH}个字符`);
+  }
+  
+  // 验证颜色格式
+  if (data.color && !rules.COLOR_PATTERN.test(data.color)) {
+    errors.push('颜色格式不正确');
+  }
+  
+  // 验证优先级范围
+  if (data.searchPriority && (data.searchPriority < rules.PRIORITY_RANGE.min || data.searchPriority > rules.PRIORITY_RANGE.max)) {
+    errors.push(`搜索优先级必须在${rules.PRIORITY_RANGE.min}-${rules.PRIORITY_RANGE.max}之间`);
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+// 验证用户配置数据
+export function validateUserConfigData(data) {
+  const errors = [];
+  const rules = VALIDATION_RULES.USER_CONFIG;
+  
+  if (!data.sourceId) {
+    errors.push('搜索源ID是必填字段');
+  }
+  
+  // 验证自定义优先级
+  if (data.customPriority && (data.customPriority < rules.PRIORITY_RANGE.min || data.customPriority > rules.PRIORITY_RANGE.max)) {
+    errors.push(`自定义优先级必须在${rules.PRIORITY_RANGE.min}-${rules.PRIORITY_RANGE.max}之间`);
+  }
+  
+  // 验证自定义名称长度
+  if (data.customName && data.customName.length > rules.CUSTOM_NAME_MAX_LENGTH) {
+    errors.push(`自定义名称不能超过${rules.CUSTOM_NAME_MAX_LENGTH}个字符`);
+  }
+  
+  // 验证自定义副标题长度
+  if (data.customSubtitle && data.customSubtitle.length > rules.CUSTOM_SUBTITLE_MAX_LENGTH) {
+    errors.push(`自定义副标题不能超过${rules.CUSTOM_SUBTITLE_MAX_LENGTH}个字符`);
+  }
+  
+  // 验证备注长度
+  if (data.notes && data.notes.length > rules.NOTES_MAX_LENGTH) {
+    errors.push(`备注不能超过${rules.NOTES_MAX_LENGTH}个字符`);
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+// 详情提取配置相关工具函数
+export function getDetailConfigEndpoint(endpoint) {
+  return APP_CONSTANTS.DETAIL_CONFIG_ENDPOINTS[endpoint.toUpperCase()];
+}
+
+export function isDetailExtractionEnabled() {
+  // 系统级默认可用，具体用户配置由 detail-config-api.js 管理
+  return true;
 }
 
 // 向后兼容性检查函数
@@ -1169,9 +847,20 @@ export function validateLegacySettings(settings) {
       warnings.push(`配置项 ${key} 已迁移至详情提取配置管理，请使用 DetailConfigAPI 进行管理`);
     }
   });
+
+  // 检查是否使用了硬编码搜索源配置
+  const sourceConfigKeys = [
+    'searchSources', 'customSearchSources', 'customSourceCategories'
+  ];
+  
+  sourceConfigKeys.forEach(key => {
+    if (settings.hasOwnProperty(key)) {
+      warnings.push(`配置项 ${key} 已迁移至搜索源管理API，请使用 SearchSourcesAPI 进行管理`);
+    }
+  });
   
   return warnings;
 }
 
-// 默认导出 - 保持向后兼容
+// 默认导出
 export default APP_CONSTANTS;

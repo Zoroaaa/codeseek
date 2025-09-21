@@ -1,4 +1,4 @@
-// src/constants.js - 优化版本：只保留系统级别的不可变配置
+// src/constants.js - 优化版本：移除硬编码搜索源定义，保留系统级别的不可变配置
 export const CONFIG = {
     // 系统级别的最大限制（安全相关，不可修改）
     MAX_TAGS_PER_USER: 50,
@@ -43,7 +43,12 @@ export const CONFIG = {
         'tag_created', 'tag_updated', 'tag_deleted',
         'detail_extraction', 'batch_detail_extraction', 'detail_cache_access',
         'detail_config_update', 'detail_cache_clear', 'detail_retry',
-        'download_click', 'magnet_click', 'copy_magnet', 'image_preview'
+        'download_click', 'magnet_click', 'copy_magnet', 'image_preview',
+        // 新增：搜索源管理相关行为
+        'major_category_create', 'major_category_update', 'major_category_delete',
+        'source_category_create', 'source_category_update', 'source_category_delete',
+        'search_source_create', 'search_source_update', 'search_source_delete',
+        'user_source_config_update', 'search_sources_export'
     ]
 };
 
@@ -84,11 +89,33 @@ export const SYSTEM_VALIDATION = {
     }
 };
 
-// 固定的系统配置（不变的业务逻辑）
-export const VALID_CATEGORIES = ['jav', 'movie', 'torrent', 'other'];
-export const VALID_SORT_COLUMNS = ['created_at', 'updated_at', 'rating_score', 'download_count', 'like_count', 'view_count'];
+// 搜索源相关的系统级别枚举（技术限制，不可变）
+export const SEARCH_SOURCE_ENUMS = {
+    // 网站类型枚举
+    SITE_TYPES: {
+        SEARCH: 'search',       // 搜索源（需要关键词）
+        BROWSE: 'browse',       // 浏览型网站（不需要关键词）  
+        REFERENCE: 'reference'  // 参考资料站（可选关键词）
+    },
+    
+    // 详情提取质量等级
+    EXTRACTION_QUALITY: {
+        NONE: 'none',
+        POOR: 'poor',
+        FAIR: 'fair',
+        GOOD: 'good',
+        EXCELLENT: 'excellent'
+    },
+    
+    // 提取优先级
+    EXTRACTION_PRIORITY: {
+        LOW: 'low',
+        MEDIUM: 'medium',
+        HIGH: 'high'
+    }
+};
 
-// 支持的源类型（系统级别）
+// 支持的源类型（系统级别，用于详情提取）
 export const SUPPORTED_SOURCE_TYPES = {
     javbus: 'javbus',
     javdb: 'javdb', 
@@ -100,7 +127,7 @@ export const SUPPORTED_SOURCE_TYPES = {
     generic: 'generic'
 };
 
-// 源域名模式（技术限制，不可变）
+// 源域名模式（技术限制，用于详情提取识别，不可变）
 export const SOURCE_DOMAIN_PATTERNS = {
     javbus: [/^.*\.javbus\.com$/, /^javbus\.com$/],
     javdb: [/^.*\.javdb\.com$/, /^javdb\.com$/],
@@ -111,7 +138,7 @@ export const SOURCE_DOMAIN_PATTERNS = {
     javguru: [/^.*\.jav\.guru$/, /^jav\.guru$/]
 };
 
-// 详情页URL模式（技术限制，不可变）
+// 详情页URL模式（技术限制，用于详情提取，不可变）
 export const DETAIL_URL_PATTERNS = {
     javbus: [/\/[A-Z]{2,6}-?\d{3,6}(?:\/|$)/i],
     javdb: [/\/v\/[a-zA-Z0-9]+/],
@@ -122,7 +149,7 @@ export const DETAIL_URL_PATTERNS = {
     javguru: [/\/\d+\/[a-z0-9\-]+/i]
 };
 
-// 搜索页面排除模式（技术限制，不可变）
+// 搜索页面排除模式（技术限制，用于状态检查，不可变）
 export const SEARCH_EXCLUDE_PATTERNS = [
     '/search/', '/search?', '?q=', '?s=', '?query=', '?keyword=',
     '/page/', '/list/', '/category/', '/genre/', '/actresses/',
@@ -169,7 +196,7 @@ export const URL_NORMALIZATION = {
     }
 };
 
-// 源特定配置（技术限制，不可变）
+// 源特定配置（技术限制，用于详情提取，不可变）
 export const SOURCE_SPECIFIC_CONFIG = {
     javbus: {
         baseUrls: ['https://www.javbus.com', 'https://javbus.com'],
@@ -222,3 +249,24 @@ export const SOURCE_SPECIFIC_CONFIG = {
         supportSubdomains: true
     }
 };
+
+// ===================== 重要说明 =====================
+// 
+// 已移除的内容：
+// - VALID_CATEGORIES: 现在通过数据库的 search_major_categories 表管理
+// - VALID_SORT_COLUMNS: 已简化，由具体功能模块自行定义
+// - 硬编码的搜索源列表: 现在通过数据库的 search_sources 表管理
+// - 硬编码的分类列表: 现在通过数据库的 search_source_categories 表管理
+// 
+// 保留的内容：
+// - 系统级别的技术限制和验证规则
+// - 详情提取相关的技术配置（因为这些是技术实现细节）
+// - 安全相关的黑名单和过滤规则
+// - 正则表达式模式（技术限制）
+// - URL规范化配置（技术限制）
+// 
+// 新的搜索源管理方式：
+// 1. 通过 /api/search-sources/major-categories API 管理大类
+// 2. 通过 /api/search-sources/categories API 管理分类
+// 3. 通过 /api/search-sources/sources API 管理搜索源
+// 4. 通过 /api/search-sources/user-configs API 管理用户配置

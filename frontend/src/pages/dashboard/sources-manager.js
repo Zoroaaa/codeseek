@@ -1,8 +1,9 @@
-// 搜索源管理器
+// 搜索源管理器 - 完全集成新的搜索源管理API
 import { APP_CONSTANTS, MAJOR_CATEGORIES, validateSourceUrl } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
-import apiService from '../../services/api.js';
+// 🔴 导入新的搜索源管理API
+import searchSourcesAPI from '../../services/search-sources-api.js';
 
 export class SourcesManager {
   constructor(dashboardApp) {
@@ -28,7 +29,7 @@ export class SourcesManager {
     try {
       await this.loadUserSearchSettings();
       this.updateCategoryFilterOptions();
-      this.updateMajorCategoryFilterOptions(); // 🔧 新增：更新大类筛选选项
+      this.updateMajorCategoryFilterOptions();
       this.renderSourcesList();
       this.updateSourcesStats();
     } catch (error) {
@@ -42,7 +43,8 @@ export class SourcesManager {
       this.builtinSearchSources = APP_CONSTANTS.SEARCH_SOURCES.map(source => ({
         ...source,
         isBuiltin: true,
-        isCustom: false
+        isCustom: false,
+        isSystem: true
       }));
       
       this.allSearchSources = [...this.builtinSearchSources];
@@ -55,27 +57,45 @@ export class SourcesManager {
     }
   }
 
+  // 🔴 使用新API加载用户搜索源设置
   async loadUserSearchSettings() {
     if (!this.app.getCurrentUser()) return;
     
     try {
-      const userSettings = await apiService.getUserSettings();
+      console.log('📡 从新API加载搜索源数据...');
       
-      this.customSearchSources = userSettings.customSearchSources || [];
-      this.enabledSources = userSettings.searchSources || APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+      // 🔴 使用新的搜索源管理API获取所有源
+      const allSources = await searchSourcesAPI.getSearchSources({
+        includeSystem: true,
+        enabledOnly: false
+      });
       
-      // 合并内置和自定义数据
-      this.allSearchSources = [
-        ...this.builtinSearchSources,
-        ...this.customSearchSources.map(s => ({ ...s, isBuiltin: false, isCustom: true }))
-      ];
+      // 🔴 获取用户配置
+      const userConfigs = await searchSourcesAPI.getUserSourceConfigs();
       
-      console.log(`用户设置：可用 ${this.enabledSources.length} 个搜索源，包含 ${this.customSearchSources.length} 个自定义源`);
+      // 分离内置和自定义源
+      this.builtinSearchSources = allSources.filter(s => s.isSystem || s.isBuiltin);
+      this.customSearchSources = allSources.filter(s => s.isCustom || !s.isSystem);
+      
+      // 合并所有源
+      this.allSearchSources = allSources;
+      
+      // 🔴 从用户配置中提取启用的源ID列表
+      this.enabledSources = userConfigs
+        .filter(config => config.isEnabled !== false)
+        .map(config => config.sourceId);
+      
+      // 如果没有配置,使用所有系统源作为默认启用
+      if (this.enabledSources.length === 0) {
+        this.enabledSources = this.builtinSearchSources.map(s => s.id);
+      }
+      
+      console.log(`✅ 已加载 ${this.allSearchSources.length} 个搜索源 (${this.builtinSearchSources.length} 内置, ${this.customSearchSources.length} 自定义), ${this.enabledSources.length} 个已启用`);
       
     } catch (error) {
-      console.warn('加载用户搜索源设置失败，使用默认设置:', error);
+      console.warn('⚠️ 从API加载搜索源失败,使用默认设置:', error);
       this.customSearchSources = [];
-      this.enabledSources = APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources;
+      this.enabledSources = this.builtinSearchSources.map(s => s.id);
       this.allSearchSources = [...this.builtinSearchSources];
     }
   }
@@ -87,10 +107,10 @@ export class SourcesManager {
       addCustomSourceBtn.addEventListener('click', () => this.showCustomSourceModal());
     }
 
-    // 🔧 搜索源筛选和排序 - 新增大类筛选
+    // 搜索源筛选和排序
     const sourcesFilter = document.getElementById('sourcesFilter');
     const categoryFilter = document.getElementById('categoryFilter');
-    const majorCategoryFilter = document.getElementById('majorCategoryFilter'); // 🔧 新增
+    const majorCategoryFilter = document.getElementById('majorCategoryFilter');
     const sourcesSort = document.getElementById('sourcesSort');
 
     if (sourcesFilter) {
@@ -99,7 +119,7 @@ export class SourcesManager {
     if (categoryFilter) {
       categoryFilter.addEventListener('change', () => this.filterAndSortSources());
     }
-    if (majorCategoryFilter) { // 🔧 新增
+    if (majorCategoryFilter) {
       majorCategoryFilter.addEventListener('change', () => this.filterAndSortSources());
     }
     if (sourcesSort) {
@@ -145,7 +165,6 @@ export class SourcesManager {
     `;
   }
 
-  // 🔧 新增：更新大类筛选选项
   updateMajorCategoryFilterOptions() {
     const majorCategoryFilter = document.getElementById('majorCategoryFilter');
     if (!majorCategoryFilter) return;
@@ -170,7 +189,7 @@ export class SourcesManager {
     // 获取当前筛选和排序设置
     const filter = document.getElementById('sourcesFilter')?.value || 'all';
     const categoryFilter = document.getElementById('categoryFilter')?.value || 'all';
-    const majorCategoryFilter = document.getElementById('majorCategoryFilter')?.value || 'all'; // 🔧 新增
+    const majorCategoryFilter = document.getElementById('majorCategoryFilter')?.value || 'all';
     const sort = document.getElementById('sourcesSort')?.value || 'priority';
 
     // 应用筛选
@@ -184,12 +203,12 @@ export class SourcesManager {
           case 'disabled':
             return !this.enabledSources.includes(source.id);
           case 'builtin':
-            return source.isBuiltin;
+            return source.isBuiltin || source.isSystem;
           case 'custom':
             return source.isCustom;
-          case 'searchable':  // 🔧 新增：可搜索源
+          case 'searchable':
             return source.searchable !== false;
-          case 'browse_only': // 🔧 新增：仅浏览站点
+          case 'browse_only':
             return source.searchable === false;
           case 'supports_detail':
             return this.supportsDetailExtraction(source.id);
@@ -199,7 +218,7 @@ export class SourcesManager {
       });
     }
 
-    // 🔧 新增：大类筛选
+    // 大类筛选
     if (majorCategoryFilter !== 'all') {
       filteredSources = filteredSources.filter(source => {
         const category = this.getCategoryById(source.category);
@@ -247,26 +266,23 @@ export class SourcesManager {
           const statusA = this.enabledSources.includes(a.id) ? 0 : 1;
           const statusB = this.enabledSources.includes(b.id) ? 0 : 1;
           return statusA - statusB;
-        case 'site_type':  // 🔧 新增：按网站类型排序
+        case 'site_type':
           const siteTypeA = a.siteType || 'search';
           const siteTypeB = b.siteType || 'search';
           return siteTypeA.localeCompare(siteTypeB);
-        case 'searchable': // 🔧 新增：按可搜索性排序
+        case 'searchable':
           const searchableA = a.searchable !== false ? 0 : 1;
           const searchableB = b.searchable !== false ? 0 : 1;
           return searchableA - searchableB;
-        case 'major_category': // 🔧 新增：按大分类排序
+        case 'major_category':
           const majorCatA = this.getMajorCategoryForSource(a.id) || 'zzz';
           const majorCatB = this.getMajorCategoryForSource(b.id) || 'zzz';
           return majorCatA.localeCompare(majorCatB);
         case 'priority':
         default:
-          if (a.isBuiltin && b.isBuiltin) {
-            return (a.priority || 999) - (b.priority || 999);
-          }
-          if (a.isBuiltin && !b.isBuiltin) return -1;
-          if (!a.isBuiltin && b.isBuiltin) return 1;
-          return (b.createdAt || 0) - (a.createdAt || 0);
+          if ((a.isBuiltin || a.isSystem) && !(b.isBuiltin || b.isSystem)) return -1;
+          if (!(a.isBuiltin || a.isSystem) && (b.isBuiltin || b.isSystem)) return 1;
+          return (a.searchPriority || a.priority || 999) - (b.searchPriority || b.priority || 999);
       }
     });
   }
@@ -277,7 +293,6 @@ export class SourcesManager {
     const isEnabled = this.enabledSources.includes(source.id);
     const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
     
-    // 🔧 网站类型标识
     const siteTypeLabel = {
       'search': '搜索源',
       'browse': '浏览站',
@@ -287,7 +302,6 @@ export class SourcesManager {
     const searchableIcon = source.searchable === false ? '🚫' : '🔍';
     const searchableTitle = source.searchable === false ? '不参与搜索' : '参与搜索';
     
-    // 🔧 新增：大分类显示
     const majorCategoryInfo = MAJOR_CATEGORIES[majorCategory];
     const majorCategoryLabel = majorCategoryInfo ? `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
     
@@ -307,14 +321,13 @@ export class SourcesManager {
             <div class="source-subtitle">${escapeHtml(source.subtitle || '')}</div>
             <div class="source-meta">
               <div class="source-major-category">
-                <span>大类：${majorCategoryLabel}</span>
+                <span>大类:${majorCategoryLabel}</span>
               </div>
               <div class="source-category">
-                <span>小类：${category ? `${category.icon} ${category.name}` : '未知分类'}</span>
+                <span>小类:${category ? `${category.icon} ${category.name}` : '未知分类'}</span>
               </div>
               <div class="source-url">${escapeHtml(source.urlTemplate)}</div>
             </div>
-            <!-- 🔧 新增：网站类型标识 -->
             <div class="source-badges">
               <span class="searchable-badge" title="${searchableTitle}">
                 ${searchableIcon}
@@ -346,13 +359,14 @@ export class SourcesManager {
   }
 
   bindSourceItemEvents() {
-    // 这里可以绑定额外的事件，目前使用onclick处理
+    // 这里可以绑定额外的事件,目前使用onclick处理
   }
 
   filterAndSortSources() {
     this.renderSourcesList();
   }
 
+  // 🔴 使用新API切换源启用状态
   async toggleSourceEnabled(sourceId, enabled) {
     try {
       if (enabled) {
@@ -363,10 +377,14 @@ export class SourcesManager {
         this.enabledSources = this.enabledSources.filter(id => id !== sourceId);
       }
 
-      await this.saveSearchSourcesSettings();
-      this.updateSourcesStats();
+      // 🔴 使用新API更新用户配置
+      await searchSourcesAPI.updateUserSourceConfig({
+        sourceId: sourceId,
+        isEnabled: enabled
+      });
       
-      showToast(`搜索源已${enabled ? '可用' : '禁用'}`, 'success', 2000);
+      this.updateSourcesStats();
+      showToast(`搜索源已${enabled ? '启用' : '禁用'}`, 'success', 2000);
       
     } catch (error) {
       console.error('切换搜索源状态失败:', error);
@@ -375,25 +393,33 @@ export class SourcesManager {
     }
   }
 
+  // 🔴 使用新API启用所有源
   async enableAllSources() {
     try {
       this.enabledSources = this.allSearchSources.map(s => s.id);
-      await this.saveSearchSourcesSettings();
+      
+      // 🔴 批量更新用户配置
+      await searchSourcesAPI.enableAllSources();
+      
       this.renderSourcesList();
       this.updateSourcesStats();
-      showToast('已可用所有搜索源', 'success');
+      showToast('已启用所有搜索源', 'success');
     } catch (error) {
-      console.error('可用所有搜索源失败:', error);
+      console.error('启用所有搜索源失败:', error);
       showToast('操作失败: ' + error.message, 'error');
     }
   }
 
+  // 🔴 使用新API禁用所有源
   async disableAllSources() {
-    if (!confirm('确定要禁用所有搜索源吗？这将影响搜索功能。')) return;
+    if (!confirm('确定要禁用所有搜索源吗?这将影响搜索功能。')) return;
     
     try {
       this.enabledSources = [];
-      await this.saveSearchSourcesSettings();
+      
+      // 🔴 批量更新用户配置
+      await searchSourcesAPI.disableAllSources();
+      
       this.renderSourcesList();
       this.updateSourcesStats();
       showToast('已禁用所有搜索源', 'success');
@@ -403,12 +429,16 @@ export class SourcesManager {
     }
   }
 
+  // 🔴 使用新API重置为默认配置
   async resetToDefaults() {
-    if (!confirm('确定要重置为默认搜索源配置吗？')) return;
+    if (!confirm('确定要重置为默认搜索源配置吗?')) return;
     
     try {
-      this.enabledSources = [...APP_CONSTANTS.DEFAULT_USER_SETTINGS.searchSources];
-      await this.saveSearchSourcesSettings();
+      // 🔴 使用新API重置
+      await searchSourcesAPI.resetToDefaults();
+      
+      // 重新加载数据
+      await this.loadUserSearchSettings();
       this.renderSourcesList();
       this.updateSourcesStats();
       showToast('已重置为默认配置', 'success');
@@ -426,13 +456,10 @@ export class SourcesManager {
     }
 
     try {
-      // 🔧 根据源类型处理测试URL
       let testUrl;
       if (source.searchable !== false) {
-        // 搜索源：使用测试关键词
         testUrl = source.urlTemplate.replace('{keyword}', 'test');
       } else {
-        // 浏览站点：直接访问基础URL
         testUrl = source.urlTemplate;
       }
       
@@ -452,13 +479,10 @@ export class SourcesManager {
     }
 
     try {
-      // 🔧 统一处理访问URL
       let baseUrl;
       if (source.searchable === false) {
-        // 浏览站点直接访问
         baseUrl = source.urlTemplate;
       } else {
-        // 搜索源访问主页
         const urlObj = new URL(source.urlTemplate.replace('{keyword}', ''));
         baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
       }
@@ -503,7 +527,7 @@ export class SourcesManager {
             <div class="form-group">
               <label for="sourceName">搜索源名称 *</label>
               <input type="text" name="sourceName" id="sourceName" required maxlength="50" 
-                     placeholder="例如：我的搜索站">
+                     placeholder="例如:我的搜索站">
             </div>
             
             <div class="form-group">
@@ -516,7 +540,7 @@ export class SourcesManager {
           <div class="form-group">
             <label for="sourceSubtitle">描述信息</label>
             <input type="text" name="sourceSubtitle" id="sourceSubtitle" maxlength="100" 
-                   placeholder="例如：专业的搜索引擎">
+                   placeholder="例如:专业的搜索引擎">
           </div>
           
           <div class="form-group">
@@ -531,11 +555,10 @@ export class SourcesManager {
             <input type="url" name="sourceUrl" id="sourceUrl" required 
                    placeholder="https://example.com/search?q={keyword}">
             <small class="form-help">
-              <span id="urlHelpText">URL中必须包含 <code>{keyword}</code> 占位符，搜索时会被替换为实际关键词</span>
+              <span id="urlHelpText">URL中必须包含 <code>{keyword}</code> 占位符,搜索时会被替换为实际关键词</span>
             </small>
           </div>
           
-          <!-- 🔧 新增：网站类型配置 -->
           <fieldset class="site-config-section">
             <legend>网站类型配置</legend>
             
@@ -544,7 +567,7 @@ export class SourcesManager {
                 <input type="checkbox" name="searchable" id="searchable" checked>
                 参与番号搜索
               </label>
-              <small>取消勾选后，搜索时不会显示该网站</small>
+              <small>取消勾选后,搜索时不会显示该网站</small>
             </div>
             
             <div class="form-group">
@@ -583,7 +606,7 @@ export class SourcesManager {
     if (form) {
       form.addEventListener('submit', (e) => this.handleCustomSourceSubmit(e));
       
-      // 🔧 新增：监听搜索类型变化，动态调整URL验证提示
+      // 监听搜索类型变化,动态调整URL验证提示
       const searchableCheckbox = form.querySelector('#searchable');
       const urlInput = form.querySelector('#sourceUrl');
       const urlHelpText = form.querySelector('#urlHelpText');
@@ -591,10 +614,10 @@ export class SourcesManager {
       if (searchableCheckbox && urlHelpText) {
         searchableCheckbox.addEventListener('change', () => {
           if (searchableCheckbox.checked) {
-            urlHelpText.innerHTML = 'URL中必须包含 <code>{keyword}</code> 占位符，搜索时会被替换为实际关键词';
+            urlHelpText.innerHTML = 'URL中必须包含 <code>{keyword}</code> 占位符,搜索时会被替换为实际关键词';
             urlInput.placeholder = 'https://example.com/search?q={keyword}';
           } else {
-            urlHelpText.innerHTML = '浏览站点只需要提供基础访问URL，无需包含搜索参数';
+            urlHelpText.innerHTML = '浏览站点只需提供基础访问URL,无需包含搜索参数';
             urlInput.placeholder = 'https://example.com';
           }
         });
@@ -604,13 +627,11 @@ export class SourcesManager {
     return modal;
   }
 
-  // 🔧 修改 populateCustomSourceForm - 自动设置默认值
   populateCustomSourceForm(modal, source) {
     const form = modal.querySelector('#customSourceForm');
     if (!form) return;
 
     if (source) {
-      // 编辑模式 - 加载现有值
       form.sourceId.value = source.id;
       form.sourceName.value = source.name;
       form.sourceSubtitle.value = source.subtitle || '';
@@ -624,7 +645,6 @@ export class SourcesManager {
       modal.querySelector('h2').textContent = '编辑自定义搜索源';
       modal.querySelector('[type="submit"]').textContent = '更新搜索源';
     } else {
-      // 新增模式 - 根据分类设置默认值
       form.reset();
       form.sourceIcon.value = '🔍';
       form.sourceCategory.value = 'others';
@@ -635,7 +655,7 @@ export class SourcesManager {
       modal.querySelector('h2').textContent = '添加自定义搜索源';
       modal.querySelector('[type="submit"]').textContent = '添加搜索源';
       
-      // 🔧 根据分类的默认配置自动设置
+      // 根据分类的默认配置自动设置
       const categorySelect = form.sourceCategory;
       categorySelect.addEventListener('change', (e) => {
         const category = this.app.getManager('categories').getCategoryById(e.target.value);
@@ -643,8 +663,6 @@ export class SourcesManager {
           form.searchable.checked = category.defaultSearchable !== false;
           form.siteType.value = category.defaultSiteType || 'search';
           form.searchPriority.value = category.searchPriority || 5;
-          
-          // 触发搜索类型变化事件来更新URL提示
           form.searchable.dispatchEvent(new Event('change'));
         }
       });
@@ -652,7 +670,6 @@ export class SourcesManager {
     
     this.updateSourceCategorySelect(form.sourceCategory);
     
-    // 触发一次搜索类型变化事件来设置正确的提示文本
     if (form.searchable) {
       form.searchable.dispatchEvent(new Event('change'));
     }
@@ -673,6 +690,7 @@ export class SourcesManager {
     selectElement.innerHTML = categoriesHTML;
   }
 
+  // 🔴 使用新API保存自定义搜索源
   async handleCustomSourceSubmit(event) {
     event.preventDefault();
     
@@ -686,7 +704,7 @@ export class SourcesManager {
       icon: formData.get('sourceIcon').trim() || '🔍',
       urlTemplate: formData.get('sourceUrl').trim(),
       category: formData.get('sourceCategory'),
-      // 🔧 新增：网站类型配置
+      categoryId: formData.get('sourceCategory'), // 🔴 新API需要
       searchable: formData.get('searchable') === 'on',
       siteType: formData.get('siteType') || 'search',
       searchPriority: parseInt(formData.get('searchPriority')) || 5,
@@ -703,10 +721,12 @@ export class SourcesManager {
       showLoading(true);
       
       if (this.editingCustomSource && sourceData.id) {
-        await this.updateCustomSource(sourceData);
+        // 🔴 使用新API更新
+        await searchSourcesAPI.updateSearchSource(sourceData.id, sourceData);
         showToast('自定义搜索源更新成功', 'success');
       } else {
-        await this.addCustomSource(sourceData);
+        // 🔴 使用新API创建
+        await searchSourcesAPI.createSearchSource(sourceData);
         showToast('自定义搜索源添加成功', 'success');
       }
       
@@ -722,14 +742,14 @@ export class SourcesManager {
     }
   }
 
-  // 🔧 修改验证函数 - 使用新的URL验证逻辑
   validateCustomSource(sourceData) {
     const rules = APP_CONSTANTS.VALIDATION_RULES.SOURCE;
     
     const requiredFieldsForValidation = rules.REQUIRED_FIELDS.filter(field => field !== 'id');
     
     for (const field of requiredFieldsForValidation) {
-      if (!sourceData[field] || sourceData[field].trim() === '') {
+      const value = sourceData[field] || sourceData[field.replace('Template', '')];
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
         return { valid: false, message: `${field} 是必需的` };
       }
     }
@@ -738,7 +758,7 @@ export class SourcesManager {
       return { valid: false, message: '搜索源名称格式不正确' };
     }
     
-    // 🔧 使用新的URL验证逻辑
+    // 使用新的URL验证逻辑
     if (!validateSourceUrl(sourceData.urlTemplate, sourceData.searchable)) {
       if (sourceData.searchable) {
         return { valid: false, message: '搜索源URL必须包含{keyword}占位符' };
@@ -760,54 +780,13 @@ export class SourcesManager {
       return { valid: false, message: 'URL格式无效' };
     }
     
-    if (!sourceData.id) {
-      const generatedId = this.generateSourceId(sourceData.name);
-      if (this.allSearchSources.some(s => s.id === generatedId)) {
-        return { valid: false, message: '搜索源名称已存在，请使用不同的名称' };
-      }
-    }
-    
     const categoriesManager = this.app.getManager('categories');
-    if (!categoriesManager || !categoriesManager.getCategoryById(sourceData.category)) {
+    const categoryId = sourceData.categoryId || sourceData.category;
+    if (!categoriesManager || !categoriesManager.getCategoryById(categoryId)) {
       return { valid: false, message: '选择的分类不存在' };
     }
     
     return { valid: true };
-  }
-
-  generateSourceId(name) {
-    return name.toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 20) + '_' + Date.now().toString(36);
-  }
-
-  async addCustomSource(sourceData) {
-    sourceData.id = this.generateSourceId(sourceData.name);
-    sourceData.createdAt = Date.now();
-    sourceData.isCustom = true;
-    sourceData.isBuiltin = false;
-    
-    this.customSearchSources.push(sourceData);
-    this.allSearchSources.push({ ...sourceData, isCustom: true, isBuiltin: false });
-    
-    await this.saveCustomSearchSources();
-  }
-
-  async updateCustomSource(sourceData) {
-    const index = this.customSearchSources.findIndex(s => s.id === sourceData.id);
-    if (index === -1) {
-      throw new Error('未找到要更新的搜索源');
-    }
-    
-    this.customSearchSources[index] = { ...this.customSearchSources[index], ...sourceData };
-    
-    const allIndex = this.allSearchSources.findIndex(s => s.id === sourceData.id);
-    if (allIndex !== -1) {
-      this.allSearchSources[allIndex] = { ...this.allSearchSources[allIndex], ...sourceData };
-    }
-    
-    await this.saveCustomSearchSources();
   }
 
   editCustomSource(sourceId) {
@@ -820,6 +799,7 @@ export class SourcesManager {
     this.showCustomSourceModal(source);
   }
 
+  // 🔴 使用新API删除自定义搜索源
   async deleteCustomSource(sourceId) {
     const source = this.customSearchSources.find(s => s.id === sourceId);
     if (!source) {
@@ -827,18 +807,20 @@ export class SourcesManager {
       return;
     }
     
-    if (!confirm(`确定要删除自定义搜索源"${source.name}"吗？此操作不可撤销。`)) {
+    if (!confirm(`确定要删除自定义搜索源"${source.name}"吗?此操作不可撤销。`)) {
       return;
     }
     
     try {
       showLoading(true);
       
+      // 🔴 使用新API删除
+      await searchSourcesAPI.deleteSearchSource(sourceId);
+      
       this.customSearchSources = this.customSearchSources.filter(s => s.id !== sourceId);
       this.allSearchSources = this.allSearchSources.filter(s => s.id !== sourceId);
       this.enabledSources = this.enabledSources.filter(id => id !== sourceId);
       
-      await this.saveCustomSearchSources();
       await this.loadTabData();
       
       showToast('自定义搜索源删除成功', 'success');
@@ -849,31 +831,6 @@ export class SourcesManager {
     } finally {
       showLoading(false);
     }
-  }
-
-  async saveCustomSearchSources() {
-    const settings = {
-      customSearchSources: this.customSearchSources,
-      searchSources: this.enabledSources,
-      customSourceCategories: this.getCustomCategories()
-    };
-    
-    await apiService.updateUserSettings(settings);
-  }
-
-  async saveSearchSourcesSettings() {
-    const settings = {
-      searchSources: this.enabledSources,
-      customSearchSources: this.customSearchSources,
-      customSourceCategories: this.getCustomCategories()
-    };
-    
-    await apiService.updateUserSettings(settings);
-    
-    // 通知主页面更新站点导航
-    window.dispatchEvent(new CustomEvent('searchSourcesChanged', {
-      detail: { newSources: this.enabledSources }
-    }));
   }
 
   updateSourcesStats() {
@@ -893,17 +850,13 @@ export class SourcesManager {
     if (elements.categoriesCount) elements.categoriesCount.textContent = categoriesCount;
   }
 
+  // 🔴 使用新API导出搜索源
   async exportSources() {
     try {
-      const data = {
-        builtinSources: this.builtinSearchSources,
-        customSources: this.customSearchSources,
-        enabledSources: this.enabledSources,
-        exportTime: new Date().toISOString(),
-        version: window.API_CONFIG?.APP_VERSION || '1.3.0'
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
+      // 🔴 使用新API导出
+      const exportData = await searchSourcesAPI.exportUserSearchSources();
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
         type: 'application/json'
       });
 
@@ -927,13 +880,11 @@ export class SourcesManager {
     this.editingCustomSource = null;
   }
 
-  // 🔧 新增：检查搜索源是否支持详情提取
   supportsDetailExtraction(sourceId) {
     const detailSources = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || [];
     return detailSources.includes(sourceId);
   }
 
-  // 🔧 新增：获取源的大分类
   getMajorCategoryForSource(sourceId) {
     const source = this.getSourceById(sourceId);
     if (!source) return null;

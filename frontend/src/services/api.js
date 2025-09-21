@@ -1,4 +1,4 @@
-// API服务主文件 - 移除详情提取功能，改为调用 detail-api.js
+// API服务主文件 - 重构版本：移除搜索源管理功能，专注核心用户功能
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 
@@ -112,7 +112,8 @@ class APIService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // 认证相关API
+  // ===================== 认证相关API =====================
+
   async register(username, email, password) {
     return await this.request('/api/auth/register', {
       method: 'POST',
@@ -190,7 +191,8 @@ class APIService {
     }
   }
 
-  // 搜索源状态检查API
+  // ===================== 搜索源状态检查API =====================
+
   async checkSourcesStatus(sources, keyword, options = {}) {
     try {
       if (!sources || !Array.isArray(sources) || sources.length === 0) {
@@ -273,7 +275,8 @@ class APIService {
     }
   }
 
-  // 用户设置相关API - 支持详情提取设置
+  // ===================== 用户设置相关API =====================
+  
   async getUserSettings() {
     try {
       const response = await this.request('/api/user/settings');
@@ -305,9 +308,9 @@ class APIService {
       throw new Error('设置数据格式错误');
     }
     
+    // 🔧 移除搜索源管理相关设置，这些现在通过独立API处理
     const allowedSettings = [
       'theme', 'autoSync', 'cacheResults', 'maxHistoryPerUser', 'maxFavoritesPerUser',
-      'searchSources', 'customSearchSources', 'customSourceCategories',
       'allowAnalytics', 'searchSuggestions',
       'checkSourceStatus', 'sourceStatusCheckTimeout', 'sourceStatusCacheDuration',
       'skipUnavailableSources', 'showSourceStatus', 'retryFailedSources',
@@ -326,6 +329,14 @@ class APIService {
       }
     });
     
+    // 🔧 如果包含搜索源相关设置，给出提示
+    const deprecatedSourceSettings = ['searchSources', 'customSearchSources', 'customSourceCategories'];
+    const hasDeprecatedSettings = deprecatedSourceSettings.some(key => settings.hasOwnProperty(key));
+    
+    if (hasDeprecatedSettings) {
+      console.warn('检测到已弃用的搜索源设置，请使用 SearchSourcesAPI 进行管理');
+    }
+    
     try {
       console.log('发送到后端的设置:', validSettings);
       return await this.request('/api/user/settings', {
@@ -338,7 +349,8 @@ class APIService {
     }
   }
 
-  // 收藏相关API
+  // ===================== 收藏相关API =====================
+
   async syncFavorites(favorites) {
     if (!this.token) {
       throw new Error('用户未登录');
@@ -374,7 +386,8 @@ class APIService {
     return response.favorites || [];
   }
 
-  // 搜索历史相关API
+  // ===================== 搜索历史相关API =====================
+
   async saveSearchHistory(query, source = 'unknown') {
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       throw new Error('搜索关键词不能为空');
@@ -443,7 +456,8 @@ class APIService {
     }
   }
 
-  // 统计相关API
+  // ===================== 统计相关API =====================
+
   async getSearchStats() {
     if (!this.token) {
       return { total: 0, today: 0, thisWeek: 0, topQueries: [] };
@@ -457,7 +471,8 @@ class APIService {
     }
   }
 
-  // 行为记录API
+  // ===================== 行为记录API =====================
+
   async recordAction(action, data) {
     try {
       return await this.request('/api/actions/record', {
@@ -469,7 +484,8 @@ class APIService {
     }
   }
 
-  // 系统配置API
+  // ===================== 系统配置API =====================
+
   async getConfig() {
     try {
       return await this.request('/api/config');
@@ -479,7 +495,8 @@ class APIService {
     }
   }
 
-  // 健康检查API
+  // ===================== 健康检查API =====================
+
   async healthCheck() {
     try {
       const response = await this.request('/api/health');
@@ -489,114 +506,35 @@ class APIService {
     }
   }
 
-  // 自定义搜索源管理API
-  async addCustomSearchSource(source) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-    
-    if (!source || !source.name || !source.urlTemplate) {
-      throw new Error('缺少必需字段：name, urlTemplate');
-    }
-    
-    if (!source.id) {
-      source.id = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
-    
-    const newSource = {
-      id: source.id,
-      name: source.name.trim(),
-      subtitle: source.subtitle?.trim() || '自定义搜索源',
-      icon: source.icon?.trim() || '🔍',
-      urlTemplate: source.urlTemplate.trim(),
-      category: source.category || 'other',
-      isCustom: true,
-      supportsDetailExtraction: source.supportsDetailExtraction || false,
-      createdAt: Date.now()
-    };
-    
-    try {
-      const currentSettings = await this.getUserSettings();
-      const customSources = currentSettings.customSearchSources || [];
-      
-      const existingSource = customSources.find(s => 
-        s.id === newSource.id || s.name === newSource.name
-      );
-      
-      if (existingSource) {
-        throw new Error('搜索源ID或名称已存在');
-      }
-      
-      const updatedCustomSources = [...customSources, newSource];
-      
-      return await this.updateUserSettings({
-        ...currentSettings,
-        customSearchSources: updatedCustomSources
-      });
-    } catch (error) {
-      console.error('添加自定义搜索源失败:', error);
-      throw error;
-    }
-  }
-
-  async updateCustomSearchSource(sourceId, updates) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-    
-    try {
-      const currentSettings = await this.getUserSettings();
-      const customSources = currentSettings.customSearchSources || [];
-      
-      const sourceIndex = customSources.findIndex(s => s.id === sourceId);
-      if (sourceIndex === -1) {
-        throw new Error('未找到指定的自定义搜索源');
-      }
-      
-      customSources[sourceIndex] = {
-        ...customSources[sourceIndex],
-        ...updates,
-        updatedAt: Date.now()
-      };
-      
-      return await this.updateUserSettings({
-        ...currentSettings,
-        customSearchSources: customSources
-      });
-    } catch (error) {
-      console.error('更新自定义搜索源失败:', error);
-      throw error;
-    }
-  }
-
-  async deleteCustomSearchSource(sourceId) {
-    if (!this.token) {
-      throw new Error('用户未登录');
-    }
-    
-    try {
-      const currentSettings = await this.getUserSettings();
-      let customSources = currentSettings.customSearchSources || [];
-      let enabledSources = currentSettings.searchSources || [];
-      
-      const sourceExists = customSources.some(s => s.id === sourceId);
-      if (!sourceExists) {
-        throw new Error('未找到指定的自定义搜索源');
-      }
-      
-      customSources = customSources.filter(s => s.id !== sourceId);
-      enabledSources = enabledSources.filter(id => id !== sourceId);
-      
-      return await this.updateUserSettings({
-        ...currentSettings,
-        customSearchSources: customSources,
-        searchSources: enabledSources
-      });
-    } catch (error) {
-      console.error('删除自定义搜索源失败:', error);
-      throw error;
-    }
-  }
+  // ===================== 已移除的功能说明 =====================
+  // 
+  // 以下功能已迁移至独立的API服务：
+  // 
+  // 1. 搜索源管理 -> SearchSourcesAPI (search-sources-api.js)
+  //    - addCustomSearchSource()
+  //    - updateCustomSearchSource()
+  //    - deleteCustomSearchSource()
+  //    - getEnabledSearchSources()
+  //    - getAllSearchSources()
+  //
+  // 2. 详情提取管理 -> DetailAPI (detail-api.js)
+  //    - extractSingleDetail()
+  //    - extractBatchDetails()
+  //    - getDetailExtractionHistory()
+  //    - updateDetailConfig()
+  //
+  // 使用新API的好处：
+  // - 功能分离清晰，职责单一
+  // - 更好的类型安全和错误处理
+  // - 独立的缓存和状态管理
+  // - 更易于测试和维护
+  // 
+  // 迁移指南：
+  // 旧代码: apiService.addCustomSearchSource(source)
+  // 新代码: searchSourcesAPI.createSearchSource(source)
+  //
+  // 旧代码: apiService.extractSingleDetail(url)
+  // 新代码: detailAPI.extractSingleDetail(url)
 }
 
 // 全局错误恢复机制

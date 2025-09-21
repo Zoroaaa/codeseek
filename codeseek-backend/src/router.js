@@ -1,4 +1,4 @@
-// src/router.js - 增强版本，添加验证状态检查路由
+// src/router.js - 重构版本：搜索源管理功能已独立，移除旧的冗余路由
 import { utils } from './utils.js';
 
 // 导入所有处理器
@@ -20,7 +20,7 @@ import {
     // 忘记密码处理器
     authForgotPasswordHandler,
     authResetPasswordHandler,
-    // 🆕 新增：验证状态检查处理器
+    // 验证状态检查处理器
     authCheckVerificationStatusHandler,
     authGetUserVerificationStatusHandler,
     authSmartSendVerificationCodeHandler
@@ -44,6 +44,7 @@ import {
     communitySearchHandler
 } from './handlers/community.js';
 
+// 用户相关处理器（已移除搜索源管理相关功能）
 import {
     userGetSettingsHandler,
     userUpdateSettingsHandler,
@@ -56,11 +57,30 @@ import {
     userGetSearchStatsHandler
 } from './handlers/user.js';
 
+// 独立的搜索源管理处理器
+import {
+    getMajorCategoriesHandler,
+    createMajorCategoryHandler,
+    getSourceCategoriesHandler,
+    createSourceCategoryHandler,
+    updateSourceCategoryHandler,
+    deleteSourceCategoryHandler,
+    getSearchSourcesHandler,
+    createSearchSourceHandler,
+    updateSearchSourceHandler,
+    deleteSearchSourceHandler,
+    getUserSourceConfigsHandler,
+    updateUserSourceConfigHandler,
+    batchUpdateUserSourceConfigsHandler,
+    getSearchSourceStatsHandler,
+    exportUserSearchSourcesHandler
+} from './handlers/search-sources.js';
+
+// 系统相关处理器（已移除搜索源管理相关功能）
 import {
     healthCheckHandler,
     sourceStatusCheckHandler,
     sourceStatusHistoryHandler,
-    getSearchSourcesHandler,
     getConfigHandler,
     recordActionHandler,
     defaultHandler
@@ -225,28 +245,45 @@ export class Router {
         this.post('/api/auth/delete-account', authDeleteAccountHandler);
         this.post('/api/auth/send-account-delete-code', authSendAccountDeleteCodeHandler);
 
-        // ===============================================
-        // 🆕 新增：邮箱验证状态检查和智能发送
-        // ===============================================
-        
-        // 检查验证状态
+        // 邮箱验证状态检查和智能发送
         this.get('/api/auth/verification-status', authCheckVerificationStatusHandler);
         this.get('/api/auth/user-verification-status', authGetUserVerificationStatusHandler);
-        
-        // 智能验证码发送（会先检查是否已有待验证码）
         this.post('/api/auth/smart-send-code', authSmartSendVerificationCodeHandler);
 
-        // ===============================================
         // 邮箱验证相关路由
-        // ===============================================
-        
-        // 注册邮箱验证
         this.post('/api/auth/send-registration-code', authSendRegistrationCodeHandler);
-        
-        // 邮箱更改流程
         this.post('/api/auth/request-email-change', authRequestEmailChangeHandler);
         this.post('/api/auth/send-email-change-code', authSendEmailChangeCodeHandler);
         this.post('/api/auth/verify-email-change-code', authVerifyEmailChangeCodeHandler);
+
+        // ===============================================
+        // 独立的搜索源管理API路由
+        // ===============================================
+        
+        // 搜索源大类管理
+        this.get('/api/search-sources/major-categories', getMajorCategoriesHandler);
+        this.post('/api/search-sources/major-categories', createMajorCategoryHandler);
+        
+        // 搜索源分类管理
+        this.get('/api/search-sources/categories', getSourceCategoriesHandler);
+        this.post('/api/search-sources/categories', createSourceCategoryHandler);
+        this.put('/api/search-sources/categories/:id', updateSourceCategoryHandler);
+        this.delete('/api/search-sources/categories/:id', deleteSourceCategoryHandler);
+        
+        // 搜索源管理
+        this.get('/api/search-sources/sources', getSearchSourcesHandler);
+        this.post('/api/search-sources/sources', createSearchSourceHandler);
+        this.put('/api/search-sources/sources/:id', updateSearchSourceHandler);
+        this.delete('/api/search-sources/sources/:id', deleteSearchSourceHandler);
+        
+        // 用户搜索源配置管理
+        this.get('/api/search-sources/user-configs', getUserSourceConfigsHandler);
+        this.post('/api/search-sources/user-configs', updateUserSourceConfigHandler);
+        this.post('/api/search-sources/user-configs/batch', batchUpdateUserSourceConfigsHandler);
+        
+        // 搜索源统计和导出
+        this.get('/api/search-sources/stats', getSearchSourceStatsHandler);
+        this.get('/api/search-sources/export', exportUserSearchSourcesHandler);
 
         // ===============================================
         // 标签管理API
@@ -257,7 +294,7 @@ export class Router {
         this.delete('/api/community/tags/:id', communityDeleteTagHandler);
 
         // ===============================================
-        // 搜索源状态检查
+        // 搜索源状态检查（系统级别服务）
         // ===============================================
         this.post('/api/source-status/check', sourceStatusCheckHandler);
         this.get('/api/source-status/history', sourceStatusHistoryHandler);
@@ -301,15 +338,10 @@ export class Router {
         this.post('/api/detail/config/preset', applyConfigPresetHandler);
 
         // ===============================================
-        // 用户设置
+        // 用户设置（已移除搜索源管理功能，现在通过独立API处理）
         // ===============================================
         this.get('/api/user/settings', userGetSettingsHandler);
         this.put('/api/user/settings', userUpdateSettingsHandler);
-
-        // ===============================================
-        // 搜索源管理
-        // ===============================================
-        this.get('/api/search-sources', getSearchSourcesHandler);
 
         // ===============================================
         // 收藏相关
@@ -342,3 +374,31 @@ export class Router {
         this.get('/*', defaultHandler);
     }
 }
+
+// ===============================================
+// 重构说明
+// ===============================================
+// 
+// 本次重构已完成：
+// 
+// 1. 移除了旧的搜索源管理冗余功能：
+//    - user.js 中的 customSearchSources、customSourceCategories 相关设置处理
+//    - system.js 中的 getSearchSourcesHandler 函数
+//    - constants.js 中的硬编码搜索源定义
+// 
+// 2. 新的搜索源管理架构：
+//    - 独立的数据库表：search_major_categories、search_source_categories、search_sources、user_search_source_configs
+//    - 独立的服务文件：search-sources-service.js
+//    - 独立的处理器文件：search-sources.js
+//    - 完整的RESTful API路由
+// 
+// 3. 功能分离清晰：
+//    - 用户设置只处理个人偏好设置
+//    - 搜索源管理通过专门的API处理
+//    - 系统级别的状态检查保持独立
+//    - 详情提取功能保持独立
+// 
+// 4. 向后兼容性：
+//    - 保留了所有现有的非搜索源管理功能
+//    - API路径清晰，便于前端调用
+//    - 数据库设计支持用户个性化配置
