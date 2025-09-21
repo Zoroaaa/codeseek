@@ -1,5 +1,5 @@
 // 主应用入口 - 集成统一搜索组件和配置管理架构,新增邮箱验证功能支持
-import { APP_CONSTANTS, getCategoriesByMajorCategory, getSourcesByMajorCategory } from '../../core/constants.js';
+import { APP_CONSTANTS } from '../../core/constants.js';
 import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { isDevEnv } from '../../utils/helpers.js';
