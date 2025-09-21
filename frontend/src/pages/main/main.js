@@ -156,98 +156,112 @@ class MagnetSearchApp {
   }
 
   // 🆕 最小回退方案（仅在API完全不可用时使用）
-  async loadMinimalFallbackData() {
-    try {
-      // 创建最基本的大类
-      this.majorCategories = [
-        {
-          id: 'search_sources',
-          name: '搜索资源',
-          icon: '🔍',
-          description: '参与番号搜索的资源站点',
-          order: 1
-        },
-        {
-          id: 'browse_sites',
-          name: '浏览站点',
-          icon: '🌐',
-          description: '仅供浏览的资源站点',
-          order: 2
-        }
-      ];
+async loadMinimalFallbackData() {
+  try {
+    // 创建最基本的大类 - 必须包含正确的字段结构
+    this.majorCategories = [
+      {
+        id: 'search_sources',
+        name: '🔍 搜索源',
+        icon: '🔍',
+        description: '支持番号搜索的网站',
+        requiresKeyword: true,
+        displayOrder: 1,
+        order: 1
+      },
+      {
+        id: 'browse_sites',
+        name: '🌐 浏览站点',
+        icon: '🌐',
+        description: '仅供访问,不参与搜索',
+        requiresKeyword: false,
+        displayOrder: 2,
+        order: 2
+      }
+    ];
 
-      // 创建最基本的分类
-      this.allCategories = [
-        {
-          id: 'torrents',
-          name: '种子资源',
-          icon: '🧲',
-          description: '提供种子下载的站点',
-          majorCategory: 'search_sources',
-          defaultSearchable: true,
-          defaultSiteType: 'search',
-          searchPriority: 1,
-          isSystem: true,
-          isBuiltin: true
-        },
-        {
-          id: 'info_sites',
-          name: '信息站点',
-          icon: '📚',
-          description: '提供影片信息的站点',
-          majorCategory: 'search_sources',
-          defaultSearchable: true,
-          defaultSiteType: 'search',
-          searchPriority: 2,
-          isSystem: true,
-          isBuiltin: true
-        }
-      ];
+    // 创建最基本的分类 - 必须包含 majorCategoryId 字段
+    this.allCategories = [
+      {
+        id: 'database',
+        name: '📚 番号资料站',
+        icon: '📚',
+        description: '提供详细的番号信息、封面和演员资料',
+        majorCategoryId: 'search_sources',  // 🔴 关键:使用 majorCategoryId
+        defaultSearchable: true,
+        defaultSiteType: 'search',
+        searchPriority: 1,
+        isSystem: true,
+        displayOrder: 1
+      },
+      {
+        id: 'streaming',
+        name: '🎥 在线播放平台',
+        icon: '🎥',
+        description: '提供在线观看和下载服务',
+        majorCategoryId: 'browse_sites',  // 🔴 关键:使用 majorCategoryId
+        defaultSearchable: false,
+        defaultSiteType: 'browse',
+        searchPriority: 5,
+        isSystem: true,
+        displayOrder: 1
+      },
+      {
+        id: 'torrent',
+        name: '🧲 磁力搜索',
+        icon: '🧲',
+        description: '提供磁力链接和种子文件',
+        majorCategoryId: 'search_sources',  // 🔴 关键:使用 majorCategoryId
+        defaultSearchable: true,
+        defaultSiteType: 'search',
+        searchPriority: 3,
+        isSystem: true,
+        displayOrder: 3
+      }
+    ];
 
-      // 创建最基本的搜索源
-      this.allSearchSources = [
-        {
-          id: 'javbus',
-          name: 'JavBus',
-          subtitle: '番号+磁力一体站，信息完善',
-          icon: '🎬',
-          category: 'info_sites',
-          urlTemplate: 'https://www.javbus.com/search/{keyword}',
-          searchable: true,
-          siteType: 'search',
-          searchPriority: 1,
-          requiresKeyword: true,
-          isSystem: true,
-          isBuiltin: true,
-          userEnabled: true
-        },
-        {
-          id: 'javdb',
-          name: 'JavDB',
-          subtitle: '极简风格番号资料站，轻量快速',
-          icon: '📚',
-          category: 'info_sites',
-          urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
-          searchable: true,
-          siteType: 'search',
-          searchPriority: 2,
-          requiresKeyword: true,
-          isSystem: true,
-          isBuiltin: true,
-          userEnabled: true
-        }
-      ];
+    // 创建最基本的搜索源 - 必须包含 categoryId 字段
+    this.allSearchSources = [
+      {
+        id: 'javbus',
+        name: 'JavBus',
+        subtitle: '番号+磁力一体站,信息完善',
+        icon: '🎬',
+        categoryId: 'database',  // 🔴 关键:使用 categoryId
+        urlTemplate: 'https://www.javbus.com/search/{keyword}',
+        searchable: true,
+        siteType: 'search',
+        searchPriority: 1,
+        requiresKeyword: true,
+        isSystem: true,
+        userEnabled: true
+      },
+      {
+        id: 'javdb',
+        name: 'JavDB',
+        subtitle: '极简风格番号资料站,轻量快速',
+        icon: '📚',
+        categoryId: 'database',  // 🔴 关键:使用 categoryId
+        urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
+        searchable: true,
+        siteType: 'search',
+        searchPriority: 2,
+        requiresKeyword: true,
+        isSystem: true,
+        userEnabled: true
+      }
+    ];
 
-      console.log('🔧 已加载最小回退数据');
-      
-    } catch (error) {
-      console.error('❌ 加载回退数据失败:', error);
-      // 设置为空数组，防止应用崩溃
-      this.majorCategories = [];
-      this.allCategories = [];
-      this.allSearchSources = [];
-    }
+    console.log('🔧 已加载最小回退数据');
+    
+  } catch (error) {
+    console.error('❌ 加载回退数据失败:', error);
+    // 设置为空数组,防止应用崩溃
+    this.majorCategories = [];
+    this.allCategories = [];
+    this.allSearchSources = [];
   }
+}
 
   // 🆕 初始化邮箱验证服务
   async initEmailVerificationService() {
@@ -678,173 +692,192 @@ class MagnetSearchApp {
   }
 
   // 🔧 渲染站点导航 - 使用动态数据
-  renderSiteNavigation(sourcesToDisplay = null) {
-    const sitesSection = document.getElementById('sitesSection');
-    if (!sitesSection) return;
+renderSiteNavigation(sourcesToDisplay = null) {
+  const sitesSection = document.getElementById('sitesSection');
+  if (!sitesSection) return;
 
-    const sources = sourcesToDisplay || this.allSearchSources;
+  const sources = sourcesToDisplay || this.allSearchSources;
 
-    if (sources.length === 0) {
-      sitesSection.innerHTML = `
-        <h2>🌐 资源站点导航</h2>
-        <div class="empty-state">
-          <p>暂无可用的搜索源</p>
-          <p>请在个人中心搜索源管理页面添加搜索源</p>
-          <button onclick="window.app && window.app.navigateToDashboard()" class="btn-primary">前往设置</button>
-        </div>
-      `;
-      return;
-    }
-
-    // 🔧 使用动态获取的大类数据
-    const majorCategories = this.majorCategories.sort((a, b) => (a.order || 999) - (b.order || 999));
-    
-    let navigationHTML = `
+  if (sources.length === 0) {
+    sitesSection.innerHTML = `
       <h2>🌐 资源站点导航</h2>
-      
-      ${this.detailExtractionAvailable ? `
-        <div class="detail-extraction-notice">
-          <span class="notice-icon">✨</span>
-          <span>标有 <strong>📋</strong> 的站点支持详情提取功能</span>
-          ${!this.detailExtractionEnabled ? `
-            <button onclick="window.app.enableDetailExtraction()" class="enable-detail-btn">启用详情提取</button>
-          ` : ''}
-        </div>
-      ` : ''}
+      <div class="empty-state">
+        <p>暂无可用的搜索源</p>
+        <p>请在个人中心搜索源管理页面添加搜索源</p>
+        <button onclick="window.app && window.app.navigateToDashboard()" class="btn-primary">前往设置</button>
+      </div>
     `;
-
-    // 按大分类渲染各个部分
-    majorCategories.forEach(majorCategory => {
-      const categorySourcesWithSubcategories = this.getSourcesByMajorCategoryWithSubcategories(sources, majorCategory.id);
-      
-      if (categorySourcesWithSubcategories.length === 0) return;
-
-      navigationHTML += `
-        <div class="major-category-section">
-          <h3 class="major-category-title">
-            ${majorCategory.icon} ${majorCategory.name}
-            <small>(${categorySourcesWithSubcategories.length}个站点)</small>
-          </h3>
-          <p class="major-category-desc">${majorCategory.description}</p>
-          
-          <div class="subcategories-container">
-            ${this.renderSubcategoriesWithSources(categorySourcesWithSubcategories, majorCategory.id)}
-          </div>
-        </div>
-      `;
-    });
-    
-    sitesSection.innerHTML = navigationHTML;
+    return;
   }
+
+  // 使用动态获取的大类数据
+  const majorCategories = this.majorCategories.sort((a, b) => (a.order || a.displayOrder || 999) - (b.order || b.displayOrder || 999));
+  
+  let navigationHTML = `
+    <h2>🌐 资源站点导航</h2>
+    
+    ${this.detailExtractionAvailable ? `
+      <div class="detail-extraction-notice">
+        <span class="notice-icon">✨</span>
+        <span>标有 <strong>📋</strong> 的站点支持详情提取功能</span>
+        ${!this.detailExtractionEnabled ? `
+          <button onclick="window.app.enableDetailExtraction()" class="enable-detail-btn">启用详情提取</button>
+        ` : ''}
+      </div>
+    ` : ''}
+  `;
+
+  // 按大分类渲染各个部分
+  majorCategories.forEach(majorCategory => {
+    const categorySourcesWithSubcategories = this.getSourcesByMajorCategoryWithSubcategories(sources, majorCategory.id);
+    
+    if (categorySourcesWithSubcategories.length === 0) return;
+
+    navigationHTML += `
+      <div class="major-category-section">
+        <h3 class="major-category-title">
+          ${majorCategory.icon} ${majorCategory.name}
+          <small>(${categorySourcesWithSubcategories.length}个站点)</small>
+        </h3>
+        <p class="major-category-desc">${majorCategory.description}</p>
+        
+        <div class="subcategories-container">
+          ${this.renderSubcategoriesWithSources(categorySourcesWithSubcategories, majorCategory.id)}
+        </div>
+      </div>
+    `;
+  });
+  
+  sitesSection.innerHTML = navigationHTML;
+}
+
 
   // 🔧 新增:获取按大分类和小分类组织的源
-  getSourcesByMajorCategoryWithSubcategories(sources, majorCategoryId) {
-    return sources.filter(source => {
-      const category = this.allCategories.find(cat => cat.id === source.category);
-      return category && category.majorCategory === majorCategoryId;
-    });
-  }
+getSourcesByMajorCategoryWithSubcategories(sources, majorCategoryId) {
+  return sources.filter(source => {
+    // 🔴 关键修复:同时支持 categoryId 和 category 字段
+    const sourceCategoryId = source.categoryId || source.category;
+    const category = this.allCategories.find(cat => cat.id === sourceCategoryId);
+    
+    if (!category) {
+      console.warn(`源 ${source.id} 的分类 ${sourceCategoryId} 未找到`);
+      return false;
+    }
+    
+    // 🔴 关键修复:同时支持 majorCategoryId 和 majorCategory 字段
+    const categoryMajorId = category.majorCategoryId || category.majorCategory;
+    return categoryMajorId === majorCategoryId;
+  });
+}
 
   // 🔧 新增:渲染小分类及其下的源
-  renderSubcategoriesWithSources(sources, majorCategoryId) {
-    // 按小分类分组
-    const sourcesBySubcategory = {};
+renderSubcategoriesWithSources(sources, majorCategoryId) {
+  // 按小分类分组
+  const sourcesBySubcategory = {};
+  
+  sources.forEach(source => {
+    // 🔴 关键修复:兼容字段名
+    const sourceCategoryId = source.categoryId || source.category;
+    const subcategory = this.allCategories.find(cat => cat.id === sourceCategoryId);
     
-    sources.forEach(source => {
-      const subcategory = this.allCategories.find(cat => cat.id === source.category);
-      if (subcategory) {
-        if (!sourcesBySubcategory[subcategory.id]) {
-          sourcesBySubcategory[subcategory.id] = {
-            category: subcategory,
-            sources: []
-          };
-        }
-        sourcesBySubcategory[subcategory.id].sources.push(source);
+    if (subcategory) {
+      if (!sourcesBySubcategory[subcategory.id]) {
+        sourcesBySubcategory[subcategory.id] = {
+          category: subcategory,
+          sources: []
+        };
       }
+      sourcesBySubcategory[subcategory.id].sources.push(source);
+    }
+  });
+
+  // 按小分类的 order/displayOrder 排序
+  const sortedSubcategories = Object.values(sourcesBySubcategory)
+    .sort((a, b) => {
+      const orderA = a.category.displayOrder || a.category.order || 999;
+      const orderB = b.category.displayOrder || b.category.order || 999;
+      return orderA - orderB;
     });
 
-    // 按小分类的order排序
-    const sortedSubcategories = Object.values(sourcesBySubcategory)
-      .sort((a, b) => (a.category.order || 999) - (b.category.order || 999));
-
-    return sortedSubcategories.map(({ category, sources }) => {
-      const isSearchable = majorCategoryId === 'search_sources';
-      
-      return `
-        <div class="subcategory-section">
-          <h4 class="subcategory-title">
-            ${category.icon} ${category.name}
-            <span class="source-count">${sources.length}个站点</span>
-            ${isSearchable ? '<span class="searchable-indicator">🔍 参与搜索</span>' : '<span class="browse-indicator">🌐 仅浏览</span>'}
-          </h4>
-          <p class="subcategory-desc">${category.description}</p>
-          
-          <div class="sites-grid">
-            ${sources.map(source => this.renderSiteItem(source, isSearchable)).join('')}
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 🔧 渲染单个站点项,包括启用状态和详情提取支持标识
-  renderSiteItem(source, isSearchable) {
-    // 通过统一搜索管理器检查源的启用状态
-    let isEnabled = true; // 默认显示为可用,具体启用状态由搜索时判断
-    
-    try {
-      if (unifiedSearchManager.isInitialized && unifiedSearchManager.configManager) {
-        const config = unifiedSearchManager.configManager.getConfig();
-        // 这里可以添加检查逻辑,当前简化处理
-      }
-    } catch (error) {
-      console.warn('检查搜索源启用状态失败:', error);
-    }
-
-    const statusClass = isEnabled ? 'enabled' : 'disabled';
-    const statusText = isEnabled ? '可用' : '未启用';
-    const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
-    
-    const badges = [];
-    
-    if (!isSearchable) {
-      badges.push('<span class="non-searchable-badge">仅浏览</span>');
-    } else if (source.searchPriority && source.searchPriority <= 3) {
-      badges.push('<span class="priority-badge">优先</span>');
-    }
-    
-    if (supportsDetailExtraction) {
-      badges.push('<span class="detail-support-badge">📋</span>');
-    }
-    
-    // 🔧 根据网站类型调整URL处理
-    let siteUrl = source.urlTemplate;
-    if (source.searchable === false) {
-      // 浏览站点直接使用基础URL
-      siteUrl = siteUrl.replace('/{keyword}', '').replace('?q={keyword}&f=all', '').replace('/search/{keyword}', '');
-    } else {
-      // 搜索源移除关键词占位符以供直接访问
-      siteUrl = siteUrl.replace('{keyword}', '');
-    }
+  return sortedSubcategories.map(({ category, sources }) => {
+    // 🔴 关键修复:根据大类判断是否可搜索
+    const isSearchable = majorCategoryId === 'search_sources';
     
     return `
-      <a href="${siteUrl}" 
-         class="site-item ${isSearchable ? 'searchable' : 'browse-only'}"
-         target="_blank">
-        <div class="site-info">
-          <div class="site-header">
-            <strong>${source.icon || '📄'} ${source.name}</strong>
-            <div class="site-badges">
-              ${source.isCustom ? '<span class="custom-badge">自定义</span>' : ''}
-              ${badges.join('')}
-              <span class="status-badge ${statusClass}">${statusText}</span>
-            </div>
-          </div>
-          <span class="site-subtitle">${source.subtitle || ''}</span>
+      <div class="subcategory-section">
+        <h4 class="subcategory-title">
+          ${category.icon} ${category.name}
+          <span class="source-count">${sources.length}个站点</span>
+          ${isSearchable ? '<span class="searchable-indicator">🔍 参与搜索</span>' : '<span class="browse-indicator">🌐 仅浏览</span>'}
+        </h4>
+        <p class="subcategory-desc">${category.description || ''}</p>
+        
+        <div class="sites-grid">
+          ${sources.map(source => this.renderSiteItem(source, isSearchable)).join('')}
         </div>
-      </a>
+      </div>
     `;
+  }).join('');
+}
+
+  // 🔧 渲染单个站点项,包括启用状态和详情提取支持标识
+renderSiteItem(source, isSearchable) {
+  // 通过统一搜索管理器检查源的启用状态
+  let isEnabled = true; // 默认显示为启用,具体启用状态由搜索时判断
+  
+  try {
+    if (unifiedSearchManager.isInitialized && unifiedSearchManager.configManager) {
+      const config = unifiedSearchManager.configManager.getConfig();
+      // 这里可以添加检查逻辑,当前简化处理
+    }
+  } catch (error) {
+    console.warn('检查搜索源启用状态失败:', error);
   }
+
+  const statusClass = isEnabled ? 'enabled' : 'disabled';
+  const statusText = isEnabled ? '可用' : '未启用';
+  const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
+  
+  const badges = [];
+  
+  if (!isSearchable) {
+    badges.push('<span class="non-searchable-badge">仅浏览</span>');
+  } else if (source.searchPriority && source.searchPriority <= 3) {
+    badges.push('<span class="priority-badge">优先</span>');
+  }
+  
+  if (supportsDetailExtraction) {
+    badges.push('<span class="detail-support-badge">📋</span>');
+  }
+  
+  // 🔴 根据网站类型调整URL处理
+  let siteUrl = source.urlTemplate;
+  if (source.searchable === false) {
+    // 浏览站点直接使用基础URL
+    siteUrl = siteUrl.replace('/{keyword}', '').replace('?q={keyword}&f=all', '').replace('/search/{keyword}', '');
+  } else {
+    // 搜索源移除关键词占位符以供直接访问
+    siteUrl = siteUrl.replace('{keyword}', '');
+  }
+  
+  return `
+    <a href="${siteUrl}" 
+       class="site-item ${isSearchable ? 'searchable' : 'browse-only'}"
+       target="_blank">
+      <div class="site-info">
+        <div class="site-header">
+          <strong>${source.icon || '📄'} ${source.name}</strong>
+          <div class="site-badges">
+            ${source.isCustom || !source.isSystem ? '<span class="custom-badge">自定义</span>' : ''}
+            ${badges.join('')}
+            <span class="status-badge ${statusClass}">${statusText}</span>
+          </div>
+        </div>
+        <span class="site-subtitle">${source.subtitle || ''}</span>
+      </div>
+    </a>
+  `;
+}
 
   // 初始化组件
   async initComponents() {
@@ -1031,58 +1064,58 @@ class MagnetSearchApp {
   }
 
   // 修改:用户登录后更新站点导航
-  async handleLogin(event) {
-    event.preventDefault();
-    
-    const username = document.getElementById('loginUsername')?.value.trim();
-    const password = document.getElementById('loginPassword')?.value;
+async handleLogin(event) {
+  event.preventDefault();
+  
+  const username = document.getElementById('loginUsername')?.value.trim();
+  const password = document.getElementById('loginPassword')?.value;
 
-    if (!username || !password) {
-      showToast('请填写用户名和密码', 'error');
-      return;
-    }
-
-    try {
-      const result = await authManager.login(username, password);
-      
-      if (result.success) {
-        this.currentUser = result.user;
-        this.updateUserUI();
-        
-        // 显示主内容区域
-        document.querySelector('.main-content').style.display = 'block';
-        
-        // 关闭模态框
-        this.closeModals();
-        
-        // 登录后初始化组件
-        await this.initComponents();
-        
-        // 🆕 登录后从新API加载搜索源
-        await this.loadSearchSourcesFromAPI();
-        
-        // 重新初始化站点导航(显示所有源)
-        await this.initSiteNavigation();
-        
-        // 检查详情提取功能可用性
-        await this.checkDetailExtractionAvailability();
-        
-        // 初始化详情提取UI
-        await this.initDetailExtractionUI();
-        
-        // 处理URL参数(如搜索查询)
-        this.handleURLParams();
-        
-        // 清空登录表单
-        document.getElementById('loginForm').reset();
-        
-        this.performanceMetrics.searchCount = 0; // 重置搜索计数
-      }
-    } catch (error) {
-      console.error('登录失败:', error);
-      this.performanceMetrics.errorCount++;
-    }
+  if (!username || !password) {
+    showToast('请填写用户名和密码', 'error');
+    return;
   }
+
+  try {
+    const result = await authManager.login(username, password);
+    
+    if (result.success) {
+      this.currentUser = result.user;
+      this.updateUserUI();
+      
+      // 显示主内容区域
+      document.querySelector('.main-content').style.display = 'block';
+      
+      // 关闭模态框
+      this.closeModals();
+      
+      // 登录后初始化组件
+      await this.initComponents();
+      
+      // 🆕 登录后从新API加载搜索源
+      await this.loadSearchSourcesFromAPI();
+      
+      // 🔴 重新初始化站点导航(显示所有源)
+      await this.initSiteNavigation();
+      
+      // 检查详情提取功能可用性
+      await this.checkDetailExtractionAvailability();
+      
+      // 初始化详情提取UI
+      await this.initDetailExtractionUI();
+      
+      // 处理URL参数(如搜索查询)
+      this.handleURLParams();
+      
+      // 清空登录表单
+      document.getElementById('loginForm').reset();
+      
+      this.performanceMetrics.searchCount = 0; // 重置搜索计数
+    }
+  } catch (error) {
+    console.error('登录失败:', error);
+    this.performanceMetrics.errorCount++;
+  }
+}
 
   // 绑定模态框事件
   bindModalEvents() {
@@ -1371,61 +1404,61 @@ class MagnetSearchApp {
   }
 
   // 修改:退出登录时重置为默认显示
-  async logout() {
-    try {
-      await authManager.logout();
-      this.currentUser = null;
-      
-      // 更新UI
-      this.updateUserUI();
-      
-      // 清空统一搜索管理器数据
-      if (unifiedSearchManager.isInitialized) {
-        await unifiedSearchManager.cleanup();
-        // 重新初始化为未登录状态
-        await unifiedSearchManager.init();
-      }
-      
-      if (favoritesManager.isInitialized) {
-        favoritesManager.favorites = [];
-        favoritesManager.renderFavorites();
-      }
-      
-      // 重置详情提取状态
-      this.detailExtractionAvailable = false;
-      this.detailExtractionEnabled = false;
-      this.updateDetailExtractionUI(false);
-      
-      // 🆕 清空所有数据，重新加载最小数据集
-      this.allSearchSources = [];
-      this.allCategories = [];
-      this.majorCategories = [];
-      
-      // 加载最小回退数据用于展示
-      await this.loadMinimalFallbackData();
-      
-      // 重新初始化站点导航(显示基础源)
-      await this.initSiteNavigation();
-      
-      // 显示登录模态框
-      this.showLoginModal();
-      
-      // 隐藏主界面
-      document.querySelector('.main-content').style.display = 'none';
-      
-      // 重置性能指标
-      this.performanceMetrics = {
-        initTime: this.performanceMetrics.initTime, // 保留初始化时间
-        searchCount: 0,
-        extractionCount: 0,
-        errorCount: 0
-      };
-      
-    } catch (error) {
-      console.error('退出登录失败:', error);
-      this.performanceMetrics.errorCount++;
+async logout() {
+  try {
+    await authManager.logout();
+    this.currentUser = null;
+    
+    // 更新UI
+    this.updateUserUI();
+    
+    // 清空统一搜索管理器数据
+    if (unifiedSearchManager.isInitialized) {
+      await unifiedSearchManager.cleanup();
+      // 重新初始化为未登录状态
+      await unifiedSearchManager.init();
     }
+    
+    if (favoritesManager.isInitialized) {
+      favoritesManager.favorites = [];
+      favoritesManager.renderFavorites();
+    }
+    
+    // 重置详情提取状态
+    this.detailExtractionAvailable = false;
+    this.detailExtractionEnabled = false;
+    this.updateDetailExtractionUI(false);
+    
+    // 🆕 清空所有数据,重新加载最小数据集
+    this.allSearchSources = [];
+    this.allCategories = [];
+    this.majorCategories = [];
+    
+    // 加载最小回退数据用于展示
+    await this.loadMinimalFallbackData();
+    
+    // 🔴 重新初始化站点导航(显示基础源)
+    await this.initSiteNavigation();
+    
+    // 显示登录模态框
+    this.showLoginModal();
+    
+    // 隐藏主界面
+    document.querySelector('.main-content').style.display = 'none';
+    
+    // 重置性能指标
+    this.performanceMetrics = {
+      initTime: this.performanceMetrics.initTime, // 保留初始化时间
+      searchCount: 0,
+      extractionCount: 0,
+      errorCount: 0
+    };
+    
+  } catch (error) {
+    console.error('退出登录失败:', error);
+    this.performanceMetrics.errorCount++;
   }
+}
 
   // 导航到Dashboard
   async navigateToDashboard() {
@@ -1456,10 +1489,24 @@ class MagnetSearchApp {
   }
 
   // 检查搜索源是否支持详情提取
-  supportsDetailExtraction(sourceId) {
-    const detailSources = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || [];
-    return detailSources.includes(sourceId);
-  }
+supportsDetailExtraction(sourceId) {
+  const detailSources = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || [];
+  return detailSources.includes(sourceId);
+}
+
+//获取源所属的大类 
+getMajorCategoryForSource(source) {
+  if (!source) return null;
+  
+  // 🔴 关键修复:兼容字段名
+  const categoryId = source.categoryId || source.category;
+  const category = this.allCategories.find(cat => cat.id === categoryId);
+  
+  if (!category) return null;
+  
+  // 🔴 关键修复:兼容字段名
+  return category.majorCategoryId || category.majorCategory;
+}
 
   // 获取应用性能统计
   getPerformanceStats() {

@@ -1,4 +1,4 @@
-// 搜索源管理器 - 修复版本：解决字段匹配和分类显示问题
+// 搜索源管理器 - 修复版本:解决字段匹配和分类显示问题
 import { APP_CONSTANTS, validateSourceUrl } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
@@ -69,19 +69,17 @@ export class SourcesManager {
       const userConfigs = await searchSourcesAPI.getUserSourceConfigs();
       console.log('✅ 已加载用户配置:', userConfigs);
       
-      // 🔴 修复：正确区分内置和自定义源
-      // 内置源：明确标记为系统源或内置源的
-      this.builtinSearchSources = allSources.filter(s => s.isSystem === true || s.isBuiltin === true);
-      // 自定义源：既不是系统源也不是内置源的
-      this.customSearchSources = allSources.filter(s => !s.isSystem && !s.isBuiltin);
+      // 🔴 修复:正确区分内置和自定义源
+      this.builtinSearchSources = allSources.filter(s => s.isSystem === true);
+      this.customSearchSources = allSources.filter(s => !s.isSystem);
       
       console.log(`📊 源分类: ${this.builtinSearchSources.length} 个内置, ${this.customSearchSources.length} 个自定义`);
       
-      // 合并所有源，并标准化字段
+      // 合并所有源,并标准化字段
       this.allSearchSources = allSources.map(source => {
-        // 🔴 修复：标准化字段名，确保 category 字段存在
-        if (source.categoryId && !source.category) {
-          source.category = source.categoryId;
+        // 🔴 修复:确保 categoryId 字段存在
+        if (!source.categoryId && source.category) {
+          source.categoryId = source.category;
         }
         return source;
       });
@@ -91,15 +89,15 @@ export class SourcesManager {
         .filter(config => config.isEnabled !== false)
         .map(config => config.sourceId);
       
-      // 如果没有配置，使用所有系统源作为默认启用
+      // 如果没有配置,使用所有系统源作为默认启用
       if (this.enabledSources.length === 0) {
         this.enabledSources = this.builtinSearchSources.map(s => s.id);
       }
       
-      console.log(`✅ 已加载 ${this.majorCategories.length} 个大类，${this.allCategories.length} 个分类，${this.allSearchSources.length} 个搜索源 (${this.builtinSearchSources.length} 内置, ${this.customSearchSources.length} 自定义), ${this.enabledSources.length} 个已启用`);
+      console.log(`✅ 已加载 ${this.majorCategories.length} 个大类,${this.allCategories.length} 个分类,${this.allSearchSources.length} 个搜索源 (${this.builtinSearchSources.length} 内置, ${this.customSearchSources.length} 自定义), ${this.enabledSources.length} 个已启用`);
       
     } catch (error) {
-      console.warn('⚠️ 从API加载搜索源失败，使用最小数据集:', error);
+      console.warn('⚠️ 从API加载搜索源失败,使用最小数据集:', error);
       await this.loadMinimalDataSet();
     }
   }
@@ -125,28 +123,26 @@ export class SourcesManager {
 
       this.allCategories = [
         {
-          id: 'torrents',
-          name: '种子资源',
-          icon: '🧲',
-          description: '提供种子下载的站点',
-          majorCategory: 'search_sources',
+          id: 'database',
+          name: '📚 番号资料站',
+          icon: '📚',
+          description: '提供详细番号信息',
+          majorCategoryId: 'search_sources',
           defaultSearchable: true,
           defaultSiteType: 'search',
           searchPriority: 1,
-          isSystem: true,
-          isBuiltin: true
+          isSystem: true
         },
         {
-          id: 'info_sites',
-          name: '信息站点',
-          icon: '📚',
-          description: '提供影片信息的站点',
-          majorCategory: 'search_sources',
+          id: 'torrent',
+          name: '🧲 磁力搜索',
+          icon: '🧲',
+          description: '提供种子下载',
+          majorCategoryId: 'search_sources',
           defaultSearchable: true,
           defaultSiteType: 'search',
-          searchPriority: 2,
-          isSystem: true,
-          isBuiltin: true
+          searchPriority: 3,
+          isSystem: true
         }
       ];
 
@@ -154,32 +150,30 @@ export class SourcesManager {
         {
           id: 'javbus',
           name: 'JavBus',
-          subtitle: '番号+磁力一体站，信息完善',
+          subtitle: '番号+磁力一体站,信息完善',
           icon: '🎬',
-          category: 'info_sites',
-          categoryId: 'info_sites',
+          categoryId: 'database',
           urlTemplate: 'https://www.javbus.com/search/{keyword}',
           searchable: true,
           siteType: 'search',
           searchPriority: 1,
           requiresKeyword: true,
           isSystem: true,
-          isBuiltin: true
+          userEnabled: true
         },
         {
           id: 'javdb',
           name: 'JavDB',
-          subtitle: '极简风格番号资料站，轻量快速',
+          subtitle: '极简风格番号资料站,轻量快速',
           icon: '📚',
-          category: 'info_sites',
-          categoryId: 'info_sites',
+          categoryId: 'database',
           urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
           searchable: true,
           siteType: 'search',
           searchPriority: 2,
           requiresKeyword: true,
           isSystem: true,
-          isBuiltin: true
+          userEnabled: true
         }
       ];
 
@@ -248,7 +242,7 @@ export class SourcesManager {
     if (!categoryFilter) return;
 
     const categoriesHTML = this.allCategories
-      .sort((a, b) => (a.order || 999) - (b.order || 999))
+      .sort((a, b) => (a.displayOrder || a.order || 999) - (b.displayOrder || b.order || 999))
       .map(category => `
         <option value="${category.id}">${category.icon} ${category.name}</option>
       `).join('');
@@ -294,9 +288,9 @@ export class SourcesManager {
           case 'disabled':
             return !this.enabledSources.includes(source.id);
           case 'builtin':
-            return source.isBuiltin || source.isSystem;
+            return source.isSystem;
           case 'custom':
-            return !source.isBuiltin && !source.isSystem;
+            return !source.isSystem;
           case 'searchable':
             return source.searchable !== false;
           case 'browse_only':
@@ -311,14 +305,16 @@ export class SourcesManager {
 
     if (majorCategoryFilter !== 'all') {
       filteredSources = filteredSources.filter(source => {
-        const category = this.getCategoryById(source.category || source.categoryId);
-        return category && category.majorCategory === majorCategoryFilter;
+        const categoryId = source.categoryId || source.category;
+        const category = this.getCategoryById(categoryId);
+        const majorCategoryId = category?.majorCategoryId || category?.majorCategory;
+        return majorCategoryId === majorCategoryFilter;
       });
     }
 
     if (categoryFilter !== 'all') {
       filteredSources = filteredSources.filter(source => {
-        const sourceCategoryId = source.category || source.categoryId;
+        const sourceCategoryId = source.categoryId || source.category;
         return sourceCategoryId === categoryFilter;
       });
     }
@@ -351,8 +347,8 @@ export class SourcesManager {
         case 'name':
           return a.name.localeCompare(b.name);
         case 'category':
-          const catA = this.getCategoryById(a.category || a.categoryId)?.name || 'Unknown';
-          const catB = this.getCategoryById(b.category || b.categoryId)?.name || 'Unknown';
+          const catA = this.getCategoryById(a.categoryId || a.category)?.name || 'Unknown';
+          const catB = this.getCategoryById(b.categoryId || b.category)?.name || 'Unknown';
           return catA.localeCompare(catB);
         case 'status':
           const statusA = this.enabledSources.includes(a.id) ? 0 : 1;
@@ -372,17 +368,17 @@ export class SourcesManager {
           return majorCatA.localeCompare(majorCatB);
         case 'priority':
         default:
-          if ((a.isBuiltin || a.isSystem) && !(b.isBuiltin || b.isSystem)) return -1;
-          if (!(a.isBuiltin || a.isSystem) && (b.isBuiltin || b.isSystem)) return 1;
+          if (a.isSystem && !b.isSystem) return -1;
+          if (!a.isSystem && b.isSystem) return 1;
           return (a.searchPriority || a.priority || 999) - (b.searchPriority || b.priority || 999);
       }
     });
   }
 
-  // 🔴 修复：正确渲染源项目，支持字段兼容
+  // 🔴 修复:正确渲染源项目,支持字段兼容
   renderSourceItem(source) {
-    // 🔴 兼容 category 和 categoryId 字段
-    const categoryId = source.category || source.categoryId;
+    // 🔴 兼容 categoryId 和 category 字段
+    const categoryId = source.categoryId || source.category;
     const category = this.getCategoryById(categoryId);
     const majorCategory = this.getMajorCategoryForSource(source.id);
     const isEnabled = this.enabledSources.includes(source.id);
@@ -400,8 +396,8 @@ export class SourcesManager {
     const majorCategoryInfo = this.majorCategories.find(mc => mc.id === majorCategory);
     const majorCategoryLabel = majorCategoryInfo ? `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
     
-    // 🔴 修复：正确判断是否为自定义源
-    const isCustomSource = !source.isSystem && !source.isBuiltin;
+    // 🔴 修复:正确判断是否为自定义源
+    const isCustomSource = !source.isSystem;
     
     return `
       <div class="source-item ${isEnabled ? 'enabled' : 'disabled'}" data-source-id="${source.id}">
@@ -503,7 +499,7 @@ export class SourcesManager {
   }
 
   async disableAllSources() {
-    if (!confirm('确定要禁用所有搜索源吗？这将影响搜索功能。')) return;
+    if (!confirm('确定要禁用所有搜索源吗?这将影响搜索功能。')) return;
     
     try {
       this.enabledSources = [];
@@ -518,7 +514,7 @@ export class SourcesManager {
   }
 
   async resetToDefaults() {
-    if (!confirm('确定要重置为默认搜索源配置吗？')) return;
+    if (!confirm('确定要重置为默认搜索源配置吗?')) return;
     
     try {
       await searchSourcesAPI.resetToDefaults();
@@ -611,7 +607,7 @@ export class SourcesManager {
             <div class="form-group">
               <label for="sourceName">搜索源名称 *</label>
               <input type="text" name="sourceName" id="sourceName" required maxlength="50" 
-                     placeholder="例如：我的搜索站">
+                     placeholder="例如:我的搜索站">
             </div>
             
             <div class="form-group">
@@ -624,7 +620,7 @@ export class SourcesManager {
           <div class="form-group">
             <label for="sourceSubtitle">描述信息</label>
             <input type="text" name="sourceSubtitle" id="sourceSubtitle" maxlength="100" 
-                   placeholder="例如：专业的搜索引擎">
+                   placeholder="例如:专业的搜索引擎">
           </div>
           
           <div class="form-group">
@@ -639,7 +635,7 @@ export class SourcesManager {
             <input type="url" name="sourceUrl" id="sourceUrl" required 
                    placeholder="https://example.com/search?q={keyword}">
             <small class="form-help">
-              <span id="urlHelpText">URL中必须包含 <code>{keyword}</code> 占位符，搜索时会被替换为实际关键词</span>
+              <span id="urlHelpText">URL中必须包含 <code>{keyword}</code> 占位符,搜索时会被替换为实际关键词</span>
             </small>
           </div>
           
@@ -651,7 +647,7 @@ export class SourcesManager {
                 <input type="checkbox" name="searchable" id="searchable" checked>
                 参与番号搜索
               </label>
-              <small>取消勾选后，搜索时不会显示该网站</small>
+              <small>取消勾选后,搜索时不会显示该网站</small>
             </div>
             
             <div class="form-group">
@@ -697,10 +693,10 @@ export class SourcesManager {
       if (searchableCheckbox && urlHelpText) {
         searchableCheckbox.addEventListener('change', () => {
           if (searchableCheckbox.checked) {
-            urlHelpText.innerHTML = 'URL中必须包含 <code>{keyword}</code> 占位符，搜索时会被替换为实际关键词';
+            urlHelpText.innerHTML = 'URL中必须包含 <code>{keyword}</code> 占位符,搜索时会被替换为实际关键词';
             urlInput.placeholder = 'https://example.com/search?q={keyword}';
           } else {
-            urlHelpText.innerHTML = '浏览站点只需提供基础访问URL，无需包含搜索参数';
+            urlHelpText.innerHTML = '浏览站点只需提供基础访问URL,无需包含搜索参数';
             urlInput.placeholder = 'https://example.com';
           }
         });
@@ -720,7 +716,7 @@ export class SourcesManager {
       form.sourceSubtitle.value = source.subtitle || '';
       form.sourceIcon.value = source.icon || '🔍';
       form.sourceUrl.value = source.urlTemplate;
-      form.sourceCategory.value = source.category || source.categoryId || 'others';
+      form.sourceCategory.value = source.categoryId || source.category || 'others';
       form.searchable.checked = source.searchable !== false;
       form.siteType.value = source.siteType || 'search';
       form.searchPriority.value = source.searchPriority || 5;
@@ -761,7 +757,7 @@ export class SourcesManager {
     if (!selectElement) return;
 
     const categoriesHTML = this.allCategories
-      .sort((a, b) => (a.order || 999) - (b.order || 999))
+      .sort((a, b) => (a.displayOrder || a.order || 999) - (b.displayOrder || b.order || 999))
       .map(category => `
         <option value="${category.id}">${category.icon} ${category.name}</option>
       `).join('');
@@ -769,7 +765,7 @@ export class SourcesManager {
     selectElement.innerHTML = categoriesHTML;
   }
 
-  // 🔴 修复：保存时使用 categoryId 字段
+  // 🔴 修复:保存时使用 categoryId 字段
   async handleCustomSourceSubmit(event) {
     event.preventDefault();
     
@@ -880,7 +876,7 @@ export class SourcesManager {
       return;
     }
     
-    if (!confirm(`确定要删除自定义搜索源"${source.name}"吗？此操作不可撤销。`)) {
+    if (!confirm(`确定要删除自定义搜索源"${source.name}"吗?此操作不可撤销。`)) {
       return;
     }
     
@@ -950,14 +946,24 @@ export class SourcesManager {
     return detailSources.includes(sourceId);
   }
 
-  // 🔴 修复：获取源的大类，支持字段兼容
+  // 🔴 修复:获取源的大类,支持字段兼容
   getMajorCategoryForSource(sourceId) {
     const source = this.getSourceById(sourceId);
     if (!source) return null;
     
-    const categoryId = source.category || source.categoryId;
+    const categoryId = source.categoryId || source.category;
     const category = this.getCategoryById(categoryId);
-    return category ? category.majorCategory : null;
+    return category ? (category.majorCategoryId || category.majorCategory) : null;
+  }
+
+  // 🆕 新增:获取指定大类下的所有源
+  getSourcesByMajorCategory(majorCategoryId) {
+    return this.allSearchSources.filter(source => {
+      const categoryId = source.categoryId || source.category;
+      const category = this.getCategoryById(categoryId);
+      const sourceMajorCategoryId = category?.majorCategoryId || category?.majorCategory;
+      return sourceMajorCategoryId === majorCategoryId;
+    });
   }
 
   getSourceById(sourceId) {
@@ -969,7 +975,7 @@ export class SourcesManager {
   }
 
   getCustomCategories() {
-    return this.allCategories.filter(category => category.isCustom);
+    return this.allCategories.filter(category => !category.isSystem);
   }
 
   getTotalSourcesCount() {

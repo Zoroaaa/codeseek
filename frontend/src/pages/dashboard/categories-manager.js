@@ -1,4 +1,4 @@
-// 分类管理器 - 修复版本：解决分类显示和大类关联问题
+// 分类管理器 - 修复版本:解决分类显示和大类关联问题
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
@@ -54,15 +54,15 @@ export class CategoriesManager {
       });
       console.log('✅ 已加载分类:', allCategories);
       
-      // 🔴 修复：正确区分内置和自定义分类
-      this.builtinCategories = allCategories.filter(c => c.isSystem === true || c.isBuiltin === true);
-      this.customCategories = allCategories.filter(c => !c.isSystem && !c.isBuiltin);
+      // 🔴 修复:正确区分内置和自定义分类
+      this.builtinCategories = allCategories.filter(c => c.isSystem === true);
+      this.customCategories = allCategories.filter(c => !c.isSystem);
       this.allCategories = allCategories;
       
-      console.log(`✅ 已加载 ${this.majorCategories.length} 个大类，${this.allCategories.length} 个分类 (${this.builtinCategories.length} 内置, ${this.customCategories.length} 自定义)`);
+      console.log(`✅ 已加载 ${this.majorCategories.length} 个大类,${this.allCategories.length} 个分类 (${this.builtinCategories.length} 内置, ${this.customCategories.length} 自定义)`);
       
     } catch (error) {
-      console.warn('⚠️ 从API加载分类失败，使用最小数据集:', error);
+      console.warn('⚠️ 从API加载分类失败,使用最小数据集:', error);
       await this.loadMinimalDataSet();
     }
   }
@@ -72,46 +72,53 @@ export class CategoriesManager {
       this.majorCategories = [
         {
           id: 'search_sources',
-          name: '搜索资源',
+          name: '🔍 搜索源',
           icon: '🔍',
-          description: '参与番号搜索的资源站点',
+          description: '支持番号搜索的网站',
           order: 1
         },
         {
           id: 'browse_sites',
-          name: '浏览站点',
+          name: '🌐 浏览站点',
           icon: '🌐',
-          description: '仅供浏览的资源站点',
+          description: '仅供访问,不参与搜索',
           order: 2
         }
       ];
 
       this.builtinCategories = [
         {
-          id: 'torrents',
-          name: '种子资源',
-          icon: '🧲',
-          description: '提供种子下载的站点',
-          majorCategory: 'search_sources',
+          id: 'database',
+          name: '📚 番号资料站',
+          icon: '📚',
+          description: '提供详细的番号信息、封面和演员资料',
+          majorCategoryId: 'search_sources',
           defaultSearchable: true,
           defaultSiteType: 'search',
           searchPriority: 1,
-          isSystem: true,
-          isBuiltin: true,
-          order: 1
+          isSystem: true
         },
         {
-          id: 'info_sites',
-          name: '信息站点',
-          icon: '📚',
-          description: '提供影片信息的站点',
-          majorCategory: 'search_sources',
+          id: 'streaming',
+          name: '🎥 在线播放平台',
+          icon: '🎥',
+          description: '提供在线观看和下载服务',
+          majorCategoryId: 'browse_sites',
+          defaultSearchable: false,
+          defaultSiteType: 'browse',
+          searchPriority: 5,
+          isSystem: true
+        },
+        {
+          id: 'torrent',
+          name: '🧲 磁力搜索',
+          icon: '🧲',
+          description: '提供磁力链接和种子文件',
+          majorCategoryId: 'search_sources',
           defaultSearchable: true,
           defaultSiteType: 'search',
-          searchPriority: 2,
-          isSystem: true,
-          isBuiltin: true,
-          order: 2
+          searchPriority: 3,
+          isSystem: true
         }
       ];
 
@@ -136,7 +143,7 @@ export class CategoriesManager {
     }
   }
 
-  // 🔴 修复：正确渲染内置分类，按大类分组
+  // 🔴 修复:正确渲染内置分类,按大类分组
   renderBuiltinCategories() {
     const builtinCategoriesList = document.getElementById('builtinCategoriesList');
     if (!builtinCategoriesList) return;
@@ -160,7 +167,7 @@ export class CategoriesManager {
       .forEach(majorCategory => {
         const categories = categoriesByMajor[majorCategory.id] || [];
         
-        console.log(`🔍 大类 ${majorCategory.id} (${majorCategory.name}) 包含 ${categories.length} 个分类`);
+        console.log(`📁 大类 ${majorCategory.id} (${majorCategory.name}) 包含 ${categories.length} 个分类`);
         
         if (categories.length === 0) return;
         
@@ -210,7 +217,8 @@ export class CategoriesManager {
     const grouped = {};
     
     categories.forEach(category => {
-      const majorCategoryId = category.majorCategory || 'others';
+      // 🔴 修复:同时支持 majorCategory 和 majorCategoryId 字段
+      const majorCategoryId = category.majorCategoryId || category.majorCategory || 'others';
       if (!grouped[majorCategoryId]) {
         grouped[majorCategoryId] = [];
       }
@@ -219,45 +227,47 @@ export class CategoriesManager {
     
     // 对每个组内的分类按order排序
     Object.keys(grouped).forEach(key => {
-      grouped[key].sort((a, b) => (a.order || 999) - (b.order || 999));
+      grouped[key].sort((a, b) => (a.displayOrder || a.order || 999) - (b.displayOrder || b.order || 999));
     });
     
     return grouped;
   }
 
-  // 🔴 修复：正确渲染分类项目
+  // 🔴 修复:正确渲染分类项目
   renderCategoryItem(category) {
     const sourcesManager = this.app.getManager('sources');
     const allSources = sourcesManager ? sourcesManager.getAllSearchSources() : [];
     const enabledSources = sourcesManager ? sourcesManager.enabledSources : [];
     
-    // 🔴 修复：支持 category 和 categoryId 字段
+    // 🔴 修复:支持 categoryId 字段匹配
     const sourceCount = allSources.filter(s => {
-      const sourceCategoryId = s.category || s.categoryId;
+      const sourceCategoryId = s.categoryId || s.category;
       return sourceCategoryId === category.id;
     }).length;
     
     const enabledSourceCount = allSources.filter(s => {
-      const sourceCategoryId = s.category || s.categoryId;
+      const sourceCategoryId = s.categoryId || s.category;
       return sourceCategoryId === category.id && enabledSources.includes(s.id);
     }).length;
     
     const searchableSources = allSources.filter(s => {
-      const sourceCategoryId = s.category || s.categoryId;
+      const sourceCategoryId = s.categoryId || s.category;
       return sourceCategoryId === category.id && s.searchable !== false;
     }).length;
     
     const browseSources = allSources.filter(s => {
-      const sourceCategoryId = s.category || s.categoryId;
+      const sourceCategoryId = s.categoryId || s.category;
       return sourceCategoryId === category.id && s.searchable === false;
     }).length;
     
-    const majorCategoryInfo = this.majorCategories.find(mc => mc.id === category.majorCategory);
+    // 🔴 修复:同时支持两种字段名
+    const majorCategoryId = category.majorCategoryId || category.majorCategory;
+    const majorCategoryInfo = this.majorCategories.find(mc => mc.id === majorCategoryId);
     const majorCategoryLabel = majorCategoryInfo ? 
       `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
     
     // 🔴 判断是否为自定义分类
-    const isCustomCategory = !category.isSystem && !category.isBuiltin;
+    const isCustomCategory = !category.isSystem;
     
     return `
       <div class="category-item ${isCustomCategory ? 'custom' : 'builtin'}" data-category-id="${category.id}">
@@ -336,9 +346,9 @@ export class CategoriesManager {
     const sourcesManager = this.app.getManager('sources');
     const allSources = sourcesManager ? sourcesManager.getAllSearchSources() : [];
     
-    // 🔴 修复：计算使用中的分类时支持字段兼容
+    // 🔴 修复:计算使用中的分类时支持字段兼容
     const usedCategories = new Set(
-      allSources.map(s => s.category || s.categoryId).filter(Boolean)
+      allSources.map(s => s.categoryId || s.category).filter(Boolean)
     );
 
     if (elements.totalCategoriesCount) elements.totalCategoriesCount.textContent = this.allCategories.length;
@@ -397,7 +407,7 @@ export class CategoriesManager {
               <div class="form-group">
                 <label for="categoryName">分类名称 *</label>
                 <input type="text" name="categoryName" id="categoryName" required maxlength="30" 
-                       placeholder="例如：我的分类">
+                       placeholder="例如:我的分类">
               </div>
               
               <div class="form-group">
@@ -413,7 +423,7 @@ export class CategoriesManager {
             <div class="form-group">
               <label for="categoryDescription">分类描述</label>
               <input type="text" name="categoryDescription" id="categoryDescription" maxlength="100" 
-                     placeholder="例如：专门的搜索资源分类">
+                     placeholder="例如:专门的搜索资源分类">
             </div>
             
             <div class="form-group">
@@ -449,9 +459,9 @@ export class CategoriesManager {
             <div class="form-group">
               <label for="defaultSiteType">默认网站类型</label>
               <select name="defaultSiteType" id="defaultSiteType">
-                <option value="search">搜索源（需要关键词）</option>
-                <option value="browse">浏览站（仅供访问）</option>
-                <option value="reference">参考站（可选关键词）</option>
+                <option value="search">搜索源(需要关键词)</option>
+                <option value="browse">浏览站(仅供访问)</option>
+                <option value="reference">参考站(可选关键词)</option>
               </select>
             </div>
             
@@ -492,7 +502,7 @@ export class CategoriesManager {
       form.categoryDescription.value = category.description || '';
       form.categoryIcon.value = category.icon || '🌟';
       form.categoryColor.value = category.color || '#6b7280';
-      form.majorCategoryId.value = category.majorCategory || 'others';
+      form.majorCategoryId.value = category.majorCategoryId || category.majorCategory || 'search_sources';
       form.defaultSearchable.checked = category.defaultSearchable !== false;
       form.defaultSiteType.value = category.defaultSiteType || 'search';
       form.searchPriority.value = category.searchPriority || 5;
@@ -502,7 +512,7 @@ export class CategoriesManager {
       form.reset();
       form.categoryIcon.value = '🌟';
       form.categoryColor.value = '#6b7280';
-      form.majorCategoryId.value = this.majorCategories.length > 0 ? this.majorCategories[0].id : 'others';
+      form.majorCategoryId.value = this.majorCategories.length > 0 ? this.majorCategories[0].id : 'search_sources';
       form.defaultSearchable.checked = true;
       form.defaultSiteType.value = 'search';
       form.searchPriority.value = 5;
@@ -616,18 +626,18 @@ export class CategoriesManager {
     const sourcesManager = this.app.getManager('sources');
     const allSources = sourcesManager ? sourcesManager.getAllSearchSources() : [];
     
-    // 🔴 修复：检查时支持字段兼容
+    // 🔴 修复:检查时支持字段兼容
     const sourcesUsingCategory = allSources.filter(s => {
-      const sourceCategoryId = s.category || s.categoryId;
+      const sourceCategoryId = s.categoryId || s.category;
       return sourceCategoryId === categoryId;
     });
     
     if (sourcesUsingCategory.length > 0) {
-      showToast(`无法删除分类"${category.name}"，因为有 ${sourcesUsingCategory.length} 个搜索源正在使用此分类`, 'error');
+      showToast(`无法删除分类"${category.name}",因为有 ${sourcesUsingCategory.length} 个搜索源正在使用此分类`, 'error');
       return;
     }
     
-    if (!confirm(`确定要删除自定义分类"${category.name}"吗？此操作不可撤销。`)) {
+    if (!confirm(`确定要删除自定义分类"${category.name}"吗?此操作不可撤销。`)) {
       return;
     }
     
