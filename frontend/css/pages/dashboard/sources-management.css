@@ -1,12 +1,24 @@
-/* 搜索源管理样式 - css/components/sources-management.css */
+/* 搜索源管理样式 - 完全适配新的搜索源管理API架构 */
 
-/* 搜索源筛选区域 */
+/* 🔧 搜索源筛选区域 - 增强API支持 */
 .sources-filter-section {
   background: var(--bg-secondary);
   padding: 16px;
   border-radius: var(--radius-md);
   margin-bottom: 20px;
   border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.sources-filter-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .filter-controls {
@@ -31,6 +43,35 @@
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 13px;
+  transition: border-color 0.2s ease;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* 🔧 新增：API加载状态指示器 */
+.api-loading-indicator {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  display: none;
+}
+
+.api-loading-indicator.active {
+  display: block;
+}
+
+.api-loading-indicator .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 /* 批量操作按钮组 */
@@ -39,11 +80,54 @@
   gap: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  padding: 12px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
 }
 
 .bulk-actions .btn {
   font-size: 12px;
   padding: 6px 12px;
+  transition: all 0.2s ease;
+}
+
+.bulk-actions .btn:hover {
+  transform: translateY(-1px);
+}
+
+/* 🔧 新增：批量操作确认对话框样式 */
+.bulk-action-confirm {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  max-width: 400px;
+  width: 90%;
+}
+
+.bulk-action-confirm .confirm-title {
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.bulk-action-confirm .confirm-message {
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.bulk-action-confirm .confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 /* 搜索源控制面板 */
@@ -57,6 +141,18 @@
   background: var(--bg-primary);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.sources-controls::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--gradient-secondary);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .control-group {
@@ -81,6 +177,40 @@
   font-size: 0.9rem;
   cursor: pointer;
   min-width: 150px;
+  transition: all 0.2s ease;
+}
+
+.control-group select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* 🔧 新增：高级筛选切换 */
+.advanced-filter-toggle {
+  margin-left: auto;
+}
+
+.advanced-filter-toggle button {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+}
+
+.advanced-filter-toggle button:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.advanced-filter-toggle button.active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
 }
 
 /* 搜索源列表 */
@@ -101,9 +231,22 @@
   height: 200px;
   color: var(--text-secondary);
   font-size: 1.1rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
 }
 
-/* 搜索源项目样式 */
+.loading-sources .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 12px;
+}
+
+/* 🔧 增强：搜索源项目样式 - 完全适配API */
 .source-item {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
@@ -112,6 +255,9 @@
   transition: all 0.2s ease-in-out;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
 }
 
 .source-item::before {
@@ -131,6 +277,10 @@
 
 .source-item.disabled {
   opacity: 0.6;
+}
+
+.source-item.disabled::before {
+  background: var(--text-muted);
 }
 
 .source-item:hover {
@@ -157,12 +307,31 @@
   opacity: 0.85;
 }
 
+/* 🔧 新增：API同步状态指示 */
+.source-item.syncing {
+  position: relative;
+}
+
+.source-item.syncing::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 /* 搜索源头部 */
 .source-header {
   display: flex;
   align-items: flex-start;
   gap: 1rem;
   margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .source-toggle {
@@ -176,11 +345,19 @@
   height: 1.25rem;
   accent-color: var(--accent-primary);
   cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.source-toggle input[type="checkbox"]:hover {
+  transform: scale(1.1);
 }
 
 .source-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 /* 搜索源名称区域 */
@@ -189,28 +366,35 @@
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .source-icon {
   font-size: 1.25rem;
+  flex-shrink: 0;
 }
 
 .source-title {
   font-weight: 600;
   color: var(--text-primary);
   font-size: 1.1rem;
+  flex: 1;
+  word-break: break-word;
 }
 
-/* 搜索源徽章 */
+/* 🔧 增强：搜索源徽章系统 */
 .custom-badge,
-.builtin-badge {
+.builtin-badge,
+.system-badge {
   font-size: 0.75rem;
   padding: 0.125rem 0.5rem;
   border-radius: 1rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
-.builtin-badge {
+.builtin-badge,
+.system-badge {
   background: var(--info-color);
   color: white;
 }
@@ -220,27 +404,46 @@
   color: white;
 }
 
+/* 🔧 新增：API来源标识 */
+.api-source-badge {
+  background: var(--gradient-primary);
+  color: white;
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
 /* 搜索源描述 */
 .source-subtitle {
   color: var(--text-secondary);
   font-size: 0.9rem;
   margin-bottom: 0.75rem;
   line-height: 1.4;
+  word-wrap: break-word;
 }
 
-/* 搜索源元信息 */
+/* 🔧 增强：搜索源元信息 - 完全适配API结构 */
 .source-meta {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.85rem;
   color: var(--text-muted);
+  flex-grow: 1;
 }
 
 .source-major-category {
   font-size: 0.85rem;
   color: var(--text-muted);
   margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.source-major-category .major-category-icon {
+  font-size: 0.8rem;
 }
 
 .source-category {
@@ -249,9 +452,60 @@
   gap: 0.25rem;
 }
 
+.source-category .category-icon {
+  font-size: 0.8rem;
+}
+
 .source-url {
   word-break: break-all;
   font-family: 'Courier New', monospace;
+  background: var(--bg-tertiary);
+  padding: 4px 6px;
+  border-radius: 3px;
+  margin-top: 4px;
+}
+
+/* 🔧 新增：分类层级显示 */
+.category-hierarchy {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.category-hierarchy .hierarchy-separator {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* 🔧 新增：源配置信息 */
+.source-config-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.source-config-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.source-config-label {
+  color: var(--text-secondary);
+}
+
+.source-config-value {
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 /* 搜索源徽章和元信息样式 */
@@ -272,11 +526,60 @@
   font-weight: 500;
 }
 
+.source-item .source-badges .searchable-badge {
+  background: var(--success-color);
+  color: white;
+}
+
+.source-item .source-badges .searchable-badge.non-searchable {
+  background: var(--text-muted);
+  color: white;
+}
+
+.source-item .source-badges .site-type-badge {
+  background: var(--info-color);
+  color: white;
+}
+
+.source-item .source-badges .priority-badge {
+  background: var(--warning-color);
+  color: white;
+}
+
+.source-item .source-badges .detail-support-badge {
+  background: var(--success-color);
+  color: white;
+  animation: glow 2s ease-in-out infinite;
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 3px rgba(16, 185, 129, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+  }
+}
+
+/* 🔧 新增：用户配置覆盖指示 */
+.user-config-override {
+  background: var(--accent-primary);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
 /* 搜索源操作按钮 */
 .source-actions {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .source-actions .action-btn {
@@ -287,6 +590,52 @@
   justify-content: center;
   border-radius: var(--radius-sm);
   transition: all 0.2s ease-in-out;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.source-actions .action-btn:hover {
+  background: var(--bg-tertiary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.source-actions .test-btn:hover {
+  background: var(--info-color);
+  color: white;
+  border-color: var(--info-color);
+}
+
+.source-actions .visit-btn:hover {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.source-actions .edit-btn:hover {
+  background: var(--warning-color);
+  color: white;
+  border-color: var(--warning-color);
+}
+
+.source-actions .delete-btn:hover {
+  background: var(--error-color);
+  color: white;
+  border-color: var(--error-color);
+}
+
+/* 🔧 新增：API操作按钮 */
+.source-actions .sync-btn {
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+}
+
+.source-actions .sync-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 /* 搜索源统计信息 */
@@ -310,6 +659,12 @@
   background: var(--bg-secondary);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.sources-stats .stat-item:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .sources-stats .stat-value {
@@ -323,6 +678,49 @@
 .sources-stats .stat-desc {
   color: var(--text-secondary);
   font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+/* 🔧 新增：API统计指标 */
+.api-stats {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.api-stats-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.api-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.api-stat-item {
+  text-align: center;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.api-stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  display: block;
+}
+
+.api-stat-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
 }
 
 /* 表单样式增强 */
@@ -356,6 +754,7 @@
 
 .form-group input[type="checkbox"] {
   margin-right: 8px;
+  accent-color: var(--accent-primary);
 }
 
 .form-group small {
@@ -395,6 +794,55 @@
   border-top: 1px solid var(--border-color);
 }
 
+/* 🔧 新增：表单验证样式 */
+.form-group.has-error input,
+.form-group.has-error select {
+  border-color: var(--error-color);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.form-group.has-success input,
+.form-group.has-success select {
+  border-color: var(--success-color);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.form-error-message {
+  color: var(--error-color);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.form-success-message {
+  color: var(--success-color);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+/* 🔧 新增：模态框加载状态 */
+.modal-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  z-index: 10;
+}
+
+.modal-loading .spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .sources-grid {
@@ -415,6 +863,41 @@
     width: 100%;
   }
 
+  .sources-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .control-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+
+  .control-group select {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .source-item {
+    padding: 1rem;
+    min-height: auto;
+  }
+
+  .source-header {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .source-actions {
+    flex-direction: column;
+  }
+
+  .source-actions .action-btn {
+    width: 100%;
+  }
+
   .form-row {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -426,6 +909,37 @@
 
   .form-actions .btn {
     width: 100%;
+  }
+
+  .sources-stats .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .api-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .sources-stats .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .api-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .source-badges {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .category-hierarchy {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
   }
 }
 
@@ -453,4 +967,68 @@
 [data-theme="dark"] .sources-filter-section {
   background: var(--bg-tertiary);
   border-color: var(--border-color);
+}
+
+[data-theme="dark"] .sources-controls {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .source-config-info {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .api-stats {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-loading {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="dark"] .bulk-action-confirm {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+/* 🔧 新增：键盘导航支持 */
+.source-item:focus-within {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.source-actions .action-btn:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+/* 🔧 新增：动画效果 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.source-item {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* 🔧 新增：打印样式 */
+@media print {
+  .sources-filter-section,
+  .bulk-actions,
+  .source-actions {
+    display: none;
+  }
+  
+  .source-item {
+    page-break-inside: avoid;
+    margin-bottom: 1rem;
+  }
 }

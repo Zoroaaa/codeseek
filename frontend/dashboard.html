@@ -36,6 +36,11 @@
     <link rel="stylesheet" href="css/utils/print.css">
 
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
+    
+    <!-- 🔧 新增：API架构支持的meta标签 -->
+    <meta name="api-architecture-supported" content="true">
+    <meta name="unified-search-sources-management" content="true">
+    <meta name="email-verification-integrated" content="true">
 </head>
 <body>
     <!-- 导航栏 -->
@@ -50,6 +55,11 @@
             <div class="nav-menu">
                 <a href="./index.html" class="nav-link">首页</a>
                 <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
+                <!-- 🔧 新增：API服务状态指示器 -->
+                <div id="apiServiceStatus" class="service-status" title="API服务状态" style="display:none;">
+                    <span class="status-icon">🔗</span>
+                    <span class="status-text">API: 连接中</span>
+                </div>
                 <div id="userInfo" class="user-info">
                     <span id="username" class="username"></span>
                     <div class="dropdown">
@@ -85,11 +95,15 @@
                 <div class="menu-item" data-tab="sources">
                     <span class="menu-icon">🔗</span>
                     <span class="menu-text">搜索源管理</span>
+                    <!-- 🔧 新增：API同步状态指示器 -->
+                    <span class="sync-indicator" id="sourcesyncIndicator" style="display:none;">⚡</span>
                 </div>
                 <!-- 新增：分类管理独立页面 -->
                 <div class="menu-item" data-tab="categories">
                     <span class="menu-icon">📂</span>
                     <span class="menu-text">分类管理</span>
+                    <!-- 🔧 新增：API同步状态指示器 -->
+                    <span class="sync-indicator" id="categorySyncIndicator" style="display:none;">⚡</span>
                 </div>
                 <!-- 新增：社区标签页 -->
                 <div class="menu-item" data-tab="community">
@@ -259,27 +273,41 @@
                 </div>
             </div>
 
-            <!-- 搜索源管理标签页 - 🔧 新增大类筛选选项 -->
+            <!-- 🔧 搜索源管理标签页 - 完全适配新API架构 -->
             <div id="sources" class="tab-content">
                 <div class="tab-header">
                     <h1>搜索源管理</h1>
-                    <p>管理您的搜索源配置，可用或禁用特定搜索源</p>
+                    <p>管理您的搜索源配置，启用或禁用特定搜索源</p>
                     <div class="header-actions">
                         <button class="btn-primary" id="addCustomSourceBtn">
                             <span>➕</span>
                             <span>添加自定义搜索源</span>
                         </button>
                         <button class="btn-secondary" onclick="app.exportSources()">导出搜索源</button>
+                        <!-- 🔧 新增：API同步按钮 -->
+                        <button class="btn-info" id="syncSourcesBtn" title="从API同步最新搜索源数据">
+                            <span>🔄</span>
+                            <span>同步数据</span>
+                        </button>
                     </div>
                 </div>
 
-                <!-- 搜索源控制面板 - 🔧 新增大类筛选 -->
+                <!-- 🔧 API连接状态指示器 -->
+                <div id="sourcesApiStatus" class="api-status-section" style="display:none;">
+                    <div class="status-content">
+                        <span class="status-icon">⚡</span>
+                        <span class="status-text">API连接状态: </span>
+                        <span class="status-value" id="sourcesApiStatusValue">检查中...</span>
+                    </div>
+                </div>
+
+                <!-- 🔧 搜索源控制面板 - 新增大类筛选 -->
                 <div class="sources-controls">
                     <div class="control-group">
                         <label>过滤条件：</label>
                         <select id="sourcesFilter">
                             <option value="all">全部搜索源</option>
-                            <option value="enabled">已可用</option>
+                            <option value="enabled">已启用</option>
                             <option value="disabled">已禁用</option>
                             <option value="builtin">内置搜索源</option>
                             <option value="custom">自定义搜索源</option>
@@ -319,17 +347,20 @@
 
                 <!-- 搜索源管理批量操作 -->
                 <div class="bulk-actions">
-                    <button class="btn-secondary" id="enableAllSourcesBtn">全部可用</button>
+                    <button class="btn-secondary" id="enableAllSourcesBtn">全部启用</button>
                     <button class="btn-secondary" id="disableAllSourcesBtn">全部禁用</button>
                     <button class="btn-warning" id="resetToDefaultsBtn">重置为默认</button>
                 </div>
 
-                <!-- 搜索源列表 -->
+                <!-- 🔧 搜索源列表 - 增强加载状态 -->
                 <div id="sourcesList" class="sources-list">
-                    <div class="loading-sources">正在加载搜索源...</div>
+                    <div class="loading-sources">
+                        <div class="spinner"></div>
+                        <div>正在从API加载搜索源...</div>
+                    </div>
                 </div>
 
-                <!-- 搜索源统计 -->
+                <!-- 🔧 搜索源统计 - 新增API统计 -->
                 <div class="sources-stats">
                     <div class="stats-grid">
                         <div class="stat-item">
@@ -338,7 +369,7 @@
                         </div>
                         <div class="stat-item">
                             <span class="stat-value" id="enabledSourcesCount">0</span>
-                            <span class="stat-desc">已可用</span>
+                            <span class="stat-desc">已启用</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-value" id="customSourcesCount">0</span>
@@ -349,10 +380,29 @@
                             <span class="stat-desc">分类数量</span>
                         </div>
                     </div>
+                    
+                    <!-- 🔧 新增：API统计信息 -->
+                    <div class="api-stats" id="sourcesApiStats" style="display:none;">
+                        <div class="api-stats-title">API数据统计</div>
+                        <div class="api-stats-grid">
+                            <div class="api-stat-item">
+                                <span class="api-stat-value" id="apiSourcesCount">0</span>
+                                <span class="api-stat-label">API搜索源</span>
+                            </div>
+                            <div class="api-stat-item">
+                                <span class="api-stat-value" id="lastSyncTime">未同步</span>
+                                <span class="api-stat-label">最后同步</span>
+                            </div>
+                            <div class="api-stat-item">
+                                <span class="api-stat-value" id="syncSuccessRate">100%</span>
+                                <span class="api-stat-label">同步成功率</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- 分类管理标签页 -->
+            <!-- 🔧 分类管理标签页 - 完全适配新API架构 -->
             <div id="categories" class="tab-content">
                 <div class="tab-header">
                     <h1>分类管理</h1>
@@ -363,6 +413,20 @@
                             <span>添加自定义分类</span>
                         </button>
                         <button class="btn-secondary" onclick="app.exportCategories()">导出分类</button>
+                        <!-- 🔧 新增：API同步按钮 -->
+                        <button class="btn-info" id="syncCategoriesBtn" title="从API同步最新分类数据">
+                            <span>🔄</span>
+                            <span>同步数据</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 🔧 API连接状态指示器 -->
+                <div id="categoriesApiStatus" class="api-status-section" style="display:none;">
+                    <div class="status-content">
+                        <span class="status-icon">⚡</span>
+                        <span class="status-text">API连接状态: </span>
+                        <span class="status-value" id="categoriesApiStatusValue">检查中...</span>
                     </div>
                 </div>
 
@@ -386,14 +450,36 @@
                             <span class="stat-desc">使用中分类</span>
                         </div>
                     </div>
+                    
+                    <!-- 🔧 新增：API统计信息 -->
+                    <div class="api-stats" id="categoriesApiStats" style="display:none;">
+                        <div class="api-stats-title">API数据统计</div>
+                        <div class="api-stats-grid">
+                            <div class="api-stat-item">
+                                <span class="api-stat-value" id="apiCategoriesCount">0</span>
+                                <span class="api-stat-label">API分类</span>
+                            </div>
+                            <div class="api-stat-item">
+                                <span class="api-stat-value" id="majorCategoriesCount">0</span>
+                                <span class="api-stat-label">大分类</span>
+                            </div>
+                            <div class="api-stat-item">
+                                <span class="api-stat-value" id="categoryLastSyncTime">未同步</span>
+                                <span class="api-stat-label">最后同步</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- 内置分类列表 -->
+                <!-- 🔧 内置分类列表 - 按大分类分组显示 -->
                 <div class="categories-section">
                     <h3>📚 内置分类</h3>
-                    <p class="section-desc">系统预定义的搜索源分类，不可删除</p>
+                    <p class="section-desc">系统预定义的搜索源分类，按大分类组织显示，不可删除</p>
                     <div id="builtinCategoriesList" class="categories-list">
-                        <!-- 内置分类将动态加载 -->
+                        <div class="loading-categories">
+                            <div class="spinner"></div>
+                            <div>正在从API加载内置分类...</div>
+                        </div>
                     </div>
                 </div>
 
@@ -402,7 +488,10 @@
                     <h3>🎨 自定义分类</h3>
                     <p class="section-desc">您创建的个性化分类，可以编辑和删除</p>
                     <div id="customCategoriesList" class="categories-list">
-                        <!-- 自定义分类将动态加载 -->
+                        <div class="loading-categories">
+                            <div class="spinner"></div>
+                            <div>正在从API加载自定义分类...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -612,7 +701,7 @@
 </div>
             </div>
 
-            <!-- 更新系统设置标签页 - 集成邮箱验证功能 -->
+            <!-- 🔧 更新系统设置标签页 - 集成邮箱验证功能 -->
             <div id="settings" class="tab-content">
                 <div class="tab-header">
                     <h1>系统设置</h1>
@@ -650,6 +739,68 @@
                                 <input type="number" id="maxFavorites" value="500" min="100" max="2000" step="100">
                                 <span class="setting-desc">收藏夹最大容量限制</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- 🔧 新增：API配置设置 -->
+                    <div class="settings-section">
+                        <h3>🔗 API配置</h3>
+                        <p style="margin-bottom: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+                            配置搜索源管理API的相关设置，影响数据同步和搜索源管理功能。
+                        </p>
+
+                        <div class="setting-group">
+                            <h5>API连接设置</h5>
+                            <div class="setting-row">
+                                <label class="setting-label">启用API数据同步</label>
+                                <div class="setting-input">
+                                    <input type="checkbox" id="enableApiSync" checked>
+                                    <span class="setting-help">开启后将定期从API同步搜索源和分类数据</span>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <label class="setting-label">同步间隔</label>
+                                <div class="setting-input">
+                                    <select id="apiSyncInterval">
+                                        <option value="300000">5分钟</option>
+                                        <option value="600000" selected>10分钟</option>
+                                        <option value="1800000">30分钟</option>
+                                        <option value="3600000">1小时</option>
+                                    </select>
+                                    <span class="setting-help">API数据自动同步的时间间隔</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="setting-group">
+                            <h5>缓存设置</h5>
+                            <div class="setting-row">
+                                <label class="setting-label">启用本地缓存</label>
+                                <div class="setting-input">
+                                    <input type="checkbox" id="enableLocalCache" checked>
+                                    <span class="setting-help">缓存API数据以提高加载速度</span>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <label class="setting-label">缓存过期时间</label>
+                                <div class="setting-input">
+                                    <input type="number" id="cacheExpireTime" min="300" max="86400" value="3600">
+                                    <span class="setting-help">本地缓存数据的有效期（秒）</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- API测试按钮 -->
+                        <button type="button" class="test-api-btn" onclick="app.getManager('settings').testApiConnection()">
+                            <span>🔬</span>
+                            <span>测试API连接</span>
+                        </button>
+
+                        <!-- API连接进度指示器 -->
+                        <div id="apiTestProgress" class="api-test-progress" style="display:none;">
+                            <div class="progress-spinner"></div>
+                            <div class="progress-text">正在测试API连接...</div>
+                            <div class="progress-result" id="apiTestResult"></div>
                         </div>
                     </div>
 
@@ -721,7 +872,7 @@
                         </button>
 
                         <!-- 状态检查进度指示器 -->
-                        <div id="statusCheckProgress" class="status-check-progress">
+                        <div id="statusCheckProgress" class="status-check-progress" style="display:none;">
                             <div class="progress-spinner"></div>
                             <div class="progress-text">正在检查搜索源状态...</div>
                             <div class="progress-stats">0/0</div>
@@ -747,7 +898,7 @@
                         </div>
                     </div>
 
-                    <!-- 🔐 账户安全设置区域 - 移除旧密码修改模态框，使用邮箱验证 -->
+                    <!-- 🔧 账户安全设置区域 - 移除旧密码修改模态框，使用邮箱验证 -->
                     <div class="settings-section">
                         <h3>🔐 账户安全</h3>
                         <div class="setting-item">
@@ -857,7 +1008,7 @@
     <script type="module">
         // 修正导入路径
         import DashboardApp from './src/pages/dashboard/dashboard-app.js';
-        // 🆕 导入邮箱验证UI组件
+        // 🔧 导入邮箱验证UI组件
         import { emailVerificationUI } from './src/components/email-verification-ui.js';
 
         // 页面加载完成后初始化
@@ -879,8 +1030,11 @@
                 window.app = new DashboardApp();
                 console.log('DashboardApp实例已创建');
                 
-                // 🆕 初始化邮箱验证集成
+                // 🔧 初始化邮箱验证集成
                 initEmailVerificationIntegration();
+                
+                // 🔧 初始化API监控
+                initApiMonitoring();
                 
                 // 绑定所有按钮事件
                 bindButtonEvents();
@@ -891,9 +1045,9 @@
             }
         });
 
-        // 🆕 初始化邮箱验证集成
+        // 🔧 初始化邮箱验证集成
         function initEmailVerificationIntegration() {
-            console.log('🔐 初始化邮箱验证集成...');
+            console.log('🔧 初始化邮箱验证集成...');
             
             // 使邮箱验证UI组件全局可用
             window.emailVerificationUI = emailVerificationUI;
@@ -934,6 +1088,52 @@
             }, 1000);
             
             console.log('✅ 邮箱验证集成完成');
+        }
+
+        // 🔧 初始化API监控
+        function initApiMonitoring() {
+            console.log('🔧 初始化API监控...');
+            
+            // 监控API服务状态
+            const apiServiceStatus = document.getElementById('apiServiceStatus');
+            const sourcesApiStatus = document.getElementById('sourcesApiStatus');
+            const categoriesApiStatus = document.getElementById('categoriesApiStatus');
+            
+            // 检查API连接状态
+            if (window.app && window.app.checkApiConnection) {
+                window.app.checkApiConnection().then(status => {
+                    updateApiStatusIndicators(status);
+                }).catch(error => {
+                    console.warn('API连接检查失败:', error);
+                    updateApiStatusIndicators({ connected: false, message: '连接失败' });
+                });
+            }
+            
+            // 定期检查API状态
+            setInterval(() => {
+                if (window.app && window.app.checkApiConnection) {
+                    window.app.checkApiConnection().then(updateApiStatusIndicators);
+                }
+            }, 30000); // 每30秒检查一次
+            
+            console.log('✅ API监控初始化完成');
+        }
+
+        // 更新API状态指示器
+        function updateApiStatusIndicators(status) {
+            const indicators = [
+                { element: document.getElementById('apiServiceStatus'), value: document.getElementById('apiServiceStatusValue') },
+                { element: document.getElementById('sourcesApiStatus'), value: document.getElementById('sourcesApiStatusValue') },
+                { element: document.getElementById('categoriesApiStatus'), value: document.getElementById('categoriesApiStatusValue') }
+            ];
+            
+            indicators.forEach(({ element, value }) => {
+                if (element && value) {
+                    element.style.display = 'block';
+                    value.textContent = status.connected ? '连接正常' : (status.message || '连接失败');
+                    element.className = `api-status-section ${status.connected ? 'connected' : 'disconnected'}`;
+                }
+            });
         }
         
         // 邮箱脱敏显示
@@ -985,6 +1185,10 @@
                     'enableAllSourcesBtn': () => window.app.enableAllSources(),
                     'disableAllSourcesBtn': () => window.app.disableAllSources(),
                     'resetToDefaultsBtn': () => window.app.resetToDefaults(),
+                    
+                    // 🔧 新增：API同步相关
+                    'syncSourcesBtn': () => window.app.getManager('sources').loadUserSearchSettings(),
+                    'syncCategoriesBtn': () => window.app.getManager('categories').loadUserCategorySettings(),
                 };
 
                 // 绑定所有按钮事件

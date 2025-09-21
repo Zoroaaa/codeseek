@@ -1,4 +1,4 @@
-/* 分类管理样式 - css/components/categories-management.css */
+/* 分类管理样式 - 完全适配新的搜索源管理API架构 - css/components/categories-management.css */
 
 /* 分类筛选和控制区域 */
 .categories-filter-section {
@@ -7,6 +7,18 @@
   border-radius: var(--radius-md);
   margin-bottom: 20px;
   border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.categories-filter-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .categories-controls {
@@ -15,6 +27,28 @@
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* 🔧 新增：API加载状态指示器 */
+.api-loading-indicator {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  display: none;
+}
+
+.api-loading-indicator.active {
+  display: block;
+}
+
+.api-loading-indicator .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 /* 大分类分组样式 */
@@ -34,6 +68,26 @@
   align-items: center;
   gap: 8px;
   color: var(--text-primary);
+  position: relative;
+}
+
+/* 🔧 新增：大分类动态加载状态 */
+.major-category-header.loading {
+  opacity: 0.7;
+}
+
+.major-category-header.loading::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 .category-count {
@@ -57,6 +111,18 @@
   border-radius: var(--radius-lg);
   padding: 2rem;
   border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.categories-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-secondary);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .categories-section h3 {
@@ -84,6 +150,29 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
+}
+
+/* 🔧 新增：分类加载状态 */
+.loading-categories {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+}
+
+.loading-categories .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 12px;
 }
 
 /* 分类项目样式 - 修复样式挤压问题 */
@@ -119,6 +208,24 @@
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: var(--accent-primary);
+}
+
+/* 🔧 新增：API同步状态指示 */
+.category-item.syncing {
+  position: relative;
+}
+
+.category-item.syncing::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 /* 分类头部 - 改善布局避免挤压 */
@@ -196,6 +303,21 @@
   font-weight: 500;
 }
 
+/* 🔧 新增：分类层级视觉指示 */
+.category-hierarchy-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.category-hierarchy-separator {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
 /* 搜索配置显示区域 */
 .category-search-config {
   display: flex;
@@ -254,6 +376,16 @@
   gap: 2px;
 }
 
+/* 🔧 新增：API来源标识 */
+.api-source-badge {
+  background: var(--gradient-primary);
+  color: white;
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
 /* 分类操作按钮 - 改善布局 */
 .category-actions {
   display: flex;
@@ -271,6 +403,18 @@
   padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
   justify-content: center;
+}
+
+/* 🔧 新增：API操作按钮 */
+.category-actions .sync-btn {
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+}
+
+.category-actions .sync-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 /* 自定义分类模态框样式 */
@@ -361,6 +505,31 @@
   line-height: 1.3;
 }
 
+/* 🔧 新增：表单验证样式 */
+.form-group.has-error input,
+.form-group.has-error select {
+  border-color: var(--error-color);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.form-group.has-success input,
+.form-group.has-success select {
+  border-color: var(--success-color);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.form-error-message {
+  color: var(--error-color);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.form-success-message {
+  color: var(--success-color);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -378,6 +547,30 @@
 
 .form-actions .btn {
   min-width: 100px;
+}
+
+/* 🔧 新增：模态框加载状态 */
+.modal-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  z-index: 10;
+}
+
+.modal-loading .spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 /* 分类徽章样式 */
@@ -441,6 +634,68 @@
   border-radius: var(--radius-full);
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+/* 🔧 新增：API统计指标 */
+.api-stats {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.api-stats-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.api-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.api-stat-item {
+  text-align: center;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.api-stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  display: block;
+}
+
+.api-stat-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+/* 🔧 新增：API数据同步状态 */
+.sync-status-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sync-status-indicator.syncing::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--border-color);
+  border-top: 1px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 /* 响应式设计 */
@@ -513,6 +768,11 @@
     flex-direction: column;
     gap: 0.25rem;
   }
+
+  .api-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.25rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -544,6 +804,10 @@
   .form-section h3 {
     font-size: 1rem;
   }
+
+  .api-stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* 深色主题适配 */
@@ -573,4 +837,57 @@
 
 [data-theme="dark"] .major-category-header {
   background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .api-stats {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-loading {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="dark"] .loading-categories {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+/* 🔧 新增：键盘导航支持 */
+.category-item:focus-within {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.category-actions .action-btn:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+/* 🔧 新增：动画效果 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.category-item {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* 🔧 新增：打印样式 */
+@media print {
+  .categories-filter-section,
+  .category-actions {
+    display: none;
+  }
+  
+  .category-item {
+    page-break-inside: avoid;
+    margin-bottom: 1rem;
+  }
 }
