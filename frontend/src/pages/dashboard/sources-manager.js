@@ -1,5 +1,5 @@
 // 搜索源管理器 - 完全集成新的搜索源管理API
-import { APP_CONSTANTS, MAJOR_CATEGORIES, validateSourceUrl } from '../../core/constants.js';
+import { APP_CONSTANTS, validateSourceUrl } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
 // 🔴 导入新的搜索源管理API
@@ -13,11 +13,15 @@ export class SourcesManager {
     this.allSearchSources = [];
     this.enabledSources = [];
     this.editingCustomSource = null;
+    
+    // 🆕 添加大类和分类数据
+    this.majorCategories = [];
+    this.allCategories = [];
   }
 
   async init() {
     console.log('🔧 初始化搜索源管理器');
-    this.loadBuiltinData();
+    // 🔴 移除loadBuiltinData调用，完全从API获取
     this.bindEvents();
   }
 
@@ -38,33 +42,26 @@ export class SourcesManager {
     }
   }
 
-  loadBuiltinData() {
-    try {
-      this.builtinSearchSources = APP_CONSTANTS.SEARCH_SOURCES.map(source => ({
-        ...source,
-        isBuiltin: true,
-        isCustom: false,
-        isSystem: true
-      }));
-      
-      this.allSearchSources = [...this.builtinSearchSources];
-      console.log(`从constants.js加载了 ${this.builtinSearchSources.length} 个内置搜索源`);
-      
-    } catch (error) {
-      console.error('加载内置数据失败:', error);
-      this.builtinSearchSources = [];
-      this.allSearchSources = [];
-    }
-  }
-
-  // 🔴 使用新API加载用户搜索源设置
+  // 🆕 完全使用新API加载用户搜索源设置
   async loadUserSearchSettings() {
-    if (!this.app.getCurrentUser()) return;
+    if (!this.app.getCurrentUser()) {
+      // 未登录时加载最小数据集
+      await this.loadMinimalDataSet();
+      return;
+    }
     
     try {
-      console.log('📡 从新API加载搜索源数据...');
+      console.log('🔡 从新API加载搜索源数据...');
       
-      // 🔴 使用新的搜索源管理API获取所有源
+      // 🔴 获取大类数据
+      this.majorCategories = await searchSourcesAPI.getMajorCategories();
+      
+      // 🔴 获取所有分类
+      this.allCategories = await searchSourcesAPI.getSourceCategories({
+        includeSystem: true
+      });
+      
+      // 🔴 获取所有搜索源
       const allSources = await searchSourcesAPI.getSearchSources({
         includeSystem: true,
         enabledOnly: false
@@ -90,13 +87,110 @@ export class SourcesManager {
         this.enabledSources = this.builtinSearchSources.map(s => s.id);
       }
       
-      console.log(`✅ 已加载 ${this.allSearchSources.length} 个搜索源 (${this.builtinSearchSources.length} 内置, ${this.customSearchSources.length} 自定义), ${this.enabledSources.length} 个已启用`);
+      console.log(`✅ 已加载 ${this.majorCategories.length} 个大类，${this.allCategories.length} 个分类，${this.allSearchSources.length} 个搜索源 (${this.builtinSearchSources.length} 内置, ${this.customSearchSources.length} 自定义), ${this.enabledSources.length} 个已启用`);
       
     } catch (error) {
-      console.warn('⚠️ 从API加载搜索源失败,使用默认设置:', error);
+      console.warn('⚠️ 从API加载搜索源失败,使用最小数据集:', error);
+      await this.loadMinimalDataSet();
+    }
+  }
+
+  // 🆕 加载最小数据集（API不可用时的回退方案）
+  async loadMinimalDataSet() {
+    try {
+      // 创建最基本的大类
+      this.majorCategories = [
+        {
+          id: 'search_sources',
+          name: '搜索资源',
+          icon: '🔍',
+          description: '参与番号搜索的资源站点',
+          order: 1
+        },
+        {
+          id: 'browse_sites',
+          name: '浏览站点',
+          icon: '🌐',
+          description: '仅供浏览的资源站点',
+          order: 2
+        }
+      ];
+
+      // 创建最基本的分类
+      this.allCategories = [
+        {
+          id: 'torrents',
+          name: '种子资源',
+          icon: '🧲',
+          description: '提供种子下载的站点',
+          majorCategory: 'search_sources',
+          defaultSearchable: true,
+          defaultSiteType: 'search',
+          searchPriority: 1,
+          isSystem: true,
+          isBuiltin: true
+        },
+        {
+          id: 'info_sites',
+          name: '信息站点',
+          icon: '📚',
+          description: '提供影片信息的站点',
+          majorCategory: 'search_sources',
+          defaultSearchable: true,
+          defaultSiteType: 'search',
+          searchPriority: 2,
+          isSystem: true,
+          isBuiltin: true
+        }
+      ];
+
+      // 创建最基本的搜索源
+      this.builtinSearchSources = [
+        {
+          id: 'javbus',
+          name: 'JavBus',
+          subtitle: '番号+磁力一体站，信息完善',
+          icon: '🎬',
+          category: 'info_sites',
+          urlTemplate: 'https://www.javbus.com/search/{keyword}',
+          searchable: true,
+          siteType: 'search',
+          searchPriority: 1,
+          requiresKeyword: true,
+          isSystem: true,
+          isBuiltin: true
+        },
+        {
+          id: 'javdb',
+          name: 'JavDB',
+          subtitle: '极简风格番号资料站，轻量快速',
+          icon: '📚',
+          category: 'info_sites',
+          urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
+          searchable: true,
+          siteType: 'search',
+          searchPriority: 2,
+          requiresKeyword: true,
+          isSystem: true,
+          isBuiltin: true
+        }
+      ];
+
       this.customSearchSources = [];
-      this.enabledSources = this.builtinSearchSources.map(s => s.id);
       this.allSearchSources = [...this.builtinSearchSources];
+      this.enabledSources = this.builtinSearchSources.map(s => s.id);
+      
+      console.log('🔧 已加载最小数据集');
+      
+    } catch (error) {
+      console.error('❌ 加载最小数据集失败:', error);
+      // 设置为空数组，防止应用崩溃
+      this.majorCategories = [];
+      this.allCategories = [];
+      this.builtinSearchSources = [];
+      this.customSearchSources = [];
+      this.allSearchSources = [];
+      this.enabledSources = [];
     }
   }
 
@@ -146,14 +240,13 @@ export class SourcesManager {
     });
   }
 
+  // 🔴 修改更新分类筛选选项 - 使用动态数据
   updateCategoryFilterOptions() {
     const categoryFilter = document.getElementById('categoryFilter');
     if (!categoryFilter) return;
 
-    const categoriesManager = this.app.getManager('categories');
-    const allCategories = categoriesManager ? categoriesManager.getAllCategories() : [];
-
-    const categoriesHTML = allCategories
+    // 🔴 使用从API获取的分类数据
+    const categoriesHTML = this.allCategories
       .sort((a, b) => (a.order || 999) - (b.order || 999))
       .map(category => `
         <option value="${category.id}">${category.icon} ${category.name}</option>
@@ -165,16 +258,17 @@ export class SourcesManager {
     `;
   }
 
+  // 🔴 修改更新大分类筛选选项 - 使用动态数据
   updateMajorCategoryFilterOptions() {
     const majorCategoryFilter = document.getElementById('majorCategoryFilter');
     if (!majorCategoryFilter) return;
 
-    const majorCategories = Object.values(MAJOR_CATEGORIES)
-      .sort((a, b) => a.order - b.order);
-
-    const majorCategoriesHTML = majorCategories.map(majorCategory => `
-      <option value="${majorCategory.id}">${majorCategory.icon} ${majorCategory.name}</option>
-    `).join('');
+    // 🔴 使用从API获取的大类数据
+    const majorCategoriesHTML = this.majorCategories
+      .sort((a, b) => (a.order || 999) - (b.order || 999))
+      .map(majorCategory => `
+        <option value="${majorCategory.id}">${majorCategory.icon} ${majorCategory.name}</option>
+      `).join('');
 
     majorCategoryFilter.innerHTML = `
       <option value="all">全部大类</option>
@@ -287,6 +381,7 @@ export class SourcesManager {
     });
   }
 
+  // 🔴 修改渲染源项目 - 使用动态数据
   renderSourceItem(source) {
     const category = this.getCategoryById(source.category);
     const majorCategory = this.getMajorCategoryForSource(source.id);
@@ -302,7 +397,8 @@ export class SourcesManager {
     const searchableIcon = source.searchable === false ? '🚫' : '🔍';
     const searchableTitle = source.searchable === false ? '不参与搜索' : '参与搜索';
     
-    const majorCategoryInfo = MAJOR_CATEGORIES[majorCategory];
+    // 🔴 使用动态获取的大类信息
+    const majorCategoryInfo = this.majorCategories.find(mc => mc.id === majorCategory);
     const majorCategoryLabel = majorCategoryInfo ? `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
     
     return `
@@ -658,7 +754,7 @@ export class SourcesManager {
       // 根据分类的默认配置自动设置
       const categorySelect = form.sourceCategory;
       categorySelect.addEventListener('change', (e) => {
-        const category = this.app.getManager('categories').getCategoryById(e.target.value);
+        const category = this.getCategoryById(e.target.value);
         if (category) {
           form.searchable.checked = category.defaultSearchable !== false;
           form.siteType.value = category.defaultSiteType || 'search';
@@ -675,13 +771,12 @@ export class SourcesManager {
     }
   }
 
+  // 🔴 修改更新源分类选择器 - 使用动态数据
   updateSourceCategorySelect(selectElement) {
     if (!selectElement) return;
 
-    const categoriesManager = this.app.getManager('categories');
-    const allCategories = categoriesManager ? categoriesManager.getAllCategories() : [];
-
-    const categoriesHTML = allCategories
+    // 🔴 使用从API获取的分类数据
+    const categoriesHTML = this.allCategories
       .sort((a, b) => (a.order || 999) - (b.order || 999))
       .map(category => `
         <option value="${category.id}">${category.icon} ${category.name}</option>
@@ -780,9 +875,8 @@ export class SourcesManager {
       return { valid: false, message: 'URL格式无效' };
     }
     
-    const categoriesManager = this.app.getManager('categories');
     const categoryId = sourceData.categoryId || sourceData.category;
-    if (!categoriesManager || !categoriesManager.getCategoryById(categoryId)) {
+    if (!this.getCategoryById(categoryId)) {
       return { valid: false, message: '选择的分类不存在' };
     }
     
@@ -845,9 +939,7 @@ export class SourcesManager {
     if (elements.enabledSourcesCount) elements.enabledSourcesCount.textContent = this.enabledSources.length;
     if (elements.customSourcesCount) elements.customSourcesCount.textContent = this.customSearchSources.length;
     
-    const categoriesManager = this.app.getManager('categories');
-    const categoriesCount = categoriesManager ? categoriesManager.getAllCategories().length : 0;
-    if (elements.categoriesCount) elements.categoriesCount.textContent = categoriesCount;
+    if (elements.categoriesCount) elements.categoriesCount.textContent = this.allCategories.length;
   }
 
   // 🔴 使用新API导出搜索源
@@ -885,6 +977,7 @@ export class SourcesManager {
     return detailSources.includes(sourceId);
   }
 
+  // 🔴 修改获取源的大分类方法
   getMajorCategoryForSource(sourceId) {
     const source = this.getSourceById(sourceId);
     if (!source) return null;
@@ -898,14 +991,14 @@ export class SourcesManager {
     return this.allSearchSources.find(source => source.id === sourceId);
   }
 
+  // 🔴 修改获取分类方法
   getCategoryById(categoryId) {
-    const categoriesManager = this.app.getManager('categories');
-    return categoriesManager ? categoriesManager.getCategoryById(categoryId) : null;
+    return this.allCategories.find(category => category.id === categoryId);
   }
 
+  // 🔴 修改获取自定义分类方法
   getCustomCategories() {
-    const categoriesManager = this.app.getManager('categories');
-    return categoriesManager ? categoriesManager.getCustomCategories() : [];
+    return this.allCategories.filter(category => category.isCustom);
   }
 
   // 公共方法供其他管理器调用
@@ -919,6 +1012,14 @@ export class SourcesManager {
 
   getAllSearchSources() {
     return this.allSearchSources;
+  }
+
+  getMajorCategories() {
+    return this.majorCategories;
+  }
+
+  getAllCategories() {
+    return this.allCategories;
   }
 }
 

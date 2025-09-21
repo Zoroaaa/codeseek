@@ -1,5 +1,5 @@
 // 主应用入口 - 集成统一搜索组件和配置管理架构,新增邮箱验证功能支持
-import { APP_CONSTANTS, MAJOR_CATEGORIES, getCategoriesByMajorCategory, getSourcesByMajorCategory } from '../../core/constants.js';
+import { APP_CONSTANTS, getCategoriesByMajorCategory, getSourcesByMajorCategory } from '../../core/constants.js';
 import configManager from '../../core/config.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { isDevEnv } from '../../utils/helpers.js';
@@ -23,9 +23,10 @@ class MagnetSearchApp {
     this.isInitialized = false;
     this.connectionStatus = APP_CONSTANTS.CONNECTION_STATUS?.CHECKING || 'checking';
     
-    // 搜索源和分类管理 - 简化版本,主要通过统一搜索管理器处理
+    // 🔴 移除硬编码数据,完全从API获取
     this.allSearchSources = [];
     this.allCategories = [];
+    this.majorCategories = [];
     
     // 详情提取功能状态
     this.detailExtractionAvailable = false;
@@ -66,7 +67,7 @@ class MagnetSearchApp {
       await configManager.init();
       
       // 🆕 初始化搜索源API
-      console.log('📡 初始化搜索源管理API...');
+      console.log('🔡 初始化搜索源管理API...');
       
       // 绑定事件
       this.bindEvents();
@@ -124,30 +125,127 @@ class MagnetSearchApp {
     }
   }
 
-  // 🆕 从新API加载搜索源数据
+  // 🆕 完全从API加载搜索源数据
   async loadSearchSourcesFromAPI() {
     try {
       console.log('🔄 从搜索源API加载数据...');
       
-      // 获取所有搜索源(包括系统内置和用户自定义)
+      // 🔴 获取大类数据
+      const majorCategories = await searchSourcesAPI.getMajorCategories();
+      this.majorCategories = majorCategories || [];
+      
+      // 🔴 获取所有分类
+      const categories = await searchSourcesAPI.getSourceCategories({
+        includeSystem: true
+      });
+      this.allCategories = categories || [];
+      
+      // 🔴 获取所有搜索源(包括系统内置和用户自定义)
       const sources = await searchSourcesAPI.getSearchSources({
         includeSystem: true,
         enabledOnly: false
       });
-      
-      // 获取所有分类
-      const categories = await searchSourcesAPI.getSourceCategories({
-        includeSystem: true
-      });
-      
       this.allSearchSources = sources || [];
-      this.allCategories = categories || [];
       
-      console.log(`✅ 已加载 ${this.allSearchSources.length} 个搜索源和 ${this.allCategories.length} 个分类`);
+      console.log(`✅ 已加载 ${this.majorCategories.length} 个大类，${this.allCategories.length} 个分类，${this.allSearchSources.length} 个搜索源`);
       
     } catch (error) {
-      console.warn('⚠️ 从API加载搜索源失败,使用内置数据:', error);
-      this.loadBuiltinData();
+      console.warn('⚠️ 从API加载搜索源失败,使用最小回退方案:', error);
+      await this.loadMinimalFallbackData();
+    }
+  }
+
+  // 🆕 最小回退方案（仅在API完全不可用时使用）
+  async loadMinimalFallbackData() {
+    try {
+      // 创建最基本的大类
+      this.majorCategories = [
+        {
+          id: 'search_sources',
+          name: '搜索资源',
+          icon: '🔍',
+          description: '参与番号搜索的资源站点',
+          order: 1
+        },
+        {
+          id: 'browse_sites',
+          name: '浏览站点',
+          icon: '🌐',
+          description: '仅供浏览的资源站点',
+          order: 2
+        }
+      ];
+
+      // 创建最基本的分类
+      this.allCategories = [
+        {
+          id: 'torrents',
+          name: '种子资源',
+          icon: '🧲',
+          description: '提供种子下载的站点',
+          majorCategory: 'search_sources',
+          defaultSearchable: true,
+          defaultSiteType: 'search',
+          searchPriority: 1,
+          isSystem: true,
+          isBuiltin: true
+        },
+        {
+          id: 'info_sites',
+          name: '信息站点',
+          icon: '📚',
+          description: '提供影片信息的站点',
+          majorCategory: 'search_sources',
+          defaultSearchable: true,
+          defaultSiteType: 'search',
+          searchPriority: 2,
+          isSystem: true,
+          isBuiltin: true
+        }
+      ];
+
+      // 创建最基本的搜索源
+      this.allSearchSources = [
+        {
+          id: 'javbus',
+          name: 'JavBus',
+          subtitle: '番号+磁力一体站，信息完善',
+          icon: '🎬',
+          category: 'info_sites',
+          urlTemplate: 'https://www.javbus.com/search/{keyword}',
+          searchable: true,
+          siteType: 'search',
+          searchPriority: 1,
+          requiresKeyword: true,
+          isSystem: true,
+          isBuiltin: true,
+          userEnabled: true
+        },
+        {
+          id: 'javdb',
+          name: 'JavDB',
+          subtitle: '极简风格番号资料站，轻量快速',
+          icon: '📚',
+          category: 'info_sites',
+          urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
+          searchable: true,
+          siteType: 'search',
+          searchPriority: 2,
+          requiresKeyword: true,
+          isSystem: true,
+          isBuiltin: true,
+          userEnabled: true
+        }
+      ];
+
+      console.log('🔧 已加载最小回退数据');
+      
+    } catch (error) {
+      console.error('❌ 加载回退数据失败:', error);
+      // 设置为空数组，防止应用崩溃
+      this.majorCategories = [];
+      this.allCategories = [];
+      this.allSearchSources = [];
     }
   }
 
@@ -173,40 +271,6 @@ class MagnetSearchApp {
     } catch (error) {
       console.error('❌ 邮箱验证服务初始化失败:', error);
       this.performanceMetrics.errorCount++;
-    }
-  }
-
-  // 从constants.js加载内置数据(作为后备方案)
-  loadBuiltinData() {
-    try {
-      // 加载内置搜索源
-      const builtinSources = (APP_CONSTANTS.SEARCH_SOURCES || []).map(source => ({
-        ...source,
-        isBuiltin: true,
-        isCustom: false,
-        isSystem: true,
-        userEnabled: true
-      }));
-      
-      // 加载内置分类
-      const builtinCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES || {}).map(category => ({
-        ...category,
-        isBuiltin: true,
-        isCustom: false
-      }));
-      
-      console.log(`从constants.js加载了 ${builtinSources.length} 个内置搜索源和 ${builtinCategories.length} 个内置分类`);
-      
-      // 初始化数据
-      this.allSearchSources = [...builtinSources];
-      this.allCategories = [...builtinCategories];
-      
-    } catch (error) {
-      console.error('加载内置数据失败:', error);
-      this.performanceMetrics.errorCount++;
-      // 使用空数组作为备份
-      this.allSearchSources = [];
-      this.allCategories = [];
     }
   }
 
@@ -588,62 +652,41 @@ class MagnetSearchApp {
     }
   }
 
-  // 🔧 初始化站点导航 - 实现分层显示
+  // 🔧 初始化站点导航 - 使用动态数据
   async initSiteNavigation() {
     try {
-      // 🆕 优先使用从新API加载的搜索源
-      let searchSources = this.allSearchSources;
-      
-      // 如果没有数据,尝试从统一搜索管理器获取
-      if (searchSources.length === 0 && unifiedSearchManager.isInitialized) {
-        try {
-          // 通过统一搜索管理器获取搜索源
-          const config = unifiedSearchManager.configManager?.getConfig();
-          if (config && config.searchSources) {
-            searchSources = config.searchSources;
-          }
-        } catch (error) {
-          console.warn('从统一搜索管理器获取搜索源失败:', error);
-        }
+      // 确保数据已加载
+      if (this.allSearchSources.length === 0) {
+        await this.loadSearchSourcesFromAPI();
       }
       
-      // 如果仍然没有数据,加载内置数据
-      if (searchSources.length === 0) {
-        console.log('未找到搜索源,加载内置数据');
-        this.loadBuiltinData();
-        searchSources = this.allSearchSources;
-      }
-      
-      this.renderSiteNavigation(searchSources);
+      this.renderSiteNavigation(this.allSearchSources);
     } catch (error) {
       console.error('初始化站点导航失败:', error);
-      // 出错时使用默认配置中的所有内置源
-      const allBuiltinSources = (APP_CONSTANTS.SEARCH_SOURCES || []).map(source => ({
-        ...source,
-        isBuiltin: true,
-        isCustom: false
-      }));
-      this.renderSiteNavigation(allBuiltinSources);
+      // 显示错误状态
+      const sitesSection = document.getElementById('sitesSection');
+      if (sitesSection) {
+        sitesSection.innerHTML = `
+          <h2>🌐 资源站点导航</h2>
+          <div class="empty-state">
+            <p>加载站点数据失败</p>
+            <button onclick="window.app && window.app.loadSearchSourcesFromAPI().then(() => window.app.initSiteNavigation())" class="btn-primary">重新加载</button>
+          </div>
+        `;
+      }
     }
   }
 
-  // 🔧 渲染站点导航 - 分层显示搜索源和浏览站点
+  // 🔧 渲染站点导航 - 使用动态数据
   renderSiteNavigation(sourcesToDisplay = null) {
     const sitesSection = document.getElementById('sitesSection');
     if (!sitesSection) return;
 
-    // 如果没有传入特定的源列表,则显示所有搜索源
-    let sources;
-    if (sourcesToDisplay && Array.isArray(sourcesToDisplay)) {
-      sources = sourcesToDisplay;
-    } else {
-      sources = this.allSearchSources;
-    }
+    const sources = sourcesToDisplay || this.allSearchSources;
 
-    // 如果没有可显示的搜索源,显示提示
     if (sources.length === 0) {
       sitesSection.innerHTML = `
-        <h2>🌍 资源站点导航</h2>
+        <h2>🌐 资源站点导航</h2>
         <div class="empty-state">
           <p>暂无可用的搜索源</p>
           <p>请在个人中心搜索源管理页面添加搜索源</p>
@@ -653,11 +696,11 @@ class MagnetSearchApp {
       return;
     }
 
-    // 🔧 按大分类分组显示
-    const majorCategories = Object.values(MAJOR_CATEGORIES).sort((a, b) => a.order - b.order);
+    // 🔧 使用动态获取的大类数据
+    const majorCategories = this.majorCategories.sort((a, b) => (a.order || 999) - (b.order || 999));
     
     let navigationHTML = `
-      <h2>🌍 资源站点导航</h2>
+      <h2>🌐 资源站点导航</h2>
       
       ${this.detailExtractionAvailable ? `
         <div class="detail-extraction-notice">
@@ -696,13 +739,10 @@ class MagnetSearchApp {
 
   // 🔧 新增:获取按大分类和小分类组织的源
   getSourcesByMajorCategoryWithSubcategories(sources, majorCategoryId) {
-    // 获取属于该大分类的所有源
-    const categorySources = sources.filter(source => {
+    return sources.filter(source => {
       const category = this.allCategories.find(cat => cat.id === source.category);
       return category && category.majorCategory === majorCategoryId;
     });
-
-    return categorySources;
   }
 
   // 🔧 新增:渲染小分类及其下的源
@@ -750,7 +790,7 @@ class MagnetSearchApp {
   // 🔧 渲染单个站点项,包括启用状态和详情提取支持标识
   renderSiteItem(source, isSearchable) {
     // 通过统一搜索管理器检查源的启用状态
-    let isEnabled = true; // 默认显示为启用,具体启用状态由搜索时判断
+    let isEnabled = true; // 默认显示为可用,具体启用状态由搜索时判断
     
     try {
       if (unifiedSearchManager.isInitialized && unifiedSearchManager.configManager) {
@@ -1356,19 +1396,15 @@ class MagnetSearchApp {
       this.detailExtractionEnabled = false;
       this.updateDetailExtractionUI(false);
       
-      // 🆕 重置为默认内置搜索源,但站点导航仍显示所有源
-      this.allSearchSources = (APP_CONSTANTS.SEARCH_SOURCES || []).map(s => ({ 
-        ...s, 
-        isBuiltin: true, 
-        isCustom: false 
-      }));
-      this.allCategories = Object.values(APP_CONSTANTS.SOURCE_CATEGORIES || {}).map(c => ({ 
-        ...c, 
-        isBuiltin: true, 
-        isCustom: false 
-      }));
+      // 🆕 清空所有数据，重新加载最小数据集
+      this.allSearchSources = [];
+      this.allCategories = [];
+      this.majorCategories = [];
       
-      // 重新初始化站点导航(显示所有内置源)
+      // 加载最小回退数据用于展示
+      await this.loadMinimalFallbackData();
+      
+      // 重新初始化站点导航(显示基础源)
       await this.initSiteNavigation();
       
       // 显示登录模态框
