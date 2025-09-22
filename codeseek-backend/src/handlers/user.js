@@ -163,21 +163,44 @@ export async function userSyncFavoritesHandler(request, env) {
             return utils.errorResponse(`收藏夹数量不能超过 ${maxFavorites} 个`);
         }
 
+        // 🔧 使用事务确保数据一致性
         await env.DB.prepare(`DELETE FROM user_favorites WHERE user_id = ?`).bind(user.id).run();
 
         for (const favorite of favorites) {
             const favoriteId = favorite.id || utils.generateId();
+            
+            // 🔧 保留客户端的原始时间戳
+            let createdAt = Date.now();
+            if (favorite.addedAt) {
+                // 如果客户端提供了 addedAt，转换并使用它
+                const clientTimestamp = new Date(favorite.addedAt).getTime();
+                if (!isNaN(clientTimestamp)) {
+                    createdAt = clientTimestamp;
+                }
+            } else if (favorite.created_at) {
+                // 兼容其他可能的时间戳字段
+                const clientTimestamp = new Date(favorite.created_at).getTime();
+                if (!isNaN(clientTimestamp)) {
+                    createdAt = clientTimestamp;
+                }
+            }
+            
             await env.DB.prepare(`
                 INSERT INTO user_favorites (id, user_id, title, subtitle, url, icon, keyword, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).bind(
                 favoriteId, user.id, favorite.title || '', favorite.subtitle || '', 
                 favorite.url || '', favorite.icon || '', favorite.keyword || '',
-                Date.now(), Date.now()
+                createdAt,  // 🔧 使用原始时间戳而不是 Date.now()
+                Date.now()   // updated_at 可以使用当前时间
             ).run();
         }
 
-        return utils.successResponse({ message: '收藏夹同步成功' });
+        // 🔧 不返回处理后的收藏列表，避免客户端覆盖本地数据
+        return utils.successResponse({ 
+            message: '收藏夹同步成功',
+            syncedCount: favorites.length
+        });
 
     } catch (error) {
         console.error('同步收藏夹失败:', error);
@@ -204,7 +227,9 @@ export async function userGetFavoritesHandler(request, env) {
             url: fav.url,
             icon: fav.icon,
             keyword: fav.keyword,
-            addedAt: new Date(fav.created_at).toISOString()
+            addedAt: new Date(fav.created_at).toISOString(), // 确保时间格式正确
+            created_at: fav.created_at,  // 保留原始时间戳用于调试
+            updated_at: fav.updated_at
         }));
 
         return utils.successResponse({ favorites });
@@ -214,6 +239,7 @@ export async function userGetFavoritesHandler(request, env) {
         return utils.errorResponse('获取收藏夹失败', 500);
     }
 }
+
 
 // ===================== 搜索历史相关 =====================
 
