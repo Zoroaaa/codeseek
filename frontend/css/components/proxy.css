@@ -1,0 +1,467 @@
+/* 代理功能相关CSS样式 */
+
+/* ===================== 代理提示通知 ===================== */
+.proxy-notice {
+  margin-bottom: 20px;
+  animation: slideInDown 0.5s ease-out;
+}
+
+.proxy-notice-content {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 15px 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  position: relative;
+}
+
+.proxy-notice-icon {
+  font-size: 1.5em;
+  flex-shrink: 0;
+}
+
+.proxy-notice-text {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.proxy-notice-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s;
+}
+
+.proxy-notice-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ===================== 代理指示器 ===================== */
+.proxy-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.proxy-badge {
+  font-size: 12px;
+}
+
+.proxy-text {
+  font-weight: 500;
+}
+
+/* ===================== 代理启用的结果项 ===================== */
+.result-item.result-proxied {
+  position: relative;
+  border-left: 3px solid #4facfe;
+}
+
+.result-item.result-proxied::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(79, 172, 254, 0.05) 0%, transparent 100%);
+  pointer-events: none;
+  border-radius: 8px;
+}
+
+/* ===================== 代理访问按钮样式 ===================== */
+.visit-btn.proxy-enabled {
+  background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  border: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.visit-btn.proxy-enabled::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.visit-btn.proxy-enabled:hover::before {
+  left: 100%;
+}
+
+.visit-btn.proxy-enabled:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);
+}
+
+/* ===================== 复制按钮组 ===================== */
+.copy-btn-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.copy-original-btn {
+  background: linear-gradient(45deg, #ff6b6b 0%, #ee5a24 100%);
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.copy-original-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(255, 107, 107, 0.4);
+}
+
+/* ===================== 代理状态样式 ===================== */
+.result-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.status-available {
+  background: rgba(34, 197, 94, 0.1);
+  color: #059669;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.status-unavailable {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-timeout {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.status-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-checking {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.status-unknown {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+/* ===================== 内容匹配和缓存徽章 ===================== */
+.content-match-badge {
+  background: rgba(34, 197, 94, 0.2);
+  color: #059669;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+.cache-badge {
+  background: rgba(99, 102, 241, 0.2);
+  color: #6366f1;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+/* ===================== 不可用原因显示 ===================== */
+.unavailable-reason {
+  background: rgba(254, 202, 202, 0.5);
+  color: #991b1b;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  margin-top: 4px;
+  border-left: 3px solid #fca5a5;
+}
+
+/* ===================== 动画效果 ===================== */
+@keyframes slideInDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.status-checking .status-icon {
+  animation: pulse 1.5s infinite;
+}
+
+/* ===================== 响应式设计 ===================== */
+@media (max-width: 768px) {
+  .proxy-notice-content {
+    padding: 12px 15px;
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+  
+  .proxy-notice-text {
+    font-size: 13px;
+  }
+  
+  .copy-btn-group {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .copy-original-btn {
+    width: 100%;
+    margin-top: 4px;
+  }
+  
+  .proxy-indicator {
+    font-size: 11px;
+    padding: 1px 6px;
+  }
+}
+
+/* ===================== 深色模式支持 ===================== */
+@media (prefers-color-scheme: dark) {
+  .proxy-notice-content {
+    background: linear-gradient(135deg, #4c1d95 0%, #581c87 100%);
+  }
+  
+  .result-item.result-proxied {
+    border-left-color: #60a5fa;
+  }
+  
+  .result-item.result-proxied::before {
+    background: linear-gradient(90deg, rgba(96, 165, 250, 0.08) 0%, transparent 100%);
+  }
+  
+  .proxy-indicator {
+    background: linear-gradient(45deg, #3b82f6 0%, #1e40af 100%);
+  }
+  
+  .unavailable-reason {
+    background: rgba(127, 29, 29, 0.3);
+    color: #fca5a5;
+    border-left-color: #ef4444;
+  }
+}
+
+/* ===================== 高对比度模式 ===================== */
+@media (prefers-contrast: high) {
+  .proxy-notice-content {
+    background: #000;
+    border: 2px solid #fff;
+  }
+  
+  .proxy-indicator {
+    background: #000;
+    border: 1px solid #fff;
+  }
+  
+  .visit-btn.proxy-enabled {
+    background: #000;
+    border: 2px solid #fff;
+  }
+  
+  .status-available {
+    background: #000;
+    color: #00ff00;
+    border: 2px solid #00ff00;
+  }
+  
+  .status-unavailable,
+  .status-error {
+    background: #000;
+    color: #ff0000;
+    border: 2px solid #ff0000;
+  }
+}
+
+/* ===================== 打印样式 ===================== */
+@media print {
+  .proxy-notice,
+  .proxy-indicator {
+    display: none;
+  }
+  
+  .result-item.result-proxied::before {
+    display: none;
+  }
+  
+  .visit-btn.proxy-enabled {
+    background: #333 !important;
+    color: #fff !important;
+  }
+}
+
+/* ===================== 焦点和辅助功能 ===================== */
+.visit-btn.proxy-enabled:focus {
+  outline: 2px solid #4facfe;
+  outline-offset: 2px;
+}
+
+.copy-original-btn:focus {
+  outline: 2px solid #ff6b6b;
+  outline-offset: 2px;
+}
+
+.proxy-notice-close:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* ===================== 工具提示样式 ===================== */
+.result-item [title] {
+  position: relative;
+}
+
+.result-item [title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  animation: fadeIn 0.3s forwards;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+/* ===================== 加载状态 ===================== */
+.result-item.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.result-item.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #4facfe;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ===================== 错误状态 ===================== */
+.result-item.error {
+  background: rgba(254, 202, 202, 0.1);
+  border-left: 3px solid #ef4444;
+}
+
+.result-item.error .result-title {
+  color: #dc2626;
+}
+
+/* ===================== 成功状态 ===================== */
+.result-item.success {
+  background: rgba(187, 247, 208, 0.1);
+  border-left: 3px solid #10b981;
+}
+
+/* ===================== 代理统计显示 ===================== */
+.proxy-stats {
+  background: rgba(79, 172, 254, 0.1);
+  border: 1px solid rgba(79, 172, 254, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 16px 0;
+  font-size: 13px;
+  color: #1e40af;
+}
+
+.proxy-stats-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.proxy-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.proxy-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.proxy-stat-value {
+  font-weight: 600;
+  color: #4facfe;
+}

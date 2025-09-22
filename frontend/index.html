@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">磁力快搜 - 专业版</title>
-    <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索，详情提取">
+    <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索，详情提取，集成代理服务解决区域限制">
 	
     <!-- 核心样式 - 必须最先引入 -->
     <link rel="stylesheet" href="css/core/variables.css">
@@ -18,12 +18,14 @@
     <link rel="stylesheet" href="css/components/loading.css">
     <link rel="stylesheet" href="css/components/search.css">
 	<link rel="stylesheet" href="css/components/detail-card.css">
-    <!-- 🆕 邮箱验证样式 -->
+    <!-- 邮箱验证样式 -->
     <link rel="stylesheet" href="css/components/email-verification.css">
     <!-- 搜索配置管理样式 -->
     <link rel="stylesheet" href="css/components/search-config.css">
     <link rel="stylesheet" href="css/components/status.css">
     <link rel="stylesheet" href="css/components/search-status.css">
+    <!-- 🆕 代理功能样式 -->
+    <link rel="stylesheet" href="css/components/proxy.css">
     
     <!-- 主页专用样式 -->
     <link rel="stylesheet" href="css/pages/main.css">
@@ -39,8 +41,17 @@
     <!-- 搜索与详情提取配置支持的meta标签 -->
     <meta name="search-config-management-supported" content="true">
     <meta name="unified-search-architecture" content="true">
+    <!-- 🆕 代理功能支持标识 -->
+    <meta name="proxy-service-supported" content="true">
+    <meta name="proxy-service-version" content="3.1.0">
 </head>
 <body>
+    <!-- 🆕 代理服务状态指示器 -->
+    <div id="proxyServiceStatus" class="proxy-service-status" style="display: none;">
+        <div class="proxy-status-indicator"></div>
+        <span class="proxy-status-text">代理服务检查中...</span>
+    </div>
+
     <!-- 导航栏 -->
     <nav class="navbar">
         <div class="nav-container">
@@ -49,18 +60,30 @@
                     <img src="images/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
                     <span class="brand-text" id="brand-text">磁力快搜</span>
                 </a>
+                <!-- 🆕 版本和代理状态徽章 -->
+                <span class="version-badge">v3.1.0</span>
+                <span id="proxyStatus" class="status-badge disabled">代理: 禁用</span>
             </div>
             <div class="nav-menu">
+                <!-- 🆕 代理服务切换按钮 -->
+                <button id="proxyToggle" class="proxy-toggle-btn" title="切换代理服务">
+                    <span class="btn-icon">🚫</span>
+                    <span class="btn-text">代理: 关</span>
+                </button>
+                
                 <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
+                
                 <!-- 配置管理按钮 -->
                 <button id="configManagementBtn" class="config-management-btn" title="搜索与详情提取配置" style="display:none;">
                     ⚙️
                 </button>
+                
                 <!-- 详情提取服务状态指示器 -->
                 <div id="detailServiceStatus" class="service-status" title="详情提取服务状态" style="display:none;">
                     <span class="status-icon">⚠️</span>
                     <span class="status-text">详情提取: 检查中</span>
                 </div>
+                
                 <div id="userMenu" class="user-menu">
                     <button id="loginBtn" class="login-btn">登录</button>
                     <div id="userInfo" class="user-info" style="display:none;">
@@ -71,6 +94,8 @@
                                 <a href="#" onclick="navigateToDashboard(); return false;">个人中心</a>
                                 <!-- 配置管理入口 -->
                                 <a href="#" onclick="window.openConfigManagement && window.openConfigManagement(); return false;">配置管理</a>
+                                <!-- 🆕 代理设置入口 -->
+                                <a href="#" onclick="window.openProxySettings && window.openProxySettings(); return false;">代理设置</a>
                                 <a href="#" id="logoutBtn">退出登录</a>
                             </div>
                         </div>
@@ -85,7 +110,7 @@
         <!-- Hero区域 -->
         <section class="hero">
             <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
-            <p class="hero-subtitle">智能搜索，云端同步，极致体验 | 完善的详情提取服务支持</p>
+            <p class="hero-subtitle">智能搜索，云端同步，极致体验 | 完善的详情提取服务支持 | 🆕 集成代理服务解决区域限制</p>
             
             <!-- 搜索框 -->
             <div class="search-container">
@@ -106,6 +131,24 @@
                         <span>搜索</span>
                     </button>
                 </div>
+                
+                <!-- 🆕 搜索建议 -->
+                <div id="searchSuggestions" class="search-suggestions" style="display: none;"></div>
+            </div>
+        </section>
+
+        <!-- 🆕 代理服务信息面板 -->
+        <section id="proxyInfoSection" class="proxy-info-section" style="display: none;">
+            <div class="proxy-info-container">
+                <div class="section-header">
+                    <h3>🌐 代理服务状态</h3>
+                    <div class="section-actions">
+                        <button id="showProxyStats" class="btn-secondary">查看统计</button>
+                        <button id="testProxyService" class="btn-secondary">测试连通性</button>
+                        <button id="openProxySettings" class="btn-secondary">代理设置</button>
+                    </div>
+                </div>
+                <div id="proxyStatsContainer"></div>
             </div>
         </section>
 
@@ -117,9 +160,11 @@
                     <li>输入完整番号获得最精确结果</li>
                     <li>使用空格分隔多个关键词</li>
                     <li>登录后可享受云端同步服务</li>
-                    <li>支持详情提取的站点会显示 🔋 标识</li>
-                    <li>详情提取包含高清小图、演员信息、下载链接等</li>
+                    <li>支持详情提取的站点会显示 📋 标识</li>
+                    <li>🆕 启用代理服务可解决区域访问限制</li>
+                    <li>详情提取包含高清封面、演员信息、下载链接等</li>
                     <li>在配置管理中可自定义搜索和提取选项</li>
+                    <li>🆕 代理访问的链接会显示 🌐 标识</li>
                 </ul>
             </div>
         </section>
@@ -187,12 +232,17 @@
                 <div class="section-actions">
                     <!-- 详情提取控制按钮 -->
                     <button id="batchExtractBtn" class="action-btn detail-action-btn" style="display:none;" title="批量提取当前搜索结果的详情信息">
-                        <span class="btn-icon">🔋</span>
+                        <span class="btn-icon">📋</span>
                         <span class="btn-text">批量提取</span>
                     </button>
                     <button id="refreshStatsBtn" class="action-btn stats-btn" style="display:none;" title="刷新详情提取统计">
                         <span class="btn-icon">📊</span>
                         <span class="btn-text">刷新统计</span>
+                    </button>
+                    <!-- 🆕 代理相关控制按钮 -->
+                    <button id="refreshProxyStatsBtn" class="action-btn proxy-btn" style="display:none;" title="刷新代理服务统计">
+                        <span class="btn-icon">🌐</span>
+                        <span class="btn-text">代理统计</span>
                     </button>
                     <button id="exportResultsBtn" class="action-btn" style="display:none;">导出结果</button>
                     <button id="clearResultsBtn" class="clear-btn">清空结果</button>
@@ -218,6 +268,28 @@
                     <span class="stats-item">
                         <span class="stats-label">缓存命中:</span>
                         <span class="stats-value" id="cacheHitRate">0%</span>
+                    </span>
+                </div>
+            </div>
+            
+            <!-- 🆕 代理服务统计信息 -->
+            <div id="proxyStats" class="proxy-service-stats" style="display:none;">
+                <div class="stats-content">
+                    <span class="stats-item">
+                        <span class="stats-label">代理访问:</span>
+                        <span class="stats-value" id="proxyAccessCount">0</span>
+                    </span>
+                    <span class="stats-item">
+                        <span class="stats-label">成功率:</span>
+                        <span class="stats-value" id="proxySuccessRate">0%</span>
+                    </span>
+                    <span class="stats-item">
+                        <span class="stats-label">平均响应:</span>
+                        <span class="stats-value" id="proxyAvgResponse">0ms</span>
+                    </span>
+                    <span class="stats-item">
+                        <span class="stats-label">服务状态:</span>
+                        <span class="stats-value" id="proxyServiceHealth">检查中</span>
                     </span>
                 </div>
             </div>
@@ -285,14 +357,13 @@
                 <button type="submit" class="submit-btn">登录</button>
                 <div class="form-links">
                     <a href="#" id="showRegister">还没有账号？注册</a>
-                    <!-- 🆕 更新忘记密码链接 -->
                     <a href="#" id="showForgotPassword">忘记密码？</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- 🆕 更新注册模态框 - 集成邮箱验证 -->
+    <!-- 注册模态框 -->
     <div id="registerModal" class="modal" aria-labelledby="register-title" role="dialog">
         <div class="modal-content">
             <span class="close" aria-label="关闭">&times;</span>
@@ -345,6 +416,79 @@
         </div>
     </div>
 
+    <!-- 🆕 代理设置模态框 -->
+    <div id="proxySettingsModal" class="modal" aria-labelledby="proxy-settings-title" role="dialog">
+        <div class="modal-content">
+            <span class="close" aria-label="关闭">&times;</span>
+            <h2 id="proxy-settings-title">🌐 代理服务设置</h2>
+            <div class="proxy-settings-content">
+                <div class="setting-section">
+                    <h3>基础设置</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableProxyService" checked>
+                            启用代理服务
+                        </label>
+                        <small>通过代理服务器访问搜索结果，解决区域限制</small>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="showProxyIndicators" checked>
+                            显示代理指示器
+                        </label>
+                        <small>在搜索结果中显示代理访问标识</small>
+                    </div>
+                </div>
+                
+                <div class="setting-section">
+                    <h3>高级设置</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="fallbackToOriginal" checked>
+                            代理失败时回退到原始链接
+                        </label>
+                        <small>当代理服务不可用时，自动使用原始链接</small>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="autoRetryOnFailure" checked>
+                            自动重试失败的代理请求
+                        </label>
+                        <small>代理请求失败时自动重试，提高成功率</small>
+                    </div>
+                </div>
+                
+                <div class="setting-section">
+                    <h3>统计信息</h3>
+                    <div id="proxySettingsStats" class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">代理请求总数:</span>
+                            <span id="totalProxyRequests" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">成功请求数:</span>
+                            <span id="successfulProxyRequests" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">服务状态:</span>
+                            <span id="proxyHealthStatus" class="stat-value">未知</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">平均响应时间:</span>
+                            <span id="proxyAvgResponseTime" class="stat-value">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="saveProxySettings" class="btn-primary">保存设置</button>
+                    <button id="testProxyConnection" class="btn-secondary">测试连接</button>
+                    <button id="resetProxySettings" class="btn-secondary">重置设置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast通知 -->
     <div id="toast" class="toast" role="alert" aria-live="polite"></div>
 
@@ -362,11 +506,24 @@
     <!-- 图片预览模态框容器 -->
     <div id="imagePreviewContainer"></div>
 
+    <!-- 🆕 代理功能通知模板 -->
+    <template id="proxyNoticeTemplate">
+        <div class="proxy-notice">
+            <div class="proxy-notice-content">
+                <span class="proxy-notice-icon">🌐</span>
+                <span class="proxy-notice-text">
+                    已启用代理访问模式，搜索结果将通过代理服务器访问，解决区域限制问题
+                </span>
+                <button class="proxy-notice-close">×</button>
+            </div>
+        </div>
+    </template>
+
     <!-- 使用统一搜索组件的脚本加载 -->
     <script type="module">
         // 现在使用更新后的服务架构初始化应用
         import MagnetSearchApp from './src/pages/main/main.js';
-        // 🆕 导入邮箱验证UI组件
+        // 导入邮箱验证UI组件
         import { emailVerificationUI } from './src/components/email-verification-ui.js';
         
         // 全局导航函数（保持向后兼容）
@@ -395,6 +552,40 @@
             }
         };
 
+        // 🆕 代理设置功能
+        window.openProxySettings = function() {
+            const proxySettingsModal = document.getElementById('proxySettingsModal');
+            if (proxySettingsModal) {
+                proxySettingsModal.style.display = 'block';
+                
+                // 更新设置界面的当前状态
+                if (window.app) {
+                    updateProxySettingsUI();
+                }
+            }
+        };
+
+        // 🆕 更新代理设置UI
+        function updateProxySettingsUI() {
+            if (window.app && window.app.proxyConfig && window.app.proxyStats) {
+                const config = window.app.proxyConfig;
+                const stats = window.app.proxyStats;
+                
+                // 更新复选框状态
+                document.getElementById('enableProxyService').checked = config.enabled;
+                document.getElementById('showProxyIndicators').checked = config.showIndicator;
+                document.getElementById('fallbackToOriginal').checked = config.fallbackToOriginal;
+                document.getElementById('autoRetryOnFailure').checked = config.autoRetryOnFailure || true;
+                
+                // 更新统计信息
+                document.getElementById('totalProxyRequests').textContent = stats.totalRequests || 0;
+                document.getElementById('successfulProxyRequests').textContent = stats.successfulRequests || 0;
+                document.getElementById('proxyHealthStatus').textContent = stats.healthStatus || '未知';
+                document.getElementById('proxyAvgResponseTime').textContent = 
+                    stats.averageResponseTime ? `${stats.averageResponseTime}ms` : '-';
+            }
+        }
+
         // 批量提取详情 - 使用统一搜索管理器
         window.batchExtractDetails = function() {
             if (window.app && window.app.batchExtractDetails) {
@@ -409,7 +600,14 @@
             }
         };
 
-        // 🆕 邮箱验证相关全局函数
+        // 🆕 刷新代理统计
+        window.refreshProxyStats = function() {
+            if (window.app && window.app.displayProxyStats) {
+                window.app.displayProxyStats();
+            }
+        };
+
+        // 邮箱验证相关全局函数
         window.emailVerificationUI = emailVerificationUI;
         
         // 显示邮箱验证相关模态框的全局函数
@@ -421,7 +619,6 @@
             emailVerificationUI.showPasswordResetModal();
         };
 
-        // 🆕 显示忘记密码模态框的全局函数
         window.showForgotPasswordModal = function() {
             emailVerificationUI.showForgotPasswordModal();
         };
@@ -442,11 +639,14 @@
                 // 创建使用统一搜索组件的应用实例
                 window.app = new MagnetSearchApp();
                 
-                // 🆕 初始化邮箱验证UI
+                // 初始化邮箱验证UI
                 initEmailVerificationIntegration();
                 
                 // 初始化配置管理UI
                 initConfigManagementUI();
+                
+                // 🆕 初始化代理功能UI
+                initProxyIntegration();
                 
                 console.log('✅ 应用初始化完成');
                 
@@ -470,7 +670,7 @@
             }
         });
 
-        // 🆕 初始化邮箱验证集成
+        // 初始化邮箱验证集成
         function initEmailVerificationIntegration() {
             console.log('📧 初始化邮箱验证集成...');
             
@@ -529,20 +729,10 @@
                 });
             }
             
-            // 🆕 添加忘记密码链接处理（更新的ID）
+            // 添加忘记密码链接处理
             const showForgotPasswordLink = document.getElementById('showForgotPassword');
             if (showForgotPasswordLink) {
                 showForgotPasswordLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    document.getElementById('loginModal').style.display = 'none';
-                    emailVerificationUI.showForgotPasswordModal();
-                });
-            }
-            
-            // 保持向后兼容的旧ID处理
-            const showPasswordResetLink = document.getElementById('showPasswordReset');
-            if (showPasswordResetLink) {
-                showPasswordResetLink.addEventListener('click', (e) => {
                     e.preventDefault();
                     document.getElementById('loginModal').style.display = 'none';
                     emailVerificationUI.showForgotPasswordModal();
@@ -614,6 +804,168 @@
             document.addEventListener('detailConfigSaved', handleDetailConfigSaved);
         }
 
+        // 🆕 初始化代理功能集成
+        function initProxyIntegration() {
+            console.log('🌐 初始化代理功能集成...');
+            
+            // 代理切换按钮
+            const proxyToggle = document.getElementById('proxyToggle');
+            if (proxyToggle) {
+                proxyToggle.addEventListener('click', () => {
+                    if (window.app && window.app.toggleProxyService) {
+                        window.app.toggleProxyService();
+                    }
+                });
+            }
+
+            // 代理设置按钮
+            const openProxySettings = document.getElementById('openProxySettings');
+            if (openProxySettings) {
+                openProxySettings.addEventListener('click', window.openProxySettings);
+            }
+
+            // 显示代理统计按钮
+            const showProxyStats = document.getElementById('showProxyStats');
+            if (showProxyStats) {
+                showProxyStats.addEventListener('click', () => {
+                    if (window.app && window.app.displayProxyStats) {
+                        window.app.displayProxyStats();
+                    }
+                });
+            }
+
+            // 测试代理服务按钮
+            const testProxyService = document.getElementById('testProxyService');
+            if (testProxyService) {
+                testProxyService.addEventListener('click', () => {
+                    if (window.app && window.app.testProxyService) {
+                        window.app.testProxyService();
+                    }
+                });
+            }
+
+            // 刷新代理统计按钮
+            const refreshProxyStatsBtn = document.getElementById('refreshProxyStatsBtn');
+            if (refreshProxyStatsBtn) {
+                refreshProxyStatsBtn.addEventListener('click', window.refreshProxyStats);
+            }
+
+            // 代理设置模态框事件
+            initProxySettingsModal();
+
+            // 监听代理相关事件
+            document.addEventListener('proxyLinkClicked', handleProxyLinkClicked);
+            document.addEventListener('proxyServiceToggled', handleProxyServiceToggled);
+
+            console.log('✅ 代理功能集成完成');
+        }
+
+        // 🆕 初始化代理设置模态框
+        function initProxySettingsModal() {
+            const proxySettingsModal = document.getElementById('proxySettingsModal');
+            const enableProxyService = document.getElementById('enableProxyService');
+            const showProxyIndicators = document.getElementById('showProxyIndicators');
+            const fallbackToOriginal = document.getElementById('fallbackToOriginal');
+            const autoRetryOnFailure = document.getElementById('autoRetryOnFailure');
+            const saveProxySettings = document.getElementById('saveProxySettings');
+            const testProxyConnection = document.getElementById('testProxyConnection');
+            const resetProxySettings = document.getElementById('resetProxySettings');
+
+            // 保存代理设置
+            if (saveProxySettings) {
+                saveProxySettings.addEventListener('click', () => {
+                    const config = {
+                        enabled: enableProxyService.checked,
+                        showIndicator: showProxyIndicators.checked,
+                        fallbackToOriginal: fallbackToOriginal.checked,
+                        autoRetryOnFailure: autoRetryOnFailure.checked
+                    };
+
+                    if (window.app) {
+                        window.app.proxyConfig = { ...window.app.proxyConfig, ...config };
+                        
+                        // 更新搜索服务的代理配置
+                        if (window.unifiedSearchManager?.searchService) {
+                            window.unifiedSearchManager.searchService.setProxyConfig(window.app.proxyConfig);
+                        }
+                        
+                        // 保存到本地存储
+                        localStorage.setItem('proxyConfig', JSON.stringify(config));
+                        
+                        // 更新UI
+                        window.app.updateProxyUI();
+                        
+                        showToast('代理设置已保存', 'success');
+                    }
+
+                    // 关闭模态框
+                    proxySettingsModal.style.display = 'none';
+                });
+            }
+
+            // 测试代理连接
+            if (testProxyConnection) {
+                testProxyConnection.addEventListener('click', async () => {
+                    const originalText = testProxyConnection.textContent;
+                    try {
+                        testProxyConnection.textContent = '测试中...';
+                        testProxyConnection.disabled = true;
+
+                        if (window.app && window.app.testProxyService) {
+                            const result = await window.app.testProxyService();
+                            
+                            if (result !== false) {
+                                showToast('代理服务连接正常！', 'success');
+                                updateProxySettingsUI(); // 更新统计信息
+                            } else {
+                                showToast('代理服务连接失败，请检查网络或稍后重试', 'error');
+                            }
+                        }
+                    } catch (error) {
+                        showToast('测试失败: ' + error.message, 'error');
+                    } finally {
+                        testProxyConnection.textContent = originalText;
+                        testProxyConnection.disabled = false;
+                    }
+                });
+            }
+
+            // 重置代理设置
+            if (resetProxySettings) {
+                resetProxySettings.addEventListener('click', () => {
+                    if (confirm('确定要重置代理设置为默认值吗？')) {
+                        enableProxyService.checked = true;
+                        showProxyIndicators.checked = true;
+                        fallbackToOriginal.checked = true;
+                        autoRetryOnFailure.checked = true;
+                        
+                        showToast('代理设置已重置', 'info');
+                    }
+                });
+            }
+        }
+
+        // 🆕 处理代理链接点击事件
+        function handleProxyLinkClicked(event) {
+            console.log('代理链接被点击:', event.detail);
+            
+            // 更新代理统计
+            if (window.app && window.app.proxyStats) {
+                window.app.proxyStats.totalRequests++;
+            }
+        }
+
+        // 🆕 处理代理服务切换事件
+        function handleProxyServiceToggled(event) {
+            console.log('代理服务状态切换:', event.detail);
+            
+            // 更新代理信息面板显示
+            const proxyInfoSection = document.getElementById('proxyInfoSection');
+            if (proxyInfoSection) {
+                proxyInfoSection.style.display = event.detail.enabled ? 'block' : 'none';
+            }
+        }
+
         // 处理搜索配置变更
         function handleSearchConfigChanged(event) {
             console.log('搜索配置已变更:', event.detail);
@@ -640,7 +992,6 @@
             
             // 根据配置更新其他UI元素
             if (config.enableDetailExtraction) {
-                // 可以在这里添加详情提取启用后的UI更新逻辑
                 console.log('详情提取功能已启用');
             }
         }
@@ -665,8 +1016,40 @@
                 setTimeout(() => {
                     if (window.app.isInitialized) {
                         window.app.checkConnectionStatus();
+                        
+                        // 🆕 重新测试代理服务
+                        if (window.app.proxyConfig?.enabled) {
+                            window.app.testProxyService();
+                        }
                     }
                 }, 100);
+            }
+        });
+
+        // 🆕 网络状态监听
+        window.addEventListener('online', () => {
+            console.log('网络已连接');
+            if (window.app && window.app.isInitialized) {
+                window.app.testConnection();
+                if (window.app.proxyConfig?.enabled) {
+                    window.app.testProxyService();
+                }
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('网络已断开');
+        });
+
+        // 🆕 全局错误处理 - 包含代理相关错误
+        window.addEventListener('error', (event) => {
+            console.error('页面错误:', event.error);
+            
+            if (event.error.message.includes('proxy') || event.error.message.includes('代理')) {
+                console.error('检测到代理相关错误');
+                if (window.app && window.app.proxyStats) {
+                    window.app.proxyStats.failedRequests++;
+                }
             }
         });
 

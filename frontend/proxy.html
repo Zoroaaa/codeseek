@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>磁力快搜 - 番号搜索引擎</title>
+    <meta name="description" content="集成代理功能的番号搜索引擎，解决区域限制访问问题">
+    
+    <!-- 基础样式 -->
+    <link rel="stylesheet" href="./assets/css/main.css">
+    <!-- 🆕 代理功能样式 -->
+    <link rel="stylesheet" href="./assets/css/proxy-styles.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="./assets/images/favicon.png">
+    
+    <!-- Meta Tags -->
+    <meta property="og:title" content="磁力快搜 - 番号搜索引擎">
+    <meta property="og:description" content="集成代理功能的番号搜索引擎，解决区域限制访问问题">
+    <meta property="og:type" content="website">
+</head>
+<body>
+    <!-- 连接状态指示器 -->
+    <div id="connectionStatus" class="connection-status" style="display: none;">
+        <div class="status-indicator"></div>
+        <span class="status-text">正在连接...</span>
+    </div>
+
+    <!-- 🆕 代理服务状态指示器 -->
+    <div id="proxyServiceStatus" class="proxy-service-status" style="display: none;">
+        <div class="proxy-status-indicator"></div>
+        <span class="proxy-status-text">代理服务检查中...</span>
+    </div>
+
+    <!-- 主导航 -->
+    <header class="main-header">
+        <nav class="main-nav">
+            <div class="nav-brand">
+                <h1>🧲 磁力快搜</h1>
+                <span class="version-badge">v3.1.0</span>
+                <!-- 🆕 代理服务状态徽章 -->
+                <span id="proxyStatus" class="status-badge disabled">代理: 禁用</span>
+            </div>
+            
+            <div class="nav-controls">
+                <!-- 🆕 代理服务切换按钮 -->
+                <button id="proxyToggle" class="proxy-toggle-btn" title="切换代理服务">
+                    <span class="btn-icon">🚫</span>
+                    <span class="btn-text">代理: 关</span>
+                </button>
+                
+                <!-- 详情提取切换按钮 -->
+                <button id="detailExtractionToggle" class="detail-toggle-btn" style="display: none;" title="切换详情提取">
+                    <span class="btn-icon">📋</span>
+                    <span class="btn-text">详情提取</span>
+                </button>
+                
+                <!-- 用户信息/登录按钮 -->
+                <div id="userInfo" class="user-info" style="display: none;">
+                    <span id="username">用户</span>
+                    <button id="logoutBtn" class="logout-btn">退出</button>
+                </div>
+                <button id="loginBtn" class="login-btn">登录</button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="main-content" style="display: none;">
+        <!-- 搜索区域 -->
+        <section class="search-section">
+            <div class="search-container">
+                <div class="search-input-group">
+                    <input type="text" id="searchInput" class="search-input" 
+                           placeholder="输入番号或关键词搜索..." 
+                           autocomplete="off">
+                    <button id="searchBtn" class="search-btn">
+                        <span class="btn-icon">🔍</span>
+                        <span class="btn-text">搜索</span>
+                    </button>
+                </div>
+                
+                <!-- 搜索建议 -->
+                <div id="searchSuggestions" class="search-suggestions" style="display: none;"></div>
+                
+                <!-- 快速提示 -->
+                <div id="quickTips" class="quick-tips">
+                    <p>💡 支持番号搜索 (如: MIMK-186) 或关键词搜索</p>
+                    <p>🌐 已启用代理服务，可解决区域访问限制</p>
+                    <p>⚡ 使用 Ctrl+K 快速聚焦搜索框</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 🆕 代理服务信息面板 -->
+        <section id="proxyInfoSection" class="proxy-info-section" style="display: none;">
+            <div class="proxy-info-container">
+                <h3>🌐 代理服务状态</h3>
+                <div id="proxyStatsContainer"></div>
+                <div class="proxy-controls">
+                    <button id="showProxyStats" class="btn-secondary">查看统计</button>
+                    <button id="testProxyService" class="btn-secondary">测试连通性</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 详情提取状态区域 -->
+        <section id="detailExtractionStatus" class="detail-extraction-status" style="display: none;">
+            <div class="status-container">
+                <h3>📋 详情提取功能</h3>
+                <div class="status-info">
+                    <span id="detailStatusBadge" class="status-badge unavailable">不可用</span>
+                    <p id="detailStatusDescription">详情提取功能当前不可用。</p>
+                </div>
+                <div class="detail-controls">
+                    <button id="batchExtractBtn" class="btn-primary" style="display: none;">批量提取详情</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 搜索状态指示器 -->
+        <div id="searchStatusIndicator" class="search-status-indicator" style="display: none;"></div>
+
+        <!-- 搜索结果区域 -->
+        <section id="resultsSection" class="results-section" style="display: none;">
+            <div class="results-header">
+                <div id="searchInfo" class="search-info"></div>
+                <div class="results-controls">
+                    <button id="clearResultsBtn" class="btn-secondary" style="display: none;">清空结果</button>
+                    <button id="exportResultsBtn" class="btn-secondary" style="display: none;">导出结果</button>
+                </div>
+            </div>
+            
+            <div id="results" class="results-container"></div>
+        </section>
+
+        <!-- 站点导航区域 -->
+        <section id="sitesSection" class="sites-section">
+            <h2>🌐 资源站点导航</h2>
+            <div class="loading-placeholder">正在加载站点数据...</div>
+        </section>
+
+        <!-- 搜索历史面板 -->
+        <aside id="searchHistoryPanel" class="search-history-panel" style="display: none;">
+            <div class="panel-header">
+                <h3>📚 搜索历史</h3>
+                <button id="clearHistoryBtn" class="btn-link">清空</button>
+            </div>
+            <div id="searchHistoryList" class="history-list"></div>
+        </aside>
+    </main>
+
+    <!-- 登录模态框 -->
+    <div id="loginModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>用户登录</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="loginUsername">用户名或邮箱:</label>
+                    <input type="text" id="loginUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">密码:</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">登录</button>
+                    <a href="#" id="showPasswordReset" class="btn-link">忘记密码？</a>
+                </div>
+                <p class="form-footer">
+                    还没有账户？ <a href="#" id="showRegister">立即注册</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- 注册模态框 -->
+    <div id="registerModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>用户注册</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="registerForm" class="register-form">
+                <div class="form-group">
+                    <label for="regUsername">用户名:</label>
+                    <input type="text" id="regUsername" required minlength="3" maxlength="20">
+                    <small>3-20个字符，支持字母数字下划线</small>
+                </div>
+                <div class="form-group">
+                    <label for="regEmail">邮箱地址:</label>
+                    <input type="email" id="regEmail" required>
+                    <small>用于账户验证和密码找回</small>
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">密码:</label>
+                    <input type="password" id="regPassword" required minlength="6">
+                    <small>至少6个字符</small>
+                </div>
+                <div class="form-group">
+                    <label for="regConfirmPassword">确认密码:</label>
+                    <input type="password" id="regConfirmPassword" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">注册并验证邮箱</button>
+                </div>
+                <p class="form-footer">
+                    已有账户？ <a href="#" id="showLogin">立即登录</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- 🆕 代理设置模态框 -->
+    <div id="proxySettingsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🌐 代理服务设置</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="proxy-settings-content">
+                <div class="setting-section">
+                    <h3>基础设置</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableProxyService" checked>
+                            启用代理服务
+                        </label>
+                        <small>通过代理服务器访问搜索结果，解决区域限制</small>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="showProxyIndicators" checked>
+                            显示代理指示器
+                        </label>
+                        <small>在搜索结果中显示代理访问标识</small>
+                    </div>
+                </div>
+                
+                <div class="setting-section">
+                    <h3>高级设置</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="fallbackToOriginal" checked>
+                            代理失败时回退到原始链接
+                        </label>
+                        <small>当代理服务不可用时，自动使用原始链接</small>
+                    </div>
+                </div>
+                
+                <div class="setting-section">
+                    <h3>统计信息</h3>
+                    <div id="proxySettingsStats" class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">代理请求总数:</span>
+                            <span id="totalProxyRequests" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">成功请求数:</span>
+                            <span id="successfulProxyRequests" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">服务状态:</span>
+                            <span id="proxyHealthStatus" class="stat-value">未知</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="saveProxySettings" class="btn-primary">保存设置</button>
+                    <button id="testProxyConnection" class="btn-secondary">测试连接</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>功能特色</h4>
+                <ul>
+                    <li>🌐 智能代理访问</li>
+                    <li>🔍 多源聚合搜索</li>
+                    <li>📋 自动详情提取</li>
+                    <li>⭐ 收藏同步管理</li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>技术支持</h4>
+                <ul>
+                    <li>✅ 区域限制解决</li>
+                    <li>🚀 高速代理服务</li>
+                    <li>🔒 安全访问保护</li>
+                    <li>📊 实时状态监控</li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>使用提示</h4>
+                <ul>
+                    <li>🔑 Ctrl+K 快速搜索</li>
+                    <li>🔄 自动状态检查</li>
+                    <li>💾 智能结果缓存</li>
+                    <li>⚙️ 个性化配置</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 磁力快搜. 集成代理服务版本 v3.1.0</p>
+            <p>
+                <a href="./dashboard.html">管理后台</a> | 
+                <a href="#" onclick="window.app?.displayProxyStats()">代理统计</a> |
+                <a href="#" onclick="window.app?.exportAppState()">导出配置</a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- 🆕 代理功能通知模板 -->
+    <template id="proxyNoticeTemplate">
+        <div class="proxy-notice">
+            <div class="proxy-notice-content">
+                <span class="proxy-notice-icon">🌐</span>
+                <span class="proxy-notice-text">
+                    已启用代理访问模式，搜索结果将通过代理服务器访问，解决区域限制问题
+                </span>
+                <button class="proxy-notice-close">×</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- JavaScript 模块 -->
+    <script type="module">
+        import MagnetSearchApp from './src/js/main.js';
+        
+        // 初始化应用
+        const app = new MagnetSearchApp();
+        
+        // 暴露到全局作用域用于调试和控制台操作
+        window.app = app;
+        
+        // 🆕 代理功能全局方法
+        window.toggleProxy = () => app.toggleProxyService();
+        window.showProxyStats = () => app.displayProxyStats();
+        window.testProxy = () => app.testProxyService();
+        
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 页面加载完成，应用已启动');
+            
+            // 🆕 绑定代理相关UI事件
+            const proxySettingsModal = document.getElementById('proxySettingsModal');
+            const enableProxyService = document.getElementById('enableProxyService');
+            const showProxyIndicators = document.getElementById('showProxyIndicators');
+            const fallbackToOriginal = document.getElementById('fallbackToOriginal');
+            const saveProxySettings = document.getElementById('saveProxySettings');
+            const testProxyConnection = document.getElementById('testProxyConnection');
+            
+            // 代理设置保存
+            if (saveProxySettings) {
+                saveProxySettings.addEventListener('click', () => {
+                    const config = {
+                        enabled: enableProxyService.checked,
+                        showIndicator: showProxyIndicators.checked,
+                        fallbackToOriginal: fallbackToOriginal.checked
+                    };
+                    
+                    app.proxyConfig = { ...app.proxyConfig, ...config };
+                    
+                    // 保存到本地存储
+                    localStorage.setItem('proxyConfig', JSON.stringify(config));
+                    
+                    // 更新UI
+                    app.updateProxyUI();
+                    
+                    // 关闭模态框
+                    proxySettingsModal.style.display = 'none';
+                    
+                    console.log('代理设置已保存:', config);
+                });
+            }
+            
+            // 测试代理连接
+            if (testProxyConnection) {
+                testProxyConnection.addEventListener('click', async () => {
+                    try {
+                        testProxyConnection.textContent = '测试中...';
+                        testProxyConnection.disabled = true;
+                        
+                        const result = await app.testProxyService();
+                        
+                        if (result && result.healthy !== false) {
+                            alert('代理服务连接正常！');
+                        } else {
+                            alert('代理服务连接失败，请检查网络或稍后重试。');
+                        }
+                    } catch (error) {
+                        alert('测试失败: ' + error.message);
+                    } finally {
+                        testProxyConnection.textContent = '测试连接';
+                        testProxyConnection.disabled = false;
+                    }
+                });
+            }
+        });
+
+        // 🆕 页面可见性变化时重新测试代理服务
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && app.isInitialized && app.proxyConfig.enabled) {
+                setTimeout(() => {
+                    app.testProxyService().catch(console.error);
+                }, 1000);
+            }
+        });
+
+        // 监听网络状态变化
+        window.addEventListener('online', () => {
+            console.log('网络已连接');
+            if (app.isInitialized) {
+                app.testConnection();
+                if (app.proxyConfig.enabled) {
+                    app.testProxyService();
+                }
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('网络已断开');
+        });
+
+        // 🆕 性能监控和错误追踪
+        window.addEventListener('error', (event) => {
+            console.error('页面错误:', event.error);
+            if (event.error.message.includes('proxy') || event.error.message.includes('代理')) {
+                console.error('代理相关错误detected');
+                if (app.proxyStats) {
+                    app.proxyStats.failedRequests++;
+                }
+            }
+        });
+
+        // 🆕 代理链接点击统计
+        document.addEventListener('click', (event) => {
+            const link = event.target.closest('a[href*="/api/proxy/"]');
+            if (link && app.proxyStats) {
+                app.proxyStats.totalRequests++;
+                console.log('代理链接被点击:', link.href);
+            }
+        });
+    </script>
+
+    <!-- 🆕 代理服务工作者脚本 (可选，用于后台监控) -->
+    <script>
+        // Service Worker 注册（如果需要离线支持）
+        if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+            navigator.serviceWorker.register('./sw.js')
+                .then(registration => {
+                    console.log('Service Worker 注册成功:', registration);
+                })
+                .catch(error => {
+                    console.log('Service Worker 注册失败:', error);
+                });
+        }
+    </script>
+</body>
+</html>

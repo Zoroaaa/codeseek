@@ -1,7 +1,7 @@
-// src/router.js - 重构版本：搜索源管理功能已独立，移除旧的冗余路由
+// src/router.js - 集成代理功能的路由器更新
 import { utils } from './utils.js';
 
-// 导入所有处理器
+// 导入所有处理器（包括新的代理处理器）
 import {
     authRegisterHandler,
     authLoginHandler,
@@ -10,17 +10,14 @@ import {
     authChangePasswordHandler,
     authLogoutHandler,
     authDeleteAccountHandler,
-    // 邮箱验证处理器
     authSendRegistrationCodeHandler,
     authSendPasswordResetCodeHandler,
     authRequestEmailChangeHandler,
     authSendEmailChangeCodeHandler,
     authVerifyEmailChangeCodeHandler,
     authSendAccountDeleteCodeHandler,
-    // 忘记密码处理器
     authForgotPasswordHandler,
     authResetPasswordHandler,
-    // 验证状态检查处理器
     authCheckVerificationStatusHandler,
     authGetUserVerificationStatusHandler,
     authSmartSendVerificationCodeHandler
@@ -44,7 +41,6 @@ import {
     communitySearchHandler
 } from './handlers/community.js';
 
-// 用户相关处理器（已移除搜索源管理相关功能）
 import {
     userGetSettingsHandler,
     userUpdateSettingsHandler,
@@ -57,7 +53,6 @@ import {
     userGetSearchStatsHandler
 } from './handlers/user.js';
 
-// 独立的搜索源管理处理器
 import {
     getMajorCategoriesHandler,
     createMajorCategoryHandler,
@@ -76,7 +71,6 @@ import {
     exportUserSearchSourcesHandler
 } from './handlers/search-sources.js';
 
-// 系统相关处理器（已移除搜索源管理相关功能）
 import {
     healthCheckHandler,
     sourceStatusCheckHandler,
@@ -99,6 +93,13 @@ import {
     applyConfigPresetHandler,
     getDetailExtractionStatsHandler
 } from './handlers/detail.js';
+
+// 🆕 导入代理处理器
+import {
+    proxyHandler,
+    proxyHealthCheckHandler,
+    proxyStatsHandler
+} from './handlers/proxy.js';
 
 export class Router {
     constructor() {
@@ -146,6 +147,12 @@ export class Router {
                 status: 204,
                 headers: utils.getCorsHeaders(request.headers.get('Origin') || '*')
             });
+        }
+
+        // 🆕 特殊处理代理请求 - 必须在其他路由之前处理
+        if (pathname.startsWith('/api/proxy/')) {
+            console.log(`代理请求: ${pathname}`);
+            return await this.executeHandler(proxyHandler, request, env);
         }
 
         // 1. 优先尝试精确匹配
@@ -221,6 +228,23 @@ export class Router {
     setupRoutes() {
         // 健康检查
         this.get('/api/health', healthCheckHandler);
+
+        // ===============================================
+        // 🆕 代理服务相关路由 - 必须在最前面定义
+        // ===============================================
+        
+        // 代理健康检查
+        this.get('/api/proxy/health', proxyHealthCheckHandler);
+        
+        // 代理统计信息
+        this.get('/api/proxy/stats', proxyStatsHandler);
+        
+        // 通用代理路由 - 匹配 /api/proxy/* 的所有请求
+        // 注意：这里不使用 this.get() 因为需要处理所有HTTP方法
+        this.routes.set('GET:/api/proxy/*', proxyHandler);
+        this.routes.set('POST:/api/proxy/*', proxyHandler);
+        this.routes.set('PUT:/api/proxy/*', proxyHandler);
+        this.routes.set('DELETE:/api/proxy/*', proxyHandler);
 
         // ===============================================
         // 认证相关路由（增强版本，包含邮箱验证和忘记密码）
@@ -376,29 +400,33 @@ export class Router {
 }
 
 // ===============================================
-// 重构说明
+// 🆕 代理功能集成说明
 // ===============================================
 // 
-// 本次重构已完成：
+// 本次更新添加了完整的代理功能：
 // 
-// 1. 移除了旧的搜索源管理冗余功能：
-//    - user.js 中的 customSearchSources、customSourceCategories 相关设置处理
-//    - system.js 中的 getSearchSourcesHandler 函数
-//    - constants.js 中的硬编码搜索源定义
-// 
-// 2. 新的搜索源管理架构：
-//    - 独立的数据库表：search_major_categories、search_source_categories、search_sources、user_search_source_configs
-//    - 独立的服务文件：search-sources-service.js
-//    - 独立的处理器文件：search-sources.js
-//    - 完整的RESTful API路由
-// 
-// 3. 功能分离清晰：
-//    - 用户设置只处理个人偏好设置
-//    - 搜索源管理通过专门的API处理
-//    - 系统级别的状态检查保持独立
-//    - 详情提取功能保持独立
-// 
-// 4. 向后兼容性：
-//    - 保留了所有现有的非搜索源管理功能
-//    - API路径清晰，便于前端调用
-//    - 数据库设计支持用户个性化配置
+// 1. 代理路由：
+//    - GET/POST/PUT/DELETE /api/proxy/* - 通用代理服务
+//    - GET /api/proxy/health - 代理健康检查
+//    - GET /api/proxy/stats - 代理使用统计
+//
+// 2. 安全特性：
+//    - 域名白名单限制
+//    - 垃圾域名黑名单过滤
+//    - 用户访问日志记录
+//    - CORS头部处理
+//
+// 3. 功能特性：
+//    - 自动处理重定向
+//    - HTML内容中链接重写
+//    - 错误页面友好显示
+//    - 响应头优化
+//
+// 4. 使用方式：
+//    - 原始URL: https://javbus.com/search/MIMK-186
+//    - 代理URL: https://your-domain.com/api/proxy/https%3A//javbus.com/search/MIMK-186
+//
+// 5. 与搜索功能集成：
+//    - 搜索服务会自动将结果URL包装为代理URL
+//    - 用户点击搜索结果时通过代理访问
+//    - 解决区域限制和访问问题
