@@ -39,68 +39,70 @@ export class SourcesManager {
     }
   }
 
-  async loadUserSearchSettings() {
-    if (!this.app.getCurrentUser()) {
-      await this.loadMinimalDataSet();
-      return;
+// 🔴 改进 loadUserSearchSettings 方法，确保加载用户自定义分类
+async loadUserSearchSettings() {
+  if (!this.app.getCurrentUser()) {
+    await this.loadMinimalDataSet();
+    return;
+  }
+  
+  try {
+    console.log('🔡 从新API加载搜索源数据...');
+    
+    // 获取大类数据
+    this.majorCategories = await searchSourcesAPI.getMajorCategories();
+    console.log('✅ 已加载大类:', this.majorCategories);
+    
+    // 🔴 修复：确保获取所有分类，包括用户自定义的
+    this.allCategories = await searchSourcesAPI.getSourceCategories({
+      includeSystem: true,
+      includeCustom: true  // 确保包含用户自定义分类
+    });
+    console.log('✅ 已加载分类:', this.allCategories);
+    
+    // 获取所有搜索源
+    const allSources = await searchSourcesAPI.getSearchSources({
+      includeSystem: true,
+      enabledOnly: false
+    });
+    console.log('✅ 已加载搜索源:', allSources);
+    
+    // 获取用户配置
+    const userConfigs = await searchSourcesAPI.getUserSourceConfigs();
+    console.log('✅ 已加载用户配置:', userConfigs);
+    
+    // 🔴 修复：正确区分内置和自定义源
+    this.builtinSearchSources = allSources.filter(s => s.isSystem === true);
+    this.customSearchSources = allSources.filter(s => !s.isSystem);
+    
+    console.log(`📊 源分类: ${this.builtinSearchSources.length} 个内置, ${this.customSearchSources.length} 个自定义`);
+    
+    // 合并所有源,并标准化字段
+    this.allSearchSources = allSources.map(source => {
+      // 🔴 修复：确保 categoryId 字段存在
+      if (!source.categoryId && source.category) {
+        source.categoryId = source.category;
+      }
+      return source;
+    });
+    
+    // 从用户配置中提取可用的源ID列表
+    this.enabledSources = userConfigs
+      .filter(config => config.isEnabled !== false)
+      .map(config => config.sourceId);
+    
+    // 如果没有配置,使用所有系统源作为默认可用
+    if (this.enabledSources.length === 0) {
+      this.enabledSources = this.builtinSearchSources.map(s => s.id);
     }
     
-    try {
-      console.log('📡 从新API加载搜索源数据...');
-      
-      // 获取大类数据
-      this.majorCategories = await searchSourcesAPI.getMajorCategories();
-      console.log('✅ 已加载大类:', this.majorCategories);
-      
-      // 获取所有分类
-      this.allCategories = await searchSourcesAPI.getSourceCategories({
-        includeSystem: true
-      });
-      console.log('✅ 已加载分类:', this.allCategories);
-      
-      // 获取所有搜索源
-      const allSources = await searchSourcesAPI.getSearchSources({
-        includeSystem: true,
-        enabledOnly: false
-      });
-      console.log('✅ 已加载搜索源:', allSources);
-      
-      // 获取用户配置
-      const userConfigs = await searchSourcesAPI.getUserSourceConfigs();
-      console.log('✅ 已加载用户配置:', userConfigs);
-      
-      // 🔴 修复:正确区分内置和自定义源
-      this.builtinSearchSources = allSources.filter(s => s.isSystem === true);
-      this.customSearchSources = allSources.filter(s => !s.isSystem);
-      
-      console.log(`📊 源分类: ${this.builtinSearchSources.length} 个内置, ${this.customSearchSources.length} 个自定义`);
-      
-      // 合并所有源,并标准化字段
-      this.allSearchSources = allSources.map(source => {
-        // 🔴 修复:确保 categoryId 字段存在
-        if (!source.categoryId && source.category) {
-          source.categoryId = source.category;
-        }
-        return source;
-      });
-      
-      // 从用户配置中提取启用的源ID列表
-      this.enabledSources = userConfigs
-        .filter(config => config.isEnabled !== false)
-        .map(config => config.sourceId);
-      
-      // 如果没有配置,使用所有系统源作为默认启用
-      if (this.enabledSources.length === 0) {
-        this.enabledSources = this.builtinSearchSources.map(s => s.id);
-      }
-      
-      console.log(`✅ 已加载 ${this.majorCategories.length} 个大类,${this.allCategories.length} 个分类,${this.allSearchSources.length} 个搜索源 (${this.builtinSearchSources.length} 内置, ${this.customSearchSources.length} 自定义), ${this.enabledSources.length} 个已启用`);
-      
-    } catch (error) {
-      console.warn('⚠️ 从API加载搜索源失败,使用最小数据集:', error);
-      await this.loadMinimalDataSet();
-    }
+    console.log(`✅ 已加载 ${this.majorCategories.length} 个大类,${this.allCategories.length} 个分类,${this.allSearchSources.length} 个搜索源 (${this.builtinSearchSources.length} 内置, ${this.customSearchSources.length} 自定义), ${this.enabledSources.length} 个已可用`);
+    
+  } catch (error) {
+    console.warn('⚠️ 从API加载搜索源失败,使用最小数据集:', error);
+    await this.loadMinimalDataSet();
   }
+}
 
   async loadMinimalDataSet() {
     try {
@@ -706,64 +708,109 @@ export class SourcesManager {
     return modal;
   }
 
-  populateCustomSourceForm(modal, source) {
-    const form = modal.querySelector('#customSourceForm');
-    if (!form) return;
+// 修复 populateCustomSourceForm 方法中的分类显示问题
+populateCustomSourceForm(modal, source) {
+  const form = modal.querySelector('#customSourceForm');
+  if (!form) return;
 
-    if (source) {
-      form.sourceId.value = source.id;
-      form.sourceName.value = source.name;
-      form.sourceSubtitle.value = source.subtitle || '';
-      form.sourceIcon.value = source.icon || '🔍';
-      form.sourceUrl.value = source.urlTemplate;
-      form.sourceCategory.value = source.categoryId || source.category || 'others';
-      form.searchable.checked = source.searchable !== false;
-      form.siteType.value = source.siteType || 'search';
-      form.searchPriority.value = source.searchPriority || 5;
-      form.requiresKeyword.checked = source.requiresKeyword !== false;
-      modal.querySelector('h2').textContent = '编辑自定义搜索源';
-      modal.querySelector('[type="submit"]').textContent = '更新搜索源';
+  // 首先更新分类选择框
+  this.updateSourceCategorySelect(form.sourceCategory);
+
+  if (source) {
+    // 编辑模式
+    form.sourceId.value = source.id;
+    form.sourceName.value = source.name;
+    form.sourceSubtitle.value = source.subtitle || '';
+    form.sourceIcon.value = source.icon || '🔍';
+    form.sourceUrl.value = source.urlTemplate;
+    
+    // 🔴 修复：确保分类值正确设置
+    const sourceCategoryId = source.categoryId || source.category;
+    
+    // 检查分类是否存在于当前分类列表中
+    const categoryExists = this.allCategories.some(cat => cat.id === sourceCategoryId);
+    
+    if (categoryExists) {
+      form.sourceCategory.value = sourceCategoryId;
     } else {
-      form.reset();
-      form.sourceIcon.value = '🔍';
-      form.sourceCategory.value = 'others';
-      form.searchable.checked = true;
-      form.siteType.value = 'search';
-      form.searchPriority.value = 5;
-      form.requiresKeyword.checked = true;
-      modal.querySelector('h2').textContent = '添加自定义搜索源';
-      modal.querySelector('[type="submit"]').textContent = '添加搜索源';
+      // 如果分类不存在，添加一个临时选项保持原始值
+      const tempOption = document.createElement('option');
+      tempOption.value = sourceCategoryId;
+      tempOption.textContent = `🔍 ${sourceCategoryId} (原分类)`;
+      tempOption.style.color = '#888';
+      form.sourceCategory.appendChild(tempOption);
+      form.sourceCategory.value = sourceCategoryId;
       
-      const categorySelect = form.sourceCategory;
-      categorySelect.addEventListener('change', (e) => {
-        const category = this.getCategoryById(e.target.value);
-        if (category) {
-          form.searchable.checked = category.defaultSearchable !== false;
-          form.siteType.value = category.defaultSiteType || 'search';
-          form.searchPriority.value = category.searchPriority || 5;
-          form.searchable.dispatchEvent(new Event('change'));
-        }
-      });
+      console.warn(`分类 ${sourceCategoryId} 不存在于当前分类列表中，已添加临时选项`);
     }
     
-    this.updateSourceCategorySelect(form.sourceCategory);
+    form.searchable.checked = source.searchable !== false;
+    form.siteType.value = source.siteType || 'search';
+    form.searchPriority.value = source.searchPriority || 5;
+    form.requiresKeyword.checked = source.requiresKeyword !== false;
+    modal.querySelector('h2').textContent = '编辑自定义搜索源';
+    modal.querySelector('[type="submit"]').textContent = '更新搜索源';
+  } else {
+    // 新增模式
+    form.reset();
+    form.sourceIcon.value = '🔍';
+    form.sourceCategory.value = 'others';
+    form.searchable.checked = true;
+    form.siteType.value = 'search';
+    form.searchPriority.value = 5;
+    form.requiresKeyword.checked = true;
+    modal.querySelector('h2').textContent = '添加自定义搜索源';
+    modal.querySelector('[type="submit"]').textContent = '添加搜索源';
     
-    if (form.searchable) {
-      form.searchable.dispatchEvent(new Event('change'));
+    // 只在新增模式下添加分类变更监听器
+    const categorySelect = form.sourceCategory;
+    // 移除之前的监听器（如果存在）
+    const newCategorySelect = categorySelect.cloneNode(true);
+    categorySelect.parentNode.replaceChild(newCategorySelect, categorySelect);
+    
+    newCategorySelect.addEventListener('change', (e) => {
+      const category = this.getCategoryById(e.target.value);
+      if (category) {
+        form.searchable.checked = category.defaultSearchable !== false;
+        form.siteType.value = category.defaultSiteType || 'search';
+        form.searchPriority.value = category.searchPriority || 5;
+        form.searchable.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+  
+  if (form.searchable) {
+    form.searchable.dispatchEvent(new Event('change'));
+  }
+}
+
+// 🔴 增强 updateSourceCategorySelect 方法，支持保持原有分类
+updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
+  if (!selectElement) return;
+
+  const currentValue = preserveCurrentValue ? selectElement.value : null;
+
+  const categoriesHTML = this.allCategories
+    .sort((a, b) => (a.displayOrder || a.order || 999) - (b.displayOrder || b.order || 999))
+    .map(category => `
+      <option value="${category.id}">${category.icon} ${category.name}</option>
+    `).join('');
+
+  selectElement.innerHTML = categoriesHTML;
+
+  // 如果需要保持原有值且该值不在新选项中，添加临时选项
+  if (preserveCurrentValue && currentValue) {
+    const valueExists = this.allCategories.some(cat => cat.id === currentValue);
+    if (!valueExists) {
+      const tempOption = document.createElement('option');
+      tempOption.value = currentValue;
+      tempOption.textContent = `🔍 ${currentValue} (原分类)`;
+      tempOption.style.color = '#888';
+      selectElement.appendChild(tempOption);
     }
+    selectElement.value = currentValue;
   }
-
-  updateSourceCategorySelect(selectElement) {
-    if (!selectElement) return;
-
-    const categoriesHTML = this.allCategories
-      .sort((a, b) => (a.displayOrder || a.order || 999) - (b.displayOrder || b.order || 999))
-      .map(category => `
-        <option value="${category.id}">${category.icon} ${category.name}</option>
-      `).join('');
-
-    selectElement.innerHTML = categoriesHTML;
-  }
+}
 
   // 🔴 修复:保存时使用 categoryId 字段
   async handleCustomSourceSubmit(event) {

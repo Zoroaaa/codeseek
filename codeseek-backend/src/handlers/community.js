@@ -977,6 +977,9 @@ export async function communityDeleteSourceHandler(request, env) {
 }
 
 // 下载搜索源
+// 完全修复版本的 communityDownloadSourceHandler 函数
+// 彻底避免复杂的 LIKE 模式，使用更安全的查询方式
+
 export async function communityDownloadSourceHandler(request, env) {
     const user = await authenticate(request, env);
     if (!user) return utils.errorResponse('认证失败', 401);
@@ -984,6 +987,7 @@ export async function communityDownloadSourceHandler(request, env) {
     try {
         const sourceId = request.params.id;
         
+        // 获取社区搜索源
         const source = await env.DB.prepare(`
             SELECT * FROM community_shared_sources 
             WHERE id = ? AND status = 'active'
@@ -993,6 +997,146 @@ export async function communityDownloadSourceHandler(request, env) {
             return utils.errorResponse('搜索源不存在', 404);
         }
         
+        // 方法1：直接查询避免复杂模式 - 检查是否已有相同名称或URL的源
+        const existingByNameOrUrl = await env.DB.prepare(`
+            SELECT id FROM search_sources 
+            WHERE created_by = ? AND is_active = 1 AND (name = ? OR url_template = ?)
+        `).bind(user.id, source.source_name, source.source_url_template).first();
+        
+        if (existingByNameOrUrl) {
+            return utils.errorResponse('您已经添加过此搜索源或相似的搜索源', 400);
+        }
+        
+        // 方法2：检查是否已从此社区源添加过 - 避免JSON_EXTRACT和复杂LIKE
+        // 获取用户所有搜索源，然后在应用层检查
+        const userSources = await env.DB.prepare(`
+            SELECT id, supported_features FROM search_sources 
+            WHERE created_by = ? AND is_active = 1
+        `).bind(user.id).all();
+        
+        // 在应用层检查是否已添加过此社区源
+        const alreadyAdded = userSources.results.some(userSource => {
+            try {
+                const features = userSource.supported_features ? JSON.parse(userSource.supported_features) : [];
+                return features.some(feature => 
+                    typeof feature === 'string' && 
+                    feature.includes('community_source_id') && 
+                    feature.includes(sourceId)
+                );
+            } catch (e) {
+                return false;
+            }
+        });
+        
+        if (alreadyAdded) {
+            return utils.errorResponse('您已经从社区添加过此搜索源', 400);
+        }
+        
+        // 分类映射关系
+        const categoryMapping = {
+            'jav': 'database',
+            'movie': 'streaming',
+            'torrent': 'torrent',
+            'other': 'others'
+        };
+        
+        const categoryId = categoryMapping[source.source_category] || 'others';
+        
+        // 验证分类是否存在
+        const categoryExists = await env.DB.prepare(`
+            SELECT id FROM search_source_categories 
+            WHERE id = ? AND is_active = 1
+        `).bind(categoryId).first();
+        
+        if (!categoryExists) {
+            throw new Error(`目标分类 ${categoryId} 不存在`);
+        }
+        
+        // 生成新的搜索源ID
+        const newSourceId = utils.generateId();
+        const now = Date.now();
+        
+        // 提取主页URL
+        let homepageUrl = null;
+        try {
+            const urlObj = new URL(source.source_url_template.replace('{keyword}', ''));
+            homepageUrl = `${urlObj.protocol}//${urlObj.host}`;
+        } catch (e) {
+            homepageUrl = null;
+        }
+        
+        // 构建支持的功能数组 - 使用简单的标识格式
+        const supportedFeatures = [
+            'community_source',
+            'custom_source'
+        ];
+        
+        // 添加社区源标识 - 使用简单格式
+        supportedFeatures.push(`community_source_id:${sourceId}`);
+        
+        if (source.description && source.description.trim()) {
+            supportedFeatures.push('description');
+        }
+        
+        // 插入到搜索源表
+        await env.DB.prepare(`
+            INSERT INTO search_sources (
+                id, category_id, name, subtitle, description, icon, url_template,
+                homepage_url, site_type, searchable, requires_keyword, search_priority,
+                supports_detail_extraction, extraction_quality, average_extraction_time,
+                supported_features, is_system, is_active, display_order, usage_count,
+                last_used_at, created_by, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+            newSourceId,
+            categoryId,
+            source.source_name,
+            source.source_subtitle || null,
+            source.description || null,
+            source.source_icon || '🔍',
+            source.source_url_template,
+            homepageUrl,
+            'browse',
+            0, // searchable: 默认不参与搜索
+            0, // requires_keyword: 默认不需要关键词
+            5, // search_priority: 默认中等优先级
+            0, // supports_detail_extraction: 默认不支持详情提取
+            'none', // extraction_quality
+            0, // average_extraction_time
+            JSON.stringify(supportedFeatures),
+            0, // is_system: 用户自定义源
+            1, // is_active: 默认激活
+            999, // display_order
+            0, // usage_count
+            null, // last_used_at
+            user.id,
+            now,
+            now
+        ).run();
+        
+        // 为用户创建搜索源配置
+        const configId = utils.generateId();
+        await env.DB.prepare(`
+            INSERT INTO user_search_source_configs (
+                id, user_id, source_id, is_enabled, custom_priority,
+                custom_name, custom_subtitle, custom_icon, notes,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+            configId,
+            user.id,
+            newSourceId,
+            1, // is_enabled: 默认可用
+            null,
+            null,
+            null,
+            null,
+            `从社区添加：${source.source_name}`,
+            now,
+            now
+        ).run();
+        
+        // 记录下载行为
         const downloadId = utils.generateId();
         const ip = utils.getClientIP(request);
         const userAgent = request.headers.get('User-Agent') || '';
@@ -1001,62 +1145,76 @@ export async function communityDownloadSourceHandler(request, env) {
             INSERT INTO community_source_downloads (
                 id, shared_source_id, user_id, ip_address, user_agent, created_at
             ) VALUES (?, ?, ?, ?, ?, ?)
-        `).bind(downloadId, sourceId, user.id, ip, userAgent, Date.now()).run();
+        `).bind(downloadId, sourceId, user.id, ip, userAgent, now).run();
         
-        const userSettings = await env.DB.prepare(`
-            SELECT settings FROM users WHERE id = ?
-        `).bind(user.id).first();
-        
-        const settings = userSettings ? JSON.parse(userSettings.settings || '{}') : {};
-        const customSources = settings.customSearchSources || [];
-        
-        const newSourceId = `community_${sourceId}_${Date.now()}`;
-        
-        const newCustomSource = {
-            id: newSourceId,
-            name: source.source_name,
-            subtitle: source.source_subtitle,
-            icon: source.source_icon,
-            urlTemplate: source.source_url_template,
-            category: source.source_category,
-            isCustom: true,
-            isFromCommunity: true,
-            communitySourceId: sourceId,
-            createdAt: Date.now()
-        };
-        
-        customSources.push(newCustomSource);
-        
-        const enabledSources = settings.searchSources || [];
-        if (!enabledSources.includes(newSourceId)) {
-            enabledSources.push(newSourceId);
-        }
-        
-        const updatedSettings = {
-            ...settings,
-            customSearchSources: customSources,
-            searchSources: enabledSources
-        };
-        
+        // 更新下载计数
         await env.DB.prepare(`
-            UPDATE users SET settings = ?, updated_at = ? WHERE id = ?
-        `).bind(JSON.stringify(updatedSettings), Date.now(), user.id).run();
+            UPDATE community_shared_sources 
+            SET download_count = download_count + 1 
+            WHERE id = ?
+        `).bind(sourceId).run();
         
-        await utils.logUserAction(env, user.id, 'community_source_downloaded', {
-            sourceId,
+        // 记录用户行为
+        await utils.logUserAction(env, user.id, 'community_source_downloaded_v3', {
+            communitySourceId: sourceId,
+            newSourceId,
             sourceName: source.source_name,
-            newSourceId
+            category: source.source_category,
+            mappedCategoryId: categoryId
         }, request);
         
+        // 获取完整的搜索源信息
+        const createdSource = await env.DB.prepare(`
+            SELECT 
+                ss.*,
+                sc.name as category_name,
+                sc.icon as category_icon,
+                mc.name as major_category_name
+            FROM search_sources ss
+            LEFT JOIN search_source_categories sc ON ss.category_id = sc.id
+            LEFT JOIN search_major_categories mc ON sc.major_category_id = mc.id
+            WHERE ss.id = ?
+        `).bind(newSourceId).first();
+        
         return utils.successResponse({
-            message: '搜索源已添加到您的自定义搜索源',
-            newSourceId,
-            source: newCustomSource
+            message: '搜索源已成功添加到您的搜索源管理',
+            sourceId: newSourceId,
+            communitySourceId: sourceId,
+            source: {
+                id: createdSource.id,
+                name: createdSource.name,
+                subtitle: createdSource.subtitle,
+                icon: createdSource.icon,
+                urlTemplate: createdSource.url_template,
+                category: {
+                    id: createdSource.category_id,
+                    name: createdSource.category_name,
+                    icon: createdSource.category_icon
+                },
+                majorCategory: {
+                    name: createdSource.major_category_name
+                },
+                description: createdSource.description,
+                isFromCommunity: true,
+                createdAt: createdSource.created_at
+            }
         });
         
     } catch (error) {
         console.error('下载搜索源失败:', error);
-        return utils.errorResponse('下载搜索源失败: ' + error.message, 500);
+        
+        let errorMessage = '添加搜索源失败';
+        if (error.message.includes('UNIQUE constraint')) {
+            errorMessage = '搜索源已存在，请勿重复添加';
+        } else if (error.message.includes('FOREIGN KEY')) {
+            errorMessage = '目标分类不存在，请联系管理员';
+        } else if (error.message.includes('目标分类')) {
+            errorMessage = error.message;
+        } else {
+            errorMessage += ': ' + error.message;
+        }
+        
+        return utils.errorResponse(errorMessage, 500);
     }
 }
 

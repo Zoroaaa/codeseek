@@ -1,4 +1,4 @@
-// src/services/search-sources-service.js - 优化版本：修复前后端字段匹配问题
+// src/services/search-sources-service.js - 优化版本：修复前后端字段匹配问题，确保所有分类字段正确返回
 import { utils } from '../utils.js';
 import { CONFIG } from '../constants.js';
 
@@ -456,7 +456,7 @@ class SearchSourcesService {
                 now
             ).run();
 
-            // 自动为用户创建配置（默认可用）
+            // 自动为用户创建配置（默认启用）
             await this.createUserSourceConfig(env, creatorId, sourceId, { isEnabled: true });
 
             return this.formatSearchSource({
@@ -483,7 +483,7 @@ class SearchSourcesService {
                 created_by: creatorId,
                 created_at: now,
                 updated_at: now,
-                user_enabled: 1 // 默认可用
+                user_enabled: 1 // 默认启用
             });
         } catch (error) {
             console.error('创建搜索源失败:', error);
@@ -891,7 +891,7 @@ class SearchSourcesService {
         };
     }
 
-    // 格式化分类数据
+    // 格式化分类数据 - 🔴 确保返回所有必要字段
     formatSourceCategory(data) {
         return {
             id: data.id,
@@ -905,6 +905,7 @@ class SearchSourcesService {
             displayOrder: data.display_order || 999,
             isSystem: Boolean(data.is_system),
             isActive: Boolean(data.is_active),
+            // 🔴 确保搜索配置字段正确返回
             defaultSearchable: Boolean(data.default_searchable),
             defaultSiteType: data.default_site_type || 'search',
             searchPriority: data.search_priority || 5,
