@@ -319,7 +319,7 @@ export class CommunityTagsManager {
     }
   }
 
-  // 渲染热门标签
+// 渲染热门标签
   renderPopularTags() {
     const container = document.getElementById('popularTagsList');
     if (!container) return;
@@ -346,7 +346,7 @@ export class CommunityTagsManager {
         
         return `
             <span class="${tagClass}" 
-                  onclick="window.app.getManager('community').communitySources.searchByTag('${escapeHtml(tag.name)}')"
+                  onclick="window.app.getManager('community').communitySources.showTagSourcesModal('${tag.id}', '${escapeHtml(tag.name)}')"
                   title="点击查看标签相关的搜索源 (使用次数: ${usageCount})">
                 ${escapeHtml(tag.name)} 
                 <span class="tag-count">(${usageCount})</span>
