@@ -351,40 +351,101 @@ class APIService {
 
   // ===================== 收藏相关API =====================
 
-  async syncFavorites(favorites) {
-    if (!this.token) {
-      throw new Error('用户未登录');
+async syncFavorites(favorites) {
+  if (!this.token) {
+    throw new Error('用户未登录');
+  }
+  
+  if (!Array.isArray(favorites)) {
+    throw new Error('收藏数据格式错误');
+  }
+  
+  const validFavorites = favorites.filter(fav => {
+    return fav && fav.title && fav.url && 
+           typeof fav.title === 'string' && 
+           typeof fav.url === 'string';
+  });
+  
+  if (validFavorites.length !== favorites.length) {
+    console.warn('过滤了无效的收藏数据');
+  }
+  
+  // 🔧 保存原始时间戳映射
+  const originalTimestamps = new Map();
+  validFavorites.forEach(fav => {
+    if (fav.id && fav.addedAt) {
+      originalTimestamps.set(fav.id, fav.addedAt);
     }
-    
-    if (!Array.isArray(favorites)) {
-      throw new Error('收藏数据格式错误');
-    }
-    
-    const validFavorites = favorites.filter(fav => {
-      return fav && fav.title && fav.url && 
-             typeof fav.title === 'string' && 
-             typeof fav.url === 'string';
+  });
+  
+  try {
+    const response = await this.request('/api/user/favorites', {
+      method: 'POST',
+      body: JSON.stringify({ favorites: validFavorites })
     });
     
-    if (validFavorites.length !== favorites.length) {
-      console.warn('过滤了无效的收藏数据');
+    // 🔧 如果服务器返回了数据，需要恢复原始时间戳
+    if (response && response.favorites && Array.isArray(response.favorites)) {
+      const restoredFavorites = response.favorites.map(fav => {
+        const originalTimestamp = originalTimestamps.get(fav.id);
+        return originalTimestamp ? {
+          ...fav,
+          addedAt: originalTimestamp  // 恢复客户端的时间戳
+        } : fav;
+      });
+      
+      return {
+        ...response,
+        favorites: restoredFavorites,
+        // 🔧 添加标志告诉前端不要更新本地数据
+        shouldUpdateLocal: false
+      };
     }
     
-    try {
-      return await this.request('/api/user/favorites', {
-        method: 'POST',
-        body: JSON.stringify({ favorites: validFavorites })
-      });
-    } catch (error) {
-      console.error('同步收藏失败:', error);
-      throw error;
-    }
+    // 🔧 如果服务器只返回成功状态，不返回数据列表
+    return {
+      ...response,
+      shouldUpdateLocal: false  // 明确告诉前端保持本地数据不变
+    };
+    
+  } catch (error) {
+    console.error('同步收藏失败:', error);
+    throw error;
   }
+}
 
-  async getFavorites() {
+// 🔧 新增：专门的获取收藏方法，确保时间戳正确
+async getFavorites() {
+  try {
     const response = await this.request('/api/user/favorites');
     return response.favorites || [];
+  } catch (error) {
+    console.error('获取收藏失败:', error);
+    throw error;
   }
+}
+
+// 🔧 新增：批量操作时的时间戳保护工具方法
+preserveTimestamps(originalFavorites, updatedFavorites) {
+  if (!Array.isArray(originalFavorites) || !Array.isArray(updatedFavorites)) {
+    return updatedFavorites;
+  }
+  
+  const timestampMap = new Map();
+  originalFavorites.forEach(fav => {
+    if (fav.id && fav.addedAt) {
+      timestampMap.set(fav.id, fav.addedAt);
+    }
+  });
+  
+  return updatedFavorites.map(fav => {
+    const originalTimestamp = timestampMap.get(fav.id);
+    return originalTimestamp ? {
+      ...fav,
+      addedAt: originalTimestamp
+    } : fav;
+  });
+}
 
   // ===================== 搜索历史相关API =====================
 

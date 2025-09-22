@@ -236,59 +236,79 @@ export class FavoritesManager {
   }
 
   // 移除收藏
-  async removeFavorite(favoriteId) {
-    if (!authManager.isAuthenticated()) {
-      showToast('用户未登录', 'error');
-      return;
-    }
-
-    if (!confirm('确定要移除这个收藏吗？')) return;
-
-    const index = this.favorites.findIndex(fav => fav.id === favoriteId);
-    if (index >= 0) {
-      try {
-        showLoading(true);
-        
-        // 先从本地移除
-        const removedFavorite = this.favorites.splice(index, 1)[0];
-        this.renderFavorites();
-        
-        // 同步到云端
-        await apiService.syncFavorites(this.favorites);
-        showToast('已移除收藏', 'success');
-        
-      } catch (error) {
-        console.error('移除收藏失败:', error);
-        showToast('移除收藏失败: ' + error.message, 'error');
-        
-        // 回滚本地操作
-        this.favorites.splice(index, 0, removedFavorite);
-        this.renderFavorites();
-        
-      } finally {
-        showLoading(false);
-      }
-    }
+async removeFavorite(favoriteId) {
+  if (!authManager.isAuthenticated()) {
+    showToast('用户未登录', 'error');
+    return;
   }
 
-  // 同步收藏
-  async syncFavorites() {
-    if (!authManager.isAuthenticated()) {
-      showToast('请先登录', 'error');
-      return;
-    }
+  if (!confirm('确定要移除这个收藏吗？')) return;
 
+  const index = this.favorites.findIndex(fav => fav.id === favoriteId);
+  if (index >= 0) {
     try {
       showLoading(true);
+      
+      // 🔧 深拷贝保存完整的收藏列表和被删除的项目
+      const originalFavorites = JSON.parse(JSON.stringify(this.favorites));
+      const removedFavorite = originalFavorites[index];
+      
+      // 先从本地移除
+      this.favorites.splice(index, 1);
+      this.renderFavorites();
+      
+      // 同步到云端 - 关键：不使用返回值更新本地数据
       await apiService.syncFavorites(this.favorites);
-      showToast('收藏夹同步成功', 'success');
+      showToast('已移除收藏', 'success');
+      
     } catch (error) {
-      console.error('收藏夹同步失败:', error);
-      showToast(`收藏夹同步失败: ${error.message}`, 'error');
+      console.error('移除收藏失败:', error);
+      showToast('移除收藏失败: ' + error.message, 'error');
+      
+      // 🔧 回滚：恢复完整的原始列表
+      this.favorites = originalFavorites;
+      this.renderFavorites();
+      
     } finally {
       showLoading(false);
     }
   }
+}
+
+  // 同步收藏
+async syncFavorites() {
+  if (!authManager.isAuthenticated()) {
+    showToast('请先登录', 'error');
+    return;
+  }
+
+  try {
+    showLoading(true);
+    
+    // 🔧 保存当前收藏的时间戳
+    const originalFavorites = JSON.parse(JSON.stringify(this.favorites));
+    
+    const result = await apiService.syncFavorites(this.favorites);
+    
+    // 🔧 检查服务器是否返回了数据，以及是否需要更新本地
+    if (result && result.favorites && !result.shouldUpdateLocal) {
+      // 服务器返回了数据但明确表示不需要更新本地
+      console.log('同步成功，保持本地数据不变');
+    } else if (result && result.favorites && result.shouldUpdateLocal) {
+      // 服务器返回了数据且需要更新本地
+      this.favorites = apiService.preserveTimestamps(originalFavorites, result.favorites);
+      this.renderFavorites();
+    }
+    // 如果服务器只返回成功状态，不做任何本地数据更新
+    
+    showToast('收藏夹同步成功', 'success');
+  } catch (error) {
+    console.error('收藏夹同步失败:', error);
+    showToast(`收藏夹同步失败: ${error.message}`, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
 
   // 导入收藏
   importFavorites() {
