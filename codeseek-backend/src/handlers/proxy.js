@@ -1,11 +1,10 @@
-// src/handlers/proxy.js - 代理服务处理器
+// src/handlers/proxy.js
 import { utils } from '../utils.js';
-import { authenticate } from '../middleware.js';
 
-// 允许代理的域名白名单 - 只允许搜索源域名
+// 允许代理的域名白名单
 const ALLOWED_DOMAINS = [
   'javbus.com',
-  'www.javbus.com',
+  'www.javbus.com', 
   'javdb.com',
   'www.javdb.com',
   'jable.tv',
@@ -23,126 +22,71 @@ const ALLOWED_DOMAINS = [
   'www.btsow.com'
 ];
 
-// 垃圾域名黑名单（从constants.js移植）
-const SPAM_DOMAINS = [
-  'seedmm.cyou', 'busfan.cyou', 'dmmsee.ink', 'ph7zhi.vip', '8pla6t.vip',
-  'ltrpvkga.com', 'frozaflurkiveltra.com', 'shvaszc.cc', 'fpnylxm.cc',
-  'mvqttfwf.com', 'jempoprostoklimor.com', '128zha.cc', 'aciyopg.cc',
-  'mnaspm.com', 'asacp.org', 'pr0rze.vip', 'go.mnaspm.com'
-];
-
-/**
- * 代理服务主处理器
- */
 export async function proxyHandler(request, env) {
   try {
     const url = new URL(request.url);
-    const pathname = url.pathname;
-
-    // 提取目标URL
-    const proxyPath = pathname.replace('/api/proxy/', '');
     
-    if (!proxyPath) {
+    // 从路径中提取编码的目标URL
+    // 路径格式: /api/proxy/{encoded_url}
+    const pathParts = url.pathname.split('/api/proxy/');
+    if (pathParts.length < 2 || !pathParts[1]) {
       return utils.errorResponse('缺少目标URL', 400);
     }
-
-    // 解码URL
+    
+    // 解码目标URL
     let targetUrl;
     try {
-      targetUrl = decodeURIComponent(proxyPath);
+      targetUrl = decodeURIComponent(pathParts[1]);
     } catch (error) {
       return utils.errorResponse('无效的URL编码', 400);
     }
 
-    // 确保URL有协议
+    // 确保有协议
     if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
       targetUrl = 'https://' + targetUrl;
     }
 
-    // 验证目标URL
-    const validation = validateTargetUrl(targetUrl);
-    if (!validation.valid) {
-      return utils.errorResponse(validation.error, 403);
-    }
-
-    // 记录访问日志（如果用户已登录）
-    const user = await authenticate(request, env).catch(() => null);
-    if (user && env.ENABLE_ACTION_LOGGING === 'true') {
-      await utils.logUserAction(env, user.id, 'proxy_access', {
-        targetUrl: targetUrl,
-        userAgent: request.headers.get('User-Agent'),
-        timestamp: Date.now()
-      }, request);
-    }
-
-    // 执行代理请求
-    return await executeProxy(request, targetUrl, url);
-
-  } catch (error) {
-    console.error('代理请求失败:', error);
-    return utils.errorResponse('代理服务暂时不可用: ' + error.message, 500);
-  }
-}
-
-/**
- * 验证目标URL是否允许代理
- */
-function validateTargetUrl(targetUrl) {
-  try {
-    const urlObj = new URL(targetUrl);
-    const hostname = urlObj.hostname.toLowerCase();
-
-    // 检查是否在黑名单中
-    if (SPAM_DOMAINS.some(domain => hostname.includes(domain))) {
-      return { valid: false, error: '该域名已被列入黑名单' };
-    }
-
-    // 检查是否在白名单中
-    const isAllowed = ALLOWED_DOMAINS.some(domain => {
-      return hostname === domain || hostname.endsWith('.' + domain);
-    });
-
-    if (!isAllowed) {
-      return { valid: false, error: '该域名不在允许的代理范围内' };
-    }
-
-    return { valid: true };
-  } catch (error) {
-    return { valid: false, error: '无效的URL格式' };
-  }
-}
-
-/**
- * 执行代理请求
- */
-async function executeProxy(originalRequest, targetUrl, originalUrlObj) {
-  try {
-    // 创建新的请求头，过滤不必要的头部
-    const newHeaders = new Headers();
-    
-    // 复制必要的请求头
-    const allowedHeaders = [
-      'accept', 'accept-language', 'cache-control', 'content-type',
-      'range', 'referer', 'user-agent'
-    ];
-
-    allowedHeaders.forEach(headerName => {
-      const headerValue = originalRequest.headers.get(headerName);
-      if (headerValue) {
-        newHeaders.set(headerName, headerValue);
+    // 验证域名是否在白名单
+    try {
+      const targetUrlObj = new URL(targetUrl);
+      const hostname = targetUrlObj.hostname.toLowerCase();
+      
+      const isAllowed = ALLOWED_DOMAINS.some(domain => 
+        hostname === domain || hostname.endsWith('.' + domain)
+      );
+      
+      if (!isAllowed) {
+        return utils.errorResponse(`域名 ${hostname} 不在允许的代理范围内`, 403);
       }
-    });
+    } catch (error) {
+      return utils.errorResponse('无效的目标URL格式', 400);
+    }
 
-    // 设置自定义Referer以绕过某些反爬限制
+    console.log(`代理请求: ${targetUrl}`);
+
+    // 创建新的请求头，过滤掉 cf- 开头的头部
+    const newHeaders = new Headers();
+    for (const [key, value] of request.headers.entries()) {
+      if (!key.startsWith('cf-') && 
+          !['host', 'content-length'].includes(key.toLowerCase())) {
+        newHeaders.set(key, value);
+      }
+    }
+
+    // 设置必要的请求头
     const targetUrlObj = new URL(targetUrl);
-    newHeaders.set('Referer', `${targetUrlObj.protocol}//${targetUrlObj.hostname}/`);
+    newHeaders.set('Host', targetUrlObj.host);
+    newHeaders.set('Referer', targetUrlObj.origin);
+    newHeaders.set('Origin', targetUrlObj.origin);
 
     // 创建代理请求
     const proxyRequest = new Request(targetUrl, {
-      method: originalRequest.method,
+      method: request.method,
       headers: newHeaders,
-      body: originalRequest.method !== 'GET' ? originalRequest.body : null,
-      redirect: 'manual' // 手动处理重定向
+      body: request.method !== 'GET' && request.method !== 'HEAD' 
+        ? request.body 
+        : null,
+      redirect: 'manual'
     });
 
     // 发起请求
@@ -150,290 +94,140 @@ async function executeProxy(originalRequest, targetUrl, originalUrlObj) {
 
     // 处理重定向
     if ([301, 302, 303, 307, 308].includes(response.status)) {
-      const locationHeader = response.headers.get('location');
-      if (locationHeader) {
-        const redirectUrl = new URL(locationHeader, targetUrl);
-        const newProxyPath = `/api/proxy/${encodeURIComponent(redirectUrl.toString())}`;
+      const location = response.headers.get('location');
+      if (location) {
+        // 将重定向URL也转换为代理URL
+        const absoluteLocation = new URL(location, targetUrl).toString();
+        const proxiedLocation = `/api/proxy/${encodeURIComponent(absoluteLocation)}`;
+        
+        const modifiedHeaders = new Headers(response.headers);
+        modifiedHeaders.set('Location', proxiedLocation);
         
         return new Response(response.body, {
           status: response.status,
           statusText: response.statusText,
-          headers: {
-            ...Object.fromEntries(response.headers.entries()),
-            'Location': `${originalUrlObj.origin}${newProxyPath}`
-          }
+          headers: modifiedHeaders
         });
       }
     }
 
+    // 处理HTML内容，替换其中的链接
     let responseBody = response.body;
-
-    // 处理HTML内容 - 替换相对路径为代理路径
     const contentType = response.headers.get('content-type');
+    
     if (contentType && contentType.includes('text/html')) {
-      try {
-        const htmlContent = await response.text();
-        const modifiedHtml = rewriteHtmlContent(htmlContent, targetUrl, originalUrlObj.origin);
-        responseBody = modifiedHtml;
-      } catch (error) {
-        console.error('处理HTML内容失败:', error);
-        responseBody = response.body; // 回退到原始内容
-      }
+      const text = await response.text();
+      const modifiedHtml = rewriteHtmlContent(text, targetUrl, url.origin);
+      responseBody = modifiedHtml;
     }
 
     // 创建响应
-    const modifiedResponse = new Response(responseBody, {
+    const modifiedHeaders = new Headers();
+    
+    // 复制安全的响应头
+    for (const [key, value] of response.headers.entries()) {
+      const lowerKey = key.toLowerCase();
+      if (!['content-encoding', 'content-length', 'connection'].includes(lowerKey)) {
+        modifiedHeaders.set(key, value);
+      }
+    }
+
+    // 添加CORS头部
+    modifiedHeaders.set('Access-Control-Allow-Origin', '*');
+    modifiedHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    modifiedHeaders.set('Access-Control-Allow-Headers', '*');
+    modifiedHeaders.set('Cache-Control', 'no-cache');
+
+    return new Response(responseBody, {
       status: response.status,
       statusText: response.statusText,
-      headers: createResponseHeaders(response.headers)
+      headers: modifiedHeaders
     });
-
-    return modifiedResponse;
 
   } catch (error) {
-    console.error('代理请求执行失败:', error);
-    
-    // 返回友好的错误页面
-    return new Response(createErrorPage(targetUrl, error.message), {
-      status: 502,
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
+    console.error('代理执行失败:', error);
+    return utils.errorResponse(`代理服务错误: ${error.message}`, 500);
   }
 }
 
-/**
- * 重写HTML内容中的链接
- */
-function rewriteHtmlContent(htmlContent, originalUrl, proxyOrigin) {
+// 重写HTML内容中的URL
+function rewriteHtmlContent(html, originalUrl, proxyOrigin) {
   const originalUrlObj = new URL(originalUrl);
-  const baseUrl = `${originalUrlObj.protocol}//${originalUrlObj.hostname}`;
+  const baseUrl = originalUrlObj.origin;
 
-  // 替换相对路径链接
-  let modifiedHtml = htmlContent;
+  // 替换各种URL模式
+  let modifiedHtml = html;
 
-  // 处理各种相对路径的情况
-  const replacements = [
-    // href="/path" -> href="/api/proxy/https://domain.com/path"
-    {
-      pattern: /href=["']\/(?!\/|http|#)([^"']*?)["']/g,
-      replacement: `href="${proxyOrigin}/api/proxy/${encodeURIComponent(baseUrl)}/$1"`
-    },
-    // src="/path" -> src="/api/proxy/https://domain.com/path"
-    {
-      pattern: /src=["']\/(?!\/|http)([^"']*?)["']/g,
-      replacement: `src="${proxyOrigin}/api/proxy/${encodeURIComponent(baseUrl)}/$1"`
-    },
-    // action="/path" -> action="/api/proxy/https://domain.com/path"
-    {
-      pattern: /action=["']\/(?!\/|http)([^"']*?)["']/g,
-      replacement: `action="${proxyOrigin}/api/proxy/${encodeURIComponent(baseUrl)}/$1"`
+  // 替换绝对路径
+  modifiedHtml = modifiedHtml.replace(
+    /(?:href|src|action)=["']\/([^"']*?)["']/g,
+    (match, path) => {
+      const absoluteUrl = `${baseUrl}/${path}`;
+      const proxyUrl = `${proxyOrigin}/api/proxy/${encodeURIComponent(absoluteUrl)}`;
+      return match.replace(`/${path}`, proxyUrl);
     }
-  ];
+  );
 
-  replacements.forEach(({ pattern, replacement }) => {
-    modifiedHtml = modifiedHtml.replace(pattern, replacement);
-  });
-
-  // 添加base标签防止相对路径问题
-  const baseTagPattern = /<base[^>]*>/i;
-  if (!baseTagPattern.test(modifiedHtml)) {
-    const headPattern = /<head[^>]*>/i;
-    if (headPattern.test(modifiedHtml)) {
-      modifiedHtml = modifiedHtml.replace(headPattern, 
-        `$&\n<base href="${proxyOrigin}/api/proxy/${encodeURIComponent(baseUrl)}/">`
-      );
+  // 替换完整URL
+  modifiedHtml = modifiedHtml.replace(
+    /(?:href|src|action)=["'](https?:\/\/[^"']+)["']/g,
+    (match, url) => {
+      // 只代理白名单中的域名
+      try {
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname.toLowerCase();
+        const shouldProxy = ALLOWED_DOMAINS.some(domain =>
+          hostname === domain || hostname.endsWith('.' + domain)
+        );
+        
+        if (shouldProxy) {
+          const proxyUrl = `${proxyOrigin}/api/proxy/${encodeURIComponent(url)}`;
+          return match.replace(url, proxyUrl);
+        }
+      } catch (e) {
+        // 忽略无效URL
+      }
+      return match;
     }
-  }
+  );
 
   return modifiedHtml;
 }
 
-/**
- * 创建响应头
- */
-function createResponseHeaders(originalHeaders) {
-  const headers = new Headers();
-
-  // 复制大部分原始头部
-  for (const [key, value] of originalHeaders.entries()) {
-    const lowerKey = key.toLowerCase();
-    
-    // 跳过可能导致问题的头部
-    if (!['content-encoding', 'content-security-policy', 'x-frame-options', 
-          'strict-transport-security'].includes(lowerKey)) {
-      headers.set(key, value);
-    }
-  }
-
-  // 添加CORS头部
-  headers.set('Access-Control-Allow-Origin', '*');
-  headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  headers.set('Access-Control-Allow-Headers', '*');
-
-  // 禁用缓存以确保实时性
-  headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-  headers.set('Pragma', 'no-cache');
-
-  return headers;
-}
-
-/**
- * 创建错误页面
- */
-function createErrorPage(targetUrl, errorMessage) {
-  return `
-    <!DOCTYPE html>
-    <html lang="zh-CN">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>代理访问失败</title>
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 40px 20px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          text-align: center;
-        }
-        .error-container {
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          padding: 30px;
-          border-radius: 15px;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        h1 { margin: 0 0 20px 0; font-size: 2em; }
-        .error-message { 
-          margin: 20px 0;
-          padding: 15px;
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 8px;
-          font-family: monospace;
-        }
-        .target-url {
-          word-break: break-all;
-          margin: 15px 0;
-          opacity: 0.8;
-        }
-        .retry-btn {
-          display: inline-block;
-          padding: 12px 24px;
-          background: rgba(255, 255, 255, 0.2);
-          color: white;
-          text-decoration: none;
-          border-radius: 25px;
-          margin: 20px 10px;
-          transition: all 0.3s;
-        }
-        .retry-btn:hover {
-          background: rgba(255, 255, 255, 0.3);
-          transform: translateY(-2px);
-        }
-      </style>
-    </head>
-    <body>
-      <div class="error-container">
-        <h1>🚫 代理访问失败</h1>
-        <div class="error-message">${errorMessage}</div>
-        <div class="target-url">目标地址: ${targetUrl}</div>
-        <a href="javascript:history.back()" class="retry-btn">返回上页</a>
-        <a href="javascript:location.reload()" class="retry-btn">重试</a>
-      </div>
-    </body>
-    </html>
-  `;
-}
-
-/**
- * 代理健康检查
- */
+// 健康检查
 export async function proxyHealthCheckHandler(request, env) {
   try {
-    // 测试代理一个简单的请求
-    const testUrl = 'https://www.javbus.com';
-    const testRequest = new Request(testUrl, {
+    const testUrl = 'https://www.javbus.com/robots.txt';
+    const response = await fetch(testUrl, {
       method: 'HEAD',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProxyHealthCheck)' }
+      signal: AbortSignal.timeout(5000)
     });
-
-    const startTime = Date.now();
-    const response = await fetch(testRequest);
-    const responseTime = Date.now() - startTime;
-
-    const isHealthy = response.ok || response.status === 403; // 403也算正常，可能是反爬限制
 
     return utils.successResponse({
-      healthy: isHealthy,
-      responseTime,
-      testUrl,
+      healthy: response.ok || response.status === 404,
       statusCode: response.status,
-      allowedDomains: ALLOWED_DOMAINS.length,
+      allowedDomains: ALLOWED_DOMAINS,
       timestamp: Date.now()
     });
-
   } catch (error) {
     return utils.successResponse({
       healthy: false,
       error: error.message,
-      allowedDomains: ALLOWED_DOMAINS.length,
+      allowedDomains: ALLOWED_DOMAINS,
       timestamp: Date.now()
     });
   }
 }
 
-/**
- * 获取代理统计信息
- */
+// 统计信息
 export async function proxyStatsHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    // 获取用户的代理访问统计
-    const stats = await env.DB.prepare(`
-      SELECT 
-        COUNT(*) as totalAccess,
-        COUNT(DISTINCT JSON_EXTRACT(data, '$.targetUrl')) as uniqueUrls,
-        MAX(created_at) as lastAccess
-      FROM user_actions 
-      WHERE user_id = ? AND action = 'proxy_access' AND created_at > datetime('now', '-7 days')
-    `).bind(user.id).first();
-
-    // 获取最近访问的域名统计
-    const domainStats = await env.DB.prepare(`
-      SELECT 
-        JSON_EXTRACT(data, '$.targetUrl') as url,
-        COUNT(*) as count
-      FROM user_actions 
-      WHERE user_id = ? AND action = 'proxy_access' AND created_at > datetime('now', '-7 days')
-      GROUP BY JSON_EXTRACT(data, '$.targetUrl')
-      ORDER BY count DESC
-      LIMIT 10
-    `).bind(user.id).all();
-
-    return utils.successResponse({
-      userStats: {
-        totalAccess: stats.totalAccess || 0,
-        uniqueUrls: stats.uniqueUrls || 0,
-        lastAccess: stats.lastAccess
-      },
-      topDomains: domainStats.results || [],
-      allowedDomains: ALLOWED_DOMAINS,
-      timestamp: Date.now()
-    });
-
-  } catch (error) {
-    console.error('获取代理统计失败:', error);
-    return utils.errorResponse('获取统计信息失败', 500);
-  }
+  // 简化的统计信息
+  return utils.successResponse({
+    allowedDomains: ALLOWED_DOMAINS,
+    totalDomains: ALLOWED_DOMAINS.length,
+    service: 'active',
+    timestamp: Date.now()
+  });
 }
 
 export default {

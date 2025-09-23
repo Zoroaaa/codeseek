@@ -62,33 +62,36 @@ class SearchService {
   }
 
   // 🆕 将普通URL转换为代理URL
-  convertToProxyUrl(originalUrl) {
+convertToProxyUrl(originalUrl) {
     if (!this.proxyEnabled || !originalUrl) {
-      return originalUrl;
+        return originalUrl;
     }
 
     try {
-      // 验证URL格式
-      new URL(originalUrl);
-      
-      // 编码原始URL
-      const encodedUrl = encodeURIComponent(originalUrl);
-      
-      // 构建代理URL
-      const proxyUrl = `${this.proxyBaseUrl}${this.proxyPath}${encodedUrl}`;
-      
-      // 更新统计
-      this.proxyStats.totalProxyUrls++;
-      
-      console.log(`URL代理转换: ${originalUrl} -> ${proxyUrl}`);
-      
-      return proxyUrl;
+        // 确保URL格式正确
+        if (!originalUrl.startsWith('http://') && !originalUrl.startsWith('https://')) {
+            originalUrl = 'https://' + originalUrl;
+        }
+
+        // 验证URL
+        const urlObj = new URL(originalUrl);
+        
+        // 编码URL - 重要：必须正确编码
+        const encodedUrl = encodeURIComponent(originalUrl);
+        
+        // 构建代理URL
+        const proxyUrl = `${this.proxyBaseUrl}/api/proxy/${encodedUrl}`;
+        
+        console.log(`URL代理转换成功: ${proxyUrl}`);
+        this.proxyStats.totalProxyUrls++;
+        
+        return proxyUrl;
     } catch (error) {
-      console.error('URL代理转换失败:', error);
-      this.proxyStats.proxyErrorCount++;
-      return originalUrl; // 回退到原始URL
+        console.error('URL代理转换失败:', error);
+        this.proxyStats.proxyErrorCount++;
+        return originalUrl; // 失败时返回原始URL
     }
-  }
+}
 
   // 🆕 检查代理服务健康状态
   async checkProxyHealth() {
