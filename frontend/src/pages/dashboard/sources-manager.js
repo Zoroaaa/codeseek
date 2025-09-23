@@ -47,7 +47,7 @@ async loadUserSearchSettings() {
   }
   
   try {
-    console.log('🔡 从新API加载搜索源数据...');
+    console.log('📡 从新API加载搜索源数据...');
     
     // 获取大类数据
     this.majorCategories = await searchSourcesAPI.getMajorCategories();
@@ -297,8 +297,6 @@ async loadUserSearchSettings() {
             return source.searchable !== false;
           case 'browse_only':
             return source.searchable === false;
-          case 'supports_detail':
-            return this.supportsDetailExtraction(source.id);
           default:
             return true;
         }
@@ -377,14 +375,16 @@ async loadUserSearchSettings() {
     });
   }
 
-  // 🔴 修复:正确渲染源项目,支持字段兼容
+  // 🔴 修复:正确渲染源项目,只有搜索资源大类才显示启用按钮
   renderSourceItem(source) {
     // 🔴 兼容 categoryId 和 category 字段
     const categoryId = source.categoryId || source.category;
     const category = this.getCategoryById(categoryId);
     const majorCategory = this.getMajorCategoryForSource(source.id);
     const isEnabled = this.enabledSources.includes(source.id);
-    const supportsDetailExtraction = this.supportsDetailExtraction(source.id);
+    
+    // 🆕 检查是否为搜索资源大类
+    const isSearchSourceCategory = majorCategory === 'search_sources';
     
     const siteTypeLabel = {
       'search': '搜索源',
@@ -404,15 +404,22 @@ async loadUserSearchSettings() {
     return `
       <div class="source-item ${isEnabled ? 'enabled' : 'disabled'}" data-source-id="${source.id}">
         <div class="source-header">
-          <div class="source-toggle">
-            <input type="checkbox" ${isEnabled ? 'checked' : ''} 
-                   onchange="app.getManager('sources').toggleSourceEnabled('${source.id}', this.checked)">
-          </div>
+          ${isSearchSourceCategory ? `
+            <div class="source-toggle">
+              <input type="checkbox" ${isEnabled ? 'checked' : ''} 
+                     onchange="app.getManager('sources').toggleSourceEnabled('${source.id}', this.checked)">
+            </div>
+          ` : `
+            <div class="source-toggle disabled-toggle">
+              <span class="toggle-placeholder" title="该类型源不参与搜索启用控制">—</span>
+            </div>
+          `}
           <div class="source-info">
             <div class="source-name">
               <span class="source-icon">${source.icon || '🔍'}</span>
               <span class="source-title">${escapeHtml(source.name)}</span>
               ${isCustomSource ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
+              ${!isSearchSourceCategory ? '<span class="non-search-badge">仅浏览</span>' : ''}
             </div>
             <div class="source-subtitle">${escapeHtml(source.subtitle || '')}</div>
             <div class="source-meta">
@@ -430,7 +437,6 @@ async loadUserSearchSettings() {
               </span>
               <span class="site-type-badge">${siteTypeLabel}</span>
               ${source.searchPriority ? `<span class="priority-badge">优先级: ${source.searchPriority}</span>` : ''}
-              ${supportsDetailExtraction ? '<span class="detail-support-badge">支持详情提取</span>' : ''}
             </div>
           </div>
         </div>
@@ -463,6 +469,13 @@ async loadUserSearchSettings() {
   }
 
   async toggleSourceEnabled(sourceId, enabled) {
+    // 🆕 检查源是否属于搜索资源大类
+    const majorCategory = this.getMajorCategoryForSource(sourceId);
+    if (majorCategory !== 'search_sources') {
+      showToast('该搜索源不属于搜索资源类别，无法启用/禁用', 'warning');
+      return;
+    }
+
     try {
       if (enabled) {
         if (!this.enabledSources.includes(sourceId)) {
@@ -489,11 +502,17 @@ async loadUserSearchSettings() {
 
   async enableAllSources() {
     try {
-      this.enabledSources = this.allSearchSources.map(s => s.id);
+      // 🆕 只启用搜索资源大类的源
+      const searchSources = this.allSearchSources.filter(source => {
+        const majorCategory = this.getMajorCategoryForSource(source.id);
+        return majorCategory === 'search_sources';
+      });
+      
+      this.enabledSources = searchSources.map(s => s.id);
       await searchSourcesAPI.enableAllSources();
       this.renderSourcesList();
       this.updateSourcesStats();
-      showToast('已启用所有搜索源', 'success');
+      showToast('已启用所有搜索资源', 'success');
     } catch (error) {
       console.error('启用所有搜索源失败:', error);
       showToast('操作失败: ' + error.message, 'error');
@@ -501,14 +520,22 @@ async loadUserSearchSettings() {
   }
 
   async disableAllSources() {
-    if (!confirm('确定要禁用所有搜索源吗?这将影响搜索功能。')) return;
+    if (!confirm('确定要禁用所有搜索资源吗?这将影响搜索功能。')) return;
     
     try {
-      this.enabledSources = [];
+      // 🆕 只禁用搜索资源大类的源
+      const searchSources = this.allSearchSources.filter(source => {
+        const majorCategory = this.getMajorCategoryForSource(source.id);
+        return majorCategory === 'search_sources';
+      });
+      
+      const searchSourceIds = searchSources.map(s => s.id);
+      this.enabledSources = this.enabledSources.filter(id => !searchSourceIds.includes(id));
+      
       await searchSourcesAPI.disableAllSources();
       this.renderSourcesList();
       this.updateSourcesStats();
-      showToast('已禁用所有搜索源', 'success');
+      showToast('已禁用所有搜索资源', 'success');
     } catch (error) {
       console.error('禁用所有搜索源失败:', error);
       showToast('操作失败: ' + error.message, 'error');
@@ -986,11 +1013,6 @@ updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
 
   resetEditingState() {
     this.editingCustomSource = null;
-  }
-
-  supportsDetailExtraction(sourceId) {
-    const detailSources = APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES || [];
-    return detailSources.includes(sourceId);
   }
 
   // 🔴 修复:获取源的大类,支持字段兼容

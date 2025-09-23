@@ -1,5 +1,5 @@
 // Enhanced Proxy Worker with Advanced URL Rewriting and Resource Optimization
-// 版本: v3.0.0 - 完善的资源处理和兼容性优化
+// 版本: v3.1.0 - 移除CORS限制，只验证代理目标域名
 
 /**
  * HTML内容处理器 - 智能重写所有URL引用
@@ -461,7 +461,10 @@ async function handleProxyRequest(request, env, targetHostname = null) {
   if (!proxyHostname) {
     return new Response(JSON.stringify({ error: "Proxy not configured" }), { 
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        ...getUnrestrictedCorsHeaders()
+      }
     });
   }
 
@@ -518,6 +521,11 @@ async function handleProxyRequest(request, env, targetHostname = null) {
       const newHeaders = new Headers(response.headers);
       newHeaders.set('location', newLocation);
       
+      // 添加无限制的CORS头
+      Object.entries(getUnrestrictedCorsHeaders()).forEach(([key, value]) => {
+        newHeaders.set(key, value);
+      });
+      
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
@@ -532,9 +540,8 @@ async function handleProxyRequest(request, env, targetHostname = null) {
   // 创建新的响应头
   const newResponseHeaders = new Headers(response.headers);
   
-  // 添加CORS头
-  const corsHeaders = getCorsHeaders(request);
-  Object.entries(corsHeaders).forEach(([key, value]) => {
+  // 添加无限制的CORS头
+  Object.entries(getUnrestrictedCorsHeaders()).forEach(([key, value]) => {
     newResponseHeaders.set(key, value);
   });
 
@@ -583,22 +590,21 @@ async function handleProxyRequest(request, env, targetHostname = null) {
 }
 
 /**
- * 获取CORS头
+ * 获取无限制的CORS头（移除所有CORS限制）
  */
-function getCorsHeaders(request) {
-  const origin = request.headers.get('origin');
-  
+function getUnrestrictedCorsHeaders() {
   return {
-    'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': '*',
+    'Access-Control-Allow-Headers': '*',
     'Access-Control-Allow-Credentials': 'true',
-    'Access-Control-Max-Age': '86400'
+    'Access-Control-Max-Age': '86400',
+    'Access-Control-Expose-Headers': '*'
   };
 }
 
 /**
- * 验证代理目标
+ * 验证代理目标（只验证域名，不验证来源）
  */
 function isValidProxyTarget(hostname, env) {
   const allowedTargets = [
@@ -648,10 +654,10 @@ export default {
     try {
       const url = new URL(request.url);
 
-      // OPTIONS请求快速响应
+      // OPTIONS请求快速响应（无限制CORS）
       if (request.method === 'OPTIONS') {
         return new Response(null, { 
-          headers: getCorsHeaders(request),
+          headers: getUnrestrictedCorsHeaders(),
           status: 204
         });
       }
@@ -661,18 +667,34 @@ export default {
         return new Response(JSON.stringify({
           status: 'healthy',
           timestamp: new Date().toISOString(),
-          version: '3.0.0',
+          version: '3.1.0',
           features: {
             htmlProcessing: true,
             cssProcessing: true,
             jsProcessing: true,
             smartCaching: true,
-            resourceOptimization: true
+            resourceOptimization: true,
+            unrestrictedCors: true
           }
         }), {
           headers: {
             'Content-Type': 'application/json',
-            ...getCorsHeaders(request)
+            ...getUnrestrictedCorsHeaders()
+          }
+        });
+      }
+
+      if (url.pathname === '/api/status') {
+        return new Response(JSON.stringify({
+          status: 'enabled',
+          endpoints: 373,
+          timestamp: Date.now(),
+          version: '3.1.0',
+          cors: 'unrestricted'
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            ...getUnrestrictedCorsHeaders()
           }
         });
       }
@@ -689,7 +711,7 @@ export default {
             status: 400,
             headers: { 
               'Content-Type': 'application/json',
-              ...getCorsHeaders(request)
+              ...getUnrestrictedCorsHeaders()
             }
           });
         }
@@ -702,7 +724,7 @@ export default {
             status: 403,
             headers: { 
               'Content-Type': 'application/json',
-              ...getCorsHeaders(request)
+              ...getUnrestrictedCorsHeaders()
             }
           });
         }
@@ -746,12 +768,12 @@ export default {
       return new Response(JSON.stringify({
         error: 'Proxy service error',
         message: env.DEBUG === 'true' ? error.message : 'Internal server error',
-        version: '3.0.0'
+        version: '3.1.0'
       }), {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
-          ...getCorsHeaders(request)
+          ...getUnrestrictedCorsHeaders()
         }
       });
     }

@@ -4,116 +4,19 @@ compatibility_date = "2024-03-18"
 workers_dev = true
 
 [vars]
-# 更灵活的允许来源配置 - 支持更多访问方式
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua,https://www.codeseek.pp.ua,null,undefined"
+# 生产环境配置
 ENVIRONMENT = "production"
-DEBUG = "true"
+DEBUG = "false"
+
+# 允许直接浏览器访问
+ALLOW_DIRECT_ACCESS = "true"
 
 # 额外的代理目标白名单（可选，补充代码中的硬编码列表）
 EXTRA_PROXY_TARGETS = ""
 
-# 允许直接浏览器访问（新增）
-ALLOW_DIRECT_ACCESS = "true"
+# 备用域名配置
+BACKUP_DOMAINS = "backup1.omnibox.pp.ua,backup2.omnibox.pp.ua"
 
-# 通用代理配置（支持动态路由）
-[[env.production]]
-name = "codeseek-site"
-[env.production.vars]
-# 生产环境配置 - 允许直接访问和来自前端的请求
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua,https://www.codeseek.pp.ua"
-ENVIRONMENT = "production"
-DEBUG = "false"
-ALLOW_DIRECT_ACCESS = "true"
-EXTRA_PROXY_TARGETS = ""
-
-# 开发环境配置
-[[env.development]]
-name = "codeseek-site-dev"
-[env.development.vars]
-ALLOWED_ORIGINS = "http://localhost:3000,https://localhost:3000,https://all.omnibox.pp.ua,https://codeseek.pp.ua"
-ENVIRONMENT = "development" 
-DEBUG = "true"
-ALLOW_DIRECT_ACCESS = "true"
-EXTRA_PROXY_TARGETS = "example.com,test.com"
-
-# 测试环境配置（新增）
-[[env.staging]]
-name = "codeseek-site-staging"
-[env.staging.vars]
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua,https://staging.codeseek.pp.ua"
-ENVIRONMENT = "staging"
-DEBUG = "true"
-ALLOW_DIRECT_ACCESS = "true"
-EXTRA_PROXY_TARGETS = ""
-
-# JavBus 专用代理环境（如果需要专门的实例）
-[[env.javbus]]
-name = "proxy-javbus"
-[env.javbus.vars]
-PROXY_HOSTNAME = "www.javbus.com"
-PROXY_PROTOCOL = "https"
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua"
-ENVIRONMENT = "production"
-DEBUG = "false"
-ALLOW_DIRECT_ACCESS = "true"
-
-# JavDB 专用代理环境
-[[env.javdb]] 
-name = "proxy-javdb"
-[env.javdb.vars]
-PROXY_HOSTNAME = "javdb.com"
-PROXY_PROTOCOL = "https"
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua"
-ENVIRONMENT = "production"
-DEBUG = "false"
-ALLOW_DIRECT_ACCESS = "true"
-
-# JavLibrary 专用代理环境
-[[env.javlibrary]]
-name = "proxy-javlibrary"
-[env.javlibrary.vars]
-PROXY_HOSTNAME = "www.javlibrary.com"
-PROXY_PROTOCOL = "https"
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua"
-ENVIRONMENT = "production"
-DEBUG = "false"
-ALLOW_DIRECT_ACCESS = "true"
-
-# BTSOW 专用代理环境（新增 - 针对当前问题）
-[[env.btsow]]
-name = "proxy-btsow"
-[env.btsow.vars]
-PROXY_HOSTNAME = "btsow.com"
-PROXY_PROTOCOL = "https"
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua"
-ENVIRONMENT = "production"
-DEBUG = "false"
-ALLOW_DIRECT_ACCESS = "true"
-
-# 多地区代理配置
-[[env.us]]
-name = "codeseek-proxy-us"
-[env.us.vars]
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua"
-ENVIRONMENT = "production"
-DEBUG = "false"
-ALLOW_DIRECT_ACCESS = "true"
-REGION_PREFERENCE = "US"
-
-[[env.eu]]
-name = "codeseek-proxy-eu"  
-[env.eu.vars]
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua"
-ENVIRONMENT = "production"
-DEBUG = "false"
-ALLOW_DIRECT_ACCESS = "true"
-REGION_PREFERENCE = "EU"
-
-[[env.asia]]
-name = "codeseek-proxy-asia"
-[env.asia.vars]
-ALLOWED_ORIGINS = "https://all.omnibox.pp.ua,https://codeseek.pp.ua"
-ENVIRONMENT = "production" 
-DEBUG = "false"
-ALLOW_DIRECT_ACCESS = "true"
-REGION_PREFERENCE = "ASIA"
+# 故障转移配置
+ENABLE_FAILOVER = "true"
+FAILOVER_TIMEOUT = "5000"

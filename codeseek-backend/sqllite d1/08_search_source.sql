@@ -1,7 +1,7 @@
 -- ===============================================
--- 搜索源管理模块数据库结构 + 默认数据 (优化版本)
--- 版本: v2.3.1
--- 说明: 修复前后端匹配问题，优化用户注册默认配置
+-- 搜索源管理模块数据库结构 + 默认数据 (移除详情提取字段版本)
+-- 版本: v2.3.2
+-- 说明: 移除详情提取相关字段，简化数据库结构
 -- ===============================================
 
 -- ===============================================
@@ -42,8 +42,6 @@ CREATE TABLE IF NOT EXISTS search_source_categories (
     default_searchable INTEGER DEFAULT 1,       -- 该分类下的源默认是否可搜索
     default_site_type TEXT DEFAULT 'search',    -- 默认网站类型(search/browse/reference)
     search_priority INTEGER DEFAULT 5,          -- 搜索优先级(1-10)
-    supports_detail_extraction INTEGER DEFAULT 0, -- 是否支持详情提取
-    extraction_priority TEXT DEFAULT 'medium',  -- 提取优先级(high/medium/low)
     -- 时间戳
     created_by TEXT,                            -- 创建者ID
     created_at INTEGER NOT NULL,                -- 创建时间戳
@@ -71,11 +69,6 @@ CREATE TABLE IF NOT EXISTS search_sources (
     searchable INTEGER DEFAULT 1,               -- 是否参与搜索(1:参与 0:不参与)
     requires_keyword INTEGER DEFAULT 1,         -- 是否需要关键词(1:需要 0:不需要)
     search_priority INTEGER DEFAULT 5,          -- 搜索优先级(1-10)
-    -- 详情提取配置
-    supports_detail_extraction INTEGER DEFAULT 0, -- 是否支持详情提取
-    extraction_quality TEXT DEFAULT 'none',     -- 提取质量(excellent/good/fair/poor/none)
-    average_extraction_time INTEGER DEFAULT 0,  -- 平均提取时间(毫秒)
-    supported_features TEXT DEFAULT '[]',       -- 支持的功能(JSON数组)
     -- 系统属性
     is_system INTEGER DEFAULT 0,                -- 是否系统搜索源(1:系统 0:自定义)
     is_active INTEGER DEFAULT 1,                -- 是否激活(1:激活 0:禁用)
@@ -151,63 +144,59 @@ INSERT OR REPLACE INTO search_major_categories (
 INSERT OR REPLACE INTO search_source_categories (
     id, major_category_id, name, description, icon, color, display_order, 
     is_system, is_active, default_searchable, default_site_type, search_priority,
-    supports_detail_extraction, extraction_priority, created_at, updated_at
+    created_at, updated_at
 ) VALUES 
-    ('database', 'search_sources', '📚 番号资料站', '提供详细的番号信息、封面和演员资料', '📚', '#3b82f6', 1, 1, 1, 1, 'search', 1, 1, 'high', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('streaming', 'browse_sites', '🎥 在线播放平台', '提供在线观看和下载服务', '🎥', '#10b981', 2, 1, 1, 0, 'browse', 5, 1, 'medium', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('torrent', 'search_sources', '🧲 磁力搜索', '提供磁力链接和种子文件', '🧲', '#f59e0b', 3, 1, 1, 1, 'search', 3, 1, 'low', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('community', 'browse_sites', '💬 社区论坛', '用户交流讨论和资源分享', '💬', '#8b5cf6', 4, 1, 1, 0, 'browse', 10, 0, 'none', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('others', 'browse_sites', '🌟 其他资源', '其他类型的搜索资源', '🌟', '#6b7280', 99, 1, 1, 0, 'browse', 10, 0, 'none', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+    ('database', 'search_sources', '📚 番号资料站', '提供详细的番号信息、封面和演员资料', '📚', '#3b82f6', 1, 1, 1, 1, 'search', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('streaming', 'search_sources', '🎥 在线播放平台', '提供在线观看和下载服务', '🎥', '#10b981', 2, 1, 1, 1, 'search', 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('torrent', 'browse_sites', '🧲 磁力搜索', '提供磁力链接和种子文件', '🧲', '#f59e0b', 3, 1, 1, 0, 'browse', 10, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('community', 'browse_sites', '💬 社区论坛', '用户交流讨论和资源分享', '💬', '#8b5cf6', 4, 1, 1, 0, 'browse', 10, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('others', 'browse_sites', '🌟 其他资源', '其他类型的搜索资源', '🌟', '#6b7280', 99, 1, 1, 0, 'browse', 10, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- 插入默认搜索源 - 番号资料站
 INSERT OR REPLACE INTO search_sources (
     id, category_id, name, subtitle, description, icon, url_template, homepage_url,
-    site_type, searchable, requires_keyword, search_priority, supports_detail_extraction,
-    extraction_quality, average_extraction_time, supported_features, is_system, is_active,
+    site_type, searchable, requires_keyword, search_priority, is_system, is_active,
     display_order, created_at, updated_at
 ) VALUES 
-    ('javbus', 'database', 'JavBus', '番号+磁力一体站，信息完善', '提供详细的番号信息、封面、演员资料和磁力链接', '🎬', 'https://www.javbus.com/search/{keyword}', 'https://www.javbus.com', 'search', 1, 1, 1, 1, 'excellent', 3000, '["screenshots", "downloadLinks", "magnetLinks", "actresses", "metadata", "description", "rating", "tags"]', 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javdb', 'database', 'JavDB', '极简风格番号资料站，轻量快速', '提供简洁的番号信息和磁力链接', '📚', 'https://javdb.com/search?q={keyword}&f=all', 'https://javdb.com', 'search', 1, 1, 2, 1, 'good', 2500, '["screenshots", "magnetLinks", "actresses", "metadata", "description", "rating", "tags"]', 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javlibrary', 'database', 'JavLibrary', '评论活跃，女优搜索详尽', '老牌番号资料站，社区活跃', '📖', 'https://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}', 'https://www.javlibrary.com', 'search', 1, 1, 3, 0, 'none', 0, '[]', 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javfinder', 'database', 'JavFinder', '智能搜索引擎，结果精准', '新兴的番号搜索引擎', '🔍', 'https://javfinder.is/search/{keyword}', 'https://javfinder.is', 'search', 1, 1, 4, 0, 'none', 0, '[]', 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+    ('javbus', 'database', 'JavBus', '番号+磁力一体站，信息完善', '提供详细的番号信息、封面、演员资料和磁力链接', '🎬', 'https://www.javbus.com/search/{keyword}', 'https://www.javbus.com', 'search', 1, 1, 1, 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('javdb', 'database', 'JavDB', '极简风格番号资料站，轻量快速', '提供简洁的番号信息和磁力链接', '📚', 'https://javdb.com/search?q={keyword}&f=all', 'https://javdb.com', 'search', 1, 1, 2, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('javlibrary', 'database', 'JavLibrary', '评论活跃，女优搜索详尽', '老牌番号资料站，社区活跃', '📖', 'https://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}', 'https://www.javlibrary.com', 'search', 1, 1, 3, 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('javfinder', 'database', 'JavFinder', '智能搜索引擎，结果精准', '新兴的番号搜索引擎', '🔍', 'https://javfinder.is/search/{keyword}', 'https://javfinder.is', 'search', 1, 1, 4, 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
--- 插入默认搜索源 - 在线播放平台
+-- 插入默认搜索源 - 在线播放平台 (现在参与搜索)
 INSERT OR REPLACE INTO search_sources (
     id, category_id, name, subtitle, description, icon, url_template, homepage_url,
-    site_type, searchable, requires_keyword, search_priority, supports_detail_extraction,
-    extraction_quality, average_extraction_time, supported_features, is_system, is_active,
+    site_type, searchable, requires_keyword, search_priority, is_system, is_active,
     display_order, created_at, updated_at
 ) VALUES 
-    ('jable', 'streaming', 'Jable', '高清在线观看，支持多种格式', '知名在线播放平台', '📺', 'https://jable.tv', 'https://jable.tv', 'browse', 0, 0, 5, 1, 'good', 3500, '["screenshots", "downloadLinks", "actresses", "metadata", "description", "tags"]', 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javmost', 'streaming', 'JavMost', '免费在线观看，更新及时', '免费在线播放平台', '🎦', 'https://javmost.com', 'https://javmost.com', 'browse', 0, 0, 6, 1, 'fair', 4500, '["screenshots", "downloadLinks", "magnetLinks", "actresses", "metadata", "description"]', 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javguru', 'streaming', 'JavGuru', '多线路播放，观看流畅', '多线路在线播放', '🎭', 'https://jav.guru', 'https://jav.guru', 'browse', 0, 0, 7, 0, 'none', 0, '[]', 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('av01', 'streaming', 'AV01', '快速预览站点，封面大图清晰', '封面预览和在线播放', '🎥', 'https://av01.tv', 'https://av01.tv', 'browse', 0, 0, 8, 0, 'none', 0, '[]', 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('missav', 'streaming', 'MissAV', '中文界面，封面高清，信息丰富', '中文在线播放平台', '💫', 'https://missav.com', 'https://missav.com', 'browse', 0, 0, 9, 0, 'none', 0, '[]', 1, 1, 5, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javhdporn', 'streaming', 'JavHD.porn', '高清资源下载，质量优秀', '高清下载和在线播放', '🎬', 'https://javhd.porn', 'https://javhd.porn', 'browse', 0, 0, 10, 0, 'none', 0, '[]', 1, 1, 6, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javgg', 'streaming', 'JavGG', '免费观看平台，速度稳定', '免费在线播放', '⚡', 'https://javgg.net', 'https://javgg.net', 'browse', 0, 0, 11, 1, 'fair', 4500, '["screenshots", "actresses", "metadata"]', 1, 1, 7, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javhihi', 'streaming', 'JavHiHi', '在线播放，无需下载', '轻量级在线播放', '🎪', 'https://javhihi.com', 'https://javhihi.com', 'browse', 0, 0, 12, 1, 'fair', 5000, '["screenshots", "actresses"]', 1, 1, 8, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+    ('jable', 'streaming', 'Jable', '高清在线观看，支持多种格式', '知名在线播放平台', '📺', 'https://jable.tv/search/{keyword}', 'https://jable.tv', 'search', 1, 1, 5, 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('javmost', 'streaming', 'JavMost', '免费在线观看，更新及时', '免费在线播放平台', '🎦', 'https://javmost.com/search/{keyword}', 'https://javmost.com', 'search', 1, 1, 6, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('javguru', 'streaming', 'JavGuru', '多线路播放，观看流畅', '多线路在线播放', '🎭', 'https://jav.guru/search/{keyword}', 'https://jav.guru', 'search', 1, 1, 7, 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('av01', 'streaming', 'AV01', '快速预览站点，封面大图清晰', '封面预览和在线播放', '🎥', 'https://av01.tv/search/{keyword}', 'https://av01.tv', 'search', 1, 1, 8, 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('missav', 'streaming', 'MissAV', '中文界面，封面高清，信息丰富', '中文在线播放平台', '💫', 'https://missav.com/search/{keyword}', 'https://missav.com', 'search', 1, 1, 9, 1, 1, 5, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('javhdporn', 'streaming', 'JavHD.porn', '高清资源下载，质量优秀', '高清下载和在线播放', '🎬', 'https://javhd.porn/search/{keyword}', 'https://javhd.porn', 'search', 1, 1, 10, 1, 1, 6, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('javgg', 'streaming', 'JavGG', '免费观看平台，速度稳定', '免费在线播放', '⚡', 'https://javgg.net/search/{keyword}', 'https://javgg.net', 'search', 1, 1, 11, 1, 1, 7, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('javhihi', 'streaming', 'JavHiHi', '在线播放，无需下载', '轻量级在线播放', '🎪', 'https://javhihi.com/search/{keyword}', 'https://javhihi.com', 'search', 1, 1, 12, 1, 1, 8, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
--- 插入默认搜索源 - 磁力搜索
+-- 插入默认搜索源 - 磁力搜索 (现在是浏览站点，不参与搜索)
 INSERT OR REPLACE INTO search_sources (
     id, category_id, name, subtitle, description, icon, url_template, homepage_url,
-    site_type, searchable, requires_keyword, search_priority, supports_detail_extraction,
-    extraction_quality, average_extraction_time, supported_features, is_system, is_active,
+    site_type, searchable, requires_keyword, search_priority, is_system, is_active,
     display_order, created_at, updated_at
 ) VALUES 
-    ('btsow', 'torrent', 'BTSOW', '中文磁力搜索引擎，番号资源丰富', '知名磁力搜索引擎', '🧲', 'https://btsow.com/search/{keyword}', 'https://btsow.com', 'search', 1, 1, 2, 0, 'none', 0, '[]', 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('magnetdl', 'torrent', 'MagnetDL', '磁力链接搜索，资源覆盖全面', '磁力链接搜索引擎', '🔗', 'https://www.magnetdl.com/search/?q={keyword}', 'https://www.magnetdl.com', 'search', 1, 1, 3, 0, 'none', 0, '[]', 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('torrentkitty', 'torrent', 'TorrentKitty', '种子搜索引擎，下载资源丰富', '种子下载搜索', '🐱', 'https://www.torrentkitty.tv/search/{keyword}', 'https://www.torrentkitty.tv', 'search', 1, 1, 4, 0, 'none', 0, '[]', 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('sukebei', 'torrent', 'Sukebei', '成人内容种子站，资源全面', '成人内容种子搜索', '🌙', 'https://sukebei.nyaa.si/?q={keyword}', 'https://sukebei.nyaa.si', 'search', 1, 1, 5, 1, 'fair', 6000, '["downloadLinks", "magnetLinks", "metadata", "description", "tags"]', 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+    ('btsow', 'torrent', 'BTSOW', '中文磁力搜索引擎，番号资源丰富', '知名磁力搜索引擎', '🧲', 'https://btsow.com', 'https://btsow.com', 'browse', 0, 0, 99, 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('magnetdl', 'torrent', 'MagnetDL', '磁力链接搜索，资源覆盖全面', '磁力链接搜索引擎', '🔗', 'https://www.magnetdl.com', 'https://www.magnetdl.com', 'browse', 0, 0, 99, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('torrentkitty', 'torrent', 'TorrentKitty', '种子搜索引擎，下载资源丰富', '种子下载搜索', '🐱', 'https://www.torrentkitty.tv', 'https://www.torrentkitty.tv', 'browse', 0, 0, 99, 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('sukebei', 'torrent', 'Sukebei', '成人内容种子站，资源全面', '成人内容种子搜索', '🌙', 'https://sukebei.nyaa.si', 'https://sukebei.nyaa.si', 'browse', 0, 0, 99, 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- 插入默认搜索源 - 社区论坛
 INSERT OR REPLACE INTO search_sources (
     id, category_id, name, subtitle, description, icon, url_template, homepage_url,
-    site_type, searchable, requires_keyword, search_priority, supports_detail_extraction,
-    extraction_quality, average_extraction_time, supported_features, is_system, is_active,
+    site_type, searchable, requires_keyword, search_priority, is_system, is_active,
     display_order, created_at, updated_at
 ) VALUES 
-    ('sehuatang', 'community', '色花堂', '综合论坛社区，资源丰富', '知名成人论坛社区', '🌸', 'https://sehuatang.org', 'https://sehuatang.org', 'browse', 0, 0, 99, 0, 'none', 0, '[]', 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('t66y', 'community', 'T66Y', '老牌论坛，资源更新快', '老牌成人论坛', '📋', 'https://t66y.com', 'https://t66y.com', 'browse', 0, 0, 99, 0, 'none', 0, '[]', 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+    ('sehuatang', 'community', '色花堂', '综合论坛社区，资源丰富', '知名成人论坛社区', '🌸', 'https://sehuatang.org', 'https://sehuatang.org', 'browse', 0, 0, 99, 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('t66y', 'community', 'T66Y', '老牌论坛，资源更新快', '老牌成人论坛', '📋', 'https://t66y.com', 'https://t66y.com', 'browse', 0, 0, 99, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- ===============================================
 -- 7. 触发器定义
@@ -285,7 +274,7 @@ CREATE TRIGGER IF NOT EXISTS create_default_user_source_configs
             ss.id,                   -- 搜索源ID
             CASE 
                 -- 默认启用策略：核心搜索源默认启用，其他根据类型决定
-                WHEN ss.id IN ('javbus', 'javdb', 'javlibrary', 'btsow') THEN 1
+                WHEN ss.id IN ('javbus', 'javdb', 'javlibrary', 'jable', 'javmost') THEN 1
                 WHEN ss.searchable = 1 AND ss.site_type = 'search' THEN 1
                 WHEN ss.site_type = 'browse' THEN 0
                 ELSE 0
