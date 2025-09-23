@@ -61,7 +61,7 @@ class SearchService {
       );
       
       this.proxyConfig = {
-        enabled: userSettings.enableProxy || false,
+        enabled: userSettings.enableProxy || true,
         baseUrl: proxyBaseUrl,
         intelligentRouting: userSettings.intelligentProxyRouting !== false,
         userRegion: userSettings.userRegion || 'CN',
