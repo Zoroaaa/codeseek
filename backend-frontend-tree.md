@@ -6,6 +6,7 @@
 ```
 磁力快搜/
 ├── 📁 codeseek-backend/          # 后端代码 (Cloudflare Workers)
+├── 📁 codeseek-site/             # 后端代理功能代码 (Cloudflare Workers)
 ├── 📁 frontend/                  # 前端代码
 ├── 📄 backend-frontend-tree.md   # 项目架构文档
 ├── 📄 readme.md                  # 项目说明文档
@@ -167,14 +168,24 @@ codeseek-backend/
 │
 ├── 📄 package.json                     # 📦 项目配置文件 (v2.1.0)
 ├── 📄 package-lock.json                # 依赖锁定文件
-
+│
 ├── 📄 wrangler.toml                    # ☁️ Cloudflare Workers 配置
 └── 📄 wranger部署.txt                   # Wrangler部署说明文档
 ```
 
+## 后端架构 (部署在Cloudflare Workers v2.1.0)
+```
+codeseek-backend/
+├── 📁 src/                            # 🎯 核心代码目录
+│   └── 📄 index.js                     # 🚀 主入口文件
+│
+└── 📁 .wrangler/                      # Wrangler临时文件目录
+    └── 📁 tmp/                         # 临时文件
+
 ## 部署架构
 - **前端**: 部署在 Cloudflare Pages
 - **后端**: 部署在 Cloudflare Workers (v2.1.0)
+- **后端代理功能**: 部署在 Cloudflare Workers 
 - **数据库**: 部署在 Cloudflare D1 (SQLite) - 模块化结构设计
 
 ## 数据库模块化结构说明

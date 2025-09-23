@@ -1,0 +1,157 @@
+
+---
+
+# 🚀 Windows 11 Wrangler + Cloudflare Worker 部署完整教程
+
+## 1. 安装 Node.js 和 npm
+
+Wrangler 是基于 Node.js 的，需要先装 Node.js。
+
+1. 打开官网：[https://nodejs.org/](https://nodejs.org/)
+2. 下载 **LTS 版本**（长期支持版，稳定可靠），例如 `18.x` 或 `20.x`。
+3. 安装时保持默认配置，一路下一步。
+4. 安装完成后，打开 **PowerShell**，输入：
+
+   ```powershell
+   node -v
+   npm -v
+   ```
+
+   如果能显示版本号，说明安装成功。
+
+---
+
+## 2. 安装 Wrangler
+
+在 **管理员 PowerShell** 中执行：
+
+```powershell
+npm install -g wrangler
+```
+
+> ⚠️ 如果遇到 `ExecutionPolicy` 错误（禁止运行脚本），解决办法：
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+然后重新运行 `npm install -g wrangler`。
+
+测试安装是否成功：
+
+```powershell
+wrangler --version
+```
+
+---
+
+## 3. 登录 Cloudflare
+
+Wrangler v3 以后，登录命令是：
+
+```powershell
+wrangler login
+```
+
+执行后会自动打开浏览器，跳转到 Cloudflare 登录页面，确认授权。
+成功后，Wrangler 就能访问你的账号了。
+
+---
+
+## 4. 初始化一个 Worker 项目
+
+在你想放项目的目录里（比如 `D:\projects`），运行：
+
+```powershell
+cd D:\projects
+wrangler init my-worker
+```
+
+* 会创建一个 `my-worker` 文件夹。
+* 里面有 `wrangler.toml` 配置文件和 `src/index.js` 代码。
+
+进入目录：
+
+```powershell
+cd my-worker
+```
+
+---
+
+## 5. 本地调试
+
+启动本地开发服务器：
+
+```powershell
+wrangler dev
+```
+
+终端会显示：
+
+```
+⎔ Starting local server...
+Listening on http://127.0.0.1:8787
+```
+
+打开浏览器访问 [http://127.0.0.1:8787](http://127.0.0.1:8787)
+你会看到返回的 "Hello World"（或项目里的默认内容）。
+
+---
+
+## 6. 部署到 Cloudflare
+
+确认无误后，运行：
+
+```powershell
+wrangler deploy
+```
+
+成功后，会输出：
+
+```
+✨ Success! Uploaded my-worker (your-worker-name)
+https://my-worker.username.workers.dev
+```
+
+这个链接就是你在 Cloudflare 上运行的 Worker 服务。
+
+---
+
+## 7. 修改代码 & 再次部署
+
+编辑 `src/index.js`：
+
+```javascript
+export default {
+  async fetch(request) {
+    return new Response("Hello, Zoro! 🚀", {
+      headers: { "content-type": "text/plain" },
+    });
+  },
+};
+```
+
+保存后再次执行：
+
+```powershell
+wrangler deploy
+```
+
+刷新 Worker 地址，就能看到新内容。
+
+---
+
+# 🎯 总结
+
+完整流程就是：
+
+1. 安装 Node.js
+2. `npm install -g wrangler` 安装 Wrangler
+3. `wrangler login` 登录账号
+4. `wrangler init` 初始化项目
+5. `wrangler dev` 本地调试
+6. `wrangler deploy` 部署上线
+
+---
+
+

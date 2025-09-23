@@ -1,4 +1,4 @@
-// src/services/search.js - 优化版本：完全集成新的搜索源管理API，修复前后端匹配问题，并添加代理功能
+// src/services/search.js - 优化版本：完全集成新的搜索源管理API，修复前后端匹配问题
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
@@ -27,235 +27,6 @@ class SearchService {
       averageResponseTime: 0,
       backendCalls: 0
     };
-    
-    // 改进的代理配置
-    this.proxyConfig = {
-      enabled: false,
-      baseUrl: '',
-      needsProxy: new Set(),
-      intelligentRouting: true,
-      userRegion: 'CN', // 默认地区
-      // 添加安全验证
-      allowedTargets: [
-        'www.javbus.com', 'javbus.com', 
-        'javdb.com', 'www.javdb.com',
-        'www.javlibrary.com', 'javlibrary.com',
-        'sukebei.nyaa.si', 'btsow.com', 'www.btsow.com'
-        // ... 其他允许的目标
-      ]
-    };
-  }
-
-  /**
-   * 初始化代理配置 - 添加安全验证
-   */
-  async initProxyConfig() {
-    try {
-      const userSettings = await this.getUserSettings();
-      
-      // 从配置获取代理基础URL，确保是受信任的域名
-      const proxyBaseUrl = this.validateProxyBaseUrl(
-        userSettings.customProxyUrl || 
-        window.API_CONFIG?.PROXY_BASE_URL || 
-        'https://codeseek-site.your-account.workers.dev'
-      );
-      
-      this.proxyConfig = {
-        enabled: userSettings.enableProxy || false,
-        baseUrl: proxyBaseUrl,
-        intelligentRouting: userSettings.intelligentProxyRouting !== false,
-        userRegion: userSettings.userRegion || 'CN',
-        needsProxy: new Set(userSettings.proxiedSources || [
-          'javbus', 'javdb', 'javlibrary', 'btsow', 'sukebei'
-        ])
-      };
-      
-      console.log('代理配置已初始化:', {
-        enabled: this.proxyConfig.enabled,
-        baseUrl: this.proxyConfig.baseUrl,
-        sourcesCount: this.proxyConfig.needsProxy.size
-      });
-    } catch (error) {
-      console.error('初始化代理配置失败:', error);
-      this.proxyConfig.enabled = false;
-    }
-  }
-  
-    /**
-   * 验证代理基础URL是否安全
-   */
-  validateProxyBaseUrl(url) {
-    if (!url) return null;
-    
-    try {
-      const urlObj = new URL(url);
-      
-      // 只允许HTTPS协议
-      if (urlObj.protocol !== 'https:') {
-        console.warn('代理URL必须使用HTTPS协议');
-        return null;
-      }
-      
-      // 验证域名是否为可信的Worker域名
-      const trustedDomains = [
-        '.zadi.workers.dev',
-        '.omnibox.pp.ua',
-        // 可以添加其他受信任的域名
-      ];
-      
-      const hostname = urlObj.hostname;
-      const isTrusted = trustedDomains.some(domain => 
-        hostname.endsWith(domain)
-      );
-      
-      if (!isTrusted) {
-        console.warn('代理URL域名不在可信列表中:', hostname);
-        return null;
-      }
-      
-      return url;
-    } catch (error) {
-      console.error('代理URL格式无效:', error);
-      return null;
-    }
-  }
-
-  /**
-   * 验证目标域名是否允许代理
-   */
-  isAllowedProxyTarget(hostname) {
-    return this.proxyConfig.allowedTargets.some(allowed => 
-      hostname === allowed || hostname === allowed.replace('www.', '')
-    );
-  }
-
-
-
-  /**
-   * 智能判断是否需要使用代理
-   */
-  shouldUseProxy(sourceId, userRegion = null) {
-    if (!this.proxyConfig.enabled) return false;
-    
-    const region = userRegion || this.proxyConfig.userRegion;
-    
-    // 如果启用了智能路由，根据源和地区自动判断
-    if (this.proxyConfig.intelligentRouting) {
-      const proxyRules = {
-        'javbus': ['CN', 'RU', 'IR', 'KR'], // 这些地区需要代理
-        'javdb': ['CN', 'RU', 'IR'],
-        'javlibrary': ['CN'],
-        'sukebei': ['CN', 'KR', 'SG'],
-        'btsow': ['CN', 'KR'],
-        'sehuatang': ['CN'],
-        't66y': ['CN']
-      };
-      
-      return proxyRules[sourceId]?.includes(region) || false;
-    }
-    
-    // 否则使用手动配置的代理源列表
-    return this.proxyConfig.needsProxy.has(sourceId);
-  }
-
-  /**
-   * 选择最佳代理服务器
-   */
-selectBestProxy(sourceId, userRegion = null) {
-  const region = userRegion || this.proxyConfig.userRegion;
-  
-  // 使用你的代理域名
-  const proxies = {
-    'US': 'https://us.omnibox.pp.ua',
-    'EU': 'https://eu.omnibox.pp.ua', 
-    'ASIA': 'https://all.omnibox.pp.ua', // 主代理服务器
-  };
-
-  // 根据用户地区选择最近的代理
-  if (['CN', 'TW', 'HK', 'MO', 'JP', 'KR', 'SG'].includes(region)) {
-    return proxies.ASIA;
-  }
-  if (['DE', 'FR', 'UK', 'IT', 'ES', 'NL', 'CH'].includes(region)) {
-    return proxies.EU;
-  }
-  
-  return proxies.US;
-}
-  
-    /**
-   * 测试代理连接
-   */
-  async testProxyConnection(proxyUrl, targetHost) {
-    try {
-      const testUrl = `${proxyUrl}/api/health`;
-      const response = await fetch(testUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        },
-        timeout: 10000 // 10秒超时
-      });
-      
-      if (response.ok) {
-        const healthData = await response.json();
-        return {
-          success: true,
-          latency: Date.now() - startTime,
-          data: healthData
-        };
-      }
-      
-      return {
-        success: false,
-        error: `HTTP ${response.status}`
-      };
-    } catch (error) {
-      return {
-        success: false, 
-        error: error.message
-      };
-    }
-  }
-
-  /**
-   * 改进的代理URL包装方法
-   */
-  wrapWithProxy(url, sourceId, options = {}) {
-    if (!this.shouldUseProxy(sourceId, options.userRegion)) {
-      return url;
-    }
-
-    try {
-      const targetUrl = new URL(url);
-      const proxyBaseUrl = options.customProxy || 
-                          this.selectBestProxy(sourceId, options.userRegion) || 
-                          this.proxyConfig.baseUrl;
-      
-      if (!proxyBaseUrl) {
-        console.warn('没有可用的代理服务器，使用原始URL');
-        return url;
-      }
-      
-      // 验证目标域名是否被允许
-      if (!this.isAllowedProxyTarget(targetUrl.hostname)) {
-        console.warn('目标域名不在代理白名单中:', targetUrl.hostname);
-        return url;
-      }
-      
-      const proxyUrl = new URL(proxyBaseUrl);
-      
-      // 修复：确保路径正确处理，避免双斜杠问题
-      const targetPath = targetUrl.pathname === '/' ? '' : targetUrl.pathname;
-      proxyUrl.pathname = `/proxy/${targetUrl.hostname}${targetPath}`;
-      proxyUrl.search = targetUrl.search;
-      proxyUrl.hash = targetUrl.hash;
-      
-      return proxyUrl.toString();
-      
-    } catch (error) {
-      console.error('包装代理URL失败:', error);
-      return url;
-    }
   }
 
   // 执行搜索 - 集成后端状态检查
@@ -264,9 +35,6 @@ selectBestProxy(sourceId, userRegion = null) {
     if (!validation.valid) {
       throw new Error(validation.errors[0]);
     }
-
-    // 初始化代理配置
-    await this.initProxyConfig();
 
     // 获取用户设置
     let useCache = options.useCache;
@@ -379,7 +147,7 @@ selectBestProxy(sourceId, userRegion = null) {
           includeSystem: true,
           enabledOnly: true
         });
-        console.log(`从API获取到 ${sources.length} 个已启用的搜索源`);
+        console.log(`从API获取到 ${sources.length} 个已可用的搜索源`);
       } catch (error) {
         console.error('获取用户搜索源失败，使用系统默认:', error);
         const defaultSources = await this.getSystemDefaultSources();
@@ -425,7 +193,7 @@ selectBestProxy(sourceId, userRegion = null) {
       {
         id: 'javbus',
         name: 'JavBus',
-        subtitle: '番号+磁力一体站,信息完善',
+        subtitle: '番号+磁力一体站，信息完善',
         icon: '🎬',
         urlTemplate: 'https://www.javbus.com/search/{keyword}',
         searchable: true,
@@ -438,7 +206,7 @@ selectBestProxy(sourceId, userRegion = null) {
       {
         id: 'javdb',
         name: 'JavDB',
-        subtitle: '极简风格番号资料站,轻量快速',
+        subtitle: '极简风格番号资料站，轻量快速',
         icon: '📚',
         urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
         searchable: true,
@@ -506,7 +274,7 @@ selectBestProxy(sourceId, userRegion = null) {
       
       console.log(`使用 ${enabledSources.length} 个搜索源进行搜索:`, enabledSources.map(s => s.name));
       
-      // 如果启用了状态检查，使用后端检查器
+      // 如果可用了状态检查，使用后端检查器
       let sourcesWithStatus = enabledSources;
       if (checkStatus && userSettings) {
         console.log('开始后端状态检查...');
@@ -666,26 +434,18 @@ selectBestProxy(sourceId, userRegion = null) {
     return reasons.length > 0 ? reasons.join('，') : '检查失败';
   }
 
-  // 从搜索源构建结果 - 添加代理URL包装
+  // 从搜索源构建结果
   buildResultsFromSources(sources, keyword, encodedKeyword, timestamp) {
     return sources.map(source => {
-      const originalUrl = source.urlTemplate.replace('{keyword}', encodedKeyword);
-      
-      // 应用代理包装
-      const proxyUrl = this.wrapWithProxy(originalUrl, source.id);
-      
       const result = {
         id: `result_${keyword}_${source.id}_${timestamp}`,
         title: source.name,
         subtitle: source.subtitle,
-        url: proxyUrl, // 使用代理URL
-        originalUrl: originalUrl, // 保留原始URL供直连选项使用
+        url: source.urlTemplate.replace('{keyword}', encodedKeyword),
         icon: source.icon,
         keyword: keyword,
         timestamp: timestamp,
-        source: source.id,
-        needsProxy: this.shouldUseProxy(source.id), // 标记是否需要代理
-        proxyUsed: proxyUrl !== originalUrl // 标记是否实际使用了代理
+        source: source.id
       };
       
       // 如果进行了状态检查，添加状态信息
@@ -874,66 +634,6 @@ selectBestProxy(sourceId, userRegion = null) {
     }
   }
 
-  // 代理相关的新方法
-
-  /**
-   * 更新代理配置
-   */
-  async updateProxyConfig(config) {
-    this.proxyConfig = { ...this.proxyConfig, ...config };
-    
-    // 如果用户已登录，保存代理设置到用户配置
-    if (authManager.isAuthenticated()) {
-      try {
-        await apiService.updateUserSettings({
-          enableProxy: this.proxyConfig.enabled,
-          proxiedSources: Array.from(this.proxyConfig.needsProxy),
-          intelligentProxyRouting: this.proxyConfig.intelligentRouting,
-          userRegion: this.proxyConfig.userRegion
-        });
-        console.log('代理配置已保存到用户设置');
-      } catch (error) {
-        console.error('保存代理配置失败:', error);
-      }
-    }
-  }
-
-  /**
-   * 获取代理配置
-   */
-  getProxyConfig() {
-    return { ...this.proxyConfig };
-  }
-
-  /**
-   * 切换源的代理使用
-   */
-  async toggleSourceProxy(sourceId, useProxy) {
-    if (useProxy) {
-      this.proxyConfig.needsProxy.add(sourceId);
-    } else {
-      this.proxyConfig.needsProxy.delete(sourceId);
-    }
-    
-    await this.updateProxyConfig({});
-    console.log(`源 ${sourceId} 代理设置已${useProxy ? '启用' : '禁用'}`);
-  }
-
-  /**
-   * 获取代理统计信息
-   */
-  getProxyStats() {
-    return {
-      enabled: this.proxyConfig.enabled,
-      proxiedSourcesCount: this.proxyConfig.needsProxy.size,
-      proxiedSources: Array.from(this.proxyConfig.needsProxy),
-      intelligentRouting: this.proxyConfig.intelligentRouting,
-      userRegion: this.proxyConfig.userRegion,
-      baseUrl: this.proxyConfig.baseUrl,
-      allowedTargetsCount: this.proxyConfig.allowedTargets.length
-    };
-  }
-
   // 清除搜索源缓存
   clearSourcesCache() {
     this.sourcesCache = null;
@@ -1082,10 +782,9 @@ selectBestProxy(sourceId, userRegion = null) {
   // 导出搜索服务状态
   exportServiceStatus() {
     return {
-      type: 'enhanced-search-service-with-proxy',
+      type: 'optimized-api-search-service',
       cacheStats: this.getCacheStats(),
       checkStats: this.getStatusCheckStats(),
-      proxyStats: this.getProxyStats(),
       userSettings: this.userSettings,
       sourcesCache: {
         size: this.sourcesCache ? this.sourcesCache.length : 0,
@@ -1093,7 +792,7 @@ selectBestProxy(sourceId, userRegion = null) {
         expired: Date.now() - this.sourcesCacheTimestamp > this.sourcesCacheExpiry
       },
       timestamp: Date.now(),
-      version: '2.4.0' // 更新版本号包含代理功能
+      version: '2.3.1' // 更新版本号
     };
   }
 
