@@ -62,36 +62,97 @@ class SearchService {
   }
 
   // 🆕 将普通URL转换为代理URL
-convertToProxyUrl(originalUrl) {
+  convertToProxyUrl(originalUrl) {
     if (!this.proxyEnabled || !originalUrl) {
-        return originalUrl;
+      return originalUrl;
     }
 
     try {
-        // 确保URL格式正确
-        if (!originalUrl.startsWith('http://') && !originalUrl.startsWith('https://')) {
-            originalUrl = 'https://' + originalUrl;
-        }
-
-        // 验证URL
-        const urlObj = new URL(originalUrl);
-        
-        // 编码URL - 重要：必须正确编码
-        const encodedUrl = encodeURIComponent(originalUrl);
-        
-        // 构建代理URL
-        const proxyUrl = `${this.proxyBaseUrl}/api/proxy/${encodedUrl}`;
-        
-        console.log(`URL代理转换成功: ${proxyUrl}`);
-        this.proxyStats.totalProxyUrls++;
-        
-        return proxyUrl;
+      // 验证URL格式
+      const urlObj = new URL(originalUrl);
+      
+      // 🔧 检查域名是否在允许的代理范围内
+      const hostname = urlObj.hostname.toLowerCase();
+      const allowedDomains = [
+        'javbus.com', 'www.javbus.com', 'javdb.com', 'www.javdb.com',
+        'jable.tv', 'www.jable.tv', 'javmost.com', 'www.javmost.com',
+        'javgg.net', 'www.javgg.net', 'sukebei.nyaa.si', 'jav.guru',
+        'www.jav.guru', 'javlibrary.com', 'www.javlibrary.com',
+        'btsow.com', 'www.btsow.com'
+      ];
+      
+      const isDomainAllowed = allowedDomains.some(domain => 
+        hostname === domain || hostname.endsWith('.' + domain)
+      );
+      
+      if (!isDomainAllowed) {
+        console.warn(`域名 ${hostname} 不在代理白名单中，使用原始URL`);
+        return originalUrl;
+      }
+      
+      // 🔧 使用更安全的编码方式
+      const encodedUrl = encodeURIComponent(originalUrl);
+      
+      // 构建代理URL
+      const proxyUrl = `${this.proxyBaseUrl}${this.proxyPath}${encodedUrl}`;
+      
+      // 更新统计
+      this.proxyStats.totalProxyUrls++;
+      
+      console.log(`URL代理转换: ${originalUrl} -> ${proxyUrl}`);
+      
+      return proxyUrl;
     } catch (error) {
-        console.error('URL代理转换失败:', error);
-        this.proxyStats.proxyErrorCount++;
-        return originalUrl; // 失败时返回原始URL
+      console.error('URL代理转换失败:', error);
+      this.proxyStats.proxyErrorCount++;
+      return originalUrl; // 回退到原始URL
     }
-}
+  }
+
+  // 🔧 新增：验证代理URL的方法
+  validateProxyUrl(proxyUrl) {
+    try {
+      if (!proxyUrl.includes(this.proxyPath)) {
+        return false;
+      }
+      
+      const urlParts = proxyUrl.split(this.proxyPath);
+      if (urlParts.length !== 2) {
+        return false;
+      }
+      
+      const encodedOriginalUrl = urlParts[1];
+      const originalUrl = decodeURIComponent(encodedOriginalUrl);
+      
+      // 验证原始URL是否有效
+      new URL(originalUrl);
+      
+      return true;
+    } catch (error) {
+      console.error('代理URL验证失败:', error);
+      return false;
+    }
+  }
+
+  // 🔧 新增：从代理URL提取原始URL的方法
+  extractOriginalUrl(proxyUrl) {
+    try {
+      if (!proxyUrl.includes(this.proxyPath)) {
+        return proxyUrl;
+      }
+      
+      const urlParts = proxyUrl.split(this.proxyPath);
+      if (urlParts.length !== 2) {
+        return proxyUrl;
+      }
+      
+      const encodedOriginalUrl = urlParts[1];
+      return decodeURIComponent(encodedOriginalUrl);
+    } catch (error) {
+      console.error('提取原始URL失败:', error);
+      return proxyUrl;
+    }
+  }
 
   // 🆕 检查代理服务健康状态
   async checkProxyHealth() {
@@ -554,22 +615,31 @@ convertToProxyUrl(originalUrl) {
   buildResultsFromSources(sources, keyword, encodedKeyword, timestamp) {
     return sources.map(source => {
       // 构建原始URL
-      const originalUrl = source.urlTemplate.replace('{keyword}', encodedKeyword);
+      let originalUrl;
+      try {
+        originalUrl = source.urlTemplate.replace('{keyword}', encodedKeyword);
+        // 验证URL格式
+        new URL(originalUrl);
+      } catch (error) {
+        console.error(`构建搜索URL失败 for ${source.name}:`, error);
+        // 使用基础URL作为后备
+        originalUrl = source.urlTemplate.replace('{keyword}', encodeURIComponent(keyword));
+      }
       
-      // 🆕 转换为代理URL
+      // 🔧 转换为代理URL
       const proxyUrl = this.convertToProxyUrl(originalUrl);
       
       const result = {
         id: `result_${keyword}_${source.id}_${timestamp}`,
         title: source.name,
         subtitle: source.subtitle,
-        url: proxyUrl, // 🆕 使用代理URL替代原始URL
-        originalUrl: originalUrl, // 🆕 保留原始URL用于调试和日志
+        url: proxyUrl, // 使用代理URL替代原始URL
+        originalUrl: originalUrl, // 保留原始URL用于调试和日志
         icon: source.icon,
         keyword: keyword,
         timestamp: timestamp,
         source: source.id,
-        proxyEnabled: this.proxyEnabled // 🆕 标记是否使用了代理
+        proxyEnabled: this.proxyEnabled && proxyUrl !== originalUrl // 标记是否使用了代理
       };
       
       // 如果进行了状态检查，添加状态信息
@@ -589,6 +659,49 @@ convertToProxyUrl(originalUrl) {
       
       return result;
     });
+  }
+
+  // 🔧 新增：批量测试代理连通性
+  async testProxyConnectivityBatch(testUrls = []) {
+    const defaultTestUrls = [
+      'https://www.javbus.com',
+      'https://javdb.com',
+      'https://www.javlibrary.com'
+    ];
+    
+    const urlsToTest = testUrls.length > 0 ? testUrls : defaultTestUrls;
+    const results = [];
+    
+    for (const testUrl of urlsToTest) {
+      try {
+        const result = await this.testProxyConnectivity(testUrl);
+        results.push({
+          url: testUrl,
+          ...result
+        });
+      } catch (error) {
+        results.push({
+          url: testUrl,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    const totalCount = results.length;
+    
+    console.log(`代理连通性测试完成: ${successCount}/${totalCount} 成功`);
+    
+    return {
+      summary: {
+        total: totalCount,
+        successful: successCount,
+        failed: totalCount - successCount,
+        successRate: (successCount / totalCount * 100).toFixed(1) + '%'
+      },
+      results
+    };
   }
 
   // 更新检查统计

@@ -149,7 +149,7 @@ export class Router {
             });
         }
 
-        // 🆕 特殊处理代理请求 - 必须在其他路由之前处理
+        // 🔧 关键修复：代理请求必须在所有其他路由之前处理
         if (pathname.startsWith('/api/proxy/')) {
             console.log(`代理请求: ${pathname}`);
             return await this.executeHandler(proxyHandler, request, env);
@@ -238,13 +238,6 @@ export class Router {
         
         // 代理统计信息
         this.get('/api/proxy/stats', proxyStatsHandler);
-        
-        // 通用代理路由 - 匹配 /api/proxy/* 的所有请求
-        // 注意：这里不使用 this.get() 因为需要处理所有HTTP方法
-        this.routes.set('GET:/api/proxy/*', proxyHandler);
-        this.routes.set('POST:/api/proxy/*', proxyHandler);
-        this.routes.set('PUT:/api/proxy/*', proxyHandler);
-        this.routes.set('DELETE:/api/proxy/*', proxyHandler);
 
         // ===============================================
         // 认证相关路由（增强版本，包含邮箱验证和忘记密码）
