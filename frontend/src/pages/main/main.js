@@ -16,6 +16,7 @@ import searchSourcesAPI from '../../services/search-sources-api.js';
 // 🆕 导入邮箱验证服务和UI组件
 import emailVerificationService from '../../services/email-verification-service.js';
 import { emailVerificationUI } from '../../components/email-verification-ui.js';
+import proxyService from '../../services/proxy-service.js';
 
 class MagnetSearchApp {
   constructor() {
@@ -889,6 +890,17 @@ renderSiteItem(source, isSearchable) {
       if (this.detailExtractionEnabled || this.detailExtractionAvailable) {
         await detailCardManager.init();
       }
+	  
+	      // 🆕 初始化代理服务
+    console.log('📡 正在初始化代理服务...');
+    await proxyService.init();
+    
+    if (proxyService.isProxyEnabled()) {
+      console.log('✅ 代理服务已启用');
+      showToast('代理模式已启用，可访问受限制的搜索源', 'success', 3000);
+    } else {
+      console.log('ℹ️ 代理服务未启用');
+    }
       
       // 初始化收藏管理器
       await favoritesManager.init();

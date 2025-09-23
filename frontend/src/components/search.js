@@ -9,6 +9,7 @@ import searchService from '../services/search.js';
 import authManager from '../services/auth.js';
 import apiService from '../services/api.js';
 import favoritesManager from './favorites.js';
+import proxyService from '../services/proxy-service.js';
 
 // 导入子组件 - 使用统一的SearchConfigManager
 import SearchConfigManager from './search/SearchConfigManager.js';
@@ -47,6 +48,12 @@ export class UnifiedSearchManager {
       await this.extractionManager.init();
       await this.resultsRenderer.init();
       await this.suggestionManager.init();
+	  
+	      // 🆕 初始化代理服务（如果还未初始化）
+    if (!proxyService.isInitialized) {
+      console.log('🔒 在搜索管理器中初始化代理服务...');
+      await proxyService.init();
+    }
       
       // 设置子组件间的通信
       this.setupComponentCommunication();
