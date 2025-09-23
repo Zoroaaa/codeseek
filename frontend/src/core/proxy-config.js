@@ -11,7 +11,7 @@ export const proxyConfig = {
   proxyServer: 'https://all.omnibox.pp.ua',
   
   // 是否默认开启（从localStorage读取用户偏好）
-  defaultEnabled: false,
+  defaultEnabled: true,
   
   // 代理URL格式模板 (支持动态路由 /proxy/{hostname}/{path})
   proxyUrlTemplate: '{proxy}/proxy/{hostname}{path}',
