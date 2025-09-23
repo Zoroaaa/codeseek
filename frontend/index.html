@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">磁力快搜 - 专业版</title>
-    <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索，详情提取">
+    <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索">
 	
     <!-- 核心样式 - 必须最先引入 -->
     <link rel="stylesheet" href="css/core/variables.css">
@@ -17,11 +17,8 @@
     <link rel="stylesheet" href="css/components/toast.css">
     <link rel="stylesheet" href="css/components/loading.css">
     <link rel="stylesheet" href="css/components/search.css">
-	<link rel="stylesheet" href="css/components/detail-card.css">
-    <!-- 🆕 邮箱验证样式 -->
+    <!-- 邮箱验证样式 -->
     <link rel="stylesheet" href="css/components/email-verification.css">
-    <!-- 搜索配置管理样式 -->
-    <link rel="stylesheet" href="css/components/search-config.css">
     <link rel="stylesheet" href="css/components/status.css">
     <link rel="stylesheet" href="css/components/search-status.css">
     
@@ -38,10 +35,6 @@
     <link rel="stylesheet" href="css/components/proxy-ui.css">
 	
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
-    
-    <!-- 搜索与详情提取配置支持的meta标签 -->
-    <meta name="search-config-management-supported" content="true">
-    <meta name="unified-search-architecture" content="true">
 </head>
 <body>
     <!-- 导航栏 -->
@@ -55,15 +48,6 @@
             </div>
             <div class="nav-menu">
                 <button id="themeToggle" class="theme-btn" title="切换主题">🌙</button>
-                <!-- 配置管理按钮 -->
-                <button id="configManagementBtn" class="config-management-btn" title="搜索与详情提取配置" style="display:none;">
-                    ⚙️
-                </button>
-                <!-- 详情提取服务状态指示器 -->
-                <div id="detailServiceStatus" class="service-status" title="详情提取服务状态" style="display:none;">
-                    <span class="status-icon">⚠️</span>
-                    <span class="status-text">详情提取: 检查中</span>
-                </div>
                 <div id="userMenu" class="user-menu">
                     <button id="loginBtn" class="login-btn">登录</button>
                     <div id="userInfo" class="user-info" style="display:none;">
@@ -72,8 +56,6 @@
                             <button class="dropdown-btn" title="用户菜单">▼</button>
                             <div class="dropdown-content">
                                 <a href="#" onclick="navigateToDashboard(); return false;">个人中心</a>
-                                <!-- 配置管理入口 -->
-                                <a href="#" onclick="window.openConfigManagement && window.openConfigManagement(); return false;">配置管理</a>
                                 <a href="#" id="logoutBtn">退出登录</a>
                             </div>
                         </div>
@@ -88,7 +70,7 @@
         <!-- Hero区域 -->
         <section class="hero">
             <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
-            <p class="hero-subtitle">智能搜索，云端同步，极致体验 | 完善的详情提取服务支持</p>
+            <p class="hero-subtitle">智能搜索，云端同步，极致体验</p>
             
             <!-- 搜索框 -->
             <div class="search-container">
@@ -120,57 +102,12 @@
                     <li>输入完整番号获得最精确结果</li>
                     <li>使用空格分隔多个关键词</li>
                     <li>登录后可享受云端同步服务</li>
-                    <li>支持详情提取的站点会显示 🔋 标识</li>
-                    <li>详情提取包含高清小图、演员信息、下载链接等</li>
-                    <li>在配置管理中可自定义搜索和提取选项</li>
                 </ul>
-            </div>
-        </section>
-
-        <!-- 搜索配置管理区域 -->
-        <section id="searchConfigSection" class="search-config-section" style="display:none;">
-            <div class="section-header">
-                <h2>⚙️ 搜索与详情提取配置</h2>
-                <div class="section-actions">
-                    <button id="showConfigBtn" class="config-btn" title="显示配置管理界面">
-                        <span class="btn-icon">⚙️</span>
-                        <span class="btn-text">配置管理</span>
-                    </button>
-                    <button id="hideConfigBtn" class="config-btn" style="display:none;" title="隐藏配置管理界面">
-                        <span class="btn-icon">🔽</span>
-                        <span class="btn-text">收起配置</span>
-                    </button>
-                </div>
-            </div>
-            <!-- 配置管理UI容器 - 由SearchConfigManager动态渲染 -->
-            <div id="searchConfigContainer" class="search-config-container" style="display:none;">
-                <!-- 内容将通过SearchConfigManager的initConfigUI方法动态生成 -->
             </div>
         </section>
 
         <!-- 搜索状态指示器 -->
         <section id="searchStatusIndicator" class="search-status-indicator" style="display:none;">
-            <!-- 内容将通过JavaScript动态更新 -->
-        </section>
-
-        <!-- 详情提取进度指示器 -->
-        <section id="extractionProgress" class="extraction-progress-container" style="display:none;">
-            <div class="progress-header">
-                <span class="progress-title">正在提取详情信息</span>
-                <span class="progress-stats">0 / 0</span>
-                <button class="progress-close" onclick="this.closest('.extraction-progress-container').style.display='none'">×</button>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: 0%"></div>
-            </div>
-            <div class="progress-message">正在处理搜索结果...</div>
-            <div class="progress-details">
-                <small>平均用时: <span class="avg-time">计算中...</span> | 成功率: <span class="success-rate">计算中...</span></small>
-            </div>
-        </section>
-
-        <!-- 详情提取洞察信息 -->
-        <section id="extractionInsights" class="extraction-insights-container" style="display:none;">
             <!-- 内容将通过JavaScript动态更新 -->
         </section>
 
@@ -188,43 +125,11 @@
             <div class="section-header">
                 <h2>🔍 搜索结果</h2>
                 <div class="section-actions">
-                    <!-- 详情提取控制按钮 -->
-                    <button id="batchExtractBtn" class="action-btn detail-action-btn" style="display:none;" title="批量提取当前搜索结果的详情信息">
-                        <span class="btn-icon">🔋</span>
-                        <span class="btn-text">批量提取</span>
-                    </button>
-                    <button id="refreshStatsBtn" class="action-btn stats-btn" style="display:none;" title="刷新详情提取统计">
-                        <span class="btn-icon">📊</span>
-                        <span class="btn-text">刷新统计</span>
-                    </button>
                     <button id="exportResultsBtn" class="action-btn" style="display:none;">导出结果</button>
                     <button id="clearResultsBtn" class="clear-btn">清空结果</button>
                 </div>
             </div>
             <div id="searchInfo" class="search-info"></div>
-            
-            <!-- 详情提取统计信息 -->
-            <div id="extractionStats" class="detail-extraction-stats" style="display:none;">
-                <div class="stats-content">
-                    <span class="stats-item">
-                        <span class="stats-label">支持详情提取:</span>
-                        <span class="stats-value" id="supportedCount">0</span>
-                    </span>
-                    <span class="stats-item">
-                        <span class="stats-label">已提取:</span>
-                        <span class="stats-value" id="extractedCount">0</span>
-                    </span>
-                    <span class="stats-item">
-                        <span class="stats-label">提取成功率:</span>
-                        <span class="stats-value" id="successRate">0%</span>
-                    </span>
-                    <span class="stats-item">
-                        <span class="stats-label">缓存命中:</span>
-                        <span class="stats-value" id="cacheHitRate">0%</span>
-                    </span>
-                </div>
-            </div>
-            
             <div id="results" class="results-grid"></div>
         </section>
 
@@ -288,14 +193,14 @@
                 <button type="submit" class="submit-btn">登录</button>
                 <div class="form-links">
                     <a href="#" id="showRegister">还没有账号？注册</a>
-                    <!-- 🆕 更新忘记密码链接 -->
+                    <!-- 忘记密码链接 -->
                     <a href="#" id="showForgotPassword">忘记密码？</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- 🆕 更新注册模态框 - 集成邮箱验证 -->
+    <!-- 注册模态框 - 集成邮箱验证 -->
     <div id="registerModal" class="modal" aria-labelledby="register-title" role="dialog">
         <div class="modal-content">
             <span class="close" aria-label="关闭">&times;</span>
@@ -362,14 +267,11 @@
         <span class="status-text">检查连接...</span>
     </div>
 
-    <!-- 图片预览模态框容器 -->
-    <div id="imagePreviewContainer"></div>
-
     <!-- 使用统一搜索组件的脚本加载 -->
     <script type="module">
         // 现在使用更新后的服务架构初始化应用
         import MagnetSearchApp from './src/pages/main/main.js';
-        // 🆕 导入邮箱验证UI组件
+        // 导入邮箱验证UI组件
         import { emailVerificationUI } from './src/components/email-verification-ui.js';
         
         // 全局导航函数（保持向后兼容）
@@ -379,40 +281,7 @@
             }
         };
 
-        // 配置管理功能
-        window.openConfigManagement = function() {
-            const configSection = document.getElementById('searchConfigSection');
-            const configContainer = document.getElementById('searchConfigContainer');
-            
-            if (configSection && configContainer) {
-                configSection.style.display = 'block';
-                configContainer.style.display = 'block';
-                
-                // 初始化配置UI（如果还未初始化）
-                if (window.unifiedSearchManager && window.unifiedSearchManager.configManager) {
-                    window.unifiedSearchManager.configManager.initConfigUI('searchConfigContainer');
-                }
-                
-                // 滚动到配置区域
-                configSection.scrollIntoView({ behavior: 'smooth' });
-            }
-        };
-
-        // 批量提取详情 - 使用统一搜索管理器
-        window.batchExtractDetails = function() {
-            if (window.app && window.app.batchExtractDetails) {
-                window.app.batchExtractDetails();
-            }
-        };
-
-        // 刷新详情提取统计
-        window.refreshExtractionStats = function() {
-            if (window.app && window.app.refreshDetailExtractionStats) {
-                window.app.refreshDetailExtractionStats();
-            }
-        };
-
-        // 🆕 邮箱验证相关全局函数
+        // 邮箱验证相关全局函数
         window.emailVerificationUI = emailVerificationUI;
         
         // 显示邮箱验证相关模态框的全局函数
@@ -424,7 +293,7 @@
             emailVerificationUI.showPasswordResetModal();
         };
 
-        // 🆕 显示忘记密码模态框的全局函数
+        // 显示忘记密码模态框的全局函数
         window.showForgotPasswordModal = function() {
             emailVerificationUI.showForgotPasswordModal();
         };
@@ -445,11 +314,8 @@
                 // 创建使用统一搜索组件的应用实例
                 window.app = new MagnetSearchApp();
                 
-                // 🆕 初始化邮箱验证UI
+                // 初始化邮箱验证UI
                 initEmailVerificationIntegration();
-                
-                // 初始化配置管理UI
-                initConfigManagementUI();
                 
                 console.log('✅ 应用初始化完成');
                 
@@ -473,7 +339,7 @@
             }
         });
 
-        // 🆕 初始化邮箱验证集成
+        // 初始化邮箱验证集成
         function initEmailVerificationIntegration() {
             console.log('📧 初始化邮箱验证集成...');
             
@@ -532,7 +398,7 @@
                 });
             }
             
-            // 🆕 添加忘记密码链接处理（更新的ID）
+            // 添加忘记密码链接处理（更新的ID）
             const showForgotPasswordLink = document.getElementById('showForgotPassword');
             if (showForgotPasswordLink) {
                 showForgotPasswordLink.addEventListener('click', (e) => {
@@ -553,99 +419,6 @@
             }
             
             console.log('✅ 邮箱验证集成完成');
-        }
-
-        // 初始化配置管理UI
-        function initConfigManagementUI() {
-            // 配置管理按钮
-            const configManagementBtn = document.getElementById('configManagementBtn');
-            if (configManagementBtn) {
-                configManagementBtn.addEventListener('click', window.openConfigManagement);
-            }
-
-            // 显示配置按钮
-            const showConfigBtn = document.getElementById('showConfigBtn');
-            if (showConfigBtn) {
-                showConfigBtn.addEventListener('click', () => {
-                    const configSection = document.getElementById('searchConfigSection');
-                    const configContainer = document.getElementById('searchConfigContainer');
-                    const hideConfigBtn = document.getElementById('hideConfigBtn');
-                    
-                    if (configSection && configContainer) {
-                        configSection.style.display = 'block';
-                        configContainer.style.display = 'block';
-                        showConfigBtn.style.display = 'none';
-                        if (hideConfigBtn) hideConfigBtn.style.display = 'inline-flex';
-                        
-                        // 初始化配置UI
-                        if (window.unifiedSearchManager && window.unifiedSearchManager.configManager) {
-                            window.unifiedSearchManager.configManager.initConfigUI('searchConfigContainer');
-                        }
-                    }
-                });
-            }
-
-            // 隐藏配置按钮
-            const hideConfigBtn = document.getElementById('hideConfigBtn');
-            if (hideConfigBtn) {
-                hideConfigBtn.addEventListener('click', () => {
-                    const configContainer = document.getElementById('searchConfigContainer');
-                    const showConfigBtn = document.getElementById('showConfigBtn');
-                    
-                    if (configContainer) {
-                        configContainer.style.display = 'none';
-                        hideConfigBtn.style.display = 'none';
-                        if (showConfigBtn) showConfigBtn.style.display = 'inline-flex';
-                    }
-                });
-            }
-
-            // 批量提取按钮
-            const batchExtractBtn = document.getElementById('batchExtractBtn');
-            if (batchExtractBtn) {
-                batchExtractBtn.addEventListener('click', window.batchExtractDetails);
-            }
-
-            // 刷新统计按钮
-            const refreshStatsBtn = document.getElementById('refreshStatsBtn');
-            if (refreshStatsBtn) {
-                refreshStatsBtn.addEventListener('click', window.refreshExtractionStats);
-            }
-
-            // 监听配置变更事件
-            document.addEventListener('searchConfigChanged', handleSearchConfigChanged);
-            document.addEventListener('detailConfigSaved', handleDetailConfigSaved);
-        }
-
-        // 处理搜索配置变更
-        function handleSearchConfigChanged(event) {
-            console.log('搜索配置已变更:', event.detail);
-            
-            // 更新UI状态
-            updateConfigRelatedUI(event.detail.config);
-        }
-
-        // 处理详情配置保存
-        function handleDetailConfigSaved(event) {
-            console.log('详情配置已保存:', event.detail);
-            
-            // 可以在这里添加保存后的处理逻辑
-            showToast('配置已保存并生效', 'success');
-        }
-
-        // 更新配置相关UI
-        function updateConfigRelatedUI(config) {
-            // 更新导航栏中的配置管理按钮显示
-            const configManagementBtn = document.getElementById('configManagementBtn');
-            if (configManagementBtn && window.app && window.app.currentUser) {
-                configManagementBtn.style.display = 'inline-block';
-            }
-            
-            // 根据配置更新其他UI元素
-            if (config.enableDetailExtraction) {
-                // 可以在这里添加详情提取启用后的UI更新逻辑
-                console.log('详情提取功能已启用');
-            }
         }
 
         // 显示Toast通知的简单实现

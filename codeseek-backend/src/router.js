@@ -1,4 +1,4 @@
-// src/router.js - 重构版本：搜索源管理功能已独立，移除旧的冗余路由
+// src/router.js - 重构版本：搜索源管理功能已独立，移除旧的冗余路由，移除详情提取功能
 import { utils } from './utils.js';
 
 // 导入所有处理器
@@ -85,20 +85,6 @@ import {
     recordActionHandler,
     defaultHandler
 } from './handlers/system.js';
-
-import {
-    extractSingleDetailHandler,
-    extractBatchDetailsHandler,
-    getDetailExtractionHistoryHandler,
-    getDetailCacheStatsHandler,
-    clearDetailCacheHandler,
-    deleteDetailCacheHandler,
-    getDetailExtractionConfigHandler,
-    updateDetailExtractionConfigHandler,
-    resetDetailExtractionConfigHandler,
-    applyConfigPresetHandler,
-    getDetailExtractionStatsHandler
-} from './handlers/detail.js';
 
 export class Router {
     constructor() {
@@ -317,27 +303,6 @@ export class Router {
         this.get('/api/community/search', communitySearchHandler);
 
         // ===============================================
-        // 详情提取相关API路由
-        // ===============================================
-        
-        // 基础详情提取功能
-        this.post('/api/detail/extract-single', extractSingleDetailHandler);
-        this.post('/api/detail/extract-batch', extractBatchDetailsHandler);
-        this.get('/api/detail/history', getDetailExtractionHistoryHandler);
-        this.get('/api/detail/stats', getDetailExtractionStatsHandler);
-        
-        // 缓存管理
-        this.get('/api/detail/cache/stats', getDetailCacheStatsHandler);
-        this.delete('/api/detail/cache/clear', clearDetailCacheHandler);
-        this.delete('/api/detail/cache/delete', deleteDetailCacheHandler);
-        
-        // 配置管理相关API路由
-        this.get('/api/detail/config', getDetailExtractionConfigHandler);
-        this.put('/api/detail/config', updateDetailExtractionConfigHandler);
-        this.post('/api/detail/config/reset', resetDetailExtractionConfigHandler);
-        this.post('/api/detail/config/preset', applyConfigPresetHandler);
-
-        // ===============================================
         // 用户设置（已移除搜索源管理功能，现在通过独立API处理）
         // ===============================================
         this.get('/api/user/settings', userGetSettingsHandler);
@@ -375,30 +340,3 @@ export class Router {
     }
 }
 
-// ===============================================
-// 重构说明
-// ===============================================
-// 
-// 本次重构已完成：
-// 
-// 1. 移除了旧的搜索源管理冗余功能：
-//    - user.js 中的 customSearchSources、customSourceCategories 相关设置处理
-//    - system.js 中的 getSearchSourcesHandler 函数
-//    - constants.js 中的硬编码搜索源定义
-// 
-// 2. 新的搜索源管理架构：
-//    - 独立的数据库表：search_major_categories、search_source_categories、search_sources、user_search_source_configs
-//    - 独立的服务文件：search-sources-service.js
-//    - 独立的处理器文件：search-sources.js
-//    - 完整的RESTful API路由
-// 
-// 3. 功能分离清晰：
-//    - 用户设置只处理个人偏好设置
-//    - 搜索源管理通过专门的API处理
-//    - 系统级别的状态检查保持独立
-//    - 详情提取功能保持独立
-// 
-// 4. 向后兼容性：
-//    - 保留了所有现有的非搜索源管理功能
-//    - API路径清晰，便于前端调用
-//    - 数据库设计支持用户个性化配置

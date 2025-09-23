@@ -1,5 +1,5 @@
-// src/components/search.js - 重构后的统一搜索组件（主组件集成子组件）
-// 专注于搜索流程编排、搜索请求协调、子组件通信、搜索状态管理
+// src/components/search.js - 清理版本：移除详情提取功能
+// 专注于搜索流程编排、搜索请求回调、子组件通信、搜索状态管理
 import { APP_CONSTANTS } from '../core/constants.js';
 import { showToast, showLoading } from '../utils/dom.js';
 import { escapeHtml } from '../utils/format.js';
@@ -11,19 +11,15 @@ import apiService from '../services/api.js';
 import favoritesManager from './favorites.js';
 import proxyService from '../services/proxy-service.js';
 
-// 导入子组件 - 使用统一的SearchConfigManager
-import SearchConfigManager from './search/SearchConfigManager.js';
+// 导入子组件 - 移除详情提取管理器
 import SearchHistoryManager from './search/SearchHistoryManager.js';
-import DetailExtractionManager from './search/DetailExtractionManager.js';
 import SearchResultsRenderer from './search/SearchResultsRenderer.js';
 import SearchSuggestionManager from './search/SearchSuggestionManager.js';
 
 export class UnifiedSearchManager {
   constructor() {
-    // 初始化子组件 - SearchConfigManager现在是统一配置管理器
-    this.configManager = new SearchConfigManager();
+    // 初始化子组件 - 移除详情提取管理器
     this.historyManager = new SearchHistoryManager();
-    this.extractionManager = new DetailExtractionManager();
     this.resultsRenderer = new SearchResultsRenderer();
     this.suggestionManager = new SearchSuggestionManager();
     
@@ -43,17 +39,15 @@ export class UnifiedSearchManager {
       console.log('开始初始化统一搜索管理器...');
       
       // 按顺序初始化所有子组件
-      await this.configManager.init();
       await this.historyManager.init();
-      await this.extractionManager.init();
       await this.resultsRenderer.init();
       await this.suggestionManager.init();
 	  
-	      // 🆕 初始化代理服务（如果还未初始化）
-    if (!proxyService.isInitialized) {
-      console.log('🔒 在搜索管理器中初始化代理服务...');
-      await proxyService.init();
-    }
+      // 初始化代理服务（如果还未初始化）
+      if (!proxyService.isInitialized) {
+        console.log('在搜索管理器中初始化代理服务...');
+        await proxyService.init();
+      }
       
       // 设置子组件间的通信
       this.setupComponentCommunication();
@@ -79,21 +73,6 @@ export class UnifiedSearchManager {
    * 设置子组件间的通信
    */
   setupComponentCommunication() {
-    // 配置变更 -> 通知相关组件
-    document.addEventListener('searchConfigChanged', (event) => {
-      const config = event.detail.config;
-      console.log('配置已更新，通知相关组件');
-      
-      // 更新建议管理器的历史数据
-      this.suggestionManager.setSearchHistory(this.historyManager.getHistory());
-      
-      // 通知详情提取管理器配置更新
-      this.extractionManager.updateConfig(config);
-      
-      // 通知结果渲染器配置更新
-      this.resultsRenderer.updateConfig(config);
-    });
-
     // 历史搜索请求 -> 执行搜索
     document.addEventListener('historySearchRequested', (event) => {
       const { keyword } = event.detail;
@@ -115,11 +94,6 @@ export class UnifiedSearchManager {
     document.addEventListener('actressSearchRequested', (event) => {
       const { name } = event.detail;
       this.searchByActress(name);
-    });
-
-    // 详情提取完成 -> 更新UI
-    document.addEventListener('detailExtractionCompleted', (event) => {
-      console.log('详情提取完成:', event.detail);
     });
 
     // 搜索结果渲染完成 -> 通知其他组件
@@ -164,36 +138,24 @@ export class UnifiedSearchManager {
 
       // 执行基础搜索
       const searchResults = await searchService.performSearch(keyword, {
-        useCache: this.configManager.config.useCache,
-        saveToHistory: this.configManager.config.saveToHistory && authManager.isAuthenticated()
+        useCache: true,
+        saveToHistory: authManager.isAuthenticated()
       });
       
       if (!searchResults || searchResults.length === 0) {
         showToast('未找到搜索结果', 'warning');
-        this.resultsRenderer.displaySearchResults(keyword, [], this.configManager.config);
+        this.resultsRenderer.displaySearchResults(keyword, []);
         return;
       }
 
       // 显示基础搜索结果
-      this.resultsRenderer.displaySearchResults(keyword, searchResults, this.configManager.config);
+      this.resultsRenderer.displaySearchResults(keyword, searchResults);
       
       // 更新搜索历史
       if (authManager.isAuthenticated()) {
         await this.historyManager.addToHistory(keyword);
         // 通知建议管理器更新历史
         this.suggestionManager.setSearchHistory(this.historyManager.getHistory());
-      }
-
-      // 检查是否启用详情提取
-      if (this.shouldUseDetailExtraction()) {
-        console.log('开始详情提取流程...');
-        await this.extractionManager.handleDetailExtraction(
-          searchResults, 
-          keyword, 
-          this.configManager.config
-        );
-      } else if (!authManager.isAuthenticated() && this.configManager.config.enableDetailExtraction) {
-        showToast('登录后可使用详情提取功能', 'info', 3000);
       }
 
     } catch (error) {
@@ -239,13 +201,6 @@ export class UnifiedSearchManager {
   }
 
   /**
-   * 判断是否应该使用详情提取
-   */
-  shouldUseDetailExtraction() {
-    return this.extractionManager.shouldUseDetailExtraction(this.configManager.config);
-  }
-
-  /**
    * 显示搜索状态检查进度
    */
   async showSearchStatusIfEnabled(keyword) {
@@ -286,13 +241,6 @@ export class UnifiedSearchManager {
         break;
       case 'copy':
         await this.copyToClipboard(url);
-        break;
-      case 'extractDetail':
-        await this.extractionManager.extractSingleDetail(
-          resultId, 
-          this.resultsRenderer.getCurrentResults(),
-          this.configManager.config
-        );
         break;
       case 'checkStatus':
         await this.checkSingleSourceStatus(source, resultId);
@@ -502,7 +450,7 @@ export class UnifiedSearchManager {
 
       // 重新渲染结果列表
       const keyword = document.getElementById('searchInput')?.value || '';
-      this.resultsRenderer.displaySearchResults(keyword, updatedResults, this.configManager.config);
+      this.resultsRenderer.displaySearchResults(keyword, updatedResults);
 
       const contentMatches = statusSummary.sources.filter(s => s.contentMatch).length;
       const unavailableCount = statusSummary.unavailable + statusSummary.timeout + statusSummary.error;
@@ -530,8 +478,7 @@ export class UnifiedSearchManager {
    * 导出搜索结果
    */
   async exportResults() {
-    const extractionStats = this.extractionManager.getExtractionStats();
-    const result = await this.resultsRenderer.exportResults(extractionStats);
+    const result = await this.resultsRenderer.exportResults();
     
     if (result.success) {
       showToast('搜索结果导出成功', 'success');
@@ -647,7 +594,6 @@ export class UnifiedSearchManager {
     // 监听认证状态变更
     document.addEventListener('authStateChanged', () => {
       this.historyManager.loadSearchHistory();
-      this.extractionManager.checkDetailServiceHealth();
     });
   }
 
@@ -693,48 +639,8 @@ export class UnifiedSearchManager {
       checkSourceStatus: (sourceId, resultId) => this.checkSingleSourceStatus(sourceId, resultId),
       refreshSourceStatus: () => this.refreshAllSourcesStatus(),
       
-      // 详情提取
-      extractSingleDetail: (resultId) => this.extractionManager.extractSingleDetail(
-        resultId, 
-        this.resultsRenderer.getCurrentResults(),
-        this.configManager.config
-      ),
-      retryExtraction: (resultId) => this.extractionManager.retryExtraction(
-        resultId,
-        this.resultsRenderer.getCurrentResults(),
-        this.configManager.config
-      ),
-      toggleDetailDisplay: (resultId) => this.extractionManager.toggleDetailDisplay(resultId),
-      
-      // 配置相关 - 通过统一配置管理器
-      refreshConfig: () => this.configManager.refreshDetailConfig(),
-      clearConfigCache: () => this.configManager.clearConfigCache(),
-      getCurrentConfig: () => this.configManager.getConfig(),
-      getEffectiveConfig: (overrides) => this.configManager.getEffectiveConfig(overrides),
-      isDetailExtractionEnabled: () => this.configManager.config.enableDetailExtraction,
-      updateDisplayConfig: (displayConfig) => this.configManager.updateDisplayConfig(displayConfig),
-      validateSearchConfig: () => this.configManager.validateSearchConfig(),
-      exportSearchConfig: () => this.configManager.exportSearchConfig(),
-      
-      // 配置UI相关
-      initConfigUI: (containerId) => this.configManager.initConfigUI(containerId),
-      showConfigHelp: () => this.configManager.showConfigHelp(),
-      exportConfig: () => this.configManager.exportConfig(),
-      importConfig: () => this.configManager.importConfig(),
-      
-      // 统计相关
-      getExtractionStats: () => this.extractionManager.getExtractionStats(),
-      resetExtractionStats: () => this.extractionManager.resetExtractionStats(),
-      getResultsStats: () => this.resultsRenderer.getResultsStats(),
-      
-      // 服务状态
-      getServiceStatus: () => this.getServiceStatus(),
-      getExtractionCapabilities: () => this.extractionManager.getExtractionCapabilities(this.configManager.config),
-      
       // 组件访问（用于高级用法）
-      configManager: this.configManager,
       historyManager: this.historyManager,
-      extractionManager: this.extractionManager,
       resultsRenderer: this.resultsRenderer,
       suggestionManager: this.suggestionManager
     };
@@ -742,9 +648,6 @@ export class UnifiedSearchManager {
     // 保持向后兼容
     window.searchManager = window.unifiedSearchManager;
     window.enhancedSearchManager = window.unifiedSearchManager;
-    
-    // 暴露配置管理器的引用，方便其他组件使用
-    window.searchConfigManager = this.configManager;
   }
 
   // ===================== 辅助方法 =====================
@@ -755,23 +658,10 @@ export class UnifiedSearchManager {
   getServiceStatus() {
     return {
       isInitialized: this.isInitialized,
-      extractionInProgress: this.extractionManager.extractionInProgress,
       currentResults: this.resultsRenderer.getCurrentResults().length,
       searchHistory: this.historyManager.getHistory().length,
-      extractionStats: this.extractionManager.getExtractionStats(),
-      config: this.configManager.getConfig(),
-      configCacheValid: this.configManager.isConfigCacheValid(),
-      features: {
-        detailExtraction: this.configManager.config.enableDetailExtraction,
-        autoExtraction: this.configManager.config.autoExtractDetails,
-        caching: this.configManager.config.enableCache,
-        retry: this.configManager.config.enableRetry,
-        configUI: true // 现在支持配置UI
-      },
       components: {
-        configManager: 'ready',
         historyManager: 'ready',
-        extractionManager: 'ready',
         resultsRenderer: 'ready',
         suggestionManager: 'ready'
       }
@@ -797,9 +687,7 @@ export class UnifiedSearchManager {
    */
   cleanup() {
     // 清理所有子组件
-    this.configManager.cleanup();
     this.historyManager.cleanup();
-    this.extractionManager.cleanup();
     this.resultsRenderer.cleanup();
     this.suggestionManager.cleanup();
     
@@ -812,9 +700,6 @@ export class UnifiedSearchManager {
     }
     if (window.enhancedSearchManager) {
       delete window.enhancedSearchManager;
-    }
-    if (window.searchConfigManager) {
-      delete window.searchConfigManager;
     }
     
     // 重置状态

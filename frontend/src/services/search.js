@@ -1,4 +1,4 @@
-// src/services/search.js - 优化版本：完全集成新的搜索源管理API，修复前后端匹配问题
+// src/services/search.js - 清理版本：移除详情提取相关代码，保留核心搜索功能
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 import { validateSearchKeyword } from '../utils/validation.js';
@@ -792,7 +792,7 @@ class SearchService {
         expired: Date.now() - this.sourcesCacheTimestamp > this.sourcesCacheExpiry
       },
       timestamp: Date.now(),
-      version: '2.3.1' // 更新版本号
+      version: '2.3.1'
     };
   }
 
