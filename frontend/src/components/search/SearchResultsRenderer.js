@@ -74,7 +74,7 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 🆕 显示搜索结果 - 集成代理功能提示
+   * 修复：显示搜索结果 - 集成代理功能提示
    */
   displaySearchResults(keyword, results, config) {
     this.currentResults = results;
@@ -90,8 +90,8 @@ export class SearchResultsRenderer {
     // 计算状态统计
     const statusStats = this.calculateStatusStats(results);
     
-    // 🆕 统计代理结果
-    const proxyResults = results.filter(r => r.proxyEnabled);
+    // 修复：统计代理结果
+    const proxyResults = results.filter(r => r.proxyEnabled && r.originalUrl && r.url !== r.originalUrl);
     this.proxyStats.totalProxyResults = proxyResults.length;
     
     if (searchInfo) {
@@ -120,10 +120,10 @@ export class SearchResultsRenderer {
         detailExtractionInfo = ` | 支持详情提取: ${supportedCount}`;
       }
       
-      // 🆕 添加代理信息
+      // 修复：添加代理信息
       let proxyInfo = '';
       if (this.proxyEnabled && proxyResults.length > 0) {
-        proxyInfo = ` | 🌐 代理访问: ${proxyResults.length}`;
+        proxyInfo = ` | 🌍 代理访问: ${proxyResults.length}`;
       }
       
       searchInfo.innerHTML = `
@@ -136,7 +136,7 @@ export class SearchResultsRenderer {
     if (clearResultsBtn) clearResultsBtn.style.display = 'inline-block';
     if (exportResultsBtn) exportResultsBtn.style.display = 'inline-block';
 
-    // 🆕 显示代理使用提示
+    // 修复：显示代理使用提示
     if (this.proxyEnabled && proxyResults.length > 0 && this.showProxyIndicator) {
       this.showProxyNotice(proxyResults.length);
     }
@@ -164,13 +164,13 @@ export class SearchResultsRenderer {
         results, 
         resultCount: results.length,
         statusStats,
-        proxyResults: proxyResults.length // 🆕 代理结果统计
+        proxyResults: proxyResults.length // 代理结果统计
       }
     }));
   }
 
   /**
-   * 🆕 显示代理使用提示
+   * 修复：显示代理使用提示
    */
   showProxyNotice(proxyCount) {
     const existingNotice = document.getElementById('proxyNotice');
@@ -183,7 +183,7 @@ export class SearchResultsRenderer {
     notice.className = 'proxy-notice';
     notice.innerHTML = `
       <div class="proxy-notice-content">
-        <span class="proxy-notice-icon">🌐</span>
+        <span class="proxy-notice-icon">🌍</span>
         <span class="proxy-notice-text">
           已启用代理访问模式，${proxyCount} 个搜索结果将通过代理服务器访问，解决区域限制问题
         </span>
@@ -205,13 +205,15 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 🆕 创建搜索结果HTML - 集成代理功能标识
+   * 创建搜索结果HTML - 修复代理功能标识
    */
   createResultHTML(result, config) {
     const isFavorited = favoritesManager.isFavorited(result.originalUrl || result.url);
     const isUnavailable = this.isResultUnavailable(result);
     const supportsDetailExtraction = this.shouldExtractDetail(result);
-    const isProxied = result.proxyEnabled && result.originalUrl;
+    
+    // 修复：准确判断是否使用了代理
+    const isProxied = result.proxyEnabled && result.originalUrl && result.url !== result.originalUrl;
     
     // 状态指示器HTML
     let statusIndicator = '';
@@ -255,18 +257,18 @@ export class SearchResultsRenderer {
       `;
     }
 
-    // 🆕 代理指示器
+    // 修复：代理指示器
     let proxyIndicator = '';
     if (isProxied && this.showProxyIndicator) {
       proxyIndicator = `
         <div class="proxy-indicator" title="通过代理服务器访问，解决区域限制">
-          <span class="proxy-badge">🌐</span>
+          <span class="proxy-badge">🌍</span>
           <span class="proxy-text">代理访问</span>
         </div>
       `;
     }
     
-    // 🆕 访问按钮状态 - 包含代理信息
+    // 修复：访问按钮状态 - 包含代理信息
     const visitButtonHTML = isUnavailable ? `
       <button class="action-btn visit-btn disabled" disabled title="该搜索源当前不可用">
         <span>不可用</span>
@@ -279,7 +281,7 @@ export class SearchResultsRenderer {
               data-source="${result.source}"
               data-result-id="${result.id}"
               title="${isProxied ? '通过代理访问（解决区域限制）' : '直接访问'}">
-        <span class="btn-icon">${isProxied ? '🌐' : '🔗'}</span>
+        <span class="btn-icon">${isProxied ? '🌍' : '🔗'}</span>
         <span class="btn-text">访问</span>
       </button>
     `;
@@ -292,7 +294,7 @@ export class SearchResultsRenderer {
       </button>
     ` : '';
 
-    // 🆕 复制按钮 - 支持复制原始URL或代理URL
+    // 修复：复制按钮 - 支持复制原始URL或代理URL
     const copyButtonHTML = `
       <div class="copy-btn-group">
         <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(result.url)}" title="复制${isProxied ? '代理' : ''}链接">
@@ -357,7 +359,7 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 🆕 绑定结果事件 - 包含代理点击统计
+   * 修复：绑定结果事件 - 包含代理点击统计
    */
   bindResultsEvents() {
     // 使用事件委托处理结果点击事件
@@ -371,7 +373,7 @@ export class SearchResultsRenderer {
       const source = button.dataset.source;
       const originalUrl = button.dataset.originalUrl;
 
-      // 🆕 记录代理点击统计
+      // 修复：记录代理点击统计
       if (action === 'visit' && originalUrl && originalUrl !== url) {
         this.proxyStats.proxyClickCount++;
         this.recordProxyClick(resultId, originalUrl, url);
@@ -418,8 +420,9 @@ export class SearchResultsRenderer {
     });
   }
 
+
   /**
-   * 🆕 记录代理点击统计
+   * 修复：记录代理点击统计
    */
   recordProxyClick(resultId, originalUrl, proxyUrl) {
     console.log(`代理链接点击统计: ${originalUrl} -> ${proxyUrl}`);
@@ -436,14 +439,14 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 🆕 获取代理统计
+   * 修复：获取代理统计
    */
   getProxyStats() {
     return { ...this.proxyStats };
   }
 
   /**
-   * 更新收藏按钮状态
+   * 修复：更新收藏按钮状态
    */
   updateFavoriteButtons() {
     const favoriteButtons = document.querySelectorAll('.favorite-btn');
@@ -453,7 +456,7 @@ export class SearchResultsRenderer {
       const result = this.currentResults.find(r => r.id === resultId);
       
       if (result) {
-        // 🆕 使用原始URL进行收藏判断
+        // 修复：使用原始URL进行收藏判断
         const urlForFavorite = result.originalUrl || result.url;
         const isFavorited = favoritesManager.isFavorited(urlForFavorite);
         btn.querySelector('span').textContent = isFavorited ? '已收藏' : '收藏';
@@ -463,7 +466,7 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 清空搜索结果
+   * 修复：清空搜索结果
    */
   clearResults() {
     const resultsSection = document.getElementById('resultsSection');
@@ -478,11 +481,11 @@ export class SearchResultsRenderer {
     if (searchInfo) searchInfo.textContent = '';
     if (clearResultsBtn) clearResultsBtn.style.display = 'none';
     if (exportResultsBtn) exportResultsBtn.style.display = 'none';
-    if (proxyNotice) proxyNotice.remove(); // 🆕 清除代理提示
+    if (proxyNotice) proxyNotice.remove(); // 修复：清除代理提示
 
     this.currentResults = [];
 
-    // 🆕 重置代理统计
+    // 修复：重置代理统计
     this.proxyStats = {
       totalProxyResults: 0,
       proxyClickCount: 0
@@ -492,8 +495,9 @@ export class SearchResultsRenderer {
     document.dispatchEvent(new CustomEvent('searchResultsCleared'));
   }
 
+
   /**
-   * 🆕 导出搜索结果 - 包含代理信息
+   * 修复：导出搜索结果 - 包含代理信息
    */
   async exportResults(extractionStats = {}) {
     if (this.currentResults.length === 0) {
@@ -504,7 +508,7 @@ export class SearchResultsRenderer {
       const data = {
         results: this.currentResults.map(result => ({
           ...result,
-          // 🆕 导出时包含代理相关信息
+          // 修复：导出时包含代理相关信息
           proxyInfo: result.proxyEnabled ? {
             originalUrl: result.originalUrl,
             proxyUrl: result.url,
@@ -514,7 +518,7 @@ export class SearchResultsRenderer {
         exportTime: new Date().toISOString(),
         version: window.API_CONFIG?.APP_VERSION || '1.0.0',
         extractionStats,
-        proxyStats: this.proxyStats // 🆕 包含代理统计
+        proxyStats: this.proxyStats // 修复：包含代理统计
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -579,14 +583,14 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 🆕 获取结果统计 - 包含代理统计
+   * 修复：获取结果统计 - 包含代理统计
    */
   getResultsStats() {
     const statusStats = this.calculateStatusStats(this.currentResults);
     
-    // 🆕 代理相关统计
-    const proxyResults = this.currentResults.filter(r => r.proxyEnabled);
-    const directResults = this.currentResults.filter(r => !r.proxyEnabled);
+    // 修复：代理相关统计
+    const proxyResults = this.currentResults.filter(r => r.proxyEnabled && r.originalUrl && r.url !== r.originalUrl);
+    const directResults = this.currentResults.filter(r => !r.proxyEnabled || !r.originalUrl || r.url === r.originalUrl);
     
     return {
       total: this.currentResults.length,
@@ -596,7 +600,7 @@ export class SearchResultsRenderer {
         oldest: Math.min(...this.currentResults.map(r => r.timestamp)),
         newest: Math.max(...this.currentResults.map(r => r.timestamp))
       } : null,
-      // 🆕 代理统计
+      // 修复：代理统计
       proxyStats: {
         proxyResults: proxyResults.length,
         directResults: directResults.length,
@@ -747,7 +751,7 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 🆕 清理资源 - 包含代理相关清理
+   * 修复：清理资源 - 包含代理相关清理
    */
   cleanup() {
     this.currentResults = [];
@@ -764,6 +768,7 @@ export class SearchResultsRenderer {
     
     console.log('搜索结果渲染器资源已清理');
   }
+
 }
 
 export default SearchResultsRenderer;

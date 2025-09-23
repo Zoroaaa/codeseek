@@ -42,7 +42,7 @@ class SearchService {
     };
   }
 
-  // 🆕 设置代理配置
+  // 设置代理配置
   setProxyConfig(config) {
     if (config.enabled !== undefined) {
       this.proxyEnabled = config.enabled;
@@ -61,7 +61,7 @@ class SearchService {
     });
   }
 
-  // 🆕 将普通URL转换为代理URL
+  // 修复：改进的URL代理转换方法
   convertToProxyUrl(originalUrl) {
     if (!this.proxyEnabled || !originalUrl) {
       return originalUrl;
@@ -71,7 +71,7 @@ class SearchService {
       // 验证URL格式
       const urlObj = new URL(originalUrl);
       
-      // 🔧 检查域名是否在允许的代理范围内
+      // 检查域名是否在允许的代理范围内
       const hostname = urlObj.hostname.toLowerCase();
       const allowedDomains = [
         'javbus.com', 'www.javbus.com', 'javdb.com', 'www.javdb.com',
@@ -90,11 +90,26 @@ class SearchService {
         return originalUrl;
       }
       
-      // 🔧 使用更安全的编码方式
-      const encodedUrl = encodeURIComponent(originalUrl);
+      // 修复：确保URL没有被重复编码
+      let cleanUrl = originalUrl;
+      
+      // 检查URL是否已经是代理URL
+      if (originalUrl.includes(this.proxyPath)) {
+        console.warn('URL已经是代理URL，跳过转换');
+        return originalUrl;
+      }
+      
+      // 修复：使用正确的编码方式
+      const encodedUrl = encodeURIComponent(cleanUrl);
+      
+      // 修复：确保代理路径正确拼接
+      const proxyBaseUrl = this.proxyBaseUrl.endsWith('/') ? 
+        this.proxyBaseUrl.slice(0, -1) : this.proxyBaseUrl;
+      const proxyPath = this.proxyPath.startsWith('/') ? 
+        this.proxyPath : '/' + this.proxyPath;
       
       // 构建代理URL
-      const proxyUrl = `${this.proxyBaseUrl}${this.proxyPath}${encodedUrl}`;
+      const proxyUrl = `${proxyBaseUrl}${proxyPath}${encodedUrl}`;
       
       // 更新统计
       this.proxyStats.totalProxyUrls++;
@@ -109,23 +124,29 @@ class SearchService {
     }
   }
 
-  // 🔧 新增：验证代理URL的方法
+  // 修复：改进的代理URL验证方法
   validateProxyUrl(proxyUrl) {
     try {
+      if (!proxyUrl || typeof proxyUrl !== 'string') {
+        return false;
+      }
+      
+      // 检查是否包含代理路径
       if (!proxyUrl.includes(this.proxyPath)) {
         return false;
       }
       
-      const urlParts = proxyUrl.split(this.proxyPath);
-      if (urlParts.length !== 2) {
+      // 提取编码的原始URL部分
+      const pathIndex = proxyUrl.indexOf(this.proxyPath);
+      const encodedUrlPart = proxyUrl.substring(pathIndex + this.proxyPath.length);
+      
+      if (!encodedUrlPart) {
         return false;
       }
       
-      const encodedOriginalUrl = urlParts[1];
-      const originalUrl = decodeURIComponent(encodedOriginalUrl);
-      
-      // 验证原始URL是否有效
-      new URL(originalUrl);
+      // 验证解码后的URL
+      const originalUrl = decodeURIComponent(encodedUrlPart);
+      new URL(originalUrl); // 这会在URL无效时抛出错误
       
       return true;
     } catch (error) {
@@ -134,27 +155,28 @@ class SearchService {
     }
   }
 
-  // 🔧 新增：从代理URL提取原始URL的方法
+  // 修复：从代理URL提取原始URL的方法
   extractOriginalUrl(proxyUrl) {
     try {
-      if (!proxyUrl.includes(this.proxyPath)) {
+      if (!proxyUrl || !proxyUrl.includes(this.proxyPath)) {
         return proxyUrl;
       }
       
-      const urlParts = proxyUrl.split(this.proxyPath);
-      if (urlParts.length !== 2) {
+      const pathIndex = proxyUrl.indexOf(this.proxyPath);
+      const encodedUrlPart = proxyUrl.substring(pathIndex + this.proxyPath.length);
+      
+      if (!encodedUrlPart) {
         return proxyUrl;
       }
       
-      const encodedOriginalUrl = urlParts[1];
-      return decodeURIComponent(encodedOriginalUrl);
+      return decodeURIComponent(encodedUrlPart);
     } catch (error) {
       console.error('提取原始URL失败:', error);
       return proxyUrl;
     }
   }
 
-  // 🆕 检查代理服务健康状态
+  // 检查代理服务健康状态
   async checkProxyHealth() {
     try {
       const response = await fetch(`${this.proxyBaseUrl}/api/proxy/health`);
@@ -177,7 +199,7 @@ class SearchService {
     }
   }
 
-  // 🆕 获取代理统计信息
+  // 获取代理统计信息
   async getProxyStats() {
     try {
       if (!authManager.isAuthenticated()) {
@@ -192,17 +214,25 @@ class SearchService {
 
       if (response.ok) {
         const serverStats = await response.json();
+        
+        // 合并本地和服务器统计
         return {
           ...this.proxyStats,
           userStats: serverStats.userStats || null,
-          allowedDomains: serverStats.allowedDomains || []
+          allowedDomains: serverStats.allowedDomains || [],
+          serverHealthy: true
         };
       } else {
         throw new Error(`获取代理统计失败: ${response.status}`);
       }
     } catch (error) {
       console.error('获取代理统计失败:', error);
-      return { ...this.proxyStats, userStats: null, error: error.message };
+      return { 
+        ...this.proxyStats, 
+        userStats: null, 
+        error: error.message,
+        serverHealthy: false
+      };
     }
   }
 
@@ -611,7 +641,7 @@ class SearchService {
     return reasons.length > 0 ? reasons.join('，') : '检查失败';
   }
 
-  // 🆕 从搜索源构建结果 - 集成代理URL转换
+  // 修复：从搜索源构建结果 - 集成代理URL转换
   buildResultsFromSources(sources, keyword, encodedKeyword, timestamp) {
     return sources.map(source => {
       // 构建原始URL
@@ -622,11 +652,11 @@ class SearchService {
         new URL(originalUrl);
       } catch (error) {
         console.error(`构建搜索URL失败 for ${source.name}:`, error);
-        // 使用基础URL作为后备
+        // 使用基础URL作为备用
         originalUrl = source.urlTemplate.replace('{keyword}', encodeURIComponent(keyword));
       }
       
-      // 🔧 转换为代理URL
+      // 修复：转换为代理URL
       const proxyUrl = this.convertToProxyUrl(originalUrl);
       
       const result = {
@@ -661,7 +691,7 @@ class SearchService {
     });
   }
 
-  // 🔧 新增：批量测试代理连通性
+  // 批量测试代理连通性
   async testProxyConnectivityBatch(testUrls = []) {
     const defaultTestUrls = [
       'https://www.javbus.com',
@@ -751,7 +781,7 @@ class SearchService {
     return statusTexts[status] || '未知';
   }
 
-  // 🆕 记录代理点击统计
+  // 记录代理点击统计
   recordProxyClick(resultId, originalUrl) {
     this.proxyStats.proxyClickCount++;
     
@@ -767,7 +797,8 @@ class SearchService {
     console.log(`代理链接点击: ${originalUrl}`);
   }
 
-  // 🆕 测试代理连通性
+
+  // 测试代理连通性
   async testProxyConnectivity(testUrl = 'https://www.javbus.com') {
     try {
       const proxyUrl = this.convertToProxyUrl(testUrl);
@@ -1007,7 +1038,7 @@ class SearchService {
     console.log('所有缓存已清理');
   }
 
-  // 🆕 获取缓存统计 - 包含代理统计
+  // 获取缓存统计 - 包含代理统计
   getCacheStats() {
     const stats = {
       searchCache: {
@@ -1019,7 +1050,7 @@ class SearchService {
         timestamp: this.sourcesCacheTimestamp,
         expired: Date.now() - this.sourcesCacheTimestamp > this.sourcesCacheExpiry
       },
-      proxyStats: this.proxyStats // 🆕 代理统计
+      proxyStats: this.proxyStats // 代理统计
     };
     
     // 搜索结果缓存统计
@@ -1034,6 +1065,7 @@ class SearchService {
     
     return stats;
   }
+
 
   // 预热缓存（预加载常用搜索）
   async warmupCache(keywords = []) {
@@ -1059,7 +1091,7 @@ class SearchService {
     }
   }
 
-  // 🆕 导出搜索服务状态 - 包含代理功能状态
+  // 导出搜索服务状态 - 包含代理功能状态
   exportServiceStatus() {
     return {
       type: 'proxy-integrated-search-service',
@@ -1078,9 +1110,10 @@ class SearchService {
       },
       proxyStats: this.proxyStats,
       timestamp: Date.now(),
-      version: '3.0.0' // 🆕 更新版本号，表示集成代理功能
+      version: '3.1.0' // 更新版本号，表示集成代理功能
     };
   }
+
 
   // 获取搜索源管理器实例（用于UI组件）
   getSearchSourcesAPI() {

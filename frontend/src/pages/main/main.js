@@ -150,18 +150,48 @@ class MagnetSearchApp {
     }
   }
 
-  // 🆕 初始化代理服务
+  // 修复：初始化代理服务
   async initProxyService() {
     try {
-      console.log('🌐 初始化代理服务...');
+      console.log('🌍 初始化代理服务...');
+      
+      // 修复：从localStorage恢复代理配置
+      const savedProxyConfig = localStorage.getItem('proxyConfig');
+      if (savedProxyConfig) {
+        try {
+          const parsedConfig = JSON.parse(savedProxyConfig);
+          this.proxyConfig = { ...this.proxyConfig, ...parsedConfig };
+        } catch (e) {
+          console.warn('解析保存的代理配置失败，使用默认配置');
+        }
+      }
       
       // 检查代理配置
       const config = configManager.getConfig();
       this.proxyConfig.baseUrl = config.BASE_URL || window.location.origin;
       
-      // 设置搜索服务的代理配置
+      // 修复：确保代理路径格式正确
+      if (!this.proxyConfig.path.startsWith('/')) {
+        this.proxyConfig.path = '/' + this.proxyConfig.path;
+      }
+      if (!this.proxyConfig.path.endsWith('/')) {
+        this.proxyConfig.path += '/';
+      }
+      
+      console.log('代理配置详情:', this.proxyConfig);
+      
+      // 修复：等待搜索服务初始化后再设置代理配置
       if (unifiedSearchManager?.searchService) {
         unifiedSearchManager.searchService.setProxyConfig(this.proxyConfig);
+        console.log('已设置搜索服务的代理配置');
+      } else {
+        // 如果搜索服务还未初始化，延迟设置
+        setTimeout(() => {
+          if (unifiedSearchManager?.searchService) {
+            unifiedSearchManager.searchService.setProxyConfig(this.proxyConfig);
+            console.log('延迟设置搜索服务的代理配置');
+          }
+        }, 1000);
       }
       
       // 暴露代理配置到全局
@@ -177,7 +207,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 🆕 测试代理服务
+  // 修复：测试代理服务
   async testProxyService() {
     try {
       if (!this.proxyConfig.enabled) {
@@ -187,7 +217,19 @@ class MagnetSearchApp {
       
       console.log('🔍 测试代理服务连通性...');
       
-      const response = await fetch(`${this.proxyConfig.baseUrl}/api/proxy/health`);
+      const healthUrl = `${this.proxyConfig.baseUrl}/api/proxy/health`;
+      console.log('健康检查URL:', healthUrl);
+      
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        timeout: 10000 // 10秒超时
+      });
+      
+      console.log('健康检查响应状态:', response.status);
       
       if (response.ok) {
         const healthData = await response.json();
@@ -198,10 +240,12 @@ class MagnetSearchApp {
         
         // 显示代理服务可用提示
         if (this.currentUser) {
-          showToast('🌐 代理服务已启用，可解决区域访问限制', 'success', 3000);
+          showToast('🌍 代理服务已可用，可解决区域访问限制', 'success', 3000);
         }
+        
+        return true;
       } else {
-        throw new Error(`代理服务健康检查失败: ${response.status}`);
+        throw new Error(`代理服务健康检查失败: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
       console.warn('⚠️ 代理服务测试失败:', error);
@@ -213,12 +257,15 @@ class MagnetSearchApp {
         showToast('代理服务暂时不可用，将使用直接访问', 'warning', 3000);
       }
       
-      // 禁用代理功能
+      // 修复：自动禁用代理功能
       this.proxyConfig.enabled = false;
+      this.updateProxyUI();
+      
+      return false;
     }
   }
 
-  // 🆕 获取代理统计信息
+  // 修复：获取代理统计信息
   async getProxyStats() {
     try {
       if (!authManager.isAuthenticated()) {
@@ -255,10 +302,21 @@ class MagnetSearchApp {
     }
   }
 
-  // 🆕 切换代理功能
+  // 修复：切换代理功能
   async toggleProxyService() {
     try {
-      this.proxyConfig.enabled = !this.proxyConfig.enabled;
+      const newState = !this.proxyConfig.enabled;
+      
+      // 如果要启用代理，先测试连通性
+      if (newState) {
+        const testResult = await this.testProxyService();
+        if (!testResult) {
+          showToast('代理服务连接测试失败，无法启用', 'error');
+          return;
+        }
+      }
+      
+      this.proxyConfig.enabled = newState;
       
       // 更新搜索服务的代理配置
       if (unifiedSearchManager?.searchService) {
@@ -266,20 +324,21 @@ class MagnetSearchApp {
       }
       
       // 保存到本地存储
-      localStorage.setItem('proxyEnabled', this.proxyConfig.enabled.toString());
+      localStorage.setItem('proxyEnabled', newState.toString());
+      localStorage.setItem('proxyConfig', JSON.stringify(this.proxyConfig));
       
       // 更新UI显示
       this.updateProxyUI();
       
-      const statusText = this.proxyConfig.enabled ? '已启用' : '已禁用';
+      const statusText = newState ? '已启用' : '已禁用';
       showToast(`代理服务${statusText}`, 'success');
       
       console.log(`代理服务${statusText}:`, this.proxyConfig);
       
-      // 如果启用代理，重新测试连通性
-      if (this.proxyConfig.enabled) {
-        await this.testProxyService();
-      }
+      // 触发代理状态变更事件
+      document.dispatchEvent(new CustomEvent('proxyServiceToggled', {
+        detail: { enabled: newState, config: this.proxyConfig }
+      }));
       
     } catch (error) {
       console.error('切换代理功能失败:', error);
@@ -287,33 +346,48 @@ class MagnetSearchApp {
     }
   }
 
-  // 🆕 更新代理相关UI
+  // 修复：更新代理相关UI
   updateProxyUI() {
     const proxyToggleBtn = document.getElementById('proxyToggle');
     const proxyStatusBadge = document.getElementById('proxyStatus');
-    const proxyStatsSection = document.getElementById('proxyStatsSection');
+    const proxyInfoSection = document.getElementById('proxyInfoSection');
     
     if (proxyToggleBtn) {
       proxyToggleBtn.classList.toggle('active', this.proxyConfig.enabled);
       proxyToggleBtn.title = this.proxyConfig.enabled ? '禁用代理服务' : '启用代理服务';
-      proxyToggleBtn.innerHTML = this.proxyConfig.enabled ? 
-        '<span class="btn-icon">🌐</span><span class="btn-text">代理: 开</span>' :
-        '<span class="btn-icon">🚫</span><span class="btn-text">代理: 关</span>';
+      
+      const icon = this.proxyConfig.enabled ? '🌍' : '🚫';
+      const text = this.proxyConfig.enabled ? '代理: 开' : '代理: 关';
+      
+      proxyToggleBtn.innerHTML = `
+        <span class="btn-icon">${icon}</span>
+        <span class="btn-text">${text}</span>
+      `;
     }
     
     if (proxyStatusBadge) {
-      proxyStatusBadge.textContent = this.proxyConfig.enabled ? 
-        (this.proxyStats.healthStatus === 'healthy' ? '可用' : '异常') : '禁用';
-      proxyStatusBadge.className = `status-badge ${this.proxyConfig.enabled ? 
-        (this.proxyStats.healthStatus === 'healthy' ? 'enabled' : 'error') : 'disabled'}`;
+      if (this.proxyConfig.enabled) {
+        const status = this.proxyStats.healthStatus === 'healthy' ? '可用' : '异常';
+        const className = this.proxyStats.healthStatus === 'healthy' ? 'enabled' : 'error';
+        proxyStatusBadge.textContent = status;
+        proxyStatusBadge.className = `status-badge ${className}`;
+      } else {
+        proxyStatusBadge.textContent = '禁用';
+        proxyStatusBadge.className = 'status-badge disabled';
+      }
     }
     
-    if (proxyStatsSection) {
-      proxyStatsSection.style.display = this.proxyConfig.enabled ? 'block' : 'none';
+    if (proxyInfoSection) {
+      proxyInfoSection.style.display = this.proxyConfig.enabled ? 'block' : 'none';
     }
+    
+    console.log('代理UI已更新:', {
+      enabled: this.proxyConfig.enabled,
+      healthStatus: this.proxyStats.healthStatus
+    });
   }
 
-  // 🆕 显示代理统计信息
+  // 修复：显示代理统计信息
   async displayProxyStats() {
     try {
       const stats = await this.getProxyStats();
@@ -327,7 +401,7 @@ class MagnetSearchApp {
       statsContainer.innerHTML = `
         <div class="proxy-stats">
           <div class="proxy-stats-title">
-            <span>🌐</span>
+            <span>🌍</span>
             代理服务统计
           </div>
           <div class="proxy-stats-grid">
@@ -1259,7 +1333,7 @@ class MagnetSearchApp {
     this.bindProxyEvents();
   }
 
-  // 🆕 绑定代理相关事件
+  // 修复：绑定代理相关事件
   bindProxyEvents() {
     // 监听代理链接点击事件
     document.addEventListener('proxyLinkClicked', (event) => {
@@ -1280,6 +1354,7 @@ class MagnetSearchApp {
       showProxyStatsBtn.addEventListener('click', () => this.displayProxyStats());
     }
   }
+
 
   // 绑定邮箱验证相关事件
   bindEmailVerificationEvents() {
