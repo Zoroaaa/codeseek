@@ -1,4 +1,4 @@
-// frontend/src/services/proxy-service.js - 代理服务（URL转换）
+// frontend/src/services/proxy-service.js - 代理服务（修复版）
 
 import { 
   proxyConfig, 
@@ -6,12 +6,15 @@ import {
   getProxyHealthCheckUrl, 
   getProxyStatusUrl,
   isDomainSupported,
-  getDefaultConfig 
+  getDefaultConfig,
+  createRequestConfig,
+  testProxyConnectivity,
+  errorLogger
 } from '../core/proxy-config.js';
 
 /**
  * 代理服务类
- * 版本: v1.0.0
+ * 版本: v1.0.1 - 修复CORS问题和增强错误处理
  * 作用: 管理代理功能的核心逻辑
  */
 class ProxyService {
@@ -20,11 +23,17 @@ class ProxyService {
     this.currentStatus = proxyConfig.status.DISABLED;
     this.healthCheckTimer = null;
     this.stats = this.loadStats();
+    this.lastHealthCheck = null;
+    this.isHealthy = null;
+    this.retryCount = 0;
     
     // 验证配置
     const validation = validateProxyConfig();
     if (!validation.isValid) {
       console.warn('代理配置验证失败:', validation.issues);
+      if (validation.warnings && validation.warnings.length > 0) {
+        console.warn('代理配置警告:', validation.warnings);
+      }
     }
   }
 
@@ -35,8 +44,16 @@ class ProxyService {
     try {
       // 加载用户偏好
       const enabled = this.loadProxyState();
+      
       if (enabled) {
-        await this.enableProxy();
+        // 尝试启用代理，但不因为初始化失败而阻塞
+        try {
+          await this.enableProxy();
+        } catch (error) {
+          console.warn('初始化时启用代理失败，将继续以禁用状态运行:', error.message);
+          this.currentStatus = proxyConfig.status.DISABLED;
+          errorLogger.log(error, { context: 'initialization', action: 'enableProxy' });
+        }
       }
       
       // 启动健康检查（如果启用了代理）
@@ -55,11 +72,12 @@ class ProxyService {
     } catch (error) {
       console.error('代理服务初始化失败:', error);
       this.currentStatus = proxyConfig.status.ERROR;
+      errorLogger.log(error, { context: 'initialization' });
       return { success: false, error: error.message };
     }
   }
 
-  // ===================== 核心功能（第一阶段） =====================
+  // ===================== 核心功能（增强版） =====================
 
   /**
    * 检查代理是否开启
@@ -80,12 +98,13 @@ class ProxyService {
       }
     } catch (error) {
       console.error('切换代理状态失败:', error);
+      errorLogger.log(error, { context: 'toggle', currentStatus: this.currentStatus });
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * 转换为代理URL
+   * 转换为代理URL（增强版）
    */
   convertToProxyUrl(originalUrl) {
     if (!originalUrl || typeof originalUrl !== 'string') {
@@ -124,9 +143,11 @@ class ProxyService {
       // 更新统计
       this.updateStats('urlConverted', originalUrl, proxyUrl);
 
+      console.debug('URL转换完成:', { original: originalUrl, proxy: proxyUrl });
       return proxyUrl;
     } catch (error) {
       console.error('URL转换失败:', error, 'Original URL:', originalUrl);
+      errorLogger.log(error, { context: 'urlConversion', originalUrl });
       this.updateStats('conversionError', originalUrl);
       return originalUrl; // 转换失败，返回原始URL
     }
@@ -146,7 +167,7 @@ class ProxyService {
         return proxyUrl; // 不是代理URL，直接返回
       }
 
-      // 解析代理URL：https://codeseek-site.workers.dev/proxy/hostname/path
+      // 解析代理URL：https://all.omnibox.pp.ua/proxy/hostname/path
       const proxyPattern = new RegExp(`${proxyConfig.proxyServer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/proxy/([^/]+)(.*)`);
       const match = proxyUrl.match(proxyPattern);
 
@@ -164,41 +185,64 @@ class ProxyService {
       return proxyUrl; // 无法解析，返回原URL
     } catch (error) {
       console.error('原始URL提取失败:', error, 'Proxy URL:', proxyUrl);
+      errorLogger.log(error, { context: 'originalUrlExtraction', proxyUrl });
       return proxyUrl;
     }
   }
 
-  // ===================== 状态管理 =====================
+  // ===================== 状态管理（增强版） =====================
 
   /**
-   * 启用代理
+   * 启用代理（增强版）
    */
   async enableProxy() {
     try {
       this.currentStatus = proxyConfig.status.CHECKING;
+      this.retryCount = 0;
       
-      // 检查代理服务器可用性
-      const healthCheck = await this.checkProxyHealth();
-      if (!healthCheck.success) {
+      // 使用增强的连接测试
+      const connectivityTest = await testProxyConnectivity();
+      if (!connectivityTest.success) {
+        // 尝试重试
+        if (this.retryCount < proxyConfig.errorHandling.maxRetries) {
+          this.retryCount++;
+          console.log(`代理连接失败，尝试重试 ${this.retryCount}/${proxyConfig.errorHandling.maxRetries}`);
+          
+          await new Promise(resolve => 
+            setTimeout(resolve, proxyConfig.errorHandling.retryDelays[this.retryCount - 1] || 1000)
+          );
+          
+          return await this.enableProxy(); // 递归重试
+        }
+        
         this.currentStatus = proxyConfig.status.ERROR;
-        return { 
-          success: false, 
-          error: `代理服务器不可用: ${healthCheck.error}` 
-        };
+        const error = `代理服务器连接失败: ${connectivityTest.error}`;
+        errorLogger.log(new Error(error), { 
+          context: 'enableProxy', 
+          retryCount: this.retryCount,
+          lastError: connectivityTest.error 
+        });
+        return { success: false, error };
       }
 
       this.currentStatus = proxyConfig.status.ENABLED;
       this.saveProxyState(true);
       this.startHealthCheck();
+      this.retryCount = 0; // 重置重试计数
       
       // 触发状态变更事件
       this.dispatchStatusChange();
       
-      console.log('代理已启用');
-      return { success: true, message: '代理已启用' };
+      console.log('代理已启用', { responseTime: connectivityTest.responseTime });
+      return { 
+        success: true, 
+        message: '代理已启用',
+        responseTime: connectivityTest.responseTime 
+      };
     } catch (error) {
       this.currentStatus = proxyConfig.status.ERROR;
       console.error('启用代理失败:', error);
+      errorLogger.log(error, { context: 'enableProxy', retryCount: this.retryCount });
       return { success: false, error: error.message };
     }
   }
@@ -211,6 +255,7 @@ class ProxyService {
       this.currentStatus = proxyConfig.status.DISABLED;
       this.saveProxyState(false);
       this.stopHealthCheck();
+      this.retryCount = 0;
       
       // 触发状态变更事件
       this.dispatchStatusChange();
@@ -219,12 +264,13 @@ class ProxyService {
       return { success: true, message: '代理已禁用' };
     } catch (error) {
       console.error('禁用代理失败:', error);
+      errorLogger.log(error, { context: 'disableProxy' });
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * 获取代理状态
+   * 获取代理状态（增强版）
    */
   getProxyStatus() {
     return {
@@ -234,29 +280,31 @@ class ProxyService {
       supportedDomains: proxyConfig.supportedDomains.length,
       stats: this.stats,
       lastHealthCheck: this.lastHealthCheck,
-      isHealthy: this.isHealthy
+      isHealthy: this.isHealthy,
+      retryCount: this.retryCount,
+      version: '1.0.1',
+      errorLogs: errorLogger.getLogs().slice(-5) // 最近5条错误
     };
   }
 
-  // ===================== 健康检查 =====================
+  // ===================== 健康检查（增强版） =====================
 
   /**
-   * 检查代理健康状态
+   * 检查代理健康状态（增强版）
    */
   async checkProxyHealth() {
     try {
+      const startTime = performance.now();
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), proxyConfig.timeouts.healthCheck);
 
       const response = await fetch(getProxyHealthCheckUrl(), {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/json'
-        }
+        ...createRequestConfig({ signal: controller.signal }),
+        method: 'GET'
       });
 
       clearTimeout(timeoutId);
+      const endTime = performance.now();
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -269,7 +317,7 @@ class ProxyService {
       return { 
         success: true, 
         data: healthData,
-        responseTime: Date.now() - this.lastHealthCheck
+        responseTime: Math.round(endTime - startTime)
       };
     } catch (error) {
       this.isHealthy = false;
@@ -282,6 +330,7 @@ class ProxyService {
         errorMessage = error.message;
       }
 
+      errorLogger.log(error, { context: 'healthCheck' });
       return { success: false, error: errorMessage };
     }
   }
@@ -300,8 +349,10 @@ class ProxyService {
         const result = await this.checkProxyHealth();
         if (!result.success) {
           console.warn('代理健康检查失败:', result.error);
-          // 可以选择自动禁用代理或提醒用户
           this.dispatchHealthCheckFailed(result.error);
+        } else {
+          // 健康检查成功，重置重试计数
+          this.retryCount = 0;
         }
       }
     }, 5 * 60 * 1000); // 5分钟
@@ -314,6 +365,51 @@ class ProxyService {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
       this.healthCheckTimer = null;
+    }
+  }
+
+  // ===================== 请求处理（新增） =====================
+
+  /**
+   * 发送代理请求（新增方法）
+   */
+  async makeProxyRequest(url, options = {}) {
+    if (!this.isProxyEnabled()) {
+      throw new Error('代理服务未启用');
+    }
+
+    const proxyUrl = this.convertToProxyUrl(url);
+    if (proxyUrl === url) {
+      throw new Error('URL转换为代理URL失败');
+    }
+
+    try {
+      const requestConfig = createRequestConfig(options);
+      const response = await fetch(proxyUrl, requestConfig);
+      
+      if (!response.ok) {
+        throw new Error(`代理请求失败: HTTP ${response.status}`);
+      }
+      
+      this.updateStats('requestSuccess', url);
+      return response;
+    } catch (error) {
+      this.updateStats('requestError', url);
+      errorLogger.log(error, { context: 'proxyRequest', url, proxyUrl });
+      
+      if (proxyConfig.errorHandling.fallbackToOriginal) {
+        console.warn('代理请求失败，尝试直接请求:', error.message);
+        try {
+          const fallbackResponse = await fetch(url, createRequestConfig(options));
+          this.updateStats('fallbackSuccess', url);
+          return fallbackResponse;
+        } catch (fallbackError) {
+          this.updateStats('fallbackError', url);
+          throw new Error(`代理和直接请求均失败: ${error.message}, ${fallbackError.message}`);
+        }
+      }
+      
+      throw error;
     }
   }
 
@@ -367,10 +463,10 @@ class ProxyService {
     }
   }
 
-  // ===================== 统计和事件 =====================
+  // ===================== 统计和事件（增强版） =====================
 
   /**
-   * 更新统计数据
+   * 更新统计数据（增强版）
    */
   updateStats(action, ...args) {
     try {
@@ -384,8 +480,20 @@ class ProxyService {
           this.stats.totalRequests++;
           this.stats.failedRequests++;
           break;
+        case 'requestSuccess':
+          this.stats.successfulRequests++;
+          break;
+        case 'requestError':
+          this.stats.failedRequests++;
+          break;
+        case 'fallbackSuccess':
+          this.stats.fallbackSuccesses = (this.stats.fallbackSuccesses || 0) + 1;
+          break;
+        case 'fallbackError':
+          this.stats.fallbackErrors = (this.stats.fallbackErrors || 0) + 1;
+          break;
         case 'healthCheckFailed':
-          // 可以添加健康检查失败统计
+          this.stats.healthCheckFailures = (this.stats.healthCheckFailures || 0) + 1;
           break;
       }
       
@@ -404,7 +512,8 @@ class ProxyService {
       detail: {
         enabled: this.isProxyEnabled(),
         status: this.currentStatus,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        stats: this.stats
       }
     }));
   }
@@ -413,13 +522,67 @@ class ProxyService {
    * 触发健康检查失败事件
    */
   dispatchHealthCheckFailed(error) {
+    this.updateStats('healthCheckFailed');
+    
     document.dispatchEvent(new CustomEvent('proxyHealthCheckFailed', {
       detail: {
         error,
         timestamp: Date.now(),
-        canRetry: true
+        canRetry: this.retryCount < proxyConfig.errorHandling.maxRetries,
+        retryCount: this.retryCount
       }
     }));
+  }
+
+  // ===================== 诊断和调试（新增） =====================
+
+  /**
+   * 运行代理诊断（新增方法）
+   */
+  async runDiagnostics() {
+    const results = {
+      timestamp: new Date().toISOString(),
+      config: validateProxyConfig(),
+      connectivity: null,
+      status: this.getProxyStatus(),
+      errors: errorLogger.getLogs().slice(-10)
+    };
+    
+    try {
+      results.connectivity = await testProxyConnectivity();
+    } catch (error) {
+      results.connectivity = { success: false, error: error.message };
+    }
+    
+    return results;
+  }
+
+  /**
+   * 重置代理服务（新增方法）
+   */
+  async resetProxy() {
+    try {
+      // 停止所有活动
+      this.stopHealthCheck();
+      
+      // 重置状态
+      this.currentStatus = proxyConfig.status.DISABLED;
+      this.retryCount = 0;
+      this.isHealthy = null;
+      this.lastHealthCheck = null;
+      
+      // 清除存储的状态
+      this.saveProxyState(false);
+      
+      // 清除错误日志
+      errorLogger.clearLogs();
+      
+      console.log('代理服务已重置');
+      return { success: true, message: '代理服务已重置' };
+    } catch (error) {
+      console.error('重置代理服务失败:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // ===================== 预留扩展接口（未来阶段） =====================
@@ -454,6 +617,7 @@ class ProxyService {
   cleanup() {
     this.stopHealthCheck();
     this.saveStats();
+    this.isInitialized = false;
     console.log('代理服务资源已清理');
   }
 }
