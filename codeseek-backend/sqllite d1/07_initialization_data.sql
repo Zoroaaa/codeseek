@@ -35,38 +35,6 @@ INSERT OR IGNORE INTO system_config (key, value, description, config_type, is_pu
 ('community_max_shares_per_user', '50', '每个用户最大分享数量', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('community_min_rating_to_feature', '4.0', '推荐搜索源的最低评分', 'float', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 
--- 详情提取功能配置
-('detail_extraction_enabled', '1', '启用详情提取功能', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_cache_size', '50000', '详情缓存最大条目数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_default_timeout', '15000', '详情提取默认超时时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_batch_size', '20', '批量详情提取最大数量', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_cache_duration', '86400000', '详情缓存默认持续时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_concurrent', '3', '详情提取最大并发数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_enable_image_proxy', '0', '启用图片代理服务', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_supported_sources', '["javbus","javdb","javlibrary","jable","javmost","missav","sukebei"]', '支持详情提取的搜索源', 'json', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-
--- 详情提取限制配置
-('detail_max_download_links', '15', '单个详情页最大下载链接数系统限制', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_magnet_links', '15', '单个详情页最大磁力链接数系统限制', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_screenshots', '20', '单个详情页最大截图数系统限制', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_concurrent_extractions', '5', '最大并发提取数系统限制', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-
--- 详情提取时间限制
-('detail_min_timeout', '5000', '提取超时最小时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_timeout', '30000', '提取超时最大时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_min_cache_duration', '3600000', '缓存最短时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_cache_duration', '604800000', '缓存最长时间(毫秒)', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-
--- 详情提取高级配置
-('detail_allow_custom_config', '1', '是否允许用户自定义详情提取配置', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_enable_presets', '1', '是否启用配置预设功能', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_max_filter_keywords', '50', '内容过滤关键词最大数量', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_min_data_quality_score', '30', '最低数据质量分数', 'integer', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('detail_enable_quality_validation', '1', '是否启用数据质量验证', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-
--- 内部标记
-('detail_config_schema_updated', '1', '详情提取配置表结构已更新', 'boolean', 0, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-
 -- 邮箱验证相关配置
 ('email_verification_enabled', '1', '是否启用邮箱验证功能', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('email_verification_required', '0', '注册时是否强制邮箱验证', 'boolean', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
@@ -126,34 +94,6 @@ INSERT OR IGNORE INTO community_source_tags (id, tag_name, tag_description, tag_
 ('tag_magnet', '磁力', '磁力链接搜索', '#22c55e', 0, 1, 'system', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('tag_hd', '高清', '高清资源相关', '#a855f7', 0, 1, 'system', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
--- ===============================================
--- 3. 系统配置预设初始化
--- ===============================================
-
--- 系统配置预设初始化
-INSERT OR REPLACE INTO detail_config_presets (
-    id, name, description, config_data, is_system_preset, is_public, created_by, 
-    created_at, updated_at
-) VALUES 
--- 保守模式预设
-('preset_conservative', '保守模式', '最小化资源使用，适合低配设备', 
- '{"enableDetailExtraction":true,"autoExtractDetails":false,"maxAutoExtractions":3,"extractionBatchSize":2,"maxDownloadLinks":5,"maxMagnetLinks":5,"maxScreenshots":5,"extractionTimeout":10000,"cacheDuration":86400000,"enableRetry":true,"maxRetryAttempts":1,"enableCache":true,"enableLocalCache":true,"showScreenshots":true,"showDownloadLinks":true,"showMagnetLinks":true,"showActressInfo":true,"showExtractedTags":false,"showRating":false,"showDescription":false,"compactMode":true,"enableImagePreview":false,"showExtractionProgress":true,"enableProgressNotifications":false,"enableContentFilter":false,"contentFilterKeywords":[],"enableStrictDomainCheck":true,"enableSpamFilter":true,"preferOriginalSources":true,"enableAutoCodeExtraction":true,"enableConcurrentExtraction":false,"maxConcurrentExtractions":1,"enableSmartBatching":false,"requireMinimumData":true,"skipLowQualityResults":false,"validateImageUrls":false,"validateDownloadLinks":false}',
- 1, 1, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-
--- 平衡模式预设
-('preset_balanced', '平衡模式', '性能和功能的平衡配置，适合大多数用户', 
- '{"enableDetailExtraction":true,"autoExtractDetails":false,"maxAutoExtractions":5,"extractionBatchSize":3,"maxDownloadLinks":10,"maxMagnetLinks":10,"maxScreenshots":10,"extractionTimeout":15000,"cacheDuration":86400000,"enableRetry":true,"maxRetryAttempts":2,"enableCache":true,"enableLocalCache":true,"showScreenshots":true,"showDownloadLinks":true,"showMagnetLinks":true,"showActressInfo":true,"showExtractedTags":true,"showRating":true,"showDescription":true,"compactMode":false,"enableImagePreview":true,"showExtractionProgress":true,"enableProgressNotifications":true,"enableContentFilter":false,"contentFilterKeywords":[],"enableStrictDomainCheck":true,"enableSpamFilter":true,"preferOriginalSources":true,"enableAutoCodeExtraction":true,"enableConcurrentExtraction":true,"maxConcurrentExtractions":3,"enableSmartBatching":true,"requireMinimumData":true,"skipLowQualityResults":false,"validateImageUrls":true,"validateDownloadLinks":true}',
- 1, 1, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-
--- 性能模式预设  
-('preset_aggressive', '性能模式', '最大化提取速度和内容，适合高配设备', 
- '{"enableDetailExtraction":true,"autoExtractDetails":true,"maxAutoExtractions":10,"extractionBatchSize":5,"maxDownloadLinks":15,"maxMagnetLinks":15,"maxScreenshots":15,"extractionTimeout":25000,"cacheDuration":172800000,"enableRetry":true,"maxRetryAttempts":3,"enableCache":true,"enableLocalCache":true,"showScreenshots":true,"showDownloadLinks":true,"showMagnetLinks":true,"showActressInfo":true,"showExtractedTags":true,"showRating":true,"showDescription":true,"compactMode":false,"enableImagePreview":true,"showExtractionProgress":true,"enableProgressNotifications":true,"enableContentFilter":false,"contentFilterKeywords":[],"enableStrictDomainCheck":false,"enableSpamFilter":true,"preferOriginalSources":false,"enableAutoCodeExtraction":true,"enableConcurrentExtraction":true,"maxConcurrentExtractions":5,"enableSmartBatching":true,"requireMinimumData":false,"skipLowQualityResults":false,"validateImageUrls":true,"validateDownloadLinks":true}',
- 1, 1, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-
--- 质量优先预设
-('preset_quality', '质量优先', '注重数据质量和准确性，速度较慢但结果更可靠', 
- '{"enableDetailExtraction":true,"autoExtractDetails":false,"maxAutoExtractions":3,"extractionBatchSize":2,"maxDownloadLinks":10,"maxMagnetLinks":10,"maxScreenshots":10,"extractionTimeout":20000,"cacheDuration":86400000,"enableRetry":true,"maxRetryAttempts":3,"enableCache":true,"enableLocalCache":true,"showScreenshots":true,"showDownloadLinks":true,"showMagnetLinks":true,"showActressInfo":true,"showExtractedTags":true,"showRating":true,"showDescription":true,"compactMode":false,"enableImagePreview":true,"showExtractionProgress":true,"enableProgressNotifications":true,"enableContentFilter":false,"contentFilterKeywords":[],"enableStrictDomainCheck":true,"enableSpamFilter":true,"preferOriginalSources":true,"enableAutoCodeExtraction":true,"enableConcurrentExtraction":false,"maxConcurrentExtractions":1,"enableSmartBatching":false,"requireMinimumData":true,"skipLowQualityResults":true,"validateImageUrls":true,"validateDownloadLinks":true}',
- 1, 1, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- ===============================================
 -- 4. 邮件模板初始化

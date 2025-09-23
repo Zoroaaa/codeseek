@@ -1,4 +1,4 @@
-// src/components/search/SearchResultsRenderer.js - 搜索结果渲染子组件（代理功能集成版）
+// src/components/search/SearchResultsRenderer.js - 搜索结果渲染子组件（代理功能集成版，已移除详情提取功能）
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../../utils/format.js';
 import favoritesManager from '../favorites.js';
@@ -107,13 +107,6 @@ export class SearchResultsRenderer {
         }
       }
       
-      // 添加详情提取信息
-      let detailExtractionInfo = '';
-      if (config.enableDetailExtraction) {
-        const supportedCount = processedResults.filter(r => this.shouldExtractDetail(r)).length;
-        detailExtractionInfo = ` | 支持详情提取: ${supportedCount}`;
-      }
-      
       // 新增：代理状态信息
       let proxyInfo = '';
       if (this.proxyEnabled) {
@@ -123,7 +116,7 @@ export class SearchResultsRenderer {
       
       searchInfo.innerHTML = `
         搜索关键词: <strong>${escapeHtml(keyword)}</strong> 
-        (${processedResults.length}个结果${statusInfo}${detailExtractionInfo}${proxyInfo}) 
+        (${processedResults.length}个结果${statusInfo}${proxyInfo}) 
         <small>${new Date().toLocaleString()}</small>
       `;
     }
@@ -252,12 +245,11 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 创建搜索结果HTML（集成代理功能）
+   * 创建搜索结果HTML（集成代理功能，已移除详情提取功能）
    */
   createResultHTML(result, config) {
     const isFavorited = favoritesManager.isFavorited(result.url);
     const isUnavailable = this.isResultUnavailable(result);
-    const supportsDetailExtraction = this.shouldExtractDetail(result);
     
     // 状态指示器HTML
     let statusIndicator = '';
@@ -328,14 +320,6 @@ export class SearchResultsRenderer {
         ` : ''}
       </div>
     `;
-
-    // 详情提取按钮
-    const detailExtractionButtonHTML = supportsDetailExtraction && !isUnavailable && config.enableDetailExtraction ? `
-      <button class="action-btn detail-btn" data-action="extractDetail" data-result-id="${result.id}" title="提取详情信息">
-        <span class="btn-icon">📋</span>
-        <span class="btn-text">详情</span>
-      </button>
-    ` : '';
     
     // URL显示逻辑优化
     let displayUrlInfo = '';
@@ -384,7 +368,6 @@ export class SearchResultsRenderer {
           <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(result.displayUrl)}">
             <span>复制</span>
           </button>
-          ${detailExtractionButtonHTML}
           ${result.status ? `
             <button class="action-btn status-btn" data-action="checkStatus" data-source="${result.source}" data-result-id="${result.id}" title="重新检查状态">
               <span>🔄</span>
@@ -395,11 +378,6 @@ export class SearchResultsRenderer {
               </button>
             ` : ''}
           ` : ''}
-        </div>
-        
-        <!-- 详情显示容器 -->
-        <div class="result-detail-container" style="display: none;">
-          <!-- 详情内容将在这里动态插入 -->
         </div>
       </div>
     `;
@@ -434,11 +412,6 @@ export class SearchResultsRenderer {
         case 'copy':
           document.dispatchEvent(new CustomEvent('resultActionRequested', {
             detail: { action: 'copy', url }
-          }));
-          break;
-        case 'extractDetail':
-          document.dispatchEvent(new CustomEvent('resultActionRequested', {
-            detail: { action: 'extractDetail', resultId }
           }));
           break;
         case 'checkStatus':
@@ -623,7 +596,7 @@ export class SearchResultsRenderer {
   /**
    * 导出搜索结果（包含代理信息）
    */
-  async exportResults(extractionStats = {}) {
+  async exportResults() {
     if (this.currentResults.length === 0) {
       return { success: false, error: '没有搜索结果可以导出' };
     }
@@ -633,7 +606,6 @@ export class SearchResultsRenderer {
         results: this.currentResults,
         exportTime: new Date().toISOString(),
         version: window.API_CONFIG?.APP_VERSION || '1.0.0',
-        extractionStats,
         proxyInfo: { // 新增：代理相关信息
           enabled: this.proxyEnabled,
           status: proxyService.getProxyStatus(),
@@ -677,9 +649,7 @@ export class SearchResultsRenderer {
     // 重新渲染该结果项
     const resultElement = document.querySelector(`[data-id="${resultId}"]`);
     if (resultElement) {
-      const updatedHTML = this.createResultHTML(this.currentResults[resultIndex], {
-        enableDetailExtraction: true // 假设启用了详情提取
-      });
+      const updatedHTML = this.createResultHTML(this.currentResults[resultIndex], this.config);
       resultElement.outerHTML = updatedHTML;
     }
 
@@ -782,14 +752,6 @@ export class SearchResultsRenderer {
     return result.status === APP_CONSTANTS.SOURCE_STATUS.UNAVAILABLE ||
            result.status === APP_CONSTANTS.SOURCE_STATUS.TIMEOUT ||
            result.status === APP_CONSTANTS.SOURCE_STATUS.ERROR;
-  }
-
-  /**
-   * 判断是否应该提取详情
-   */
-  shouldExtractDetail(result) {
-    if (!result || !result.source) return false;
-    return APP_CONSTANTS.DETAIL_EXTRACTION_SOURCES?.includes(result.source) || false;
   }
 
   /**
