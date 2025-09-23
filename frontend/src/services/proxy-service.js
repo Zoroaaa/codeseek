@@ -106,100 +106,100 @@ class ProxyService {
   /**
    * 转换为代理URL（增强版）
    */
-export function convertToProxyUrl(originalUrl, proxyServer) {
-  if (!originalUrl || typeof originalUrl !== 'string') {
-    throw new Error('Invalid URL provided');
-  }
+  convertToProxyUrl(originalUrl) {
+    if (!originalUrl || typeof originalUrl !== 'string') {
+      throw new Error('Invalid URL provided');
+    }
 
-  try {
-    const url = new URL(originalUrl);
-    const hostname = url.hostname;
-    
-    // 检查域名是否支持代理
-    if (!isDomainSupported(hostname)) {
-      console.warn(`域名 ${hostname} 不在代理支持列表中`);
+    try {
+      const url = new URL(originalUrl);
+      const hostname = url.hostname;
+      
+      // 检查域名是否支持代理
+      if (!isDomainSupported(hostname)) {
+        console.warn(`域名 ${hostname} 不在代理支持列表中`);
+        return originalUrl;
+      }
+
+      // 构建完整路径（包含pathname + search + hash）
+      let path = url.pathname || '/';
+      if (url.search) {
+        path += url.search;
+      }
+      if (url.hash) {
+        path += url.hash;
+      }
+
+      // 确保路径以 / 开头
+      if (!path.startsWith('/')) {
+        path = '/' + path;
+      }
+
+      // 生成代理URL - 注意这里的格式
+      const proxyUrl = `${proxyConfig.proxyServer}/proxy/${hostname}${path}`;
+
+      console.debug('URL转换完成:', { 
+        original: originalUrl, 
+        proxy: proxyUrl,
+        hostname,
+        path
+      });
+      
+      return proxyUrl;
+    } catch (error) {
+      console.error('URL转换失败:', error, 'Original URL:', originalUrl);
       return originalUrl;
     }
-
-    // 构建完整路径（包含pathname + search + hash）
-    let path = url.pathname || '/';
-    if (url.search) {
-      path += url.search;
-    }
-    if (url.hash) {
-      path += url.hash;
-    }
-
-    // 确保路径以 / 开头
-    if (!path.startsWith('/')) {
-      path = '/' + path;
-    }
-
-    // 生成代理URL - 注意这里的格式
-    const proxyUrl = `${proxyServer}/proxy/${hostname}${path}`;
-
-    console.debug('URL转换完成:', { 
-      original: originalUrl, 
-      proxy: proxyUrl,
-      hostname,
-      path
-    });
-    
-    return proxyUrl;
-  } catch (error) {
-    console.error('URL转换失败:', error, 'Original URL:', originalUrl);
-    return originalUrl;
   }
-}
 
   /**
    * 获取原始URL（从代理URL中提取）
    */
-export function getOriginalUrl(proxyUrl, proxyServer) {
-  if (!proxyUrl || typeof proxyUrl !== 'string') {
-    return proxyUrl;
-  }
-
-  try {
-    // 检查是否是代理URL
-    const proxyPrefix = `${proxyServer}/proxy/`;
-    if (!proxyUrl.includes(proxyPrefix)) {
-      return proxyUrl; // 不是代理URL，直接返回
+  getOriginalUrl(proxyUrl) {
+    if (!proxyUrl || typeof proxyUrl !== 'string') {
+      return proxyUrl;
     }
 
-    // 解析代理URL：https://all.omnibox.pp.ua/proxy/hostname/path
-    const proxyPrefixIndex = proxyUrl.indexOf('/proxy/') + 7; // '/proxy/'.length = 7
-    const remainingUrl = proxyUrl.substring(proxyPrefixIndex);
-    
-    // 找到第一个 / 来分离hostname和path
-    const firstSlashIndex = remainingUrl.indexOf('/');
-    
-    let hostname, path;
-    if (firstSlashIndex === -1) {
-      // 没有路径部分，只有hostname
-      hostname = remainingUrl;
-      path = '/';
-    } else {
-      hostname = remainingUrl.substring(0, firstSlashIndex);
-      path = remainingUrl.substring(firstSlashIndex);
+    try {
+      // 检查是否是代理URL
+      const proxyPrefix = `${proxyConfig.proxyServer}/proxy/`;
+      if (!proxyUrl.includes(proxyPrefix)) {
+        return proxyUrl; // 不是代理URL，直接返回
+      }
+
+      // 解析代理URL：https://all.omnibox.pp.ua/proxy/hostname/path
+      const proxyPrefixIndex = proxyUrl.indexOf('/proxy/') + 7; // '/proxy/'.length = 7
+      const remainingUrl = proxyUrl.substring(proxyPrefixIndex);
+      
+      // 找到第一个 / 来分离hostname和path
+      const firstSlashIndex = remainingUrl.indexOf('/');
+      
+      let hostname, path;
+      if (firstSlashIndex === -1) {
+        // 没有路径部分，只有hostname
+        hostname = remainingUrl;
+        path = '/';
+      } else {
+        hostname = remainingUrl.substring(0, firstSlashIndex);
+        path = remainingUrl.substring(firstSlashIndex);
+      }
+      
+      // 重构原始URL
+      const originalUrl = `https://${hostname}${path}`;
+      
+      console.debug('代理URL转换为原始URL:', {
+        proxy: proxyUrl,
+        original: originalUrl,
+        hostname,
+        path
+      });
+      
+      return originalUrl;
+    } catch (error) {
+      console.error('原始URL提取失败:', error, 'Proxy URL:', proxyUrl);
+      return proxyUrl;
     }
-    
-    // 重构原始URL
-    const originalUrl = `https://${hostname}${path}`;
-    
-    console.debug('代理URL转换为原始URL:', {
-      proxy: proxyUrl,
-      original: originalUrl,
-      hostname,
-      path
-    });
-    
-    return originalUrl;
-  } catch (error) {
-    console.error('原始URL提取失败:', error, 'Proxy URL:', proxyUrl);
-    return proxyUrl;
   }
-}
 
   // ===================== 状态管理（增强版） =====================
 
@@ -635,5 +635,102 @@ export function getOriginalUrl(proxyUrl, proxyServer) {
 
 // 创建单例实例
 const proxyService = new ProxyService();
+
+// 导出独立的工具函数
+export function convertToProxyUrl(originalUrl, proxyServer) {
+  if (!originalUrl || typeof originalUrl !== 'string') {
+    throw new Error('Invalid URL provided');
+  }
+
+  const server = proxyServer || proxyConfig.proxyServer;
+  
+  try {
+    const url = new URL(originalUrl);
+    const hostname = url.hostname;
+    
+    // 检查域名是否支持代理
+    if (!isDomainSupported(hostname)) {
+      console.warn(`域名 ${hostname} 不在代理支持列表中`);
+      return originalUrl;
+    }
+
+    // 构建完整路径（包含pathname + search + hash）
+    let path = url.pathname || '/';
+    if (url.search) {
+      path += url.search;
+    }
+    if (url.hash) {
+      path += url.hash;
+    }
+
+    // 确保路径以 / 开头
+    if (!path.startsWith('/')) {
+      path = '/' + path;
+    }
+
+    // 生成代理URL
+    const proxyUrl = `${server}/proxy/${hostname}${path}`;
+
+    console.debug('URL转换完成:', { 
+      original: originalUrl, 
+      proxy: proxyUrl,
+      hostname,
+      path
+    });
+    
+    return proxyUrl;
+  } catch (error) {
+    console.error('URL转换失败:', error, 'Original URL:', originalUrl);
+    return originalUrl;
+  }
+}
+
+export function getOriginalUrl(proxyUrl, proxyServer) {
+  if (!proxyUrl || typeof proxyUrl !== 'string') {
+    return proxyUrl;
+  }
+
+  const server = proxyServer || proxyConfig.proxyServer;
+
+  try {
+    // 检查是否是代理URL
+    const proxyPrefix = `${server}/proxy/`;
+    if (!proxyUrl.includes(proxyPrefix)) {
+      return proxyUrl; // 不是代理URL，直接返回
+    }
+
+    // 解析代理URL：https://all.omnibox.pp.ua/proxy/hostname/path
+    const proxyPrefixIndex = proxyUrl.indexOf('/proxy/') + 7; // '/proxy/'.length = 7
+    const remainingUrl = proxyUrl.substring(proxyPrefixIndex);
+    
+    // 找到第一个 / 来分离hostname和path
+    const firstSlashIndex = remainingUrl.indexOf('/');
+    
+    let hostname, path;
+    if (firstSlashIndex === -1) {
+      // 没有路径部分，只有hostname
+      hostname = remainingUrl;
+      path = '/';
+    } else {
+      hostname = remainingUrl.substring(0, firstSlashIndex);
+      path = remainingUrl.substring(firstSlashIndex);
+    }
+    
+    // 重构原始URL
+    const originalUrl = `https://${hostname}${path}`;
+    
+    console.debug('代理URL转换为原始URL:', {
+      proxy: proxyUrl,
+      original: originalUrl,
+      hostname,
+      path
+    });
+    
+    return originalUrl;
+  } catch (error) {
+    console.error('原始URL提取失败:', error, 'Proxy URL:', proxyUrl);
+    return proxyUrl;
+  }
+}
 
 export default proxyService;
