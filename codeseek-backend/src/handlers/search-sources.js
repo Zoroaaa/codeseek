@@ -1,1095 +1,745 @@
-// src/handlers/search-sources.js - 集成代理功能的搜索源处理器
-import { authenticate } from '../utils/auth.js';
-import * as utils from '../utils/response.js';
-import { generateId } from '../utils/helpers.js';
+// src/handlers/search-sources.js - 优化版本：增强验证和错误处理
+import { utils } from '../utils.js';
+import { authenticate } from '../middleware.js';
+import { searchSourcesService } from '../services/search-sources-service.js';
 
-// ===============================================
-// 搜索源基础处理器 (保持原有功能)
-// ===============================================
+// ===================== 搜索源大类管理 =====================
 
-/**
- * 获取搜索源列表
- */
-export async function getSearchSourcesHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const url = new URL(request.url);
-    const includeSystem = url.searchParams.get('includeSystem') !== 'false';
-    const enabledOnly = url.searchParams.get('enabledOnly') === 'true';
-    const searchable = url.searchParams.get('searchable');
-    const categoryId = url.searchParams.get('categoryId');
-
-    let query = `
-      SELECT 
-        ss.*,
-        usc.is_enabled as user_enabled,
-        usc.custom_priority,
-        usc.custom_name,
-        usc.custom_subtitle,
-        usc.custom_icon,
-        usc.notes,
-        usc.use_proxy,
-        usc.custom_proxy_url,
-        usc.proxy_preference,
-        usc.allow_fallback_direct
-      FROM search_sources ss
-      LEFT JOIN user_search_source_configs usc 
-        ON ss.id = usc.source_id AND usc.user_id = ?
-      WHERE ss.is_active = 1
-    `;
-    
-    const params = [user.id];
-
-    if (!includeSystem) {
-      query += ` AND ss.is_system = 0`;
+// 获取所有搜索源大类
+export async function getMajorCategoriesHandler(request, env) {
+    try {
+        const result = await searchSourcesService.getAllMajorCategories(env);
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('获取搜索源大类失败:', error);
+        return utils.errorResponse('获取搜索源大类失败', 500);
     }
-    
-    if (enabledOnly) {
-      query += ` AND (usc.is_enabled = 1 OR (usc.is_enabled IS NULL AND ss.is_system = 1))`;
-    }
-    
-    if (searchable !== null) {
-      const searchableValue = searchable === 'true' ? 1 : 0;
-      query += ` AND ss.searchable = ${searchableValue}`;
-    }
-    
-    if (categoryId) {
-      query += ` AND ss.category_id = ?`;
-      params.push(categoryId);
-    }
-
-    query += ` ORDER BY ss.search_priority ASC, ss.display_order ASC, ss.name ASC`;
-
-    const result = await env.DB.prepare(query).bind(...params).all();
-    
-    const sources = result.results.map(source => ({
-      id: source.id,
-      categoryId: source.category_id,
-      name: source.custom_name || source.name,
-      subtitle: source.custom_subtitle || source.subtitle,
-      description: source.description,
-      icon: source.custom_icon || source.icon,
-      urlTemplate: source.url_template,
-      homepageUrl: source.homepage_url,
-      siteType: source.site_type,
-      searchable: source.searchable === 1,
-      requiresKeyword: source.requires_keyword === 1,
-      searchPriority: source.custom_priority || source.search_priority,
-      supportsDetailExtraction: source.supports_detail_extraction === 1,
-      extractionQuality: source.extraction_quality,
-      averageExtractionTime: source.average_extraction_time,
-      supportedFeatures: JSON.parse(source.supported_features || '[]'),
-      isSystem: source.is_system === 1,
-      displayOrder: source.display_order,
-      usageCount: source.usage_count,
-      lastUsedAt: source.last_used_at,
-      userEnabled: source.user_enabled !== 0, // null视为启用
-      notes: source.notes,
-      // 代理相关字段
-      needsProxy: source.needs_proxy === 1,
-      proxyConfig: source.proxy_config ? JSON.parse(source.proxy_config) : null,
-      proxyRegions: source.proxy_regions ? JSON.parse(source.proxy_regions) : null,
-      proxyPriority: source.proxy_priority,
-      supportsDirectAccess: source.supports_direct_access === 1,
-      proxyUsageCount: source.proxy_usage_count || 0,
-      directUsageCount: source.direct_usage_count || 0,
-      userUseProxy: source.use_proxy === 1,
-      customProxyUrl: source.custom_proxy_url,
-      proxyPreference: source.proxy_preference || 'auto',
-      allowFallbackDirect: source.allow_fallback_direct !== 0,
-      createdAt: source.created_at,
-      updatedAt: source.updated_at
-    }));
-
-    return utils.successResponse(sources);
-  } catch (error) {
-    console.error('获取搜索源列表失败:', error);
-    return utils.errorResponse('获取搜索源列表失败', 500);
-  }
 }
 
-/**
- * 更新用户搜索源配置
- */
-export async function updateUserSourceConfigHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const { 
-      sourceId, 
-      isEnabled, 
-      customPriority, 
-      customName, 
-      customSubtitle, 
-      customIcon, 
-      notes,
-      useProxy,
-      customProxyUrl,
-      proxyPreference,
-      allowFallbackDirect
-    } = await request.json();
-
-    if (!sourceId) {
-      return utils.errorResponse('缺少必需的sourceId参数', 400);
+// 创建搜索源大类 (需要管理员权限)
+export async function createMajorCategoryHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
     }
 
-    // 检查搜索源是否存在
-    const sourceExists = await env.DB.prepare(
-      'SELECT id FROM search_sources WHERE id = ? AND is_active = 1'
-    ).bind(sourceId).first();
-
-    if (!sourceExists) {
-      return utils.errorResponse('搜索源不存在', 404);
+    // 简单的管理员检查 - 实际项目中应该有更完善的权限系统
+    if (!user.permissions.includes('admin') && !user.permissions.includes('search_source_management')) {
+        return utils.errorResponse('权限不足', 403);
     }
-
-    const configId = `${user.id}_${sourceId}`;
-    const now = Date.now();
-
-    // 尝试更新现有配置
-    const updateResult = await env.DB.prepare(`
-      UPDATE user_search_source_configs 
-      SET 
-        is_enabled = ?,
-        custom_priority = ?,
-        custom_name = ?,
-        custom_subtitle = ?,
-        custom_icon = ?,
-        notes = ?,
-        use_proxy = ?,
-        custom_proxy_url = ?,
-        proxy_preference = ?,
-        allow_fallback_direct = ?,
-        updated_at = ?
-      WHERE user_id = ? AND source_id = ?
-    `).bind(
-      isEnabled ? 1 : 0,
-      customPriority || null,
-      customName || null,
-      customSubtitle || null,
-      customIcon || null,
-      notes || null,
-      useProxy ? 1 : 0,
-      customProxyUrl || null,
-      proxyPreference || 'auto',
-      allowFallbackDirect ? 1 : 0,
-      now,
-      user.id,
-      sourceId
-    ).run();
-
-    // 如果没有更新任何行，则插入新配置
-    if (updateResult.changes === 0) {
-      await env.DB.prepare(`
-        INSERT INTO user_search_source_configs (
-          id, user_id, source_id, is_enabled, custom_priority,
-          custom_name, custom_subtitle, custom_icon, notes,
-          use_proxy, custom_proxy_url, proxy_preference, allow_fallback_direct,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        configId,
-        user.id,
-        sourceId,
-        isEnabled ? 1 : 0,
-        customPriority || null,
-        customName || null,
-        customSubtitle || null,
-        customIcon || null,
-        notes || null,
-        useProxy ? 1 : 0,
-        customProxyUrl || null,
-        proxyPreference || 'auto',
-        allowFallbackDirect ? 1 : 0,
-        now,
-        now
-      ).run();
-    }
-
-    return utils.successResponse({ message: '搜索源配置已更新' });
-  } catch (error) {
-    console.error('更新搜索源配置失败:', error);
-    return utils.errorResponse('更新搜索源配置失败', 500);
-  }
-}
-
-// ===============================================
-// 代理配置处理器 (新增)
-// ===============================================
-
-/**
- * 获取代理配置
- */
-export async function getProxyConfigHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    // 获取用户的代理配置
-    const userProxyConfig = await env.DB.prepare(`
-      SELECT * FROM user_proxy_configs WHERE user_id = ?
-    `).bind(user.id).first();
-
-    // 获取可用的代理服务器
-    const proxyServers = await env.DB.prepare(`
-      SELECT 
-        id, name, description, base_url, server_region, 
-        supported_regions, server_type, health_status,
-        average_response_time, success_rate, priority, weight,
-        is_active
-      FROM proxy_servers 
-      WHERE is_active = 1
-      ORDER BY priority ASC, success_rate DESC
-    `).all();
-
-    // 获取需要代理的搜索源
-    const proxySources = await env.DB.prepare(`
-      SELECT 
-        ss.id,
-        ss.name,
-        ss.needs_proxy,
-        ss.proxy_config,
-        ss.proxy_regions,
-        ss.proxy_priority,
-        usc.use_proxy as user_proxy_enabled,
-        usc.custom_proxy_url,
-        usc.proxy_preference
-      FROM search_sources ss
-      LEFT JOIN user_search_source_configs usc 
-        ON ss.id = usc.source_id AND usc.user_id = ?
-      WHERE ss.is_active = 1 AND (ss.needs_proxy = 1 OR usc.use_proxy = 1)
-      ORDER BY ss.proxy_priority ASC, ss.name ASC
-    `).bind(user.id).all();
-
-    // 获取全局代理设置
-    const globalProxy = {
-      enabled: env.PROXY_ENABLED === 'true',
-      baseUrl: env.PROXY_BASE_URL || '',
-      defaultSources: env.PROXY_DEFAULT_SOURCES?.split(',') || [],
-      intelligentRouting: env.PROXY_INTELLIGENT_ROUTING !== 'false'
-    };
-
-    const response = {
-      global: globalProxy,
-      userConfig: userProxyConfig ? {
-        proxyEnabled: userProxyConfig.proxy_enabled === 1,
-        intelligentRouting: userProxyConfig.intelligent_routing === 1,
-        userRegion: userProxyConfig.user_region,
-        preferredProxyServer: userProxyConfig.preferred_proxy_server,
-        fallbackProxyServers: userProxyConfig.fallback_proxy_servers ? 
-          JSON.parse(userProxyConfig.fallback_proxy_servers) : [],
-        autoSwitchOnFailure: userProxyConfig.auto_switch_on_failure === 1,
-        autoFallbackDirect: userProxyConfig.auto_fallback_direct === 1,
-        healthCheckInterval: userProxyConfig.health_check_interval,
-        requestTimeout: userProxyConfig.request_timeout,
-        maxRetries: userProxyConfig.max_retries,
-        retryDelay: userProxyConfig.retry_delay,
-        customProxyRules: userProxyConfig.custom_proxy_rules ? 
-          JSON.parse(userProxyConfig.custom_proxy_rules) : null,
-        whitelistSources: userProxyConfig.whitelist_sources ? 
-          JSON.parse(userProxyConfig.whitelist_sources) : [],
-        blacklistSources: userProxyConfig.blacklist_sources ? 
-          JSON.parse(userProxyConfig.blacklist_sources) : [],
-        totalProxyRequests: userProxyConfig.total_proxy_requests,
-        successfulProxyRequests: userProxyConfig.successful_proxy_requests,
-        failedProxyRequests: userProxyConfig.failed_proxy_requests,
-        dataTransferred: userProxyConfig.data_transferred
-      } : null,
-      proxyServers: proxyServers.results.map(server => ({
-        id: server.id,
-        name: server.name,
-        description: server.description,
-        baseUrl: server.base_url,
-        serverRegion: server.server_region,
-        supportedRegions: server.supported_regions ? JSON.parse(server.supported_regions) : [],
-        serverType: server.server_type,
-        healthStatus: server.health_status,
-        averageResponseTime: server.average_response_time,
-        successRate: server.success_rate,
-        priority: server.priority,
-        weight: server.weight,
-        isActive: server.is_active === 1
-      })),
-      sources: proxySources.results.map(source => ({
-        id: source.id,
-        name: source.name,
-        needsProxy: source.needs_proxy === 1,
-        proxyConfig: source.proxy_config ? JSON.parse(source.proxy_config) : null,
-        proxyRegions: source.proxy_regions ? JSON.parse(source.proxy_regions) : null,
-        proxyPriority: source.proxy_priority,
-        userProxyEnabled: source.user_proxy_enabled === 1,
-        customProxyUrl: source.custom_proxy_url,
-        proxyPreference: source.proxy_preference || 'auto'
-      }))
-    };
-
-    return utils.successResponse(response);
-  } catch (error) {
-    console.error('获取代理配置失败:', error);
-    return utils.errorResponse('获取代理配置失败', 500);
-  }
-}
-
-/**
- * 更新用户代理设置
- */
-export async function updateProxySettingsHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const {
-      proxyEnabled,
-      intelligentRouting,
-      userRegion,
-      preferredProxyServer,
-      fallbackProxyServers,
-      autoSwitchOnFailure,
-      autoFallbackDirect,
-      healthCheckInterval,
-      requestTimeout,
-      maxRetries,
-      retryDelay,
-      customProxyRules,
-      whitelistSources,
-      blacklistSources
-    } = await request.json();
-
-    const now = Date.now();
-    const configId = `${user.id}_proxy_config`;
-
-    // 尝试更新现有配置
-    const updateResult = await env.DB.prepare(`
-      UPDATE user_proxy_configs 
-      SET 
-        proxy_enabled = ?,
-        intelligent_routing = ?,
-        user_region = ?,
-        preferred_proxy_server = ?,
-        fallback_proxy_servers = ?,
-        auto_switch_on_failure = ?,
-        auto_fallback_direct = ?,
-        health_check_interval = ?,
-        request_timeout = ?,
-        max_retries = ?,
-        retry_delay = ?,
-        custom_proxy_rules = ?,
-        whitelist_sources = ?,
-        blacklist_sources = ?,
-        updated_at = ?
-      WHERE user_id = ?
-    `).bind(
-      proxyEnabled ? 1 : 0,
-      intelligentRouting !== false ? 1 : 0,
-      userRegion || 'CN',
-      preferredProxyServer || null,
-      fallbackProxyServers ? JSON.stringify(fallbackProxyServers) : '[]',
-      autoSwitchOnFailure !== false ? 1 : 0,
-      autoFallbackDirect !== false ? 1 : 0,
-      healthCheckInterval || 300,
-      requestTimeout || 30000,
-      maxRetries || 2,
-      retryDelay || 1000,
-      customProxyRules ? JSON.stringify(customProxyRules) : null,
-      whitelistSources ? JSON.stringify(whitelistSources) : '[]',
-      blacklistSources ? JSON.stringify(blacklistSources) : '[]',
-      now,
-      user.id
-    ).run();
-
-    // 如果没有更新任何行，则插入新配置
-    if (updateResult.changes === 0) {
-      await env.DB.prepare(`
-        INSERT INTO user_proxy_configs (
-          id, user_id, proxy_enabled, intelligent_routing, user_region,
-          preferred_proxy_server, fallback_proxy_servers, auto_switch_on_failure,
-          auto_fallback_direct, health_check_interval, request_timeout,
-          max_retries, retry_delay, custom_proxy_rules, whitelist_sources,
-          blacklist_sources, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        configId,
-        user.id,
-        proxyEnabled ? 1 : 0,
-        intelligentRouting !== false ? 1 : 0,
-        userRegion || 'CN',
-        preferredProxyServer || null,
-        fallbackProxyServers ? JSON.stringify(fallbackProxyServers) : '[]',
-        autoSwitchOnFailure !== false ? 1 : 0,
-        autoFallbackDirect !== false ? 1 : 0,
-        healthCheckInterval || 300,
-        requestTimeout || 30000,
-        maxRetries || 2,
-        retryDelay || 1000,
-        customProxyRules ? JSON.stringify(customProxyRules) : null,
-        whitelistSources ? JSON.stringify(whitelistSources) : '[]',
-        blacklistSources ? JSON.stringify(blacklistSources) : '[]',
-        now,
-        now
-      ).run();
-    }
-
-    return utils.successResponse({ message: '代理设置已更新' });
-  } catch (error) {
-    console.error('更新代理设置失败:', error);
-    return utils.errorResponse('更新代理设置失败', 500);
-  }
-}
-
-/**
- * 更新单个搜索源的代理设置
- */
-export async function updateSourceProxyHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const { 
-      sourceId, 
-      useProxy, 
-      customProxyUrl, 
-      proxyPreference, 
-      allowFallbackDirect 
-    } = await request.json();
-
-    if (!sourceId) {
-      return utils.errorResponse('缺少必需的sourceId参数', 400);
-    }
-
-    const now = Date.now();
-    const configId = `${user.id}_${sourceId}`;
-
-    // 尝试更新现有配置
-    const updateResult = await env.DB.prepare(`
-      UPDATE user_search_source_configs 
-      SET 
-        use_proxy = ?,
-        custom_proxy_url = ?,
-        proxy_preference = ?,
-        allow_fallback_direct = ?,
-        updated_at = ?
-      WHERE user_id = ? AND source_id = ?
-    `).bind(
-      useProxy ? 1 : 0,
-      customProxyUrl || null,
-      proxyPreference || 'auto',
-      allowFallbackDirect !== false ? 1 : 0,
-      now,
-      user.id,
-      sourceId
-    ).run();
-
-    // 如果没有更新任何行，则插入新配置
-    if (updateResult.changes === 0) {
-      await env.DB.prepare(`
-        INSERT INTO user_search_source_configs (
-          id, user_id, source_id, is_enabled, use_proxy, custom_proxy_url,
-          proxy_preference, allow_fallback_direct, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        configId,
-        user.id,
-        sourceId,
-        1, // 默认启用
-        useProxy ? 1 : 0,
-        customProxyUrl || null,
-        proxyPreference || 'auto',
-        allowFallbackDirect !== false ? 1 : 0,
-        now,
-        now
-      ).run();
-    }
-
-    return utils.successResponse({ message: '搜索源代理设置已更新' });
-  } catch (error) {
-    console.error('更新搜索源代理设置失败:', error);
-    return utils.errorResponse('更新搜索源代理设置失败', 500);
-  }
-}
-
-/**
- * 获取代理服务器列表
- */
-export async function getProxyServersHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const url = new URL(request.url);
-    const includeInactive = url.searchParams.get('includeInactive') === 'true';
-    const serverRegion = url.searchParams.get('serverRegion');
-    const serverType = url.searchParams.get('serverType');
-
-    let query = `
-      SELECT * FROM proxy_servers
-      WHERE 1=1
-    `;
-    const params = [];
-
-    if (!includeInactive) {
-      query += ` AND is_active = 1`;
-    }
-
-    if (serverRegion) {
-      query += ` AND server_region = ?`;
-      params.push(serverRegion);
-    }
-
-    if (serverType) {
-      query += ` AND server_type = ?`;
-      params.push(serverType);
-    }
-
-    query += ` ORDER BY priority ASC, success_rate DESC, average_response_time ASC`;
-
-    const result = await env.DB.prepare(query).bind(...params).all();
-
-    const servers = result.results.map(server => ({
-      id: server.id,
-      name: server.name,
-      description: server.description,
-      baseUrl: server.base_url,
-      serverRegion: server.server_region,
-      supportedRegions: server.supported_regions ? JSON.parse(server.supported_regions) : [],
-      serverType: server.server_type,
-      maxConcurrentRequests: server.max_concurrent_requests,
-      requestTimeout: server.request_timeout,
-      isActive: server.is_active === 1,
-      healthStatus: server.health_status,
-      lastHealthCheck: server.last_health_check,
-      averageResponseTime: server.average_response_time,
-      successRate: server.success_rate,
-      uptimePercentage: server.uptime_percentage,
-      totalRequests: server.total_requests,
-      successfulRequests: server.successful_requests,
-      failedRequests: server.failed_requests,
-      authRequired: server.auth_required === 1,
-      authConfig: server.auth_config ? JSON.parse(server.auth_config) : null,
-      rateLimitConfig: server.rate_limit_config ? JSON.parse(server.rate_limit_config) : null,
-      customHeaders: server.custom_headers ? JSON.parse(server.custom_headers) : null,
-      priority: server.priority,
-      weight: server.weight,
-      isSystem: server.is_system === 1,
-      createdAt: server.created_at,
-      updatedAt: server.updated_at
-    }));
-
-    return utils.successResponse(servers);
-  } catch (error) {
-    console.error('获取代理服务器列表失败:', error);
-    return utils.errorResponse('获取代理服务器列表失败', 500);
-  }
-}
-
-/**
- * 检查代理服务器健康状态
- */
-export async function checkProxyHealthHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const { serverId } = await request.json();
-    
-    if (!serverId) {
-      return utils.errorResponse('缺少服务器ID', 400);
-    }
-
-    // 获取代理服务器信息
-    const server = await env.DB.prepare(
-      'SELECT * FROM proxy_servers WHERE id = ? AND is_active = 1'
-    ).bind(serverId).first();
-
-    if (!server) {
-      return utils.errorResponse('代理服务器不存在', 404);
-    }
-
-    const startTime = Date.now();
-    let healthStatus = 'unknown';
-    let responseTime = 0;
-    let error = null;
 
     try {
-      // 发送健康检查请求到代理服务器
-      const healthCheckUrl = `${server.base_url}/api/health`;
-      const response = await fetch(healthCheckUrl, {
-        method: 'GET',
-        timeout: server.request_timeout || 30000,
-        headers: {
-          'User-Agent': 'MagnetSearch-HealthCheck/1.0',
-          'Accept': 'application/json'
+        const body = await request.json().catch(() => ({}));
+        const { name, description, icon, color, requiresKeyword } = body;
+
+        // 增强输入验证
+        const validation = validateMajorCategoryInput({ name, description, icon, color, requiresKeyword });
+        if (!validation.valid) {
+            return utils.errorResponse(validation.error, 400);
         }
-      });
 
-      responseTime = Date.now() - startTime;
-      
-      if (response.ok) {
-        const healthData = await response.json();
-        healthStatus = healthData.status === 'healthy' ? 'healthy' : 'degraded';
-      } else {
-        healthStatus = 'degraded';
-        error = `HTTP ${response.status}`;
-      }
-    } catch (err) {
-      responseTime = Date.now() - startTime;
-      healthStatus = 'unhealthy';
-      error = err.message;
+        const majorCategoryData = {
+            name: name.trim(),
+            description: description?.trim() || '',
+            icon: icon?.trim() || '🌟',
+            color: color?.trim() || '#6b7280',
+            requiresKeyword: requiresKeyword !== false
+        };
+
+        const result = await searchSourcesService.createMajorCategory(env, majorCategoryData, user.id);
+        
+        await utils.logUserAction(env, user.id, 'major_category_create', {
+            majorCategoryId: result.id,
+            majorCategoryName: result.name
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('创建搜索源大类失败:', error);
+        return utils.errorResponse('创建搜索源大类失败: ' + error.message, 500);
     }
-
-    // 更新服务器健康状态
-    await env.DB.prepare(`
-      UPDATE proxy_servers 
-      SET 
-        health_status = ?,
-        last_health_check = ?,
-        average_response_time = CASE 
-          WHEN average_response_time = 0 THEN ?
-          ELSE (average_response_time + ?) / 2
-        END,
-        updated_at = ?
-      WHERE id = ?
-    `).bind(
-      healthStatus,
-      Date.now(),
-      responseTime,
-      responseTime,
-      Date.now(),
-      serverId
-    ).run();
-
-    return utils.successResponse({
-      serverId,
-      healthStatus,
-      responseTime,
-      error,
-      timestamp: Date.now()
-    });
-  } catch (error) {
-    console.error('检查代理服务器健康状态失败:', error);
-    return utils.errorResponse('检查代理服务器健康状态失败', 500);
-  }
 }
 
-/**
- * 获取代理使用统计
- */
-export async function getProxyStatsHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
+// ===================== 搜索源分类管理 =====================
 
-  try {
-    // 获取用户代理统计
-    const userStats = await env.DB.prepare(`
-      SELECT 
-        total_proxy_requests,
-        successful_proxy_requests,
-        failed_proxy_requests,
-        data_transferred,
-        user_region,
-        preferred_proxy_server
-      FROM user_proxy_configs 
-      WHERE user_id = ?
-    `).bind(user.id).first();
-
-    // 获取搜索源代理使用统计
-    const sourceStats = await env.DB.prepare(`
-      SELECT 
-        ss.id,
-        ss.name,
-        ss.proxy_usage_count,
-        ss.direct_usage_count,
-        CASE 
-          WHEN ss.proxy_usage_count + ss.direct_usage_count > 0 
-          THEN ROUND(CAST(ss.proxy_usage_count AS REAL) / (ss.proxy_usage_count + ss.direct_usage_count) * 100, 2)
-          ELSE 0 
-        END as proxy_usage_percentage
-      FROM search_sources ss
-      WHERE ss.is_active = 1 AND (ss.proxy_usage_count > 0 OR ss.direct_usage_count > 0)
-      ORDER BY ss.proxy_usage_count DESC
-    `).all();
-
-    // 获取代理服务器性能统计
-    const serverStats = await env.DB.prepare(`
-      SELECT 
-        id, name, server_region, health_status,
-        total_requests, success_rate, average_response_time,
-        uptime_percentage, priority, weight
-      FROM proxy_servers 
-      WHERE is_active = 1
-      ORDER BY success_rate DESC, average_response_time ASC
-    `).all();
-
-    const stats = {
-      user: userStats ? {
-        totalProxyRequests: userStats.total_proxy_requests || 0,
-        successfulProxyRequests: userStats.successful_proxy_requests || 0,
-        failedProxyRequests: userStats.failed_proxy_requests || 0,
-        successRate: userStats.total_proxy_requests > 0 ? 
-          ((userStats.successful_proxy_requests || 0) / userStats.total_proxy_requests * 100).toFixed(2) : 0,
-        dataTransferred: userStats.data_transferred || 0,
-        userRegion: userStats.user_region,
-        preferredProxyServer: userStats.preferred_proxy_server
-      } : null,
-      sources: sourceStats.results,
-      servers: serverStats.results.map(server => ({
-        id: server.id,
-        name: server.name,
-        serverRegion: server.server_region,
-        healthStatus: server.health_status,
-        totalRequests: server.total_requests,
-        successRate: server.success_rate,
-        averageResponseTime: server.average_response_time,
-        uptimePercentage: server.uptime_percentage,
-        priority: server.priority,
-        weight: server.weight
-      }))
-    };
-
-    return utils.successResponse(stats);
-  } catch (error) {
-    console.error('获取代理统计失败:', error);
-    return utils.errorResponse('获取代理统计失败', 500);
-  }
-}
-
-/**
- * 智能代理路由推荐
- */
-export async function getProxyRecommendationHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const { sourceId, userRegion } = await request.json();
-
-    if (!sourceId) {
-      return utils.errorResponse('缺少搜索源ID', 400);
-    }
-
-    // 获取搜索源信息
-    const source = await env.DB.prepare(
-      'SELECT * FROM search_sources WHERE id = ? AND is_active = 1'
-    ).bind(sourceId).first();
-
-    if (!source) {
-      return utils.errorResponse('搜索源不存在', 404);
-    }
-
-    // 获取用户代理配置
-    const userConfig = await env.DB.prepare(
-      'SELECT * FROM user_proxy_configs WHERE user_id = ?'
-    ).bind(user.id).first();
-
-    const region = userRegion || userConfig?.user_region || 'CN';
-
-    // 判断是否需要代理
-    let needsProxy = source.needs_proxy === 1;
-    
-    if (source.proxy_regions) {
-      const proxyRegions = JSON.parse(source.proxy_regions);
-      needsProxy = needsProxy || proxyRegions.includes(region);
-    }
-
-    let recommendation = {
-      sourceId,
-      sourceName: source.name,
-      needsProxy,
-      userRegion: region,
-      recommendedServers: [],
-      reasoning: []
-    };
-
-    if (needsProxy) {
-      // 获取适合的代理服务器
-      const suitableServers = await env.DB.prepare(`
-        SELECT 
-          ps.*,
-          CASE 
-            WHEN ps.server_region = ? THEN 10
-            WHEN ps.supported_regions LIKE '%"' || ? || '"%' THEN 8
-            WHEN ps.supported_regions LIKE '%"*"%' THEN 5
-            ELSE 1
-          END as region_score
-        FROM proxy_servers ps
-        WHERE ps.is_active = 1 
-          AND ps.health_status IN ('healthy', 'unknown')
-        ORDER BY 
-          region_score DESC,
-          ps.success_rate DESC,
-          ps.average_response_time ASC,
-          ps.priority ASC
-        LIMIT 3
-      `).bind(region, region).all();
-
-      recommendation.recommendedServers = suitableServers.results.map(server => ({
-        id: server.id,
-        name: server.name,
-        baseUrl: server.base_url,
-        serverRegion: server.server_region,
-        healthStatus: server.health_status,
-        successRate: server.success_rate,
-        averageResponseTime: server.average_response_time,
-        regionScore: server.region_score
-      }));
-
-      // 生成推荐理由
-      if (source.needs_proxy === 1) {
-        recommendation.reasoning.push('该搜索源需要代理访问');
-      }
-      
-      if (source.proxy_regions) {
-        const proxyRegions = JSON.parse(source.proxy_regions);
-        if (proxyRegions.includes(region)) {
-          recommendation.reasoning.push(`您所在的地区(${region})需要代理访问该搜索源`);
-        }
-      }
-
-      if (recommendation.recommendedServers.length > 0) {
-        const bestServer = recommendation.recommendedServers[0];
-        recommendation.reasoning.push(`推荐使用${bestServer.name}代理服务器，成功率${(bestServer.successRate * 100).toFixed(1)}%`);
-      }
-    } else {
-      recommendation.reasoning.push('该搜索源支持直接访问，无需使用代理');
-    }
-
-    return utils.successResponse(recommendation);
-  } catch (error) {
-    console.error('获取代理推荐失败:', error);
-    return utils.errorResponse('获取代理推荐失败', 500);
-  }
-}
-
-// ===============================================
-// 其他现有处理器 (保持不变)
-// ===============================================
-
-/**
- * 获取搜索源分类
- */
+// 获取用户的搜索源分类
 export async function getSourceCategoriesHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const url = new URL(request.url);
-    const includeSystem = url.searchParams.get('includeSystem') !== 'false';
-    const includeCustom = url.searchParams.get('includeCustom') !== 'false';
-
-    let query = `
-      SELECT * FROM search_source_categories 
-      WHERE is_active = 1
-    `;
-    const params = [];
-
-    if (!includeSystem) {
-      query += ` AND is_system = 0`;
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
     }
 
-    if (!includeCustom) {
-      query += ` AND is_system = 1`;
+    try {
+        const url = new URL(request.url);
+        const majorCategoryId = url.searchParams.get('majorCategory');
+        const includeSystem = url.searchParams.get('includeSystem') !== 'false';
+
+        const result = await searchSourcesService.getUserSourceCategories(
+            env, 
+            user.id, 
+            { majorCategoryId, includeSystem }
+        );
+        
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('获取搜索源分类失败:', error);
+        return utils.errorResponse('获取搜索源分类失败', 500);
+    }
+}
+
+// 创建搜索源分类
+export async function createSourceCategoryHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
     }
 
-    query += ` ORDER BY display_order ASC, name ASC`;
+    try {
+        const body = await request.json().catch(() => ({}));
+        const {
+            majorCategoryId,
+            name,
+            description,
+            icon,
+            color,
+            defaultSearchable,
+            defaultSiteType,
+            searchPriority,
+            supportsDetailExtraction,
+            extractionPriority
+        } = body;
 
-    const result = await env.DB.prepare(query).bind(...params).all();
-    
-    const categories = result.results.map(category => ({
-      id: category.id,
-      majorCategoryId: category.major_category_id,
-      name: category.name,
-      description: category.description,
-      icon: category.icon,
-      color: category.color,
-      displayOrder: category.display_order,
-      isSystem: category.is_system === 1,
-      isActive: category.is_active === 1,
-      defaultSearchable: category.default_searchable === 1,
-      defaultSiteType: category.default_site_type,
-      searchPriority: category.search_priority,
-      supportsDetailExtraction: category.supports_detail_extraction === 1,
-      extractionPriority: category.extraction_priority,
-      createdBy: category.created_by,
-      createdAt: category.created_at,
-      updatedAt: category.updated_at
-    }));
+        // 增强输入验证
+        const validation = validateCategoryInput(body);
+        if (!validation.valid) {
+            return utils.errorResponse(validation.error, 400);
+        }
 
-    return utils.successResponse(categories);
-  } catch (error) {
-    console.error('获取搜索源分类失败:', error);
-    return utils.errorResponse('获取搜索源分类失败', 500);
-  }
+        const categoryData = {
+            majorCategoryId: majorCategoryId.trim(),
+            name: name.trim(),
+            description: description?.trim() || '',
+            icon: icon?.trim() || '📁',
+            color: color?.trim() || '#3b82f6',
+            defaultSearchable: defaultSearchable !== false,
+            defaultSiteType: defaultSiteType || 'search',
+            searchPriority: Math.min(Math.max(parseInt(searchPriority) || 5, 1), 10),
+            supportsDetailExtraction: supportsDetailExtraction === true,
+            extractionPriority: extractionPriority || 'medium'
+        };
+
+        const result = await searchSourcesService.createSourceCategory(env, categoryData, user.id);
+        
+        await utils.logUserAction(env, user.id, 'source_category_create', {
+            categoryId: result.id,
+            categoryName: result.name,
+            majorCategoryId: result.majorCategoryId
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('创建搜索源分类失败:', error);
+        return utils.errorResponse('创建搜索源分类失败: ' + error.message, 500);
+    }
 }
 
-/**
- * 获取主要分类
- */
-export async function getMajorCategoriesHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const result = await env.DB.prepare(`
-      SELECT * FROM search_major_categories 
-      WHERE is_active = 1
-      ORDER BY display_order ASC, name ASC
-    `).all();
-    
-    const categories = result.results.map(category => ({
-      id: category.id,
-      name: category.name,
-      description: category.description,
-      icon: category.icon,
-      color: category.color,
-      requiresKeyword: category.requires_keyword === 1,
-      displayOrder: category.display_order,
-      isSystem: category.is_system === 1,
-      isActive: category.is_active === 1,
-      createdAt: category.created_at,
-      updatedAt: category.updated_at
-    }));
-
-    return utils.successResponse(categories);
-  } catch (error) {
-    console.error('获取主要分类失败:', error);
-    return utils.errorResponse('获取主要分类失败', 500);
-  }
-}
-
-/**
- * 批量启用所有搜索源
- */
-export async function enableAllSourcesHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const now = Date.now();
-    
-    // 获取所有系统搜索源
-    const sources = await env.DB.prepare(
-      'SELECT id FROM search_sources WHERE is_system = 1 AND is_active = 1'
-    ).all();
-
-    // 为每个源创建或更新配置
-    for (const source of sources.results) {
-      const configId = `${user.id}_${source.id}`;
-      
-      await env.DB.prepare(`
-        INSERT OR REPLACE INTO user_search_source_configs (
-          id, user_id, source_id, is_enabled, created_at, updated_at
-        ) VALUES (?, ?, ?, 1, ?, ?)
-      `).bind(configId, user.id, source.id, now, now).run();
+// 更新搜索源分类
+export async function updateSourceCategoryHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
     }
 
-    return utils.successResponse({ 
-      message: '已启用所有搜索源',
-      count: sources.results.length 
-    });
-  } catch (error) {
-    console.error('批量启用搜索源失败:', error);
-    return utils.errorResponse('批量启用搜索源失败', 500);
-  }
+    try {
+        const categoryId = request.params?.id;
+        if (!categoryId) {
+            return utils.errorResponse('分类ID不能为空', 400);
+        }
+
+        const body = await request.json().catch(() => ({}));
+        
+        // 增强输入验证
+        const validation = validateCategoryUpdateInput(body);
+        if (!validation.valid) {
+            return utils.errorResponse(validation.error, 400);
+        }
+
+        const updateData = {};
+
+        // 允许更新的字段
+        const allowedFields = [
+            'name', 'description', 'icon', 'color', 
+            'defaultSearchable', 'defaultSiteType', 'searchPriority',
+            'supportsDetailExtraction', 'extractionPriority'
+        ];
+
+        allowedFields.forEach(field => {
+            if (body.hasOwnProperty(field)) {
+                if (field === 'searchPriority') {
+                    updateData[field] = Math.min(Math.max(parseInt(body[field]) || 5, 1), 10);
+                } else if (typeof body[field] === 'string') {
+                    updateData[field] = body[field].trim();
+                } else {
+                    updateData[field] = body[field];
+                }
+            }
+        });
+
+        if (Object.keys(updateData).length === 0) {
+            return utils.errorResponse('没有提供要更新的数据', 400);
+        }
+
+        const result = await searchSourcesService.updateSourceCategory(env, categoryId, updateData, user.id);
+        
+        await utils.logUserAction(env, user.id, 'source_category_update', {
+            categoryId,
+            updatedFields: Object.keys(updateData)
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('更新搜索源分类失败:', error);
+        return utils.errorResponse('更新搜索源分类失败: ' + error.message, 500);
+    }
 }
 
-/**
- * 批量禁用所有搜索源
- */
-export async function disableAllSourcesHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const now = Date.now();
-    
-    await env.DB.prepare(`
-      UPDATE user_search_source_configs 
-      SET is_enabled = 0, updated_at = ?
-      WHERE user_id = ?
-    `).bind(now, user.id).run();
-
-    return utils.successResponse({ message: '已禁用所有搜索源' });
-  } catch (error) {
-    console.error('批量禁用搜索源失败:', error);
-    return utils.errorResponse('批量禁用搜索源失败', 500);
-  }
-}
-
-/**
- * 重置为默认配置
- */
-export async function resetToDefaultsHandler(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) {
-    return utils.errorResponse('认证失败', 401);
-  }
-
-  try {
-    const now = Date.now();
-    
-    // 删除所有用户配置
-    await env.DB.prepare(
-      'DELETE FROM user_search_source_configs WHERE user_id = ?'
-    ).bind(user.id).run();
-
-    // 重新创建默认配置
-    const defaultSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
-    const sources = await env.DB.prepare(`
-      SELECT id, needs_proxy FROM search_sources 
-      WHERE id IN (${defaultSources.map(() => '?').join(',')}) AND is_active = 1
-    `).bind(...defaultSources).all();
-
-    for (const source of sources.results) {
-      const configId = `${user.id}_${source.id}`;
-      
-      await env.DB.prepare(`
-        INSERT INTO user_search_source_configs (
-          id, user_id, source_id, is_enabled, use_proxy, proxy_preference,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, 1, ?, 'auto', ?, ?)
-      `).bind(
-        configId, 
-        user.id, 
-        source.id, 
-        source.needs_proxy === 1 ? 1 : 0,
-        now, 
-        now
-      ).run();
+// 删除搜索源分类
+export async function deleteSourceCategoryHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
     }
 
-    return utils.successResponse({ 
-      message: '已重置为默认配置',
-      enabledSources: defaultSources 
-    });
-  } catch (error) {
-    console.error('重置默认配置失败:', error);
-    return utils.errorResponse('重置默认配置失败', 500);
-  }
+    try {
+        const categoryId = request.params?.id;
+        if (!categoryId) {
+            return utils.errorResponse('分类ID不能为空', 400);
+        }
+
+        const result = await searchSourcesService.deleteSourceCategory(env, categoryId, user.id);
+        
+        await utils.logUserAction(env, user.id, 'source_category_delete', {
+            categoryId,
+            categoryName: result.deletedCategory.name
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('删除搜索源分类失败:', error);
+        return utils.errorResponse('删除搜索源分类失败: ' + error.message, 500);
+    }
+}
+
+// ===================== 搜索源管理 =====================
+
+// 获取用户的搜索源
+export async function getSearchSourcesHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const url = new URL(request.url);
+        const categoryId = url.searchParams.get('category');
+        const majorCategoryId = url.searchParams.get('majorCategory');
+        const searchable = url.searchParams.get('searchable');
+        const includeSystem = url.searchParams.get('includeSystem') !== 'false';
+        const enabledOnly = url.searchParams.get('enabledOnly') === 'true';
+
+        const filters = {
+            categoryId,
+            majorCategoryId,
+            searchable: searchable === 'true' ? true : searchable === 'false' ? false : null,
+            includeSystem,
+            enabledOnly
+        };
+
+        const result = await searchSourcesService.getUserSearchSources(env, user.id, filters);
+        
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('获取搜索源失败:', error);
+        return utils.errorResponse('获取搜索源失败', 500);
+    }
+}
+
+// 创建搜索源
+export async function createSearchSourceHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const body = await request.json().catch(() => ({}));
+        
+        // 增强输入验证
+        const validation = validateSourceInput(body);
+        if (!validation.valid) {
+            return utils.errorResponse(validation.error, 400);
+        }
+
+        const {
+            categoryId,
+            name,
+            subtitle,
+            description,
+            icon,
+            urlTemplate,
+            homepageUrl,
+            siteType,
+            searchable,
+            requiresKeyword,
+            searchPriority,
+            supportsDetailExtraction,
+            extractionQuality,
+            supportedFeatures
+        } = body;
+
+        const sourceData = {
+            categoryId: categoryId.trim(),
+            name: name.trim(),
+            subtitle: subtitle?.trim() || '',
+            description: description?.trim() || '',
+            icon: icon?.trim() || '🔍',
+            urlTemplate: urlTemplate.trim(),
+            homepageUrl: homepageUrl?.trim() || '',
+            siteType: siteType || 'search',
+            searchable: searchable !== false,
+            requiresKeyword: requiresKeyword !== false,
+            searchPriority: Math.min(Math.max(parseInt(searchPriority) || 5, 1), 10),
+            supportsDetailExtraction: supportsDetailExtraction === true,
+            extractionQuality: extractionQuality || 'none',
+            supportedFeatures: Array.isArray(supportedFeatures) ? supportedFeatures : []
+        };
+
+        const result = await searchSourcesService.createSearchSource(env, sourceData, user.id);
+        
+        await utils.logUserAction(env, user.id, 'search_source_create', {
+            sourceId: result.id,
+            sourceName: result.name,
+            categoryId: result.categoryId
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('创建搜索源失败:', error);
+        return utils.errorResponse('创建搜索源失败: ' + error.message, 500);
+    }
+}
+
+// 更新搜索源
+export async function updateSearchSourceHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const sourceId = request.params?.id;
+        if (!sourceId) {
+            return utils.errorResponse('搜索源ID不能为空', 400);
+        }
+
+        const body = await request.json().catch(() => ({}));
+        
+        // 增强输入验证
+        const validation = validateSourceUpdateInput(body);
+        if (!validation.valid) {
+            return utils.errorResponse(validation.error, 400);
+        }
+
+        const updateData = {};
+
+        // 允许更新的字段
+        const allowedFields = [
+            'categoryId', 'name', 'subtitle', 'description', 'icon', 
+            'urlTemplate', 'homepageUrl', 'siteType', 'searchable', 
+            'requiresKeyword', 'searchPriority', 'supportsDetailExtraction',
+            'extractionQuality', 'supportedFeatures'
+        ];
+
+        allowedFields.forEach(field => {
+            if (body.hasOwnProperty(field)) {
+                if (field === 'searchPriority') {
+                    updateData[field] = Math.min(Math.max(parseInt(body[field]) || 5, 1), 10);
+                } else if (field === 'supportedFeatures') {
+                    updateData[field] = Array.isArray(body[field]) ? body[field] : [];
+                } else if (typeof body[field] === 'string') {
+                    updateData[field] = body[field].trim();
+                } else {
+                    updateData[field] = body[field];
+                }
+            }
+        });
+
+        if (Object.keys(updateData).length === 0) {
+            return utils.errorResponse('没有提供要更新的数据', 400);
+        }
+
+        const result = await searchSourcesService.updateSearchSource(env, sourceId, updateData, user.id);
+        
+        await utils.logUserAction(env, user.id, 'search_source_update', {
+            sourceId,
+            updatedFields: Object.keys(updateData)
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('更新搜索源失败:', error);
+        return utils.errorResponse('更新搜索源失败: ' + error.message, 500);
+    }
+}
+
+// 删除搜索源
+export async function deleteSearchSourceHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const sourceId = request.params?.id;
+        if (!sourceId) {
+            return utils.errorResponse('搜索源ID不能为空', 400);
+        }
+
+        const result = await searchSourcesService.deleteSearchSource(env, sourceId, user.id);
+        
+        await utils.logUserAction(env, user.id, 'search_source_delete', {
+            sourceId,
+            sourceName: result.deletedSource.name
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('删除搜索源失败:', error);
+        return utils.errorResponse('删除搜索源失败: ' + error.message, 500);
+    }
+}
+
+// ===================== 用户搜索源配置管理 =====================
+
+// 获取用户搜索源配置
+export async function getUserSourceConfigsHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const result = await searchSourcesService.getUserSourceConfigs(env, user.id);
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('获取用户搜索源配置失败:', error);
+        return utils.errorResponse('获取用户搜索源配置失败', 500);
+    }
+}
+
+// 更新用户搜索源配置
+export async function updateUserSourceConfigHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const body = await request.json().catch(() => ({}));
+        
+        // 增强输入验证
+        const validation = validateUserConfigInput(body);
+        if (!validation.valid) {
+            return utils.errorResponse(validation.error, 400);
+        }
+
+        const { sourceId, isEnabled, customPriority, customName, customSubtitle, customIcon, notes } = body;
+
+        const configData = {
+            sourceId: sourceId.trim(),
+            isEnabled: isEnabled !== false,
+            customPriority: customPriority ? Math.min(Math.max(parseInt(customPriority), 1), 10) : null,
+            customName: customName?.trim() || null,
+            customSubtitle: customSubtitle?.trim() || null,
+            customIcon: customIcon?.trim() || null,
+            notes: notes?.trim() || null
+        };
+
+        const result = await searchSourcesService.updateUserSourceConfig(env, user.id, configData);
+        
+        await utils.logUserAction(env, user.id, 'user_source_config_update', {
+            sourceId,
+            isEnabled: configData.isEnabled
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('更新用户搜索源配置失败:', error);
+        return utils.errorResponse('更新用户搜索源配置失败: ' + error.message, 500);
+    }
+}
+
+// 批量更新用户搜索源配置
+export async function batchUpdateUserSourceConfigsHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const body = await request.json().catch(() => ({}));
+        const { configs } = body;
+
+        // 增强输入验证
+        const validation = validateBatchConfigInput(configs);
+        if (!validation.valid) {
+            return utils.errorResponse(validation.error, 400);
+        }
+
+        const result = await searchSourcesService.batchUpdateUserSourceConfigs(env, user.id, configs);
+        
+        await utils.logUserAction(env, user.id, 'user_source_configs_batch_update', {
+            configCount: configs.length,
+            enabledCount: configs.filter(c => c.isEnabled !== false).length
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('批量更新用户搜索源配置失败:', error);
+        return utils.errorResponse('批量更新用户搜索源配置失败: ' + error.message, 500);
+    }
+}
+
+// ===================== 搜索源统计和导入导出 =====================
+
+// 获取搜索源统计信息
+export async function getSearchSourceStatsHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const result = await searchSourcesService.getSearchSourceStats(env, user.id);
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('获取搜索源统计信息失败:', error);
+        return utils.errorResponse('获取搜索源统计信息失败', 500);
+    }
+}
+
+// 导出用户搜索源配置
+export async function exportUserSearchSourcesHandler(request, env) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return utils.errorResponse('认证失败', 401);
+    }
+
+    try {
+        const result = await searchSourcesService.exportUserSearchSources(env, user.id);
+        
+        await utils.logUserAction(env, user.id, 'search_sources_export', {
+            exportedCount: result.sources?.length || 0
+        }, request);
+
+        return utils.successResponse(result);
+    } catch (error) {
+        console.error('导出搜索源配置失败:', error);
+        return utils.errorResponse('导出搜索源配置失败', 500);
+    }
+}
+
+// ===================== 验证函数 =====================
+
+// 验证大类输入
+function validateMajorCategoryInput(data) {
+    if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
+        return { valid: false, error: '大类名称不能为空' };
+    }
+
+    if (data.name.length > 30) {
+        return { valid: false, error: '大类名称不能超过30个字符' };
+    }
+
+    if (data.description && data.description.length > 100) {
+        return { valid: false, error: '大类描述不能超过100个字符' };
+    }
+
+    if (data.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.color)) {
+        return { valid: false, error: '颜色格式不正确' };
+    }
+
+    return { valid: true };
+}
+
+// 验证分类输入
+function validateCategoryInput(data) {
+    if (!data.majorCategoryId || typeof data.majorCategoryId !== 'string') {
+        return { valid: false, error: '大类ID不能为空' };
+    }
+
+    if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
+        return { valid: false, error: '分类名称不能为空' };
+    }
+
+    if (data.name.length > 30) {
+        return { valid: false, error: '分类名称不能超过30个字符' };
+    }
+
+    if (data.description && data.description.length > 100) {
+        return { valid: false, error: '分类描述不能超过100个字符' };
+    }
+
+    if (data.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.color)) {
+        return { valid: false, error: '颜色格式不正确' };
+    }
+
+    if (data.searchPriority && (data.searchPriority < 1 || data.searchPriority > 10)) {
+        return { valid: false, error: '搜索优先级必须在1-10之间' };
+    }
+
+    const validSiteTypes = ['search', 'browse', 'reference'];
+    if (data.defaultSiteType && !validSiteTypes.includes(data.defaultSiteType)) {
+        return { valid: false, error: '网站类型必须是search、browse或reference' };
+    }
+
+    const validExtractionPriorities = ['high', 'medium', 'low', 'none'];
+    if (data.extractionPriority && !validExtractionPriorities.includes(data.extractionPriority)) {
+        return { valid: false, error: '提取优先级必须是high、medium、low或none' };
+    }
+
+    return { valid: true };
+}
+
+// 验证分类更新输入
+function validateCategoryUpdateInput(data) {
+    if (data.name !== undefined && (!data.name || data.name.trim().length === 0)) {
+        return { valid: false, error: '分类名称不能为空' };
+    }
+
+    if (data.name && data.name.length > 30) {
+        return { valid: false, error: '分类名称不能超过30个字符' };
+    }
+
+    if (data.description && data.description.length > 100) {
+        return { valid: false, error: '分类描述不能超过100个字符' };
+    }
+
+    if (data.color && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(data.color)) {
+        return { valid: false, error: '颜色格式不正确' };
+    }
+
+    return { valid: true };
+}
+
+// 验证搜索源输入
+function validateSourceInput(data) {
+    if (!data.categoryId || typeof data.categoryId !== 'string') {
+        return { valid: false, error: '分类ID不能为空' };
+    }
+
+    if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
+        return { valid: false, error: '搜索源名称不能为空' };
+    }
+
+    if (data.name.length > 50) {
+        return { valid: false, error: '搜索源名称不能超过50个字符' };
+    }
+
+    if (!data.urlTemplate || typeof data.urlTemplate !== 'string' || data.urlTemplate.trim().length === 0) {
+        return { valid: false, error: 'URL模板不能为空' };
+    }
+
+    // 验证URL格式
+    if (!/^https?:\/\/.+/.test(data.urlTemplate)) {
+        return { valid: false, error: 'URL模板格式不正确' };
+    }
+
+    // 如果是搜索源，必须包含{keyword}
+    if (data.searchable !== false && !data.urlTemplate.includes('{keyword}')) {
+        return { valid: false, error: '搜索源的URL模板必须包含{keyword}占位符' };
+    }
+
+    if (data.subtitle && data.subtitle.length > 100) {
+        return { valid: false, error: '搜索源副标题不能超过100个字符' };
+    }
+
+    if (data.description && data.description.length > 200) {
+        return { valid: false, error: '搜索源描述不能超过200个字符' };
+    }
+
+    const validSiteTypes = ['search', 'browse', 'reference'];
+    if (data.siteType && !validSiteTypes.includes(data.siteType)) {
+        return { valid: false, error: '网站类型必须是search、browse或reference' };
+    }
+
+    const validExtractionQualities = ['excellent', 'good', 'fair', 'poor', 'none'];
+    if (data.extractionQuality && !validExtractionQualities.includes(data.extractionQuality)) {
+        return { valid: false, error: '提取质量必须是excellent、good、fair、poor或none' };
+    }
+
+    return { valid: true };
+}
+
+// 验证搜索源更新输入
+function validateSourceUpdateInput(data) {
+    if (data.name !== undefined && (!data.name || data.name.trim().length === 0)) {
+        return { valid: false, error: '搜索源名称不能为空' };
+    }
+
+    if (data.name && data.name.length > 50) {
+        return { valid: false, error: '搜索源名称不能超过50个字符' };
+    }
+
+    if (data.urlTemplate && !/^https?:\/\/.+/.test(data.urlTemplate)) {
+        return { valid: false, error: 'URL模板格式不正确' };
+    }
+
+    return { valid: true };
+}
+
+// 验证用户配置输入
+function validateUserConfigInput(data) {
+    if (!data.sourceId || typeof data.sourceId !== 'string') {
+        return { valid: false, error: '搜索源ID不能为空' };
+    }
+
+    if (data.customPriority && (data.customPriority < 1 || data.customPriority > 10)) {
+        return { valid: false, error: '自定义优先级必须在1-10之间' };
+    }
+
+    if (data.customName && data.customName.length > 50) {
+        return { valid: false, error: '自定义名称不能超过50个字符' };
+    }
+
+    if (data.customSubtitle && data.customSubtitle.length > 100) {
+        return { valid: false, error: '自定义副标题不能超过100个字符' };
+    }
+
+    if (data.notes && data.notes.length > 500) {
+        return { valid: false, error: '备注不能超过500个字符' };
+    }
+
+    return { valid: true };
+}
+
+// 验证批量配置输入
+function validateBatchConfigInput(configs) {
+    if (!Array.isArray(configs) || configs.length === 0) {
+        return { valid: false, error: '配置列表不能为空' };
+    }
+
+    if (configs.length > 100) {
+        return { valid: false, error: '批量更新不能超过100个配置' };
+    }
+
+    for (let i = 0; i < configs.length; i++) {
+        const config = configs[i];
+        const validation = validateUserConfigInput(config);
+        if (!validation.valid) {
+            return { valid: false, error: `第${i + 1}个配置: ${validation.error}` };
+        }
+    }
+
+    return { valid: true };
 }

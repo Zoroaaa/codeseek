@@ -57,7 +57,7 @@ class SearchService {
       const proxyBaseUrl = this.validateProxyBaseUrl(
         userSettings.customProxyUrl || 
         window.API_CONFIG?.PROXY_BASE_URL || 
-        'https://codeseek-site.your-account.workers.dev'
+        'https://all.omnibox.pp.ua'
       );
       
       this.proxyConfig = {
