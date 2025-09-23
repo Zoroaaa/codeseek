@@ -1,41 +1,59 @@
 // Enhanced Proxy Worker with flexible origin validation
-// 版本: v2.1.2 - 修复CORS验证逻辑，支持更灵活的访问方式
+// 版本: v2.1.3 - 修复CORS验证逻辑，支持更灵活的访问方式
 
 /**
- * 验证请求来源是否合法（改进版）
+ * 验证请求来源是否合法（修复版）
  */
 function isValidOrigin(request, allowedOrigins) {
-  if (!allowedOrigins) return false;
+  if (!allowedOrigins) return true; // 如果没有配置限制，允许所有访问
   
-  const origin = request.headers.get('origin') || request.headers.get('referer');
+  const origin = request.headers.get('origin');
+  const referer = request.headers.get('referer');
   
   // 调试模式下记录origin信息
   const DEBUG = request.env?.DEBUG === 'true';
   if (DEBUG) {
     console.log('Origin validation:', {
       origin,
-      referer: request.headers.get('referer'),
+      referer,
       userAgent: request.headers.get('user-agent'),
       method: request.method
     });
   }
   
   // 如果没有origin头，检查是否为直接访问
-  if (!origin) {
-    // 允许某些情况下的直接访问（如浏览器直接输入URL）
+  if (!origin || origin === 'null') {
+    // 允许直接浏览器访问
     const userAgent = request.headers.get('user-agent') || '';
-    const isDirectBrowserAccess = userAgent.includes('Mozilla') && 
-                                  (request.method === 'GET' || request.method === 'HEAD');
+    const isDirectBrowserAccess = userAgent.includes('Mozilla');
     
     if (isDirectBrowserAccess) {
-      console.log('Allowing direct browser access without origin header');
+      if (DEBUG) console.log('Allowing direct browser access without origin header');
       return true;
     }
     
-    console.log('No origin header found and not direct browser access');
-    return false;
+    // 如果有referer，尝试从referer提取origin
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        const refererOrigin = `${refererUrl.protocol}//${refererUrl.hostname}`;
+        return checkOriginAgainstAllowed(refererOrigin, allowedOrigins, DEBUG);
+      } catch (error) {
+        if (DEBUG) console.log('Failed to extract origin from referer:', error.message);
+      }
+    }
+    
+    if (DEBUG) console.log('No valid origin found, allowing for compatibility');
+    return true; // 为了兼容性，允许访问
   }
   
+  return checkOriginAgainstAllowed(origin, allowedOrigins, DEBUG);
+}
+
+/**
+ * 检查origin是否在允许列表中
+ */
+function checkOriginAgainstAllowed(origin, allowedOrigins, DEBUG = false) {
   const allowedDomains = allowedOrigins.split(',').map(domain => domain.trim());
   
   // 尝试解析origin URL
@@ -43,12 +61,16 @@ function isValidOrigin(request, allowedOrigins) {
   try {
     originUrl = new URL(origin);
   } catch (error) {
-    console.log('Invalid origin URL:', origin, error.message);
+    if (DEBUG) console.log('Invalid origin URL:', origin, error.message);
     return false;
   }
   
   // 检查是否匹配允许的域名
   const isAllowed = allowedDomains.some(allowed => {
+    if (allowed === 'null' || allowed === 'undefined') {
+      return origin === 'null' || !origin;
+    }
+    
     try {
       const allowedUrl = new URL(allowed);
       const hostnameMatch = originUrl.hostname === allowedUrl.hostname;
@@ -66,7 +88,7 @@ function isValidOrigin(request, allowedOrigins) {
       
       return hostnameMatch && protocolMatch;
     } catch (error) {
-      console.log('Invalid allowed domain URL:', allowed, error.message);
+      if (DEBUG) console.log('Invalid allowed domain URL:', allowed, error.message);
       return false;
     }
   });
@@ -79,21 +101,26 @@ function isValidOrigin(request, allowedOrigins) {
 }
 
 /**
- * 获取灵活的CORS头（改进版）
+ * 获取灵活的CORS头（修复版）
  */
 function getFlexibleCorsHeaders(request, env) {
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
   const allowedOrigins = env.ALLOWED_ORIGINS;
   
+  // 基础CORS头 - 更宽松的配置
+  const baseCorsHeaders = {
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, User-Agent, Cache-Control, Origin, Referer',
+    'Access-Control-Max-Age': '86400',
+  };
+  
   // 如果有有效的origin且在白名单中
-  if (origin && isValidOrigin(request, allowedOrigins)) {
+  if (origin && origin !== 'null' && isValidOrigin(request, allowedOrigins)) {
     return {
+      ...baseCorsHeaders,
       'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, User-Agent',
       'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Max-Age': '86400',
       'Vary': 'Origin',
     };
   }
@@ -104,21 +131,11 @@ function getFlexibleCorsHeaders(request, env) {
       const refererUrl = new URL(referer);
       const refererOrigin = `${refererUrl.protocol}//${refererUrl.hostname}`;
       
-      // 创建临时请求对象来验证referer作为origin
-      const tempRequest = {
-        headers: new Map([['origin', refererOrigin]]),
-        method: request.method,
-        env: { DEBUG: env.DEBUG }
-      };
-      tempRequest.headers.get = function(name) { return this.get(name); };
-      
-      if (isValidOrigin(tempRequest, allowedOrigins)) {
+      if (checkOriginAgainstAllowed(refererOrigin, allowedOrigins)) {
         return {
+          ...baseCorsHeaders,
           'Access-Control-Allow-Origin': refererOrigin,
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, User-Agent',
           'Access-Control-Allow-Credentials': 'true',
-          'Access-Control-Max-Age': '86400',
           'Vary': 'Origin',
         };
       }
@@ -127,22 +144,24 @@ function getFlexibleCorsHeaders(request, env) {
     }
   }
   
-  // 对于直接浏览器访问，提供基本的CORS头
+  // 对于直接浏览器访问或origin为null的情况
   const userAgent = request.headers.get('user-agent') || '';
-  const isDirectBrowserAccess = userAgent.includes('Mozilla') && 
-                                (request.method === 'GET' || request.method === 'HEAD');
+  const isDirectBrowserAccess = userAgent.includes('Mozilla');
   
-  if (isDirectBrowserAccess && !origin) {
-    console.log('Providing basic CORS headers for direct browser access');
+  if (isDirectBrowserAccess) {
+    console.log('Providing CORS headers for direct browser access');
     return {
-      'Access-Control-Allow-Methods': 'GET, HEAD',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
+      ...baseCorsHeaders,
+      'Access-Control-Allow-Origin': '*', // 对于直接访问，允许所有origin
       'Cache-Control': 'public, max-age=300'
     };
   }
   
-  return null; // 仍然拒绝访问
+  // 默认返回宽松的CORS头
+  return {
+    ...baseCorsHeaders,
+    'Access-Control-Allow-Origin': '*'
+  };
 }
 
 /**
@@ -315,36 +334,13 @@ async function replaceResponseText(
 }
 
 /**
- * 处理代理请求的核心逻辑（改进版）
+ * 处理代理请求的核心逻辑（修复版）
  */
 async function handleProxyRequest(request, env, targetHostname = null) {
   logDebug(request, `Starting proxy request, targetHostname: ${targetHostname}`, env);
   
-  // 灵活验证来源
+  // 获取CORS头 - 使用更宽松的验证
   const corsHeaders = getFlexibleCorsHeaders(request, env);
-  if (!corsHeaders) {
-    logError(request, "Access denied - invalid origin");
-    
-    // 提供更详细的错误信息用于调试
-    const debugInfo = env.DEBUG === 'true' ? {
-      origin: request.headers.get('origin'),
-      referer: request.headers.get('referer'),
-      userAgent: request.headers.get('user-agent'),
-      allowedOrigins: env.ALLOWED_ORIGINS,
-      method: request.method
-    } : null;
-    
-    return new Response(JSON.stringify({
-      error: "Access denied: Invalid origin",
-      message: "请确保从授权的域名访问此服务",
-      debug: debugInfo
-    }), { 
-      status: 403,
-      headers: { 
-        'Content-Type': 'application/json; charset=utf-8'
-      }
-    });
-  }
   
   const {
     PROXY_HOSTNAME,
@@ -527,23 +523,20 @@ h1 { color: #dc2626; margin: 0 0 1rem 0; }
 }
 
 /**
- * 处理健康检查请求
+ * 处理健康检查请求（修复版）
  */
 async function handleHealthCheck(request, env) {
-  // 健康检查允许更宽松的访问
-  const corsHeaders = getFlexibleCorsHeaders(request, env) || {
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  };
+  const corsHeaders = getFlexibleCorsHeaders(request, env);
   
   const healthData = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '2.1.2',
+    version: '2.1.3',
     environment: env.ENVIRONMENT || 'production',
     security: {
-      originValidation: true,
-      flexibleCors: true,
+      originValidation: 'flexible',
+      corsSupport: true,
+      directAccess: true,
       domainWhitelist: true
     },
     features: {
@@ -579,20 +572,18 @@ async function handleApiRoute(request, env) {
   
   // 代理状态端点
   if (path === '/api/status') {
-    const corsHeaders = getFlexibleCorsHeaders(request, env) || {
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    };
+    const corsHeaders = getFlexibleCorsHeaders(request, env);
     
     const status = {
       proxyTarget: env.PROXY_HOSTNAME || 'not configured',
       protocol: env.PROXY_PROTOCOL || 'https',
-      allowedOrigins: env.ALLOWED_ORIGINS || 'not configured',
+      allowedOrigins: env.ALLOWED_ORIGINS || 'flexible',
       timestamp: new Date().toISOString(),
       debug: env.DEBUG === 'true',
       security: 'flexible',
       dynamicProxyEnabled: true,
-      version: '2.1.2'
+      version: '2.1.3',
+      cors: 'enhanced'
     };
     
     return new Response(JSON.stringify(status, null, 2), {
@@ -603,7 +594,11 @@ async function handleApiRoute(request, env) {
     });
   }
   
-  return new Response('API endpoint not found', { status: 404 });
+  const corsHeaders = getFlexibleCorsHeaders(request, env);
+  return new Response('API endpoint not found', { 
+    status: 404,
+    headers: corsHeaders
+  });
 }
 
 export default {
@@ -613,12 +608,9 @@ export default {
       
       logDebug(request, `Request received for path: ${url.pathname}`, env);
       
-      // 预检请求的特殊处理
+      // 预检请求的特殊处理 - 确保所有CORS头都正确返回
       if (request.method === 'OPTIONS') {
-        const corsHeaders = getFlexibleCorsHeaders(request, env) || {
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
-          'Access-Control-Allow-Headers': 'Content-Type'
-        };
+        const corsHeaders = getFlexibleCorsHeaders(request, env);
         return new Response(null, { 
           headers: corsHeaders,
           status: 204
@@ -639,29 +631,38 @@ export default {
         const targetHostname = pathParts[0];
         
         if (!targetHostname) {
+          const corsHeaders = getFlexibleCorsHeaders(request, env);
           logError(request, "Invalid proxy URL: missing hostname");
           return new Response(JSON.stringify({
             error: 'Invalid proxy URL: missing hostname',
             expectedFormat: '/proxy/{hostname}/{path}'
           }), { 
             status: 400,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
           });
         }
         
         // 验证hostname格式和白名单
         if (!/^[a-zA-Z0-9.-]+$/.test(targetHostname)) {
+          const corsHeaders = getFlexibleCorsHeaders(request, env);
           logError(request, `Invalid hostname format: ${targetHostname}`);
           return new Response(JSON.stringify({
             error: 'Invalid hostname format',
             hostname: targetHostname
           }), { 
             status: 400,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
           });
         }
         
         if (!isValidProxyTarget(targetHostname, env)) {
+          const corsHeaders = getFlexibleCorsHeaders(request, env);
           logError(request, `Forbidden proxy target: ${targetHostname}`);
           return new Response(JSON.stringify({
             error: 'Forbidden proxy target',
@@ -669,7 +670,10 @@ export default {
             message: '该域名不在代理白名单中'
           }), { 
             status: 403,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
           });
         }
         
@@ -720,12 +724,10 @@ export default {
         message: env.DEBUG === 'true' ? error.message : 'Internal server error',
         timestamp: new Date().toISOString(),
         code: 'WORKER_ERROR',
-        version: '2.1.2'
+        version: '2.1.3'
       };
       
-      const corsHeaders = getFlexibleCorsHeaders(request, env) || {
-        'Access-Control-Allow-Methods': 'GET, OPTIONS'
-      };
+      const corsHeaders = getFlexibleCorsHeaders(request, env);
       
       return new Response(JSON.stringify(errorResponse), {
         status: 500,

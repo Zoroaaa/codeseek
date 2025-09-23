@@ -1,8 +1,8 @@
-// frontend/src/core/proxy-config.js - 代理配置（修复版）
+// frontend/src/core/proxy-config.js - 代理配置（CORS修复版）
 
 /**
  * 代理配置管理
- * 版本: v1.0.1 - 修复CORS和直接访问问题
+ * 版本: v1.0.2 - 修复CORS和直接访问问题
  * 作用: 统一管理代理服务器配置和相关设置
  */
 
@@ -53,24 +53,23 @@ export const proxyConfig = {
     'www.t66y.com'
   ],
   
-  // 请求配置（新增）
+  // 请求配置（修复CORS问题）
   requestConfig: {
-    // 请求头设置
+    // 简化请求头设置 - 避免触发CORS预检请求
     headers: {
-      'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-      'Cache-Control': 'no-cache',
-      // 确保发送正确的Origin头
-      'Origin': window.location.origin,
-      // 设置Referer头
-      'Referer': window.location.href
+      // 只保留必要的头，移除可能导致CORS问题的头
+      // 'Content-Type': 'application/json', // 只在POST请求时添加
+      // 移除 X-Requested-With，这会触发预检请求
+      // 移除 Cache-Control，这会触发预检请求
+      // Origin 和 Referer 由浏览器自动设置
     },
     
-    // 请求选项
+    // 请求选项（优化版）
     options: {
       credentials: 'omit', // 不发送cookies，避免CORS问题
       mode: 'cors', // 明确指定CORS模式
-      cache: 'no-cache'
+      cache: 'default', // 使用默认缓存策略
+      redirect: 'follow' // 跟随重定向
     }
   },
   
@@ -93,7 +92,7 @@ export const proxyConfig = {
     proxyEnabled: 'codeseek_proxy_enabled',
     proxyPreferences: 'codeseek_proxy_preferences',
     proxyStats: 'codeseek_proxy_stats',
-    proxyErrors: 'codeseek_proxy_errors' // 新增：错误日志
+    proxyErrors: 'codeseek_proxy_errors'
   },
   
   // 代理状态枚举
@@ -106,13 +105,13 @@ export const proxyConfig = {
   
   // 超时设置（优化后）
   timeouts: {
-    healthCheck: 8000,  // 健康检查超时（增加到8秒）
-    request: 30000,     // 请求超时
-    retry: 3,           // 重试次数
-    retryDelay: 1000   // 重试延迟
+    healthCheck: 10000,  // 健康检查超时（增加到10秒）
+    request: 30000,      // 请求超时
+    retry: 3,            // 重试次数
+    retryDelay: 1000    // 重试延迟
   },
   
-  // 错误处理配置（新增）
+  // 错误处理配置
   errorHandling: {
     maxRetries: 3,
     retryDelays: [1000, 2000, 5000], // 递增延迟
@@ -161,6 +160,7 @@ export const proxyConfig = {
  */
 export function validateProxyConfig() {
   const issues = [];
+  const warnings = [];
   
   if (!proxyConfig.proxyServer) {
     issues.push('代理服务器地址未配置');
@@ -182,15 +182,10 @@ export function validateProxyConfig() {
     issues.push('支持的域名列表为空');
   }
   
-  // 新增：验证请求配置
-  if (!proxyConfig.requestConfig.headers.Origin) {
-    console.warn('代理配置警告：Origin头未设置，可能导致CORS问题');
-  }
-  
   return {
     isValid: issues.length === 0,
     issues,
-    warnings: issues.length === 0 && !proxyConfig.requestConfig.headers.Origin ? ['Origin头未设置'] : []
+    warnings
   };
 }
 
@@ -230,7 +225,7 @@ export function getDefaultConfig() {
       autoEnable: false,
       showStatusInResults: true,
       preferOriginalOnError: true,
-      logErrors: true // 新增
+      logErrors: true
     },
     stats: {
       totalRequests: 0,
@@ -242,53 +237,64 @@ export function getDefaultConfig() {
 }
 
 /**
- * 创建增强的请求配置（新增函数）
+ * 创建简化的请求配置（修复CORS问题）
  */
 export function createRequestConfig(options = {}) {
   const config = {
     method: options.method || 'GET',
-    headers: {
-      ...proxyConfig.requestConfig.headers,
-      ...options.headers
-    },
     ...proxyConfig.requestConfig.options,
     ...options
   };
   
-  // 确保Origin头设置正确
-  if (!config.headers['Origin']) {
-    config.headers['Origin'] = window.location.origin;
+  // 只在需要时添加请求头，避免不必要的预检请求
+  const headers = {};
+  
+  // 只在POST/PUT等请求时添加Content-Type
+  if (options.body && (config.method === 'POST' || config.method === 'PUT' || config.method === 'PATCH')) {
+    headers['Content-Type'] = 'application/json';
   }
   
-  // 确保Referer头设置正确
-  if (!config.headers['Referer']) {
-    config.headers['Referer'] = window.location.href;
+  // 合并用户提供的请求头
+  if (options.headers) {
+    Object.assign(headers, options.headers);
+  }
+  
+  // 只在有请求头时才添加headers属性
+  if (Object.keys(headers).length > 0) {
+    config.headers = headers;
   }
   
   return config;
 }
 
 /**
- * 检测代理可用性（新增函数）
+ * 检测代理可用性（修复版）
  */
 export async function testProxyConnectivity() {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), proxyConfig.timeouts.healthCheck);
     
+    const startTime = performance.now();
+    
+    // 使用简化的请求配置
     const response = await fetch(getProxyHealthCheckUrl(), {
-      ...createRequestConfig(),
+      method: 'GET',
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-cache',
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
+    const endTime = performance.now();
     
     if (response.ok) {
       const data = await response.json();
       return {
         success: true,
         data,
-        responseTime: Date.now() - performance.now()
+        responseTime: Math.round(endTime - startTime)
       };
     } else {
       return {
@@ -297,15 +303,22 @@ export async function testProxyConnectivity() {
       };
     }
   } catch (error) {
+    let errorMessage = '连接失败';
+    if (error.name === 'AbortError') {
+      errorMessage = '连接超时';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
     return {
       success: false,
-      error: error.name === 'AbortError' ? '连接超时' : error.message
+      error: errorMessage
     };
   }
 }
 
 /**
- * 错误日志管理（新增）
+ * 错误日志管理（优化版）
  */
 export const errorLogger = {
   /**
@@ -316,14 +329,14 @@ export const errorLogger = {
     
     const errorLog = {
       timestamp: new Date().toISOString(),
-      error: error.message || error,
+      error: error.message || error.toString(),
       context,
       userAgent: navigator.userAgent,
       url: window.location.href
     };
     
     try {
-      const existingLogs = JSON.parse(localStorage.getItem(proxyConfig.storageKeys.proxyErrors) || '[]');
+      const existingLogs = this.getLogs();
       existingLogs.push(errorLog);
       
       // 保持最近100条错误记录
@@ -343,7 +356,8 @@ export const errorLogger = {
    */
   getLogs() {
     try {
-      return JSON.parse(localStorage.getItem(proxyConfig.storageKeys.proxyErrors) || '[]');
+      const logs = localStorage.getItem(proxyConfig.storageKeys.proxyErrors);
+      return logs ? JSON.parse(logs) : [];
     } catch (error) {
       console.warn('无法读取错误日志:', error);
       return [];
@@ -356,10 +370,62 @@ export const errorLogger = {
   clearLogs() {
     try {
       localStorage.removeItem(proxyConfig.storageKeys.proxyErrors);
+      console.log('错误日志已清除');
       return true;
     } catch (error) {
       console.warn('无法清除错误日志:', error);
       return false;
     }
+  },
+  
+  /**
+   * 获取最近的错误统计
+   */
+  getRecentErrorStats() {
+    const logs = this.getLogs();
+    const now = Date.now();
+    const oneHourAgo = now - 60 * 60 * 1000;
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    
+    const recentErrors = logs.filter(log => {
+      const logTime = new Date(log.timestamp).getTime();
+      return logTime > oneDayAgo;
+    });
+    
+    const hourlyErrors = recentErrors.filter(log => {
+      const logTime = new Date(log.timestamp).getTime();
+      return logTime > oneHourAgo;
+    });
+    
+    return {
+      total: logs.length,
+      last24Hours: recentErrors.length,
+      lastHour: hourlyErrors.length,
+      errorTypes: this._groupErrorsByType(recentErrors)
+    };
+  },
+  
+  /**
+   * 按错误类型分组
+   */
+  _groupErrorsByType(logs) {
+    const grouped = {};
+    logs.forEach(log => {
+      const errorType = this._categorizeError(log.error);
+      grouped[errorType] = (grouped[errorType] || 0) + 1;
+    });
+    return grouped;
+  },
+  
+  /**
+   * 错误分类
+   */
+  _categorizeError(errorMessage) {
+    if (errorMessage.includes('CORS')) return 'CORS错误';
+    if (errorMessage.includes('timeout') || errorMessage.includes('超时')) return '超时错误';
+    if (errorMessage.includes('network') || errorMessage.includes('网络')) return '网络错误';
+    if (errorMessage.includes('404')) return '资源未找到';
+    if (errorMessage.includes('500')) return '服务器错误';
+    return '其他错误';
   }
 };
