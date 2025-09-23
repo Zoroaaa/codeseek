@@ -107,11 +107,6 @@ class ConfigManager {
       return '/api';
     }
   }
-  
-  // 添加代理配置检测
-getProxyBaseURL() {
-  return this.getConfigValue('CF_PROXY_BASE_URL', 'https://all.omnibox.pp.ua');
-}
 
   // 自动检测最佳API URL
   autoDetectApiURL() {

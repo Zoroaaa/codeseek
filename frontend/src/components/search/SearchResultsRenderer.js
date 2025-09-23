@@ -1,19 +1,15 @@
-// src/components/search/SearchResultsRenderer.js - 集成代理功能的搜索结果渲染子组件
+// src/components/search/SearchResultsRenderer.js - 搜索结果渲染子组件（代理功能集成版）
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { escapeHtml, truncateUrl, formatRelativeTime } from '../../utils/format.js';
 import favoritesManager from '../favorites.js';
 import authManager from '../../services/auth.js';
+import proxyService from '../../services/proxy-service.js'; // 新增：导入代理服务
 
 export class SearchResultsRenderer {
   constructor() {
     this.currentResults = [];
     this.config = {}; // 添加配置属性
-    this.proxyStats = {
-      totalResults: 0,
-      proxyResults: 0,
-      directResults: 0,
-      mixedAccess: 0
-    };
+    this.proxyEnabled = false; // 新增：代理状态
   }
 
   /**
@@ -21,8 +17,17 @@ export class SearchResultsRenderer {
    */
   async init() {
     try {
+      // 初始化代理服务
+      await proxyService.init();
+      this.proxyEnabled = proxyService.isProxyEnabled();
+      
       this.bindResultsEvents();
-      console.log('搜索结果渲染器初始化完成');
+      this.bindProxyEvents(); // 新增：绑定代理相关事件
+      
+      console.log('搜索结果渲染器初始化完成', {
+        proxyEnabled: this.proxyEnabled,
+        proxyStatus: proxyService.getProxyStatus()
+      });
     } catch (error) {
       console.error('搜索结果渲染器初始化失败:', error);
     }
@@ -64,11 +69,10 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 显示搜索结果
+   * 显示搜索结果（集成代理功能）
    */
   displaySearchResults(keyword, results, config) {
     this.currentResults = results;
-    this.updateProxyStats(results);
     
     const resultsSection = document.getElementById('resultsSection');
     const searchInfo = document.getElementById('searchInfo');
@@ -78,15 +82,18 @@ export class SearchResultsRenderer {
 
     if (resultsSection) resultsSection.style.display = 'block';
     
+    // 处理代理URL转换（新增功能）
+    const processedResults = this.processResultsWithProxy(results);
+    
     // 计算状态统计
-    const statusStats = this.calculateStatusStats(results);
+    const statusStats = this.calculateStatusStats(processedResults);
     
     if (searchInfo) {
       let statusInfo = '';
       if (statusStats.hasStatus) {
         const availableCount = statusStats.available;
         const unavailableCount = statusStats.unavailable + statusStats.timeout + statusStats.error;
-        const totalCount = results.length;
+        const totalCount = processedResults.length;
         const contentMatches = statusStats.contentMatches || 0;
         
         statusInfo = ` | 可用: ${availableCount}/${totalCount}`;
@@ -103,26 +110,21 @@ export class SearchResultsRenderer {
       // 添加详情提取信息
       let detailExtractionInfo = '';
       if (config.enableDetailExtraction) {
-        const supportedCount = results.filter(r => this.shouldExtractDetail(r)).length;
+        const supportedCount = processedResults.filter(r => this.shouldExtractDetail(r)).length;
         detailExtractionInfo = ` | 支持详情提取: ${supportedCount}`;
       }
-
-      // 添加代理使用统计信息
+      
+      // 新增：代理状态信息
       let proxyInfo = '';
-      if (this.proxyStats.proxyResults > 0 || this.proxyStats.directResults > 0) {
-        proxyInfo = ` | 代理访问: ${this.proxyStats.proxyResults}/${this.proxyStats.totalResults}`;
-        if (this.proxyStats.mixedAccess > 0) {
-          proxyInfo += ` | 混合访问: ${this.proxyStats.mixedAccess}`;
-        }
+      if (this.proxyEnabled) {
+        const proxiedCount = processedResults.filter(r => r.isProxied).length;
+        proxyInfo = ` | 代理访问: ${proxiedCount}`;
       }
       
       searchInfo.innerHTML = `
-        <div class="search-info-main">
-          搜索关键词: <strong>${escapeHtml(keyword)}</strong> 
-          (${results.length}个结果${statusInfo}${detailExtractionInfo}${proxyInfo}) 
-          <small>${new Date().toLocaleString()}</small>
-        </div>
-        ${this.renderProxyStatsBar()}
+        搜索关键词: <strong>${escapeHtml(keyword)}</strong> 
+        (${processedResults.length}个结果${statusInfo}${detailExtractionInfo}${proxyInfo}) 
+        <small>${new Date().toLocaleString()}</small>
       `;
     }
 
@@ -131,7 +133,12 @@ export class SearchResultsRenderer {
 
     if (resultsContainer) {
       resultsContainer.className = 'results-grid';
-      resultsContainer.innerHTML = results.map(result => this.createResultHTML(result, config)).join('');
+      
+      // 在结果容器前添加代理开关UI（新增功能）
+      const proxyControlsHTML = this.createProxyControlsHTML();
+      const resultsHTML = processedResults.map(result => this.createResultHTML(result, config)).join('');
+      
+      resultsContainer.innerHTML = `${proxyControlsHTML}${resultsHTML}`;
     }
     
     // 隐藏状态指示器
@@ -149,69 +156,103 @@ export class SearchResultsRenderer {
     document.dispatchEvent(new CustomEvent('searchResultsRendered', {
       detail: { 
         keyword, 
-        results, 
-        resultCount: results.length,
+        results: processedResults, 
+        resultCount: processedResults.length,
         statusStats,
-        proxyStats: this.proxyStats
+        proxyEnabled: this.proxyEnabled
       }
     }));
   }
 
   /**
-   * 更新代理统计信息
+   * 处理搜索结果的代理URL转换（新增方法）
    */
-  updateProxyStats(results) {
-    this.proxyStats = {
-      totalResults: results.length,
-      proxyResults: 0,
-      directResults: 0,
-      mixedAccess: 0
-    };
-
-    results.forEach(result => {
-      if (result.needsProxy && result.proxyUsed) {
-        this.proxyStats.proxyResults++;
-      } else if (result.needsProxy && !result.proxyUsed) {
-        this.proxyStats.directResults++;
-      } else if (!result.needsProxy) {
-        this.proxyStats.directResults++;
+  processResultsWithProxy(results) {
+    return results.map(result => {
+      const processed = { ...result };
+      
+      if (this.proxyEnabled) {
+        // 转换为代理URL
+        processed.proxyUrl = proxyService.convertToProxyUrl(result.url);
+        processed.originalUrl = result.url;
+        processed.isProxied = processed.proxyUrl !== result.url;
+        processed.displayUrl = processed.proxyUrl; // 主要显示的URL
+      } else {
+        processed.displayUrl = result.url;
+        processed.isProxied = false;
       }
-
-      // 如果既有原始URL又有代理URL，算作混合访问
-      if (result.originalUrl && result.url !== result.originalUrl) {
-        this.proxyStats.mixedAccess++;
-      }
+      
+      return processed;
     });
   }
 
   /**
-   * 渲染代理统计条
+   * 创建代理控制面板HTML（新增方法）
    */
-  renderProxyStatsBar() {
-    if (this.proxyStats.totalResults === 0) return '';
-
-    const proxyPercentage = (this.proxyStats.proxyResults / this.proxyStats.totalResults * 100).toFixed(1);
-    const directPercentage = (this.proxyStats.directResults / this.proxyStats.totalResults * 100).toFixed(1);
-
-    return `
-      <div class="proxy-stats-bar">
-        <div class="proxy-stats-info">
-          <span class="proxy-count">🔐 代理: ${this.proxyStats.proxyResults} (${proxyPercentage}%)</span>
-          <span class="direct-count">🌐 直连: ${this.proxyStats.directResults} (${directPercentage}%)</span>
-          ${this.proxyStats.mixedAccess > 0 ? `<span class="mixed-count">🔄 可切换: ${this.proxyStats.mixedAccess}</span>` : ''}
+  createProxyControlsHTML() {
+    const proxyStatus = proxyService.getProxyStatus();
+    const isEnabled = proxyStatus.enabled;
+    const isHealthy = proxyStatus.isHealthy !== false; // 默认为健康
+    
+    const toggleText = isEnabled ? '🔒 代理已启用' : '🔓 启用代理模式';
+    const statusClass = isEnabled ? 'proxy-enabled' : 'proxy-disabled';
+    const healthClass = isHealthy ? 'proxy-healthy' : 'proxy-unhealthy';
+    
+    // 代理状态详细信息
+    let statusDetails = '';
+    if (isEnabled) {
+      const supportedCount = proxyStatus.supportedDomains || 0;
+      const stats = proxyStatus.stats;
+      statusDetails = `
+        <div class="proxy-status-details">
+          <small>
+            支持 ${supportedCount} 个域名 | 
+            总请求: ${stats?.totalRequests || 0} | 
+            成功: ${stats?.successfulRequests || 0}
+            ${stats?.lastUsed ? ` | 最后使用: ${formatRelativeTime(stats.lastUsed)}` : ''}
+          </small>
         </div>
-        <div class="proxy-stats-visual">
-          <div class="stats-bar">
-            <div class="proxy-bar" style="width: ${proxyPercentage}%" title="代理访问"></div>
-            <div class="direct-bar" style="width: ${directPercentage}%" title="直接访问"></div>
+      `;
+    }
+    
+    return `
+      <div class="proxy-controls-panel ${statusClass} ${healthClass}">
+        <div class="proxy-toggle-section">
+          <button class="proxy-toggle-btn" id="proxyToggleBtn" data-action="toggleProxy">
+            <span class="toggle-text">${toggleText}</span>
+            <span class="toggle-indicator ${isEnabled ? 'enabled' : 'disabled'}"></span>
+          </button>
+          
+          ${isEnabled ? `
+            <button class="proxy-info-btn" id="proxyInfoBtn" data-action="showProxyInfo" title="查看代理状态详情">
+              <span>ℹ️</span>
+            </button>
+          ` : ''}
+          
+          <div class="proxy-help-text">
+            <small>
+              ${isEnabled ? 
+                '代理模式已启用，搜索结果将通过代理服务器访问' : 
+                '启用代理模式可访问受限制的搜索源'
+              }
+            </small>
           </div>
         </div>
+        
+        ${statusDetails}
+        
+        ${!isHealthy && isEnabled ? `
+          <div class="proxy-health-warning">
+            <span class="warning-icon">⚠️</span>
+            <span>代理服务器响应异常，可能影响访问效果</span>
+          </div>
+        ` : ''}
       </div>
     `;
   }
 
   /**
-   * 创建搜索结果HTML
+   * 创建搜索结果HTML（集成代理功能）
    */
   createResultHTML(result, config) {
     const isFavorited = favoritesManager.isFavorited(result.url);
@@ -255,16 +296,38 @@ export class SearchResultsRenderer {
           <span class="status-text">${statusText}</span>
           ${result.contentMatch ? '<span class="content-match-badge">✓</span>' : ''}
           ${result.fromCache ? '<span class="cache-badge">💾</span>' : ''}
+          ${result.isProxied ? '<span class="proxy-badge">🔒</span>' : ''}
         </div>
         ${unavailableReasonHTML}
       `;
     }
-
-    // 代理状态指示器
-    const proxyIndicator = this.createProxyIndicator(result);
     
-    // 访问按钮状态 - 支持代理和直连切换
-    const visitButtonHTML = this.createVisitButtons(result, isUnavailable);
+    // 访问按钮HTML（支持双链接）
+    const visitButtonHTML = isUnavailable ? `
+      <button class="action-btn visit-btn disabled" disabled title="该搜索源当前不可用">
+        <span>不可用</span>
+      </button>
+    ` : `
+      <div class="visit-buttons-group">
+        <button class="action-btn visit-btn primary" 
+                data-action="visit" 
+                data-url="${escapeHtml(result.displayUrl)}" 
+                data-source="${result.source}"
+                title="${result.isProxied ? '通过代理访问' : '直接访问'}">
+          <span>${result.isProxied ? '🔒 代理访问' : '直接访问'}</span>
+        </button>
+        
+        ${result.isProxied ? `
+          <button class="action-btn visit-btn secondary" 
+                  data-action="visit" 
+                  data-url="${escapeHtml(result.originalUrl)}" 
+                  data-source="${result.source}"
+                  title="尝试直接访问原始链接">
+            <span class="small-text">🔗 原始</span>
+          </button>
+        ` : ''}
+      </div>
+    `;
 
     // 详情提取按钮
     const detailExtractionButtonHTML = supportsDetailExtraction && !isUnavailable && config.enableDetailExtraction ? `
@@ -274,8 +337,29 @@ export class SearchResultsRenderer {
       </button>
     ` : '';
     
+    // URL显示逻辑优化
+    let displayUrlInfo = '';
+    if (result.isProxied) {
+      displayUrlInfo = `
+        <div class="result-urls">
+          <div class="result-url proxy-url" title="${escapeHtml(result.proxyUrl)}">
+            <span class="url-label">🔒 代理:</span> ${truncateUrl(result.proxyUrl)}
+          </div>
+          <div class="result-url original-url" title="${escapeHtml(result.originalUrl)}">
+            <span class="url-label">🔗 原始:</span> ${truncateUrl(result.originalUrl)}
+          </div>
+        </div>
+      `;
+    } else {
+      displayUrlInfo = `
+        <div class="result-url" title="${escapeHtml(result.url)}">
+          ${truncateUrl(result.url)}
+        </div>
+      `;
+    }
+    
     return `
-      <div class="result-item ${isUnavailable ? 'result-unavailable' : ''}" 
+      <div class="result-item ${isUnavailable ? 'result-unavailable' : ''} ${result.isProxied ? 'result-proxied' : ''}" 
            data-id="${result.id}" 
            data-result-id="${result.id}">
         <div class="result-image">
@@ -284,13 +368,10 @@ export class SearchResultsRenderer {
         <div class="result-content">
           <div class="result-title">${escapeHtml(result.title)}</div>
           <div class="result-subtitle">${escapeHtml(result.subtitle)}</div>
-          <div class="result-url" title="${escapeHtml(result.url)}">
-            ${truncateUrl(result.url)}
-          </div>
+          ${displayUrlInfo}
           <div class="result-meta">
             <span class="result-source">${result.source}</span>
             <span class="result-time">${formatRelativeTime(result.timestamp)}</span>
-            ${proxyIndicator}
             ${statusIndicator}
           </div>
         </div>
@@ -300,7 +381,7 @@ export class SearchResultsRenderer {
                   data-action="favorite" data-result-id="${result.id}">
             <span>${isFavorited ? '已收藏' : '收藏'}</span>
           </button>
-          <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(result.url)}">
+          <button class="action-btn copy-btn" data-action="copy" data-url="${escapeHtml(result.displayUrl)}">
             <span>复制</span>
           </button>
           ${detailExtractionButtonHTML}
@@ -314,7 +395,6 @@ export class SearchResultsRenderer {
               </button>
             ` : ''}
           ` : ''}
-          ${this.createProxyControlButtons(result)}
         </div>
         
         <!-- 详情显示容器 -->
@@ -326,107 +406,7 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 创建代理状态指示器
-   */
-  createProxyIndicator(result) {
-    if (!result.needsProxy && !result.proxyUsed) {
-      return ''; // 不需要也不使用代理的源不显示指示器
-    }
-
-    let proxyStatus = '';
-    let proxyClass = '';
-    let proxyTitle = '';
-
-    if (result.needsProxy && result.proxyUsed) {
-      proxyStatus = '🔐 代理';
-      proxyClass = 'proxy-enabled';
-      proxyTitle = '通过代理访问';
-    } else if (result.needsProxy && !result.proxyUsed) {
-      proxyStatus = '⚠️ 直连';
-      proxyClass = 'proxy-bypassed';
-      proxyTitle = '需要代理但使用直连访问';
-    } else if (!result.needsProxy && result.proxyUsed) {
-      proxyStatus = '🔐 可选';
-      proxyClass = 'proxy-optional';
-      proxyTitle = '可选择代理访问';
-    }
-
-    return `
-      <span class="proxy-indicator ${proxyClass}" title="${proxyTitle}">
-        ${proxyStatus}
-      </span>
-    `;
-  }
-
-  /**
-   * 创建访问按钮
-   */
-  createVisitButtons(result, isUnavailable) {
-    if (isUnavailable) {
-      return `
-        <button class="action-btn visit-btn disabled" disabled title="该搜索源当前不可用">
-          <span>不可用</span>
-        </button>
-      `;
-    }
-
-    // 主访问按钮（当前URL）
-    const primaryUrl = result.url;
-    const primaryLabel = result.proxyUsed ? '访问(代理)' : '访问';
-    
-    let buttons = `
-      <button class="action-btn visit-btn primary" 
-              data-action="visit" 
-              data-url="${escapeHtml(primaryUrl)}" 
-              data-source="${result.source}">
-        <span>${primaryLabel}</span>
-      </button>
-    `;
-
-    // 如果有备用访问选项，添加切换按钮
-    if (result.originalUrl && result.url !== result.originalUrl) {
-      const alternativeUrl = result.originalUrl;
-      const alternativeLabel = result.proxyUsed ? '直连' : '代理';
-      
-      buttons += `
-        <div class="visit-options-dropdown">
-          <button class="action-btn visit-btn alternative" 
-                  data-action="visitAlternative" 
-                  data-url="${escapeHtml(alternativeUrl)}" 
-                  data-source="${result.source}"
-                  title="切换访问方式">
-            <span>${alternativeLabel}</span>
-          </button>
-        </div>
-      `;
-    }
-
-    return `<div class="visit-button-group">${buttons}</div>`;
-  }
-
-  /**
-   * 创建代理控制按钮
-   */
-  createProxyControlButtons(result) {
-    if (!result.needsProxy && !result.proxyUsed) {
-      return ''; // 不相关的源不显示代理控制
-    }
-
-    return `
-      <div class="proxy-controls">
-        <button class="action-btn proxy-toggle-btn" 
-                data-action="toggleProxy" 
-                data-result-id="${result.id}"
-                data-source="${result.source}"
-                title="切换代理设置">
-          <span>🔄 ${result.proxyUsed ? '禁用代理' : '启用代理'}</span>
-        </button>
-      </div>
-    `;
-  }
-
-  /**
-   * 绑定结果事件
+   * 绑定结果事件（扩展代理功能）
    */
   bindResultsEvents() {
     // 使用事件委托处理结果点击事件
@@ -443,27 +423,7 @@ export class SearchResultsRenderer {
       switch (action) {
         case 'visit':
           document.dispatchEvent(new CustomEvent('resultActionRequested', {
-            detail: { action: 'visit', url, source, accessType: 'primary' }
-          }));
-          break;
-        case 'visitAlternative':
-          document.dispatchEvent(new CustomEvent('resultActionRequested', {
-            detail: { action: 'visit', url, source, accessType: 'alternative' }
-          }));
-          break;
-        case 'visitDirect':
-          document.dispatchEvent(new CustomEvent('resultActionRequested', {
-            detail: { action: 'visit', url, source, accessType: 'direct' }
-          }));
-          break;
-        case 'visitProxy':
-          document.dispatchEvent(new CustomEvent('resultActionRequested', {
-            detail: { action: 'visit', url, source, accessType: 'proxy' }
-          }));
-          break;
-        case 'toggleProxy':
-          document.dispatchEvent(new CustomEvent('resultActionRequested', {
-            detail: { action: 'toggleProxy', resultId, source }
+            detail: { action: 'visit', url, source }
           }));
           break;
         case 'favorite':
@@ -491,6 +451,13 @@ export class SearchResultsRenderer {
             detail: { action: 'viewDetails', resultId }
           }));
           break;
+        // 新增：代理相关动作
+        case 'toggleProxy':
+          this.handleProxyToggle();
+          break;
+        case 'showProxyInfo':
+          this.showProxyInfo();
+          break;
       }
     });
 
@@ -498,87 +465,119 @@ export class SearchResultsRenderer {
     document.addEventListener('favoritesChanged', () => {
       this.updateFavoriteButtons();
     });
+  }
 
-    // 监听代理设置变化事件
-    document.addEventListener('proxySettingsChanged', (e) => {
-      this.handleProxySettingsChange(e.detail);
+  /**
+   * 绑定代理相关事件（新增方法）
+   */
+  bindProxyEvents() {
+    // 监听代理状态变化
+    document.addEventListener('proxyStatusChanged', (e) => {
+      this.proxyEnabled = e.detail.enabled;
+      this.refreshResultsForProxyChange();
+      console.log('代理状态已变更:', e.detail);
+    });
+
+    // 监听代理健康检查失败
+    document.addEventListener('proxyHealthCheckFailed', (e) => {
+      console.warn('代理健康检查失败:', e.detail.error);
+      this.showProxyHealthWarning(e.detail.error);
     });
   }
 
   /**
-   * 处理代理设置变化
+   * 处理代理开关切换（新增方法）
    */
-  handleProxySettingsChange(detail) {
-    const { resultId, source, useProxy } = detail;
-    
-    // 更新对应结果项的显示
-    const resultElement = document.querySelector(`[data-result-id="${resultId}"]`);
-    if (resultElement) {
-      // 找到对应的结果数据并更新
-      const result = this.currentResults.find(r => r.id === resultId);
-      if (result) {
-        // 更新结果数据中的代理设置
-        result.proxyUsed = useProxy;
-        
-        // 重新渲染该结果项
-        const updatedHTML = this.createResultHTML(result, this.config);
-        resultElement.outerHTML = updatedHTML;
-        
-        // 更新统计信息
-        this.updateProxyStats(this.currentResults);
-        
-        // 更新搜索信息显示
-        const keyword = document.getElementById('searchInput')?.value || '';
-        const searchInfo = document.getElementById('searchInfo');
-        if (searchInfo) {
-          const statusStats = this.calculateStatusStats(this.currentResults);
-          this.updateSearchInfoDisplay(keyword, this.currentResults.length, statusStats);
-        }
+  async handleProxyToggle() {
+    const toggleBtn = document.getElementById('proxyToggleBtn');
+    if (toggleBtn) {
+      toggleBtn.disabled = true;
+      toggleBtn.innerHTML = '<span class="toggle-text">切换中...</span>';
+    }
+
+    try {
+      const result = await proxyService.toggleProxy();
+      if (result.success) {
+        console.log('代理状态切换成功:', result.message);
+        // 状态变化会通过事件处理
+      } else {
+        console.error('代理状态切换失败:', result.error);
+        this.showError(`代理切换失败: ${result.error}`);
       }
+    } catch (error) {
+      console.error('代理切换异常:', error);
+      this.showError(`代理切换异常: ${error.message}`);
+    }
+
+    if (toggleBtn) {
+      toggleBtn.disabled = false;
     }
   }
 
   /**
-   * 更新搜索信息显示
+   * 显示代理信息（新增方法）
    */
-  updateSearchInfoDisplay(keyword, resultCount, statusStats) {
-    const searchInfo = document.getElementById('searchInfo');
-    if (!searchInfo) return;
+  showProxyInfo() {
+    const status = proxyService.getProxyStatus();
+    const info = `
+代理状态: ${status.enabled ? '已启用' : '已禁用'}
+代理服务器: ${status.server}
+支持域名: ${status.supportedDomains} 个
+统计信息:
+  - 总请求: ${status.stats?.totalRequests || 0}
+  - 成功请求: ${status.stats?.successfulRequests || 0}
+  - 失败请求: ${status.stats?.failedRequests || 0}
+  ${status.stats?.lastUsed ? `- 最后使用: ${new Date(status.stats.lastUsed).toLocaleString()}` : ''}
 
-    let statusInfo = '';
-    if (statusStats.hasStatus) {
-      const availableCount = statusStats.available;
-      const unavailableCount = statusStats.unavailable + statusStats.timeout + statusStats.error;
-      const contentMatches = statusStats.contentMatches || 0;
-      
-      statusInfo = ` | 可用: ${availableCount}/${resultCount}`;
-      
-      if (unavailableCount > 0) {
-        statusInfo += ` | 不可用: ${unavailableCount}`;
-      }
-      
-      if (contentMatches > 0) {
-        statusInfo += ` | 内容匹配: ${contentMatches}`;
-      }
-    }
-
-    // 代理使用统计信息
-    let proxyInfo = '';
-    if (this.proxyStats.proxyResults > 0 || this.proxyStats.directResults > 0) {
-      proxyInfo = ` | 代理访问: ${this.proxyStats.proxyResults}/${this.proxyStats.totalResults}`;
-      if (this.proxyStats.mixedAccess > 0) {
-        proxyInfo += ` | 混合访问: ${this.proxyStats.mixedAccess}`;
-      }
-    }
-    
-    searchInfo.innerHTML = `
-      <div class="search-info-main">
-        搜索关键词: <strong>${escapeHtml(keyword)}</strong> 
-        (${resultCount}个结果${statusInfo}${proxyInfo}) 
-        <small>${new Date().toLocaleString()}</small>
-      </div>
-      ${this.renderProxyStatsBar()}
+健康状态: ${status.isHealthy ? '正常' : '异常'}
+最后检查: ${status.lastHealthCheck ? new Date(status.lastHealthCheck).toLocaleString() : '未检查'}
     `;
+    
+    alert(info); // 简单实现，后续可以改为模态框
+  }
+
+  /**
+   * 刷新结果以应用代理变化（新增方法）
+   */
+  refreshResultsForProxyChange() {
+    if (this.currentResults.length > 0) {
+      const keyword = document.getElementById('searchInput')?.value || '';
+      this.displaySearchResults(keyword, this.currentResults, this.config);
+    }
+  }
+
+  /**
+   * 显示代理健康警告（新增方法）
+   */
+  showProxyHealthWarning(error) {
+    // 在页面顶部显示警告
+    const warning = document.createElement('div');
+    warning.className = 'proxy-health-warning-toast';
+    warning.innerHTML = `
+      <div class="warning-content">
+        <span class="warning-icon">⚠️</span>
+        <span>代理服务异常: ${error}</span>
+        <button class="close-warning" onclick="this.parentElement.parentElement.remove()">×</button>
+      </div>
+    `;
+    
+    document.body.insertBefore(warning, document.body.firstChild);
+    
+    // 3秒后自动移除
+    setTimeout(() => {
+      if (warning.parentNode) {
+        warning.parentNode.removeChild(warning);
+      }
+    }, 3000);
+  }
+
+  /**
+   * 显示错误信息（新增方法）
+   */
+  showError(message) {
+    // 简单的错误提示，后续可以改进
+    console.error(message);
+    alert(message);
   }
 
   /**
@@ -616,19 +615,13 @@ export class SearchResultsRenderer {
     if (exportResultsBtn) exportResultsBtn.style.display = 'none';
 
     this.currentResults = [];
-    this.proxyStats = {
-      totalResults: 0,
-      proxyResults: 0,
-      directResults: 0,
-      mixedAccess: 0
-    };
 
     // 触发结果清空事件
     document.dispatchEvent(new CustomEvent('searchResultsCleared'));
   }
 
   /**
-   * 导出搜索结果
+   * 导出搜索结果（包含代理信息）
    */
   async exportResults(extractionStats = {}) {
     if (this.currentResults.length === 0) {
@@ -638,10 +631,14 @@ export class SearchResultsRenderer {
     try {
       const data = {
         results: this.currentResults,
-        proxyStats: this.proxyStats,
         exportTime: new Date().toISOString(),
         version: window.API_CONFIG?.APP_VERSION || '1.0.0',
-        extractionStats
+        extractionStats,
+        proxyInfo: { // 新增：代理相关信息
+          enabled: this.proxyEnabled,
+          status: proxyService.getProxyStatus(),
+          processedResults: this.currentResults.filter(r => r.isProxied).length
+        }
       };
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -680,30 +677,9 @@ export class SearchResultsRenderer {
     // 重新渲染该结果项
     const resultElement = document.querySelector(`[data-id="${resultId}"]`);
     if (resultElement) {
-      const updatedHTML = this.createResultHTML(this.currentResults[resultIndex], this.config);
-      resultElement.outerHTML = updatedHTML;
-    }
-
-    return true;
-  }
-
-  /**
-   * 更新单个结果的代理状态
-   */
-  updateResultProxyStatus(resultId, proxyData) {
-    const result = this.findResult(resultId);
-    if (!result) return false;
-
-    // 更新代理相关数据
-    Object.assign(result, proxyData);
-
-    // 重新计算统计信息
-    this.updateProxyStats(this.currentResults);
-
-    // 重新渲染该结果项
-    const resultElement = document.querySelector(`[data-id="${resultId}"]`);
-    if (resultElement) {
-      const updatedHTML = this.createResultHTML(result, this.config);
+      const updatedHTML = this.createResultHTML(this.currentResults[resultIndex], {
+        enableDetailExtraction: true // 假设启用了详情提取
+      });
       resultElement.outerHTML = updatedHTML;
     }
 
@@ -725,28 +701,27 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 获取结果统计
+   * 获取结果统计（包含代理信息）
    */
   getResultsStats() {
     const statusStats = this.calculateStatusStats(this.currentResults);
+    const proxyStats = {
+      total: this.currentResults.length,
+      proxied: this.currentResults.filter(r => r.isProxied).length,
+      direct: this.currentResults.filter(r => !r.isProxied).length,
+      enabled: this.proxyEnabled
+    };
     
     return {
       total: this.currentResults.length,
       statusStats,
-      proxyStats: this.proxyStats,
+      proxyStats, // 新增：代理统计
       sources: [...new Set(this.currentResults.map(r => r.source))],
       timeRange: this.currentResults.length > 0 ? {
         oldest: Math.min(...this.currentResults.map(r => r.timestamp)),
         newest: Math.max(...this.currentResults.map(r => r.timestamp))
       } : null
     };
-  }
-
-  /**
-   * 获取代理统计信息
-   */
-  getProxyStats() {
-    return { ...this.proxyStats };
   }
 
   // ===================== 辅助方法 =====================
@@ -890,41 +865,11 @@ export class SearchResultsRenderer {
   }
 
   /**
-   * 显示代理状态提示
-   */
-  showProxyStatusTip(message, type = 'info') {
-    const tip = document.createElement('div');
-    tip.className = `proxy-status-tip ${type}`;
-    tip.innerHTML = `
-      <span class="tip-icon">${type === 'warning' ? '⚠️' : type === 'error' ? '❌' : 'ℹ️'}</span>
-      <span class="tip-message">${message}</span>
-      <button class="tip-close" onclick="this.parentElement.remove()">×</button>
-    `;
-    
-    const container = document.getElementById('resultsSection');
-    if (container) {
-      container.insertBefore(tip, container.firstChild);
-      
-      // 3秒后自动移除
-      setTimeout(() => {
-        if (tip.parentElement) {
-          tip.remove();
-        }
-      }, 3000);
-    }
-  }
-
-  /**
    * 清理资源
    */
   cleanup() {
     this.currentResults = [];
-    this.proxyStats = {
-      totalResults: 0,
-      proxyResults: 0,
-      directResults: 0,
-      mixedAccess: 0
-    };
+    proxyService.cleanup(); // 新增：清理代理服务资源
     console.log('搜索结果渲染器资源已清理');
   }
 }
