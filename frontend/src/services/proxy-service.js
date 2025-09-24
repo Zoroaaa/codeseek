@@ -1,12 +1,14 @@
-// frontend/src/services/proxy-service.js - 完整版代理服务
-// 版本: v2.1.0 - 完善的资源处理、智能缓存和所有原有功能
+// frontend/src/services/proxy-service.js - 升级版代理服务 v4.0.0
+// 对应后端架构 v4.0.0，集成所有新特性
 
 import { 
   proxyConfig, 
   validateProxyConfig, 
   getProxyHealthCheckUrl, 
   getProxyStatusUrl,
+  getProxyCacheStatsUrl,
   isDomainSupported,
+  getDomainCategory,
   getDefaultConfig,
   createRequestConfig,
   testProxyConnectivity,
@@ -14,138 +16,258 @@ import {
 } from '../core/proxy-config.js';
 
 /**
- * 资源类型枚举
+ * v4.0.0 资源类型枚举（对应后端处理器）
  */
 const RESOURCE_TYPES = {
   HTML: 'html',
-  CSS: 'css',
+  CSS: 'css', 
   JS: 'javascript',
   IMAGE: 'image',
   FONT: 'font',
   MEDIA: 'media',
   API: 'api',
   DOCUMENT: 'document',
+  MAGNET: 'magnet',      // v4.0.0新增：磁力链接
+  TORRENT: 'torrent',    // v4.0.0新增：种子文件
   OTHER: 'other'
 };
 
 /**
- * 智能缓存管理器
+ * v4.0.0 智能缓存管理器（对应后端CacheManager）
  */
 class CacheManager {
   constructor() {
     this.cache = new Map();
-    this.maxCacheSize = 100; // 最大缓存条目数
+    this.maxCacheSize = proxyConfig.cacheStrategy.maxEntries;
+    this.maxMemorySize = proxyConfig.cacheStrategy.maxSize * 1024 * 1024; // 转换为字节
+    this.currentMemoryUsage = 0;
     this.cacheStats = {
       hits: 0,
       misses: 0,
-      evictions: 0
+      evictions: 0,
+      sets: 0,
+      errors: 0,
+      expired: 0
     };
+    
+    // v4.0.0: 启动定期清理
+    this.startPeriodicCleanup();
   }
 
-  /**
-   * 生成缓存键
-   */
   generateKey(url, options = {}) {
     const { method = 'GET', headers = {} } = options;
-    return `${method}:${url}:${JSON.stringify(headers)}`;
+    const headersString = JSON.stringify(Object.fromEntries(
+      Object.entries(headers).filter(([k]) => ['authorization', 'cookie'].includes(k.toLowerCase()))
+    ));
+    return `${method}:${url}:${headersString}`;
   }
 
-  /**
-   * 获取缓存
-   */
   get(url, options = {}) {
     const key = this.generateKey(url, options);
     const cached = this.cache.get(key);
     
     if (cached && !this.isExpired(cached)) {
       this.cacheStats.hits++;
+      // v4.0.0: LRU更新
       this.cache.delete(key);
-      this.cache.set(key, cached); // LRU: 移到末尾
+      this.cache.set(key, cached);
       return cached.data;
+    }
+    
+    if (cached && this.isExpired(cached)) {
+      this.cache.delete(key);
+      this.cacheStats.expired++;
+      this.updateMemoryUsage(-cached.size);
     }
     
     this.cacheStats.misses++;
     return null;
   }
 
-  /**
-   * 设置缓存
-   */
   set(url, data, options = {}) {
     const key = this.generateKey(url, options);
-    const ttl = this.getTTL(data.resourceType);
+    const resourceType = this.detectResourceType(url, data);
+    const ttl = this.getTTL(resourceType);
     
-    // LRU淘汰策略
-    if (this.cache.size >= this.maxCacheSize) {
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
-      this.cacheStats.evictions++;
+    // v4.0.0: 估算内存使用
+    const estimatedSize = this.estimateDataSize(data);
+    
+    // v4.0.0: 内存限制检查
+    if (estimatedSize > this.maxMemorySize * 0.1) { // 单个条目不超过总内存的10%
+      console.warn(`Cache item too large: ${estimatedSize} bytes`);
+      return false;
     }
     
-    this.cache.set(key, {
-      data,
+    // v4.0.0: LRU淘汰策略
+    while (this.cache.size >= this.maxCacheSize || 
+           this.currentMemoryUsage + estimatedSize > this.maxMemorySize) {
+      const firstKey = this.cache.keys().next().value;
+      if (!firstKey) break;
+      
+      const firstItem = this.cache.get(firstKey);
+      this.cache.delete(firstKey);
+      this.cacheStats.evictions++;
+      this.updateMemoryUsage(-firstItem.size);
+    }
+    
+    const cacheItem = {
+      data: {
+        ...data,
+        resourceType,
+        cached: true,
+        cacheTime: Date.now()
+      },
       timestamp: Date.now(),
       ttl,
-      resourceType: data.resourceType
-    });
+      resourceType,
+      size: estimatedSize,
+      accessCount: 0,
+      lastAccess: Date.now()
+    };
+    
+    this.cache.set(key, cacheItem);
+    this.cacheStats.sets++;
+    this.updateMemoryUsage(estimatedSize);
+    
+    return true;
   }
 
-  /**
-   * 判断缓存是否过期
-   */
   isExpired(cached) {
     return Date.now() - cached.timestamp > cached.ttl;
   }
 
-  /**
-   * 获取TTL（基于资源类型）
-   */
   getTTL(resourceType) {
-    const ttlMap = {
-      [RESOURCE_TYPES.HTML]: 5 * 60 * 1000,        // 5分钟
-      [RESOURCE_TYPES.CSS]: 60 * 60 * 1000,        // 1小时
-      [RESOURCE_TYPES.JS]: 60 * 60 * 1000,         // 1小时
-      [RESOURCE_TYPES.IMAGE]: 24 * 60 * 60 * 1000, // 24小时
-      [RESOURCE_TYPES.FONT]: 7 * 24 * 60 * 60 * 1000, // 7天
-      [RESOURCE_TYPES.API]: 60 * 1000,             // 1分钟
-      [RESOURCE_TYPES.OTHER]: 30 * 60 * 1000       // 30分钟
-    };
-    
-    return ttlMap[resourceType] || ttlMap[RESOURCE_TYPES.OTHER];
+    return proxyConfig.cacheStrategy.ttl[resourceType] || 
+           proxyConfig.cacheStrategy.ttl.other;
   }
 
-  /**
-   * 清除缓存
-   */
-  clear(pattern = null) {
-    if (pattern) {
-      // 清除匹配模式的缓存
-      const keys = Array.from(this.cache.keys());
-      keys.forEach(key => {
-        if (key.includes(pattern)) {
-          this.cache.delete(key);
-        }
-      });
-    } else {
-      // 清除所有缓存
-      this.cache.clear();
+  // v4.0.0: 检测资源类型
+  detectResourceType(url, data) {
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname.toLowerCase();
+      const ext = pathname.split('.').pop();
+      
+      // v4.0.0: 特殊协议检测
+      if (url.startsWith('magnet:')) return RESOURCE_TYPES.MAGNET;
+      if (url.startsWith('thunder:') || url.startsWith('ed2k:')) return RESOURCE_TYPES.TORRENT;
+      
+      // 扩展名检测
+      const typeMap = {
+        'html': RESOURCE_TYPES.HTML,
+        'htm': RESOURCE_TYPES.HTML,
+        'css': RESOURCE_TYPES.CSS,
+        'js': RESOURCE_TYPES.JS,
+        'mjs': RESOURCE_TYPES.JS,
+        'json': RESOURCE_TYPES.API,
+        'jpg': RESOURCE_TYPES.IMAGE,
+        'jpeg': RESOURCE_TYPES.IMAGE,
+        'png': RESOURCE_TYPES.IMAGE,
+        'gif': RESOURCE_TYPES.IMAGE,
+        'svg': RESOURCE_TYPES.IMAGE,
+        'webp': RESOURCE_TYPES.IMAGE,
+        'woff': RESOURCE_TYPES.FONT,
+        'woff2': RESOURCE_TYPES.FONT,
+        'ttf': RESOURCE_TYPES.FONT,
+        'eot': RESOURCE_TYPES.FONT,
+        'mp4': RESOURCE_TYPES.MEDIA,
+        'webm': RESOURCE_TYPES.MEDIA,
+        'mp3': RESOURCE_TYPES.MEDIA,
+        'torrent': RESOURCE_TYPES.TORRENT
+      };
+      
+      if (typeMap[ext]) return typeMap[ext];
+      
+      // Content-Type检测
+      if (data && data.headers) {
+        const contentType = data.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) return RESOURCE_TYPES.HTML;
+        if (contentType.includes('text/css')) return RESOURCE_TYPES.CSS;
+        if (contentType.includes('javascript')) return RESOURCE_TYPES.JS;
+        if (contentType.includes('image/')) return RESOURCE_TYPES.IMAGE;
+        if (contentType.includes('font/')) return RESOURCE_TYPES.FONT;
+        if (contentType.includes('video/') || contentType.includes('audio/')) return RESOURCE_TYPES.MEDIA;
+        if (contentType.includes('application/json')) return RESOURCE_TYPES.API;
+        if (contentType.includes('torrent')) return RESOURCE_TYPES.TORRENT;
+      }
+      
+      return RESOURCE_TYPES.OTHER;
+    } catch (error) {
+      return RESOURCE_TYPES.OTHER;
     }
   }
 
-  /**
-   * 获取缓存统计
-   */
+  // v4.0.0: 估算数据大小
+  estimateDataSize(data) {
+    try {
+      if (data instanceof Response) {
+        return parseInt(data.headers.get('content-length')) || 1024;
+      }
+      return JSON.stringify(data).length * 2; // Unicode字符估算
+    } catch (error) {
+      return 1024; // 默认1KB
+    }
+  }
+
+  updateMemoryUsage(delta) {
+    this.currentMemoryUsage = Math.max(0, this.currentMemoryUsage + delta);
+  }
+
+  clear(pattern = null) {
+    if (pattern) {
+      const keys = Array.from(this.cache.keys());
+      keys.forEach(key => {
+        if (key.includes(pattern)) {
+          const item = this.cache.get(key);
+          this.cache.delete(key);
+          this.updateMemoryUsage(-item.size);
+        }
+      });
+    } else {
+      this.cache.clear();
+      this.currentMemoryUsage = 0;
+    }
+  }
+
+  // v4.0.0: 定期清理过期缓存
+  startPeriodicCleanup() {
+    const cleanupInterval = proxyConfig.cacheStrategy.cleanup.interval;
+    
+    setInterval(() => {
+      let cleanedCount = 0;
+      const now = Date.now();
+      
+      for (const [key, item] of this.cache.entries()) {
+        if (this.isExpired(item)) {
+          this.cache.delete(key);
+          this.updateMemoryUsage(-item.size);
+          this.cacheStats.expired++;
+          cleanedCount++;
+        }
+      }
+      
+      if (cleanedCount > 0) {
+        console.debug(`[CacheManager] Cleaned ${cleanedCount} expired items`);
+      }
+    }, cleanupInterval);
+  }
+
   getStats() {
     return {
       ...this.cacheStats,
       size: this.cache.size,
+      memoryUsage: {
+        current: Math.round(this.currentMemoryUsage / 1024),  // KB
+        max: Math.round(this.maxMemorySize / 1024),           // KB
+        utilization: (this.currentMemoryUsage / this.maxMemorySize * 100).toFixed(1) + '%'
+      },
       hitRate: this.cacheStats.hits / (this.cacheStats.hits + this.cacheStats.misses) || 0
     };
   }
 }
 
 /**
- * 请求队列管理器
+ * v4.0.0 智能请求队列管理器
  */
 class RequestQueue {
   constructor(maxConcurrent = 6) {
@@ -156,42 +278,62 @@ class RequestQueue {
       totalRequests: 0,
       completedRequests: 0,
       failedRequests: 0,
-      averageTime: 0
+      averageTime: 0,
+      queueTime: 0
+    };
+    
+    // v4.0.0: 优先级队列
+    this.priorityQueues = {
+      high: [],    // 10-8分
+      medium: [],  // 7-5分  
+      low: []      // 4-1分
     };
   }
 
-  /**
-   * 添加请求到队列
-   */
-  async add(requestFn, priority = 0) {
+  async add(requestFn, priority = 0, metadata = {}) {
+    const requestItem = {
+      fn: requestFn,
+      priority,
+      metadata,
+      resolve: null,
+      reject: null,
+      startTime: null,
+      queueTime: Date.now()
+    };
+
     return new Promise((resolve, reject) => {
-      this.queue.push({
-        fn: requestFn,
-        priority,
-        resolve,
-        reject,
-        startTime: null
-      });
+      requestItem.resolve = resolve;
+      requestItem.reject = reject;
       
-      // 按优先级排序
-      this.queue.sort((a, b) => b.priority - a.priority);
+      // v4.0.0: 优先级分配
+      if (priority >= 8) {
+        this.priorityQueues.high.push(requestItem);
+      } else if (priority >= 5) {
+        this.priorityQueues.medium.push(requestItem);
+      } else {
+        this.priorityQueues.low.push(requestItem);
+      }
       
       this.processNext();
     });
   }
 
-  /**
-   * 处理下一个请求
-   */
   async processNext() {
-    if (this.active >= this.maxConcurrent || this.queue.length === 0) {
-      return;
-    }
+    if (this.active >= this.maxConcurrent) return;
 
-    const item = this.queue.shift();
+    // v4.0.0: 按优先级处理
+    let item = this.priorityQueues.high.shift() || 
+               this.priorityQueues.medium.shift() || 
+               this.priorityQueues.low.shift();
+               
+    if (!item) return;
+
     this.active++;
     this.stats.totalRequests++;
     item.startTime = Date.now();
+    
+    // 计算队列等待时间
+    this.stats.queueTime = (this.stats.queueTime + (item.startTime - item.queueTime)) / 2;
 
     try {
       const result = await item.fn();
@@ -207,117 +349,123 @@ class RequestQueue {
     }
   }
 
-  /**
-   * 更新平均响应时间
-   */
   updateAverageTime(responseTime) {
-    const weight = 0.9; // 指数移动平均权重
+    const weight = 0.9;
     this.stats.averageTime = this.stats.averageTime * weight + responseTime * (1 - weight);
   }
 
-  /**
-   * 获取队列状态
-   */
   getStatus() {
     return {
-      queueLength: this.queue.length,
+      queueLength: this.priorityQueues.high.length + 
+                   this.priorityQueues.medium.length + 
+                   this.priorityQueues.low.length,
       activeRequests: this.active,
-      stats: { ...this.stats }
+      stats: { ...this.stats },
+      priorityDistribution: {
+        high: this.priorityQueues.high.length,
+        medium: this.priorityQueues.medium.length,
+        low: this.priorityQueues.low.length
+      }
     };
   }
 }
 
 /**
- * 完整版代理服务类
+ * v4.0.0 升级版代理服务类
  */
 class ProxyService {
   constructor() {
     this.isInitialized = false;
     this.currentStatus = proxyConfig.status.DISABLED;
     this.healthCheckTimer = null;
-    this.stats = this.loadStats(); // 修复：正确加载统计数据
+    this.stats = this.loadStats();
     this.lastHealthCheck = null;
     this.isHealthy = null;
     this.retryCount = 0;
     
-    // 新增：缓存管理器和请求队列
+    // v4.0.0: 新增组件
     this.cacheManager = new CacheManager();
-    this.requestQueue = new RequestQueue(6);
+    this.requestQueue = new RequestQueue(proxyConfig.performance.maxConcurrent);
     
-    // 性能监控
+    // v4.0.0: 性能监控
     this.performanceMetrics = {
       avgResponseTime: 0,
       successRate: 1,
+      redirectCount: 0,        // 重定向计数
+      specialLinksProcessed: 0,// 特殊链接处理计数
       lastMeasurement: Date.now()
+    };
+    
+    // v4.0.0: 智能特性
+    this.smartMode = {
+      enabled: proxyConfig.smartMode.enabled,
+      autoDetect: proxyConfig.smartMode.autoDetect,
+      domainCache: new Map() // 域名可访问性缓存
     };
     
     // 验证配置
     const validation = validateProxyConfig();
     if (!validation.isValid) {
-      console.warn('代理配置验证失败:', validation.issues);
-      if (validation.warnings && validation.warnings.length > 0) {
-        console.warn('代理配置警告:', validation.warnings);
-      }
+      console.warn('[ProxyService v4.0.0] Config validation failed:', validation.issues);
+    }
+    if (validation.warnings?.length > 0) {
+      console.warn('[ProxyService v4.0.0] Config warnings:', validation.warnings);
     }
   }
 
   /**
-   * 初始化代理服务
+   * v4.0.0 初始化代理服务
    */
   async init() {
     try {
-      // 加载用户偏好
+      console.log('[ProxyService v4.0.0] Initializing...');
+      
       const enabled = this.loadProxyState();
       
       if (enabled) {
-        // 异步启用代理，不阻塞初始化
         this.enableProxyAsync();
       }
       
-      // 设置性能监控
+      // v4.0.0: 启动监控
       this.startPerformanceMonitoring();
+      this.startSmartModeMonitoring();
       
       this.isInitialized = true;
-      console.log('代理服务初始化完成', {
+      
+      console.log('[ProxyService v4.0.0] Initialized successfully', {
         enabled: this.isProxyEnabled(),
         status: this.currentStatus,
         cacheEnabled: true,
-        queueEnabled: true
+        queueEnabled: true,
+        smartMode: this.smartMode.enabled,
+        version: proxyConfig.version
       });
       
       return { success: true };
     } catch (error) {
-      console.error('代理服务初始化失败:', error);
+      console.error('[ProxyService v4.0.0] Initialization failed:', error);
       this.currentStatus = proxyConfig.status.ERROR;
       errorLogger.log(error, { context: 'initialization' });
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * 异步启用代理
-   */
   async enableProxyAsync() {
     try {
       await this.enableProxy();
     } catch (error) {
-      console.warn('异步启用代理失败:', error.message);
+      console.warn('[ProxyService v4.0.0] Async enable failed:', error.message);
       errorLogger.log(error, { context: 'enableProxyAsync' });
     }
   }
 
-  // ===================== 核心功能（增强版） =====================
+  // ===================== v4.0.0 核心功能增强 =====================
 
-  /**
-   * 检查代理是否开启
-   */
   isProxyEnabled() {
-    return this.currentStatus === proxyConfig.status.ENABLED;
+    return this.currentStatus === proxyConfig.status.ENABLED ||
+           this.currentStatus === proxyConfig.status.SMART;
   }
 
-  /**
-   * 切换代理开关
-   */
   async toggleProxy() {
     try {
       if (this.isProxyEnabled()) {
@@ -326,14 +474,14 @@ class ProxyService {
         return await this.enableProxy();
       }
     } catch (error) {
-      console.error('切换代理状态失败:', error);
+      console.error('[ProxyService v4.0.0] Toggle failed:', error);
       errorLogger.log(error, { context: 'toggle', currentStatus: this.currentStatus });
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * 智能URL转换（优化版）
+   * v4.0.0 智能URL转换（支持特殊协议）
    */
   convertToProxyUrl(originalUrl, options = {}) {
     if (!originalUrl || typeof originalUrl !== 'string') {
@@ -341,39 +489,45 @@ class ProxyService {
     }
 
     try {
-      const url = new URL(originalUrl);
-      const hostname = url.hostname;
-      
-      // 检查缓存的URL映射
+      // v4.0.0: 特殊协议保护
+      if (this.isSpecialProtocol(originalUrl)) {
+        console.debug(`[ProxyService v4.0.0] Special protocol preserved: ${originalUrl.substring(0, 20)}...`);
+        this.stats.specialLinksProcessed = (this.stats.specialLinksProcessed || 0) + 1;
+        return originalUrl;
+      }
+
+      // 缓存检查
       const cachedMapping = this.cacheManager.get(`url-mapping:${originalUrl}`);
       if (cachedMapping) {
         return cachedMapping;
       }
+
+      const url = new URL(originalUrl);
+      const hostname = url.hostname;
       
-      // 检查域名是否支持代理
+      // v4.0.0: 智能域名检查
       if (!isDomainSupported(hostname)) {
-        console.debug(`域名 ${hostname} 不在代理支持列表中`);
+        // 智能模式下尝试自动检测
+        if (this.smartMode.enabled && this.smartMode.autoDetect) {
+          return this.handleSmartModeUrl(originalUrl, hostname);
+        }
+        
+        console.debug(`[ProxyService v4.0.0] Domain not supported: ${hostname}`);
         return originalUrl;
       }
 
-      // 确定资源类型
-      const resourceType = this.detectResourceType(url.pathname);
+      // 资源类型检测
+      const resourceType = this.cacheManager.detectResourceType(originalUrl);
+      const domainCategory = getDomainCategory(hostname);
       
       // 构建完整路径
       let path = url.pathname || '/';
-      if (url.search) {
-        path += url.search;
-      }
-      if (url.hash) {
-        path += url.hash;
-      }
+      if (url.search) path += url.search;
+      if (url.hash) path += url.hash;
+      
+      if (!path.startsWith('/')) path = '/' + path;
 
-      // 确保路径以 / 开头
-      if (!path.startsWith('/')) {
-        path = '/' + path;
-      }
-
-      // 生成代理URL
+      // v4.0.0: 使用新的URL格式
       const proxyUrl = `${proxyConfig.proxyServer}/proxy/${hostname}${path}`;
 
       // 缓存URL映射
@@ -381,23 +535,86 @@ class ProxyService {
         resourceType: RESOURCE_TYPES.OTHER
       });
 
-      console.debug('URL转换完成:', { 
+      console.debug(`[ProxyService v4.0.0] URL converted:`, { 
         original: originalUrl, 
         proxy: proxyUrl,
         hostname,
-        path,
-        resourceType
+        resourceType,
+        domainCategory
       });
       
+      this.updateStats('urlConverted');
       return proxyUrl;
+      
     } catch (error) {
-      console.error('URL转换失败:', error, 'Original URL:', originalUrl);
+      console.error('[ProxyService v4.0.0] URL conversion failed:', error, 'URL:', originalUrl);
+      this.updateStats('conversionError');
+      errorLogger.log(error, { context: 'convertToProxyUrl', url: originalUrl });
       return originalUrl;
     }
   }
 
   /**
-   * 获取原始URL（从代理URL中提取）
+   * v4.0.0 智能模式URL处理
+   */
+  async handleSmartModeUrl(originalUrl, hostname) {
+    // 检查域名缓存
+    const cachedResult = this.smartMode.domainCache.get(hostname);
+    if (cachedResult) {
+      if (cachedResult.accessible) {
+        return originalUrl; // 直接可访问
+      } else {
+        return this.convertToProxyUrl(originalUrl); // 需要代理
+      }
+    }
+
+    // 异步测试域名可访问性
+    this.testDomainAccessibility(hostname, originalUrl);
+    
+    // 默认返回代理URL，避免阻塞
+    return this.convertToProxyUrl(originalUrl);
+  }
+
+  /**
+   * v4.0.0 测试域名可访问性
+   */
+  async testDomainAccessibility(hostname, originalUrl) {
+    try {
+      const testUrl = `https://${hostname}/`;
+      const controller = new AbortController();
+      
+      setTimeout(() => controller.abort(), proxyConfig.smartMode.testTimeout);
+      
+      const response = await fetch(testUrl, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        signal: controller.signal
+      });
+      
+      // 缓存结果
+      this.smartMode.domainCache.set(hostname, {
+        accessible: true,
+        lastTest: Date.now()
+      });
+      
+    } catch (error) {
+      this.smartMode.domainCache.set(hostname, {
+        accessible: false,
+        lastTest: Date.now()
+      });
+    }
+  }
+
+  /**
+   * v4.0.0 检查特殊协议
+   */
+  isSpecialProtocol(url) {
+    const specialProtocols = ['magnet:', 'thunder:', 'ed2k:', 'ftp:', 'ftps:'];
+    return specialProtocols.some(protocol => url.toLowerCase().startsWith(protocol));
+  }
+
+  /**
+   * v4.0.0 获取原始URL（从代理URL中提取）
    */
   getOriginalUrl(proxyUrl) {
     if (!proxyUrl || typeof proxyUrl !== 'string') {
@@ -405,22 +622,18 @@ class ProxyService {
     }
 
     try {
-      // 检查是否是代理URL
       const proxyPrefix = `${proxyConfig.proxyServer}/proxy/`;
       if (!proxyUrl.includes(proxyPrefix)) {
-        return proxyUrl; // 不是代理URL，直接返回
+        return proxyUrl;
       }
 
-      // 解析代理URL：https://all.omnibox.pp.ua/proxy/hostname/path
-      const proxyPrefixIndex = proxyUrl.indexOf('/proxy/') + 7; // '/proxy/'.length = 7
+      const proxyPrefixIndex = proxyUrl.indexOf('/proxy/') + 7;
       const remainingUrl = proxyUrl.substring(proxyPrefixIndex);
       
-      // 找到第一个 / 来分离hostname和path
       const firstSlashIndex = remainingUrl.indexOf('/');
       
       let hostname, path;
       if (firstSlashIndex === -1) {
-        // 没有路径部分，只有hostname
         hostname = remainingUrl;
         path = '/';
       } else {
@@ -428,10 +641,9 @@ class ProxyService {
         path = remainingUrl.substring(firstSlashIndex);
       }
       
-      // 重构原始URL
       const originalUrl = `https://${hostname}${path}`;
       
-      console.debug('代理URL转换为原始URL:', {
+      console.debug('[ProxyService v4.0.0] Proxy URL converted to original:', {
         proxy: proxyUrl,
         original: originalUrl,
         hostname,
@@ -439,71 +651,37 @@ class ProxyService {
       });
       
       return originalUrl;
+      
     } catch (error) {
-      console.error('原始URL提取失败:', error, 'Proxy URL:', proxyUrl);
+      console.error('[ProxyService v4.0.0] Original URL extraction failed:', error, 'Proxy URL:', proxyUrl);
       return proxyUrl;
     }
   }
 
   /**
-   * 检测资源类型
-   */
-  detectResourceType(pathname) {
-    const ext = pathname.split('.').pop().toLowerCase();
-    
-    const typeMap = {
-      'html': RESOURCE_TYPES.HTML,
-      'htm': RESOURCE_TYPES.HTML,
-      'css': RESOURCE_TYPES.CSS,
-      'js': RESOURCE_TYPES.JS,
-      'mjs': RESOURCE_TYPES.JS,
-      'json': RESOURCE_TYPES.API,
-      'jpg': RESOURCE_TYPES.IMAGE,
-      'jpeg': RESOURCE_TYPES.IMAGE,
-      'png': RESOURCE_TYPES.IMAGE,
-      'gif': RESOURCE_TYPES.IMAGE,
-      'svg': RESOURCE_TYPES.IMAGE,
-      'webp': RESOURCE_TYPES.IMAGE,
-      'woff': RESOURCE_TYPES.FONT,
-      'woff2': RESOURCE_TYPES.FONT,
-      'ttf': RESOURCE_TYPES.FONT,
-      'eot': RESOURCE_TYPES.FONT,
-      'mp4': RESOURCE_TYPES.MEDIA,
-      'webm': RESOURCE_TYPES.MEDIA,
-      'mp3': RESOURCE_TYPES.MEDIA,
-      'pdf': RESOURCE_TYPES.DOCUMENT,
-      'doc': RESOURCE_TYPES.DOCUMENT,
-      'docx': RESOURCE_TYPES.DOCUMENT
-    };
-    
-    return typeMap[ext] || RESOURCE_TYPES.OTHER;
-  }
-
-  /**
-   * 智能代理请求（优化版）
+   * v4.0.0 智能代理请求（新增方法）
    */
   async makeProxyRequest(url, options = {}) {
     if (!this.isProxyEnabled()) {
-      throw new Error('代理服务未启用');
+      throw new Error('Proxy service not enabled');
     }
 
-    // 检测资源类型
-    const resourceType = this.detectResourceType(new URL(url).pathname);
+    const resourceType = this.cacheManager.detectResourceType(url);
     
     // 检查缓存
     const cached = this.cacheManager.get(url, options);
     if (cached) {
-      console.debug('使用缓存响应:', url);
+      console.debug('[ProxyService v4.0.0] Using cached response:', url);
       this.updateStats('cacheHit', url);
       return cached;
     }
 
     const proxyUrl = this.convertToProxyUrl(url);
-    if (proxyUrl === url) {
-      throw new Error('URL转换为代理URL失败');
+    if (proxyUrl === url && !this.isSpecialProtocol(url)) {
+      throw new Error('URL conversion to proxy failed');
     }
 
-    // 使用请求队列
+    // v4.0.0: 使用优先级请求队列
     const priority = this.getRequestPriority(resourceType);
     
     return this.requestQueue.add(async () => {
@@ -511,24 +689,25 @@ class ProxyService {
       
       try {
         const requestConfig = this.optimizeRequestConfig(options, resourceType);
-        const response = await fetch(proxyUrl, requestConfig);
+        
+        // v4.0.0: 重定向处理
+        const response = await this.fetchWithRedirectHandling(proxyUrl, requestConfig);
         
         const responseTime = performance.now() - startTime;
         this.updatePerformanceMetrics(responseTime, true);
         
         if (!response.ok) {
-          throw new Error(`代理请求失败: HTTP ${response.status}`);
+          throw new Error(`Proxy request failed: HTTP ${response.status}`);
         }
         
-        // 缓存响应（对于可缓存的资源类型）
+        // 缓存响应
         if (this.isCacheable(resourceType, response)) {
-          this.cacheManager.set(url, response.clone(), {
-            resourceType
-          });
+          this.cacheManager.set(url, response.clone(), { resourceType });
         }
         
         this.updateStats('requestSuccess', url);
         return response;
+        
       } catch (error) {
         const responseTime = performance.now() - startTime;
         this.updatePerformanceMetrics(responseTime, false);
@@ -536,8 +715,8 @@ class ProxyService {
         this.updateStats('requestError', url);
         errorLogger.log(error, { context: 'proxyRequest', url, proxyUrl });
         
-        // 智能降级策略
-        if (proxyConfig.errorHandling.fallbackToOriginal) {
+        // v4.0.0: 智能降级策略
+        if (proxyConfig.errorHandling.fallbackToOriginal && !this.isSpecialProtocol(url)) {
           return this.handleFallback(url, options, error);
         }
         
@@ -547,86 +726,94 @@ class ProxyService {
   }
 
   /**
-   * 优化请求配置
+   * v4.0.0 重定向处理（防循环）
    */
-  optimizeRequestConfig(options, resourceType) {
-    const config = createRequestConfig(options);
+  async fetchWithRedirectHandling(url, options, redirectCount = 0) {
+    const maxRedirects = proxyConfig.requestConfig.retry.maxAttempts;
     
-    // 根据资源类型优化请求
+    if (redirectCount >= maxRedirects) {
+      throw new Error(`Too many redirects (${maxRedirects}) for ${url}`);
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      redirect: 'manual' // 手动处理重定向
+    });
+
+    // 检查重定向
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (location) {
+        this.stats.redirectCount = (this.stats.redirectCount || 0) + 1;
+        
+        // v4.0.0: 重定向URL处理
+        let redirectUrl;
+        try {
+          redirectUrl = new URL(location, url).href;
+        } catch (error) {
+          throw new Error(`Invalid redirect location: ${location}`);
+        }
+        
+        // 防止重定向循环
+        if (redirectUrl === url) {
+          throw new Error(`Redirect loop detected: ${url}`);
+        }
+        
+        console.debug(`[ProxyService v4.0.0] Following redirect (${redirectCount + 1}): ${redirectUrl}`);
+        return this.fetchWithRedirectHandling(redirectUrl, options, redirectCount + 1);
+      }
+    }
+
+    return response;
+  }
+
+  optimizeRequestConfig(options, resourceType) {
+    const config = createRequestConfig({ ...options, resourceType });
+    
+    // v4.0.0: 根据资源类型优化
     if (resourceType === RESOURCE_TYPES.IMAGE || resourceType === RESOURCE_TYPES.MEDIA) {
-      // 对图片和媒体资源使用较长的超时
-      config.timeout = 30000;
-      
-      // 添加Accept头以获取最佳格式
-      config.headers = config.headers || {};
-      if (resourceType === RESOURCE_TYPES.IMAGE) {
-        config.headers['Accept'] = 'image/webp,image/apng,image/*,*/*;q=0.8';
+      config.timeout = 60000; // 媒体文件更长超时
+      if (!config.headers.get('Accept')) {
+        config.headers.set('Accept', 'image/webp,image/apng,image/*,*/*;q=0.8');
       }
     } else if (resourceType === RESOURCE_TYPES.API) {
-      // API请求使用较短超时
-      config.timeout = 10000;
-      config.headers = config.headers || {};
-      config.headers['Accept'] = 'application/json';
-    }
-    
-    // 添加压缩支持
-    if (!config.headers['Accept-Encoding']) {
-      config.headers['Accept-Encoding'] = 'gzip, deflate, br';
+      config.timeout = 10000; // API请求短超时
+      config.headers.set('Accept', 'application/json');
+    } else if (resourceType === RESOURCE_TYPES.TORRENT || resourceType === RESOURCE_TYPES.MAGNET) {
+      // v4.0.0: 种子和磁力链接特殊处理
+      config.timeout = 30000;
+      config.headers.set('Accept', 'application/x-bittorrent,*/*');
     }
     
     return config;
   }
 
-  /**
-   * 获取请求优先级
-   */
   getRequestPriority(resourceType) {
-    const priorityMap = {
-      [RESOURCE_TYPES.HTML]: 10,
-      [RESOURCE_TYPES.CSS]: 9,
-      [RESOURCE_TYPES.JS]: 8,
-      [RESOURCE_TYPES.API]: 7,
-      [RESOURCE_TYPES.FONT]: 6,
-      [RESOURCE_TYPES.IMAGE]: 5,
-      [RESOURCE_TYPES.MEDIA]: 4,
-      [RESOURCE_TYPES.DOCUMENT]: 3,
-      [RESOURCE_TYPES.OTHER]: 1
-    };
-    
-    return priorityMap[resourceType] || 1;
+    return proxyConfig.performance.priority[resourceType] || 1;
   }
 
-  /**
-   * 判断资源是否可缓存
-   */
   isCacheable(resourceType, response) {
-    // 只缓存成功的GET请求
-    if (response.status !== 200) {
-      return false;
-    }
+    if (response.status !== 200) return false;
     
-    // 检查Cache-Control头
     const cacheControl = response.headers.get('cache-control');
     if (cacheControl && (cacheControl.includes('no-cache') || cacheControl.includes('no-store'))) {
       return false;
     }
     
-    // 某些资源类型总是可缓存的
+    // v4.0.0: 更多资源类型可缓存
     const alwaysCacheable = [
       RESOURCE_TYPES.IMAGE,
       RESOURCE_TYPES.FONT,
       RESOURCE_TYPES.CSS,
-      RESOURCE_TYPES.JS
+      RESOURCE_TYPES.JS,
+      RESOURCE_TYPES.MEDIA
     ];
     
     return alwaysCacheable.includes(resourceType);
   }
 
-  /**
-   * 处理降级
-   */
   async handleFallback(url, options, originalError) {
-    console.warn('代理请求失败，尝试直接请求:', originalError.message);
+    console.warn('[ProxyService v4.0.0] Proxy failed, trying direct access:', originalError.message);
     
     try {
       const fallbackResponse = await fetch(url, createRequestConfig(options));
@@ -634,37 +821,34 @@ class ProxyService {
       return fallbackResponse;
     } catch (fallbackError) {
       this.updateStats('fallbackError', url);
-      throw new Error(`代理和直接请求均失败: ${originalError.message}, ${fallbackError.message}`);
+      throw new Error(`Both proxy and direct access failed: ${originalError.message}, ${fallbackError.message}`);
     }
   }
 
-  // ===================== 状态管理（增强版） =====================
+  // ===================== v4.0.0 状态管理增强 =====================
 
-  /**
-   * 启用代理（优化版）
-   */
   async enableProxy() {
     try {
+      console.log('[ProxyService v4.0.0] Enabling proxy...');
       this.currentStatus = proxyConfig.status.CHECKING;
       this.retryCount = 0;
       
-      // 并发测试多个端点以提高可靠性
+      // v4.0.0: 并发测试多个端点
       const connectivityTests = await Promise.allSettled([
         testProxyConnectivity(),
-        this.testProxyEndpoint('/api/health'),
-        this.testProxyEndpoint('/api/status')
+        this.testProxyEndpoint(proxyConfig.apiEndpoints.health),
+        this.testProxyEndpoint(proxyConfig.apiEndpoints.status),
+        this.testProxyEndpoint(proxyConfig.apiEndpoints.proxyStats)
       ]);
       
-      // 只要有一个成功就认为代理可用
       const successfulTest = connectivityTests.find(result => 
         result.status === 'fulfilled' && result.value.success
       );
       
       if (!successfulTest) {
-        // 重试逻辑
         if (this.retryCount < proxyConfig.errorHandling.maxRetries) {
           this.retryCount++;
-          console.log(`代理连接失败，尝试重试 ${this.retryCount}/${proxyConfig.errorHandling.maxRetries}`);
+          console.log(`[ProxyService v4.0.0] Connection failed, retrying ${this.retryCount}/${proxyConfig.errorHandling.maxRetries}`);
           
           await new Promise(resolve => 
             setTimeout(resolve, proxyConfig.errorHandling.retryDelays[this.retryCount - 1] || 1000)
@@ -674,65 +858,73 @@ class ProxyService {
         }
         
         this.currentStatus = proxyConfig.status.ERROR;
-        const error = '代理服务器连接失败';
+        const error = 'Proxy server connection failed';
         errorLogger.log(new Error(error), { 
           context: 'enableProxy', 
-          retryCount: this.retryCount
+          retryCount: this.retryCount,
+          tests: connectivityTests.map(r => r.status === 'fulfilled' ? r.value : r.reason?.message)
         });
         return { success: false, error };
       }
 
-      this.currentStatus = proxyConfig.status.ENABLED;
+      // v4.0.0: 根据健康状态设置状态
+      const healthData = successfulTest.value.data;
+      if (healthData?.status === 'healthy') {
+        this.currentStatus = proxyConfig.status.ENABLED;
+        this.isHealthy = true;
+      } else {
+        this.currentStatus = proxyConfig.status.DEGRADED;
+        this.isHealthy = false;
+      }
+      
       this.saveProxyState(true);
       this.startHealthCheck();
       this.retryCount = 0;
       
-      // 触发状态变更事件
       this.dispatchStatusChange();
       
-      console.log('代理已启用', { 
+      console.log('[ProxyService v4.0.0] Proxy enabled successfully', { 
+        status: this.currentStatus,
+        healthy: this.isHealthy,
         responseTime: successfulTest.value.responseTime,
-        endpoints: connectivityTests.map(r => r.status)
+        version: healthData?.version || 'unknown'
       });
       
       return { 
         success: true, 
-        message: '代理已启用',
-        responseTime: successfulTest.value.responseTime 
+        message: 'Proxy enabled successfully',
+        status: this.currentStatus,
+        responseTime: successfulTest.value.responseTime,
+        version: healthData?.version
       };
+      
     } catch (error) {
       this.currentStatus = proxyConfig.status.ERROR;
-      console.error('启用代理失败:', error);
+      console.error('[ProxyService v4.0.0] Enable proxy failed:', error);
       errorLogger.log(error, { context: 'enableProxy', retryCount: this.retryCount });
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * 禁用代理
-   */
   async disableProxy() {
     try {
       this.currentStatus = proxyConfig.status.DISABLED;
       this.saveProxyState(false);
       this.stopHealthCheck();
       this.retryCount = 0;
+      this.isHealthy = null;
       
-      // 触发状态变更事件
       this.dispatchStatusChange();
       
-      console.log('代理已禁用');
-      return { success: true, message: '代理已禁用' };
+      console.log('[ProxyService v4.0.0] Proxy disabled');
+      return { success: true, message: 'Proxy disabled' };
     } catch (error) {
-      console.error('禁用代理失败:', error);
+      console.error('[ProxyService v4.0.0] Disable proxy failed:', error);
       errorLogger.log(error, { context: 'disableProxy' });
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * 测试代理端点
-   */
   async testProxyEndpoint(endpoint) {
     try {
       const controller = new AbortController();
@@ -748,17 +940,22 @@ class ProxyService {
       clearTimeout(timeoutId);
       
       if (response.ok) {
-        return { success: true };
+        const data = await response.json();
+        return { 
+          success: true, 
+          data,
+          endpoint: endpoint
+        };
       }
       
-      return { success: false, error: `HTTP ${response.status}` };
+      return { success: false, error: `HTTP ${response.status}`, endpoint };
     } catch (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: error.message, endpoint };
     }
   }
 
   /**
-   * 获取代理状态（增强版）
+   * v4.0.0 增强版状态获取
    */
   getProxyStatus() {
     return {
@@ -770,59 +967,89 @@ class ProxyService {
       lastHealthCheck: this.lastHealthCheck,
       isHealthy: this.isHealthy,
       retryCount: this.retryCount,
+      
+      // v4.0.0: 新增性能指标
       performance: {
         avgResponseTime: Math.round(this.performanceMetrics.avgResponseTime),
-        successRate: this.performanceMetrics.successRate,
+        successRate: (this.performanceMetrics.successRate * 100).toFixed(1) + '%',
+        redirectCount: this.performanceMetrics.redirectCount,
+        specialLinksProcessed: this.performanceMetrics.specialLinksProcessed,
         cacheStats: this.cacheManager.getStats(),
         queueStatus: this.requestQueue.getStatus()
       },
-      version: '2.1.0',
-      errorLogs: errorLogger.getLogs().slice(-5)
+      
+      // v4.0.0: 智能模式状态
+      smartMode: {
+        ...this.smartMode,
+        domainCacheSize: this.smartMode.domainCache.size
+      },
+      
+      // v4.0.0: 版本和特性信息
+      version: proxyConfig.version,
+      features: {
+        magnetLinks: proxyConfig.specialHandling.magnetLinks,
+        smartCaching: proxyConfig.cacheStrategy.enabled,
+        redirectHandling: true,
+        healthMonitoring: true,
+        requestQueue: true,
+        specialProtocolSupport: true
+      },
+      
+      errorLogs: errorLogger.getLogs().slice(-5),
+      config: validateProxyConfig()
     };
   }
 
-  // ===================== 性能监控 =====================
+  // ===================== v4.0.0 性能和监控增强 =====================
 
-  /**
-   * 性能监控
-   */
   startPerformanceMonitoring() {
     setInterval(() => {
       const queueStatus = this.requestQueue.getStatus();
       const cacheStats = this.cacheManager.getStats();
       
-      console.debug('性能指标:', {
-        avgResponseTime: Math.round(this.performanceMetrics.avgResponseTime),
+      console.debug('[ProxyService v4.0.0] Performance metrics:', {
+        avgResponseTime: Math.round(this.performanceMetrics.avgResponseTime) + 'ms',
         successRate: (this.performanceMetrics.successRate * 100).toFixed(1) + '%',
+        redirectCount: this.performanceMetrics.redirectCount,
+        specialLinks: this.performanceMetrics.specialLinksProcessed,
         queueLength: queueStatus.queueLength,
         activeRequests: queueStatus.activeRequests,
         cacheHitRate: (cacheStats.hitRate * 100).toFixed(1) + '%',
-        cacheSize: cacheStats.size
+        cacheSize: cacheStats.size,
+        memoryUsage: cacheStats.memoryUsage?.current + 'KB'
       });
-    }, 60000); // 每分钟记录一次
+    }, 60000);
   }
 
-  /**
-   * 更新性能指标
-   */
+  startSmartModeMonitoring() {
+    if (!this.smartMode.enabled) return;
+    
+    // 定期清理域名缓存
+    setInterval(() => {
+      const now = Date.now();
+      const maxAge = 24 * 60 * 60 * 1000; // 24小时
+      
+      for (const [domain, data] of this.smartMode.domainCache.entries()) {
+        if (now - data.lastTest > maxAge) {
+          this.smartMode.domainCache.delete(domain);
+        }
+      }
+    }, 60 * 60 * 1000); // 每小时清理一次
+  }
+
   updatePerformanceMetrics(responseTime, success) {
-    // 指数移动平均
     const alpha = 0.1;
     this.performanceMetrics.avgResponseTime = 
       (1 - alpha) * this.performanceMetrics.avgResponseTime + alpha * responseTime;
     
-    // 成功率
     this.performanceMetrics.successRate = 
       (1 - alpha) * this.performanceMetrics.successRate + alpha * (success ? 1 : 0);
     
     this.performanceMetrics.lastMeasurement = Date.now();
   }
 
-  // ===================== 健康检查（增强版） =====================
+  // ===================== v4.0.0 健康检查增强 =====================
 
-  /**
-   * 健康检查（优化版）
-   */
   async checkProxyHealth() {
     try {
       const startTime = performance.now();
@@ -848,11 +1075,11 @@ class ProxyService {
       this.lastHealthCheck = Date.now();
       this.isHealthy = healthData.status === 'healthy';
 
-      // 根据健康状态动态调整检查频率
+      // v4.0.0: 根据健康状态调整检查频率
       if (this.isHealthy) {
-        this.adjustHealthCheckFrequency(5 * 60 * 1000); // 健康时5分钟
+        this.adjustHealthCheckFrequency(5 * 60 * 1000);
       } else {
-        this.adjustHealthCheckFrequency(1 * 60 * 1000); // 不健康时1分钟
+        this.adjustHealthCheckFrequency(1 * 60 * 1000);
       }
 
       return { 
@@ -860,16 +1087,16 @@ class ProxyService {
         data: healthData,
         responseTime: Math.round(endTime - startTime)
       };
+      
     } catch (error) {
       this.isHealthy = false;
       this.lastHealthCheck = Date.now();
       
-      // 错误时增加检查频率
-      this.adjustHealthCheckFrequency(30 * 1000); // 30秒
+      this.adjustHealthCheckFrequency(30 * 1000);
       
-      let errorMessage = '健康检查失败';
+      let errorMessage = 'Health check failed';
       if (error.name === 'AbortError') {
-        errorMessage = '健康检查超时';
+        errorMessage = 'Health check timeout';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -879,9 +1106,6 @@ class ProxyService {
     }
   }
 
-  /**
-   * 调整健康检查频率
-   */
   adjustHealthCheckFrequency(interval) {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
@@ -891,10 +1115,9 @@ class ProxyService {
       if (this.isProxyEnabled()) {
         this.checkProxyHealth().then(result => {
           if (!result.success) {
-            console.warn('代理健康检查失败:', result.error);
+            console.warn('[ProxyService v4.0.0] Health check failed:', result.error);
             this.dispatchHealthCheckFailed(result.error);
           } else {
-            // 健康检查成功，重置重试计数
             this.retryCount = 0;
           }
         });
@@ -902,20 +1125,11 @@ class ProxyService {
     }, interval);
   }
 
-  /**
-   * 启动健康检查
-   */
   startHealthCheck() {
-    // 立即执行一次健康检查
     this.checkProxyHealth();
-    
-    // 设置定期检查
     this.adjustHealthCheckFrequency(5 * 60 * 1000);
   }
 
-  /**
-   * 停止健康检查定时器
-   */
   stopHealthCheck() {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
@@ -923,61 +1137,58 @@ class ProxyService {
     }
   }
 
-  // ===================== 本地存储管理 =====================
+  // ===================== 存储和统计管理 =====================
 
-  /**
-   * 保存代理状态
-   */
   saveProxyState(enabled) {
     try {
       localStorage.setItem(proxyConfig.storageKeys.proxyEnabled, enabled.toString());
     } catch (error) {
-      console.warn('保存代理状态失败:', error);
+      console.warn('[ProxyService v4.0.0] Failed to save proxy state:', error);
     }
   }
 
-  /**
-   * 加载代理状态
-   */
   loadProxyState() {
     try {
       const stored = localStorage.getItem(proxyConfig.storageKeys.proxyEnabled);
       return stored === 'true';
     } catch (error) {
-      console.warn('加载代理状态失败:', error);
+      console.warn('[ProxyService v4.0.0] Failed to load proxy state:', error);
       return proxyConfig.defaultEnabled;
     }
   }
 
-  /**
-   * 保存统计数据
-   */
   saveStats() {
     try {
-      localStorage.setItem(proxyConfig.storageKeys.proxyStats, JSON.stringify(this.stats));
+      const statsWithVersion = {
+        ...this.stats,
+        version: proxyConfig.version,
+        lastSaved: Date.now()
+      };
+      localStorage.setItem(proxyConfig.storageKeys.proxyStats, JSON.stringify(statsWithVersion));
     } catch (error) {
-      console.warn('保存代理统计失败:', error);
+      console.warn('[ProxyService v4.0.0] Failed to save stats:', error);
     }
   }
 
-  /**
-   * 加载统计数据
-   */
   loadStats() {
     try {
       const stored = localStorage.getItem(proxyConfig.storageKeys.proxyStats);
-      return stored ? JSON.parse(stored) : getDefaultConfig().stats;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // v4.0.0: 版本兼容性检查
+        if (parsed.version?.backend !== proxyConfig.version.backend) {
+          console.log('[ProxyService v4.0.0] Stats version mismatch, resetting...');
+          return getDefaultConfig().stats;
+        }
+        return parsed;
+      }
+      return getDefaultConfig().stats;
     } catch (error) {
-      console.warn('加载代理统计失败:', error);
+      console.warn('[ProxyService v4.0.0] Failed to load stats:', error);
       return getDefaultConfig().stats;
     }
   }
 
-  // ===================== 统计和事件（增强版） =====================
-
-  /**
-   * 更新统计数据（增强版）
-   */
   updateStats(action, ...args) {
     try {
       switch (action) {
@@ -1010,30 +1221,25 @@ class ProxyService {
           break;
       }
       
-      // 异步保存，避免阻塞
       setTimeout(() => this.saveStats(), 0);
     } catch (error) {
-      console.warn('更新统计数据失败:', error);
+      console.warn('[ProxyService v4.0.0] Failed to update stats:', error);
     }
   }
 
-  /**
-   * 触发状态变更事件
-   */
   dispatchStatusChange() {
     document.dispatchEvent(new CustomEvent('proxyStatusChanged', {
       detail: {
         enabled: this.isProxyEnabled(),
         status: this.currentStatus,
+        healthy: this.isHealthy,
         timestamp: Date.now(),
-        stats: this.stats
+        stats: this.stats,
+        version: proxyConfig.version
       }
     }));
   }
 
-  /**
-   * 触发健康检查失败事件
-   */
   dispatchHealthCheckFailed(error) {
     this.updateStats('healthCheckFailed');
     
@@ -1047,14 +1253,12 @@ class ProxyService {
     }));
   }
 
-  // ===================== 诊断和调试（增强版） =====================
+  // ===================== v4.0.0 诊断和管理 =====================
 
-  /**
-   * 运行诊断（增强版）
-   */
   async runDiagnostics() {
     const results = {
       timestamp: new Date().toISOString(),
+      version: proxyConfig.version,
       config: validateProxyConfig(),
       connectivity: null,
       performance: {
@@ -1063,6 +1267,11 @@ class ProxyService {
         queue: this.requestQueue.getStatus()
       },
       status: this.getProxyStatus(),
+      smartMode: {
+        enabled: this.smartMode.enabled,
+        domainCacheSize: this.smartMode.domainCache.size,
+        domains: Array.from(this.smartMode.domainCache.keys())
+      },
       errors: errorLogger.getLogs().slice(-10),
       recommendations: []
     };
@@ -1073,63 +1282,67 @@ class ProxyService {
       results.connectivity = { success: false, error: error.message };
     }
     
-    // 生成建议
+    // v4.0.0: 智能建议生成
     if (results.performance.cache.hitRate < 0.3) {
-      results.recommendations.push('缓存命中率较低，考虑调整缓存策略');
+      results.recommendations.push('Cache hit rate is low, consider adjusting cache strategy');
     }
     
     if (results.performance.metrics.avgResponseTime > 2000) {
-      results.recommendations.push('平均响应时间较高，可能存在网络问题');
+      results.recommendations.push('Average response time is high, check network conditions');
     }
     
-    if (results.performance.metrics.successRate < 0.8) {
-      results.recommendations.push('成功率较低，建议检查代理服务器状态');
+    if (results.performance.metrics.redirectCount > 50) {
+      results.recommendations.push('High redirect count detected, monitor for redirect loops');
+    }
+    
+    if (!this.smartMode.enabled && proxyConfig.supportedDomains.length > 20) {
+      results.recommendations.push('Consider enabling smart mode for better performance');
     }
     
     return results;
   }
 
-  /**
-   * 重置代理服务
-   */
   async resetProxy() {
     try {
-      // 停止所有活动
+      console.log('[ProxyService v4.0.0] Resetting proxy service...');
+      
       this.stopHealthCheck();
       
-      // 重置状态
       this.currentStatus = proxyConfig.status.DISABLED;
       this.retryCount = 0;
       this.isHealthy = null;
       this.lastHealthCheck = null;
       
-      // 清除存储的状态
       this.saveProxyState(false);
       
-      // 清除缓存
       this.cacheManager.clear();
+      this.smartMode.domainCache.clear();
       
-      // 清除错误日志
       errorLogger.clearLogs();
       
-      console.log('代理服务已重置');
-      return { success: true, message: '代理服务已重置' };
+      // 重置性能指标
+      this.performanceMetrics = {
+        avgResponseTime: 0,
+        successRate: 1,
+        redirectCount: 0,
+        specialLinksProcessed: 0,
+        lastMeasurement: Date.now()
+      };
+      
+      console.log('[ProxyService v4.0.0] Proxy service reset complete');
+      return { success: true, message: 'Proxy service reset successfully' };
     } catch (error) {
-      console.error('重置代理服务失败:', error);
+      console.error('[ProxyService v4.0.0] Reset failed:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // ===================== 预留扩展接口（未来阶段） =====================
-
-  /**
-   * 智能判断是否需要代理
-   */
   shouldProxy(url) {
-    // 预留接口，未来可以根据规则智能判断
     if (!url) return false;
     
     try {
+      if (this.isSpecialProtocol(url)) return true; // 特殊协议总是代理
+      
       const hostname = new URL(url).hostname;
       return isDomainSupported(hostname);
     } catch {
@@ -1137,71 +1350,37 @@ class ProxyService {
     }
   }
 
-  /**
-   * 设置代理规则
-   */
-  setProxyRules(rules) {
-    // 预留接口，未来可以设置自定义代理规则
-    console.warn('setProxyRules is not implemented yet');
-    return { success: false, error: 'Not implemented' };
-  }
-
-  /**
-   * 清理资源
-   */
   cleanup() {
     this.stopHealthCheck();
     this.saveStats();
     this.cacheManager.clear();
+    this.smartMode.domainCache.clear();
     this.isInitialized = false;
-    console.log('代理服务资源已清理');
+    console.log('[ProxyService v4.0.0] Resources cleaned up');
   }
 }
 
 // 创建单例实例
 const proxyService = new ProxyService();
 
-// 导出独立的工具函数
+// 导出独立工具函数（向后兼容）
 export function convertToProxyUrl(originalUrl, proxyServer) {
-  const service = new ProxyService();
-  service.proxyConfig = { ...proxyConfig, proxyServer: proxyServer || proxyConfig.proxyServer };
-  return service.convertToProxyUrl(originalUrl);
+  const tempConfig = { ...proxyConfig };
+  if (proxyServer) {
+    tempConfig.proxyServer = proxyServer;
+  }
+  
+  const tempService = Object.create(proxyService);
+  tempService.proxyConfig = tempConfig;
+  return tempService.convertToProxyUrl(originalUrl);
 }
 
 export function getOriginalUrl(proxyUrl, proxyServer) {
-  if (!proxyUrl || typeof proxyUrl !== 'string') {
-    return proxyUrl;
+  const tempService = Object.create(proxyService);
+  if (proxyServer) {
+    tempService.proxyConfig = { ...proxyConfig, proxyServer };
   }
-
-  const server = proxyServer || proxyConfig.proxyServer;
-
-  try {
-    const proxyPrefix = `${server}/proxy/`;
-    if (!proxyUrl.includes(proxyPrefix)) {
-      return proxyUrl;
-    }
-
-    const proxyPrefixIndex = proxyUrl.indexOf('/proxy/') + 7;
-    const remainingUrl = proxyUrl.substring(proxyPrefixIndex);
-    
-    const firstSlashIndex = remainingUrl.indexOf('/');
-    
-    let hostname, path;
-    if (firstSlashIndex === -1) {
-      hostname = remainingUrl;
-      path = '/';
-    } else {
-      hostname = remainingUrl.substring(0, firstSlashIndex);
-      path = remainingUrl.substring(firstSlashIndex);
-    }
-    
-    const originalUrl = `https://${hostname}${path}`;
-    
-    return originalUrl;
-  } catch (error) {
-    console.error('原始URL提取失败:', error, 'Proxy URL:', proxyUrl);
-    return proxyUrl;
-  }
+  return tempService.getOriginalUrl(proxyUrl);
 }
 
 export default proxyService;
