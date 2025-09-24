@@ -1,66 +1,19 @@
-/* frontend/css/components/proxy-ui.css - 代理功能UI样式 v4.0.0 */
-/* 版本: v4.0.0 - 对应后端架构v4.0.0，支持所有新特性 */
+/* frontend/css/components/proxy-ui.css - 代理功能UI样式 */
+/* 版本: v1.0.0 */
 
-/* ===================== CSS变量定义 ===================== */
-:root {
-  --proxy-primary: #3b82f6;
-  --proxy-primary-dark: #1e40af;
-  --proxy-success: #10b981;
-  --proxy-success-dark: #059669;
-  --proxy-warning: #f59e0b;
-  --proxy-warning-dark: #d97706;
-  --proxy-error: #ef4444;
-  --proxy-error-dark: #dc2626;
-  --proxy-gray: #64748b;
-  --proxy-gray-light: #94a3b8;
-  --proxy-gray-dark: #334155;
-  
-  /* v4.0.0: 新增颜色变量 */
-  --proxy-info: #06b6d4;
-  --proxy-info-dark: #0891b2;
-  --proxy-purple: #8b5cf6;
-  --proxy-purple-dark: #7c3aed;
-  
-  /* 背景和边框 */
-  --proxy-bg-light: #f8fafc;
-  --proxy-bg-lighter: #ffffff;
-  --proxy-bg-dark: #1e293b;
-  --proxy-bg-darker: #0f172a;
-  --proxy-border-light: #e2e8f0;
-  --proxy-border-dark: #334155;
-  
-  /* 阴影 */
-  --proxy-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
-  --proxy-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
-  --proxy-shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
-  --proxy-shadow-xl: 0 12px 24px rgba(0, 0, 0, 0.2);
-  
-  /* 动画时长 */
-  --proxy-transition-fast: 0.15s;
-  --proxy-transition-normal: 0.25s;
-  --proxy-transition-slow: 0.4s;
-  
-  /* 边框半径 */
-  --proxy-radius-sm: 6px;
-  --proxy-radius-md: 8px;
-  --proxy-radius-lg: 12px;
-  --proxy-radius-xl: 16px;
-}
-
-/* ===================== v4.0.0 代理控制中心 ===================== */
+/* ===================== 代理控制面板 ===================== */
 .proxy-controls-panel {
-  background: linear-gradient(135deg, var(--proxy-bg-light) 0%, var(--proxy-border-light) 100%);
-  border: 2px solid var(--proxy-border-light);
-  border-radius: var(--proxy-radius-lg);
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-  box-shadow: var(--proxy-shadow-lg);
-  transition: all var(--proxy-transition-normal) ease;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 }
 
-/* v4.0.0: 状态指示条 */
 .proxy-controls-panel::before {
   content: '';
   position: absolute;
@@ -68,124 +21,56 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, var(--proxy-primary), var(--proxy-primary-dark));
+  background: linear-gradient(90deg, #3b82f6, #1e40af);
   transform: scaleX(0);
-  transition: transform var(--proxy-transition-normal) ease;
+  transition: transform 0.3s ease;
 }
 
 .proxy-controls-panel.proxy-enabled::before {
   transform: scaleX(1);
-  background: linear-gradient(90deg, var(--proxy-success), var(--proxy-success-dark));
 }
 
-.proxy-controls-panel.proxy-smart::before {
-  background: linear-gradient(90deg, var(--proxy-purple), var(--proxy-purple-dark));
-}
-
-.proxy-controls-panel.proxy-degraded::before {
-  background: linear-gradient(90deg, var(--proxy-warning), var(--proxy-warning-dark));
-}
-
-.proxy-controls-panel.proxy-error::before {
-  background: linear-gradient(90deg, var(--proxy-error), var(--proxy-error-dark));
-}
-
-/* v4.0.0: 启用状态样式增强 */
 .proxy-controls-panel.proxy-enabled {
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border-color: var(--proxy-primary);
+  border-color: #3b82f6;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 .proxy-controls-panel.proxy-unhealthy {
-  border-color: var(--proxy-warning);
+  border-color: #f59e0b;
   background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
 }
 
-.proxy-controls-panel.proxy-smart {
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-  border-color: var(--proxy-purple);
-}
-
-/* ===================== v4.0.0 代理控制头部 ===================== */
-.proxy-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-  gap: 1rem;
-}
-
-.proxy-title h3 {
-  margin: 0 0 0.25rem 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--proxy-gray-dark);
+/* ===================== 代理切换区域 ===================== */
+.proxy-toggle-section {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.proxy-title h3::before {
-  content: '🔒';
-  font-size: 1.5rem;
-}
-
-.proxy-enabled .proxy-title h3::before {
-  content: '✅';
-}
-
-.proxy-smart .proxy-title h3::before {
-  content: '🧠';
-}
-
-.proxy-degraded .proxy-title h3::before {
-  content: '⚡';
-}
-
-.proxy-error .proxy-title h3::before {
-  content: '❌';
-}
-
-.proxy-version-info {
-  color: var(--proxy-gray);
-  font-size: 0.75rem;
-  font-weight: 400;
-}
-
-/* ===================== v4.0.0 代理操作区域 ===================== */
-.proxy-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 
-/* v4.0.0: 增强的切换按钮 */
 .proxy-toggle-btn {
-  background: linear-gradient(135deg, var(--proxy-primary) 0%, var(--proxy-primary-dark) 100%);
+  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
   color: white;
   border: none;
-  border-radius: var(--proxy-radius-md);
+  border-radius: 8px;
   padding: 0.75rem 1.25rem;
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all var(--proxy-transition-fast) ease;
+  transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
-  box-shadow: var(--proxy-shadow-md);
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  min-width: 140px;
-  justify-content: center;
 }
 
 .proxy-toggle-btn:hover {
-  background: linear-gradient(135deg, var(--proxy-primary-dark) 0%, #1e3a8a 100%);
+  background: linear-gradient(135deg, #3730a3 0%, #312e81 100%);
   transform: translateY(-1px);
-  box-shadow: var(--proxy-shadow-lg);
+  box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3);
 }
 
 .proxy-toggle-btn:active {
@@ -193,44 +78,29 @@
 }
 
 .proxy-toggle-btn:disabled {
-  background: var(--proxy-gray-light);
+  background: #9ca3af;
   cursor: not-allowed;
   transform: none;
-  box-shadow: var(--proxy-shadow-sm);
-  opacity: 0.6;
+  box-shadow: none;
 }
 
 .proxy-enabled .proxy-toggle-btn {
-  background: linear-gradient(135deg, var(--proxy-success) 0%, var(--proxy-success-dark) 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
 }
 
 .proxy-enabled .proxy-toggle-btn:hover {
-  background: linear-gradient(135deg, var(--proxy-success-dark) 0%, #047857 100%);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
   box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
-.proxy-smart .proxy-toggle-btn {
-  background: linear-gradient(135deg, var(--proxy-purple) 0%, var(--proxy-purple-dark) 100%);
-}
-
-.proxy-degraded .proxy-toggle-btn {
-  background: linear-gradient(135deg, var(--proxy-warning) 0%, var(--proxy-warning-dark) 100%);
-}
-
-.proxy-error .proxy-toggle-btn {
-  background: linear-gradient(135deg, var(--proxy-error) 0%, var(--proxy-error-dark) 100%);
-}
-
-/* v4.0.0: 状态指示器增强 */
 .toggle-indicator {
   width: 12px;
   height: 12px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.8);
-  transition: all var(--proxy-transition-normal) ease;
+  transition: all 0.3s ease;
   position: relative;
-  flex-shrink: 0;
 }
 
 .toggle-indicator.enabled {
@@ -240,572 +110,223 @@
 }
 
 @keyframes pulse {
-  0%, 100% { 
-    opacity: 1; 
-    transform: scale(1);
-  }
-  50% { 
-    opacity: 0.7;
-    transform: scale(1.1);
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
-/* ===================== v4.0.0 操作按钮组 ===================== */
-.proxy-info-btn,
-.proxy-diagnostics-btn {
+/* ===================== 代理信息按钮 ===================== */
+.proxy-info-btn {
   background: rgba(59, 130, 246, 0.1);
-  color: var(--proxy-primary);
+  color: #3b82f6;
   border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: var(--proxy-radius-sm);
-  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  padding: 0.5rem;
   cursor: pointer;
-  transition: all var(--proxy-transition-fast) ease;
+  transition: all 0.2s ease;
   font-size: 1rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
 }
 
-.proxy-info-btn:hover,
-.proxy-diagnostics-btn:hover {
+.proxy-info-btn:hover {
   background: rgba(59, 130, 246, 0.2);
-  transform: translateY(-1px);
-  box-shadow: var(--proxy-shadow-sm);
+  transform: scale(1.05);
 }
 
-.proxy-diagnostics-btn {
-  background: rgba(139, 92, 246, 0.1);
-  color: var(--proxy-purple);
-  border-color: rgba(139, 92, 246, 0.2);
+/* ===================== 代理帮助文本 ===================== */
+.proxy-help-text {
+  flex: 1;
+  min-width: 200px;
+  color: #64748b;
+  font-style: italic;
 }
 
-.proxy-diagnostics-btn:hover {
-  background: rgba(139, 92, 246, 0.2);
+.proxy-enabled .proxy-help-text {
+  color: #1e40af;
 }
 
-/* ===================== v4.0.0 状态详情区域 ===================== */
+/* ===================== 代理状态详情 ===================== */
 .proxy-status-details {
-  margin-top: 1rem;
-  padding-top: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
-  color: var(--proxy-gray);
+  color: #64748b;
   font-size: 0.85rem;
 }
 
 .proxy-enabled .proxy-status-details {
   border-top-color: rgba(59, 130, 246, 0.2);
-  color: var(--proxy-primary-dark);
+  color: #1e40af;
 }
 
-.status-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin: 0.25rem 0;
-  flex-wrap: wrap;
-}
-
-.status-label {
-  font-weight: 600;
-  color: var(--proxy-gray-dark);
-}
-
-.status-value {
-  color: var(--proxy-primary);
-  font-weight: 500;
-}
-
-.proxy-enabled .status-label {
-  color: var(--proxy-primary-dark);
-}
-
-/* ===================== v4.0.0 性能监控面板 ===================== */
-.performance-monitor-panel {
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-  border: 1px solid var(--proxy-border-light);
-  border-radius: var(--proxy-radius-md);
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--proxy-shadow-sm);
-  transition: all var(--proxy-transition-normal) ease;
-}
-
-.performance-monitor-panel.collapsed .performance-metrics {
-  display: none;
-}
-
-.performance-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.performance-header h4 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--proxy-gray-dark);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.performance-toggle {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: var(--proxy-radius-sm);
-  padding: 0.25rem 0.5rem;
-  cursor: pointer;
-  transition: all var(--proxy-transition-fast) ease;
-  font-size: 0.9rem;
-}
-
-.performance-toggle:hover {
-  background: rgba(59, 130, 246, 0.2);
-  transform: scale(1.05);
-}
-
-.performance-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.metric-group {
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: var(--proxy-radius-sm);
-  padding: 0.75rem;
-  box-shadow: var(--proxy-shadow-sm);
-}
-
-.metric {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 0.25rem 0;
-}
-
-.metric-label {
-  font-size: 0.8rem;
-  color: var(--proxy-gray);
-  font-weight: 500;
-}
-
-.metric-value {
-  font-weight: 600;
-  color: var(--proxy-primary);
-  font-size: 0.85rem;
-}
-
-/* ===================== v4.0.0 健康警告增强 ===================== */
+/* ===================== 代理健康警告 ===================== */
 .proxy-health-warning {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  border: 1px solid var(--proxy-warning);
-  border-radius: var(--proxy-radius-md);
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
   color: #92400e;
-  font-size: 0.9rem;
-  font-weight: 500;
-  box-shadow: var(--proxy-shadow-sm);
+  font-size: 0.85rem;
 }
 
 .proxy-health-warning .warning-icon {
-  font-size: 1.25rem;
+  font-size: 1rem;
   animation: bounce 2s infinite;
-  flex-shrink: 0;
 }
 
 @keyframes bounce {
-  0%, 20%, 53%, 80%, 100% { 
-    transform: translateY(0); 
-  }
-  40%, 43% { 
-    transform: translateY(-8px); 
-  }
-  70% { 
-    transform: translateY(-4px); 
-  }
+  0%, 20%, 53%, 80%, 100% { transform: translateY(0); }
+  40%, 43% { transform: translateY(-8px); }
+  70% { transform: translateY(-4px); }
 }
 
-/* ===================== v4.0.0 帮助文本增强 ===================== */
-.proxy-help-text {
-  margin-top: 0.75rem;
-  color: var(--proxy-gray);
-  font-style: italic;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  background: rgba(59, 130, 246, 0.05);
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--proxy-radius-sm);
-  border-left: 3px solid var(--proxy-primary);
-}
-
-.proxy-enabled .proxy-help-text {
-  color: var(--proxy-primary-dark);
-  background: rgba(16, 185, 129, 0.05);
-  border-left-color: var(--proxy-success);
-}
-
-.proxy-smart .proxy-help-text {
-  background: rgba(139, 92, 246, 0.05);
-  border-left-color: var(--proxy-purple);
-}
-
-/* ===================== v4.0.0 结果项代理样式增强 ===================== */
+/* ===================== 搜索结果代理相关样式 ===================== */
 .result-item.result-proxied {
-  border-left: 4px solid var(--proxy-primary);
+  border-left: 4px solid #3b82f6;
   background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+}
+
+.result-item.result-proxied .result-content {
   position: relative;
 }
 
-.result-item.result-proxied::after {
-  content: '';
+.result-item.result-proxied .result-content::before {
+  content: '🔒';
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 8px;
-  height: 8px;
-  background: var(--proxy-primary);
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  top: 0.25rem;
+  right: 0.25rem;
+  font-size: 0.8rem;
+  opacity: 0.6;
 }
 
-.result-item.result-special-protocol {
-  border-left: 4px solid var(--proxy-purple);
-  background: linear-gradient(135deg, #f3f4f6 0%, #f9fafb 100%);
-}
-
-.result-item.result-special-protocol::after {
-  background: var(--proxy-purple);
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3);
-}
-
-/* ===================== v4.0.0 URL显示区域增强 ===================== */
+/* ===================== URL显示区域 ===================== */
 .result-urls {
   margin: 0.5rem 0;
-  background: rgba(248, 250, 252, 0.8);
-  border-radius: var(--proxy-radius-sm);
-  padding: 0.5rem;
-  border: 1px solid var(--proxy-border-light);
 }
 
 .result-url {
   font-size: 0.85rem;
-  color: var(--proxy-gray);
+  color: #64748b;
   margin: 0.25rem 0;
   word-break: break-all;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem;
-  border-radius: var(--proxy-radius-sm);
-  transition: background-color var(--proxy-transition-fast) ease;
-}
-
-.result-url:hover {
-  background: rgba(59, 130, 246, 0.05);
+  gap: 0.25rem;
 }
 
 .result-url .url-label {
   font-weight: 600;
   font-size: 0.8rem;
   flex-shrink: 0;
-  padding: 0.125rem 0.375rem;
-  border-radius: 4px;
-  background: rgba(107, 114, 128, 0.1);
 }
 
 .result-url.proxy-url {
-  color: var(--proxy-primary);
+  color: #3b82f6;
   font-weight: 500;
 }
 
 .result-url.proxy-url .url-label {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--proxy-primary-dark);
+  color: #1e40af;
 }
 
 .result-url.original-url {
-  color: var(--proxy-gray-light);
+  color: #6b7280;
   font-size: 0.8rem;
 }
 
-.result-url.original-url .url-label {
-  background: rgba(107, 114, 128, 0.05);
-  color: var(--proxy-gray);
-}
-
-/* ===================== v4.0.0 访问按钮组增强 ===================== */
+/* ===================== 访问按钮组 ===================== */
 .visit-buttons-group {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.25rem;
   align-items: center;
-  flex-wrap: wrap;
 }
 
-.visit-btn.primary {
-  background: linear-gradient(135deg, var(--proxy-primary) 0%, var(--proxy-primary-dark) 100%);
+.visit-buttons-group .visit-btn.primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
   color: white;
   font-weight: 600;
-  min-width: 100px;
-  border: none;
-  border-radius: var(--proxy-radius-sm);
-  padding: 0.6rem 1rem;
-  cursor: pointer;
-  transition: all var(--proxy-transition-fast) ease;
-  box-shadow: var(--proxy-shadow-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
+  min-width: 80px;
 }
 
-.visit-btn.primary:hover {
-  background: linear-gradient(135deg, var(--proxy-primary-dark) 0%, #1e3a8a 100%);
+.visit-buttons-group .visit-btn.primary:hover {
+  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
   transform: translateY(-1px);
-  box-shadow: var(--proxy-shadow-md);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
 }
 
-.visit-btn.secondary {
+.visit-buttons-group .visit-btn.secondary {
   background: rgba(107, 114, 128, 0.1);
-  color: var(--proxy-gray);
+  color: #6b7280;
   border: 1px solid rgba(107, 114, 128, 0.2);
-  border-radius: var(--proxy-radius-sm);
   font-size: 0.8rem;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-  transition: all var(--proxy-transition-fast) ease;
+  padding: 0.4rem 0.6rem;
   min-width: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
 }
 
-.visit-btn.secondary:hover {
+.visit-buttons-group .visit-btn.secondary:hover {
   background: rgba(107, 114, 128, 0.2);
   color: #374151;
-  transform: translateY(-1px);
 }
 
-.visit-btn.special-protocol {
-  background: linear-gradient(135deg, var(--proxy-purple) 0%, var(--proxy-purple-dark) 100%);
-  color: white;
-  font-weight: 600;
-}
-
-.visit-btn.special-protocol:hover {
-  background: linear-gradient(135deg, var(--proxy-purple-dark) 0%, #6d28d9 100%);
-}
-
-.visit-btn.disabled {
-  background: var(--proxy-gray-light);
-  color: white;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.visit-btn.disabled:hover {
-  transform: none;
-  box-shadow: var(--proxy-shadow-sm);
-}
-
-.small-text {
+.visit-buttons-group .small-text {
   font-size: 0.75rem;
 }
 
-/* ===================== v4.0.0 状态徽章增强 ===================== */
-.proxy-badge,
-.protocol-badge,
-.content-match-badge,
-.cache-badge {
+/* ===================== 状态标识 ===================== */
+.proxy-badge {
+  background: #3b82f6;
+  color: white;
   font-size: 0.7rem;
-  padding: 0.2rem 0.4rem;
+  padding: 0.15rem 0.3rem;
   border-radius: 4px;
   margin-left: 0.25rem;
   font-weight: 600;
-  color: white;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.125rem;
 }
 
-.proxy-badge {
-  background: var(--proxy-primary);
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.3);
-}
-
-.protocol-badge {
-  background: var(--proxy-purple);
-  box-shadow: 0 1px 2px rgba(139, 92, 246, 0.3);
-}
-
-.content-match-badge {
-  background: var(--proxy-success);
-  box-shadow: 0 1px 2px rgba(16, 185, 129, 0.3);
-}
-
-.cache-badge {
-  background: var(--proxy-info);
-  box-shadow: 0 1px 2px rgba(6, 182, 212, 0.3);
-}
-
-/* ===================== v4.0.0 操作按钮增强 ===================== */
-.action-btn {
-  background: rgba(107, 114, 128, 0.1);
-  color: var(--proxy-gray);
-  border: 1px solid rgba(107, 114, 128, 0.2);
-  border-radius: var(--proxy-radius-sm);
-  padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all var(--proxy-transition-fast) ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  min-width: 60px;
-}
-
-.action-btn:hover {
-  background: rgba(107, 114, 128, 0.2);
-  color: #374151;
-  transform: translateY(-1px);
-  box-shadow: var(--proxy-shadow-sm);
-}
-
-.action-btn.proxy-btn {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--proxy-primary);
-  border-color: rgba(59, 130, 246, 0.2);
-}
-
-.action-btn.proxy-btn:hover {
-  background: rgba(59, 130, 246, 0.2);
-}
-
-.action-btn.status-btn {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--proxy-success);
-  border-color: rgba(16, 185, 129, 0.2);
-}
-
-.action-btn.status-btn:hover {
-  background: rgba(16, 185, 129, 0.2);
-}
-
-/* ===================== v4.0.0 资源信息显示 ===================== */
-.result-resource-info {
-  display: flex;
-  gap: 0.5rem;
-  margin: 0.25rem 0;
-  flex-wrap: wrap;
-}
-
-.resource-type,
-.domain-category {
-  font-size: 0.7rem;
-  padding: 0.125rem 0.375rem;
-  border-radius: 4px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.resource-type {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--proxy-primary-dark);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-.domain-category {
-  background: rgba(139, 92, 246, 0.1);
-  color: var(--proxy-purple-dark);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-}
-
-/* ===================== v4.0.0 通知系统 ===================== */
-.notification {
+/* ===================== 代理健康警告吐司 ===================== */
+.proxy-health-warning-toast {
   position: fixed;
   top: 1rem;
   right: 1rem;
   z-index: 9999;
-  border-radius: var(--proxy-radius-md);
-  box-shadow: var(--proxy-shadow-xl);
-  animation: slideInRight var(--proxy-transition-normal) ease-out;
-  max-width: 350px;
-  min-width: 280px;
-  backdrop-filter: blur(8px);
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideInRight 0.3s ease-out;
+  max-width: 300px;
 }
 
-.notification-success {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%);
-  border: 1px solid var(--proxy-success);
-  color: white;
-}
-
-.notification-error {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%);
-  border: 1px solid var(--proxy-error);
-  color: white;
-}
-
-.notification-warning {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%);
-  border: 1px solid var(--proxy-warning);
-  color: white;
-}
-
-.notification-info {
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.95) 0%, rgba(8, 145, 178, 0.95) 100%);
-  border: 1px solid var(--proxy-info);
-  color: white;
-}
-
-.notification-content {
-  padding: 1rem 1.25rem;
+.warning-content {
+  padding: 0.75rem 1rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  color: #92400e;
   font-size: 0.9rem;
-  font-weight: 500;
 }
 
-.notification-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.notification-message {
-  flex: 1;
-  line-height: 1.4;
-}
-
-.notification-close {
+.close-warning {
   background: none;
   border: none;
-  color: inherit;
-  font-size: 1.25rem;
+  color: #92400e;
+  font-size: 1.2rem;
   cursor: pointer;
   padding: 0;
-  width: 24px;
-  height: 24px;
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background-color var(--proxy-transition-fast) ease;
-  flex-shrink: 0;
+  transition: background-color 0.2s ease;
 }
 
-.notification-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+.close-warning:hover {
+  background: rgba(146, 64, 14, 0.1);
 }
 
 @keyframes slideInRight {
@@ -819,143 +340,34 @@
   }
 }
 
-/* ===================== v4.0.0 模态框系统 ===================== */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  animation: fadeIn var(--proxy-transition-normal) ease-out;
-}
-
-.modal-content {
-  background: var(--proxy-bg-lighter);
-  border-radius: var(--proxy-radius-xl);
-  box-shadow: var(--proxy-shadow-xl);
-  max-width: 600px;
-  width: 100%;
-  max-height: 80vh;
-  overflow: hidden;
-  animation: slideUp var(--proxy-transition-normal) ease-out;
-}
-
-.modal-header {
-  padding: 1.5rem 1.5rem 1rem 1.5rem;
-  border-bottom: 1px solid var(--proxy-border-light);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--proxy-gray-dark);
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: var(--proxy-gray);
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all var(--proxy-transition-fast) ease;
-}
-
-.modal-close:hover {
-  background: rgba(107, 114, 128, 0.1);
-  color: var(--proxy-gray-dark);
-}
-
-.modal-body {
-  padding: 1rem 1.5rem 1.5rem 1.5rem;
-  overflow-y: auto;
-  max-height: 60vh;
-}
-
-.modal-body pre {
-  background: var(--proxy-bg-light);
-  border: 1px solid var(--proxy-border-light);
-  border-radius: var(--proxy-radius-md);
-  padding: 1rem;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* ===================== v4.0.0 响应式设计增强 ===================== */
+/* ===================== 响应式设计 ===================== */
 @media (max-width: 768px) {
   .proxy-controls-panel {
-    padding: 1rem;
-    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
   }
   
-  .proxy-header {
+  .proxy-toggle-section {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.75rem;
-  }
-  
-  .proxy-actions {
-    justify-content: center;
+    gap: 0.5rem;
   }
   
   .proxy-toggle-btn {
-    min-width: 120px;
-    padding: 0.6rem 1rem;
+    justify-content: center;
   }
   
-  .performance-metrics {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-  
-  .status-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
+  .proxy-help-text {
+    min-width: auto;
+    text-align: center;
   }
   
   .visit-buttons-group {
     flex-direction: column;
-    width: 100%;
     gap: 0.5rem;
   }
   
-  .visit-btn {
+  .visit-buttons-group .visit-btn {
     width: 100%;
     justify-content: center;
   }
@@ -963,40 +375,26 @@
   .result-urls .result-url {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.25rem;
+    gap: 0.125rem;
   }
   
-  .result-resource-info {
-    justify-content: center;
-  }
-  
-  .notification {
+  .proxy-health-warning-toast {
     top: auto;
     bottom: 1rem;
     right: 1rem;
     left: 1rem;
     max-width: none;
   }
-  
-  .modal-content {
-    margin: 1rem;
-    max-height: 90vh;
-  }
 }
 
 @media (max-width: 480px) {
   .proxy-controls-panel {
-    padding: 0.75rem;
-  }
-  
-  .proxy-title h3 {
-    font-size: 1.1rem;
+    padding: 0.5rem 0.75rem;
   }
   
   .proxy-toggle-btn {
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 1rem;
     font-size: 0.85rem;
-    min-width: 100px;
   }
   
   .proxy-status-details {
@@ -1010,74 +408,51 @@
   .result-url.original-url {
     font-size: 0.75rem;
   }
-  
-  .performance-monitor-panel {
-    padding: 0.75rem;
-  }
-  
-  .metric-group {
-    padding: 0.5rem;
-  }
-  
-  .action-btn {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.8rem;
-    min-width: 50px;
-  }
 }
 
-/* ===================== v4.0.0 暗色主题增强 ===================== */
+/* ===================== 暗色主题支持 ===================== */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --proxy-bg-light: var(--proxy-bg-dark);
-    --proxy-bg-lighter: #0f172a;
-    --proxy-border-light: var(--proxy-border-dark);
-    --proxy-gray: #94a3b8;
-    --proxy-gray-light: #64748b;
-    --proxy-gray-dark: #f1f5f9;
-  }
-  
   .proxy-controls-panel {
-    background: linear-gradient(135deg, var(--proxy-bg-dark) 0%, var(--proxy-bg-darker) 100%);
-    border-color: var(--proxy-border-dark);
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #334155;
     color: #e2e8f0;
   }
   
   .proxy-controls-panel.proxy-enabled {
     background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-    border-color: var(--proxy-primary);
+    border-color: #3b82f6;
   }
   
   .proxy-controls-panel.proxy-unhealthy {
     background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
-    border-color: var(--proxy-warning);
+    border-color: #f59e0b;
   }
   
-  .performance-monitor-panel {
-    background: linear-gradient(135deg, var(--proxy-bg-dark) 0%, #0f172a 100%);
-    border-color: var(--proxy-border-dark);
+  .proxy-help-text {
+    color: #94a3b8;
   }
   
-  .metric-group {
-    background: rgba(15, 23, 42, 0.8);
+  .proxy-enabled .proxy-help-text {
+    color: #dbeafe;
+  }
+  
+  .proxy-status-details {
+    color: #94a3b8;
+    border-top-color: rgba(148, 163, 184, 0.2);
+  }
+  
+  .proxy-enabled .proxy-status-details {
+    color: #dbeafe;
+    border-top-color: rgba(59, 130, 246, 0.3);
   }
   
   .result-item.result-proxied {
-    background: linear-gradient(135deg, #1e3a8a 0%, var(--proxy-bg-dark) 100%);
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%);
     border-left-color: #60a5fa;
   }
   
-  .result-urls {
-    background: rgba(15, 23, 42, 0.8);
-    border-color: var(--proxy-border-dark);
-  }
-  
   .result-url {
-    color: var(--proxy-gray);
-  }
-  
-  .result-url:hover {
-    background: rgba(59, 130, 246, 0.1);
+    color: #94a3b8;
   }
   
   .result-url.proxy-url {
@@ -1085,37 +460,22 @@
   }
   
   .result-url.original-url {
-    color: var(--proxy-gray-light);
+    color: #6b7280;
   }
   
-  .visit-btn.secondary {
+  .visit-buttons-group .visit-btn.secondary {
     background: rgba(148, 163, 184, 0.1);
-    color: var(--proxy-gray);
+    color: #94a3b8;
     border-color: rgba(148, 163, 184, 0.2);
   }
   
-  .visit-btn.secondary:hover {
+  .visit-buttons-group .visit-btn.secondary:hover {
     background: rgba(148, 163, 184, 0.2);
-    color: #e2e8f0;
-  }
-  
-  .modal-content {
-    background: var(--proxy-bg-dark);
-    color: #e2e8f0;
-  }
-  
-  .modal-header {
-    border-bottom-color: var(--proxy-border-dark);
-  }
-  
-  .modal-body pre {
-    background: var(--proxy-bg-darker);
-    border-color: var(--proxy-border-dark);
     color: #e2e8f0;
   }
 }
 
-/* ===================== v4.0.0 可访问性增强 ===================== */
+/* ===================== 动画优化 ===================== */
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
@@ -1135,16 +495,12 @@
     animation: none;
   }
   
-  .notification {
-    animation: none;
-  }
-  
-  .modal-overlay,
-  .modal-content {
+  .proxy-health-warning-toast {
     animation: none;
   }
 }
 
+/* ===================== 高对比度支持 ===================== */
 @media (prefers-contrast: high) {
   .proxy-controls-panel {
     border-width: 3px;
@@ -1154,95 +510,16 @@
     border: 2px solid transparent;
   }
   
-  .proxy-toggle-btn:focus,
-  .proxy-info-btn:focus,
-  .proxy-diagnostics-btn:focus {
-    outline: 3px solid;
-    outline-offset: 2px;
+  .proxy-toggle-btn:focus {
+    border-color: #ffffff;
+    outline: 2px solid #000000;
   }
   
   .result-item.result-proxied {
     border-left-width: 6px;
   }
   
-  .proxy-badge,
-  .protocol-badge,
-  .content-match-badge,
-  .cache-badge {
-    border: 1px solid;
-  }
-  
-  .notification {
-    border-width: 2px;
-  }
-}
-
-/* ===================== v4.0.0 打印样式 ===================== */
-@media print {
-  .proxy-controls-panel,
-  .performance-monitor-panel,
-  .notification,
-  .modal-overlay {
-    display: none !important;
-  }
-  
-  .result-item.result-proxied {
-    background: none !important;
-    border-left: 3px solid #000 !important;
-  }
-  
-  .visit-btn,
-  .action-btn {
-    border: 1px solid #000 !important;
-    background: none !important;
-    color: #000 !important;
-  }
-}
-
-/* ===================== v4.0.0 特殊效果和动画 ===================== */
-.proxy-controls-panel.proxy-enabled {
-  animation: enabledPulse 3s ease-in-out infinite;
-}
-
-@keyframes enabledPulse {
-  0%, 100% {
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-  }
-  50% {
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
-  }
-}
-
-.performance-metrics {
-  animation: fadeInUp var(--proxy-transition-slow) ease-out;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* v4.0.0: 加载状态 */
-.proxy-loading::after {
-  content: '';
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-left: 0.5rem;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+  .proxy-badge {
+    border: 1px solid #ffffff;
   }
 }
