@@ -3,106 +3,65 @@ main = "src/index.js"
 compatibility_date = "2024-03-18"
 workers_dev = true
 
-[env.production]
-name = "codeseek-site"
-route = "https://all.omnibox.pp.ua/*"
-
-[env.staging]
-name = "codeseek-site-staging"
-
-# 环境变量配置
 [vars]
-# 基础配置
+# 生产环境配置
 ENVIRONMENT = "production"
 DEBUG = "false"
 
-# 代理配置
+# 允许直接浏览器访问
 ALLOW_DIRECT_ACCESS = "true"
-ENABLE_FAILOVER = "true"
-FAILOVER_TIMEOUT = "5000"
-MAX_REDIRECTS = "10"
-REQUEST_TIMEOUT = "30000"
 
-# 安全配置
-BLOCK_MALICIOUS_SCRIPTS = "true"
-SANITIZE_HTML = "true"
-BLOCK_ADS = "true"
-MAX_CONTENT_SIZE = "52428800"  # 50MB
-BLOCK_EXTERNAL_REDIRECTS = "false"
-
-# 缓存配置
-ENABLE_SMART_CACHING = "true"
-CACHE_HTML_TTL = "300000"      # 5分钟
-CACHE_CSS_TTL = "3600000"      # 1小时
-CACHE_JS_TTL = "3600000"       # 1小时
-CACHE_IMAGE_TTL = "86400000"   # 24小时
-CACHE_FONT_TTL = "604800000"   # 7天
-CACHE_MAX_SIZE = "10485760"    # 10MB
-
-# 处理器配置
-HTML_INJECT_PROXY_SCRIPT = "true"
-HTML_REWRITE_URLS = "true"
-HTML_PROCESS_FORMS = "true"
-HTML_HANDLE_WEBSOCKETS = "true"
-CSS_REWRITE_URLS = "true"
-CSS_PROCESS_IMPORTS = "true"
-CSS_HANDLE_FONTS = "true"
-JS_REWRITE_URLS = "true"
-JS_HANDLE_APIS = "true"
-JS_PROCESS_MODULES = "true"
-
-# 特殊处理
-MAGNET_LINKS = "true"
-DOWNLOAD_LINKS = "true"
-TORRENT_FILES = "true"
-ED2K_LINKS = "true"
-THUNDER_LINKS = "true"
-
-# 额外的代理目标白名单（逗号分隔）
+# 额外的代理目标白名单（可选，补充代码中的硬编码列表）
 EXTRA_PROXY_TARGETS = ""
 
-# 备用域名配置（逗号分隔）
+# 备用域名配置
 BACKUP_DOMAINS = ""
 
-# 开发环境变量
-[env.development.vars]
-ENVIRONMENT = "development"
-DEBUG = "true"
-ALLOW_DIRECT_ACCESS = "true"
-ENABLE_FAILOVER = "false"
+# 故障转移配置
+ENABLE_FAILOVER = "true"
+FAILOVER_TIMEOUT = "5000"
 
-# 预览环境变量  
-[env.preview.vars]
-ENVIRONMENT = "preview"
-DEBUG = "true"
-ALLOW_DIRECT_ACCESS = "true"
+# 外部代理API配置（可选）
+# PROXY_API = "https://your-proxy-api.com/proxy"
+# PROXY_API_KEY = "your-api-key-here"
+# PROXY_TIMEOUT = "10000"
+# PROXY_RETRIES = "2"
 
-# KV命名空间绑定（用于速率限制和缓存）
+# 代理协议设置（默认https）
+PROXY_PROTOCOL = "https"
+
+# KV缓存配置
+# 缓存TTL设置（秒）
+CACHE_HTML_TTL = "3600"      # HTML缓存1小时
+CACHE_CSS_TTL = "86400"      # CSS缓存1天  
+CACHE_JS_TTL = "86400"       # JavaScript缓存1天
+CACHE_IMAGE_TTL = "2592000"  # 图片缓存30天
+CACHE_FONT_TTL = "2592000"   # 字体缓存30天
+CACHE_JSON_TTL = "1800"      # JSON缓存30分钟
+CACHE_DEFAULT_TTL = "3600"   # 默认缓存1小时
+
+# KV命名空间绑定
 [[kv_namespaces]]
-binding = "RATE_LIMIT_KV"
-id = "41e4a2ca358940bfa0dc6c18fc38016d"
-preview_id = "41e4a2ca358940bfa0dc6c18fc38016d"
+binding = "KV_CACHE"
+id = "21feed084fa648dd932e404935aec39c"  # 替换为实际的KV命名空间ID
 
-[[kv_namespaces]]
-binding = "CACHE_KV"
-id = "41e4a2ca358940bfa0dc6c18fc38016d" 
-preview_id = "41e4a2ca358940bfa0dc6c18fc38016d"
+# 开发环境配置
+[env.development]
+vars = { DEBUG = "true", ENVIRONMENT = "development" }
 
-# Durable Objects绑定（可选，用于高级功能）
-# [[durable_objects.bindings]]
-# name = "PROXY_SESSIONS"
-# class_name = "ProxySession"
+# 测试环境配置  
+[env.staging]
+vars = { DEBUG = "true", ENVIRONMENT = "staging" }
 
-# 定时触发器配置 - 修复：使用正确的cron格式
-[triggers]
-crons = ["0 */6 * * *"]  # 每6小时清理一次缓存
+# 生产环境配置
+[env.production]
+vars = { DEBUG = "false", ENVIRONMENT = "production" }
 
+# 路由配置（可选）
+# routes = [
+#   { pattern = "your-domain.com/*", zone_name = "your-domain.com" }
+# ]
 
-
-# 部署配置
-[build]
-command = "echo 'No build step required for modular ES6'"
-cwd = "."
-
-# 兼容性标志 - 修复：使用字符串数组格式，只包含需要启用的标志
-compatibility_flags = ["formdata_parser_supports_files"]
+# 触发器配置（可选）
+# [[triggers.crons]]
+# cron = "0 */6 * * *"  # 每6小时清理一次过期缓存
