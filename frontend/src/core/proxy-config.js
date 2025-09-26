@@ -7,7 +7,7 @@
  */
 export const proxyConfig = {
   // 代理服务器地址（从后端wrangler.toml配置得知）
-  proxyServer: 'https://all.omnibox.pp.ua',
+  proxyServer: 'https://omnibox.pp.ua',
   
   // 备用代理服务器
   backupServers: [
