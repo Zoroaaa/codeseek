@@ -160,8 +160,7 @@ INSERT OR REPLACE INTO search_sources (
 ) VALUES 
     ('javbus', 'database', 'JavBus', '番号+磁力一体站，信息完善', '提供详细的番号信息、封面、演员资料和磁力链接', '🎬', 'https://www.javbus.com/search/{keyword}', 'https://www.javbus.com', 'search', 1, 1, 1, 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('javdb', 'database', 'JavDB', '极简风格番号资料站，轻量快速', '提供简洁的番号信息和磁力链接', '📚', 'https://javdb.com/search?q={keyword}&f=all', 'https://javdb.com', 'search', 1, 1, 2, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javlibrary', 'database', 'JavLibrary', '评论活跃，女优搜索详尽', '老牌番号资料站，社区活跃', '📖', 'https://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}', 'https://www.javlibrary.com', 'search', 1, 1, 3, 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javfinder', 'database', 'JavFinder', '智能搜索引擎，结果精准', '新兴的番号搜索引擎', '🔍', 'https://javfinder.is/search/{keyword}', 'https://javfinder.is', 'search', 1, 1, 4, 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+    ('javlibrary', 'database', 'JavLibrary', '评论活跃，女优搜索详尽', '老牌番号资料站，社区活跃', '📖', 'https://www.javlibrary.com/cn/vl_searchbyid.php?keyword={keyword}', 'https://www.javlibrary.com', 'search', 1, 1, 3, 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- 插入默认搜索源 - 在线播放平台 (现在参与搜索)
 INSERT OR REPLACE INTO search_sources (
@@ -173,7 +172,6 @@ INSERT OR REPLACE INTO search_sources (
     ('javmost', 'streaming', 'JavMost', '免费在线观看，更新及时', '免费在线播放平台', '🎦', 'https://javmost.com/search/{keyword}', 'https://javmost.com', 'search', 1, 1, 6, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('javguru', 'streaming', 'JavGuru', '多线路播放，观看流畅', '多线路在线播放', '🎭', 'https://jav.guru/search/{keyword}', 'https://jav.guru', 'search', 1, 1, 7, 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('av01', 'streaming', 'AV01', '快速预览站点，封面大图清晰', '封面预览和在线播放', '🎥', 'https://av01.tv/search/{keyword}', 'https://av01.tv', 'search', 1, 1, 8, 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('missav', 'streaming', 'MissAV', '中文界面，封面高清，信息丰富', '中文在线播放平台', '💫', 'https://missav.com/search/{keyword}', 'https://missav.com', 'search', 1, 1, 9, 1, 1, 5, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('javhdporn', 'streaming', 'JavHD.porn', '高清资源下载，质量优秀', '高清下载和在线播放', '🎬', 'https://javhd.porn/search/{keyword}', 'https://javhd.porn', 'search', 1, 1, 10, 1, 1, 6, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('javgg', 'streaming', 'JavGG', '免费观看平台，速度稳定', '免费在线播放', '⚡', 'https://javgg.net/search/{keyword}', 'https://javgg.net', 'search', 1, 1, 11, 1, 1, 7, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('javhihi', 'streaming', 'JavHiHi', '在线播放，无需下载', '轻量级在线播放', '🎪', 'https://javhihi.com/search/{keyword}', 'https://javhihi.com', 'search', 1, 1, 12, 1, 1, 8, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);

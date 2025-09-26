@@ -1,35 +1,34 @@
-// frontend/src/core/proxy-config.js - 优化版代理配置
-// 版本: v2.0.0 - 完善的配置管理和智能策略
+// frontend/src/core/proxy-config.js - 重构版代理配置
+// 版本: v2.1.0 - 适配后端Enhanced Proxy Worker v2.0.0
 
 /**
- * 代理配置管理中心
- * 提供统一的配置管理、验证和优化策略
+ * 代理配置管理中心 - 重构版
+ * 完全适配后端Enhanced Proxy Worker v2.0.0功能
  */
 export const proxyConfig = {
-  // 代理服务器地址
+  // 代理服务器地址（从后端wrangler.toml配置得知）
   proxyServer: 'https://all.omnibox.pp.ua',
   
-  // 备用代理服务器（用于故障转移）
+  // 备用代理服务器
   backupServers: [
-    // 'https://backup1.proxy.example.com',
-    // 'https://backup2.proxy.example.com'
+    // 可根据需要添加备用服务器
   ],
   
-  // 是否默认开启
+  // 默认开启状态
   defaultEnabled: true,
   
-  // 智能模式：根据网站可访问性自动启用代理
+  // 智能模式配置
   smartMode: {
     enabled: false,
     autoDetect: true,
-    testTimeout: 3000,
-    cache: new Map() // 缓存测试结果
+    testTimeout: 5000, // 增加超时时间以适配后端
+    cache: new Map()
   },
   
-  // 代理URL格式模板
-  proxyUrlTemplate: '{proxy}/proxy/{hostname}{path}',
+  // 代理URL格式（适配后端格式：{proxy}/{target_url}）
+  proxyUrlFormat: '{proxy}/{target_url}',
   
-  // 支持代理的域名白名单（优化后的列表）
+  // 支持代理的域名白名单
   supportedDomains: [
     // JAV相关站点
     'www.javbus.com', 'javbus.com',
@@ -55,7 +54,7 @@ export const proxyConfig = {
     't66y.com', 'www.t66y.com'
   ],
   
-  // 域名分类（用于优化处理）
+  // 域名分类
   domainCategories: {
     video: ['jable.tv', 'missav.com', 'av01.tv', 'javmost.com'],
     database: ['javbus.com', 'javdb.com', 'javlibrary.com'],
@@ -63,29 +62,36 @@ export const proxyConfig = {
     forum: ['sehuatang.org', 't66y.com']
   },
   
-  // 请求配置（优化版）
+  // 后端API端点配置
+  api: {
+    health: '/api/health',
+    status: '/api/status',
+    cacheClear: '/api/cache/clear'
+  },
+  
+  // 请求配置（适配后端CORS设置）
   requestConfig: {
-    // 基础请求头
     headers: {
-      // 使用最小必要的请求头，避免CORS预检
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
     },
     
-    // 请求选项
     options: {
-      credentials: 'omit',
+      credentials: 'omit', // 后端设置了无限制CORS
       mode: 'cors',
       cache: 'default',
-      redirect: 'follow',
-      keepalive: true // 保持连接
+      redirect: 'follow'
     },
     
-    // 超时配置（根据资源类型动态调整）
+    // 超时配置（根据后端缓存TTL调整）
     timeouts: {
       default: 15000,
       api: 10000,
       html: 15000,
       resource: 30000,
-      media: 60000
+      media: 60000,
+      healthCheck: 10000 // 适配后端健康检查
     },
     
     // 重试策略
@@ -96,31 +102,27 @@ export const proxyConfig = {
     }
   },
   
-  // 缓存策略配置
+  // 缓存策略（适配后端KV缓存）
   cacheStrategy: {
     enabled: true,
-    maxSize: 100, // MB
+    maxSize: 100,
     maxEntries: 500,
     
-    // 资源TTL（毫秒）
+    // TTL配置（与后端wrangler.toml保持一致）
     ttl: {
-      html: 5 * 60 * 1000,          // 5分钟
-      css: 60 * 60 * 1000,          // 1小时
-      js: 60 * 60 * 1000,           // 1小时
-      image: 24 * 60 * 60 * 1000,   // 24小时
-      font: 7 * 24 * 60 * 60 * 1000, // 7天
-      api: 60 * 1000,               // 1分钟
-      media: 60 * 60 * 1000,        // 1小时
-      default: 30 * 60 * 1000       // 30分钟
+      html: 3600 * 1000,           // 1小时（后端CACHE_HTML_TTL=3600）
+      css: 86400 * 1000,           // 1天（后端CACHE_CSS_TTL=86400）
+      js: 86400 * 1000,            // 1天（后端CACHE_JS_TTL=86400）
+      image: 2592000 * 1000,       // 30天（后端CACHE_IMAGE_TTL=2592000）
+      font: 2592000 * 1000,        // 30天（后端CACHE_FONT_TTL=2592000）
+      api: 1800 * 1000,            // 30分钟（后端CACHE_JSON_TTL=1800）
+      media: 3600 * 1000,          // 1小时
+      default: 3600 * 1000         // 1小时（后端CACHE_DEFAULT_TTL=3600）
     },
     
-    // 缓存规则
     rules: {
-      // 总是缓存的资源类型
       alwaysCache: ['image', 'font', 'css', 'js'],
-      // 从不缓存的资源类型
       neverCache: ['api/auth', 'api/user'],
-      // 条件缓存
       conditionalCache: {
         'api': (response) => response.status === 200,
         'html': (response) => !response.headers.get('cache-control')?.includes('no-cache')
@@ -130,10 +132,8 @@ export const proxyConfig = {
   
   // 性能优化配置
   performance: {
-    // 并发请求限制
     maxConcurrent: 6,
     
-    // 请求优先级
     priority: {
       html: 10,
       css: 9,
@@ -145,18 +145,16 @@ export const proxyConfig = {
       other: 1
     },
     
-    // 预加载策略
     preload: {
       enabled: true,
       resources: ['css', 'js', 'font'],
       maxPreloads: 10
     },
     
-    // 懒加载策略
     lazyLoad: {
       enabled: true,
       resources: ['image', 'media'],
-      threshold: 100 // 视口距离（像素）
+      threshold: 100
     }
   },
   
@@ -176,11 +174,11 @@ export const proxyConfig = {
     ENABLED: 'enabled',
     ERROR: 'error',
     CHECKING: 'checking',
-    DEGRADED: 'degraded', // 新增：降级状态
-    SMART: 'smart' // 新增：智能模式
+    DEGRADED: 'degraded',
+    SMART: 'smart'
   },
   
-  // 超时设置（优化版）
+  // 超时设置
   timeouts: {
     healthCheck: 10000,
     request: 30000,
@@ -194,41 +192,23 @@ export const proxyConfig = {
     }
   },
   
-  // 错误处理配置（增强版）
+  // 错误处理配置（适配后端Enhanced Error Handling）
   errorHandling: {
     maxRetries: 3,
     retryDelays: [1000, 2000, 5000],
     fallbackToOriginal: true,
     logErrors: true,
     
-    // 错误分类和处理策略
     strategies: {
-      network: {
-        retry: true,
-        fallback: true,
-        notify: false
-      },
-      timeout: {
-        retry: true,
-        fallback: true,
-        notify: true
-      },
-      server: {
-        retry: false,
-        fallback: true,
-        notify: true
-      },
-      client: {
-        retry: false,
-        fallback: false,
-        notify: false
-      }
+      network: { retry: true, fallback: true, notify: false },
+      timeout: { retry: true, fallback: true, notify: true },
+      server: { retry: false, fallback: true, notify: true },
+      client: { retry: false, fallback: false, notify: false }
     }
   },
   
-  // UI配置（优化版）
+  // UI配置
   ui: {
-    // 代理状态指示器配置
     statusIndicator: {
       showInResults: true,
       showInToolbar: true,
@@ -236,7 +216,6 @@ export const proxyConfig = {
       showPerformanceMetrics: true
     },
     
-    // 按钮配置
     buttons: {
       toggleText: {
         enabled: '🔒 代理已启用',
@@ -255,7 +234,6 @@ export const proxyConfig = {
       }
     },
     
-    // 通知配置
     notifications: {
       enabled: true,
       position: 'top-right',
@@ -268,7 +246,6 @@ export const proxyConfig = {
       }
     },
     
-    // 样式类名
     cssClasses: {
       proxyEnabled: 'proxy-enabled',
       proxyDisabled: 'proxy-disabled',
@@ -284,51 +261,29 @@ export const proxyConfig = {
   // 监控和分析配置
   monitoring: {
     enabled: true,
-    
-    // 收集的指标
-    metrics: [
-      'responseTime',
-      'successRate',
-      'cacheHitRate',
-      'errorRate',
-      'throughput'
-    ],
-    
-    // 报告频率（毫秒）
+    metrics: ['responseTime', 'successRate', 'cacheHitRate', 'errorRate', 'throughput'],
     reportInterval: 60000,
-    
-    // 性能阈值警告
     thresholds: {
-      responseTime: 2000, // ms
-      successRate: 0.8,   // 80%
-      errorRate: 0.2      // 20%
+      responseTime: 2000,
+      successRate: 0.8,
+      errorRate: 0.2
     }
   },
   
   // 安全配置
   security: {
-    // 内容安全策略
-    csp: {
-      enabled: false,
-      policy: "default-src 'self'; script-src 'self' 'unsafe-inline'"
-    },
-    
-    // 请求签名
-    signing: {
-      enabled: false,
-      algorithm: 'SHA-256'
-    },
-    
-    // 域名验证
-    domainValidation: {
-      enabled: true,
-      strict: false
-    }
-  }
+    csp: { enabled: false },
+    signing: { enabled: false },
+    domainValidation: { enabled: true, strict: false }
+  },
+  
+  // 版本信息
+  version: '2.1.0',
+  backendVersion: '2.0.0'
 };
 
 /**
- * 高级验证代理配置
+ * 验证代理配置
  */
 export function validateProxyConfig() {
   const issues = [];
@@ -349,11 +304,13 @@ export function validateProxyConfig() {
     }
   }
   
-  // URL模板验证
-  if (!proxyConfig.proxyUrlTemplate.includes('{proxy}') || 
-      !proxyConfig.proxyUrlTemplate.includes('{hostname}')) {
-    issues.push('代理URL模板格式不正确');
-  }
+  // API端点验证
+  const requiredEndpoints = ['health', 'status', 'cacheClear'];
+  requiredEndpoints.forEach(endpoint => {
+    if (!proxyConfig.api[endpoint]) {
+      issues.push(`缺少必要的API端点配置: ${endpoint}`);
+    }
+  });
   
   // 域名列表验证
   if (!Array.isArray(proxyConfig.supportedDomains) || 
@@ -383,21 +340,39 @@ export function validateProxyConfig() {
 }
 
 /**
+ * 获取后端API完整URL
+ */
+export function getApiUrl(endpoint) {
+  const endpointPath = proxyConfig.api[endpoint];
+  if (!endpointPath) {
+    throw new Error(`未知的API端点: ${endpoint}`);
+  }
+  return `${proxyConfig.proxyServer}${endpointPath}`;
+}
+
+/**
  * 获取代理健康检查URL
  */
 export function getProxyHealthCheckUrl() {
-  return `${proxyConfig.proxyServer}/api/health`;
+  return getApiUrl('health');
 }
 
 /**
  * 获取代理状态检查URL
  */
 export function getProxyStatusUrl() {
-  return `${proxyConfig.proxyServer}/api/status`;
+  return getApiUrl('status');
 }
 
 /**
- * 智能域名检查（支持通配符和正则）
+ * 获取缓存清理URL
+ */
+export function getCacheClearUrl() {
+  return getApiUrl('cacheClear');
+}
+
+/**
+ * 智能域名检查
  */
 export function isDomainSupported(hostname) {
   if (!hostname) return false;
@@ -409,17 +384,17 @@ export function isDomainSupported(hostname) {
     return true;
   }
   
-  // 检查是否是子域名
+  // 子域名匹配
   return proxyConfig.supportedDomains.some(domain => {
     const normalizedDomain = domain.toLowerCase();
     
-    // 处理通配符（如 *.example.com）
+    // 通配符匹配
     if (normalizedDomain.startsWith('*.')) {
       const baseDomain = normalizedDomain.substring(2);
       return normalizedHostname.endsWith(baseDomain);
     }
     
-    // 处理主域名匹配子域名
+    // 子域名匹配
     return normalizedHostname === normalizedDomain || 
            normalizedHostname.endsWith('.' + normalizedDomain);
   });
@@ -482,15 +457,17 @@ export function createRequestConfig(options = {}) {
   // 智能请求头管理
   const headers = new Headers();
   
-  // 只在必要时添加请求头
+  // 基础请求头
+  Object.entries(proxyConfig.requestConfig.headers).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
+  
+  // POST请求特殊处理
   if (options.body && ['POST', 'PUT', 'PATCH'].includes(config.method)) {
     headers.set('Content-Type', 'application/json');
   }
   
-  // 添加压缩支持
-  headers.set('Accept-Encoding', 'gzip, deflate, br');
-  
-  // 根据资源类型设置Accept头
+  // 资源类型特定的Accept头
   const acceptHeaders = {
     html: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     css: 'text/css,*/*;q=0.1',
@@ -504,7 +481,7 @@ export function createRequestConfig(options = {}) {
     headers.set('Accept', acceptHeaders[resourceType]);
   }
   
-  // 合并用户提供的请求头
+  // 合并用户请求头
   if (options.headers) {
     Object.entries(options.headers).forEach(([key, value]) => {
       headers.set(key, value);
@@ -512,18 +489,17 @@ export function createRequestConfig(options = {}) {
   }
   
   config.headers = headers;
-  
   return config;
 }
 
 /**
- * 智能代理连接测试
+ * 智能代理连接测试（适配后端多端点）
  */
 export async function testProxyConnectivity() {
   const endpoints = [
-    '/api/health',
-    '/api/status',
-    '/_health'
+    proxyConfig.api.health,
+    proxyConfig.api.status,
+    '/_health' // 后端支持的备用端点
   ];
   
   // 并发测试多个端点
@@ -590,13 +566,13 @@ export async function testProxyConnectivity() {
 }
 
 /**
- * 增强版错误日志管理
+ * 增强版错误日志管理（适配后端Enhanced Error Handling）
  */
 export const errorLogger = {
   maxLogs: 200,
   
   /**
-   * 记录错误（带分类）
+   * 记录错误
    */
   log(error, context = {}) {
     if (!proxyConfig.errorHandling.logErrors) return;
@@ -609,6 +585,8 @@ export const errorLogger = {
       type: this.classifyError(error),
       userAgent: navigator.userAgent,
       url: window.location.href,
+      backendVersion: proxyConfig.backendVersion,
+      frontendVersion: proxyConfig.version,
       performance: {
         memory: performance.memory ? {
           used: Math.round(performance.memory.usedJSHeapSize / 1048576),
@@ -646,24 +624,12 @@ export const errorLogger = {
   classifyError(error) {
     const message = error.message || '';
     
-    if (message.includes('network') || message.includes('fetch')) {
-      return 'network';
-    }
-    if (message.includes('timeout') || message.includes('超时')) {
-      return 'timeout';
-    }
-    if (message.includes('CORS')) {
-      return 'cors';
-    }
-    if (message.includes('404') || message.includes('not found')) {
-      return 'not_found';
-    }
-    if (message.includes('500') || message.includes('server')) {
-      return 'server';
-    }
-    if (message.includes('403') || message.includes('forbidden')) {
-      return 'forbidden';
-    }
+    if (message.includes('network') || message.includes('fetch')) return 'network';
+    if (message.includes('timeout') || message.includes('超时')) return 'timeout';
+    if (message.includes('CORS')) return 'cors';
+    if (message.includes('404') || message.includes('not found')) return 'not_found';
+    if (message.includes('500') || message.includes('server')) return 'server';
+    if (message.includes('403') || message.includes('forbidden')) return 'forbidden';
     
     return 'unknown';
   },
@@ -672,8 +638,7 @@ export const errorLogger = {
    * 发送到监控系统
    */
   async sendToMonitoring(errorLog) {
-    // 实现监控上报逻辑（如果需要）
-    // 例如：发送到 Sentry、LogRocket 等
+    // 预留接口，可接入监控服务
   },
   
   /**
@@ -704,7 +669,7 @@ export const errorLogger = {
   },
   
   /**
-   * 获取错误统计（增强版）
+   * 获取错误统计
    */
   getErrorStats() {
     const logs = this.getLogs();
