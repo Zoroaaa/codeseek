@@ -1,84 +1,108 @@
-name = "codeseek-site"
-main = "src/index.js"
-compatibility_date = "2024-03-18"
-workers_dev = true
+# 增强代理工作器配置
+# 针对新的8文件模块化架构进行优化
 
+name = "codeseek-site"
+main = "src/worker.js"
+compatibility_date = "2024-03-18"
+
+# 环境变量 - 生产环境默认设置
 [vars]
 # 基础配置
 ENVIRONMENT = "production"
 DEBUG = "false"
+PROXY_VERSION = "2.0.0"
+
+# 安全配置
+PROXY_PASSWORD = "zoro666"
+SHOW_PASSWORD_PAGE = "true"
+ENHANCED_ERROR_HANDLING = "true"
+DETAILED_ERROR_LOGS = "false"
 
 # 代理功能配置
 ALLOW_DIRECT_ACCESS = "true"
 ENABLE_PROXY_HINT = "true"
-PROXY_VERSION = "2.0.0"
+ENABLE_CONTENT_INJECTION = "true"
 
+# 缓存配置 (TTL单位为秒)
+CACHE_HTML_TTL = "3600"      # HTML缓存 1小时
+CACHE_CSS_TTL = "86400"      # CSS缓存 1天
+CACHE_JS_TTL = "86400"       # JavaScript缓存 1天
+CACHE_IMAGE_TTL = "2592000"  # 图片缓存 30天
+CACHE_FONT_TTL = "2592000"   # 字体缓存 30天
+CACHE_JSON_TTL = "1800"      # JSON缓存 30分钟
+CACHE_DEFAULT_TTL = "3600"   # 默认缓存 1小时
+MAX_CACHE_SIZE = "1048576"   # 单项最大缓存大小 1MB
 
-
-# 缓存配置（TTL单位：秒）
-CACHE_HTML_TTL = "3600"      # HTML缓存1小时
-CACHE_CSS_TTL = "86400"      # CSS缓存1天
-CACHE_JS_TTL = "86400"       # JavaScript缓存1天
-CACHE_IMAGE_TTL = "2592000"  # 图片缓存30天
-CACHE_FONT_TTL = "2592000"   # 字体缓存30天
-CACHE_JSON_TTL = "1800"      # JSON缓存30分钟
-CACHE_DEFAULT_TTL = "3600"   # 默认缓存1小时
-
-# 安全配置
+# 安全和CORS配置
 ENABLE_CORS = "true"
 ALLOW_ALL_ORIGINS = "true"
 REMOVE_CSP = "true"
-
-# 错误处理配置
-ENHANCED_ERROR_HANDLING = "true"
-DETAILED_ERROR_LOGS = "false"
+CORS_MAX_AGE = "86400"
 
 # 性能配置
 ENABLE_GZIP = "true"
-MAX_RESPONSE_SIZE = "52428800"  # 50MB
+MAX_RESPONSE_SIZE = "52428800"  # 最大响应大小 50MB
+REQUEST_TIMEOUT = "30000"       # 请求超时 30秒
+CONCURRENT_REQUESTS_LIMIT = "10"
 
-# 监控配置
+# 速率限制配置
+ENABLE_RATE_LIMITING = "true"
+RATE_LIMIT_REQUESTS = "60"      # 每分钟请求数
+RATE_LIMIT_WINDOW = "60000"     # 1分钟窗口时间 (毫秒)
+
+# 内容过滤配置
+ENABLE_USER_AGENT_BLOCKING = "true"
+ENABLE_CONTENT_FILTERING = "true"
+
+# 监控和健康检查配置
 ENABLE_HEALTH_CHECK = "true"
 ENABLE_METRICS = "true"
+ENABLE_ACCESS_LOGS = "false"
 
-# KV存储绑定
+# KV存储绑定用于缓存
 [[kv_namespaces]]
 binding = "KV_CACHE"
-id = "21feed084fa648dd932e404935aec39c"  # 替换为您的实际KV命名空间ID
-preview_id = "21feed084fa648dd932e404935aec39c"  # 替换为您的预览KV命名空间ID
+id = "21feed084fa648dd932e404935aec39c"
+preview_id = "21feed084fa648dd932e404935aec39c"
 
-# 环境配置 - development
-[env.development.vars]
-DEBUG = "false"
-ENVIRONMENT = "development"
-DETAILED_ERROR_LOGS = "true"
-CACHE_HTML_TTL = "60"
-CACHE_CSS_TTL = "300"
-CACHE_JS_TTL = "300"
+# 兼容性配置
+compatibility_flags = ["nodejs_compat"]
 
-# 环境配置 - staging
-[env.staging.vars]
-DEBUG = "false"
-ENVIRONMENT = "staging"
-DETAILED_ERROR_LOGS = "true"
+# 可观测性配置
+[observability]
+enabled = true
 
-# 环境配置 - production
-[env.production.vars]
-DEBUG = "false"
-ENVIRONMENT = "production"
-DETAILED_ERROR_LOGS = "false"
-
-# 自定义域名配置（可选）
+# 可选：自定义域名路由
+# 取消注释并配置自定义域名
 # routes = [
 #   { pattern = "proxy.yourdomain.com/*", zone_name = "yourdomain.com" }
 # ]
 
+# 可选：持久对象 (用于会话等高级功能)
+# [[durable_objects.bindings]]
+# name = "PROXY_SESSIONS"
+# class_name = "ProxySession"
 
-# 兼容性标志
-compatibility_flags = ["nodejs_compat"]
+# 可选：R2存储绑定 (用于大文件缓存)
+# [[r2_buckets]]
+# binding = "PROXY_STORAGE"
+# bucket_name = "enhanced-proxy-storage"
 
-# 构建配置
-[build]
-command = ""
-cwd = ""
-watch_dir = "src"
+# 可选：分析引擎绑定 (用于详细指标)
+# [[analytics_engine_datasets]]
+# binding = "PROXY_ANALYTICS"
+
+# 可选：定时触发器用于维护任务
+# [[triggers.crons]]
+# cron = "0 2 * * *"  # 每天凌晨2点
+# destination = "cleanup-cache"
+
+# 可选：队列绑定 (用于后台任务)
+# [[queues.consumers]]
+# queue = "proxy-tasks"
+# max_batch_size = 10
+# max_batch_timeout = 1000
+
+# [[queues.producers]]
+# binding = "PROXY_QUEUE"
+# queue = "proxy-tasks"

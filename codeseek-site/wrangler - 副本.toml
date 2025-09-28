@@ -1,0 +1,84 @@
+name = "codeseek-site"
+main = "src/index.js"
+compatibility_date = "2024-03-18"
+workers_dev = true
+
+[vars]
+# 基础配置
+ENVIRONMENT = "production"
+DEBUG = "false"
+
+# 代理功能配置
+ALLOW_DIRECT_ACCESS = "true"
+ENABLE_PROXY_HINT = "true"
+PROXY_VERSION = "2.0.0"
+
+
+
+# 缓存配置（TTL单位：秒）
+CACHE_HTML_TTL = "3600"      # HTML缓存1小时
+CACHE_CSS_TTL = "86400"      # CSS缓存1天
+CACHE_JS_TTL = "86400"       # JavaScript缓存1天
+CACHE_IMAGE_TTL = "2592000"  # 图片缓存30天
+CACHE_FONT_TTL = "2592000"   # 字体缓存30天
+CACHE_JSON_TTL = "1800"      # JSON缓存30分钟
+CACHE_DEFAULT_TTL = "3600"   # 默认缓存1小时
+
+# 安全配置
+ENABLE_CORS = "true"
+ALLOW_ALL_ORIGINS = "true"
+REMOVE_CSP = "true"
+
+# 错误处理配置
+ENHANCED_ERROR_HANDLING = "true"
+DETAILED_ERROR_LOGS = "false"
+
+# 性能配置
+ENABLE_GZIP = "true"
+MAX_RESPONSE_SIZE = "52428800"  # 50MB
+
+# 监控配置
+ENABLE_HEALTH_CHECK = "true"
+ENABLE_METRICS = "true"
+
+# KV存储绑定
+[[kv_namespaces]]
+binding = "KV_CACHE"
+id = "21feed084fa648dd932e404935aec39c"  # 替换为您的实际KV命名空间ID
+preview_id = "21feed084fa648dd932e404935aec39c"  # 替换为您的预览KV命名空间ID
+
+# 环境配置 - development
+[env.development.vars]
+DEBUG = "false"
+ENVIRONMENT = "development"
+DETAILED_ERROR_LOGS = "true"
+CACHE_HTML_TTL = "60"
+CACHE_CSS_TTL = "300"
+CACHE_JS_TTL = "300"
+
+# 环境配置 - staging
+[env.staging.vars]
+DEBUG = "false"
+ENVIRONMENT = "staging"
+DETAILED_ERROR_LOGS = "true"
+
+# 环境配置 - production
+[env.production.vars]
+DEBUG = "false"
+ENVIRONMENT = "production"
+DETAILED_ERROR_LOGS = "false"
+
+# 自定义域名配置（可选）
+# routes = [
+#   { pattern = "proxy.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
+
+
+# 兼容性标志
+compatibility_flags = ["nodejs_compat"]
+
+# 构建配置
+[build]
+command = ""
+cwd = ""
+watch_dir = "src"
