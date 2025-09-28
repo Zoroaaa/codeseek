@@ -940,7 +940,7 @@ class SearchSourcesAPI {
 
   // ===================== 便捷方法 =====================
 
-  // 切换搜索源可用状态
+  // 切换搜索源启用状态
   async toggleSourceEnabled(sourceId, enabled) {
     return await this.updateUserSourceConfig({
       sourceId,
@@ -948,7 +948,7 @@ class SearchSourcesAPI {
     });
   }
 
-  // 批量可用/禁用搜索源
+  // 批量启用/禁用搜索源
   async batchToggleSources(sourceIds, enabled) {
     const configs = sourceIds.map(sourceId => ({
       sourceId,
@@ -957,7 +957,7 @@ class SearchSourcesAPI {
     return await this.batchUpdateUserSourceConfigs(configs);
   }
 
-  // 可用所有搜索源
+  // 启用所有搜索源
   async enableAllSources() {
     try {
       const sources = await this.getSearchSources({ includeSystem: true });
@@ -967,7 +967,7 @@ class SearchSourcesAPI {
       }));
       return await this.batchUpdateUserSourceConfigs(configs);
     } catch (error) {
-      console.error('可用所有搜索源失败:', error);
+      console.error('启用所有搜索源失败:', error);
       throw error;
     }
   }
@@ -993,7 +993,7 @@ class SearchSourcesAPI {
       // 获取所有搜索源
       const sources = await this.getSearchSources({ includeSystem: true });
       
-      // 默认可用的搜索源ID列表（回退到基本搜索源）
+      // 默认启用的搜索源ID列表（回退到基本搜索源）
       const defaultEnabledSources = ['javbus', 'javdb', 'javlibrary', 'btsow'];
       
       const configs = sources.map(source => ({
@@ -1109,12 +1109,12 @@ class SearchSourcesAPI {
 
   // 为了兼容现有代码，提供一些兼容性方法
 
-  // 获取可用的搜索源（兼容原有接口）
+  // 获取启用的搜索源（兼容原有接口）
   async getEnabledSearchSources() {
     try {
       return await this.getSearchSources({ enabledOnly: true });
     } catch (error) {
-      console.error('获取可用的搜索源失败:', error);
+      console.error('获取启用的搜索源失败:', error);
       return [];
     }
   }
@@ -1175,7 +1175,7 @@ class SearchSourcesAPI {
   setDebugMode(enabled) {
     this.debugMode = enabled;
     if (enabled) {
-      console.log('🐛 搜索源API调试模式已开启');
+      console.log('🛠 搜索源API调试模式已开启');
     }
   }
 }

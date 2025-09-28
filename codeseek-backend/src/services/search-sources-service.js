@@ -146,9 +146,8 @@ class SearchSourcesService {
                 INSERT INTO search_source_categories (
                     id, major_category_id, name, description, icon, color,
                     display_order, is_system, is_active, default_searchable,
-                    default_site_type, search_priority, supports_detail_extraction,
-                    extraction_priority, created_by, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    default_site_type, search_priority, created_by, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).bind(
                 categoryId,
                 categoryData.majorCategoryId,
@@ -162,8 +161,6 @@ class SearchSourcesService {
                 categoryData.defaultSearchable ? 1 : 0,
                 categoryData.defaultSiteType || 'search',
                 categoryData.searchPriority || 5,
-                categoryData.supportsDetailExtraction ? 1 : 0,
-                categoryData.extractionPriority || 'medium',
                 creatorId,
                 now,
                 now
@@ -182,8 +179,6 @@ class SearchSourcesService {
                 default_searchable: categoryData.defaultSearchable ? 1 : 0,
                 default_site_type: categoryData.defaultSiteType || 'search',
                 search_priority: categoryData.searchPriority || 5,
-                supports_detail_extraction: categoryData.supportsDetailExtraction ? 1 : 0,
-                extraction_priority: categoryData.extractionPriority || 'medium',
                 created_by: creatorId,
                 created_at: now,
                 updated_at: now
@@ -426,27 +421,22 @@ class SearchSourcesService {
                 INSERT INTO search_sources (
                     id, category_id, name, subtitle, description, icon, url_template,
                     homepage_url, site_type, searchable, requires_keyword, search_priority,
-                    supports_detail_extraction, extraction_quality, average_extraction_time,
-                    supported_features, is_system, is_active, display_order, usage_count,
+                    is_system, is_active, display_order, usage_count,
                     created_by, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).bind(
                 sourceId,
                 sourceData.categoryId,
                 sourceData.name,
                 sourceData.subtitle || '',
                 sourceData.description || '',
-                sourceData.icon || '🔍',
+                sourceData.icon || '📁',
                 sourceData.urlTemplate,
                 sourceData.homepageUrl || '',
                 sourceData.siteType || 'search',
                 sourceData.searchable ? 1 : 0,
                 sourceData.requiresKeyword ? 1 : 0,
                 sourceData.searchPriority || 5,
-                sourceData.supportsDetailExtraction ? 1 : 0,
-                sourceData.extractionQuality || 'none',
-                0, // 初始提取时间
-                JSON.stringify(sourceData.supportedFeatures || []),
                 0, // 用户创建的非系统源
                 1, // 激活状态
                 999, // 新创建的排在最后
@@ -465,17 +455,13 @@ class SearchSourcesService {
                 name: sourceData.name,
                 subtitle: sourceData.subtitle || '',
                 description: sourceData.description || '',
-                icon: sourceData.icon || '🔍',
+                icon: sourceData.icon || '📁',
                 url_template: sourceData.urlTemplate,
                 homepage_url: sourceData.homepageUrl || '',
                 site_type: sourceData.siteType || 'search',
                 searchable: sourceData.searchable ? 1 : 0,
                 requires_keyword: sourceData.requiresKeyword ? 1 : 0,
                 search_priority: sourceData.searchPriority || 5,
-                supports_detail_extraction: sourceData.supportsDetailExtraction ? 1 : 0,
-                extraction_quality: sourceData.extractionQuality || 'none',
-                average_extraction_time: 0,
-                supported_features: JSON.stringify(sourceData.supportedFeatures || []),
                 is_system: 0,
                 is_active: 1,
                 display_order: 999,
@@ -539,9 +525,7 @@ class SearchSourcesService {
                 const dbField = this.convertSourceFieldToDb(field);
                 if (dbField) {
                     let value = updateData[field];
-                    if (field === 'supportedFeatures') {
-                        value = JSON.stringify(value);
-                    } else if (typeof value === 'boolean') {
+                    if (typeof value === 'boolean') {
                         value = value ? 1 : 0;
                     }
                     updateFields.push(`${dbField} = ?`);
@@ -909,8 +893,6 @@ class SearchSourcesService {
             defaultSearchable: Boolean(data.default_searchable),
             defaultSiteType: data.default_site_type || 'search',
             searchPriority: data.search_priority || 5,
-            supportsDetailExtraction: Boolean(data.supports_detail_extraction),
-            extractionPriority: data.extraction_priority || 'medium',
             createdBy: data.created_by,
             createdAt: data.created_at,
             updatedAt: data.updated_at
@@ -932,8 +914,8 @@ class SearchSourcesService {
             subtitle: data.custom_subtitle || data.subtitle || '',
             originalSubtitle: data.subtitle || '',
             description: data.description || '',
-            icon: data.custom_icon || data.icon || '🔍',
-            originalIcon: data.icon || '🔍',
+            icon: data.custom_icon || data.icon || '📁',
+            originalIcon: data.icon || '📁',
             urlTemplate: data.url_template,
             homepageUrl: data.homepage_url || '',
             siteType: data.site_type || 'search',
@@ -941,10 +923,6 @@ class SearchSourcesService {
             requiresKeyword: Boolean(data.requires_keyword),
             searchPriority: data.custom_priority || data.search_priority || 5,
             originalPriority: data.search_priority || 5,
-            supportsDetailExtraction: Boolean(data.supports_detail_extraction),
-            extractionQuality: data.extraction_quality || 'none',
-            averageExtractionTime: data.average_extraction_time || 0,
-            supportedFeatures: this.parseJsonSafely(data.supported_features, []),
             isSystem: Boolean(data.is_system),
             isActive: Boolean(data.is_active),
             displayOrder: data.display_order || 999,
@@ -990,9 +968,7 @@ class SearchSourcesService {
             'color': 'color',
             'defaultSearchable': 'default_searchable',
             'defaultSiteType': 'default_site_type',
-            'searchPriority': 'search_priority',
-            'supportsDetailExtraction': 'supports_detail_extraction',
-            'extractionPriority': 'extraction_priority'
+            'searchPriority': 'search_priority'
         };
         return fieldMap[field];
     }
@@ -1010,10 +986,7 @@ class SearchSourcesService {
             'siteType': 'site_type',
             'searchable': 'searchable',
             'requiresKeyword': 'requires_keyword',
-            'searchPriority': 'search_priority',
-            'supportsDetailExtraction': 'supports_detail_extraction',
-            'extractionQuality': 'extraction_quality',
-            'supportedFeatures': 'supported_features'
+            'searchPriority': 'search_priority'
         };
         return fieldMap[field];
     }

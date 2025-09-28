@@ -104,9 +104,7 @@ export async function createSourceCategoryHandler(request, env) {
             color,
             defaultSearchable,
             defaultSiteType,
-            searchPriority,
-            supportsDetailExtraction,
-            extractionPriority
+            searchPriority
         } = body;
 
         // 增强输入验证
@@ -123,9 +121,7 @@ export async function createSourceCategoryHandler(request, env) {
             color: color?.trim() || '#3b82f6',
             defaultSearchable: defaultSearchable !== false,
             defaultSiteType: defaultSiteType || 'search',
-            searchPriority: Math.min(Math.max(parseInt(searchPriority) || 5, 1), 10),
-            supportsDetailExtraction: supportsDetailExtraction === true,
-            extractionPriority: extractionPriority || 'medium'
+            searchPriority: Math.min(Math.max(parseInt(searchPriority) || 5, 1), 10)
         };
 
         const result = await searchSourcesService.createSourceCategory(env, categoryData, user.id);
@@ -169,8 +165,7 @@ export async function updateSourceCategoryHandler(request, env) {
         // 允许更新的字段
         const allowedFields = [
             'name', 'description', 'icon', 'color', 
-            'defaultSearchable', 'defaultSiteType', 'searchPriority',
-            'supportsDetailExtraction', 'extractionPriority'
+            'defaultSearchable', 'defaultSiteType', 'searchPriority'
         ];
 
         allowedFields.forEach(field => {
@@ -291,10 +286,7 @@ export async function createSearchSourceHandler(request, env) {
             siteType,
             searchable,
             requiresKeyword,
-            searchPriority,
-            supportsDetailExtraction,
-            extractionQuality,
-            supportedFeatures
+            searchPriority
         } = body;
 
         const sourceData = {
@@ -302,16 +294,13 @@ export async function createSearchSourceHandler(request, env) {
             name: name.trim(),
             subtitle: subtitle?.trim() || '',
             description: description?.trim() || '',
-            icon: icon?.trim() || '🔍',
+            icon: icon?.trim() || '📁',
             urlTemplate: urlTemplate.trim(),
             homepageUrl: homepageUrl?.trim() || '',
             siteType: siteType || 'search',
             searchable: searchable !== false,
             requiresKeyword: requiresKeyword !== false,
-            searchPriority: Math.min(Math.max(parseInt(searchPriority) || 5, 1), 10),
-            supportsDetailExtraction: supportsDetailExtraction === true,
-            extractionQuality: extractionQuality || 'none',
-            supportedFeatures: Array.isArray(supportedFeatures) ? supportedFeatures : []
+            searchPriority: Math.min(Math.max(parseInt(searchPriority) || 5, 1), 10)
         };
 
         const result = await searchSourcesService.createSearchSource(env, sourceData, user.id);
@@ -356,16 +345,13 @@ export async function updateSearchSourceHandler(request, env) {
         const allowedFields = [
             'categoryId', 'name', 'subtitle', 'description', 'icon', 
             'urlTemplate', 'homepageUrl', 'siteType', 'searchable', 
-            'requiresKeyword', 'searchPriority', 'supportsDetailExtraction',
-            'extractionQuality', 'supportedFeatures'
+            'requiresKeyword', 'searchPriority'
         ];
 
         allowedFields.forEach(field => {
             if (body.hasOwnProperty(field)) {
                 if (field === 'searchPriority') {
                     updateData[field] = Math.min(Math.max(parseInt(body[field]) || 5, 1), 10);
-                } else if (field === 'supportedFeatures') {
-                    updateData[field] = Array.isArray(body[field]) ? body[field] : [];
                 } else if (typeof body[field] === 'string') {
                     updateData[field] = body[field].trim();
                 } else {
@@ -603,11 +589,6 @@ function validateCategoryInput(data) {
         return { valid: false, error: '网站类型必须是search、browse或reference' };
     }
 
-    const validExtractionPriorities = ['high', 'medium', 'low', 'none'];
-    if (data.extractionPriority && !validExtractionPriorities.includes(data.extractionPriority)) {
-        return { valid: false, error: '提取优先级必须是high、medium、low或none' };
-    }
-
     return { valid: true };
 }
 
@@ -671,11 +652,6 @@ function validateSourceInput(data) {
     const validSiteTypes = ['search', 'browse', 'reference'];
     if (data.siteType && !validSiteTypes.includes(data.siteType)) {
         return { valid: false, error: '网站类型必须是search、browse或reference' };
-    }
-
-    const validExtractionQualities = ['excellent', 'good', 'fair', 'poor', 'none'];
-    if (data.extractionQuality && !validExtractionQualities.includes(data.extractionQuality)) {
-        return { valid: false, error: '提取质量必须是excellent、good、fair、poor或none' };
     }
 
     return { valid: true };

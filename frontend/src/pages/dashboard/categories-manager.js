@@ -167,7 +167,7 @@ export class CategoriesManager {
       .forEach(majorCategory => {
         const categories = categoriesByMajor[majorCategory.id] || [];
         
-        console.log(`📁 大类 ${majorCategory.id} (${majorCategory.name}) 包含 ${categories.length} 个分类`);
+        console.log(`🔍 大类 ${majorCategory.id} (${majorCategory.name}) 包含 ${categories.length} 个分类`);
         
         if (categories.length === 0) return;
         
