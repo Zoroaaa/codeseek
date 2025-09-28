@@ -1,8 +1,8 @@
-// frontend/src/core/proxy-config.js - 重构版代理配置
+// frontend/src/core/proxy-config.js - 重构版代理配置（无域名限制版）
 // 版本: v2.1.0 - 适配后端Enhanced Proxy Worker v2.0.0
 
 /**
- * 代理配置管理中心 - 重构版
+ * 代理配置管理中心 - 重构版（无域名限制）
  * 完全适配后端Enhanced Proxy Worker v2.0.0功能
  */
 export const proxyConfig = {
@@ -28,39 +28,6 @@ export const proxyConfig = {
   // 代理URL格式（适配后端格式：{proxy}/{target_url}）
   proxyUrlFormat: '{proxy}/{target_url}',
   
-  // 支持代理的域名白名单
-  supportedDomains: [
-    // JAV相关站点
-    'www.javbus.com', 'javbus.com',
-    'javdb.com', 'www.javdb.com',
-    'www.javlibrary.com', 'javlibrary.com',
-    'jable.tv', 'www.jable.tv',
-    'javmost.com', 'www.javmost.com',
-    'jav.guru', 'www.jav.guru',
-    'av01.tv', 'www.av01.tv',
-    'missav.com', 'www.missav.com',
-    'javhd.porn', 'www.javhd.porn',
-    'javgg.net', 'www.javgg.net',
-    'javhihi.com', 'www.javhihi.com',
-    
-    // 种子/磁力站点
-    'sukebei.nyaa.si',
-    'btsow.com', 'www.btsow.com',
-    'magnetdl.com', 'www.magnetdl.com',
-    'torrentkitty.tv', 'www.torrentkitty.tv',
-    
-    // 论坛站点
-    'sehuatang.org', 'www.sehuatang.org',
-    't66y.com', 'www.t66y.com'
-  ],
-  
-  // 域名分类
-  domainCategories: {
-    video: ['jable.tv', 'missav.com', 'av01.tv', 'javmost.com'],
-    database: ['javbus.com', 'javdb.com', 'javlibrary.com'],
-    torrent: ['sukebei.nyaa.si', 'btsow.com', 'magnetdl.com'],
-    forum: ['sehuatang.org', 't66y.com']
-  },
   
   // 后端API端点配置
   api: {
@@ -227,7 +194,7 @@ export const proxyConfig = {
       },
       tooltips: {
         enabled: '点击关闭代理模式\n成功率: {successRate}%\n响应时间: {avgTime}ms',
-        disabled: '点击启用代理模式，通过代理服务器访问搜索结果',
+        disabled: '点击启用代理模式，通过代理服务器访问所有网站',
         unavailable: '代理服务不可用',
         degraded: '代理服务部分可用，已启用降级模式',
         smart: '智能模式：自动检测并使用代理'
@@ -270,11 +237,14 @@ export const proxyConfig = {
     }
   },
   
-  // 安全配置
+  // 安全配置 - 已关闭域名验证
   security: {
     csp: { enabled: false },
     signing: { enabled: false },
-    domainValidation: { enabled: true, strict: false }
+    domainValidation: { 
+      enabled: false,  // 关闭域名验证
+      strict: false 
+    }
   },
   
   // 版本信息
@@ -312,12 +282,6 @@ export function validateProxyConfig() {
     }
   });
   
-  // 域名列表验证
-  if (!Array.isArray(proxyConfig.supportedDomains) || 
-      proxyConfig.supportedDomains.length === 0) {
-    issues.push('支持的域名列表为空');
-  }
-  
   // 性能建议
   if (proxyConfig.performance.maxConcurrent > 10) {
     warnings.push('并发请求数过高可能影响性能');
@@ -327,9 +291,8 @@ export function validateProxyConfig() {
     recommendations.push('建议启用缓存以提升性能');
   }
   
-  if (!proxyConfig.smartMode.enabled && proxyConfig.supportedDomains.length > 20) {
-    recommendations.push('域名较多时建议启用智能模式');
-  }
+  // 移除域名相关的验证，因为已不做域名限制
+  recommendations.push('当前配置支持所有域名的代理访问');
   
   return {
     isValid: issues.length === 0,
@@ -372,44 +335,87 @@ export function getCacheClearUrl() {
 }
 
 /**
- * 智能域名检查
+ * 域名支持检查 - 现在支持所有域名
  */
 export function isDomainSupported(hostname) {
+  // 移除域名限制，所有域名都支持代理
   if (!hostname) return false;
   
-  const normalizedHostname = hostname.toLowerCase();
+  // 基本的域名格式验证
+  const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?(?:\.[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?)*$/;
   
-  // 精确匹配
-  if (proxyConfig.supportedDomains.includes(normalizedHostname)) {
-    return true;
-  }
-  
-  // 子域名匹配
-  return proxyConfig.supportedDomains.some(domain => {
-    const normalizedDomain = domain.toLowerCase();
+  try {
+    const normalizedHostname = hostname.toLowerCase().trim();
     
-    // 通配符匹配
-    if (normalizedDomain.startsWith('*.')) {
-      const baseDomain = normalizedDomain.substring(2);
-      return normalizedHostname.endsWith(baseDomain);
+    // 排除明显无效的域名
+    if (normalizedHostname.length === 0 || 
+        normalizedHostname.includes('..') ||
+        normalizedHostname.startsWith('.') || 
+        normalizedHostname.endsWith('.') ||
+        normalizedHostname.includes(' ')) {
+      return false;
     }
     
-    // 子域名匹配
-    return normalizedHostname === normalizedDomain || 
-           normalizedHostname.endsWith('.' + normalizedDomain);
-  });
+    // 排除本地地址和内网地址
+    if (normalizedHostname === 'localhost' ||
+        normalizedHostname.startsWith('127.') ||
+        normalizedHostname.startsWith('192.168.') ||
+        normalizedHostname.startsWith('10.') ||
+        normalizedHostname.endsWith('.local')) {
+      return false;
+    }
+    
+    // 基本格式检查
+    return domainRegex.test(normalizedHostname);
+    
+  } catch (error) {
+    console.warn('域名验证出错:', error);
+    return false;
+  }
 }
 
 /**
- * 获取域名分类
+ * 获取域名分类 - 支持动态分类
  */
 export function getDomainCategory(hostname) {
+  if (!hostname) return 'unknown';
+  
+  const normalizedHostname = hostname.toLowerCase();
+  
+  // 检查预定义分类
   for (const [category, domains] of Object.entries(proxyConfig.domainCategories)) {
-    if (domains.some(domain => hostname.includes(domain))) {
+    if (domains.some(domain => normalizedHostname.includes(domain.toLowerCase()))) {
       return category;
     }
   }
-  return 'other';
+  
+  // 基于域名特征的智能分类
+  if (normalizedHostname.includes('video') || 
+      normalizedHostname.includes('tube') || 
+      normalizedHostname.includes('av') ||
+      normalizedHostname.includes('porn')) {
+    return 'video';
+  }
+  
+  if (normalizedHostname.includes('torrent') || 
+      normalizedHostname.includes('magnet') || 
+      normalizedHostname.includes('bt')) {
+    return 'torrent';
+  }
+  
+  if (normalizedHostname.includes('forum') || 
+      normalizedHostname.includes('bbs') || 
+      normalizedHostname.includes('community')) {
+    return 'forum';
+  }
+  
+  if (normalizedHostname.includes('db') || 
+      normalizedHostname.includes('library') || 
+      normalizedHostname.includes('data')) {
+    return 'database';
+  }
+  
+  return 'general';
 }
 
 /**
@@ -425,7 +431,9 @@ export function getDefaultConfig() {
       performanceMode: 'balanced',
       showStatusInResults: true,
       preferOriginalOnError: true,
-      logErrors: true
+      logErrors: true,
+      domainWhitelist: [], // 用户自定义白名单（可选）
+      domainBlacklist: []  // 用户自定义黑名单（可选）
     },
     stats: {
       totalRequests: 0,
@@ -434,9 +442,38 @@ export function getDefaultConfig() {
       cacheHits: 0,
       cacheMisses: 0,
       lastUsed: null,
-      averageResponseTime: 0
+      averageResponseTime: 0,
+      uniqueDomainsAccessed: new Set() // 记录访问过的唯一域名
     }
   };
+}
+
+/**
+ * 用户自定义域名过滤（可选功能）
+ */
+export function isUserAllowedDomain(hostname, userPreferences = {}) {
+  if (!hostname) return false;
+  
+  const { domainWhitelist = [], domainBlacklist = [] } = userPreferences;
+  
+  // 如果有黑名单，检查是否被禁止
+  if (domainBlacklist.length > 0) {
+    const isBlacklisted = domainBlacklist.some(domain => 
+      hostname.toLowerCase().includes(domain.toLowerCase())
+    );
+    if (isBlacklisted) return false;
+  }
+  
+  // 如果有白名单，检查是否在白名单中
+  if (domainWhitelist.length > 0) {
+    const isWhitelisted = domainWhitelist.some(domain => 
+      hostname.toLowerCase().includes(domain.toLowerCase())
+    );
+    return isWhitelisted;
+  }
+  
+  // 没有特殊配置时，允许所有通过基本验证的域名
+  return isDomainSupported(hostname);
 }
 
 /**
