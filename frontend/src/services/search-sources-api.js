@@ -1,4 +1,4 @@
-// src/services/search-sources-api.js - 优化版本：修复前后端字段匹配问题
+// src/services/search-sources-api.js - 优化版本：修复前后端字段匹配问题，提升稳定性
 import { APP_CONSTANTS } from '../core/constants.js';
 import { generateId } from '../utils/helpers.js';
 
@@ -9,14 +9,14 @@ class SearchSourcesAPI {
     this.maxRetries = 3;
     this.retryDelay = 1000;
     
-    // 缓存机制
+    // 缓存机制 - 优化缓存策略
     this.cache = new Map();
     this.cacheExpiry = {
-      majorCategories: 600000,    // 10分钟
-      categories: 300000,         // 5分钟
-      sources: 300000,            // 5分钟
-      userConfigs: 120000,        // 2分钟
-      stats: 60000                // 1分钟
+      majorCategories: 300000,    // 5分钟（减少缓存时间确保数据及时更新）
+      categories: 180000,         // 3分钟
+      sources: 180000,            // 3分钟
+      userConfigs: 60000,         // 1分钟
+      stats: 30000                // 30秒
     };
     
     // 请求统计
@@ -27,6 +27,9 @@ class SearchSourcesAPI {
       cacheHits: 0,
       averageResponseTime: 0
     };
+    
+    // 添加调试模式
+    this.debugMode = false;
   }
 
   // 从环境变量或配置获取API基础URL
@@ -45,13 +48,20 @@ class SearchSourcesAPI {
     return window.API_CONFIG?.PROD_URL || 'https://backend.codeseek.pp.ua';
   }
 
+  // 优化token设置方法
   setToken(token) {
     this.token = token;
     if (token) {
       localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN, token);
+      if (this.debugMode) {
+        console.log('✅ API Token已设置');
+      }
     } else {
       localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
       this.clearCache();
+      if (this.debugMode) {
+        console.log('🗑️ API Token已清除，缓存已清空');
+      }
     }
   }
 
@@ -61,12 +71,21 @@ class SearchSourcesAPI {
     const cacheKey = this.getCacheKey(endpoint, options);
     const startTime = Date.now();
     
-    // 检查缓存
-    if (options.method === 'GET' || !options.method) {
+    // 对于用户相关请求，必须有token
+    if (!this.token && this.requiresAuth(endpoint)) {
+      const error = new Error('用户未登录或认证已过期');
+      error.code = 'AUTH_REQUIRED';
+      throw error;
+    }
+    
+    // 检查缓存 - 但登录后强制刷新用户相关数据
+    if ((options.method === 'GET' || !options.method) && !options.forceRefresh) {
       const cached = this.getFromCache(cacheKey);
       if (cached) {
         this.requestStats.cacheHits++;
-        console.log(`缓存命中: ${endpoint}`);
+        if (this.debugMode) {
+          console.log(`📦 缓存命中: ${endpoint}`);
+        }
         return cached;
       }
     }
@@ -96,6 +115,10 @@ class SearchSourcesAPI {
           throw new Error('网络连接不可用');
         }
         
+        if (this.debugMode) {
+          console.log(`🌐 API请求: ${config.method} ${url} (尝试 ${attempt + 1}/${this.maxRetries})`);
+        }
+        
         const response = await fetch(url, config);
         
         if (response.ok) {
@@ -117,15 +140,33 @@ class SearchSourcesAPI {
           const responseTime = Date.now() - startTime;
           this.updateStats('success', responseTime);
           
+          if (this.debugMode) {
+            console.log(`✅ API响应成功: ${endpoint} (${responseTime}ms)`);
+          }
+          
           return result;
         }
         
+        // 处理401认证错误
         if (response.status === 401) {
           this.setToken(null);
-          throw new Error('认证失败，请重新登录');
+          const authError = new Error('认证失败，请重新登录');
+          authError.code = 'AUTH_FAILED';
+          throw authError;
         }
         
+        // 处理403权限错误
+        if (response.status === 403) {
+          const permError = new Error('权限不足');
+          permError.code = 'PERMISSION_DENIED';
+          throw permError;
+        }
+        
+        // 5xx错误重试
         if (response.status >= 500 && attempt < this.maxRetries - 1) {
+          if (this.debugMode) {
+            console.warn(`⚠️ 服务器错误 ${response.status}，准备重试...`);
+          }
           await this.delay(this.retryDelay * (attempt + 1));
           continue;
         }
@@ -140,13 +181,19 @@ class SearchSourcesAPI {
           if (errorText) errorMessage += `: ${errorText}`;
         }
         
-        throw new Error(errorMessage);
+        const httpError = new Error(errorMessage);
+        httpError.code = `HTTP_${response.status}`;
+        throw httpError;
         
       } catch (error) {
         lastError = error;
         
+        // 网络错误重试
         if ((error.name === 'TypeError' || error.message.includes('fetch')) && 
             attempt < this.maxRetries - 1) {
+          if (this.debugMode) {
+            console.warn(`⚠️ 网络错误，准备重试: ${error.message}`);
+          }
           await this.delay(this.retryDelay * (attempt + 1));
           continue;
         }
@@ -155,15 +202,29 @@ class SearchSourcesAPI {
     }
     
     this.updateStats('error');
-    console.error(`搜索源管理API请求失败 (${endpoint}):`, lastError);
+    console.error(`❌ 搜索源管理API请求失败 (${endpoint}):`, lastError);
     throw lastError;
   }
 
-  // 缓存相关方法
+  // 判断接口是否需要认证
+  requiresAuth(endpoint) {
+    const authRequiredPaths = [
+      '/api/search-sources/categories',
+      '/api/search-sources/sources',
+      '/api/search-sources/user-configs',
+      '/api/search-sources/stats',
+      '/api/search-sources/export'
+    ];
+    
+    return authRequiredPaths.some(path => endpoint.includes(path));
+  }
+
+  // 缓存相关方法 - 优化缓存逻辑
   getCacheKey(endpoint, options) {
     const method = options.method || 'GET';
     const params = new URLSearchParams(new URL(`${this.baseURL}${endpoint}`).search).toString();
-    return `${method}:${endpoint}:${params}`;
+    const tokenHash = this.token ? this.token.slice(-8) : 'guest'; // 使用token的后8位作为缓存隔离
+    return `${method}:${endpoint}:${params}:${tokenHash}`;
   }
 
   getFromCache(key) {
@@ -199,12 +260,30 @@ class SearchSourcesAPI {
     if (endpoint.includes('sources')) return this.cacheExpiry.sources;
     if (endpoint.includes('user-configs')) return this.cacheExpiry.userConfigs;
     if (endpoint.includes('stats')) return this.cacheExpiry.stats;
-    return 300000; // 默认5分钟
+    return 180000; // 默认3分钟
   }
 
   clearCache() {
     this.cache.clear();
-    console.log('搜索源API缓存已清空');
+    if (this.debugMode) {
+      console.log('🗑️ 搜索源API缓存已清空');
+    }
+  }
+
+  // 清除特定用户的缓存
+  clearUserCache() {
+    const keysToDelete = [];
+    for (const [key] of this.cache) {
+      if (key.includes(this.token ? this.token.slice(-8) : 'guest')) {
+        keysToDelete.push(key);
+      }
+    }
+    
+    keysToDelete.forEach(key => this.cache.delete(key));
+    
+    if (this.debugMode && keysToDelete.length > 0) {
+      console.log(`🗑️ 已清除 ${keysToDelete.length} 个用户相关缓存`);
+    }
   }
 
   // 统计更新方法
@@ -230,14 +309,45 @@ class SearchSourcesAPI {
 
   // ===================== 搜索源大类管理 =====================
 
-  // 获取所有搜索源大类
+  // 获取所有搜索源大类 - 优化错误处理
   async getMajorCategories() {
     try {
+      if (this.debugMode) {
+        console.log('📋 正在获取搜索源大类...');
+      }
+      
       const response = await this.request('/api/search-sources/major-categories');
-      return response.majorCategories || [];
+      const majorCategories = response.majorCategories || [];
+      
+      if (this.debugMode) {
+        console.log(`✅ 获取到 ${majorCategories.length} 个大类`);
+      }
+      
+      return majorCategories;
     } catch (error) {
       console.error('获取搜索源大类失败:', error);
-      return [];
+      
+      // 返回基本的大类数据作为回退
+      return [
+        {
+          id: 'search_sources',
+          name: '🔍 搜索源',
+          icon: '🔍',
+          description: '支持番号搜索的网站',
+          requiresKeyword: true,
+          displayOrder: 1,
+          order: 1
+        },
+        {
+          id: 'browse_sites',
+          name: '🌐 浏览站点',
+          icon: '🌐',
+          description: '仅供访问,不参与搜索',
+          requiresKeyword: false,
+          displayOrder: 2,
+          order: 2
+        }
+      ];
     }
   }
 
@@ -283,15 +393,15 @@ class SearchSourcesAPI {
       errors.push('大类名称不能为空');
     }
     
-    if (data.name && data.name.length > APP_CONSTANTS.LIMITS.MAX_CATEGORY_NAME_LENGTH) {
-      errors.push(`大类名称不能超过${APP_CONSTANTS.LIMITS.MAX_CATEGORY_NAME_LENGTH}个字符`);
+    if (data.name && data.name.length > (APP_CONSTANTS.LIMITS?.MAX_CATEGORY_NAME_LENGTH || 50)) {
+      errors.push(`大类名称不能超过${APP_CONSTANTS.LIMITS?.MAX_CATEGORY_NAME_LENGTH || 50}个字符`);
     }
     
-    if (data.description && data.description.length > APP_CONSTANTS.LIMITS.MAX_CATEGORY_DESC_LENGTH) {
-      errors.push(`大类描述不能超过${APP_CONSTANTS.LIMITS.MAX_CATEGORY_DESC_LENGTH}个字符`);
+    if (data.description && data.description.length > (APP_CONSTANTS.LIMITS?.MAX_CATEGORY_DESC_LENGTH || 200)) {
+      errors.push(`大类描述不能超过${APP_CONSTANTS.LIMITS?.MAX_CATEGORY_DESC_LENGTH || 200}个字符`);
     }
     
-    if (data.color && !APP_CONSTANTS.VALIDATION_RULES.MAJOR_CATEGORY.COLOR_PATTERN.test(data.color)) {
+    if (data.color && !/^#[0-9A-Fa-f]{6}$/.test(data.color)) {
       errors.push('颜色格式不正确');
     }
     
@@ -303,13 +413,17 @@ class SearchSourcesAPI {
 
   // ===================== 搜索源分类管理 =====================
 
-  // 获取用户的搜索源分类
+  // 获取用户的搜索源分类 - 优化错误处理
   async getSourceCategories(options = {}) {
     if (!this.token) {
       throw new Error('用户未登录');
     }
 
     try {
+      if (this.debugMode) {
+        console.log('📂 正在获取搜索源分类...', options);
+      }
+      
       const params = new URLSearchParams();
       
       if (options.majorCategory) {
@@ -320,11 +434,44 @@ class SearchSourcesAPI {
       }
 
       const endpoint = `/api/search-sources/categories${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await this.request(endpoint);
-      return response.categories || [];
+      const response = await this.request(endpoint, { forceRefresh: options.forceRefresh });
+      const categories = response.categories || [];
+      
+      if (this.debugMode) {
+        console.log(`✅ 获取到 ${categories.length} 个分类`);
+      }
+      
+      return categories;
     } catch (error) {
       console.error('获取搜索源分类失败:', error);
-      return [];
+      
+      // 返回基本的分类数据作为回退
+      return [
+        {
+          id: 'database',
+          name: '📚 番号资料站',
+          icon: '📚',
+          description: '提供详细的番号信息、封面和演员资料',
+          majorCategoryId: 'search_sources',
+          defaultSearchable: true,
+          defaultSiteType: 'search',
+          searchPriority: 1,
+          isSystem: true,
+          displayOrder: 1
+        },
+        {
+          id: 'torrent',
+          name: '🧲 磁力搜索',
+          icon: '🧲',
+          description: '提供磁力链接和种子文件',
+          majorCategoryId: 'search_sources',
+          defaultSearchable: true,
+          defaultSiteType: 'search',
+          searchPriority: 3,
+          isSystem: true,
+          displayOrder: 3
+        }
+      ];
     }
   }
 
@@ -377,15 +524,15 @@ class SearchSourcesAPI {
       errors.push('分类名称不能为空');
     }
     
-    if (data.name && data.name.length > APP_CONSTANTS.LIMITS.MAX_CATEGORY_NAME_LENGTH) {
-      errors.push(`分类名称不能超过${APP_CONSTANTS.LIMITS.MAX_CATEGORY_NAME_LENGTH}个字符`);
+    if (data.name && data.name.length > (APP_CONSTANTS.LIMITS?.MAX_CATEGORY_NAME_LENGTH || 50)) {
+      errors.push(`分类名称不能超过${APP_CONSTANTS.LIMITS?.MAX_CATEGORY_NAME_LENGTH || 50}个字符`);
     }
     
-    if (data.description && data.description.length > APP_CONSTANTS.LIMITS.MAX_CATEGORY_DESC_LENGTH) {
-      errors.push(`分类描述不能超过${APP_CONSTANTS.LIMITS.MAX_CATEGORY_DESC_LENGTH}个字符`);
+    if (data.description && data.description.length > (APP_CONSTANTS.LIMITS?.MAX_CATEGORY_DESC_LENGTH || 200)) {
+      errors.push(`分类描述不能超过${APP_CONSTANTS.LIMITS?.MAX_CATEGORY_DESC_LENGTH || 200}个字符`);
     }
     
-    if (data.color && !APP_CONSTANTS.VALIDATION_RULES.CATEGORY.COLOR_PATTERN.test(data.color)) {
+    if (data.color && !/^#[0-9A-Fa-f]{6}$/.test(data.color)) {
       errors.push('颜色格式不正确');
     }
     
@@ -448,11 +595,11 @@ class SearchSourcesAPI {
       errors.push('分类名称不能为空');
     }
     
-    if (data.name && data.name.length > APP_CONSTANTS.LIMITS.MAX_CATEGORY_NAME_LENGTH) {
-      errors.push(`分类名称不能超过${APP_CONSTANTS.LIMITS.MAX_CATEGORY_NAME_LENGTH}个字符`);
+    if (data.name && data.name.length > (APP_CONSTANTS.LIMITS?.MAX_CATEGORY_NAME_LENGTH || 50)) {
+      errors.push(`分类名称不能超过${APP_CONSTANTS.LIMITS?.MAX_CATEGORY_NAME_LENGTH || 50}个字符`);
     }
     
-    if (data.color && !APP_CONSTANTS.VALIDATION_RULES.CATEGORY.COLOR_PATTERN.test(data.color)) {
+    if (data.color && !/^#[0-9A-Fa-f]{6}$/.test(data.color)) {
       errors.push('颜色格式不正确');
     }
     
@@ -489,13 +636,17 @@ class SearchSourcesAPI {
 
   // ===================== 搜索源管理 =====================
 
-  // 获取用户的搜索源
+  // 获取用户的搜索源 - 优化错误处理和回退数据
   async getSearchSources(options = {}) {
     if (!this.token) {
       throw new Error('用户未登录');
     }
 
     try {
+      if (this.debugMode) {
+        console.log('🔍 正在获取搜索源...', options);
+      }
+      
       const params = new URLSearchParams();
       
       if (options.category) params.append('category', options.category);
@@ -505,11 +656,48 @@ class SearchSourcesAPI {
       if (options.enabledOnly !== undefined) params.append('enabledOnly', options.enabledOnly.toString());
 
       const endpoint = `/api/search-sources/sources${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await this.request(endpoint);
-      return response.sources || [];
+      const response = await this.request(endpoint, { forceRefresh: options.forceRefresh });
+      const sources = response.sources || [];
+      
+      if (this.debugMode) {
+        console.log(`✅ 获取到 ${sources.length} 个搜索源`);
+      }
+      
+      return sources;
     } catch (error) {
       console.error('获取搜索源失败:', error);
-      return [];
+      
+      // 返回基本的搜索源数据作为回退
+      return [
+        {
+          id: 'javbus',
+          name: 'JavBus',
+          subtitle: '番号+磁力一体站,信息完善',
+          icon: '🎬',
+          categoryId: 'database',
+          urlTemplate: 'https://www.javbus.com/search/{keyword}',
+          searchable: true,
+          siteType: 'search',
+          searchPriority: 1,
+          requiresKeyword: true,
+          isSystem: true,
+          userEnabled: true
+        },
+        {
+          id: 'javdb',
+          name: 'JavDB',
+          subtitle: '极简风格番号资料站,轻量快速',
+          icon: '📚',
+          categoryId: 'database',
+          urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
+          searchable: true,
+          siteType: 'search',
+          searchPriority: 2,
+          requiresKeyword: true,
+          isSystem: true,
+          userEnabled: true
+        }
+      ];
     }
   }
 
@@ -533,7 +721,7 @@ class SearchSourcesAPI {
           name: sourceData.name.trim(),
           subtitle: sourceData.subtitle?.trim() || '',
           description: sourceData.description?.trim() || '',
-          icon: sourceData.icon?.trim() || '🔍',
+          icon: sourceData.icon?.trim() || '📁',
           urlTemplate: sourceData.urlTemplate.trim(),
           homepageUrl: sourceData.homepageUrl?.trim() || '',
           siteType: sourceData.siteType || 'search',
@@ -568,8 +756,8 @@ class SearchSourcesAPI {
       errors.push('搜索源名称不能为空');
     }
     
-    if (data.name && data.name.length > APP_CONSTANTS.LIMITS.MAX_SOURCE_NAME_LENGTH) {
-      errors.push(`搜索源名称不能超过${APP_CONSTANTS.LIMITS.MAX_SOURCE_NAME_LENGTH}个字符`);
+    if (data.name && data.name.length > (APP_CONSTANTS.LIMITS?.MAX_SOURCE_NAME_LENGTH || 100)) {
+      errors.push(`搜索源名称不能超过${APP_CONSTANTS.LIMITS?.MAX_SOURCE_NAME_LENGTH || 100}个字符`);
     }
     
     if (!data.urlTemplate || typeof data.urlTemplate !== 'string' || data.urlTemplate.trim().length === 0) {
@@ -581,7 +769,7 @@ class SearchSourcesAPI {
       errors.push('搜索源的URL模板必须包含{keyword}占位符');
     }
     
-    if (data.urlTemplate && !APP_CONSTANTS.VALIDATION_RULES.SOURCE.URL_PATTERN.test(data.urlTemplate)) {
+    if (data.urlTemplate && !/^https?:\/\/.+/.test(data.urlTemplate)) {
       errors.push('URL模板格式不正确');
     }
     
@@ -885,8 +1073,8 @@ class SearchSourcesAPI {
       }
     }
     
-    if (deletedCount > 0) {
-      console.log(`已清除 ${deletedCount} 个相关缓存项`);
+    if (deletedCount > 0 && this.debugMode) {
+      console.log(`🗑️ 已清除 ${deletedCount} 个相关缓存项`);
     }
   }
 
@@ -956,6 +1144,46 @@ class SearchSourcesAPI {
     } catch (error) {
       console.error('获取所有搜索源失败:', error);
       return [];
+    }
+  }
+
+  // 强制刷新所有数据（用于登录后）
+  async forceRefreshAllData() {
+    try {
+      if (this.debugMode) {
+        console.log('🔄 强制刷新所有数据...');
+      }
+      
+      // 清除当前用户的所有缓存
+      this.clearUserCache();
+      
+      // 并行获取所有数据
+      const [majorCategories, categories, sources] = await Promise.all([
+        this.getMajorCategories(),
+        this.getSourceCategories({ includeSystem: true, forceRefresh: true }),
+        this.getSearchSources({ includeSystem: true, forceRefresh: true })
+      ]);
+      
+      if (this.debugMode) {
+        console.log(`✅ 强制刷新完成: ${majorCategories.length} 个大类, ${categories.length} 个分类, ${sources.length} 个搜索源`);
+      }
+      
+      return {
+        majorCategories,
+        categories,
+        sources
+      };
+    } catch (error) {
+      console.error('强制刷新数据失败:', error);
+      throw error;
+    }
+  }
+
+  // 设置调试模式
+  setDebugMode(enabled) {
+    this.debugMode = enabled;
+    if (enabled) {
+      console.log('🐛 搜索源API调试模式已开启');
     }
   }
 }

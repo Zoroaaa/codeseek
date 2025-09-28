@@ -125,6 +125,9 @@ class MagnetSearchApp {
     document.querySelector('.main-content').style.display = 'block';
     
     try {
+      // 设置API token
+      searchSourcesAPI.setToken(this.getAuthToken());
+      
       // 初始化所有组件和数据
       await this.initUserComponents();
       await this.loadUserData();
@@ -136,6 +139,11 @@ class MagnetSearchApp {
       // 如果用户数据加载失败，退回到访客模式
       await this.handleUserInitError(error);
     }
+  }
+
+  // 获取认证token
+  getAuthToken() {
+    return localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
   }
 
   // 初始化用户组件
@@ -157,6 +165,7 @@ class MagnetSearchApp {
     }
     
     // 初始化收藏管理器
+    console.log('⭐ 正在初始化收藏管理器...');
     await favoritesManager.init();
     
     console.log('✅ 用户组件初始化完成');
@@ -166,13 +175,38 @@ class MagnetSearchApp {
   async loadUserData() {
     console.log('📊 加载用户数据...');
     
-    // 加载搜索源数据
-    await this.loadSearchSourcesFromAPI();
-    
-    // 初始化站点导航
-    await this.initSiteNavigation();
-    
-    console.log('✅ 用户数据加载完成');
+    try {
+      // 并行加载数据以提高性能
+      await Promise.all([
+        this.loadSearchSourcesFromAPI(),
+        this.loadUserFavorites()
+      ]);
+      
+      // 初始化站点导航
+      await this.initSiteNavigation();
+      
+      console.log('✅ 用户数据加载完成');
+    } catch (error) {
+      console.error('加载用户数据失败:', error);
+      // 即使部分数据加载失败，也要确保基本功能可用
+      await this.loadMinimalFallbackData();
+      await this.initSiteNavigation();
+      throw error;
+    }
+  }
+
+  // 加载用户收藏数据
+  async loadUserFavorites() {
+    try {
+      if (favoritesManager.isInitialized) {
+        console.log('📚 正在加载用户收藏...');
+        await favoritesManager.loadFavorites();
+        console.log('✅ 收藏数据加载完成');
+      }
+    } catch (error) {
+      console.error('⚠️ 加载收藏数据失败:', error);
+      // 收藏数据加载失败不应阻止应用启动
+    }
   }
 
   // 处理用户初始化错误
@@ -183,6 +217,9 @@ class MagnetSearchApp {
     this.currentUser = null;
     localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
     localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.USER_INFO);
+    
+    // 清除API token
+    searchSourcesAPI.setToken(null);
     
     // 回退到访客模式
     await this.initForGuest();
@@ -195,10 +232,14 @@ class MagnetSearchApp {
     // 防止重复加载
     if (this.dataLoadStatus.isLoading) {
       console.log('数据正在加载中，跳过重复请求');
+      // 等待当前加载完成
+      while (this.dataLoadStatus.isLoading) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
       return;
     }
 
-    // 如果最近刚加载过，跳过
+    // 如果最近刚加载过且成功，跳过
     const timeSinceLastLoad = Date.now() - this.dataLoadStatus.lastLoadTime;
     if (this.dataLoadStatus.hasLoaded && timeSinceLastLoad < 30000) {
       console.log('数据最近已加载，跳过重复加载');
@@ -214,21 +255,35 @@ class MagnetSearchApp {
       try {
         console.log(`📄 从搜索源API加载数据... (尝试 ${retry + 1}/${maxRetries + 1})`);
         
-        // 获取大类数据
-        const majorCategories = await searchSourcesAPI.getMajorCategories();
+        // 确保API有token
+        if (!searchSourcesAPI.token) {
+          searchSourcesAPI.setToken(this.getAuthToken());
+        }
+        
+        // 并行获取所有数据类型
+        const [majorCategories, categories, sources] = await Promise.all([
+          searchSourcesAPI.getMajorCategories().catch(err => {
+            console.warn('获取大类失败:', err);
+            return [];
+          }),
+          searchSourcesAPI.getSourceCategories({
+            includeSystem: true
+          }).catch(err => {
+            console.warn('获取分类失败:', err);
+            return [];
+          }),
+          searchSourcesAPI.getSearchSources({
+            includeSystem: true,
+            enabledOnly: false
+          }).catch(err => {
+            console.warn('获取搜索源失败:', err);
+            return [];
+          })
+        ]);
+        
+        // 更新数据
         this.majorCategories = majorCategories || [];
-        
-        // 获取所有分类
-        const categories = await searchSourcesAPI.getSourceCategories({
-          includeSystem: true
-        });
         this.allCategories = categories || [];
-        
-        // 获取所有搜索源(包括系统内置和用户自定义)
-        const sources = await searchSourcesAPI.getSearchSources({
-          includeSystem: true,
-          enabledOnly: false
-        });
         this.allSearchSources = sources || [];
         
         // 标记加载成功
@@ -762,7 +817,7 @@ class MagnetSearchApp {
     const username = document.getElementById('loginUsername')?.value.trim();
     const password = document.getElementById('loginPassword')?.value;
 
-    if (!username || !password) {
+    if (!username || password) {
       showToast('请填写用户名和密码', 'error');
       return;
     }
@@ -785,6 +840,9 @@ class MagnetSearchApp {
         // 重置数据加载状态，确保重新加载用户数据
         this.dataLoadStatus.hasLoaded = false;
         this.dataLoadStatus.lastLoadTime = 0;
+        
+        // 设置API token
+        searchSourcesAPI.setToken(result.token || this.getAuthToken());
         
         // 初始化用户组件和数据
         await this.initUserComponents();
@@ -1074,7 +1132,7 @@ class MagnetSearchApp {
     }
   }
 
-  // 优化：退出登录时保持基础展示功能
+  // 优化：退出登录时保持基础展示功能，并正确清理数据
   async logout() {
     try {
       showLoading(true, '正在退出...');
@@ -1082,17 +1140,15 @@ class MagnetSearchApp {
       await authManager.logout();
       this.currentUser = null;
       
+      // 清除API token
+      searchSourcesAPI.setToken(null);
+      
       // 更新UI
       this.updateUserUI();
       
-      // 清空用户相关数据
+      // 清空用户相关数据，但不清空收藏数据（由收藏管理器自己处理）
       if (unifiedSearchManager.isInitialized) {
         await unifiedSearchManager.cleanup();
-      }
-      
-      if (favoritesManager.isInitialized) {
-        favoritesManager.favorites = [];
-        favoritesManager.renderFavorites();
       }
       
       // 重置数据加载状态
