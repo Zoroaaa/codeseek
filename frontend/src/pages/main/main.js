@@ -599,58 +599,76 @@ class MagnetSearchApp {
     }).join('');
   }
 
-  // 渲染单个站点项,包括可用状态和详情提取支持标识
-  renderSiteItem(source, isSearchable) {
-    // 通过统一搜索管理器检查源的可用状态
-    let isEnabled = true; // 默认显示为可用,具体可用状态由搜索时判断
-    
-    try {
-      if (unifiedSearchManager.isInitialized) {
-        // 这里可以添加检查逻辑,当前简化处理
-      }
-    } catch (error) {
-      console.warn('检查搜索源可用状态失败:', error);
+// 渲染单个站点项,包括可用状态
+renderSiteItem(source, isSearchable) {
+  // 通过统一搜索管理器检查源的可用状态
+  let isEnabled = true; // 默认显示为可用,具体可用状态由搜索时判断
+  
+  try {
+    if (unifiedSearchManager.isInitialized) {
+      // 这里可以添加检查逻辑,当前简化处理
     }
-
-    const statusClass = isEnabled ? 'enabled' : 'disabled';
-    const statusText = isEnabled ? '可用' : '未可用';
-    
-    const badges = [];
-    
-    if (!isSearchable) {
-      badges.push('<span class="non-searchable-badge">仅浏览</span>');
-    } else if (source.searchPriority && source.searchPriority <= 3) {
-      badges.push('<span class="priority-badge">优先</span>');
-    }
-    
-    // 根据网站类型调整URL处理
-    let siteUrl = source.urlTemplate;
-    if (source.searchable === false) {
-      // 浏览站点直接使用基础URL
-      siteUrl = siteUrl.replace('/{keyword}', '').replace('?q={keyword}&f=all', '').replace('/search/{keyword}', '');
-    } else {
-      // 搜索源移除关键词占位符以供直接访问
-      siteUrl = siteUrl.replace('{keyword}', '');
-    }
-    
-    return `
-      <a href="${siteUrl}" 
-         class="site-item ${isSearchable ? 'searchable' : 'browse-only'}"
-         target="_blank">
-        <div class="site-info">
-          <div class="site-header">
-            <strong>${source.icon || '📄'} ${source.name}</strong>
-            <div class="site-badges">
-              ${source.isCustom || !source.isSystem ? '<span class="custom-badge">自定义</span>' : ''}
-              ${badges.join('')}
-              <span class="status-badge ${statusClass}">${statusText}</span>
-            </div>
-          </div>
-          <span class="site-subtitle">${source.subtitle || ''}</span>
-        </div>
-      </a>
-    `;
+  } catch (error) {
+    console.warn('检查搜索源可用状态失败:', error);
   }
+
+  const statusClass = isEnabled ? 'enabled' : 'disabled';
+  const statusText = isEnabled ? '可用' : '未可用';
+  
+  const badges = [];
+  
+  if (!isSearchable) {
+    badges.push('<span class="non-searchable-badge">仅浏览</span>');
+  } else if (source.searchPriority && source.searchPriority <= 3) {
+    badges.push('<span class="priority-badge">优先</span>');
+  }
+  
+  // 🔴 修改：统一处理URL，所有站点都访问主页面
+  let siteUrl;
+  try {
+    // 创建一个测试URL来提取基础域名
+    let testUrl = source.urlTemplate;
+    
+    // 如果URL包含{keyword}，先用临时值替换以便解析
+    if (testUrl.includes('{keyword}')) {
+      testUrl = testUrl.replace('{keyword}', 'temp');
+    }
+    
+    // 解析URL并提取基础部分
+    const urlObj = new URL(testUrl);
+    
+    // 构建主页面URL：协议 + 主机名
+    siteUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+    
+    // 如果有端口号，也要包含
+    if (urlObj.port) {
+      siteUrl += `:${urlObj.port}`;
+    }
+    
+  } catch (error) {
+    console.warn('解析站点URL失败:', source.urlTemplate, error);
+    // 如果解析失败，fallback到原来的简单处理方式
+    siteUrl = source.urlTemplate.replace('{keyword}', '');
+  }
+  
+  return `
+    <a href="${siteUrl}" 
+       class="site-item ${isSearchable ? 'searchable' : 'browse-only'}"
+       target="_blank">
+      <div class="site-info">
+        <div class="site-header">
+          <strong>${source.icon || '📄'} ${source.name}</strong>
+          <div class="site-badges">
+            ${source.isCustom || !source.isSystem ? '<span class="custom-badge">自定义</span>' : ''}
+            ${badges.join('')}
+            <span class="status-badge ${statusClass}">${statusText}</span>
+          </div>
+        </div>
+        <span class="site-subtitle">${source.subtitle || ''}</span>
+      </div>
+    </a>
+  `;
+}
 
   // 显示连接状态
   showConnectionStatus() {
