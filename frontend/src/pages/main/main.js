@@ -37,6 +37,7 @@ class MagnetSearchApp {
     this.init();
   }
 
+  // 优化: 改进初始化流程
   async init() {
     const startTime = performance.now();
     
@@ -50,31 +51,30 @@ class MagnetSearchApp {
       // 初始化配置
       await configManager.init();
       
-      // 初始化搜索源API
-      console.log('📡 初始化搜索源管理API...');
-      
       // 绑定事件
       this.bindEvents();
       
-      // 初始化主题(仅从localStorage读取主题设置)
+      // 初始化主题
       themeManager.init();
       
       // 初始化邮箱验证服务
       await this.initEmailVerificationService();
       
-      // 检查认证状态
-      await this.checkAuthStatus();
+      // 检查认证状态并根据结果决定后续流程
+      const isAuthenticated = await this.checkAuthStatus();
       
-      // 若未认证,打开登录模态
-      if (!this.currentUser) {
+      if (!isAuthenticated) {
+        // 未认证用户: 显示登录界面和基础数据
+        console.log('📱 未认证用户,显示登录界面');
         document.getElementById('loginModal').style.display = 'block';
         document.querySelector('.main-content').style.display = 'none';
+        
+        // 加载基础数据用于展示
+        await this.loadMinimalFallbackData();
       } else {
+        // 已认证用户: 显示主界面
+        console.log('👤 已认证用户,显示主界面');
         document.querySelector('.main-content').style.display = 'block';
-        // 已登录用户初始化组件
-        await this.initComponents();
-        // 从新API加载搜索源数据
-        await this.loadSearchSourcesFromAPI();
       }
 
       // 初始化站点导航
@@ -83,7 +83,7 @@ class MagnetSearchApp {
       // 测试API连接
       await this.testConnection();
       
-      // 处理URL参数(如搜索关键词)
+      // 处理URL参数
       this.handleURLParams();
       
       // 记录初始化性能
@@ -91,13 +91,6 @@ class MagnetSearchApp {
       
       this.isInitialized = true;
       this.hideConnectionStatus();
-	  
-	      // 数据完整性检查
-    const dataCheck = this.validateDataIntegrity();
-    if (!dataCheck.isValid && this.currentUser) {
-      console.warn('⚠️ 数据完整性检查失败:', dataCheck.issues);
-      showToast('数据加载不完整，建议刷新页面', 'warning', 3000);
-    }
       
       console.log(`✅ 应用初始化完成 (${Math.round(this.performanceMetrics.initTime)}ms)`);
       
@@ -112,41 +105,50 @@ class MagnetSearchApp {
     }
   }
 
-  // 完全从API加载搜索源数据
-async loadSearchSourcesFromAPI() {
-  try {
-    console.log('📄 从搜索源API加载数据...');
-    
-    // 检查认证状态
-    if (!this.currentUser) {
-      console.warn('⚠️ 用户未登录，使用基础数据');
+  // 优化: 改进搜索源API加载
+  async loadSearchSourcesFromAPI() {
+    try {
+      console.log('📡 从API加载搜索源数据...');
+      
+      // 确保认证状态
+      if (!this.currentUser) {
+        throw new Error('用户未认证,无法加载搜索源');
+      }
+      
+      // 验证token有效性
+      const isTokenValid = await authManager.verifyToken();
+      if (!isTokenValid) {
+        throw new Error('认证token无效,请重新登录');
+      }
+      
+      // 并行加载所有数据类型
+      const loadPromises = [
+        searchSourcesAPI.getMajorCategories(),
+        searchSourcesAPI.getSourceCategories({ includeSystem: true }),
+        searchSourcesAPI.getSearchSources({ includeSystem: true, enabledOnly: false })
+      ];
+      
+      const [majorCategories, categories, sources] = await Promise.all(loadPromises);
+      
+      // 验证数据有效性
+      this.majorCategories = Array.isArray(majorCategories) ? majorCategories : [];
+      this.allCategories = Array.isArray(categories) ? categories : [];
+      this.allSearchSources = Array.isArray(sources) ? sources : [];
+      
+      console.log(`✅ API数据加载完成: ${this.majorCategories.length}个大类, ${this.allCategories.length}个分类, ${this.allSearchSources.length}个搜索源`);
+      
+      // 如果所有数据都为空,可能是API问题,使用回退数据
+      if (this.majorCategories.length === 0 && this.allCategories.length === 0 && this.allSearchSources.length === 0) {
+        console.warn('⚠️ API返回空数据,使用回退方案');
+        await this.loadMinimalFallbackData();
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ 从API加载搜索源失败:', error);
       await this.loadMinimalFallbackData();
-      return;
-    }
-    
-    // 检查网络连接
-    if (!navigator.onLine) {
-      throw new Error('网络连接不可用');
-    }
-    
-    // 使用带重试的加载方法
-    await this.loadSearchSourcesWithRetry();
-    
-  } catch (error) {
-    console.error('❌ 从API加载搜索源失败:', error);
-    await this.loadMinimalFallbackData();
-    
-    // 根据错误类型显示不同的提示
-    if (error.message.includes('认证') || error.message.includes('Token')) {
-      showToast('登录状态异常，请重新登录', 'error');
-      setTimeout(() => {
-        this.logout();
-      }, 2000);
-    } else {
-      showToast('加载搜索源数据失败，已使用基础配置', 'warning');
+      throw error; // 重新抛出错误以便上层处理
     }
   }
-}
 
   // 最小回退方案（仅在API完全不可用时使用）
 async loadMinimalFallbackData() {
@@ -477,30 +479,64 @@ renderSiteItem(source, isSearchable) {
   `;
 }
 
-  // 初始化组件
+  // 优化: 改进组件初始化
   async initComponents() {
     try {
-      // 初始化统一搜索管理器
-      await unifiedSearchManager.init();
+      console.log('📦 开始初始化组件...');
       
-      // 初始化代理服务
-      console.log('📡 正在初始化代理服务...');
+      // 1. 首先初始化代理服务
+      console.log('🔗 初始化代理服务...');
       await proxyService.init();
-      
       if (proxyService.isProxyEnabled()) {
-        console.log('✅ 代理服务已可用');
-        showToast('代理模式已可用，可访问受限制的搜索源', 'success', 3000);
-      } else {
-        console.log('ℹ️ 代理服务未可用');
+        console.log('✅ 代理服务已启用');
       }
       
-      // 初始化收藏管理器
-      await favoritesManager.init();
+      // 2. 初始化统一搜索管理器
+      console.log('🔍 初始化搜索管理器...');
+      if (!unifiedSearchManager.isInitialized) {
+        await unifiedSearchManager.init();
+      } else {
+        // 如果已经初始化,重新设置用户状态
+        await unifiedSearchManager.refreshUserData();
+      }
+      
+      // 3. 初始化收藏管理器
+      console.log('⭐ 初始化收藏管理器...');
+      if (!favoritesManager.isInitialized) {
+        await favoritesManager.init();
+      } else {
+        // 如果已经初始化,清空旧数据准备重新加载
+        favoritesManager.favorites = [];
+        favoritesManager.renderFavorites();
+      }
       
       console.log('✅ 组件初始化完成');
+      
     } catch (error) {
       console.error('组件初始化失败:', error);
       this.performanceMetrics.errorCount++;
+      throw error;
+    }
+  }
+
+  // 新增: 清理组件状态
+  async cleanupComponents() {
+    try {
+      // 只清理必要的状态,不完全销毁组件
+      if (unifiedSearchManager.isInitialized) {
+        // 清理搜索结果但保持组件活跃
+        unifiedSearchManager.clearSearchResults();
+      }
+      
+      if (favoritesManager.isInitialized) {
+        // 清空收藏列表准备重新加载
+        favoritesManager.favorites = [];
+        favoritesManager.renderFavorites();
+      }
+      
+    } catch (error) {
+      console.warn('清理组件状态时出错:', error);
+      // 不抛出错误,继续初始化流程
     }
   }
 
@@ -662,122 +698,166 @@ renderSiteItem(source, isSearchable) {
     }
   }
 
-// 修改 handleLogin 方法 - 添加重试机制和更好的错误处理
-async handleLogin(event) {
-  event.preventDefault();
-  
-  const username = document.getElementById('loginUsername')?.value.trim();
-  const password = document.getElementById('loginPassword')?.value;
+  // 修改:用户登录后更新站点导航
+  async handleLogin(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('loginUsername')?.value.trim();
+    const password = document.getElementById('loginPassword')?.value;
 
-  if (!username || !password) {
-    showToast('请填写用户名和密码', 'error');
-    return;
+    if (!username || !password) {
+      showToast('请填写用户名和密码', 'error');
+      return;
+    }
+
+    try {
+      showLoading(true, '正在登录...');
+      
+      const result = await authManager.login(username, password);
+      
+      if (result.success) {
+        console.log('✅ 登录成功,开始初始化用户数据...');
+        
+        // 1. 首先设置用户状态
+        this.currentUser = result.user;
+        this.updateUserUI();
+        
+        // 2. 显示主内容区域
+        document.querySelector('.main-content').style.display = 'block';
+        this.closeModals();
+        
+        // 3. 等待一下确保认证状态完全建立
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // 4. 按顺序初始化组件和数据
+        await this.initializeUserSession();
+        
+        // 5. 处理URL参数
+        this.handleURLParams();
+        
+        // 6. 清空登录表单
+        document.getElementById('loginForm').reset();
+        
+        console.log('✅ 用户会话初始化完成');
+        showToast('登录成功!', 'success');
+        
+      }
+    } catch (error) {
+      console.error('登录失败:', error);
+      showToast('登录失败: ' + error.message, 'error');
+      this.performanceMetrics.errorCount++;
+    } finally {
+      showLoading(false);
+    }
   }
 
-  try {
-    const result = await authManager.login(username, password);
-    
-    if (result.success) {
-      this.currentUser = result.user;
+  // 新增: 统一的用户会话初始化方法
+  async initializeUserSession() {
+    try {
+      console.log('🔄 开始初始化用户会话...');
       
-      // 显示主内容区域
-      document.querySelector('.main-content').style.display = 'block';
+      // 1. 重置错误计数
+      this.performanceMetrics.searchCount = 0;
       
-      // 关闭模态框
-      this.closeModals();
+      // 2. 先确保组件处于干净状态
+      await this.cleanupComponents();
       
-      // 更新UI状态
-      this.updateUserUI();
-      
-      // 等待一小段时间确保token设置完成
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // 登录后初始化组件
+      // 3. 初始化核心组件 (按依赖顺序)
+      console.log('📦 初始化核心组件...');
       await this.initComponents();
       
-      // 登录后从新API加载搜索源 - 添加重试机制
-      await this.loadSearchSourcesWithRetry();
+      // 4. 加载搜索源数据 (需要认证状态)
+      console.log('📊 加载用户数据...');
+      await this.loadUserData();
       
-      // 重新初始化站点导航
+      // 5. 重新初始化站点导航
+      console.log('🌐 更新站点导航...');
       await this.initSiteNavigation();
       
-      // 处理URL参数
-      this.handleURLParams();
+      console.log('✅ 用户会话初始化完成');
       
-      // 清空登录表单
-      document.getElementById('loginForm').reset();
+    } catch (error) {
+      console.error('❌ 用户会话初始化失败:', error);
+      showToast('数据加载失败,正在重试...', 'warning');
       
-      this.performanceMetrics.searchCount = 0;
+      // 重试一次
+      setTimeout(async () => {
+        try {
+          await this.retryUserDataLoading();
+        } catch (retryError) {
+          console.error('重试失败:', retryError);
+          showToast('数据加载失败,请刷新页面重试', 'error');
+        }
+      }, 2000);
     }
-  } catch (error) {
-    console.error('登录失败:', error);
-    this.performanceMetrics.errorCount++;
   }
-}
 
-// 新增：带重试机制的搜索源加载方法
-async loadSearchSourcesWithRetry(maxRetries = 3, delay = 1000) {
-  for (let i = 0; i < maxRetries; i++) {
+  // 新增: 重试用户数据加载
+  async retryUserDataLoading() {
+    console.log('🔄 重试加载用户数据...');
+    
+    // 确保认证状态有效
+    const isAuthValid = await authManager.verifyToken();
+    if (!isAuthValid) {
+      throw new Error('认证状态无效,请重新登录');
+    }
+    
+    // 重新加载数据
+    await this.loadUserData();
+    await this.initSiteNavigation();
+    
+    showToast('数据加载成功!', 'success');
+  }
+
+  // 新增: 加载用户相关数据
+  async loadUserData() {
+    // 确保用户已登录
+    if (!this.currentUser) {
+      throw new Error('用户未登录');
+    }
+    
     try {
-      console.log(`🔄 第${i + 1}次尝试加载搜索源数据...`);
+      // 并行加载数据以提高性能
+      const [sourcesResult, favoritesResult] = await Promise.allSettled([
+        this.loadSearchSourcesFromAPI(),
+        this.loadUserFavorites()
+      ]);
       
-      // 检查用户登录状态
-      if (!this.currentUser) {
-        throw new Error('用户未登录');
+      // 检查搜索源加载结果
+      if (sourcesResult.status === 'rejected') {
+        console.warn('搜索源加载失败:', sourcesResult.reason);
+        // 使用回退数据但不抛出错误
+        await this.loadMinimalFallbackData();
       }
       
-      // 验证token有效性
-      const tokenValid = await authManager.verifyToken();
-      if (!tokenValid) {
-        throw new Error('Token验证失败');
-      }
-      
-      // 获取大类数据
-      const majorCategories = await searchSourcesAPI.getMajorCategories();
-      this.majorCategories = majorCategories || [];
-      
-      // 获取所有分类
-      const categories = await searchSourcesAPI.getSourceCategories({
-        includeSystem: true
-      });
-      this.allCategories = categories || [];
-      
-      // 获取所有搜索源
-      const sources = await searchSourcesAPI.getSearchSources({
-        includeSystem: true,
-        enabledOnly: false
-      });
-      this.allSearchSources = sources || [];
-      
-      console.log(`✅ 成功加载 ${this.majorCategories.length} 个大类，${this.allCategories.length} 个分类，${this.allSearchSources.length} 个搜索源`);
-      
-      // 如果成功加载了数据，直接返回
-      if (this.allSearchSources.length > 0) {
-        return;
-      } else {
-        throw new Error('加载的搜索源数据为空');
+      // 检查收藏加载结果
+      if (favoritesResult.status === 'rejected') {
+        console.warn('收藏数据加载失败:', favoritesResult.reason);
+        // 收藏加载失败不影响主流程
       }
       
     } catch (error) {
-      console.warn(`⚠️ 第${i + 1}次加载失败:`, error.message);
-      
-      // 如果是最后一次重试，使用回退方案
-      if (i === maxRetries - 1) {
-        console.warn('🔧 所有重试均失败，使用最小回退数据');
-        await this.loadMinimalFallbackData();
-        showToast('部分功能可能受限，建议刷新页面重试', 'warning', 5000);
-        return;
-      }
-      
-      // 等待一段时间后重试
-      if (i < maxRetries - 1) {
-        console.log(`⏳ ${delay}ms后重试...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 1.5; // 递增延迟时间
+      console.error('加载用户数据失败:', error);
+      // 确保至少有基础数据可用
+      await this.loadMinimalFallbackData();
+      throw error;
+    }
+  }
+
+  // 新增: 加载用户收藏数据
+  async loadUserFavorites() {
+    if (favoritesManager && favoritesManager.isInitialized) {
+      try {
+        await favoritesManager.loadFavorites();
+        console.log('✅ 收藏数据加载完成');
+      } catch (error) {
+        console.warn('收藏数据加载失败:', error);
+        // 重置为空收藏列表
+        favoritesManager.favorites = [];
       }
     }
   }
-}
+
 
   // 绑定模态框事件
   bindModalEvents() {
@@ -993,69 +1073,36 @@ async loadSearchSourcesWithRetry(maxRetries = 3, delay = 1000) {
     }
   }
 
-  // 检查认证状态
-async checkAuthStatus() {
-  const token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-  if (!token) {
-    console.log('未找到认证token');
-    return;
-  }
-
-  try {
-    console.log('🔐 验证用户登录状态...');
-    const isValid = await authManager.verifyToken();
-    
-    if (isValid) {
-      this.currentUser = authManager.getCurrentUser();
-      this.updateUserUI();
-      console.log('✅ 用户认证成功:', this.currentUser.username);
-      
-      // 认证成功后确保加载完整数据
-      if (this.currentUser && this.allSearchSources.length === 0) {
-        console.log('🔄 检测到搜索源数据为空，重新加载...');
-        await this.loadSearchSourcesWithRetry();
-        await this.initSiteNavigation();
-      }
-    } else {
-      console.log('Token验证失败,已清除');
-      this.currentUser = null;
+  // 优化: 改进认证状态检查
+  async checkAuthStatus() {
+    const token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      console.log('未找到认证token');
+      return false;
     }
-  } catch (error) {
-    console.error('验证token失败:', error);
-    this.performanceMetrics.errorCount++;
-    
-    // 如果token验证失败，清除登录状态
-    localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-    localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.USER_INFO);
-    this.currentUser = null;
-  }
-}
 
-// 新增：数据完整性检查方法
-validateDataIntegrity() {
-  const issues = [];
-  
-  if (!this.currentUser) {
-    issues.push('用户未登录');
+    try {
+      console.log('🔐 验证用户认证状态...');
+      const isValid = await authManager.verifyToken();
+      
+      if (isValid) {
+        this.currentUser = authManager.getCurrentUser();
+        this.updateUserUI();
+        console.log('✅ 用户认证有效:', this.currentUser.username);
+        
+        // 认证有效,初始化用户会话
+        await this.initializeUserSession();
+        return true;
+      } else {
+        console.log('Token验证失败,已清除');
+        return false;
+      }
+    } catch (error) {
+      console.error('验证token失败:', error);
+      this.performanceMetrics.errorCount++;
+      return false;
+    }
   }
-  
-  if (this.allSearchSources.length === 0) {
-    issues.push('搜索源数据为空');
-  }
-  
-  if (this.allCategories.length === 0) {
-    issues.push('分类数据为空');
-  }
-  
-  if (this.majorCategories.length === 0) {
-    issues.push('大类数据为空');
-  }
-  
-  return {
-    isValid: issues.length === 0,
-    issues: issues
-  };
-}
 
   // 更新用户界面
   updateUserUI() {
@@ -1082,56 +1129,88 @@ validateDataIntegrity() {
     }
   }
 
-  // 修改:退出登录时重置为默认显示
-async logout() {
-  try {
-    await authManager.logout();
-    this.currentUser = null;
-    
-    // 更新UI
-    this.updateUserUI();
-    
-    // 清空统一搜索管理器数据
-    if (unifiedSearchManager.isInitialized) {
-      await unifiedSearchManager.cleanup();
-      // 重新初始化为未登录状态
-      await unifiedSearchManager.init();
+  // 优化: 改进退出登录逻辑
+  async logout() {
+    try {
+      showLoading(true, '正在退出...');
+      console.log('🚪 开始退出登录...');
+      
+      // 1. 清理认证状态
+      await authManager.logout();
+      this.currentUser = null;
+      
+      // 2. 清理组件状态 (但不完全销毁)
+      await this.cleanupUserSession();
+      
+      // 3. 更新UI状态
+      this.updateUserUI();
+      
+      // 4. 重置为未登录状态的基础数据
+      await this.resetToLoggedOutState();
+      
+      // 5. 显示登录界面
+      document.querySelector('.main-content').style.display = 'none';
+      this.showLoginModal();
+      
+      console.log('✅ 退出登录完成');
+      showToast('已退出登录', 'info');
+      
+    } catch (error) {
+      console.error('退出登录失败:', error);
+      showToast('退出登录时出现错误', 'error');
+      this.performanceMetrics.errorCount++;
+    } finally {
+      showLoading(false);
     }
-    
-    if (favoritesManager.isInitialized) {
-      favoritesManager.favorites = [];
-      favoritesManager.renderFavorites();
-    }
-    
-    // 清空所有数据,重新加载最小数据集
-    this.allSearchSources = [];
-    this.allCategories = [];
-    this.majorCategories = [];
-    
-    // 加载最小回退数据用于展示
-    await this.loadMinimalFallbackData();
-    
-    // 重新初始化站点导航(显示基础源)
-    await this.initSiteNavigation();
-    
-    // 显示登录模态框
-    this.showLoginModal();
-    
-    // 隐藏主界面
-    document.querySelector('.main-content').style.display = 'none';
-    
-    // 重置性能指标
-    this.performanceMetrics = {
-      initTime: this.performanceMetrics.initTime, // 保留初始化时间
-      searchCount: 0,
-      errorCount: 0
-    };
-    
-  } catch (error) {
-    console.error('退出登录失败:', error);
-    this.performanceMetrics.errorCount++;
   }
-}
+
+  // 新增: 清理用户会话
+  async cleanupUserSession() {
+    try {
+      console.log('🧹 清理用户会话...');
+      
+      // 清理搜索管理器数据但保持组件可用
+      if (unifiedSearchManager.isInitialized) {
+        unifiedSearchManager.clearSearchResults();
+        unifiedSearchManager.resetToGuestMode();
+      }
+      
+      // 清理收藏管理器数据
+      if (favoritesManager.isInitialized) {
+        favoritesManager.favorites = [];
+        favoritesManager.renderFavorites();
+      }
+      
+      // 清空搜索源数据
+      this.allSearchSources = [];
+      this.allCategories = [];
+      this.majorCategories = [];
+      
+    } catch (error) {
+      console.warn('清理用户会话时出错:', error);
+    }
+  }
+
+  // 新增: 重置为未登录状态
+  async resetToLoggedOutState() {
+    try {
+      // 加载最小回退数据用于展示
+      await this.loadMinimalFallbackData();
+      
+      // 重新初始化站点导航(显示基础源)
+      await this.initSiteNavigation();
+      
+      // 重置性能指标
+      this.performanceMetrics = {
+        initTime: this.performanceMetrics.initTime,
+        searchCount: 0,
+        errorCount: 0
+      };
+      
+    } catch (error) {
+      console.error('重置登出状态失败:', error);
+    }
+  }
 
   // 导航到Dashboard
   async navigateToDashboard() {
