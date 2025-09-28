@@ -727,10 +727,7 @@ class SearchSourcesAPI {
           siteType: sourceData.siteType || 'search',
           searchable: sourceData.searchable !== false,
           requiresKeyword: sourceData.requiresKeyword !== false,
-          searchPriority: Math.min(Math.max(parseInt(sourceData.searchPriority) || 5, 1), 10),
-          supportsDetailExtraction: sourceData.supportsDetailExtraction === true,
-          extractionQuality: sourceData.extractionQuality || 'none',
-          supportedFeatures: Array.isArray(sourceData.supportedFeatures) ? sourceData.supportedFeatures : []
+          searchPriority: Math.min(Math.max(parseInt(sourceData.searchPriority) || 5, 1), 10)
         })
       });
       
@@ -811,11 +808,6 @@ class SearchSourcesAPI {
       if (updateData.requiresKeyword !== undefined) cleanedData.requiresKeyword = updateData.requiresKeyword;
       if (updateData.searchPriority !== undefined) {
         cleanedData.searchPriority = Math.min(Math.max(parseInt(updateData.searchPriority) || 5, 1), 10);
-      }
-      if (updateData.supportsDetailExtraction !== undefined) cleanedData.supportsDetailExtraction = updateData.supportsDetailExtraction;
-      if (updateData.extractionQuality !== undefined) cleanedData.extractionQuality = updateData.extractionQuality;
-      if (updateData.supportedFeatures !== undefined) {
-        cleanedData.supportedFeatures = Array.isArray(updateData.supportedFeatures) ? updateData.supportedFeatures : [];
       }
 
       const result = await this.request(`/api/search-sources/sources/${sourceId}`, {

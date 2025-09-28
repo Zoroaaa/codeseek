@@ -168,10 +168,10 @@ INSERT OR REPLACE INTO search_sources (
     site_type, searchable, requires_keyword, search_priority, is_system, is_active,
     display_order, created_at, updated_at
 ) VALUES 
-    ('jable', 'streaming', 'Jable', '高清在线观看，支持多种格式', '知名在线播放平台', '📺', 'https://jable.tv/search/{keyword}', 'https://jable.tv', 'search', 1, 1, 5, 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('javmost', 'streaming', 'JavMost', '免费在线观看，更新及时', '免费在线播放平台', '🎦', 'https://javmost.com/search/{keyword}', 'https://javmost.com', 'search', 1, 1, 6, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('jable', 'streaming', 'Jable', '高清在线观看，支持多种格式', '知名在线播放平台', '📺', 'https://jable.tv/videos/{keyword}/', 'https://jable.tv', 'search', 1, 1, 5, 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('javmost', 'streaming', 'JavMost', '免费在线观看，更新及时', '免费在线播放平台', '🎦', 'https://www5.javmost.com/search/{keyword}', 'https://javmost.com', 'search', 1, 1, 6, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('javguru', 'streaming', 'JavGuru', '多线路播放，观看流畅', '多线路在线播放', '🎭', 'https://jav.guru/search/{keyword}', 'https://jav.guru', 'search', 1, 1, 7, 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('av01', 'streaming', 'AV01', '快速预览站点，封面大图清晰', '封面预览和在线播放', '🎥', 'https://av01.tv/search/{keyword}', 'https://av01.tv', 'search', 1, 1, 8, 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('av01', 'streaming', 'AV01', '快速预览站点，封面大图清晰', '封面预览和在线播放', '🎥', 'https://av01.tv/jp/search?q={keyword}', 'https://av01.tv', 'search', 1, 1, 8, 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('javhdporn', 'streaming', 'JavHD.porn', '高清资源下载，质量优秀', '高清下载和在线播放', '🎬', 'https://javhd.porn/search/{keyword}', 'https://javhd.porn', 'search', 1, 1, 10, 1, 1, 6, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('javgg', 'streaming', 'JavGG', '免费观看平台，速度稳定', '免费在线播放', '⚡', 'https://javgg.net/search/{keyword}', 'https://javgg.net', 'search', 1, 1, 11, 1, 1, 7, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('javhihi', 'streaming', 'JavHiHi', '在线播放，无需下载', '轻量级在线播放', '🎪', 'https://javhihi.com/search/{keyword}', 'https://javhihi.com', 'search', 1, 1, 12, 1, 1, 8, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
