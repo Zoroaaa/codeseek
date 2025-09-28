@@ -817,7 +817,7 @@ class MagnetSearchApp {
     const username = document.getElementById('loginUsername')?.value.trim();
     const password = document.getElementById('loginPassword')?.value;
 
-    if (!username || password) {
+    if (!username || !password) {
       showToast('请填写用户名和密码', 'error');
       return;
     }
