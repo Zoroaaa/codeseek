@@ -1,4 +1,4 @@
-// 搜索源管理器 - 修复版本:解决字段匹配和分类显示问题
+// 搜索源管理器 - 修复版本:解决字段匹配和分类显示问题，支持内置搜索源编辑
 import { APP_CONSTANTS, validateSourceUrl } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
@@ -11,7 +11,7 @@ export class SourcesManager {
     this.customSearchSources = [];
     this.allSearchSources = [];
     this.enabledSources = [];
-    this.editingCustomSource = null;
+    this.editingSource = null; // 🔄 改名为通用的编辑状态
     
     this.majorCategories = [];
     this.allCategories = [];
@@ -86,17 +86,17 @@ async loadUserSearchSettings() {
       return source;
     });
     
-    // 从用户配置中提取可用的源ID列表
+    // 从用户配置中提取启用的源ID列表
     this.enabledSources = userConfigs
       .filter(config => config.isEnabled !== false)
       .map(config => config.sourceId);
     
-    // 如果没有配置,使用所有系统源作为默认可用
+    // 如果没有配置,使用所有系统源作为默认启用
     if (this.enabledSources.length === 0) {
       this.enabledSources = this.builtinSearchSources.map(s => s.id);
     }
     
-    console.log(`✅ 已加载 ${this.majorCategories.length} 个大类,${this.allCategories.length} 个分类,${this.allSearchSources.length} 个搜索源 (${this.builtinSearchSources.length} 内置, ${this.customSearchSources.length} 自定义), ${this.enabledSources.length} 个已可用`);
+    console.log(`✅ 已加载 ${this.majorCategories.length} 个大类,${this.allCategories.length} 个分类,${this.allSearchSources.length} 个搜索源 (${this.builtinSearchSources.length} 内置, ${this.customSearchSources.length} 自定义), ${this.enabledSources.length} 个已启用`);
     
   } catch (error) {
     console.warn('⚠️ 从API加载搜索源失败,使用最小数据集:', error);
@@ -199,7 +199,7 @@ async loadUserSearchSettings() {
   bindEvents() {
     const addCustomSourceBtn = document.getElementById('addCustomSourceBtn');
     if (addCustomSourceBtn) {
-      addCustomSourceBtn.addEventListener('click', () => this.showCustomSourceModal());
+      addCustomSourceBtn.addEventListener('click', () => this.showSourceModal());
     }
 
     const sourcesFilter = document.getElementById('sourcesFilter');
@@ -326,7 +326,7 @@ async loadUserSearchSettings() {
         <div class="empty-state">
           <span style="font-size: 3rem;">🔍</span>
           <p>没有找到匹配的搜索源</p>
-          <button class="btn-primary" onclick="app.getManager('sources').showCustomSourceModal()">添加自定义搜索源</button>
+          <button class="btn-primary" onclick="app.getManager('sources').showSourceModal()">添加自定义搜索源</button>
         </div>
       `;
       return;
@@ -375,7 +375,7 @@ async loadUserSearchSettings() {
     });
   }
 
-  // 🔴 修复:正确渲染源项目,只有搜索资源大类才显示启用按钮
+  // 🔄 修复:正确渲染源项目,内置源只显示编辑按钮
   renderSourceItem(source) {
     // 🔴 兼容 categoryId 和 category 字段
     const categoryId = source.categoryId || source.category;
@@ -398,8 +398,8 @@ async loadUserSearchSettings() {
     const majorCategoryInfo = this.majorCategories.find(mc => mc.id === majorCategory);
     const majorCategoryLabel = majorCategoryInfo ? `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
     
-    // 🔴 修复:正确判断是否为自定义源
-    const isCustomSource = !source.isSystem;
+    // 🔄 正确判断是否为内置源
+    const isBuiltinSource = source.isSystem === true;
     
     return `
       <div class="source-item ${isEnabled ? 'enabled' : 'disabled'}" data-source-id="${source.id}">
@@ -416,9 +416,9 @@ async loadUserSearchSettings() {
           `}
           <div class="source-info">
             <div class="source-name">
-              <span class="source-icon">${source.icon || '🔍'}</span>
+              <span class="source-icon">${source.icon || '🔗'}</span>
               <span class="source-title">${escapeHtml(source.name)}</span>
-              ${isCustomSource ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
+              ${isBuiltinSource ? '<span class="builtin-badge">内置</span>' : '<span class="custom-badge">自定义</span>'}
               ${!isSearchSourceCategory ? '<span class="non-search-badge">仅浏览</span>' : ''}
             </div>
             <div class="source-subtitle">${escapeHtml(source.subtitle || '')}</div>
@@ -447,10 +447,11 @@ async loadUserSearchSettings() {
           <button class="action-btn visit-btn" onclick="app.getManager('sources').visitSource('${source.id}')" title="访问网站">
             访问
           </button>
-          ${isCustomSource ? `
-            <button class="action-btn edit-btn" onclick="app.getManager('sources').editCustomSource('${source.id}')" title="编辑">
-              编辑
-            </button>
+          <!-- 🔄 内置源只显示编辑按钮，不显示删除按钮 -->
+          <button class="action-btn edit-btn" onclick="app.getManager('sources').editSource('${source.id}')" title="编辑">
+            编辑
+          </button>
+          ${!isBuiltinSource ? `
             <button class="action-btn delete-btn" onclick="app.getManager('sources').deleteCustomSource('${source.id}')" title="删除">
               删除
             </button>
@@ -603,16 +604,28 @@ async loadUserSearchSettings() {
     }
   }
 
-  showCustomSourceModal(source = null) {
-    this.editingCustomSource = source;
+  // 🔄 修改为通用的编辑方法，同时支持内置和自定义搜索源
+  editSource(sourceId) {
+    const source = this.allSearchSources.find(s => s.id === sourceId);
+    if (!source) {
+      showToast('未找到指定的搜索源', 'error');
+      return;
+    }
     
-    let modal = document.getElementById('customSourceModal');
+    this.showSourceModal(source);
+  }
+
+  // 🔄 修改方法名为通用的显示搜索源模态框
+  showSourceModal(source = null) {
+    this.editingSource = source;
+    
+    let modal = document.getElementById('sourceModal'); // 🔄 改为通用的ID
     if (!modal) {
-      modal = this.createCustomSourceModal();
+      modal = this.createSourceModal();
       document.body.appendChild(modal);
     }
     
-    this.populateCustomSourceForm(modal, source);
+    this.populateSourceForm(modal, source);
     modal.style.display = 'block';
     
     setTimeout(() => {
@@ -621,15 +634,16 @@ async loadUserSearchSettings() {
     }, 100);
   }
 
-  createCustomSourceModal() {
+  // 🔄 修改方法名为通用的创建搜索源模态框
+  createSourceModal() {
     const modal = document.createElement('div');
-    modal.id = 'customSourceModal';
+    modal.id = 'sourceModal'; // 🔄 改为通用的ID
     modal.className = 'modal';
     modal.innerHTML = `
       <div class="modal-content">
         <span class="close">&times;</span>
-        <h2>添加自定义搜索源</h2>
-        <form id="customSourceForm">
+        <h2>搜索源管理</h2>
+        <form id="sourceForm">
           <input type="hidden" name="sourceId">
           
           <div class="form-row">
@@ -642,7 +656,7 @@ async loadUserSearchSettings() {
             <div class="form-group">
               <label for="sourceIcon">图标</label>
               <input type="text" name="sourceIcon" id="sourceIcon" maxlength="5" 
-                     placeholder="🔍" value="🔍">
+                     placeholder="🔗" value="🔗">
             </div>
           </div>
           
@@ -705,15 +719,15 @@ async loadUserSearchSettings() {
           
           <div class="form-actions">
             <button type="button" class="btn-secondary" onclick="app.closeModals()">取消</button>
-            <button type="submit" class="btn-primary">添加搜索源</button>
+            <button type="submit" class="btn-primary">保存搜索源</button>
           </div>
         </form>
       </div>
     `;
     
-    const form = modal.querySelector('#customSourceForm');
+    const form = modal.querySelector('#sourceForm');
     if (form) {
-      form.addEventListener('submit', (e) => this.handleCustomSourceSubmit(e));
+      form.addEventListener('submit', (e) => this.handleSourceSubmit(e));
       
       const searchableCheckbox = form.querySelector('#searchable');
       const urlInput = form.querySelector('#sourceUrl');
@@ -735,9 +749,9 @@ async loadUserSearchSettings() {
     return modal;
   }
 
-// 修复 populateCustomSourceForm 方法中的分类显示问题
-populateCustomSourceForm(modal, source) {
-  const form = modal.querySelector('#customSourceForm');
+// 🔄 修复 populateSourceForm 方法中的分类显示问题
+populateSourceForm(modal, source) {
+  const form = modal.querySelector('#sourceForm');
   if (!form) return;
 
   // 首先更新分类选择框
@@ -748,7 +762,7 @@ populateCustomSourceForm(modal, source) {
     form.sourceId.value = source.id;
     form.sourceName.value = source.name;
     form.sourceSubtitle.value = source.subtitle || '';
-    form.sourceIcon.value = source.icon || '🔍';
+    form.sourceIcon.value = source.icon || '🔗';
     form.sourceUrl.value = source.urlTemplate;
     
     // 🔴 修复：确保分类值正确设置
@@ -763,7 +777,7 @@ populateCustomSourceForm(modal, source) {
       // 如果分类不存在，添加一个临时选项保持原始值
       const tempOption = document.createElement('option');
       tempOption.value = sourceCategoryId;
-      tempOption.textContent = `🔍 ${sourceCategoryId} (原分类)`;
+      tempOption.textContent = `🔗 ${sourceCategoryId} (原分类)`;
       tempOption.style.color = '#888';
       form.sourceCategory.appendChild(tempOption);
       form.sourceCategory.value = sourceCategoryId;
@@ -775,12 +789,15 @@ populateCustomSourceForm(modal, source) {
     form.siteType.value = source.siteType || 'search';
     form.searchPriority.value = source.searchPriority || 5;
     form.requiresKeyword.checked = source.requiresKeyword !== false;
-    modal.querySelector('h2').textContent = '编辑自定义搜索源';
-    modal.querySelector('[type="submit"]').textContent = '更新搜索源';
+    
+    // 🔄 根据搜索源类型显示不同标题
+    const isBuiltin = source.isSystem === true;
+    modal.querySelector('h2').textContent = isBuiltin ? '编辑内置搜索源' : '编辑自定义搜索源';
+    modal.querySelector('[type="submit"]').textContent = '保存修改';
   } else {
     // 新增模式
     form.reset();
-    form.sourceIcon.value = '🔍';
+    form.sourceIcon.value = '🔗';
     form.sourceCategory.value = 'others';
     form.searchable.checked = true;
     form.siteType.value = 'search';
@@ -831,7 +848,7 @@ updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
     if (!valueExists) {
       const tempOption = document.createElement('option');
       tempOption.value = currentValue;
-      tempOption.textContent = `🔍 ${currentValue} (原分类)`;
+      tempOption.textContent = `🔗 ${currentValue} (原分类)`;
       tempOption.style.color = '#888';
       selectElement.appendChild(tempOption);
     }
@@ -839,8 +856,8 @@ updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
   }
 }
 
-  // 🔴 修复:保存时使用 categoryId 字段
-  async handleCustomSourceSubmit(event) {
+  // 🔄 修改方法名为通用的表单提交处理
+  async handleSourceSubmit(event) {
     event.preventDefault();
     
     const form = event.target;
@@ -850,7 +867,7 @@ updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
       id: formData.get('sourceId') || null,
       name: formData.get('sourceName').trim(),
       subtitle: formData.get('sourceSubtitle').trim(),
-      icon: formData.get('sourceIcon').trim() || '🔍',
+      icon: formData.get('sourceIcon').trim() || '🔗',
       urlTemplate: formData.get('sourceUrl').trim(),
       categoryId: formData.get('sourceCategory'),  // 🔴 使用 categoryId
       searchable: formData.get('searchable') === 'on',
@@ -859,7 +876,7 @@ updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
       requiresKeyword: formData.get('requiresKeyword') === 'on'
     };
     
-    const validation = this.validateCustomSource(sourceData);
+    const validation = this.validateSource(sourceData);
     if (!validation.valid) {
       showToast(validation.message, 'error');
       return;
@@ -868,9 +885,9 @@ updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
     try {
       showLoading(true);
       
-      if (this.editingCustomSource && sourceData.id) {
+      if (this.editingSource && sourceData.id) {
         await searchSourcesAPI.updateSearchSource(sourceData.id, sourceData);
-        showToast('自定义搜索源更新成功', 'success');
+        showToast('搜索源更新成功', 'success');
       } else {
         await searchSourcesAPI.createSearchSource(sourceData);
         showToast('自定义搜索源添加成功', 'success');
@@ -881,14 +898,15 @@ updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
       this.app.closeModals();
       
     } catch (error) {
-      console.error('保存自定义搜索源失败:', error);
+      console.error('保存搜索源失败:', error);
       showToast('保存失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
   }
 
-  validateCustomSource(sourceData) {
+  // 🔄 修改方法名为通用的搜索源验证
+  validateSource(sourceData) {
     const rules = APP_CONSTANTS.VALIDATION_RULES.SOURCE;
     
     const requiredFieldsForValidation = rules.REQUIRED_FIELDS.filter(field => field !== 'id');
@@ -933,16 +951,7 @@ updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
     return { valid: true };
   }
 
-  editCustomSource(sourceId) {
-    const source = this.customSearchSources.find(s => s.id === sourceId);
-    if (!source) {
-      showToast('未找到指定的自定义搜索源', 'error');
-      return;
-    }
-    
-    this.showCustomSourceModal(source);
-  }
-
+  // 🔄 保留原有的自定义搜索源删除功能
   async deleteCustomSource(sourceId) {
     const source = this.customSearchSources.find(s => s.id === sourceId);
     if (!source) {
@@ -1012,7 +1021,7 @@ updateSourceCategorySelect(selectElement, preserveCurrentValue = false) {
   }
 
   resetEditingState() {
-    this.editingCustomSource = null;
+    this.editingSource = null;
   }
 
   // 🔴 修复:获取源的大类,支持字段兼容

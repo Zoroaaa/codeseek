@@ -1,4 +1,4 @@
-// 分类管理器 - 修复版本:解决分类显示和大类关联问题，确保自定义分类显示完整信息
+// 分类管理器 - 修复版本:解决分类显示和大类关联问题，确保自定义分类显示完整信息，支持内置分类编辑
 import { APP_CONSTANTS } from '../../core/constants.js';
 import { showLoading, showToast } from '../../utils/dom.js';
 import { escapeHtml } from '../../utils/format.js';
@@ -10,7 +10,7 @@ export class CategoriesManager {
     this.builtinCategories = [];
     this.customCategories = [];
     this.allCategories = [];
-    this.editingCustomCategory = null;
+    this.editingCategory = null; // 🔄 改名为通用的编辑状态
     this.majorCategories = [];
   }
 
@@ -139,7 +139,7 @@ export class CategoriesManager {
   bindEvents() {
     const addCustomCategoryBtn = document.getElementById('addCustomCategoryBtn');
     if (addCustomCategoryBtn) {
-      addCustomCategoryBtn.addEventListener('click', () => this.showCustomCategoryModal());
+      addCustomCategoryBtn.addEventListener('click', () => this.showCategoryModal());
     }
   }
 
@@ -167,7 +167,7 @@ export class CategoriesManager {
       .forEach(majorCategory => {
         const categories = categoriesByMajor[majorCategory.id] || [];
         
-        console.log(`🔍 大类 ${majorCategory.id} (${majorCategory.name}) 包含 ${categories.length} 个分类`);
+        console.log(`📁 大类 ${majorCategory.id} (${majorCategory.name}) 包含 ${categories.length} 个分类`);
         
         if (categories.length === 0) return;
         
@@ -200,7 +200,7 @@ export class CategoriesManager {
         <div class="empty-state">
           <span style="font-size: 3rem;">🎨</span>
           <p>暂无自定义分类</p>
-          <button class="btn-primary" onclick="app.getManager('categories').showCustomCategoryModal()">添加自定义分类</button>
+          <button class="btn-primary" onclick="app.getManager('categories').showCategoryModal()">添加自定义分类</button>
         </div>
       `;
       return;
@@ -240,7 +240,7 @@ export class CategoriesManager {
         <div class="empty-state">
           <span style="font-size: 3rem;">🎨</span>
           <p>暂无自定义分类</p>
-          <button class="btn-primary" onclick="app.getManager('categories').showCustomCategoryModal()">添加自定义分类</button>
+          <button class="btn-primary" onclick="app.getManager('categories').showCategoryModal()">添加自定义分类</button>
         </div>
       `;
     }
@@ -266,7 +266,7 @@ export class CategoriesManager {
     return grouped;
   }
 
-  // 🔴 修复:确保自定义分类显示完整信息，与内置分类样式一致
+  // 🔄 修复:确保分类显示完整信息，内置分类只显示编辑按钮
   renderCategoryItem(category) {
     const sourcesManager = this.app.getManager('sources');
     const allSources = sourcesManager ? sourcesManager.getAllSearchSources() : [];
@@ -299,11 +299,11 @@ export class CategoriesManager {
     const majorCategoryLabel = majorCategoryInfo ? 
       `${majorCategoryInfo.icon} ${majorCategoryInfo.name}` : '未知大类';
     
-    // 🔴 判断是否为自定义分类
-    const isCustomCategory = !category.isSystem;
+    // 🔄 判断是否为内置分类
+    const isBuiltinCategory = category.isSystem === true;
     
     return `
-      <div class="category-item ${isCustomCategory ? 'custom' : 'builtin'}" data-category-id="${category.id}">
+      <div class="category-item ${isBuiltinCategory ? 'builtin' : 'custom'}" data-category-id="${category.id}">
         <div class="category-header">
           <div class="category-icon">${category.icon || '📁'}</div>
           <div class="category-info">
@@ -315,7 +315,7 @@ export class CategoriesManager {
                 <span class="category-usage">
                   ${enabledSourceCount}/${sourceCount} 个搜索源已启用
                 </span>
-                ${isCustomCategory ? '<span class="custom-badge">自定义</span>' : '<span class="builtin-badge">内置</span>'}
+                ${isBuiltinCategory ? '<span class="builtin-badge">内置</span>' : '<span class="custom-badge">自定义</span>'}
               </div>
               
               <!-- 🔴 修复: 所有分类都显示大类信息 -->
@@ -344,10 +344,11 @@ export class CategoriesManager {
           <button class="action-btn view-btn" onclick="app.getManager('categories').viewCategorySources('${category.id}')" title="查看搜索源">
             查看源
           </button>
-          ${isCustomCategory ? `
-            <button class="action-btn edit-btn" onclick="app.getManager('categories').editCustomCategory('${category.id}')" title="编辑">
-              编辑
-            </button>
+          <!-- 🔄 内置分类只显示编辑按钮，不显示删除按钮 -->
+          <button class="action-btn edit-btn" onclick="app.getManager('categories').editCategory('${category.id}')" title="编辑">
+            编辑
+          </button>
+          ${!isBuiltinCategory ? `
             <button class="action-btn delete-btn" onclick="app.getManager('categories').deleteCustomCategory('${category.id}')" title="删除">
               删除
             </button>
@@ -403,16 +404,28 @@ export class CategoriesManager {
     }, 100);
   }
 
-  showCustomCategoryModal(category = null) {
-    this.editingCustomCategory = category;
+  // 🔄 修改为通用的编辑方法，同时支持内置和自定义分类
+  editCategory(categoryId) {
+    const category = this.allCategories.find(c => c.id === categoryId);
+    if (!category) {
+      showToast('未找到指定的分类', 'error');
+      return;
+    }
     
-    let modal = document.getElementById('customCategoryModal');
+    this.showCategoryModal(category);
+  }
+
+  // 🔄 修改方法名为通用的显示分类模态框
+  showCategoryModal(category = null) {
+    this.editingCategory = category;
+    
+    let modal = document.getElementById('categoryModal'); // 🔄 改为通用的ID
     if (!modal) {
-      modal = this.createCustomCategoryModal();
+      modal = this.createCategoryModal();
       document.body.appendChild(modal);
     }
     
-    this.populateCustomCategoryForm(modal, category);
+    this.populateCategoryForm(modal, category);
     modal.style.display = 'block';
     
     setTimeout(() => {
@@ -421,15 +434,16 @@ export class CategoriesManager {
     }, 100);
   }
 
-  createCustomCategoryModal() {
+  // 🔄 修改方法名为通用的创建分类模态框
+  createCategoryModal() {
     const modal = document.createElement('div');
-    modal.id = 'customCategoryModal';
+    modal.id = 'categoryModal'; // 🔄 改为通用的ID
     modal.className = 'modal';
     modal.innerHTML = `
       <div class="modal-content custom-category-modal-content">
         <span class="close">&times;</span>
-        <h2>添加自定义分类</h2>
-        <form id="customCategoryForm" class="custom-category-form">
+        <h2>分类管理</h2>
+        <form id="categoryForm" class="custom-category-form">
           <input type="hidden" name="categoryId">
           
           <div class="form-section basic-info">
@@ -506,22 +520,23 @@ export class CategoriesManager {
           
           <div class="form-actions">
             <button type="button" class="btn-secondary" onclick="app.closeModals()">取消</button>
-            <button type="submit" class="btn-primary">添加分类</button>
+            <button type="submit" class="btn-primary">保存分类</button>
           </div>
         </form>
       </div>
     `;
     
-    const form = modal.querySelector('#customCategoryForm');
+    const form = modal.querySelector('#categoryForm');
     if (form) {
-      form.addEventListener('submit', (e) => this.handleCustomCategorySubmit(e));
+      form.addEventListener('submit', (e) => this.handleCategorySubmit(e));
     }
     
     return modal;
   }
 
-  populateCustomCategoryForm(modal, category) {
-    const form = modal.querySelector('#customCategoryForm');
+  // 🔄 修改方法名为通用的表单填充
+  populateCategoryForm(modal, category) {
+    const form = modal.querySelector('#categoryForm');
     if (!form) return;
 
     // 更新大类选择器选项
@@ -537,8 +552,11 @@ export class CategoriesManager {
       form.defaultSearchable.checked = category.defaultSearchable !== false;
       form.defaultSiteType.value = category.defaultSiteType || 'search';
       form.searchPriority.value = category.searchPriority || 5;
-      modal.querySelector('h2').textContent = '编辑自定义分类';
-      modal.querySelector('[type="submit"]').textContent = '更新分类';
+      
+      // 🔄 根据分类类型显示不同标题
+      const isBuiltin = category.isSystem === true;
+      modal.querySelector('h2').textContent = isBuiltin ? '编辑内置分类' : '编辑自定义分类';
+      modal.querySelector('[type="submit"]').textContent = '保存修改';
     } else {
       form.reset();
       form.categoryIcon.value = '🌟';
@@ -564,7 +582,8 @@ export class CategoriesManager {
     selectElement.innerHTML = majorCategoriesHTML;
   }
 
-  async handleCustomCategorySubmit(event) {
+  // 🔄 修改方法名为通用的表单提交处理
+  async handleCategorySubmit(event) {
     event.preventDefault();
     
     const form = event.target;
@@ -582,7 +601,7 @@ export class CategoriesManager {
       searchPriority: parseInt(formData.get('searchPriority')) || 5
     };
     
-    const validation = this.validateCustomCategory(categoryData);
+    const validation = this.validateCategory(categoryData);
     if (!validation.valid) {
       showToast(validation.message, 'error');
       return;
@@ -591,9 +610,9 @@ export class CategoriesManager {
     try {
       showLoading(true);
       
-      if (this.editingCustomCategory && categoryData.id) {
+      if (this.editingCategory && categoryData.id) {
         await searchSourcesAPI.updateSourceCategory(categoryData.id, categoryData);
-        showToast('自定义分类更新成功', 'success');
+        showToast('分类更新成功', 'success');
       } else {
         await searchSourcesAPI.createSourceCategory(categoryData);
         showToast('自定义分类添加成功', 'success');
@@ -604,14 +623,15 @@ export class CategoriesManager {
       this.app.closeModals();
       
     } catch (error) {
-      console.error('保存自定义分类失败:', error);
+      console.error('保存分类失败:', error);
       showToast('保存失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
   }
 
-  validateCustomCategory(categoryData) {
+  // 🔄 修改方法名为通用的分类验证
+  validateCategory(categoryData) {
     const rules = APP_CONSTANTS.VALIDATION_RULES.CATEGORY;
     
     const requiredFields = ['name', 'icon', 'majorCategoryId'];
@@ -637,16 +657,7 @@ export class CategoriesManager {
     return { valid: true };
   }
 
-  editCustomCategory(categoryId) {
-    const category = this.customCategories.find(c => c.id === categoryId);
-    if (!category) {
-      showToast('未找到指定的自定义分类', 'error');
-      return;
-    }
-    
-    this.showCustomCategoryModal(category);
-  }
-
+  // 🔄 保留原有的自定义分类删除功能
   async deleteCustomCategory(categoryId) {
     const category = this.customCategories.find(c => c.id === categoryId);
     if (!category) {
@@ -723,7 +734,7 @@ export class CategoriesManager {
   }
 
   resetEditingState() {
-    this.editingCustomCategory = null;
+    this.editingCategory = null;
   }
 
   getCategoryById(categoryId) {
