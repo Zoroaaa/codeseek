@@ -1078,15 +1078,14 @@ export async function communityDownloadSourceHandler(request, env) {
             supportedFeatures.push('description');
         }
         
-        // 插入到搜索源表
+        // 插入到搜索源表 - 移除详情提取相关字段
         await env.DB.prepare(`
             INSERT INTO search_sources (
                 id, category_id, name, subtitle, description, icon, url_template,
                 homepage_url, site_type, searchable, requires_keyword, search_priority,
-                supports_detail_extraction, extraction_quality, average_extraction_time,
                 supported_features, is_system, is_active, display_order, usage_count,
                 last_used_at, created_by, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
             newSourceId,
             categoryId,
@@ -1100,9 +1099,6 @@ export async function communityDownloadSourceHandler(request, env) {
             0, // searchable: 默认不参与搜索
             0, // requires_keyword: 默认不需要关键词
             5, // search_priority: 默认中等优先级
-            0, // supports_detail_extraction: 默认不支持详情提取
-            'none', // extraction_quality
-            0, // average_extraction_time
             JSON.stringify(supportedFeatures),
             0, // is_system: 用户自定义源
             1, // is_active: 默认激活
@@ -1126,7 +1122,7 @@ export async function communityDownloadSourceHandler(request, env) {
             configId,
             user.id,
             newSourceId,
-            1, // is_enabled: 默认可用
+            1, // is_enabled: 默认启用
             null,
             null,
             null,
