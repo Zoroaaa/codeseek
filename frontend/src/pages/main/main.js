@@ -27,6 +27,14 @@ class MagnetSearchApp {
     this.allCategories = [];
     this.majorCategories = [];
     
+    // 数据加载状态标记
+    this.dataLoadStatus = {
+      isLoading: false,
+      hasLoaded: false,
+      lastLoadTime: 0,
+      retryCount: 0
+    };
+    
     // 性能监控
     this.performanceMetrics = {
       initTime: 0,
@@ -37,7 +45,6 @@ class MagnetSearchApp {
     this.init();
   }
 
-  // 优化: 改进初始化流程
   async init() {
     const startTime = performance.now();
     
@@ -54,36 +61,28 @@ class MagnetSearchApp {
       // 绑定事件
       this.bindEvents();
       
-      // 初始化主题
+      // 初始化主题(仅从localStorage读取主题设置)
       themeManager.init();
       
       // 初始化邮箱验证服务
       await this.initEmailVerificationService();
       
-      // 检查认证状态并根据结果决定后续流程
-      const isAuthenticated = await this.checkAuthStatus();
+      // 检查认证状态
+      await this.checkAuthStatus();
       
-      if (!isAuthenticated) {
-        // 未认证用户: 显示登录界面和基础数据
-        console.log('📱 未认证用户,显示登录界面');
-        document.getElementById('loginModal').style.display = 'block';
-        document.querySelector('.main-content').style.display = 'none';
-        
-        // 加载基础数据用于展示
-        await this.loadMinimalFallbackData();
+      // 根据登录状态初始化应用
+      if (!this.currentUser) {
+        // 未登录：显示登录界面，加载基础数据
+        await this.initForGuest();
       } else {
-        // 已认证用户: 显示主界面
-        console.log('👤 已认证用户,显示主界面');
-        document.querySelector('.main-content').style.display = 'block';
+        // 已登录：初始化完整功能
+        await this.initForUser();
       }
-
-      // 初始化站点导航
-      await this.initSiteNavigation();
 
       // 测试API连接
       await this.testConnection();
       
-      // 处理URL参数
+      // 处理URL参数(如搜索关键词)
       this.handleURLParams();
       
       // 记录初始化性能
@@ -105,158 +104,277 @@ class MagnetSearchApp {
     }
   }
 
-  // 优化: 改进搜索源API加载
-  async loadSearchSourcesFromAPI() {
+  // 为访客初始化基础功能
+  async initForGuest() {
+    console.log('👤 初始化访客模式...');
+    
+    // 显示登录模态框
+    document.getElementById('loginModal').style.display = 'block';
+    document.querySelector('.main-content').style.display = 'none';
+    
+    // 加载最小基础数据用于展示
+    await this.loadMinimalFallbackData();
+    await this.initSiteNavigation();
+  }
+
+  // 为已登录用户初始化完整功能
+  async initForUser() {
+    console.log('👨‍💻 初始化用户模式...');
+    
+    // 显示主内容区域
+    document.querySelector('.main-content').style.display = 'block';
+    
     try {
-      console.log('📡 从API加载搜索源数据...');
+      // 初始化所有组件和数据
+      await this.initUserComponents();
+      await this.loadUserData();
       
-      // 确保认证状态
-      if (!this.currentUser) {
-        throw new Error('用户未认证,无法加载搜索源');
-      }
-      
-      // 验证token有效性
-      const isTokenValid = await authManager.verifyToken();
-      if (!isTokenValid) {
-        throw new Error('认证token无效,请重新登录');
-      }
-      
-      // 并行加载所有数据类型
-      const loadPromises = [
-        searchSourcesAPI.getMajorCategories(),
-        searchSourcesAPI.getSourceCategories({ includeSystem: true }),
-        searchSourcesAPI.getSearchSources({ includeSystem: true, enabledOnly: false })
-      ];
-      
-      const [majorCategories, categories, sources] = await Promise.all(loadPromises);
-      
-      // 验证数据有效性
-      this.majorCategories = Array.isArray(majorCategories) ? majorCategories : [];
-      this.allCategories = Array.isArray(categories) ? categories : [];
-      this.allSearchSources = Array.isArray(sources) ? sources : [];
-      
-      console.log(`✅ API数据加载完成: ${this.majorCategories.length}个大类, ${this.allCategories.length}个分类, ${this.allSearchSources.length}个搜索源`);
-      
-      // 如果所有数据都为空,可能是API问题,使用回退数据
-      if (this.majorCategories.length === 0 && this.allCategories.length === 0 && this.allSearchSources.length === 0) {
-        console.warn('⚠️ API返回空数据,使用回退方案');
-        await this.loadMinimalFallbackData();
-      }
+      this.updateUserUI();
       
     } catch (error) {
-      console.warn('⚠️ 从API加载搜索源失败:', error);
+      console.error('用户模式初始化失败:', error);
+      // 如果用户数据加载失败，退回到访客模式
+      await this.handleUserInitError(error);
+    }
+  }
+
+  // 初始化用户组件
+  async initUserComponents() {
+    console.log('🔧 初始化用户组件...');
+    
+    // 初始化统一搜索管理器
+    await unifiedSearchManager.init();
+    
+    // 初始化代理服务
+    console.log('📡 正在初始化代理服务...');
+    await proxyService.init();
+    
+    if (proxyService.isProxyEnabled()) {
+      console.log('✅ 代理服务已可用');
+      showToast('代理模式已可用，可访问受限制的搜索源', 'success', 3000);
+    } else {
+      console.log('ℹ️ 代理服务未可用');
+    }
+    
+    // 初始化收藏管理器
+    await favoritesManager.init();
+    
+    console.log('✅ 用户组件初始化完成');
+  }
+
+  // 加载用户数据（搜索源、收藏等）
+  async loadUserData() {
+    console.log('📊 加载用户数据...');
+    
+    // 加载搜索源数据
+    await this.loadSearchSourcesFromAPI();
+    
+    // 初始化站点导航
+    await this.initSiteNavigation();
+    
+    console.log('✅ 用户数据加载完成');
+  }
+
+  // 处理用户初始化错误
+  async handleUserInitError(error) {
+    console.error('用户初始化失败，回退到访客模式:', error);
+    
+    // 清除认证状态
+    this.currentUser = null;
+    localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.USER_INFO);
+    
+    // 回退到访客模式
+    await this.initForGuest();
+    
+    showToast('用户数据加载失败，请重新登录', 'warning', 5000);
+  }
+
+  // 优化：完全从API加载搜索源数据，增加重试机制
+  async loadSearchSourcesFromAPI() {
+    // 防止重复加载
+    if (this.dataLoadStatus.isLoading) {
+      console.log('数据正在加载中，跳过重复请求');
+      return;
+    }
+
+    // 如果最近刚加载过，跳过
+    const timeSinceLastLoad = Date.now() - this.dataLoadStatus.lastLoadTime;
+    if (this.dataLoadStatus.hasLoaded && timeSinceLastLoad < 30000) {
+      console.log('数据最近已加载，跳过重复加载');
+      return;
+    }
+
+    this.dataLoadStatus.isLoading = true;
+    
+    const maxRetries = 3;
+    let lastError = null;
+
+    for (let retry = 0; retry <= maxRetries; retry++) {
+      try {
+        console.log(`📄 从搜索源API加载数据... (尝试 ${retry + 1}/${maxRetries + 1})`);
+        
+        // 获取大类数据
+        const majorCategories = await searchSourcesAPI.getMajorCategories();
+        this.majorCategories = majorCategories || [];
+        
+        // 获取所有分类
+        const categories = await searchSourcesAPI.getSourceCategories({
+          includeSystem: true
+        });
+        this.allCategories = categories || [];
+        
+        // 获取所有搜索源(包括系统内置和用户自定义)
+        const sources = await searchSourcesAPI.getSearchSources({
+          includeSystem: true,
+          enabledOnly: false
+        });
+        this.allSearchSources = sources || [];
+        
+        // 标记加载成功
+        this.dataLoadStatus.hasLoaded = true;
+        this.dataLoadStatus.lastLoadTime = Date.now();
+        this.dataLoadStatus.retryCount = 0;
+        
+        console.log(`✅ 已加载 ${this.majorCategories.length} 个大类，${this.allCategories.length} 个分类，${this.allSearchSources.length} 个搜索源`);
+        break;
+        
+      } catch (error) {
+        lastError = error;
+        this.dataLoadStatus.retryCount++;
+        
+        console.warn(`⚠️ 从API加载搜索源失败 (尝试 ${retry + 1}/${maxRetries + 1}):`, error);
+        
+        if (retry < maxRetries) {
+          // 等待后重试
+          const delay = Math.pow(2, retry) * 1000; // 指数退避
+          console.log(`等待 ${delay}ms 后重试...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    this.dataLoadStatus.isLoading = false;
+
+    // 如果所有重试都失败，使用回退数据
+    if (!this.dataLoadStatus.hasLoaded) {
+      console.warn('⚠️ 从API加载搜索源失败，使用最小回退方案:', lastError);
       await this.loadMinimalFallbackData();
-      throw error; // 重新抛出错误以便上层处理
+      showToast('数据加载失败，正在使用离线数据', 'warning', 3000);
     }
   }
 
   // 最小回退方案（仅在API完全不可用时使用）
-async loadMinimalFallbackData() {
-  try {
-    // 创建最基本的大类 - 必须包含正确的字段结构
-    this.majorCategories = [
-      {
-        id: 'search_sources',
-        name: '🔍 搜索源',
-        icon: '🔍',
-        description: '支持番号搜索的网站',
-        requiresKeyword: true,
-        displayOrder: 1,
-        order: 1
-      },
-      {
-        id: 'browse_sites',
-        name: '🌐 浏览站点',
-        icon: '🌐',
-        description: '仅供访问,不参与搜索',
-        requiresKeyword: false,
-        displayOrder: 2,
-        order: 2
-      }
-    ];
+  async loadMinimalFallbackData() {
+    try {
+      // 创建最基本的大类 - 必须包含正确的字段结构
+      this.majorCategories = [
+        {
+          id: 'search_sources',
+          name: '🔍 搜索源',
+          icon: '🔍',
+          description: '支持番号搜索的网站',
+          requiresKeyword: true,
+          displayOrder: 1,
+          order: 1
+        },
+        {
+          id: 'browse_sites',
+          name: '🌐 浏览站点',
+          icon: '🌐',
+          description: '仅供访问,不参与搜索',
+          requiresKeyword: false,
+          displayOrder: 2,
+          order: 2
+        }
+      ];
 
-    // 创建最基本的分类 - 必须包含 majorCategoryId 字段
-    this.allCategories = [
-      {
-        id: 'database',
-        name: '📚 番号资料站',
-        icon: '📚',
-        description: '提供详细的番号信息、封面和演员资料',
-        majorCategoryId: 'search_sources',  // 关键:使用 majorCategoryId
-        defaultSearchable: true,
-        defaultSiteType: 'search',
-        searchPriority: 1,
-        isSystem: true,
-        displayOrder: 1
-      },
-      {
-        id: 'streaming',
-        name: '🎥 在线播放平台',
-        icon: '🎥',
-        description: '提供在线观看和下载服务',
-        majorCategoryId: 'browse_sites',  // 关键:使用 majorCategoryId
-        defaultSearchable: false,
-        defaultSiteType: 'browse',
-        searchPriority: 5,
-        isSystem: true,
-        displayOrder: 1
-      },
-      {
-        id: 'torrent',
-        name: '🧲 磁力搜索',
-        icon: '🧲',
-        description: '提供磁力链接和种子文件',
-        majorCategoryId: 'search_sources',  // 关键:使用 majorCategoryId
-        defaultSearchable: true,
-        defaultSiteType: 'search',
-        searchPriority: 3,
-        isSystem: true,
-        displayOrder: 3
-      }
-    ];
+      // 创建最基本的分类 - 必须包含 majorCategoryId 字段
+      this.allCategories = [
+        {
+          id: 'database',
+          name: '📚 番号资料站',
+          icon: '📚',
+          description: '提供详细的番号信息、封面和演员资料',
+          majorCategoryId: 'search_sources',  // 关键:使用 majorCategoryId
+          defaultSearchable: true,
+          defaultSiteType: 'search',
+          searchPriority: 1,
+          isSystem: true,
+          displayOrder: 1
+        },
+        {
+          id: 'streaming',
+          name: '🎥 在线播放平台',
+          icon: '🎥',
+          description: '提供在线观看和下载服务',
+          majorCategoryId: 'browse_sites',  // 关键:使用 majorCategoryId
+          defaultSearchable: false,
+          defaultSiteType: 'browse',
+          searchPriority: 5,
+          isSystem: true,
+          displayOrder: 1
+        },
+        {
+          id: 'torrent',
+          name: '🧲 磁力搜索',
+          icon: '🧲',
+          description: '提供磁力链接和种子文件',
+          majorCategoryId: 'search_sources',  // 关键:使用 majorCategoryId
+          defaultSearchable: true,
+          defaultSiteType: 'search',
+          searchPriority: 3,
+          isSystem: true,
+          displayOrder: 3
+        }
+      ];
 
-    // 创建最基本的搜索源 - 必须包含 categoryId 字段
-    this.allSearchSources = [
-      {
-        id: 'javbus',
-        name: 'JavBus',
-        subtitle: '番号+磁力一体站,信息完善',
-        icon: '🎬',
-        categoryId: 'database',  // 关键:使用 categoryId
-        urlTemplate: 'https://www.javbus.com/search/{keyword}',
-        searchable: true,
-        siteType: 'search',
-        searchPriority: 1,
-        requiresKeyword: true,
-        isSystem: true,
-        userEnabled: true
-      },
-      {
-        id: 'javdb',
-        name: 'JavDB',
-        subtitle: '极简风格番号资料站,轻量快速',
-        icon: '📚',
-        categoryId: 'database',  // 关键:使用 categoryId
-        urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
-        searchable: true,
-        siteType: 'search',
-        searchPriority: 2,
-        requiresKeyword: true,
-        isSystem: true,
-        userEnabled: true
-      }
-    ];
+      // 创建最基本的搜索源 - 必须包含 categoryId 字段
+      this.allSearchSources = [
+        {
+          id: 'javbus',
+          name: 'JavBus',
+          subtitle: '番号+磁力一体站,信息完善',
+          icon: '🎬',
+          categoryId: 'database',  // 关键:使用 categoryId
+          urlTemplate: 'https://www.javbus.com/search/{keyword}',
+          searchable: true,
+          siteType: 'search',
+          searchPriority: 1,
+          requiresKeyword: true,
+          isSystem: true,
+          userEnabled: true
+        },
+        {
+          id: 'javdb',
+          name: 'JavDB',
+          subtitle: '极简风格番号资料站,轻量快速',
+          icon: '📚',
+          categoryId: 'database',  // 关键:使用 categoryId
+          urlTemplate: 'https://javdb.com/search?q={keyword}&f=all',
+          searchable: true,
+          siteType: 'search',
+          searchPriority: 2,
+          requiresKeyword: true,
+          isSystem: true,
+          userEnabled: true
+        }
+      ];
 
-    console.log('🔧 已加载最小回退数据');
-    
-  } catch (error) {
-    console.error('❌ 加载回退数据失败:', error);
-    // 设置为空数组,防止应用崩溃
-    this.majorCategories = [];
-    this.allCategories = [];
-    this.allSearchSources = [];
+      // 标记为已加载回退数据
+      this.dataLoadStatus.hasLoaded = true;
+      this.dataLoadStatus.lastLoadTime = Date.now();
+
+      console.log('🔧 已加载最小回退数据');
+      
+    } catch (error) {
+      console.error('❌ 加载回退数据失败:', error);
+      // 设置为空数组,防止应用崩溃
+      this.majorCategories = [];
+      this.allCategories = [];
+      this.allSearchSources = [];
+    }
   }
-}
 
   // 初始化邮箱验证服务
   async initEmailVerificationService() {
@@ -287,7 +405,7 @@ async loadMinimalFallbackData() {
   async initSiteNavigation() {
     try {
       // 确保数据已加载
-      if (this.allSearchSources.length === 0) {
+      if (this.allSearchSources.length === 0 && !this.dataLoadStatus.hasLoaded) {
         await this.loadSearchSourcesFromAPI();
       }
       
@@ -309,235 +427,174 @@ async loadMinimalFallbackData() {
   }
 
   // 渲染站点导航 - 使用动态数据
-renderSiteNavigation(sourcesToDisplay = null) {
-  const sitesSection = document.getElementById('sitesSection');
-  if (!sitesSection) return;
+  renderSiteNavigation(sourcesToDisplay = null) {
+    const sitesSection = document.getElementById('sitesSection');
+    if (!sitesSection) return;
 
-  const sources = sourcesToDisplay || this.allSearchSources;
+    const sources = sourcesToDisplay || this.allSearchSources;
 
-  if (sources.length === 0) {
-    sitesSection.innerHTML = `
+    if (sources.length === 0) {
+      sitesSection.innerHTML = `
+        <h2>🌐 资源站点导航</h2>
+        <div class="empty-state">
+          <p>暂无可用的搜索源</p>
+          <p>请在个人中心搜索源管理页面添加搜索源</p>
+          <button onclick="window.app && window.app.navigateToDashboard()" class="btn-primary">前往设置</button>
+        </div>
+      `;
+      return;
+    }
+
+    // 使用动态获取的大类数据
+    const majorCategories = this.majorCategories.sort((a, b) => (a.order || a.displayOrder || 999) - (b.order || b.displayOrder || 999));
+    
+    let navigationHTML = `
       <h2>🌐 资源站点导航</h2>
-      <div class="empty-state">
-        <p>暂无可用的搜索源</p>
-        <p>请在个人中心搜索源管理页面添加搜索源</p>
-        <button onclick="window.app && window.app.navigateToDashboard()" class="btn-primary">前往设置</button>
-      </div>
     `;
-    return;
-  }
 
-  // 使用动态获取的大类数据
-  const majorCategories = this.majorCategories.sort((a, b) => (a.order || a.displayOrder || 999) - (b.order || b.displayOrder || 999));
-  
-  let navigationHTML = `
-    <h2>🌐 资源站点导航</h2>
-  `;
+    // 按大分类渲染各个部分
+    majorCategories.forEach(majorCategory => {
+      const categorySourcesWithSubcategories = this.getSourcesByMajorCategoryWithSubcategories(sources, majorCategory.id);
+      
+      if (categorySourcesWithSubcategories.length === 0) return;
 
-  // 按大分类渲染各个部分
-  majorCategories.forEach(majorCategory => {
-    const categorySourcesWithSubcategories = this.getSourcesByMajorCategoryWithSubcategories(sources, majorCategory.id);
-    
-    if (categorySourcesWithSubcategories.length === 0) return;
-
-    navigationHTML += `
-      <div class="major-category-section">
-        <h3 class="major-category-title">
-          ${majorCategory.icon} ${majorCategory.name}
-          <small>(${categorySourcesWithSubcategories.length}个站点)</small>
-        </h3>
-        <p class="major-category-desc">${majorCategory.description}</p>
-        
-        <div class="subcategories-container">
-          ${this.renderSubcategoriesWithSources(categorySourcesWithSubcategories, majorCategory.id)}
-        </div>
-      </div>
-    `;
-  });
-  
-  sitesSection.innerHTML = navigationHTML;
-}
-
-  // 新增:获取按大分类和小分类组织的源
-getSourcesByMajorCategoryWithSubcategories(sources, majorCategoryId) {
-  return sources.filter(source => {
-    // 关键修复:同时支持 categoryId 和 category 字段
-    const sourceCategoryId = source.categoryId || source.category;
-    const category = this.allCategories.find(cat => cat.id === sourceCategoryId);
-    
-    if (!category) {
-      console.warn(`源 ${source.id} 的分类 ${sourceCategoryId} 未找到`);
-      return false;
-    }
-    
-    // 关键修复:同时支持 majorCategoryId 和 majorCategory 字段
-    const categoryMajorId = category.majorCategoryId || category.majorCategory;
-    return categoryMajorId === majorCategoryId;
-  });
-}
-
-  // 新增:渲染小分类及其下的源
-renderSubcategoriesWithSources(sources, majorCategoryId) {
-  // 按小分类分组
-  const sourcesBySubcategory = {};
-  
-  sources.forEach(source => {
-    // 关键修复:兼容字段名
-    const sourceCategoryId = source.categoryId || source.category;
-    const subcategory = this.allCategories.find(cat => cat.id === sourceCategoryId);
-    
-    if (subcategory) {
-      if (!sourcesBySubcategory[subcategory.id]) {
-        sourcesBySubcategory[subcategory.id] = {
-          category: subcategory,
-          sources: []
-        };
-      }
-      sourcesBySubcategory[subcategory.id].sources.push(source);
-    }
-  });
-
-  // 按小分类的 order/displayOrder 排序
-  const sortedSubcategories = Object.values(sourcesBySubcategory)
-    .sort((a, b) => {
-      const orderA = a.category.displayOrder || a.category.order || 999;
-      const orderB = b.category.displayOrder || b.category.order || 999;
-      return orderA - orderB;
-    });
-
-  return sortedSubcategories.map(({ category, sources }) => {
-    // 关键修复:根据大类判断是否可搜索
-    const isSearchable = majorCategoryId === 'search_sources';
-    
-    return `
-      <div class="subcategory-section">
-        <h4 class="subcategory-title">
-          ${category.icon} ${category.name}
-          <span class="source-count">${sources.length}个站点</span>
-          ${isSearchable ? '<span class="searchable-indicator">🔍 参与搜索</span>' : '<span class="browse-indicator">🌐 仅浏览</span>'}
-        </h4>
-        <p class="subcategory-desc">${category.description || ''}</p>
-        
-        <div class="sites-grid">
-          ${sources.map(source => this.renderSiteItem(source, isSearchable)).join('')}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-  // 渲染单个站点项,包括可用状态和详情提取支持标识
-renderSiteItem(source, isSearchable) {
-  // 通过统一搜索管理器检查源的可用状态
-  let isEnabled = true; // 默认显示为可用,具体可用状态由搜索时判断
-  
-  try {
-    if (unifiedSearchManager.isInitialized) {
-      // 这里可以添加检查逻辑,当前简化处理
-    }
-  } catch (error) {
-    console.warn('检查搜索源可用状态失败:', error);
-  }
-
-  const statusClass = isEnabled ? 'enabled' : 'disabled';
-  const statusText = isEnabled ? '可用' : '未可用';
-  
-  const badges = [];
-  
-  if (!isSearchable) {
-    badges.push('<span class="non-searchable-badge">仅浏览</span>');
-  } else if (source.searchPriority && source.searchPriority <= 3) {
-    badges.push('<span class="priority-badge">优先</span>');
-  }
-  
-  // 根据网站类型调整URL处理
-  let siteUrl = source.urlTemplate;
-  if (source.searchable === false) {
-    // 浏览站点直接使用基础URL
-    siteUrl = siteUrl.replace('/{keyword}', '').replace('?q={keyword}&f=all', '').replace('/search/{keyword}', '');
-  } else {
-    // 搜索源移除关键词占位符以供直接访问
-    siteUrl = siteUrl.replace('{keyword}', '');
-  }
-  
-  return `
-    <a href="${siteUrl}" 
-       class="site-item ${isSearchable ? 'searchable' : 'browse-only'}"
-       target="_blank">
-      <div class="site-info">
-        <div class="site-header">
-          <strong>${source.icon || '📄'} ${source.name}</strong>
-          <div class="site-badges">
-            ${source.isCustom || !source.isSystem ? '<span class="custom-badge">自定义</span>' : ''}
-            ${badges.join('')}
-            <span class="status-badge ${statusClass}">${statusText}</span>
+      navigationHTML += `
+        <div class="major-category-section">
+          <h3 class="major-category-title">
+            ${majorCategory.icon} ${majorCategory.name}
+            <small>(${categorySourcesWithSubcategories.length}个站点)</small>
+          </h3>
+          <p class="major-category-desc">${majorCategory.description}</p>
+          
+          <div class="subcategories-container">
+            ${this.renderSubcategoriesWithSources(categorySourcesWithSubcategories, majorCategory.id)}
           </div>
         </div>
-        <span class="site-subtitle">${source.subtitle || ''}</span>
-      </div>
-    </a>
-  `;
-}
-
-  // 优化: 改进组件初始化
-  async initComponents() {
-    try {
-      console.log('📦 开始初始化组件...');
-      
-      // 1. 首先初始化代理服务
-      console.log('🔗 初始化代理服务...');
-      await proxyService.init();
-      if (proxyService.isProxyEnabled()) {
-        console.log('✅ 代理服务已启用');
-      }
-      
-      // 2. 初始化统一搜索管理器
-      console.log('🔍 初始化搜索管理器...');
-      if (!unifiedSearchManager.isInitialized) {
-        await unifiedSearchManager.init();
-      } else {
-        // 如果已经初始化,重新设置用户状态
-        await unifiedSearchManager.refreshUserData();
-      }
-      
-      // 3. 初始化收藏管理器
-      console.log('⭐ 初始化收藏管理器...');
-      if (!favoritesManager.isInitialized) {
-        await favoritesManager.init();
-      } else {
-        // 如果已经初始化,清空旧数据准备重新加载
-        favoritesManager.favorites = [];
-        favoritesManager.renderFavorites();
-      }
-      
-      console.log('✅ 组件初始化完成');
-      
-    } catch (error) {
-      console.error('组件初始化失败:', error);
-      this.performanceMetrics.errorCount++;
-      throw error;
-    }
+      `;
+    });
+    
+    sitesSection.innerHTML = navigationHTML;
   }
 
-  // 新增: 清理组件状态
-  async cleanupComponents() {
+  // 新增:获取按大分类和小分类组织的源
+  getSourcesByMajorCategoryWithSubcategories(sources, majorCategoryId) {
+    return sources.filter(source => {
+      // 关键修复:同时支持 categoryId 和 category 字段
+      const sourceCategoryId = source.categoryId || source.category;
+      const category = this.allCategories.find(cat => cat.id === sourceCategoryId);
+      
+      if (!category) {
+        console.warn(`源 ${source.id} 的分类 ${sourceCategoryId} 未找到`);
+        return false;
+      }
+      
+      // 关键修复:同时支持 majorCategoryId 和 majorCategory 字段
+      const categoryMajorId = category.majorCategoryId || category.majorCategory;
+      return categoryMajorId === majorCategoryId;
+    });
+  }
+
+  // 新增:渲染小分类及其下的源
+  renderSubcategoriesWithSources(sources, majorCategoryId) {
+    // 按小分类分组
+    const sourcesBySubcategory = {};
+    
+    sources.forEach(source => {
+      // 关键修复:兼容字段名
+      const sourceCategoryId = source.categoryId || source.category;
+      const subcategory = this.allCategories.find(cat => cat.id === sourceCategoryId);
+      
+      if (subcategory) {
+        if (!sourcesBySubcategory[subcategory.id]) {
+          sourcesBySubcategory[subcategory.id] = {
+            category: subcategory,
+            sources: []
+          };
+        }
+        sourcesBySubcategory[subcategory.id].sources.push(source);
+      }
+    });
+
+    // 按小分类的 order/displayOrder 排序
+    const sortedSubcategories = Object.values(sourcesBySubcategory)
+      .sort((a, b) => {
+        const orderA = a.category.displayOrder || a.category.order || 999;
+        const orderB = b.category.displayOrder || b.category.order || 999;
+        return orderA - orderB;
+      });
+
+    return sortedSubcategories.map(({ category, sources }) => {
+      // 关键修复:根据大类判断是否可搜索
+      const isSearchable = majorCategoryId === 'search_sources';
+      
+      return `
+        <div class="subcategory-section">
+          <h4 class="subcategory-title">
+            ${category.icon} ${category.name}
+            <span class="source-count">${sources.length}个站点</span>
+            ${isSearchable ? '<span class="searchable-indicator">🔍 参与搜索</span>' : '<span class="browse-indicator">🌐 仅浏览</span>'}
+          </h4>
+          <p class="subcategory-desc">${category.description || ''}</p>
+          
+          <div class="sites-grid">
+            ${sources.map(source => this.renderSiteItem(source, isSearchable)).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 渲染单个站点项,包括可用状态和详情提取支持标识
+  renderSiteItem(source, isSearchable) {
+    // 通过统一搜索管理器检查源的可用状态
+    let isEnabled = true; // 默认显示为可用,具体可用状态由搜索时判断
+    
     try {
-      // 只清理必要的状态,不完全销毁组件
       if (unifiedSearchManager.isInitialized) {
-        // 清理搜索结果但保持组件活跃
-        unifiedSearchManager.clearSearchResults();
+        // 这里可以添加检查逻辑,当前简化处理
       }
-      
-      if (favoritesManager.isInitialized) {
-        // 清空收藏列表准备重新加载
-        favoritesManager.favorites = [];
-        favoritesManager.renderFavorites();
-      }
-      
     } catch (error) {
-      console.warn('清理组件状态时出错:', error);
-      // 不抛出错误,继续初始化流程
+      console.warn('检查搜索源可用状态失败:', error);
     }
+
+    const statusClass = isEnabled ? 'enabled' : 'disabled';
+    const statusText = isEnabled ? '可用' : '未可用';
+    
+    const badges = [];
+    
+    if (!isSearchable) {
+      badges.push('<span class="non-searchable-badge">仅浏览</span>');
+    } else if (source.searchPriority && source.searchPriority <= 3) {
+      badges.push('<span class="priority-badge">优先</span>');
+    }
+    
+    // 根据网站类型调整URL处理
+    let siteUrl = source.urlTemplate;
+    if (source.searchable === false) {
+      // 浏览站点直接使用基础URL
+      siteUrl = siteUrl.replace('/{keyword}', '').replace('?q={keyword}&f=all', '').replace('/search/{keyword}', '');
+    } else {
+      // 搜索源移除关键词占位符以供直接访问
+      siteUrl = siteUrl.replace('{keyword}', '');
+    }
+    
+    return `
+      <a href="${siteUrl}" 
+         class="site-item ${isSearchable ? 'searchable' : 'browse-only'}"
+         target="_blank">
+        <div class="site-info">
+          <div class="site-header">
+            <strong>${source.icon || '📄'} ${source.name}</strong>
+            <div class="site-badges">
+              ${source.isCustom || !source.isSystem ? '<span class="custom-badge">自定义</span>' : ''}
+              ${badges.join('')}
+              <span class="status-badge ${statusClass}">${statusText}</span>
+            </div>
+          </div>
+          <span class="site-subtitle">${source.subtitle || ''}</span>
+        </div>
+      </a>
+    `;
   }
 
   // 显示连接状态
@@ -698,7 +755,7 @@ renderSiteItem(source, isSearchable) {
     }
   }
 
-  // 修改:用户登录后更新站点导航
+  // 优化：用户登录后确保数据正确加载
   async handleLogin(event) {
     event.preventDefault();
     
@@ -716,148 +773,45 @@ renderSiteItem(source, isSearchable) {
       const result = await authManager.login(username, password);
       
       if (result.success) {
-        console.log('✅ 登录成功,开始初始化用户数据...');
-        
-        // 1. 首先设置用户状态
         this.currentUser = result.user;
-        this.updateUserUI();
+        console.log('✅ 登录成功:', this.currentUser.username);
         
-        // 2. 显示主内容区域
-        document.querySelector('.main-content').style.display = 'block';
+        // 关闭模态框
         this.closeModals();
         
-        // 3. 等待一下确保认证状态完全建立
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // 显示主内容区域
+        document.querySelector('.main-content').style.display = 'block';
         
-        // 4. 按顺序初始化组件和数据
-        await this.initializeUserSession();
+        // 重置数据加载状态，确保重新加载用户数据
+        this.dataLoadStatus.hasLoaded = false;
+        this.dataLoadStatus.lastLoadTime = 0;
         
-        // 5. 处理URL参数
+        // 初始化用户组件和数据
+        await this.initUserComponents();
+        await this.loadUserData();
+        
+        // 更新用户界面
+        this.updateUserUI();
+        
+        // 处理URL参数(如搜索查询)
         this.handleURLParams();
         
-        // 6. 清空登录表单
+        // 清空登录表单
         document.getElementById('loginForm').reset();
         
-        console.log('✅ 用户会话初始化完成');
-        showToast('登录成功!', 'success');
+        // 重置性能计数
+        this.performanceMetrics.searchCount = 0;
         
+        showToast('登录成功!', 'success');
       }
     } catch (error) {
       console.error('登录失败:', error);
-      showToast('登录失败: ' + error.message, 'error');
       this.performanceMetrics.errorCount++;
+      showToast('登录失败: ' + error.message, 'error');
     } finally {
       showLoading(false);
     }
   }
-
-  // 新增: 统一的用户会话初始化方法
-  async initializeUserSession() {
-    try {
-      console.log('🔄 开始初始化用户会话...');
-      
-      // 1. 重置错误计数
-      this.performanceMetrics.searchCount = 0;
-      
-      // 2. 先确保组件处于干净状态
-      await this.cleanupComponents();
-      
-      // 3. 初始化核心组件 (按依赖顺序)
-      console.log('📦 初始化核心组件...');
-      await this.initComponents();
-      
-      // 4. 加载搜索源数据 (需要认证状态)
-      console.log('📊 加载用户数据...');
-      await this.loadUserData();
-      
-      // 5. 重新初始化站点导航
-      console.log('🌐 更新站点导航...');
-      await this.initSiteNavigation();
-      
-      console.log('✅ 用户会话初始化完成');
-      
-    } catch (error) {
-      console.error('❌ 用户会话初始化失败:', error);
-      showToast('数据加载失败,正在重试...', 'warning');
-      
-      // 重试一次
-      setTimeout(async () => {
-        try {
-          await this.retryUserDataLoading();
-        } catch (retryError) {
-          console.error('重试失败:', retryError);
-          showToast('数据加载失败,请刷新页面重试', 'error');
-        }
-      }, 2000);
-    }
-  }
-
-  // 新增: 重试用户数据加载
-  async retryUserDataLoading() {
-    console.log('🔄 重试加载用户数据...');
-    
-    // 确保认证状态有效
-    const isAuthValid = await authManager.verifyToken();
-    if (!isAuthValid) {
-      throw new Error('认证状态无效,请重新登录');
-    }
-    
-    // 重新加载数据
-    await this.loadUserData();
-    await this.initSiteNavigation();
-    
-    showToast('数据加载成功!', 'success');
-  }
-
-  // 新增: 加载用户相关数据
-  async loadUserData() {
-    // 确保用户已登录
-    if (!this.currentUser) {
-      throw new Error('用户未登录');
-    }
-    
-    try {
-      // 并行加载数据以提高性能
-      const [sourcesResult, favoritesResult] = await Promise.allSettled([
-        this.loadSearchSourcesFromAPI(),
-        this.loadUserFavorites()
-      ]);
-      
-      // 检查搜索源加载结果
-      if (sourcesResult.status === 'rejected') {
-        console.warn('搜索源加载失败:', sourcesResult.reason);
-        // 使用回退数据但不抛出错误
-        await this.loadMinimalFallbackData();
-      }
-      
-      // 检查收藏加载结果
-      if (favoritesResult.status === 'rejected') {
-        console.warn('收藏数据加载失败:', favoritesResult.reason);
-        // 收藏加载失败不影响主流程
-      }
-      
-    } catch (error) {
-      console.error('加载用户数据失败:', error);
-      // 确保至少有基础数据可用
-      await this.loadMinimalFallbackData();
-      throw error;
-    }
-  }
-
-  // 新增: 加载用户收藏数据
-  async loadUserFavorites() {
-    if (favoritesManager && favoritesManager.isInitialized) {
-      try {
-        await favoritesManager.loadFavorites();
-        console.log('✅ 收藏数据加载完成');
-      } catch (error) {
-        console.warn('收藏数据加载失败:', error);
-        // 重置为空收藏列表
-        favoritesManager.favorites = [];
-      }
-    }
-  }
-
 
   // 绑定模态框事件
   bindModalEvents() {
@@ -1073,34 +1027,25 @@ renderSiteItem(source, isSearchable) {
     }
   }
 
-  // 优化: 改进认证状态检查
+  // 检查认证状态
   async checkAuthStatus() {
     const token = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
     if (!token) {
       console.log('未找到认证token');
-      return false;
+      return;
     }
 
     try {
-      console.log('🔐 验证用户认证状态...');
       const isValid = await authManager.verifyToken();
-      
       if (isValid) {
         this.currentUser = authManager.getCurrentUser();
-        this.updateUserUI();
-        console.log('✅ 用户认证有效:', this.currentUser.username);
-        
-        // 认证有效,初始化用户会话
-        await this.initializeUserSession();
-        return true;
+        console.log('✅ 用户认证成功:', this.currentUser.username);
       } else {
         console.log('Token验证失败,已清除');
-        return false;
       }
     } catch (error) {
       console.error('验证token失败:', error);
       this.performanceMetrics.errorCount++;
-      return false;
     }
   }
 
@@ -1129,86 +1074,55 @@ renderSiteItem(source, isSearchable) {
     }
   }
 
-  // 优化: 改进退出登录逻辑
+  // 优化：退出登录时保持基础展示功能
   async logout() {
     try {
       showLoading(true, '正在退出...');
-      console.log('🚪 开始退出登录...');
       
-      // 1. 清理认证状态
       await authManager.logout();
       this.currentUser = null;
       
-      // 2. 清理组件状态 (但不完全销毁)
-      await this.cleanupUserSession();
-      
-      // 3. 更新UI状态
+      // 更新UI
       this.updateUserUI();
       
-      // 4. 重置为未登录状态的基础数据
-      await this.resetToLoggedOutState();
-      
-      // 5. 显示登录界面
-      document.querySelector('.main-content').style.display = 'none';
-      this.showLoginModal();
-      
-      console.log('✅ 退出登录完成');
-      showToast('已退出登录', 'info');
-      
-    } catch (error) {
-      console.error('退出登录失败:', error);
-      showToast('退出登录时出现错误', 'error');
-      this.performanceMetrics.errorCount++;
-    } finally {
-      showLoading(false);
-    }
-  }
-
-  // 新增: 清理用户会话
-  async cleanupUserSession() {
-    try {
-      console.log('🧹 清理用户会话...');
-      
-      // 清理搜索管理器数据但保持组件可用
+      // 清空用户相关数据
       if (unifiedSearchManager.isInitialized) {
-        unifiedSearchManager.clearSearchResults();
-        unifiedSearchManager.resetToGuestMode();
+        await unifiedSearchManager.cleanup();
       }
       
-      // 清理收藏管理器数据
       if (favoritesManager.isInitialized) {
         favoritesManager.favorites = [];
         favoritesManager.renderFavorites();
       }
       
-      // 清空搜索源数据
+      // 重置数据加载状态
+      this.dataLoadStatus.hasLoaded = false;
+      this.dataLoadStatus.lastLoadTime = 0;
+      this.dataLoadStatus.retryCount = 0;
+      
+      // 清空搜索源数据，准备重新加载基础数据
       this.allSearchSources = [];
       this.allCategories = [];
       this.majorCategories = [];
       
-    } catch (error) {
-      console.warn('清理用户会话时出错:', error);
-    }
-  }
-
-  // 新增: 重置为未登录状态
-  async resetToLoggedOutState() {
-    try {
-      // 加载最小回退数据用于展示
-      await this.loadMinimalFallbackData();
-      
-      // 重新初始化站点导航(显示基础源)
-      await this.initSiteNavigation();
+      // 切换到访客模式
+      await this.initForGuest();
       
       // 重置性能指标
       this.performanceMetrics = {
-        initTime: this.performanceMetrics.initTime,
+        initTime: this.performanceMetrics.initTime, // 保留初始化时间
         searchCount: 0,
         errorCount: 0
       };
       
+      showToast('已退出登录', 'info');
+      
     } catch (error) {
-      console.error('重置登出状态失败:', error);
+      console.error('退出登录失败:', error);
+      this.performanceMetrics.errorCount++;
+      showToast('退出登录失败: ' + error.message, 'error');
+    } finally {
+      showLoading(false);
     }
   }
 
@@ -1240,19 +1154,19 @@ renderSiteItem(source, isSearchable) {
     }
   }
 
-//获取源所属的大类 
-getMajorCategoryForSource(source) {
-  if (!source) return null;
-  
-  // 关键修复:兼容字段名
-  const categoryId = source.categoryId || source.category;
-  const category = this.allCategories.find(cat => cat.id === categoryId);
-  
-  if (!category) return null;
-  
-  // 关键修复:兼容字段名
-  return category.majorCategoryId || category.majorCategory;
-}
+  //获取源所属的大类 
+  getMajorCategoryForSource(source) {
+    if (!source) return null;
+    
+    // 关键修复:兼容字段名
+    const categoryId = source.categoryId || source.category;
+    const category = this.allCategories.find(cat => cat.id === categoryId);
+    
+    if (!category) return null;
+    
+    // 关键修复:兼容字段名
+    return category.majorCategoryId || category.majorCategory;
+  }
 
   // 获取应用性能统计
   getPerformanceStats() {
@@ -1282,6 +1196,7 @@ getMajorCategoryForSource(source) {
         username: this.currentUser.username,
         email: this.currentUser.email
       } : null,
+      dataLoadStatus: this.dataLoadStatus,
       performanceStats: this.getPerformanceStats(),
       timestamp: Date.now(),
       version: APP_CONSTANTS.DEFAULT_VERSION || '3.0.0'
