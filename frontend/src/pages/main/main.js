@@ -979,26 +979,12 @@ class MagnetSearchApp {
       
     } catch (error) {
       console.error('注册流程启动失败:', error);
-    try {
-      this.closeModals();
-      
-      emailVerificationUI.verificationData = {
-        username,
-        email,
-        password
-      };
-      
-      emailVerificationUI.showRegistrationVerificationModal(email);
-      
-    } catch (error) {
-      console.error('注册流程启动失败:', error);
       showToast('注册失败: ' + error.message, 'error');
       this.resetSubmitButton(submitBtn);
       this.performanceMetrics.errorCount++;
     } finally {
       this.resetSubmitButton(submitBtn);
     }
-  }
   }
 
   resetSubmitButton(submitBtn) {
