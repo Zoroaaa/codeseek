@@ -999,6 +999,7 @@ class MagnetSearchApp {
       this.resetSubmitButton(submitBtn);
     }
   }
+  }
 
   resetSubmitButton(submitBtn) {
     if (submitBtn) {
