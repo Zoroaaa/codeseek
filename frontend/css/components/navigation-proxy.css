@@ -1,0 +1,586 @@
+/* frontend/css/components/navigation-proxy.css - 导航站点代理样式 */
+/* 版本: v1.0.0 */
+
+/* ===================== 代理状态横幅 ===================== */
+.proxy-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  transition: all 0.3s ease;
+}
+
+.proxy-status-banner.disabled {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.proxy-status-banner .proxy-indicator {
+  font-size: 1.5rem;
+  animation: none;
+}
+
+.proxy-status-banner .proxy-indicator.active {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7; 
+    transform: scale(1.1);
+  }
+}
+
+.proxy-status-banner span:not(.proxy-indicator) {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #1e40af;
+}
+
+.proxy-status-banner.disabled span:not(.proxy-indicator) {
+  color: #64748b;
+}
+
+.proxy-status-banner button {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.proxy-status-banner .btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.proxy-status-banner .btn-primary:hover {
+  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.proxy-status-banner .btn-secondary {
+  background: rgba(100, 116, 139, 0.1);
+  color: #475569;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.proxy-status-banner .btn-secondary:hover {
+  background: rgba(100, 116, 139, 0.2);
+  color: #1e293b;
+}
+
+/* ===================== 站点网格增强 ===================== */
+.sites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.site-item {
+  display: block;
+  padding: 1rem 1.25rem;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.site-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #1e40af);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.site-item:hover {
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.15);
+}
+
+.site-item:hover::before {
+  transform: scaleX(1);
+}
+
+/* 代理访问的站点特殊样式 */
+.site-item[href*="omnibox.pp.ua"] {
+  border-left: 4px solid #3b82f6;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.site-item[href*="omnibox.pp.ua"]::after {
+  content: '🔒';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+.site-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.site-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.site-header strong {
+  font-size: 1rem;
+  color: #1f2937;
+  flex: 1;
+}
+
+.site-badges {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.site-badges span {
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.custom-badge {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+}
+
+.priority-badge {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #3b82f6;
+}
+
+.non-searchable-badge {
+  background: #e5e7eb;
+  color: #6b7280;
+  border: 1px solid #9ca3af;
+}
+
+.proxy-badge {
+  background: #3b82f6;
+  color: white;
+  border: 1px solid #1e40af;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.3rem;
+}
+
+.status-badge {
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.status-badge.enabled {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #10b981;
+}
+
+.status-badge.disabled {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #ef4444;
+}
+
+.site-subtitle {
+  font-size: 0.85rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* ===================== 分类标题增强 ===================== */
+.major-category-section {
+  margin-bottom: 3rem;
+}
+
+.major-category-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.major-category-title small {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.major-category-desc {
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.subcategories-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.subcategory-section {
+  background: #f9fafb;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.subcategory-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.source-count {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+.searchable-indicator {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #3b82f6;
+}
+
+.browse-indicator {
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #d1d5db;
+}
+
+.subcategory-desc {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+/* ===================== 空状态样式 ===================== */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background: white;
+  border-radius: 12px;
+  border: 2px dashed #d1d5db;
+  margin: 2rem 0;
+}
+
+.empty-state p {
+  color: #6b7280;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.empty-state .btn-primary {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.empty-state .btn-primary:hover {
+  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* ===================== 响应式设计 ===================== */
+@media (max-width: 768px) {
+  .proxy-status-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+  
+  .proxy-status-banner button {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .sites-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .site-item {
+    padding: 0.875rem 1rem;
+  }
+  
+  .site-header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .site-badges {
+    justify-content: flex-start;
+  }
+  
+  .major-category-title {
+    font-size: 1.3rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .subcategory-section {
+    padding: 1rem;
+  }
+  
+  .subcategory-title {
+    font-size: 1.1rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .proxy-status-banner {
+    padding: 0.75rem;
+  }
+  
+  .proxy-status-banner span:not(.proxy-indicator) {
+    font-size: 0.85rem;
+  }
+  
+  .proxy-status-banner button {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .site-item {
+    padding: 0.75rem;
+  }
+  
+  .site-header strong {
+    font-size: 0.9rem;
+  }
+  
+  .site-subtitle {
+    font-size: 0.8rem;
+  }
+  
+  .major-category-title {
+    font-size: 1.2rem;
+  }
+  
+  .subcategory-title {
+    font-size: 1rem;
+  }
+}
+
+/* ===================== 暗色主题支持 ===================== */
+@media (prefers-color-scheme: dark) {
+  .proxy-status-banner {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    border-color: #3b82f6;
+    color: #dbeafe;
+  }
+  
+  .proxy-status-banner.disabled {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #334155;
+  }
+  
+  .proxy-status-banner span:not(.proxy-indicator) {
+    color: #dbeafe;
+  }
+  
+  .proxy-status-banner.disabled span:not(.proxy-indicator) {
+    color: #94a3b8;
+  }
+  
+  .site-item {
+    background: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
+  }
+  
+  .site-item:hover {
+    border-color: #60a5fa;
+    box-shadow: 0 8px 20px rgba(96, 165, 250, 0.2);
+  }
+  
+  .site-item[href*="omnibox.pp.ua"] {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%);
+    border-left-color: #60a5fa;
+  }
+  
+  .site-header strong {
+    color: #f1f5f9;
+  }
+  
+  .site-subtitle {
+    color: #94a3b8;
+  }
+  
+  .subcategory-section {
+    background: #0f172a;
+    border-color: #1e293b;
+  }
+  
+  .subcategory-title {
+    color: #e2e8f0;
+  }
+  
+  .subcategory-desc,
+  .major-category-desc {
+    color: #94a3b8;
+  }
+  
+  .major-category-title {
+    color: #f1f5f9;
+  }
+  
+  .major-category-title small {
+    color: #94a3b8;
+  }
+  
+  .empty-state {
+    background: #1e293b;
+    border-color: #334155;
+  }
+  
+  .empty-state p {
+    color: #94a3b8;
+  }
+  
+  .status-badge.enabled {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+    border-color: #10b981;
+  }
+  
+  .status-badge.disabled {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border-color: #ef4444;
+  }
+  
+  .custom-badge {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fde68a;
+    border-color: #fbbf24;
+  }
+  
+  .priority-badge {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+    border-color: #3b82f6;
+  }
+  
+  .non-searchable-badge {
+    background: rgba(107, 114, 128, 0.2);
+    color: #d1d5db;
+    border-color: #6b7280;
+  }
+  
+  .searchable-indicator {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+    border-color: #3b82f6;
+  }
+  
+  .browse-indicator {
+    background: rgba(107, 114, 128, 0.2);
+    color: #d1d5db;
+    border-color: #6b7280;
+  }
+}
+
+/* ===================== 动画优化 ===================== */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .proxy-status-banner .proxy-indicator.active {
+    animation: none;
+  }
+  
+  .site-item::before {
+    transition: none;
+  }
+}
+
+/* ===================== 打印样式 ===================== */
+@media print {
+  .proxy-status-banner button {
+    display: none;
+  }
+  
+  .site-item {
+    border: 1px solid #000;
+    box-shadow: none;
+    page-break-inside: avoid;
+  }
+  
+  .site-item:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}

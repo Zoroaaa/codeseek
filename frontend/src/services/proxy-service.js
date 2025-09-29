@@ -1,5 +1,5 @@
-// frontend/src/services/proxy-service.js - 重构版代理服务
-// 版本: v2.1.0 - 适配后端Enhanced Proxy Worker v2.0.0
+// frontend/src/services/proxy-service.js - 完整适配后端Enhanced Proxy Worker v2.0.0
+// 版本: v2.2.0 - 移除域名限制，支持所有搜索源代理
 
 import { 
   proxyConfig, 
@@ -7,7 +7,6 @@ import {
   getProxyHealthCheckUrl, 
   getProxyStatusUrl,
   getCacheClearUrl,
-  isDomainSupported,
   getDefaultConfig,
   createRequestConfig,
   testProxyConnectivity,
@@ -43,17 +42,11 @@ class CacheManager {
     };
   }
 
-  /**
-   * 生成缓存键
-   */
   generateKey(url, options = {}) {
     const { method = 'GET', headers = {} } = options;
     return `${method}:${url}:${JSON.stringify(headers)}`;
   }
 
-  /**
-   * 获取缓存
-   */
   get(url, options = {}) {
     const key = this.generateKey(url, options);
     const cached = this.cache.get(key);
@@ -61,7 +54,7 @@ class CacheManager {
     if (cached && !this.isExpired(cached)) {
       this.cacheStats.hits++;
       this.cache.delete(key);
-      this.cache.set(key, cached); // LRU移到末尾
+      this.cache.set(key, cached);
       return cached.data;
     }
     
@@ -69,14 +62,10 @@ class CacheManager {
     return null;
   }
 
-  /**
-   * 设置缓存
-   */
   set(url, data, options = {}) {
     const key = this.generateKey(url, options);
     const ttl = this.getTTL(data.resourceType);
     
-    // LRU淘汰策略
     if (this.cache.size >= this.maxCacheSize) {
       const firstKey = this.cache.keys().next().value;
       this.cache.delete(firstKey);
@@ -91,24 +80,15 @@ class CacheManager {
     });
   }
 
-  /**
-   * 判断缓存是否过期
-   */
   isExpired(cached) {
     return Date.now() - cached.timestamp > cached.ttl;
   }
 
-  /**
-   * 获取TTL（基于资源类型）
-   */
   getTTL(resourceType) {
     return proxyConfig.cacheStrategy.ttl[resourceType] || 
            proxyConfig.cacheStrategy.ttl.default;
   }
 
-  /**
-   * 清除缓存
-   */
   clear(pattern = null) {
     if (pattern) {
       const keys = Array.from(this.cache.keys());
@@ -122,9 +102,6 @@ class CacheManager {
     }
   }
 
-  /**
-   * 获取缓存统计
-   */
   getStats() {
     return {
       ...this.cacheStats,
@@ -150,9 +127,6 @@ class RequestQueue {
     };
   }
 
-  /**
-   * 添加请求到队列
-   */
   async add(requestFn, priority = 0) {
     return new Promise((resolve, reject) => {
       this.queue.push({
@@ -168,9 +142,6 @@ class RequestQueue {
     });
   }
 
-  /**
-   * 处理下一个请求
-   */
   async processNext() {
     if (this.active >= this.maxConcurrent || this.queue.length === 0) {
       return;
@@ -195,17 +166,11 @@ class RequestQueue {
     }
   }
 
-  /**
-   * 更新平均响应时间
-   */
   updateAverageTime(responseTime) {
     const weight = 0.9;
     this.stats.averageTime = this.stats.averageTime * weight + responseTime * (1 - weight);
   }
 
-  /**
-   * 获取队列状态
-   */
   getStatus() {
     return {
       queueLength: this.queue.length,
@@ -216,7 +181,7 @@ class RequestQueue {
 }
 
 /**
- * 重构版代理服务类（适配后端Enhanced Proxy Worker）
+ * 完整适配版代理服务类
  */
 class ProxyService {
   constructor() {
@@ -228,37 +193,27 @@ class ProxyService {
     this.isHealthy = null;
     this.retryCount = 0;
     
-    // 缓存管理器和请求队列
     this.cacheManager = new CacheManager();
     this.requestQueue = new RequestQueue(proxyConfig.performance.maxConcurrent);
     
-    // 性能监控
     this.performanceMetrics = {
       avgResponseTime: 0,
       successRate: 1,
       lastMeasurement: Date.now()
     };
     
-    // 后端版本信息
     this.backendInfo = {
       version: null,
       features: null,
       lastUpdated: null
     };
     
-    // 验证配置
     const validation = validateProxyConfig();
     if (!validation.isValid) {
       console.warn('代理配置验证失败:', validation.issues);
-      if (validation.warnings && validation.warnings.length > 0) {
-        console.warn('代理配置警告:', validation.warnings);
-      }
     }
   }
 
-  /**
-   * 初始化代理服务
-   */
   async init() {
     try {
       const enabled = this.loadProxyState();
@@ -286,9 +241,6 @@ class ProxyService {
     }
   }
 
-  /**
-   * 异步启用代理
-   */
   async enableProxyAsync() {
     try {
       await this.enableProxy();
@@ -298,18 +250,12 @@ class ProxyService {
     }
   }
 
-  // ===================== 核心功能（重构版） =====================
+  // ===================== 核心功能（移除域名限制） =====================
 
-  /**
-   * 检查代理是否开启
-   */
   isProxyEnabled() {
     return this.currentStatus === proxyConfig.status.ENABLED;
   }
 
-  /**
-   * 切换代理开关
-   */
   async toggleProxy() {
     try {
       if (this.isProxyEnabled()) {
@@ -325,7 +271,7 @@ class ProxyService {
   }
 
   /**
-   * 智能URL转换（适配后端格式）
+   * 🔴 关键修改：移除域名限制，支持所有URL代理
    */
   convertToProxyUrl(originalUrl, options = {}) {
     if (!originalUrl || typeof originalUrl !== 'string') {
@@ -333,8 +279,8 @@ class ProxyService {
     }
 
     try {
+      // 验证URL格式
       const url = new URL(originalUrl);
-      const hostname = url.hostname;
       
       // 检查缓存的URL映射
       const cachedMapping = this.cacheManager.get(`url-mapping:${originalUrl}`);
@@ -342,14 +288,10 @@ class ProxyService {
         return cachedMapping;
       }
       
-      // 检查域名是否支持代理
-      if (!isDomainSupported(hostname)) {
-        console.debug(`域名 ${hostname} 不在代理支持列表中`);
-        return originalUrl;
-      }
-
+      // 🔴 移除域名检查，支持所有URL
+      // 不再调用 isDomainSupported(hostname)
+      
       // 根据后端格式构建代理URL：{proxy}/{target_url}
-      // 后端期望的格式是：https://all.omnibox.pp.ua/https://target.com/path
       const proxyUrl = `${proxyConfig.proxyServer}/${originalUrl}`;
 
       // 缓存URL映射
@@ -360,7 +302,7 @@ class ProxyService {
       console.debug('URL转换完成:', { 
         original: originalUrl, 
         proxy: proxyUrl,
-        hostname
+        hostname: url.hostname
       });
       
       return proxyUrl;
@@ -370,22 +312,17 @@ class ProxyService {
     }
   }
 
-  /**
-   * 获取原始URL（从代理URL中提取）
-   */
   getOriginalUrl(proxyUrl) {
     if (!proxyUrl || typeof proxyUrl !== 'string') {
       return proxyUrl;
     }
 
     try {
-      // 检查是否是代理URL
       const proxyPrefix = `${proxyConfig.proxyServer}/`;
       if (!proxyUrl.startsWith(proxyPrefix)) {
-        return proxyUrl; // 不是代理URL，直接返回
+        return proxyUrl;
       }
 
-      // 提取原始URL：去掉代理前缀
       const originalUrl = proxyUrl.substring(proxyPrefix.length);
       
       console.debug('代理URL转换为原始URL:', {
@@ -400,9 +337,6 @@ class ProxyService {
     }
   }
 
-  /**
-   * 检测资源类型
-   */
   detectResourceType(pathname) {
     const ext = pathname.split('.').pop().toLowerCase();
     
@@ -432,9 +366,6 @@ class ProxyService {
     return typeMap[ext] || RESOURCE_TYPES.OTHER;
   }
 
-  /**
-   * 智能代理请求（适配后端API）
-   */
   async makeProxyRequest(url, options = {}) {
     if (!this.isProxyEnabled()) {
       throw new Error('代理服务未启用');
@@ -442,7 +373,6 @@ class ProxyService {
 
     const resourceType = this.detectResourceType(new URL(url).pathname);
     
-    // 检查缓存
     const cached = this.cacheManager.get(url, options);
     if (cached) {
       console.debug('使用缓存响应:', url);
@@ -455,7 +385,6 @@ class ProxyService {
       throw new Error('URL转换为代理URL失败');
     }
 
-    // 使用请求队列
     const priority = this.getRequestPriority(resourceType);
     
     return this.requestQueue.add(async () => {
@@ -472,7 +401,6 @@ class ProxyService {
           throw new Error(`代理请求失败: HTTP ${response.status}`);
         }
         
-        // 缓存响应
         if (this.isCacheable(resourceType, response)) {
           this.cacheManager.set(url, response.clone(), { resourceType });
         }
@@ -486,7 +414,6 @@ class ProxyService {
         this.updateStats('requestError', url);
         errorLogger.log(error, { context: 'proxyRequest', url, proxyUrl });
         
-        // 智能降级策略
         if (proxyConfig.errorHandling.fallbackToOriginal) {
           return this.handleFallback(url, options, error);
         }
@@ -496,13 +423,9 @@ class ProxyService {
     }, priority);
   }
 
-  /**
-   * 优化请求配置
-   */
   optimizeRequestConfig(options, resourceType) {
     const config = createRequestConfig({ ...options, resourceType });
     
-    // 针对不同资源类型的特殊处理
     if (resourceType === RESOURCE_TYPES.IMAGE || resourceType === RESOURCE_TYPES.MEDIA) {
       config.timeout = proxyConfig.requestConfig.timeouts.media;
     } else if (resourceType === RESOURCE_TYPES.API) {
@@ -512,16 +435,10 @@ class ProxyService {
     return config;
   }
 
-  /**
-   * 获取请求优先级
-   */
   getRequestPriority(resourceType) {
     return proxyConfig.performance.priority[resourceType] || 1;
   }
 
-  /**
-   * 判断资源是否可缓存
-   */
   isCacheable(resourceType, response) {
     if (response.status !== 200) return false;
     
@@ -533,9 +450,6 @@ class ProxyService {
     return proxyConfig.cacheStrategy.rules.alwaysCache.includes(resourceType);
   }
 
-  /**
-   * 处理降级
-   */
   async handleFallback(url, options, originalError) {
     console.warn('代理请求失败，尝试直接请求:', originalError.message);
     
@@ -549,24 +463,19 @@ class ProxyService {
     }
   }
 
-  // ===================== 状态管理（适配后端API） =====================
+  // ===================== 状态管理 =====================
 
-  /**
-   * 启用代理（适配后端健康检查）
-   */
   async enableProxy() {
     try {
       this.currentStatus = proxyConfig.status.CHECKING;
       this.retryCount = 0;
       
-      // 并发测试多个端点
       const connectivityTests = await Promise.allSettled([
         testProxyConnectivity(),
         this.testBackendStatus(),
         this.fetchBackendInfo()
       ]);
       
-      // 检查是否有成功的连接
       const successfulTest = connectivityTests.find(
         r => r.status === 'fulfilled' && r.value.success
       );
@@ -618,9 +527,6 @@ class ProxyService {
     }
   }
 
-  /**
-   * 禁用代理
-   */
   async disableProxy() {
     try {
       this.currentStatus = proxyConfig.status.DISABLED;
@@ -639,9 +545,6 @@ class ProxyService {
     }
   }
 
-  /**
-   * 测试后端状态
-   */
   async testBackendStatus() {
     try {
       const controller = new AbortController();
@@ -667,9 +570,6 @@ class ProxyService {
     }
   }
 
-  /**
-   * 获取后端信息
-   */
   async fetchBackendInfo() {
     try {
       const response = await fetch(getProxyStatusUrl(), {
@@ -694,15 +594,12 @@ class ProxyService {
     }
   }
 
-  /**
-   * 获取代理状态（增强版）
-   */
   getProxyStatus() {
     return {
       enabled: this.isProxyEnabled(),
       status: this.currentStatus,
       server: proxyConfig.proxyServer,
-      supportedDomains: proxyConfig.supportedDomains.length,
+      supportedDomains: 'ALL', // 🔴 修改：支持所有域名
       stats: this.stats,
       lastHealthCheck: this.lastHealthCheck,
       isHealthy: this.isHealthy,
@@ -719,11 +616,8 @@ class ProxyService {
     };
   }
 
-  // ===================== 健康检查（适配后端API） =====================
+  // ===================== 健康检查 =====================
 
-  /**
-   * 健康检查（适配后端enhanced版本）
-   */
   async checkProxyHealth() {
     try {
       const startTime = performance.now();
@@ -749,14 +643,12 @@ class ProxyService {
       this.lastHealthCheck = Date.now();
       this.isHealthy = healthData.status === 'healthy';
 
-      // 更新后端信息
       if (healthData.version) {
         this.backendInfo.version = healthData.version;
         this.backendInfo.features = healthData.features;
         this.backendInfo.lastUpdated = Date.now();
       }
 
-      // 根据健康状态动态调整检查频率
       if (this.isHealthy) {
         this.adjustHealthCheckFrequency(5 * 60 * 1000);
       } else {
@@ -785,9 +677,6 @@ class ProxyService {
     }
   }
 
-  /**
-   * 调整健康检查频率
-   */
   adjustHealthCheckFrequency(interval) {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
@@ -807,17 +696,11 @@ class ProxyService {
     }, interval);
   }
 
-  /**
-   * 启动健康检查
-   */
   startHealthCheck() {
     this.checkProxyHealth();
     this.adjustHealthCheckFrequency(5 * 60 * 1000);
   }
 
-  /**
-   * 停止健康检查
-   */
   stopHealthCheck() {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
@@ -825,11 +708,8 @@ class ProxyService {
     }
   }
 
-  // ===================== 缓存管理（适配后端KV） =====================
+  // ===================== 缓存管理 =====================
 
-  /**
-   * 清理代理缓存（支持后端KV清理）
-   */
   async clearProxyCache(pattern = null) {
     const results = {
       frontend: false,
@@ -837,7 +717,6 @@ class ProxyService {
       errors: []
     };
 
-    // 清理前端缓存
     try {
       this.cacheManager.clear(pattern);
       results.frontend = true;
@@ -845,7 +724,6 @@ class ProxyService {
       results.errors.push(`前端缓存清理失败: ${error.message}`);
     }
 
-    // 清理后端KV缓存
     try {
       const response = await fetch(getCacheClearUrl(), {
         method: 'POST',
@@ -870,9 +748,6 @@ class ProxyService {
 
   // ===================== 性能监控和统计 =====================
 
-  /**
-   * 性能监控
-   */
   startPerformanceMonitoring() {
     setInterval(() => {
       const queueStatus = this.requestQueue.getStatus();
@@ -890,9 +765,6 @@ class ProxyService {
     }, 60000);
   }
 
-  /**
-   * 更新性能指标
-   */
   updatePerformanceMetrics(responseTime, success) {
     const alpha = 0.1;
     this.performanceMetrics.avgResponseTime = 
@@ -1032,7 +904,6 @@ class ProxyService {
       results.connectivity = { success: false, error: error.message };
     }
     
-    // 生成建议
     if (results.performance.cache.hitRate < 0.3) {
       results.recommendations.push('缓存命中率较低，考虑调整缓存策略');
     }
@@ -1068,12 +939,15 @@ class ProxyService {
     }
   }
 
+  /**
+   * 🔴 关键修改：支持所有URL，不再检查域名限制
+   */
   shouldProxy(url) {
     if (!url) return false;
     
     try {
-      const hostname = new URL(url).hostname;
-      return isDomainSupported(hostname);
+      new URL(url); // 仅验证URL格式
+      return true; // 所有有效URL都支持代理
     } catch {
       return false;
     }
