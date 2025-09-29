@@ -1,4 +1,4 @@
-# 磁力快搜 - 专业版
+# 磁力快搜 - codeseek
 
 <div align="center">
 
@@ -235,10 +235,10 @@ cd codeseek-backend
 wrangler d1 execute codeseek --file=./sqllite\ d1/01_user_management.sql
 wrangler d1 execute codeseek --file=./sqllite\ d1/02_search_engine.sql
 wrangler d1 execute codeseek --file=./sqllite\ d1/03_community.sql
+wrangler d1 execute codeseek --file=./sqllite\ d1/04_search_source.sql
 wrangler d1 execute codeseek --file=./sqllite\ d1/05_email_security.sql
 wrangler d1 execute codeseek --file=./sqllite\ d1/06_system_analytics.sql
 wrangler d1 execute codeseek --file=./sqllite\ d1/07_initialization_data.sql
-wrangler d1 execute codeseek --file=./sqllite\ d1/08_search_source.sql
 ```
 
 ## 🎯 核心功能
@@ -834,25 +834,17 @@ async function fetchWithAuth(url, options = {}) {
   - 所有分享和推广项目的朋友
 
 - **资源支持**
-  - [各搜索站点](docs/SOURCES.md) - 提供丰富的搜索资源
   - 开源软件社区提供的各种工具和库
 
 ## 📧 联系与支持
 
 ### 官方渠道
-- **项目主页**: [https://github.com/magnet-search/magnet-search](https://github.com/magnet-search/magnet-search)
-- **问题反馈**: [Issues](https://github.com/magnet-search/magnet-search/issues)
-- **功能建议**: [Discussions](https://github.com/magnet-search/magnet-search/discussions)
-- **社区论坛**: [Discord 社区](https://discord.gg/magnetsearch)
+- **项目主页**: [codeseek](https://github.com/Zoroaaa/codeseek)
+- **问题反馈**: [Issues](https://github.com/Zoroaaa/codeseek/issues)
+- **功能建议**: [Discussions](https://github.com/Zoroaaa/codeseek/discussions)
 
 ### 贡献交流
-- **邮件列表**: dev@magnetsearch.org
-- **开发者群**: 加入Discord获取开发团队联系方式
-
-### 使用帮助
-- **使用文档**: [docs.magnetsearch.org](https://docs.magnetsearch.org)
-- **常见问题**: [FAQ](https://github.com/magnet-search/magnet-search/wiki/FAQ)
-- **用户指南**: [Wiki](https://github.com/magnet-search/magnet-search/wiki)
+- **邮件列表**: zoroasx@gmail.com
 
 ---
 
