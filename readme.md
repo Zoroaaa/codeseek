@@ -12,7 +12,9 @@
 
 </div>
 
-[项目完整介绍](https://zread.ai/Zoroaaa/codeseek)
+[项目完整介绍](https://zread.ai/Zoroaaa/codeseek)    
+
+项目demo网址： https://codeseek.pp.ua/  代理网页密码：zoro666
 
 ## ✨ 项目特色
 
