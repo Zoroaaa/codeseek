@@ -12,9 +12,23 @@
 
 </div>
 
-[项目完整介绍](https://zread.ai/Zoroaaa/codeseek)    
+<<<<<<< HEAD
+## 🔗 快速访问
 
-项目demo网址： https://codeseek.pp.ua/        代理网页密码：zoro666          使用问题联系邮箱：zoroasx@gmali.com
+<div align="center">
+
+| 资源类型 | 链接 | 备注 |
+|---------|------|------|
+| 📖 项目文档 | [完整介绍](https://zread.ai/Zoroaaa/codeseek) | 详细的项目说明和使用指南 |
+| 🚀 在线演示 | [https://codeseek.pp.ua](https://codeseek.pp.ua) | 体验完整功能 |
+| 🔑 演示密码 | `zoro666` | 代理网页访问密码 |
+| 📧 技术支持 | [zoroasx@gmail.com](mailto:zoroasx@gmail.com) | 使用问题反馈 |
+
+</div>
+
+> **提示**: 演示站点仅供测试体验，请勿存储重要数据。生产环境建议自行部署。
+=======
+
 
 ## ✨ 项目特色
 
