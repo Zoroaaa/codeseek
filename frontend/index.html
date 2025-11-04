@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">磁力快搜 - 专业版</title>
-    <meta name="description" content="专业的磁力搜索工具，支持云端同步，智能搜索">
+    <title id="page-title">磁力快搜</title>
+    <meta name="description" content="磁力搜索工具，支持云端同步，智能搜索">
 	
     <!-- 核心样式 - 必须最先引入 -->
     <link rel="stylesheet" href="css/core/variables.css">
@@ -70,7 +70,7 @@
     <main class="main-content" style="display:none;">
         <!-- Hero区域 -->
         <section class="hero">
-            <h1 class="hero-title" id="hero-title">磁力快搜 - 专业版</h1>
+            <h1 class="hero-title" id="hero-title">磁力快搜</h1>
             <p class="hero-subtitle">智能搜索，云端同步，极致体验</p>
             
             <!-- 搜索框 -->
@@ -307,9 +307,9 @@
                 // 更新页面标题与品牌名称
                 if (window.API_CONFIG) {
                     const appName = window.API_CONFIG.APP_NAME || '磁力快搜';
-                    document.getElementById('page-title').textContent = `${appName} - 专业版`;
+                    document.getElementById('page-title').textContent = `${appName}`;
                     document.getElementById('brand-text').textContent = appName;
-                    document.getElementById('hero-title').textContent = `${appName} - 专业版`;
+                    document.getElementById('hero-title').textContent = `${appName}`;
                 }
                 
                 // 创建使用统一搜索组件的应用实例
