@@ -1,4 +1,4 @@
-/* 导航栏 - 移动端优化版 */
+/* 导航栏 - 更现代的样式 */
 .navbar {
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
@@ -28,7 +28,6 @@
   color: var(--accent-primary);
   text-decoration: none;
   transition: var(--transition-base);
-  flex-shrink: 0; /* 防止品牌被压缩 */
 }
 
 .nav-brand:hover {
@@ -48,14 +47,12 @@
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  flex-shrink: 0;
 }
 
 .nav-menu {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  flex-shrink: 0; /* 防止菜单被压缩 */
 }
 
 .nav-link {
@@ -65,7 +62,6 @@
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
   transition: var(--transition-base);
-  white-space: nowrap; /* 防止文字换行 */
 }
 
 .nav-link:hover {
@@ -81,7 +77,6 @@
   padding: 0.5rem;
   border-radius: var(--radius-sm);
   transition: var(--transition-base);
-  flex-shrink: 0;
 }
 
 .theme-btn:hover {
@@ -98,7 +93,6 @@
   cursor: pointer;
   font-weight: 500;
   transition: var(--transition-base);
-  white-space: nowrap;
 }
 
 .login-btn:hover {
@@ -111,17 +105,12 @@
   align-items: center;
   gap: 0.75rem;
   position: relative;
-  flex-shrink: 0;
 }
 
 .username {
   font-weight: 500;
   font-size: 0.95rem;
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 150px;
 }
 
 .dropdown {
@@ -156,7 +145,6 @@
   visibility: hidden;
   transform: translateY(10px);
   transition: var(--transition-base);
-  margin-top: 0.5rem;
 }
 
 .dropdown:hover .dropdown-content {
@@ -172,7 +160,6 @@
   text-decoration: none;
   font-size: 0.9rem;
   transition: var(--transition-base);
-  white-space: nowrap;
 }
 
 .dropdown-content a:hover,
@@ -181,179 +168,24 @@
   color: var(--accent-primary);
 }
 
-/* ========== 移动端响应式设计 ========== */
-
-/* 平板设备 (768px - 1023px) */
-@media (max-width: 1023px) {
+/* 响应式设计 */
+@media (max-width: 768px) {
   .nav-container {
     padding: 0 1rem;
     height: 64px;
   }
   
-  .nav-brand {
+  .nav-brand .brand-text {
     font-size: 1.25rem;
   }
   
   .nav-menu {
     gap: 1rem;
   }
-  
-  .nav-link {
-    padding: 0.4rem 0.75rem;
-    font-size: 0.9rem;
-  }
-  
-  .username {
-    max-width: 100px;
-    font-size: 0.9rem;
-  }
 }
 
-/* 手机横屏 (480px - 767px) */
-@media (max-width: 767px) {
-  .nav-container {
-    padding: 0 0.75rem;
-    height: 56px;
-  }
-  
-  .logo {
-    width: 32px;
-    height: 32px;
-  }
-  
-  .nav-brand {
-    font-size: 1.1rem;
-    gap: 0.5rem;
-  }
-  
-  .nav-menu {
-    gap: 0.5rem;
-  }
-  
-  /* 隐藏首页链接文字，只保留图标 */
-  .nav-link {
-    padding: 0.5rem;
-    font-size: 0;
-  }
-  
-  .nav-link::before {
-    content: '🏠';
-    font-size: 1.2rem;
-  }
-  
-  .theme-btn {
-    padding: 0.4rem;
-    font-size: 1.1rem;
-  }
-  
-  .username {
-    max-width: 80px;
-    font-size: 0.85rem;
-  }
-  
-  .dropdown-btn {
-    padding: 0.4rem;
-    font-size: 0.9rem;
-  }
-}
-
-/* 手机竖屏 (最大479px) */
-@media (max-width: 479px) {
-  .nav-container {
-    padding: 0 0.5rem;
-    height: 52px;
-  }
-  
-  .logo {
-    width: 28px;
-    height: 28px;
-  }
-  
+@media (max-width: 480px) {
   .nav-brand .brand-text {
-    display: none; /* 隐藏品牌文字 */
-  }
-  
-  .nav-menu {
-    gap: 0.25rem;
-  }
-  
-  .nav-link {
-    padding: 0.4rem;
-  }
-  
-  .nav-link::before {
-    font-size: 1rem;
-  }
-  
-  .theme-btn {
-    padding: 0.3rem;
-    font-size: 1rem;
-  }
-  
-  /* 简化用户信息显示 */
-  .username {
-    display: none; /* 小屏幕隐藏用户名 */
-  }
-  
-  .dropdown-btn {
-    padding: 0.3rem 0.5rem;
-  }
-  
-  /* 下拉菜单适配 */
-  .dropdown-content {
-    right: -10px;
-    min-width: 140px;
-  }
-  
-  .dropdown-content a {
-    padding: 0.6rem 1rem;
-    font-size: 0.85rem;
-  }
-}
-
-/* 触摸设备优化 */
-@media (hover: none) and (pointer: coarse) {
-  .nav-link,
-  .theme-btn,
-  .dropdown-btn {
-    min-height: 44px; /* 确保触摸目标足够大 */
-    min-width: 44px;
-  }
-  
-  /* 触摸设备上使用点击显示下拉菜单 */
-  .dropdown-content {
     display: none;
-  }
-  
-  .dropdown.active .dropdown-content {
-    display: block;
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-  }
-}
-
-/* 超小屏幕 (最大360px) */
-@media (max-width: 360px) {
-  .nav-container {
-    padding: 0 0.25rem;
-    height: 48px;
-  }
-  
-  .logo {
-    width: 24px;
-    height: 24px;
-  }
-  
-  .nav-brand {
-    font-size: 1rem;
-  }
-  
-  .theme-btn {
-    font-size: 0.9rem;
-  }
-  
-  .dropdown-content {
-    min-width: 120px;
   }
 }
