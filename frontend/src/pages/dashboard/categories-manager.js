@@ -428,11 +428,6 @@ export class CategoriesManager {
     this.populateCategoryForm(modal, category);
     modal.style.display = 'block';
     
-    // 添加拖动功能
-    import('../../utils/dom.js').then(({ makeModalDraggable }) => {
-      makeModalDraggable(modal);
-    });
-    
     setTimeout(() => {
       const nameInput = modal.querySelector('#categoryName');
       if (nameInput) nameInput.focus();
