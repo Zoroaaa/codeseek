@@ -566,52 +566,11 @@
 }
 
 /* ============= 表单样式 ============= */
-.custom-category-modal-content,
-.add-source-modal-content,
-.edit-source-modal-content,
-.share-source-modal-content,
-.my-shares-modal-content {
+.custom-category-modal-content {
   max-width: 600px;
   width: 90vw;
   max-height: 90vh;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 为模态框添加平滑滚动 */
-.custom-category-modal-content::-webkit-scrollbar,
-.add-source-modal-content::-webkit-scrollbar,
-.edit-source-modal-content::-webkit-scrollbar,
-.share-source-modal-content::-webkit-scrollbar,
-.my-shares-modal-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.custom-category-modal-content::-webkit-scrollbar-track,
-.add-source-modal-content::-webkit-scrollbar-track,
-.edit-source-modal-content::-webkit-scrollbar-track,
-.share-source-modal-content::-webkit-scrollbar-track,
-.my-shares-modal-content::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-  border-radius: 4px;
-}
-
-.custom-category-modal-content::-webkit-scrollbar-thumb,
-.add-source-modal-content::-webkit-scrollbar-thumb,
-.edit-source-modal-content::-webkit-scrollbar-thumb,
-.share-source-modal-content::-webkit-scrollbar-thumb,
-.my-shares-modal-content::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
-}
-
-.custom-category-modal-content::-webkit-scrollbar-thumb:hover,
-.add-source-modal-content::-webkit-scrollbar-thumb:hover,
-.edit-source-modal-content::-webkit-scrollbar-thumb:hover,
-.share-source-modal-content::-webkit-scrollbar-thumb:hover,
-.my-shares-modal-content::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-primary);
 }
 
 .form-section {
@@ -1228,16 +1187,6 @@
   .menu-item {
     min-width: 80px;
     padding: 0.75rem 0.5rem;
-  }
-  
-  /* 移动端模态框优化 */
-  .custom-category-modal-content,
-  .add-source-modal-content,
-  .edit-source-modal-content,
-  .share-source-modal-content,
-  .my-shares-modal-content {
-    width: 95vw;
-    max-height: 85vh;
   }
 }
 
