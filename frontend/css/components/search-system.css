@@ -509,6 +509,68 @@
   gap: 0.5rem;
 }
 
+/* 搜索状态指示器 */
+.search-status-indicator {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.search-status-indicator .status-message {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.search-status-indicator .status-icon {
+  font-size: 1.25rem;
+}
+
+/* 快速提示 */
+.quick-tips {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border-left: 4px solid var(--accent-primary);
+}
+
+.quick-tips .tips-content h3 {
+  margin: 0 0 1rem 0;
+  color: var(--accent-primary);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quick-tips .tips-content ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.quick-tips .tips-content li {
+  padding: 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.quick-tips .tips-content li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--success-color);
+  font-weight: bold;
+}
+
 /* ============= 响应式设计 ============= */
 @media (max-width: 768px) {
   .search-box {

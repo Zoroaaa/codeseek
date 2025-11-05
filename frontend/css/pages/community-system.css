@@ -714,6 +714,93 @@
   line-height: 1.5;
 }
 
+/* 社区页脚 */
+.community-footer {
+  margin-top: 2rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.community-footer p {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+.community-footer a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: var(--transition-base);
+}
+
+.community-footer a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+/* 数据库状态指示器 */
+.db-status-indicator {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  display: inline-block;
+}
+
+.db-status-indicator #dbStatus {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* 错误处理器 */
+.error-handler {
+  background: var(--bg-primary);
+  border: 2px solid var(--error-color);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  margin: 2rem 0;
+  box-shadow: var(--shadow-lg);
+}
+
+.error-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.error-icon {
+  font-size: 3rem;
+  color: var(--error-color);
+  flex-shrink: 0;
+}
+
+.error-details {
+  flex: 1;
+}
+
+.error-details h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--error-color);
+  font-size: 1.25rem;
+}
+
+.error-details p {
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.error-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
 /* ============= 响应式设计 ============= */
 @media (max-width: 768px) {
   .community-sources-grid {
