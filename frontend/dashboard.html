@@ -5,36 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">用户面板 - 磁力快搜</title>
 	
-    <!-- 核心样式 -->
-    <link rel="stylesheet" href="css/core/variables.css">
-    <link rel="stylesheet" href="css/core/base.css">
+    <!-- 核心样式 - 必须最先引入 -->
+    <link rel="stylesheet" href="css/core.css">
     
-    <!-- 组件样式 -->
-    <link rel="stylesheet" href="css/components/navbar.css">
-    <link rel="stylesheet" href="css/components/buttons.css">
-    <link rel="stylesheet" href="css/components/modal.css">
-    <link rel="stylesheet" href="css/components/toast.css">
-    <link rel="stylesheet" href="css/components/loading.css">
-    <link rel="stylesheet" href="css/components/search.css">
-    <link rel="stylesheet" href="css/components/status.css">
-	<link rel="stylesheet" href="css/components/search-status.css">
-    <!-- 新增：邮箱验证样式 -->
-    <link rel="stylesheet" href="css/components/email-verification.css">
+    <!-- 组件样式 - 按依赖顺序引入 -->
+    <link rel="stylesheet" href="css/components/navigation.css">
+    <link rel="stylesheet" href="css/components/proxy-system.css">
+    <link rel="stylesheet" href="css/components/search-system.css">
+    <link rel="stylesheet" href="css/components/status-system.css">
+    <link rel="stylesheet" href="css/components/ui-components.css">
+    <link rel="stylesheet" href="css/components/user-system.css">
 	
 	<!-- Dashboard功能模块样式 -->
-    <link rel="stylesheet" href="css/pages/dashboard/sources-management.css">
-    <link rel="stylesheet" href="css/pages/dashboard/categories-management.css">
-    <link rel="stylesheet" href="css/pages/dashboard/community.css">
-    
-    <!-- 仪表盘专用样式 -->
-    <link rel="stylesheet" href="css/pages/dashboard/dashboard.css">
+    <link rel="stylesheet" href="css/pages/management-system.css">
+    <link rel="stylesheet" href="css/pages/community-system.css">
     
     <!-- 工具样式 -->
-    <link rel="stylesheet" href="css/utils/animations.css">
-    <link rel="stylesheet" href="css/utils/responsive.css">
-    <link rel="stylesheet" href="css/utils/accessibility.css">
-    <link rel="stylesheet" href="css/utils/print.css">
-
+    <link rel="stylesheet" href="css/utilities.css">
+    
+	<!-- logo -->
     <link rel="icon" href="images/favicon.ico" type="image/x-icon">
 </head>
 <body>

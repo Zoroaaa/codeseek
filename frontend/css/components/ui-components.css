@@ -1,0 +1,521 @@
+/* ================================================================
+   UI组件 - UI Components
+   包含：模态框、Toast通知、加载动画、表单组件
+   ================================================================ */
+
+/* ============= 通用模态框 ============= */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-primary);
+  padding: 2.5rem;
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 480px;
+  box-shadow: var(--shadow-lg);
+  animation: slideIn 0.3s ease;
+  border: 1px solid var(--border-color);
+}
+
+.modal-content h2 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: var(--text-primary);
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: var(--transition-base);
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.close:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  transform: rotate(90deg);
+}
+
+/* ============= 表单样式 ============= */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: var(--transition-base);
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.form-group input::placeholder {
+  color: var(--text-muted);
+}
+
+.form-group input:disabled,
+.form-group select:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.form-links {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.form-links a {
+  color: var(--accent-primary);
+  font-size: 0.95rem;
+  transition: var(--transition-base);
+}
+
+.form-links a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline !important;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-help {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.form-help code {
+  background: var(--bg-tertiary);
+  padding: 0.125rem 0.25rem;
+  border-radius: var(--radius-sm);
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 复选框样式 */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: var(--transition-base);
+}
+
+.checkbox-label:hover {
+  color: var(--text-primary);
+}
+
+.checkbox-label input[type="checkbox"] {
+  accent-color: var(--accent-primary);
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+/* ============= Toast通知 ============= */
+.toast {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: var(--gradient-primary);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-lg);
+  z-index: 1001;
+  transform: translateX(400px);
+  transition: var(--transition-base);
+  box-shadow: var(--shadow-lg);
+  max-width: 320px;
+  font-weight: 500;
+}
+
+.toast.show {
+  transform: translateX(0);
+}
+
+.toast.error {
+  background: var(--error-color);
+}
+
+.toast.success {
+  background: var(--success-color);
+}
+
+.toast.warning {
+  background: var(--warning-color);
+}
+
+.toast.info {
+  background: var(--info-color);
+}
+
+/* ============= 加载动画 ============= */
+.loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1002;
+  backdrop-filter: blur(4px);
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--bg-tertiary);
+  border-top: 4px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* 进度指示器 */
+.status-check-progress {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.status-check-progress.show {
+  display: flex;
+}
+
+.progress-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--bg-secondary);
+  border-top: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.progress-text {
+  flex: 1;
+}
+
+.progress-stats {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: var(--accent-primary);
+}
+
+/* ============= 提取进度条 ============= */
+.extraction-progress-container {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin: 1rem 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.progress-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.progress-message {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ============= 空状态 ============= */
+.empty-state {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  color: var(--text-secondary);
+}
+
+.empty-state span {
+  display: block;
+  margin-bottom: 1.5rem;
+  font-size: 3rem;
+}
+
+.empty-state p {
+  margin-bottom: 1.5rem;
+  font-size: 1.15rem;
+}
+
+/* ============= 站点网格 ============= */
+.sites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.site-item {
+  display: block;
+  padding: 1rem 1.25rem;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.site-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #1e40af);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.site-item:hover {
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.15);
+}
+
+.site-item:hover::before {
+  transform: scaleX(1);
+}
+
+.site-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.site-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.site-header strong {
+  font-size: 1rem;
+  color: #1f2937;
+  flex: 1;
+}
+
+.site-subtitle {
+  font-size: 0.85rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* ============= 徽章样式 ============= */
+.custom-badge {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.priority-badge {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #3b82f6;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.non-searchable-badge {
+  background: #e5e7eb;
+  color: #6b7280;
+  border: 1px solid #9ca3af;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* ============= 响应式设计 ============= */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    padding: 2rem 1.5rem;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .toast {
+    right: 1rem;
+    max-width: calc(100vw - 2rem);
+  }
+  
+  .sites-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .site-item {
+    padding: 0.875rem 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    width: 98%;
+    padding: 1.5rem;
+  }
+  
+  .modal-content h2 {
+    font-size: 1.5rem;
+  }
+  
+  .site-header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+/* ============= 深色主题适配 ============= */
+[data-theme="dark"] .site-item {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .site-item:hover {
+  border-color: #60a5fa;
+  box-shadow: 0 8px 20px rgba(96, 165, 250, 0.2);
+}
+
+[data-theme="dark"] .site-header strong {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .site-subtitle {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .custom-badge {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fde68a;
+  border-color: #fbbf24;
+}
+
+[data-theme="dark"] .priority-badge {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  border-color: #3b82f6;
+}
+
+[data-theme="dark"] .non-searchable-badge {
+  background: rgba(107, 114, 128, 0.2);
+  color: #d1d5db;
+  border-color: #6b7280;
+}

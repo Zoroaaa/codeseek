@@ -1,4 +1,9 @@
-/* 导航栏 - 更现代的样式 */
+/* ================================================================
+   导航系统 - Navigation System
+   包含：导航栏、面包屑、菜单、下拉列表
+   ================================================================ */
+
+/* ============= 主导航栏 ============= */
 .navbar {
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
@@ -19,6 +24,7 @@
   height: 72px;
 }
 
+/* 品牌标识 */
 .nav-brand {
   display: flex;
   align-items: center;
@@ -26,7 +32,6 @@
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--accent-primary);
-  text-decoration: none;
   transition: var(--transition-base);
 }
 
@@ -38,8 +43,6 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  text-decoration: none;
-  color: inherit;
 }
 
 .logo {
@@ -49,6 +52,7 @@
   object-fit: cover;
 }
 
+/* 导航菜单 */
 .nav-menu {
   display: flex;
   align-items: center;
@@ -57,7 +61,6 @@
 
 .nav-link {
   color: var(--text-secondary);
-  text-decoration: none;
   font-weight: 500;
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
@@ -69,6 +72,7 @@
   background: var(--bg-tertiary);
 }
 
+/* 主题切换按钮 */
 .theme-btn {
   background: none;
   border: none;
@@ -77,6 +81,7 @@
   padding: 0.5rem;
   border-radius: var(--radius-sm);
   transition: var(--transition-base);
+  color: var(--text-secondary);
 }
 
 .theme-btn:hover {
@@ -84,6 +89,7 @@
   transform: scale(1.1);
 }
 
+/* 登录按钮 */
 .login-btn {
   background: var(--gradient-primary);
   color: white;
@@ -100,6 +106,7 @@
   box-shadow: var(--shadow-md);
 }
 
+/* 用户信息 */
 .user-info {
   display: flex;
   align-items: center;
@@ -113,6 +120,7 @@
   color: var(--text-primary);
 }
 
+/* 下拉菜单 */
 .dropdown {
   position: relative;
 }
@@ -157,7 +165,6 @@
   display: block;
   padding: 0.75rem 1.25rem;
   color: var(--text-primary);
-  text-decoration: none;
   font-size: 0.9rem;
   transition: var(--transition-base);
 }
@@ -168,7 +175,7 @@
   color: var(--accent-primary);
 }
 
-/* 响应式设计 */
+/* ============= 响应式设计 ============= */
 @media (max-width: 768px) {
   .nav-container {
     padding: 0 1rem;
@@ -187,5 +194,13 @@
 @media (max-width: 480px) {
   .nav-brand .brand-text {
     display: none;
+  }
+  
+  .nav-menu {
+    gap: 0.5rem;
+  }
+  
+  .nav-link {
+    padding: 0.5rem;
   }
 }

@@ -1,7 +1,71 @@
-/* frontend/css/components/proxy-ui.css - 代理功能UI样式 */
-/* 版本: v1.0.0 */
+/* ================================================================
+   代理系统 - Proxy System
+   包含：代理控制面板、代理状态、导航代理、代理结果标识
+   ================================================================ */
 
-/* ===================== 代理控制面板 ===================== */
+/* ============= 代理状态横幅 ============= */
+.proxy-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  transition: all 0.3s ease;
+}
+
+.proxy-status-banner.disabled {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.proxy-status-banner .proxy-indicator {
+  font-size: 1.5rem;
+}
+
+.proxy-status-banner .proxy-indicator.active {
+  animation: pulse 2s infinite;
+}
+
+.proxy-status-banner span:not(.proxy-indicator) {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #1e40af;
+}
+
+.proxy-status-banner.disabled span:not(.proxy-indicator) {
+  color: #64748b;
+}
+
+.proxy-status-banner button {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.proxy-status-banner .btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.proxy-status-banner .btn-primary:hover {
+  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* ============= 代理控制面板 ============= */
 .proxy-controls-panel {
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   border: 2px solid #e2e8f0;
@@ -41,7 +105,7 @@
   background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
 }
 
-/* ===================== 代理切换区域 ===================== */
+/* ============= 代理切换区域 ============= */
 .proxy-toggle-section {
   display: flex;
   align-items: center;
@@ -59,7 +123,6 @@
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  position: relative;
   overflow: hidden;
   box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
   display: flex;
@@ -71,10 +134,6 @@
   background: linear-gradient(135deg, #3730a3 0%, #312e81 100%);
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3);
-}
-
-.proxy-toggle-btn:active {
-  transform: translateY(0);
 }
 
 .proxy-toggle-btn:disabled {
@@ -100,7 +159,6 @@
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.8);
   transition: all 0.3s ease;
-  position: relative;
 }
 
 .toggle-indicator.enabled {
@@ -109,12 +167,7 @@
   animation: pulse 2s infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-/* ===================== 代理信息按钮 ===================== */
+/* ============= 代理信息按钮 ============= */
 .proxy-info-btn {
   background: rgba(59, 130, 246, 0.1);
   color: #3b82f6;
@@ -131,7 +184,7 @@
   transform: scale(1.05);
 }
 
-/* ===================== 代理帮助文本 ===================== */
+/* ============= 代理帮助文本 ============= */
 .proxy-help-text {
   flex: 1;
   min-width: 200px;
@@ -143,7 +196,7 @@
   color: #1e40af;
 }
 
-/* ===================== 代理状态详情 ===================== */
+/* ============= 代理状态详情 ============= */
 .proxy-status-details {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
@@ -157,7 +210,7 @@
   color: #1e40af;
 }
 
-/* ===================== 代理健康警告 ===================== */
+/* ============= 代理健康警告 ============= */
 .proxy-health-warning {
   display: flex;
   align-items: center;
@@ -182,14 +235,10 @@
   70% { transform: translateY(-4px); }
 }
 
-/* ===================== 搜索结果代理相关样式 ===================== */
+/* ============= 搜索结果代理样式 ============= */
 .result-item.result-proxied {
   border-left: 4px solid #3b82f6;
   background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
-}
-
-.result-item.result-proxied .result-content {
-  position: relative;
 }
 
 .result-item.result-proxied .result-content::before {
@@ -201,7 +250,7 @@
   opacity: 0.6;
 }
 
-/* ===================== URL显示区域 ===================== */
+/* ============= URL显示区域 ============= */
 .result-urls {
   margin: 0.5rem 0;
 }
@@ -236,7 +285,7 @@
   font-size: 0.8rem;
 }
 
-/* ===================== 访问按钮组 ===================== */
+/* ============= 访问按钮组 ============= */
 .visit-buttons-group {
   display: flex;
   gap: 0.25rem;
@@ -270,11 +319,7 @@
   color: #374151;
 }
 
-.visit-buttons-group .small-text {
-  font-size: 0.75rem;
-}
-
-/* ===================== 状态标识 ===================== */
+/* ============= 状态标识 ============= */
 .proxy-badge {
   background: #3b82f6;
   color: white;
@@ -285,7 +330,22 @@
   font-weight: 600;
 }
 
-/* ===================== 代理健康警告吐司 ===================== */
+/* ============= 站点导航代理样式 ============= */
+.site-item[href*="omnibox.pp.ua"] {
+  border-left: 4px solid #3b82f6;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.site-item[href*="omnibox.pp.ua"]::after {
+  content: '🔒';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+/* ============= 健康警告横幅 ============= */
 .proxy-health-warning-toast {
   position: fixed;
   top: 1rem;
@@ -340,21 +400,25 @@
   }
 }
 
-/* ===================== 响应式设计 ===================== */
+/* ============= 响应式设计 ============= */
 @media (max-width: 768px) {
-  .proxy-controls-panel {
+  .proxy-controls-panel,
+  .proxy-status-banner {
     padding: 0.75rem 1rem;
     margin-bottom: 1rem;
   }
   
-  .proxy-toggle-section {
+  .proxy-toggle-section,
+  .proxy-status-banner {
     flex-direction: column;
     align-items: stretch;
     gap: 0.5rem;
   }
   
-  .proxy-toggle-btn {
+  .proxy-toggle-btn,
+  .proxy-status-banner button {
     justify-content: center;
+    width: 100%;
   }
   
   .proxy-help-text {
@@ -388,11 +452,13 @@
 }
 
 @media (max-width: 480px) {
-  .proxy-controls-panel {
+  .proxy-controls-panel,
+  .proxy-status-banner {
     padding: 0.5rem 0.75rem;
   }
   
-  .proxy-toggle-btn {
+  .proxy-toggle-btn,
+  .proxy-status-banner button {
     padding: 0.5rem 1rem;
     font-size: 0.85rem;
   }
@@ -404,122 +470,57 @@
   .result-url {
     font-size: 0.8rem;
   }
-  
-  .result-url.original-url {
-    font-size: 0.75rem;
-  }
 }
 
-/* ===================== 暗色主题支持 ===================== */
-@media (prefers-color-scheme: dark) {
-  .proxy-controls-panel {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    border-color: #334155;
-    color: #e2e8f0;
-  }
-  
-  .proxy-controls-panel.proxy-enabled {
-    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-    border-color: #3b82f6;
-  }
-  
-  .proxy-controls-panel.proxy-unhealthy {
-    background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
-    border-color: #f59e0b;
-  }
-  
-  .proxy-help-text {
-    color: #94a3b8;
-  }
-  
-  .proxy-enabled .proxy-help-text {
-    color: #dbeafe;
-  }
-  
-  .proxy-status-details {
-    color: #94a3b8;
-    border-top-color: rgba(148, 163, 184, 0.2);
-  }
-  
-  .proxy-enabled .proxy-status-details {
-    color: #dbeafe;
-    border-top-color: rgba(59, 130, 246, 0.3);
-  }
-  
-  .result-item.result-proxied {
-    background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%);
-    border-left-color: #60a5fa;
-  }
-  
-  .result-url {
-    color: #94a3b8;
-  }
-  
-  .result-url.proxy-url {
-    color: #60a5fa;
-  }
-  
-  .result-url.original-url {
-    color: #6b7280;
-  }
-  
-  .visit-buttons-group .visit-btn.secondary {
-    background: rgba(148, 163, 184, 0.1);
-    color: #94a3b8;
-    border-color: rgba(148, 163, 184, 0.2);
-  }
-  
-  .visit-buttons-group .visit-btn.secondary:hover {
-    background: rgba(148, 163, 184, 0.2);
-    color: #e2e8f0;
-  }
+/* ============= 深色主题适配 ============= */
+[data-theme="dark"] .proxy-controls-panel {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-color: #334155;
 }
 
-/* ===================== 动画优化 ===================== */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-  
-  .proxy-controls-panel::before {
-    transition: none;
-  }
-  
-  .toggle-indicator.enabled {
-    animation: none;
-  }
-  
-  .proxy-health-warning .warning-icon {
-    animation: none;
-  }
-  
-  .proxy-health-warning-toast {
-    animation: none;
-  }
+[data-theme="dark"] .proxy-controls-panel.proxy-enabled {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  border-color: #3b82f6;
 }
 
-/* ===================== 高对比度支持 ===================== */
-@media (prefers-contrast: high) {
-  .proxy-controls-panel {
-    border-width: 3px;
-  }
-  
-  .proxy-toggle-btn {
-    border: 2px solid transparent;
-  }
-  
-  .proxy-toggle-btn:focus {
-    border-color: #ffffff;
-    outline: 2px solid #000000;
-  }
-  
-  .result-item.result-proxied {
-    border-left-width: 6px;
-  }
-  
-  .proxy-badge {
-    border: 1px solid #ffffff;
-  }
+[data-theme="dark"] .proxy-controls-panel.proxy-unhealthy {
+  background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+  border-color: #f59e0b;
+}
+
+[data-theme="dark"] .proxy-status-banner {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  border-color: #3b82f6;
+  color: #dbeafe;
+}
+
+[data-theme="dark"] .proxy-status-banner.disabled {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-color: #334155;
+}
+
+[data-theme="dark"] .proxy-help-text {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .proxy-enabled .proxy-help-text {
+  color: #dbeafe;
+}
+
+[data-theme="dark"] .result-item.result-proxied {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%);
+  border-left-color: #60a5fa;
+}
+
+[data-theme="dark"] .result-url {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .result-url.proxy-url {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .site-item[href*="omnibox.pp.ua"] {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%);
+  border-left-color: #60a5fa;
 }

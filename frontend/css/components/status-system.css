@@ -1,4 +1,9 @@
-/* 连接状态指示器 */
+/* ================================================================
+   状态系统 - Status System
+   包含：连接状态、搜索源状态、结果状态、站点状态
+   ================================================================ */
+
+/* ============= 连接状态指示器 ============= */
 .connection-status {
   position: fixed;
   top: 90px;
@@ -39,18 +44,17 @@
   background: var(--error-color);
 }
 
-/* 搜索结果状态指示器 - 增强版 */
-.result-status {
-  display: flex;
+/* ============= 通用状态样式 ============= */
+.result-status,
+.source-status-indicator {
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0.5rem 0;
   padding: 0.375rem 0.75rem;
   border-radius: var(--radius-md);
   font-size: 0.8rem;
   font-weight: 500;
   transition: var(--transition-base);
-  position: relative;
 }
 
 .status-dot {
@@ -72,9 +76,10 @@
   font-family: 'Courier New', monospace;
 }
 
-/* 状态类型样式 - 增强版 */
+/* ============= 状态类型样式 ============= */
 .status-available,
-.status-online {
+.status-online,
+.result-status.status-available {
   background: rgba(16, 185, 129, 0.1);
   color: #059669;
   border: 1px solid rgba(16, 185, 129, 0.2);
@@ -86,7 +91,8 @@
 }
 
 .status-unavailable,
-.status-offline {
+.status-offline,
+.result-status.status-unavailable {
   background: rgba(239, 68, 68, 0.1);
   color: #dc2626;
   border: 1px solid rgba(239, 68, 68, 0.2);
@@ -98,7 +104,6 @@
   background: #ef4444;
 }
 
-/* 🔧 不可用状态的特殊效果 */
 .status-unavailable::before {
   content: '⚠️';
   position: absolute;
@@ -109,7 +114,8 @@
   opacity: 0.8;
 }
 
-.status-error {
+.status-error,
+.result-status.status-error {
   background: rgba(239, 68, 68, 0.1);
   color: #dc2626;
   border: 1px solid rgba(239, 68, 68, 0.2);
@@ -119,7 +125,8 @@
   background: #ef4444;
 }
 
-.status-timeout {
+.status-timeout,
+.result-status.status-timeout {
   background: rgba(245, 158, 11, 0.1);
   color: #d97706;
   border: 1px solid rgba(245, 158, 11, 0.2);
@@ -129,7 +136,8 @@
   background: #f59e0b;
 }
 
-.status-checking {
+.status-checking,
+.result-status.status-checking {
   background: rgba(59, 130, 246, 0.1);
   color: #2563eb;
   border: 1px solid rgba(59, 130, 246, 0.2);
@@ -140,7 +148,8 @@
   animation: pulse 1s infinite;
 }
 
-.status-unknown {
+.status-unknown,
+.result-status.status-unknown {
   background: rgba(156, 163, 175, 0.1);
   color: #9ca3af;
   border: 1px solid rgba(156, 163, 175, 0.2);
@@ -150,7 +159,7 @@
   background: #9ca3af;
 }
 
-/* 🔧 新增：不可用状态的详细信息显示 */
+/* ============= 状态详情 ============= */
 .status-details {
   margin-top: 0.5rem;
   padding: 0.5rem;
@@ -172,52 +181,27 @@
   line-height: 1.4;
 }
 
-.status-details-error {
-  color: var(--error-color);
-  font-weight: 500;
-}
-
-.status-details-warning {
-  color: var(--warning-color);
-  font-weight: 500;
-}
-
-/* 🔧 状态图标增强 */
-.status-icon {
-  font-size: 0.8rem;
-  margin-right: 0.25rem;
-}
-
-/* 🔧 内容匹配和缓存标识 */
-.content-match-badge {
+/* ============= 内容匹配和缓存标识 ============= */
+.content-match-badge,
+.cache-badge {
   background: var(--success-color);
   color: white;
   font-size: 0.6rem;
-  padding: 1px 4px;
+  padding: 2px 4px;
   border-radius: 3px;
   font-weight: 600;
   margin-left: 0.25rem;
 }
 
 .cache-badge {
-  background: var(--info-color, #6366f1);
-  color: white;
-  font-size: 0.6rem;
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-weight: 600;
-  margin-left: 0.25rem;
+  background: var(--info-color);
 }
 
-/* 搜索源状态指示器 */
+/* ============= 搜索源状态指示器 ============= */
 .source-status-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
   padding: 0.125rem 0.5rem;
   border-radius: 1rem;
   font-size: 0.75rem;
-  font-weight: 500;
 }
 
 .source-status-indicator.online {
@@ -247,15 +231,13 @@
   background: currentColor;
 }
 
-/* 🔧 站点导航状态样式 - 增强版 */
+/* ============= 站点导航状态样式 ============= */
 .site-item {
   transition: var(--transition-base);
   position: relative;
   display: block;
   padding: 1rem;
   border-radius: var(--radius-md);
-  text-decoration: none;
-  color: var(--text-primary);
   border: 1px solid var(--border-color);
 }
 
@@ -272,17 +254,10 @@
 
 .site-item.disabled {
   opacity: 0.6;
-  position: relative;
   background: var(--bg-tertiary);
-  border-color: var(--border-color);
+  position: relative;
 }
 
-.site-item.disabled:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
-}
-
-/* 🔧 不可用站点的视觉处理 */
 .site-item.disabled::before {
   content: '';
   position: absolute;
@@ -299,11 +274,10 @@
   );
   transform: translateY(-50%);
   z-index: 1;
-  border-radius: 1px;
 }
 
 .site-item.disabled .site-header strong {
-  text-decoration: line-through;
+  text-decoration: line-through !important;
   text-decoration-color: var(--error-color);
   color: var(--text-muted);
 }
@@ -335,18 +309,9 @@
   color: white;
 }
 
-.custom-badge {
-  background: var(--accent-primary);
-  color: white;
-  font-size: 9px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-weight: 600;
-}
-
-/* 🔧 搜索源状态面板 */
+/* ============= 搜索源状态面板 ============= */
 .source-status-panel {
-  background-color: var(--bg-primary);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   margin: 1rem 0;
@@ -411,204 +376,7 @@
   color: var(--text-secondary);
 }
 
-.metric-item {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-/* 🔧 增强版搜索结果样式 */
-.result-item.enhanced {
-  border-left: 3px solid transparent;
-  transition: all 0.3s ease;
-  animation: fadeInUp 0.3s ease-out;
-}
-
-.result-item.result-excellent {
-  border-left-color: #10b981;
-  background-color: rgba(16, 185, 129, 0.05);
-}
-
-.result-item.result-good {
-  border-left-color: #3b82f6;
-  background-color: rgba(59, 130, 246, 0.05);
-}
-
-.result-item.result-poor {
-  border-left-color: #ef4444;
-  background-color: rgba(239, 68, 68, 0.05);
-}
-
-/* 🔧 不可用结果的特殊处理 */
-.result-item.result-unavailable {
-  border-left-color: var(--error-color);
-  position: relative;
-}
-
-.result-item.result-unavailable .result-status {
-  border-color: rgba(239, 68, 68, 0.3);
-  animation: statusPulse 2s ease-in-out infinite;
-}
-
-/* 🔧 不可用原因的详细显示 */
-.unavailable-details {
-  background: rgba(239, 68, 68, 0.05);
-  border: 1px solid rgba(239, 68, 68, 0.15);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem;
-  margin: 0.5rem 0;
-  font-size: 0.75rem;
-}
-
-.unavailable-details-title {
-  font-weight: 600;
-  color: var(--error-color);
-  margin-bottom: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.unavailable-details-title::before {
-  content: '❌';
-  font-size: 0.7rem;
-}
-
-.unavailable-details-content {
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.unavailable-details-list {
-  list-style: none;
-  padding: 0;
-  margin: 0.25rem 0;
-}
-
-.unavailable-details-list li {
-  padding: 0.125rem 0;
-  padding-left: 1rem;
-  position: relative;
-}
-
-.unavailable-details-list li::before {
-  content: '•';
-  position: absolute;
-  left: 0.25rem;
-  color: var(--error-color);
-  font-weight: bold;
-}
-
-/* 质量评分 */
-.result-quality {
-  margin: 8px 0;
-  font-size: 0.85rem;
-}
-
-.quality-score,
-.reliability-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0;
-}
-
-.quality-bar,
-.reliability-bar {
-  flex: 1;
-  height: 4px;
-  background-color: var(--border-color);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.quality-fill,
-.reliability-fill {
-  height: 100%;
-  transition: width 0.3s ease;
-}
-
-.quality-fill.excellent {
-  background-color: #10b981;
-}
-
-.quality-fill.good {
-  background-color: #3b82f6;
-}
-
-.quality-fill.fair {
-  background-color: #f59e0b;
-}
-
-.quality-fill.poor {
-  background-color: #ef4444;
-}
-
-/* 推荐标签 */
-.recommend-badge {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 8px;
-  font-weight: 600;
-}
-
-.badge-excellent {
-  background-color: #10b981;
-  color: white;
-}
-
-.badge-good {
-  background-color: #3b82f6;
-  color: white;
-}
-
-/* 🔧 搜索结果统计面板 */
-.results-stats {
-  display: flex;
-  gap: 16px;
-  margin: 12px 0;
-  padding: 12px;
-  background-color: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  border: 1px solid var(--border-color);
-}
-
-.stats-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.stats-icon {
-  font-size: 0.8rem;
-}
-
-.stats-value {
-  font-weight: 600;
-}
-
-.stats-value.all-available {
-  color: #10b981;
-}
-
-.stats-value.some-unavailable {
-  color: #f59e0b;
-}
-
-.stats-value.many-unavailable {
-  color: #ef4444;
-}
-
-.stats-value.quality-excellent { color: #10b981; }
-.stats-value.quality-good { color: #3b82f6; }
-.stats-value.quality-fair { color: #f59e0b; }
-.stats-value.quality-poor { color: #ef4444; }
-
-/* 🔧 状态变化动画 */
+/* ============= 状态变化动画 ============= */
 @keyframes statusPulse {
   0%, 100% { 
     opacity: 1; 
@@ -631,7 +399,52 @@
   animation: statusAlert 2s ease-in-out infinite;
 }
 
-/* 深色主题适配 */
+/* ============= 响应式设计 ============= */
+@media (max-width: 768px) {
+  .connection-status {
+    top: 72px;
+    right: 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .result-status {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .response-time {
+    order: 3;
+    flex-basis: 100%;
+    text-align: center;
+    margin-top: 0.25rem;
+  }
+  
+  .source-status-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .source-metrics {
+    align-self: stretch;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .result-status {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  
+  .status-dot {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+/* ============= 深色主题适配 ============= */
 [data-theme="dark"] .result-status {
   border-color: rgba(255, 255, 255, 0.1);
 }
@@ -687,116 +500,7 @@
   );
 }
 
-[data-theme="dark"] .unavailable-details {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.25);
-}
-
 [data-theme="dark"] .status-details {
   background: rgba(255, 255, 255, 0.03);
   border-color: rgba(255, 255, 255, 0.1);
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .connection-status {
-    top: 72px;
-    right: 1rem;
-    font-size: 0.85rem;
-  }
-  
-  .result-status {
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    padding: 0.25rem 0.5rem;
-  }
-  
-  .response-time {
-    order: 3;
-    flex-basis: 100%;
-    text-align: center;
-    margin-top: 0.25rem;
-  }
-  
-  .source-status-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-  
-  .source-metrics {
-    align-self: stretch;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  
-  .results-stats {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .unavailable-details {
-    font-size: 0.7rem;
-    padding: 0.375rem;
-  }
-  
-  .status-badges {
-    flex-wrap: wrap;
-    gap: 0.125rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .result-status {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-  }
-  
-  .status-dot {
-    width: 6px;
-    height: 6px;
-  }
-
-  .unavailable-details {
-    margin: 0.25rem 0;
-  }
-  
-  .unavailable-details-list li {
-    padding-left: 0.75rem;
-    font-size: 0.65rem;
-  }
-}
-
-/* 动画效果 */
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 🔧 状态指示器的实用工具类 */
-.status-indicator-success {
-  color: var(--success-color);
-}
-
-.status-indicator-warning {
-  color: var(--warning-color);
-}
-
-.status-indicator-error {
-  color: var(--error-color);
-}
-
-.status-indicator-info {
-  color: var(--info-color, #6366f1);
 }
