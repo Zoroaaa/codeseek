@@ -38,6 +38,89 @@ export function showToast(message, type = 'info', duration = 3000) {
   };
 }
 
+// 为模态框添加拖动功能
+export function makeModalDraggable(modal) {
+  const modalContent = modal.querySelector('.modal-content');
+  if (!modalContent) return;
+  
+  let isDragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+  
+  // 找到拖动句柄（如果没有明确的句柄，则使用整个头部区域）
+  let dragHandle = modalContent.querySelector('.modal-header, h2, h3');
+  
+  // 如果都没有找到，就使用整个模态框内容的顶部区域
+  if (!dragHandle && modalContent) {
+    dragHandle = modalContent;
+  }
+  
+  // 开始拖动
+  function startDrag(e) {
+    // 如果点击的是关闭按钮或者表单元素，不开始拖动
+    if (e.target.closest('.close') || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON') {
+      return;
+    }
+    
+    isDragging = true;
+    
+    // 计算鼠标相对于模态框内容左上角的偏移量
+    const rect = modalContent.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    
+    // 添加拖动时的样式
+    modalContent.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none'; // 防止拖动时选中文本
+  }
+  
+  // 拖动中
+  function onDrag(e) {
+    if (!isDragging) return;
+    
+    // 计算新位置
+    let newX = e.clientX - offsetX;
+    let newY = e.clientY - offsetY;
+    
+    // 限制在可视区域内
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const modalWidth = modalContent.offsetWidth;
+    const modalHeight = modalContent.offsetHeight;
+    
+    newX = Math.max(0, Math.min(newX, viewportWidth - modalWidth));
+    newY = Math.max(0, Math.min(newY, viewportHeight - modalHeight));
+    
+    // 设置位置（使用transform实现平滑移动）
+    modalContent.style.transform = `translate(${newX}px, ${newY}px)`;
+    modalContent.style.left = '0';
+    modalContent.style.top = '0';
+  }
+  
+  // 结束拖动
+  function endDrag() {
+    if (!isDragging) return;
+    
+    isDragging = false;
+    modalContent.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+  
+  // 绑定事件
+  if (dragHandle) {
+    dragHandle.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+    
+    // 清理事件监听器
+    modal.addEventListener('hide', () => {
+      dragHandle.removeEventListener('mousedown', startDrag);
+      document.removeEventListener('mousemove', onDrag);
+      document.removeEventListener('mouseup', endDrag);
+    });
+  }
+}
+
 // 显示模态框
 export function showModal(modalId) {
   const modal = document.getElementById(modalId);
@@ -55,6 +138,9 @@ export function showModal(modalId) {
       hideModal(modalId);
     }
   });
+  
+  // 添加拖动功能
+  makeModalDraggable(modal);
 }
 
 // 隐藏模态框

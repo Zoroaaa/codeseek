@@ -66,11 +66,19 @@ export class CommunityTagsManager {
       return;
     }
 
+    // 移除现有模态框
+    const existingModal = document.getElementById('createTagModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+
     const modalHTML = `
       <div id="createTagModal" class="modal tag-modal" style="display: block;">
         <div class="modal-content">
-          <span class="close" onclick="document.getElementById('createTagModal').remove()">&times;</span>
-          <h2>🏷️ 创建新标签</h2>
+          <div class="modal-header">
+            <h2>🏷️ 创建新标签</h2>
+            <span class="close" onclick="document.getElementById('createTagModal').remove()">&times;</span>
+          </div>
           
           <form id="createTagForm">
             <div class="form-group">
@@ -89,7 +97,7 @@ export class CommunityTagsManager {
             </div>
             
             <div class="form-group">
-              <label for="tagColor">标签颜色:</label>
+              <label for="tagColor">标签颜色:</label>`}]}}}`}],"fixes":[{"type":"add_drag_functionality","changes":["添加了可拖动的modal-header容器","将标题和关闭按钮移到模态框头部","添加了draggable-header类以支持拖动功能"]}]}}
               <input type="color" id="tagColor" name="tagColor" value="#3b82f6">
               <div class="tag-color-preview">
                 <span>预览:</span>
