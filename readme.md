@@ -22,7 +22,7 @@
 | 📖 项目文档 | 👉 [完整介绍](https://zread.ai/Zoroaaa/codeseek) | 详细的项目说明和使用指南 |
 | 🚀 在线演示 | 👉 [https://codeseek.pp.ua](https://codeseek.pp.ua) | 体验完整功能 |
 | 🔑 演示密码 | 👉`zoro666` | 代理网页访问密码 |
-| 📧 技术支持 | [zoroasx@gmail.com](mailto:zoroasx@gmail.com) | 使用问题反馈 |
+| 📧 技术支持 | 👉 [zoroasx@gmail.com](mailto:zoroasx@gmail.com) | 使用问题反馈 |
 
 </div>
 
