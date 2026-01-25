@@ -1,4 +1,23 @@
+### 前端技术栈
+- **核心**: 原生JavaScript ES6+ 模块化
+- **样式**: CSS3 + 响应式设计
+- **存储**: LocalStorage + IndexedDB
+- **部署**: Cloudflare Pages
+- **版本**: v2.3.1
 
+### 后端技术栈
+- **运行时**: Cloudflare Workers
+- **数据库**: Cloudflare D1 (SQLite)
+- **认证**: JWT Token
+- **API**: RESTful 风格
+- **版本**: v2.1.0
+
+### 代理服务
+- **架构**: Cloudflare Workers边缘计算
+- **功能**: URL重写、资源优化、请求转发
+- **版本**: v3.1.0
+
+### 项目结构
 
 # 磁力快搜 - 项目架构树
 
