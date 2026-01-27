@@ -50,4 +50,3 @@ database_id = "42216a7e-3dbb-4feb-9974-2a8ee32af550"  # 数据库唯一标识符
 # 监控和可观测性配置
 [observability]
 enabled = true                                 # 启用 Cloudflare 的监控和日志功能
-
