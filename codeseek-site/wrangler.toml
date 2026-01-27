@@ -1,108 +1,83 @@
-# 增强代理工作器配置
-# 针对新的8文件模块化架构进行优化
-
+# wrangler.toml - Enhanced Proxy Worker 配置
 name = "codeseek-site"
 main = "src/worker.js"
-compatibility_date = "2024-03-18"
+compatibility_date = "2024-12-19"
+compatibility_flags = ["nodejs_compat"]
 
-# 环境变量 - 生产环境默认设置
+# 环境变量配置
 [vars]
-# 基础配置
+# ==================== 基础配置 ====================
+# 运行环境：production(生产)/staging(预发布)/development(开发)
 ENVIRONMENT = "production"
+
+# 调试模式：true(开启详细错误信息)/false(仅显示通用错误)
 DEBUG = "false"
-PROXY_VERSION = "2.0.0"
 
-# 安全配置
+# 日志级别：error/warn/info/debug (数字越小越严格)
+LOG_LEVEL = "warn"
+
+# ==================== 安全配置 ====================
+# 代理访问密码，空字符串表示无需密码
 PROXY_PASSWORD = "zoro666"
+
+# 是否显示密码输入页面：true(显示)/false(直接返回403)
 SHOW_PASSWORD_PAGE = "true"
-ENHANCED_ERROR_HANDLING = "true"
-DETAILED_ERROR_LOGS = "false"
 
-# 代理功能配置
-ALLOW_DIRECT_ACCESS = "true"
-ENABLE_PROXY_HINT = "true"
-ENABLE_CONTENT_INJECTION = "true"
+# ==================== 缓存 TTL 配置（单位：秒）====================
+# HTML 内容缓存时间（1小时）
+CACHE_HTML_TTL = "3600"
 
-# 缓存配置 (TTL单位为秒)
-CACHE_HTML_TTL = "3600"      # HTML缓存 1小时
-CACHE_CSS_TTL = "86400"      # CSS缓存 1天
-CACHE_JS_TTL = "86400"       # JavaScript缓存 1天
-CACHE_IMAGE_TTL = "2592000"  # 图片缓存 30天
-CACHE_FONT_TTL = "2592000"   # 字体缓存 30天
-CACHE_JSON_TTL = "1800"      # JSON缓存 30分钟
-CACHE_DEFAULT_TTL = "3600"   # 默认缓存 1小时
-MAX_CACHE_SIZE = "1048576"   # 单项最大缓存大小 1MB
+# CSS 样式表缓存时间（1天）
+CACHE_CSS_TTL = "86400"
 
-# 安全和CORS配置
-ENABLE_CORS = "true"
-ALLOW_ALL_ORIGINS = "true"
-REMOVE_CSP = "true"
-CORS_MAX_AGE = "86400"
+# JavaScript 文件缓存时间（1天）
+CACHE_JS_TTL = "86400"
 
-# 性能配置
-ENABLE_GZIP = "true"
-MAX_RESPONSE_SIZE = "52428800"  # 最大响应大小 50MB
-REQUEST_TIMEOUT = "30000"       # 请求超时 30秒
-CONCURRENT_REQUESTS_LIMIT = "10"
+# 图片资源缓存时间（30天）
+CACHE_IMAGE_TTL = "2592000"
 
-# 速率限制配置
-ENABLE_RATE_LIMITING = "true"
-RATE_LIMIT_REQUESTS = "60"      # 每分钟请求数
-RATE_LIMIT_WINDOW = "60000"     # 1分钟窗口时间 (毫秒)
+# 字体文件缓存时间（30天）
+CACHE_FONT_TTL = "2592000"
 
-# 内容过滤配置
-ENABLE_USER_AGENT_BLOCKING = "true"
-ENABLE_CONTENT_FILTERING = "true"
+# JSON 数据缓存时间（30分钟）
+CACHE_JSON_TTL = "1800"
 
-# 监控和健康检查配置
-ENABLE_HEALTH_CHECK = "true"
-ENABLE_METRICS = "true"
-ENABLE_ACCESS_LOGS = "false"
+# 默认缓存时间（1小时）
+CACHE_DEFAULT_TTL = "3600"
 
-# KV存储绑定用于缓存
+# ==================== 性能配置 ====================
+# 单个缓存项最大大小（1MB = 1048576 字节）
+MAX_CACHE_SIZE = "1048576"
+
+# ==================== KV 存储绑定 ====================
+# KV 命名空间用于缓存存储
 [[kv_namespaces]]
 binding = "KV_CACHE"
 id = "21feed084fa648dd932e404935aec39c"
 preview_id = "21feed084fa648dd932e404935aec39c"
 
-# 兼容性配置
-compatibility_flags = ["nodejs_compat"]
+# 生产环境配置（覆盖默认值）
+[env.production]
+vars = { 
+  ENVIRONMENT = "production", 
+  DEBUG = "false", 
+  LOG_LEVEL = "warn" 
+}
 
-# 可观测性配置
-[observability]
+# ==================== 部署配置 ====================
+[deployment]
+env = "production"
+
+# ==================== 日志配置 ====================
+[logpush]
 enabled = true
 
-# 可选：自定义域名路由
-# 取消注释并配置自定义域名
-# routes = [
-#   { pattern = "proxy.yourdomain.com/*", zone_name = "yourdomain.com" }
-# ]
+# ==================== 分析配置 ====================
+[analytics]
+enabled = true
 
-# 可选：持久对象 (用于会话等高级功能)
-# [[durable_objects.bindings]]
-# name = "PROXY_SESSIONS"
-# class_name = "ProxySession"
-
-# 可选：R2存储绑定 (用于大文件缓存)
-# [[r2_buckets]]
-# binding = "PROXY_STORAGE"
-# bucket_name = "enhanced-proxy-storage"
-
-# 可选：分析引擎绑定 (用于详细指标)
-# [[analytics_engine_datasets]]
-# binding = "PROXY_ANALYTICS"
-
-# 可选：定时触发器用于维护任务
-# [[triggers.crons]]
-# cron = "0 2 * * *"  # 每天凌晨2点
-# destination = "cleanup-cache"
-
-# 可选：队列绑定 (用于后台任务)
-# [[queues.consumers]]
-# queue = "proxy-tasks"
-# max_batch_size = 10
-# max_batch_timeout = 1000
-
-# [[queues.producers]]
-# binding = "PROXY_QUEUE"
-# queue = "proxy-tasks"
+# ==================== 注意事项 ====================
+# 1. 确保在 Cloudflare Dashboard 中已创建对应的 KV 命名空间
+# 2. 在生产环境部署前，建议先在 staging 环境测试
+# 3. 密码等敏感信息建议使用 secrets 管理
+# 4. 缓存时间可根据实际业务需求调整
