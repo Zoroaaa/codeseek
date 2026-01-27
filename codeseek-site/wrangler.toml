@@ -5,10 +5,6 @@ compatibility_date = "2024-12-19"
 compatibility_flags = ["nodejs_compat"]
 preview_urls = false
 
-# Node.js 兼容性配置
-[node_compat]
-enabled = true
-
 # 环境变量配置
 [vars]
 # ==================== 基础配置 ====================
