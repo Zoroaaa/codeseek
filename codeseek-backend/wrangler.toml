@@ -17,24 +17,14 @@ COMMUNITY_MAX_SHARES_PER_USER = "50"           # 社区中每个用户最大分�
 # 系统行为日志配置
 ENABLE_ACTION_LOGGING = "true"                 # 是否启用用户行为日志记录
 
-# ===============================================
 # 邮箱验证功能配置
-# ===============================================
-
-# 邮箱验证基础开关
 EMAIL_VERIFICATION_ENABLED = "true"            # 是否启用邮箱验证系统
-EMAIL_VERIFICATION_REQUIRED = "true"          # 注册时是否强制要求邮箱验证（false=可选验证）
-
-# 验证码技术参数
+EMAIL_VERIFICATION_REQUIRED = "false"          # 注册时是否强制要求邮箱验证
 VERIFICATION_CODE_LENGTH = "6"                 # 验证码位数（6位数字）
 VERIFICATION_CODE_EXPIRY = "900000"            # 验证码过期时间（毫秒，15分钟=900000）
 MAX_VERIFICATION_ATTEMPTS = "3"                # 单个验证码最大尝试次数
-
-# 邮件发送频率限制（防滥用）
 EMAIL_RATE_LIMIT_PER_HOUR = "5"               # 同一邮箱/IP每小时最大发送次数
 EMAIL_RATE_LIMIT_PER_DAY = "20"               # 同一邮箱/IP每天最大发送次数
-
-# 邮件发件人配置
 DEFAULT_FROM_EMAIL = "noreply@tempemail.pp.ua" # 系统发送邮件的发件人邮箱地址
 DEFAULT_FROM_NAME = "磁力快搜"                  # 系统发送邮件的发件人显示名称
 SITE_URL = "https://tempemail.pp.ua"          # 网站域名（用于邮件中的链接和引用）
@@ -42,49 +32,24 @@ SITE_URL = "https://tempemail.pp.ua"          # 网站域名（用于邮件中�
 # JWT令牌配置
 JWT_EXPIRY_DAYS = "30"                         # JWT令牌有效期（天）
 
-# ===============================================
 # 社区功能配置
-# ===============================================
+COMMUNITY_REQUIRE_APPROVAL = "false"           # 社区分享的搜索源是否需要管理员审核
 
-COMMUNITY_REQUIRE_APPROVAL = "false"           # 社区分享的搜索源是否需要管理员审核（false=自动通过）
-
-# ===============================================
 # 搜索源状态检查配置
-# ===============================================
-
 ENABLE_SOURCE_STATUS_CHECK = "true"            # 是否启用搜索源状态自动检查功能
 SOURCE_STATUS_CHECK_TIMEOUT = "10000"          # 单个搜索源状态检查超时时间（毫秒，10秒）
 SOURCE_STATUS_CACHE_DURATION = "300000"        # 状态检查结果缓存时间（毫秒，5分钟=300000）
 
-# ===============================================
 # 数据库配置
-# ===============================================
-
 [[d1_databases]]
 binding = "DB"                                  # 在代码中使用的数据库实例名称
 database_name = "codeseek"                     # Cloudflare D1 数据库名称
 database_id = "42216a7e-3dbb-4feb-9974-2a8ee32af550"  # 数据库唯一标识符
 
-# ===============================================
 # 监控和可观测性配置
-# ===============================================
-
 [observability]
 enabled = true                                 # 启用 Cloudflare 的监控和日志功能
 
-# ===============================================
-# 环境特定配置
-# ===============================================
-
 # 生产环境配置
 [env.production]
-name = "codeseek-backend-prod"                 # 生产环境 Worker 名称
-
-# 开发环境配置（可选，用于本地测试）
-[env.development]
-name = "codeseek-backend-dev"                  # 开发环境 Worker 名称
-vars = { 
-    APP_VERSION = "2.1.0-dev",                  # 开发环境版本标识
-    ALLOW_REGISTRATION = "true",               # 开发环境允许注册
-    EMAIL_VERIFICATION_ENABLED = "false"        # 开发环境关闭邮箱验证（方便测试）
-}
+name = "codeseek-backend"                 # 生产环境 Worker 名称
