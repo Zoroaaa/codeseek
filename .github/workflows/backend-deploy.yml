@@ -3,7 +3,7 @@ name: Deploy to Cloudflare Workers
 on:
   push:
     branches: [ main ]
-    paths: ['codeseek-backend/**']  # 只有后端目录变化时才触发
+    paths: ['codeseek-backend/**']
 
 jobs:
   deploy:
@@ -11,7 +11,7 @@ jobs:
     name: Deploy Backend to Production
     defaults:
       run:
-        working-directory: ./codeseek-backend  # 设置工作目录
+        working-directory: ./codeseek-backend
     
     steps:
       - name: Checkout Code
@@ -26,14 +26,15 @@ jobs:
       
       - name: Install Dependencies
         run: npm ci
-        working-directory: ./codeseek-backend
+      
+      - name: Update Wrangler
+        run: npm install --save-dev wrangler@4
       
       - name: Validate Configuration
         run: |
           echo "验证配置文件..."
           npx wrangler --version
           npx wrangler whoami
-        working-directory: ./codeseek-backend
       
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
