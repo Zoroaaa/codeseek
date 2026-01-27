@@ -67,12 +67,12 @@ LOG_LEVEL = "warn"
 env = "production"
 
 # ==================== 日志配置 ====================
-[logpush]
-enabled = true
+# 启用日志推送（使用布尔值）
+logpush = true
 
 # ==================== 分析配置 ====================
-[analytics]
-enabled = true
+# 启用分析（使用布尔值）
+analytics_engine_datasets = []
 
 # ==================== 注意事项 ====================
 # 1. 确保在 Cloudflare Dashboard 中已创建对应的 KV 命名空间
