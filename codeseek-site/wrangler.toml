@@ -58,11 +58,9 @@ preview_id = "21feed084fa648dd932e404935aec39c"
 
 # 生产环境配置（覆盖默认值）
 [env.production]
-vars = { 
-  ENVIRONMENT = "production", 
-  DEBUG = "false", 
-  LOG_LEVEL = "warn" 
-}
+ENVIRONMENT = "production"
+DEBUG = "false"
+LOG_LEVEL = "warn"
 
 # ==================== 部署配置 ====================
 [deployment]
