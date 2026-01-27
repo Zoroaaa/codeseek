@@ -17,7 +17,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          # 强制获取完整历史，确保所有文件同步
           fetch-depth: 0
       
       - name: Setup Node.js 20
@@ -30,59 +29,65 @@ jobs:
       - name: Install and Update Dependencies
         run: |
           echo "安装和更新依赖..."
-          # 检查当前状态
           echo "=== 安装前状态 ==="
           ls -la package*.json || echo "没有 package 文件"
           
-          # 检查并备份 package-lock.json
+          # 检查 package-lock.json 是否为空或无效
           if [ -f package-lock.json ]; then
-            echo "备份旧的 lock 文件..."
-            cp package-lock.json package-lock.json.backup.$(date +%Y%m%d_%H%M%S)
-            
-            # 检查 Wrangler 版本是否匹配
-            CURRENT_WRANGLER=$(node -e "console.log(require('./package.json').devDependencies?.wrangler || 'not-found')" 2>/dev/null || echo "not-found")
-            EXPECTED_WRANGLER="4.0.0"
+            if [ $(stat -f%z package-lock.json 2>/dev/null || stat -c%s package-lock.json) -lt 10 ]; then
+              echo "package-lock.json 文件为空或太小，删除并重新生成"
+              rm package-lock.json
+            else
+              echo "package-lock.json 文件大小正常"
+            fi
+          fi
+          
+          # 检查 Wrangler 版本是否匹配
+          if [ -f package.json ]; then
+            CURRENT_WRANGLER=$(node -e "try { console.log(require('./package.json').devDependencies?.wrangler || 'not-found') } catch(e) { console.log('parse-error') }" 2>/dev/null || echo "error")
+            EXPECTED_WRANGLER="^4.60.0"
             
             if [ "$CURRENT_WRANGLER" != "$EXPECTED_WRANGLER" ]; then
-              echo "Wrangler 版本不匹配: 当前 $CURRENT_WRANGLER, 期望 $EXPECTED_WRANGLER"
-              echo "更新 package.json 中的 Wrangler 版本..."
+              echo "Wrangler 版本需要更新: 当前 $CURRENT_WRANGLER, 期望 $EXPECTED_WRANGLER"
               
-              # 更新 package.json
-              node << 'EOF'
+              # 使用更安全的方式更新 package.json
+              node -e "
               const fs = require('fs');
-              const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              try {
+                const packagePath = './package.json';
+                const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+                
+                // 更新 devDependencies
+                if (!packageJson.devDependencies) packageJson.devDependencies = {};
+                packageJson.devDependencies.wrangler = '$EXPECTED_WRANGLER';
+                
+                // 确保 engines 配置正确
+                if (!packageJson.engines) packageJson.engines = {};
+                packageJson.engines.node = '>=20.0.0';
+                
+                fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2));
+                console.log('✅ 更新 package.json 完成');
+              } catch (error) {
+                console.error('❌ 更新 package.json 失败:', error.message);
+                process.exit(1);
+              }
+              "
               
-              if (!packageJson.devDependencies) packageJson.devDependencies = {};
-              packageJson.devDependencies.wrangler = '4.0.0';
-              
-              if (!packageJson.engines) packageJson.engines = {};
-              packageJson.engines.node = '>=18.0.0';
-              
-              fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
-              console.log('✅ 更新 package.json 完成');
-              EOF
-              
-              # 删除旧的依赖
-              rm package-lock.json
+              # 清理旧的依赖文件
+              if [ -f package-lock.json ]; then
+                rm package-lock.json
+              fi
               if [ -d node_modules ]; then
                 rm -rf node_modules
               fi
             else
               echo "Wrangler 版本匹配，检查依赖同步..."
-              # 检查 package-lock.json 是否同步
-              if ! npm ls --depth=0 > /dev/null 2>&1; then
-                echo "package-lock.json 不同步，重新生成..."
-                rm package-lock.json
-                if [ -d node_modules ]; then
-                  rm -rf node_modules
-                fi
-              fi
             fi
           fi
           
           # 全新安装
           echo "执行全新安装..."
-          npm install
+          npm install --force
           
           # 验证安装
           echo "=== 安装后验证 ==="
@@ -119,7 +124,6 @@ jobs:
           workingDirectory: ./codeseek-site
           command: deploy
         env:
-          # 确保使用最新的 Wrangler
           WRANGLER_VERSION: 4
       
       - name: Health Check with Retry
@@ -127,7 +131,6 @@ jobs:
           echo "部署完成，执行健康检查..."
           sleep 20
           
-          # 添加重试机制
           max_attempts=3
           attempt=1
           
@@ -137,11 +140,11 @@ jobs:
               echo "✅ 健康检查成功"
               exit 0
             else
-              echo "❌❌ 健康检查失败，等待 10 秒后重试..."
+              echo "健康检查失败，等待 10 秒后重试..."
               sleep 10
               attempt=$((attempt + 1))
             fi
           done
           
-          echo "❌❌ 所有健康检查尝试都失败"
+          echo "❌ 所有健康检查尝试都失败"
           exit 1
