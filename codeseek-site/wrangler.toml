@@ -4,20 +4,9 @@ main = "src/worker.js"
 compatibility_date = "2024-12-19"
 compatibility_flags = ["nodejs_compat"]
 preview_urls = false  
-# ==================== 日志配置 ====================
-# 启用日志推送（使用布尔值）
-logpush = true
-
-# ==================== 分析配置 ====================
-# 启用分析（使用布尔值）
-analytics_engine_datasets = []
 
 # 环境变量配置
 [vars]
-# ==================== 基础配置 ====================
-# 运行环境：production(生产)/staging(预发布)/development(开发)
-ENVIRONMENT = "production"
-
 # 调试模式：true(开启详细错误信息)/false(仅显示通用错误)
 DEBUG = "false"
 
@@ -63,6 +52,10 @@ MAX_CACHE_SIZE = "1048576"
 binding = "KV_CACHE"
 id = "21feed084fa648dd932e404935aec39c"
 preview_id = "21feed084fa648dd932e404935aec39c"
+
+# 监控和可观测性配置
+[observability]
+enabled = true                                 # 启用 Cloudflare 的监控和日志功能
 
 # ==================== 注意事项 ====================
 # 1. 确保在 Cloudflare Dashboard 中已创建对应的 KV 命名空间
