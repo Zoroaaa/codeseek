@@ -16,6 +16,9 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          # 强制获取完整历史，确保所有文件同步
+          fetch-depth: 0
       
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
@@ -24,14 +27,39 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'codeseek-backend/package-lock.json'
       
-      - name: Install Dependencies
-        run: npm ci
+      - name: Install and Update Dependencies
+        run: |
+          echo "安装和更新依赖..."
+          # 检查当前状态
+          echo "=== 安装前状态 ==="
+          ls -la package*.json || echo "没有 package 文件"
+          
+          # 如果有 lock 文件，先备份然后删除
+          if [ -f package-lock.json ]; then
+            echo "备份旧的 lock 文件..."
+            cp package-lock.json package-lock.json.backup
+            rm package-lock.json
+          fi
+          
+          # 如果有 node_modules，删除
+          if [ -d node_modules ]; then
+            rm -rf node_modules
+          fi
+          
+          # 全新安装
+          echo "执行全新安装..."
+          npm install
+          
+          # 验证安装
+          echo "=== 安装后验证 ==="
+          npx wrangler --version
+          echo "Wrangler 版本验证完成"
       
-      - name: Update Wrangler to v4
-        run: npm install --save-dev wrangler@4
-      
-      - name: Validate Wrangler Installation
-        run: npx wrangler --version
+      - name: Validate Configuration
+        run: |
+          echo "验证配置文件..."
+          npx wrangler --version
+          npx wrangler whoami
       
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
@@ -40,10 +68,30 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: ./codeseek-backend
           command: deploy
+        env:
+          # 确保使用最新的 Wrangler
+          WRANGLER_VERSION: 4
       
-      - name: Health Check
+      - name: Health Check with Retry
         run: |
           echo "部署完成，执行健康检查..."
-          sleep 15  # 增加等待时间确保部署完成
-          # 使用实际的部署域名
-          curl -f https://backend.codeseek.pp.ua/api/health || exit 1
+          sleep 20
+          
+          # 添加重试机制
+          max_attempts=3
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "健康检查尝试 $attempt/$max_attempts"
+            if curl -f https://codeseek-backend.zadi.workers.dev/api/health; then
+              echo "✅ 健康检查成功"
+              exit 0
+            else
+              echo "❌ 健康检查失败，等待 10 秒后重试..."
+              sleep 10
+              attempt=$((attempt + 1))
+            fi
+          done
+          
+          echo "❌ 所有健康检查尝试都失败"
+          exit 1
