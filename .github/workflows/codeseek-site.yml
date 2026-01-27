@@ -1,0 +1,137 @@
+name: Deploy Codeseek Site to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'codeseek-site/**'
+      - '.github/workflows/codeseek-site.yml'
+
+env:
+  NODE_VERSION: '20'
+  PROJECT_DIR: 'codeseek-site'
+
+jobs:
+  test:
+    name: Test and Validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.PROJECT_DIR }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: '${{ env.PROJECT_DIR }}/package-lock.json'
+
+      - name: Install Dependencies
+        run: |
+          echo "Installing dependencies..."
+          npm ci --audit=false
+
+      - name: Validate Configuration
+        run: |
+          echo "Validating project structure..."
+          ls -la
+          npx wrangler --version
+          
+          # 检查必要的文件是否存在
+          if [ -f src/worker.js ]; then
+            echo "✅ worker.js found"
+          else
+            echo "❌ worker.js not found"
+            exit 1
+          fi
+
+      - name: Syntax Check
+        run: |
+          echo "Checking syntax..."
+          node -c src/worker.js
+          echo "✅ Syntax check passed"
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    
+    defaults:
+      run:
+        working-directory: ${{ env.PROJECT_DIR }}
+
+    environment:
+      name: production
+      url: https://codeseek-site.zadi.workers.dev
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: '${{ env.PROJECT_DIR }}/package-lock.json'
+
+      - name: Install Dependencies
+        run: |
+          echo "Installing production dependencies..."
+          npm ci --only=production --audit=false
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ${{ env.PROJECT_DIR }}
+          command: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Health Check with Retry
+        run: |
+          echo "Performing health check..."
+          MAX_ATTEMPTS=5
+          ATTEMPT=1
+          SUCCESS=false
+          
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Health check attempt $ATTEMPT/$MAX_ATTEMPTS"
+            
+            RESPONSE=$(curl -s -w "%{http_code}" -H "User-Agent: GitHub-Actions-Health-Check" \
+                    https://codeseek-site.zadi.workers.dev/api/health)
+            STATUS_CODE=${RESPONSE: -3}
+            
+            if [ "$STATUS_CODE" -eq 200 ]; then
+              echo "✅ Health check passed (Status: $STATUS_CODE)"
+              SUCCESS=true
+              break
+            else
+              echo "❌ Health check failed (Status: $STATUS_CODE), waiting 10 seconds..."
+              sleep 10
+              ATTEMPT=$((ATTEMPT + 1))
+            fi
+          done
+          
+          if [ "$SUCCESS" = false ]; then
+            echo "❌ All health check attempts failed"
+            exit 1
+          fi
+
+      - name: Verify Deployment
+        run: |
+          echo "🚀 Deployment verification..."
+          echo "Production URL: https://codeseek-site.zadi.workers.dev"
+          echo "Health Check: https://codeseek-site.zadi.workers.dev/api/health"
+          echo "Status API: https://codeseek-site.zadi.workers.dev/api/status"
+          
+          # 测试主要功能
+          curl -s https://codeseek-site.zadi.workers.dev/api/status | jq . || echo "Status API response received"
