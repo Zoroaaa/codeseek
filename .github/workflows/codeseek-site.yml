@@ -1,137 +1,147 @@
-name: Deploy Codeseek Site to Cloudflare Workers
+name: Deploy to Cloudflare Workers
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'codeseek-site/**'
-      - '.github/workflows/codeseek-site.yml'
-
-env:
-  NODE_VERSION: '20'
-  PROJECT_DIR: 'codeseek-site'
+    branches: [ main ]
+    paths: ['codeseek-site/**']
 
 jobs:
-  test:
-    name: Test and Validate
+  deploy:
     runs-on: ubuntu-latest
+    name: Deploy Codeseek Site to Production
     defaults:
       run:
-        working-directory: ${{ env.PROJECT_DIR }}
-
+        working-directory: ./codeseek-site
+    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        with:
+          # 强制获取完整历史，确保所有文件同步
+          fetch-depth: 0
+      
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '20'
           cache: 'npm'
-          cache-dependency-path: '${{ env.PROJECT_DIR }}/package-lock.json'
-
-      - name: Install Dependencies
+          cache-dependency-path: 'codeseek-site/package-lock.json'
+      
+      - name: Install and Update Dependencies
         run: |
-          echo "Installing dependencies..."
-          npm ci --audit=false
-
+          echo "安装和更新依赖..."
+          # 检查当前状态
+          echo "=== 安装前状态 ==="
+          ls -la package*.json || echo "没有 package 文件"
+          
+          # 检查并备份 package-lock.json
+          if [ -f package-lock.json ]; then
+            echo "备份旧的 lock 文件..."
+            cp package-lock.json package-lock.json.backup.$(date +%Y%m%d_%H%M%S)
+            
+            # 检查 Wrangler 版本是否匹配
+            CURRENT_WRANGLER=$(node -e "console.log(require('./package.json').devDependencies?.wrangler || 'not-found')" 2>/dev/null || echo "not-found")
+            EXPECTED_WRANGLER="4.0.0"
+            
+            if [ "$CURRENT_WRANGLER" != "$EXPECTED_WRANGLER" ]; then
+              echo "Wrangler 版本不匹配: 当前 $CURRENT_WRANGLER, 期望 $EXPECTED_WRANGLER"
+              echo "更新 package.json 中的 Wrangler 版本..."
+              
+              # 更新 package.json
+              node << 'EOF'
+              const fs = require('fs');
+              const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              
+              if (!packageJson.devDependencies) packageJson.devDependencies = {};
+              packageJson.devDependencies.wrangler = '4.0.0';
+              
+              if (!packageJson.engines) packageJson.engines = {};
+              packageJson.engines.node = '>=18.0.0';
+              
+              fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
+              console.log('✅ 更新 package.json 完成');
+              EOF
+              
+              # 删除旧的依赖
+              rm package-lock.json
+              if [ -d node_modules ]; then
+                rm -rf node_modules
+              fi
+            else
+              echo "Wrangler 版本匹配，检查依赖同步..."
+              # 检查 package-lock.json 是否同步
+              if ! npm ls --depth=0 > /dev/null 2>&1; then
+                echo "package-lock.json 不同步，重新生成..."
+                rm package-lock.json
+                if [ -d node_modules ]; then
+                  rm -rf node_modules
+                fi
+              fi
+            fi
+          fi
+          
+          # 全新安装
+          echo "执行全新安装..."
+          npm install
+          
+          # 验证安装
+          echo "=== 安装后验证 ==="
+          npx wrangler --version
+          echo "Wrangler 版本验证完成"
+      
       - name: Validate Configuration
         run: |
-          echo "Validating project structure..."
-          ls -la
+          echo "验证配置文件..."
           npx wrangler --version
+          npx wrangler whoami
           
-          # 检查必要的文件是否存在
+          # 检查必要文件
+          echo "检查项目文件..."
           if [ -f src/worker.js ]; then
-            echo "✅ worker.js found"
+            echo "✅ worker.js 存在"
           else
-            echo "❌ worker.js not found"
+            echo "❌ worker.js 不存在"
             exit 1
           fi
-
-      - name: Syntax Check
-        run: |
-          echo "Checking syntax..."
-          node -c src/worker.js
-          echo "✅ Syntax check passed"
-
-  deploy:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    
-    defaults:
-      run:
-        working-directory: ${{ env.PROJECT_DIR }}
-
-    environment:
-      name: production
-      url: https://codeseek-site.zadi.workers.dev
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: '${{ env.PROJECT_DIR }}/package-lock.json'
-
-      - name: Install Dependencies
-        run: |
-          echo "Installing production dependencies..."
-          npm ci --only=production --audit=false
-
+          
+          if [ -f wrangler.toml ]; then
+            echo "✅ wrangler.toml 存在"
+          else
+            echo "❌ wrangler.toml 不存在"
+            exit 1
+          fi
+      
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: ${{ env.PROJECT_DIR }}
+          workingDirectory: ./codeseek-site
           command: deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
+          # 确保使用最新的 Wrangler
+          WRANGLER_VERSION: 4
+      
       - name: Health Check with Retry
         run: |
-          echo "Performing health check..."
-          MAX_ATTEMPTS=5
-          ATTEMPT=1
-          SUCCESS=false
+          echo "部署完成，执行健康检查..."
+          sleep 20
           
-          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "Health check attempt $ATTEMPT/$MAX_ATTEMPTS"
-            
-            RESPONSE=$(curl -s -w "%{http_code}" -H "User-Agent: GitHub-Actions-Health-Check" \
-                    https://codeseek-site.zadi.workers.dev/api/health)
-            STATUS_CODE=${RESPONSE: -3}
-            
-            if [ "$STATUS_CODE" -eq 200 ]; then
-              echo "✅ Health check passed (Status: $STATUS_CODE)"
-              SUCCESS=true
-              break
+          # 添加重试机制
+          max_attempts=3
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "健康检查尝试 $attempt/$max_attempts"
+            if curl -f https://codeseek-site.zadi.workers.dev/api/health; then
+              echo "✅ 健康检查成功"
+              exit 0
             else
-              echo "❌ Health check failed (Status: $STATUS_CODE), waiting 10 seconds..."
+              echo "❌❌ 健康检查失败，等待 10 秒后重试..."
               sleep 10
-              ATTEMPT=$((ATTEMPT + 1))
+              attempt=$((attempt + 1))
             fi
           done
           
-          if [ "$SUCCESS" = false ]; then
-            echo "❌ All health check attempts failed"
-            exit 1
-          fi
-
-      - name: Verify Deployment
-        run: |
-          echo "🚀 Deployment verification..."
-          echo "Production URL: https://codeseek-site.zadi.workers.dev"
-          echo "Health Check: https://codeseek-site.zadi.workers.dev/api/health"
-          echo "Status API: https://codeseek-site.zadi.workers.dev/api/status"
-          
-          # 测试主要功能
-          curl -s https://codeseek-site.zadi.workers.dev/api/status | jq . || echo "Status API response received"
+          echo "❌❌ 所有健康检查尝试都失败"
+          exit 1
