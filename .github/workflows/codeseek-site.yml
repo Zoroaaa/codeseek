@@ -124,7 +124,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: ./codeseek-site
-          command: deploy --env=production  # 明确指定环境
+          command: deploy 
         env:
           WRANGLER_VERSION: 4
       
