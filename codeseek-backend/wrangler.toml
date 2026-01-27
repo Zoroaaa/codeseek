@@ -50,6 +50,3 @@ database_id = "42216a7e-3dbb-4feb-9974-2a8ee32af550"  # 数据库唯一标识符
 [observability]
 enabled = true                                 # 启用 Cloudflare 的监控和日志功能
 
-# 生产环境配置
-[env.production]
-name = "codeseek-backend"                 # 生产环境 Worker 名称
