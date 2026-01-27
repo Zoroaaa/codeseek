@@ -55,7 +55,7 @@ preview_id = "21feed084fa648dd932e404935aec39c"
 
 # 监控和可观测性配置
 [observability]
-enabled = true                                 # 启用 Cloudflare 的监控和日志功能
+enabled = true         # 启用 Cloudflare 的监控和日志功能
 
 # ==================== 注意事项 ====================
 # 1. 确保在 Cloudflare Dashboard 中已创建对应的 KV 命名空间
