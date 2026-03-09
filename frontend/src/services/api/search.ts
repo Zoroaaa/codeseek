@@ -156,11 +156,11 @@ export const userApi = {
         data: {
           history: response.data.history.map(h => ({
             id: h.id,
-            user_id: h.user_id,
+            userId: h.user_id,
             query: h.query,
             source: h.source,
-            results_count: h.results_count,
-            created_at: h.created_at,
+            resultsCount: h.results_count,
+            createdAt: h.created_at,
           }))
         }
       };

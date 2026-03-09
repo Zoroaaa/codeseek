@@ -20,11 +20,38 @@ export const sourceApi = {
     success: boolean; 
     data: MajorCategory[]
   }> => {
-    const response = await apiClient.get<{ success: boolean; data: { categories: MajorCategory[] } }>('/search-sources/major-categories');
-    return {
-      success: response.success,
-      data: response.data?.categories || []
-    };
+    const response = await apiClient.get<{ success: boolean; data: { categories: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      icon: string | null;
+      color: string;
+      requires_keyword: number;
+      display_order: number;
+      is_system: number;
+      is_active: number;
+      created_at: number;
+      updated_at: number;
+    }> } }>('/search-sources/major-categories');
+    
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: response.data.categories.map(c => ({
+          id: c.id,
+          name: c.name,
+          description: c.description || undefined,
+          icon: c.icon || undefined,
+          color: c.color,
+          requiresKeyword: c.requires_keyword === 1,
+          isActive: c.is_active === 1,
+          displayOrder: c.display_order,
+          createdAt: new Date(c.created_at).toISOString(),
+          updatedAt: new Date(c.updated_at).toISOString(),
+        }))
+      };
+    }
+    return { success: false, data: [] };
   },
 
   getMajorCategory: async (id: string): Promise<{ 
@@ -58,11 +85,47 @@ export const sourceApi = {
     data: Category[]
   }> => {
     const params = majorCategoryId ? `?majorCategoryId=${majorCategoryId}` : '';
-    const response = await apiClient.get<{ success: boolean; data: { categories: Category[] } }>(`/search-sources/categories${params}`);
-    return {
-      success: response.success,
-      data: response.data?.categories || []
-    };
+    const response = await apiClient.get<{ success: boolean; data: { categories: Array<{
+      id: string;
+      major_category_id: string;
+      major_category_name: string | null;
+      name: string;
+      description: string | null;
+      icon: string | null;
+      color: string;
+      default_searchable: number;
+      default_site_type: string;
+      search_priority: number;
+      is_system: number;
+      is_active: number;
+      display_order: number;
+      created_by: string | null;
+      created_at: number;
+      updated_at: number;
+    }> } }>(`/search-sources/categories${params}`);
+    
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: response.data.categories.map(c => ({
+          id: c.id,
+          majorCategoryId: c.major_category_id,
+          majorCategoryName: c.major_category_name || undefined,
+          name: c.name,
+          description: c.description || undefined,
+          icon: c.icon || undefined,
+          color: c.color,
+          defaultSearchable: c.default_searchable === 1,
+          defaultSiteType: c.default_site_type as 'search' | 'browse' | 'reference',
+          searchPriority: c.search_priority,
+          isActive: c.is_active === 1,
+          displayOrder: c.display_order,
+          createdAt: new Date(c.created_at).toISOString(),
+          updatedAt: new Date(c.updated_at).toISOString(),
+        }))
+      };
+    }
+    return { success: false, data: [] };
   },
 
   getCategory: async (id: string): Promise<{ 
@@ -157,11 +220,55 @@ export const sourceApi = {
     success: boolean; 
     data: SearchSource[]
   }> => {
-    const response = await apiClient.get<{ success: boolean; data: { sources: SearchSource[] } }>('/search-sources?searchable=true');
-    return {
-      success: response.success,
-      data: response.data?.sources || []
-    };
+    const response = await apiClient.get<{ success: boolean; data: { sources: Array<{
+      id: string;
+      category_id: string;
+      name: string;
+      subtitle: string | null;
+      description: string | null;
+      icon: string | null;
+      url_template: string;
+      homepage_url: string | null;
+      site_type: string;
+      searchable: number;
+      requires_keyword: number;
+      search_priority: number;
+      is_system: number;
+      is_active: number;
+      display_order: number;
+      usage_count: number;
+      last_used_at: number | null;
+      created_by: string | null;
+      created_at: number;
+      updated_at: number;
+    }> } }>('/search-sources?searchable=true');
+    
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: response.data.sources.map(s => ({
+          id: s.id,
+          categoryId: s.category_id,
+          name: s.name,
+          subtitle: s.subtitle || undefined,
+          description: s.description || undefined,
+          icon: s.icon || undefined,
+          urlTemplate: s.url_template,
+          homepageUrl: s.homepage_url || undefined,
+          siteType: s.site_type as 'search' | 'browse' | 'reference',
+          searchable: s.searchable === 1,
+          requiresKeyword: s.requires_keyword === 1,
+          searchPriority: s.search_priority,
+          isActive: s.is_active === 1,
+          usageCount: s.usage_count,
+          displayOrder: s.display_order,
+          createdAt: new Date(s.created_at).toISOString(),
+          updatedAt: new Date(s.updated_at).toISOString(),
+          status: 'active' as const,
+        }))
+      };
+    }
+    return { success: false, data: [] };
   },
 
   getUserSourceConfigs: async (): Promise<{ 

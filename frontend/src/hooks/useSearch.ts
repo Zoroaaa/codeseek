@@ -98,11 +98,11 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
         if (autoSaveHistory && isAuthenticated && searchResults.length > 0) {
           const historyItem: SearchHistoryItem = {
             id: crypto.randomUUID(),
-            user_id: '',
+            userId: '',
             query: query.trim(),
             source: selectedSources.join(','),
-            results_count: pagination.total,
-            created_at: Date.now(),
+            resultsCount: pagination.total,
+            createdAt: Date.now(),
           };
           addToHistory(historyItem);
         }

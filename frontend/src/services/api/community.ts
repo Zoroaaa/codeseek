@@ -566,7 +566,7 @@ export const communityApi = {
           created_at: number;
         }>;
       }
-    }>('/community/user-stats');
+    }>('/community/sources/user-stats');
     
     if (response.success && response.data) {
       return {
@@ -617,7 +617,7 @@ export const communityApi = {
           createdAt: string;
         }>;
       }
-    }>('/community/stats');
+    }>('/community/sources/stats');
     
     if (response.success && response.data) {
       return {

@@ -461,7 +461,7 @@ export const MainSearchPage: React.FC = () => {
                               <Search className="w-4 h-4 text-surface-400" />
                               <span className="text-surface-900 dark:text-surface-100">{item.query}</span>
                             </div>
-                            <span className="text-xs text-surface-500">{formatDate(new Date(item.created_at).toISOString())}</span>
+                            <span className="text-xs text-surface-500">{formatDate(new Date(item.createdAt).toISOString())}</span>
                           </div>
                         ))}
                       </div>

@@ -81,7 +81,7 @@ export const CommunityManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [sortBy, toast]);
+  }, [sortBy]);
 
   useEffect(() => {
     loadData();

@@ -412,7 +412,7 @@ export const HistoryManager: React.FC = () => {
   };
 
   const filterByDate = (item: SearchHistoryItem) => {
-    const itemDate = new Date(item.created_at);
+    const itemDate = new Date(item.createdAt);
     const now = new Date();
     
     switch (dateFilter) {
@@ -453,7 +453,7 @@ export const HistoryManager: React.FC = () => {
   };
 
   const groupedHistory = filteredHistory.reduce((groups, item) => {
-    const date = new Date(item.created_at).toDateString();
+    const date = new Date(item.createdAt).toDateString();
     if (!groups[date]) {
       groups[date] = [];
     }
@@ -571,9 +571,9 @@ export const HistoryManager: React.FC = () => {
                         {item.query}
                       </p>
                       <div className="flex items-center gap-3 text-sm text-surface-500 dark:text-surface-400">
-                        <span>{formatDate(item.created_at)}</span>
-                        {item.results_count !== undefined && (
-                          <span>{item.results_count} 条结果</span>
+                        <span>{formatDate(item.createdAt)}</span>
+                        {item.resultsCount !== undefined && (
+                          <span>{item.resultsCount} 条结果</span>
                         )}
                         {item.source && (
                           <Badge variant="outline">{item.source}</Badge>

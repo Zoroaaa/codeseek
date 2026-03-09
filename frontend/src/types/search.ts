@@ -1,10 +1,10 @@
 export interface SearchHistoryItem {
   id: string;
-  user_id: string;
+  userId: string;
   query: string;
   source: string;
-  results_count: number;
-  created_at: number;
+  resultsCount: number;
+  createdAt: number;
 }
 
 export interface FavoriteItem {
