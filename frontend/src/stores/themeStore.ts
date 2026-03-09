@@ -97,12 +97,15 @@ export const useThemeStore = create<ThemeState>()(
         sidebarCollapsed: state.sidebarCollapsed,
         sidebarWidth: state.sidebarWidth,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          const resolvedTheme = resolveTheme(state.theme);
-          applyTheme(resolvedTheme);
-          state.resolvedTheme = resolvedTheme;
-        }
+      onRehydrateStorage: () => () => {
+        setTimeout(() => {
+          const state = useThemeStore.getState();
+          if (state) {
+            const resolvedTheme = resolveTheme(state.theme);
+            applyTheme(resolvedTheme);
+            useThemeStore.setState({ resolvedTheme });
+          }
+        }, 0);
       },
     }
   )
