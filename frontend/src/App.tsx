@@ -85,8 +85,12 @@ const App: React.FC = () => {
       if (token) {
         try {
           apiClient.setToken(token);
-          const user = await apiClient.get('/auth/me');
-          setUser(user as import('@/types').User);
+          const response = await apiClient.get<{ success: boolean; data: import('@/types').User }>('/auth/me');
+          if (response.success && response.data) {
+            setUser(response.data);
+          } else {
+            logout();
+          }
         } catch {
           logout();
         }

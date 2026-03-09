@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
 
 export const DashboardLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
-  const { resolvedTheme, toggleTheme, sidebarCollapsed, toggleSidebar } = useThemeStore();
+  const { theme, resolvedTheme, toggleTheme, sidebarCollapsed, toggleSidebar } = useThemeStore();
   const location = useLocation();
   const navigate = useNavigate();
 
