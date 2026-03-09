@@ -48,12 +48,16 @@ const AuthRedirect: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 };
 
 const App: React.FC = () => {
-  const { token, setUser, setLoading, logout } = useAuthStore();
+  const { setUser, setLoading, logout } = useAuthStore();
   const { resolvedTheme } = useThemeStore();
 
   useEffect(() => {
-    apiClient.setToken(token);
-  }, [token]);
+    // 订阅 token 变化，同步到 apiClient
+    const unsub = useAuthStore.subscribe((state) => {
+      apiClient.setToken(state.token);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -66,8 +70,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initAuth = async () => {
-      if (token) {
+      // 等待 zustand persist rehydrate 完成
+      const currentToken = useAuthStore.getState().token;
+      if (currentToken) {
         try {
+          apiClient.setToken(currentToken);
           const user = await apiClient.get('/auth/me');
           setUser(user as import('@/types').User);
         } catch {
@@ -78,7 +85,20 @@ const App: React.FC = () => {
       }
     };
 
-    initAuth();
+    // 订阅 store，等待 token rehydrate 后再执行
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      initAuth();
+    });
+
+    // 如果已经 hydrated（比如同步存储），直接执行
+    if (useAuthStore.persist.hasHydrated()) {
+      initAuth();
+      unsub();
+    }
+
+    return () => {
+      unsub();
+    };
   }, []);
 
   return (

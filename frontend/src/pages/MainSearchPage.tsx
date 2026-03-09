@@ -28,6 +28,7 @@ import {
 import { useSearchStore, useSourceStore, useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { searchApi, sourceApi, userApi } from '@/services/api';
 import { Button, Input, Loading } from '@/components/ui';
+import { convertToProxyUrl } from '@/services/proxy/ProxyService';
 import { useToast } from '@/components/ui/Toast';
 import { useNavigate, Link } from 'react-router-dom';
 import type { SearchResult, FavoriteItem, SearchHistoryItem } from '@/types';
@@ -433,7 +434,7 @@ export const MainSearchPage: React.FC = () => {
                       </button>
                       {result.url && (
                         <button
-                          onClick={() => window.open(result.url, '_blank')}
+                          onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(result.url) : result.url, '_blank')}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 transition-all shadow-sm shadow-primary-500/25"
                         >
                           <span className="hidden sm:inline">前往</span>
@@ -532,7 +533,7 @@ export const MainSearchPage: React.FC = () => {
                             {item.subtitle && <p className="text-xs text-surface-400 truncate mt-0.5">{item.subtitle}</p>}
                           </div>
                           <div className="flex items-center gap-1 ml-3 shrink-0">
-                            <button onClick={() => window.open(item.url, '_blank')} className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
+                            <button onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')} className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
                               <ExternalLink className="w-3.5 h-3.5" />
                             </button>
                             <button onClick={() => handleRemoveFavorite(item.id)} className="p-1.5 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors">
@@ -596,7 +597,7 @@ export const MainSearchPage: React.FC = () => {
                                   </div>
                                   <span className="text-xs font-medium text-surface-700 dark:text-surface-300 truncate">{source.name}</span>
                                 </div>
-                                <button onClick={() => window.open(source.urlTemplate.replace('{keyword}', ''), '_blank')} className="p-1 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-white dark:hover:bg-surface-700 transition-colors shrink-0 ml-1">
+                                <button onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(source.urlTemplate.replace('{keyword}', '')) : source.urlTemplate.replace('{keyword}', ''), '_blank')} className="p-1 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-white dark:hover:bg-surface-700 transition-colors shrink-0 ml-1">
                                   <ExternalLink className="w-3 h-3" />
                                 </button>
                               </div>

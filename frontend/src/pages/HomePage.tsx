@@ -276,21 +276,6 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      <footer className="py-8 px-4 sm:px-6 lg:px-8 border-t border-surface-200 dark:border-surface-800 bg-white/50 dark:bg-surface-900/50 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
-              <Search className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-surface-700 dark:text-surface-300">
-              磁力快搜
-            </span>
-          </div>
-          <p className="text-sm text-surface-500 dark:text-surface-400">
-            © {new Date().getFullYear()} 磁力快搜. 保留所有权利.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 };

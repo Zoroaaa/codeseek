@@ -101,8 +101,11 @@ export const useThemeStore = create<ThemeState>()(
         if (state) {
           const resolvedTheme = resolveTheme(state.theme);
           applyTheme(resolvedTheme);
-          // 同步更新 resolvedTheme，避免第一次点击无响应
           state.resolvedTheme = resolvedTheme;
+          // 延迟同步到store，确保zustand内部状态与resolvedTheme一致
+          setTimeout(() => {
+            useThemeStore.setState({ resolvedTheme });
+          }, 0);
         }
       },
     }

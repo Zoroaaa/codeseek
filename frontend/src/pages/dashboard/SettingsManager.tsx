@@ -182,9 +182,22 @@ export const SettingsManager: React.FC = () => {
       });
       
       if (response.success && response.data) {
-        setEmailChangeRequestId(response.data.requestId);
+        const requestId = response.data.requestId;
+        setEmailChangeRequestId(requestId);
         setEmailChangeMaskedEmail(response.data.maskedEmail);
-        setEmailChangeCountdown(response.data.expiresIn || 300);
+
+        // 创建请求后立即发送验证码到新邮箱
+        const sendResponse = await authApi.sendEmailChangeCode({
+          requestId,
+          emailType: 'new',
+        });
+
+        if (sendResponse.success && sendResponse.data) {
+          setEmailChangeCountdown(sendResponse.data.expiresIn || 300);
+        } else {
+          setEmailChangeCountdown(response.data.expiresIn || 300);
+        }
+
         setEmailChangeStep('verify');
         toast.success('验证码已发送到新邮箱');
       }
