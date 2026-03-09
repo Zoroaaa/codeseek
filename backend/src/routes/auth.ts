@@ -356,11 +356,14 @@ authRoutes.post('/forgot-password', async (c) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
+    
+    const emailHash = await hashPassword(email);
+    const codeHash = await hashPassword(code);
 
     await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, user_id, email, verification_code, verification_type, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(verificationId, user.id, user.email, code, 'password_reset', expiresAt, Date.now()).run();
+      INSERT INTO email_verifications (id, user_id, email, email_hash, verification_code, code_hash, verification_type, status, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+    `).bind(verificationId, user.id, user.email, emailHash, code, codeHash, 'password_reset', expiresAt, Date.now()).run();
 
     if (c.env.RESEND_API_KEY) {
       try {
@@ -639,11 +642,14 @@ authRoutes.post('/send-registration-code', async (c) => {
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
     const expiresIn = 900;
+    
+    const emailHash = await hashPassword(email);
+    const codeHash = await hashPassword(code);
 
     await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, email, verification_code, verification_type, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(verificationId, email, code, 'registration', expiresAt, Date.now()).run();
+      INSERT INTO email_verifications (id, email, email_hash, verification_code, code_hash, verification_type, status, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+    `).bind(verificationId, email, emailHash, code, codeHash, 'registration', expiresAt, Date.now()).run();
 
     if (c.env.RESEND_API_KEY) {
       try {
@@ -707,11 +713,14 @@ authRoutes.post('/send-password-reset-code', async (c) => {
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
     const expiresIn = 900;
+    
+    const emailHash = await hashPassword(user.email);
+    const codeHash = await hashPassword(code);
 
     await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, user_id, email, verification_code, verification_type, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(verificationId, user.id, user.email, code, 'password_reset', expiresAt, Date.now()).run();
+      INSERT INTO email_verifications (id, user_id, email, email_hash, verification_code, code_hash, verification_type, status, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+    `).bind(verificationId, user.id, user.email, emailHash, code, codeHash, 'password_reset', expiresAt, Date.now()).run();
 
     if (c.env.RESEND_API_KEY) {
       try {
@@ -867,11 +876,14 @@ authRoutes.post('/send-email-change-code', async (c) => {
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
     const expiresIn = 900;
+    
+    const emailHash = await hashPassword(targetEmail);
+    const codeHash = await hashPassword(code);
 
     await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, user_id, email, verification_code, verification_type, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(verificationId, payload.userId, targetEmail, code, verificationType, expiresAt, Date.now()).run();
+      INSERT INTO email_verifications (id, user_id, email, email_hash, verification_code, code_hash, verification_type, status, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+    `).bind(verificationId, payload.userId, targetEmail, emailHash, code, codeHash, verificationType, expiresAt, Date.now()).run();
 
     if (c.env.RESEND_API_KEY) {
       try {
