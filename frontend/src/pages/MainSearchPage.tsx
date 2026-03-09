@@ -46,7 +46,7 @@ export const MainSearchPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { user, isAuthenticated, logout } = useAuthStore();
-  const { theme, toggleTheme } = useThemeStore();
+  const { resolvedTheme, toggleTheme } = useThemeStore();
   const { keyword, setKeyword, setResults, isSearching, setSearching } = useSearchStore();
   const { majorCategories, setMajorCategories, sources, setSources, categories, setCategories } = useSourceStore();
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy, initializeProxy } = useProxyStore();
@@ -247,10 +247,6 @@ export const MainSearchPage: React.FC = () => {
     });
   };
 
-  const handleNavigateToDashboard = () => {
-    navigate('/dashboard');
-  };
-
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -312,17 +308,8 @@ export const MainSearchPage: React.FC = () => {
                 onClick={toggleTheme}
                 className="p-2 rounded-lg text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-200 dark:hover:bg-surface-800 transition-colors"
               >
-                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleNavigateToDashboard}
-                leftIcon={<LayoutDashboard className="w-4 h-4" />}
-                className="hidden sm:flex"
-              >
-                控制台
-              </Button>
               <Button
                 variant="ghost"
                 size="sm"

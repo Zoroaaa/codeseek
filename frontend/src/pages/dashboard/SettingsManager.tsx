@@ -12,6 +12,7 @@ import {
   Send, 
   AlertTriangle,
   Trash2,
+  Settings,
 } from 'lucide-react';
 import { Card, Button, Input, Tabs, Modal } from '@/components/ui';
 import { useAuthStore, useThemeStore } from '@/stores';
@@ -321,7 +322,7 @@ export const SettingsManager: React.FC = () => {
     >
       {emailChangeStep === 'request' ? (
         <div className="space-y-4">
-          <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
+          <div className="p-4 bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800 rounded-xl">
             <p className="text-sm text-surface-600 dark:text-surface-400">当前邮箱</p>
             <p className="font-medium text-surface-900 dark:text-surface-100">
               {maskEmail(user?.email || '')}
@@ -370,8 +371,8 @@ export const SettingsManager: React.FC = () => {
       ) : (
         <div className="space-y-4">
           <div className="text-center mb-4">
-            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-              <Mail className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+            <div className="w-14 h-14 mx-auto mb-3 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg">
+              <Mail className="w-6 h-6 text-white" />
             </div>
             <p className="text-sm text-surface-600 dark:text-surface-400">
               验证码已发送到 <span className="font-medium">{emailChangeMaskedEmail}</span>
@@ -447,9 +448,11 @@ export const SettingsManager: React.FC = () => {
     >
       {deleteAccountStep === 'confirm' ? (
         <div className="space-y-4">
-          <div className="p-4 bg-error-50 dark:bg-error-900/20 rounded-lg border border-error-200 dark:border-error-800">
+          <div className="p-4 bg-gradient-to-r from-error-50 to-error-100/50 dark:from-error-900/20 dark:to-error-800/20 rounded-xl border border-error-200 dark:border-error-800">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-6 h-6 text-error-500 flex-shrink-0 mt-0.5" />
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-error-500 to-error-600 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-white" />
+              </div>
               <div>
                 <h4 className="font-semibold text-error-700 dark:text-error-400 mb-1">
                   警告：此操作无法撤销
@@ -488,15 +491,15 @@ export const SettingsManager: React.FC = () => {
       ) : (
         <div className="space-y-4">
           <div className="text-center mb-4">
-            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-error-100 dark:bg-error-900/30 flex items-center justify-center">
-              <AlertTriangle className="w-6 h-6 text-error-600 dark:text-error-400" />
+            <div className="w-14 h-14 mx-auto mb-3 rounded-xl bg-gradient-to-br from-error-500 to-error-600 flex items-center justify-center shadow-lg">
+              <AlertTriangle className="w-6 h-6 text-white" />
             </div>
             <p className="text-sm text-surface-600 dark:text-surface-400">
               验证码已发送到 <span className="font-medium">{deleteMaskedEmail}</span>
             </p>
           </div>
 
-          <div className="p-3 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
+          <div className="p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
             <p className="text-sm text-surface-600 dark:text-surface-400 mb-2">
               请输入以下文字确认删除：
             </p>
@@ -567,13 +570,18 @@ export const SettingsManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
-          系统设置
-        </h2>
-        <p className="text-surface-500 dark:text-surface-400 mt-1">
-          管理您的账户和偏好设置
-        </p>
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/25">
+          <Settings className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+            系统设置
+          </h2>
+          <p className="text-surface-500 dark:text-surface-400">
+            管理您的账户和偏好设置
+          </p>
+        </div>
       </div>
 
       <Tabs
@@ -588,8 +596,11 @@ export const SettingsManager: React.FC = () => {
       />
 
       {activeTab === 'profile' && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">
+        <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
+          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+              <User className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+            </div>
             个人资料
           </h3>
           <form onSubmit={handleUpdateProfile} className="space-y-4 max-w-md">
@@ -604,7 +615,7 @@ export const SettingsManager: React.FC = () => {
                 邮箱
               </label>
               <div className="flex items-center gap-3">
-                <div className="flex-1 p-3 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
+                <div className="flex-1 p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
                   <span className="text-surface-900 dark:text-surface-100">
                     {maskEmail(user?.email || '')}
                   </span>
@@ -627,8 +638,11 @@ export const SettingsManager: React.FC = () => {
 
       {activeTab === 'security' && (
         <div className="space-y-6">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">
+          <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
+            <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
+                <Lock className="w-4 h-4 text-success-600 dark:text-success-400" />
+              </div>
               修改密码
             </h3>
             <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
@@ -671,8 +685,11 @@ export const SettingsManager: React.FC = () => {
             </form>
           </Card>
 
-          <Card className="p-6 border-error-200 dark:border-error-800">
-            <h3 className="text-lg font-semibold text-error-600 dark:text-error-400 mb-4">
+          <Card className="p-6 border-error-200 dark:border-error-800 shadow-lg bg-gradient-to-r from-error-50/50 to-error-100/30 dark:from-error-900/10 dark:to-error-800/10">
+            <h3 className="text-lg font-semibold text-error-600 dark:text-error-400 mb-4 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-error-100 dark:bg-error-900/30 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4 text-error-600 dark:text-error-400" />
+              </div>
               危险操作
             </h3>
             <p className="text-sm text-surface-600 dark:text-surface-400 mb-4">
@@ -690,13 +707,16 @@ export const SettingsManager: React.FC = () => {
       )}
 
       {activeTab === 'appearance' && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">
+        <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
+          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+              <Palette className="w-4 h-4 text-accent-600 dark:text-accent-400" />
+            </div>
             外观设置
           </h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">
                 主题模式
               </label>
               <div className="flex gap-3">
@@ -708,14 +728,14 @@ export const SettingsManager: React.FC = () => {
                   <button
                     key={option.value}
                     onClick={() => setTheme(option.value as 'light' | 'dark' | 'system')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                    className={`flex items-center gap-2 px-5 py-3 rounded-xl border-2 transition-all duration-200 ${
                       theme === option.value
-                        ? 'border-primary-500 bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
-                        : 'border-surface-300 dark:border-surface-600 hover:border-primary-300'
+                        ? 'border-primary-500 bg-gradient-to-r from-primary-50 to-accent-50 text-primary-600 dark:from-primary-900/20 dark:to-accent-900/20 dark:text-primary-400 shadow-md'
+                        : 'border-surface-200 dark:border-surface-700 hover:border-primary-300 dark:hover:border-primary-600'
                     }`}
                   >
-                    <span>{option.icon}</span>
-                    <span>{option.label}</span>
+                    <span className="text-xl">{option.icon}</span>
+                    <span className="font-medium">{option.label}</span>
                   </button>
                 ))}
               </div>
@@ -725,12 +745,15 @@ export const SettingsManager: React.FC = () => {
       )}
 
       {activeTab === 'notifications' && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">
+        <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
+          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-warning-100 dark:bg-warning-900/30 flex items-center justify-center">
+              <Bell className="w-4 h-4 text-warning-600 dark:text-warning-400" />
+            </div>
             通知设置
           </h3>
           <div className="space-y-4">
-            <label className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
+            <label className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
               <div>
                 <p className="font-medium text-surface-900 dark:text-surface-100">
                   邮件通知
@@ -746,7 +769,7 @@ export const SettingsManager: React.FC = () => {
                 className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
               />
             </label>
-            <label className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
+            <label className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
               <div>
                 <p className="font-medium text-surface-900 dark:text-surface-100">
                   浏览器通知

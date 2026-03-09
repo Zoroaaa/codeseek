@@ -195,14 +195,19 @@ export const CommunityManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
-            社区分享
-          </h2>
-          <p className="text-surface-500 dark:text-surface-400 mt-1">
-            发现和分享优质搜索源
-          </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-success-500 to-accent-500 flex items-center justify-center shadow-lg shadow-success-500/25">
+            <Globe className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+              社区分享
+            </h2>
+            <p className="text-surface-500 dark:text-surface-400">
+              发现和分享优质搜索源
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -224,10 +229,10 @@ export const CommunityManager: React.FC = () => {
 
       {communityStats && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <Card className="p-4">
+          <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                <Globe className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-md">
+                <Globe className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">分享总数</p>
@@ -237,10 +242,10 @@ export const CommunityManager: React.FC = () => {
               </div>
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
-                <Download className="w-5 h-5 text-success-600 dark:text-success-400" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-success-400 to-success-600 flex items-center justify-center shadow-md">
+                <Download className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">总下载</p>
@@ -250,10 +255,10 @@ export const CommunityManager: React.FC = () => {
               </div>
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
-                <User className="w-5 h-5 text-accent-600 dark:text-accent-400" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center shadow-md">
+                <User className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">参与用户</p>
@@ -263,10 +268,10 @@ export const CommunityManager: React.FC = () => {
               </div>
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/30 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-warning-600 dark:text-warning-400" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-warning-400 to-warning-600 flex items-center justify-center shadow-md">
+                <MessageSquare className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">评价数</p>
@@ -276,10 +281,10 @@ export const CommunityManager: React.FC = () => {
               </div>
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-error-100 dark:bg-error-900/30 flex items-center justify-center">
-                <Star className="w-5 h-5 text-error-600 dark:text-error-400" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-error-400 to-error-600 flex items-center justify-center shadow-md">
+                <Star className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">平均评分</p>
@@ -302,7 +307,7 @@ export const CommunityManager: React.FC = () => {
         onChange={setActiveTab}
       />
 
-      <Card className="p-4">
+      <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Input
@@ -317,7 +322,7 @@ export const CommunityManager: React.FC = () => {
             <select
               value={selectedTag}
               onChange={(e) => setSelectedTag(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100"
+              className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">所有标签</option>
               {tags.map(tag => (
@@ -327,7 +332,7 @@ export const CommunityManager: React.FC = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'popular' | 'recent' | 'rating')}
-              className="px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100"
+              className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
             >
               <option value="popular">最受欢迎</option>
               <option value="recent">最新发布</option>
@@ -338,16 +343,16 @@ export const CommunityManager: React.FC = () => {
       </Card>
 
       {filteredSources.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredSources.map(source => (
-            <Card key={source.id} className="p-4 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-3">
+            <Card key={source.id} className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   {source.sourceIcon ? (
-                    <img src={source.sourceIcon} alt="" className="w-10 h-10 rounded" />
+                    <img src={source.sourceIcon} alt="" className="w-12 h-12 rounded-xl shadow-sm" />
                   ) : (
-                    <div className="w-10 h-10 rounded bg-surface-200 dark:bg-surface-700 flex items-center justify-center">
-                      <Globe className="w-5 h-5 text-surface-500" />
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-surface-200 to-surface-300 dark:from-surface-700 dark:to-surface-600 flex items-center justify-center">
+                      <Globe className="w-6 h-6 text-surface-500" />
                     </div>
                   )}
                   <div>
@@ -374,11 +379,11 @@ export const CommunityManager: React.FC = () => {
                 />
               </div>
               
-              <p className="text-sm text-surface-600 dark:text-surface-400 mb-3 line-clamp-2">
+              <p className="text-sm text-surface-600 dark:text-surface-400 mb-4 line-clamp-2">
                 {source.description || '暂无描述'}
               </p>
               
-              <div className="flex flex-wrap gap-1 mb-3">
+              <div className="flex flex-wrap gap-1 mb-4">
                 {source.tags.slice(0, 3).map(tagId => {
                   const tag = tags.find(t => t.id === tagId);
                   return tag ? (
@@ -394,7 +399,7 @@ export const CommunityManager: React.FC = () => {
                 )}
               </div>
               
-              <div className="flex items-center justify-between text-sm text-surface-500 dark:text-surface-400 mb-3">
+              <div className="flex items-center justify-between text-sm text-surface-500 dark:text-surface-400 mb-4">
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
                     <Heart className="w-4 h-4" />
@@ -412,7 +417,7 @@ export const CommunityManager: React.FC = () => {
                 {renderStars(Math.round(source.ratingScore))}
               </div>
               
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between pt-4 border-t border-surface-200 dark:border-surface-700">
                 <span className="text-xs text-surface-400">
                   by {source.authorName}
                 </span>
@@ -421,6 +426,7 @@ export const CommunityManager: React.FC = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleLikeSource(source.id)}
+                    className="hover:bg-error-50 dark:hover:bg-error-900/20"
                   >
                     <Heart className="w-4 h-4" />
                   </Button>
@@ -428,8 +434,8 @@ export const CommunityManager: React.FC = () => {
                     variant="primary"
                     size="sm"
                     onClick={() => handleDownloadSource(source.id)}
+                    leftIcon={<Download className="w-4 h-4" />}
                   >
-                    <Download className="w-4 h-4 mr-1" />
                     导入
                   </Button>
                 </div>
@@ -526,10 +532,10 @@ export const CommunityManager: React.FC = () => {
                       : [...(shareForm.tags || []), tag.id];
                     setShareForm({ ...shareForm, tags: newTags });
                   }}
-                  className={`px-3 py-1 rounded-full text-sm ${
+                  className={`px-4 py-1.5 rounded-full text-sm transition-all ${
                     shareForm.tags?.includes(tag.id)
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400'
+                      ? 'bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-md'
+                      : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-700'
                   }`}
                 >
                   {tag.name}
@@ -576,10 +582,10 @@ export const CommunityManager: React.FC = () => {
           
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {tags.map(tag => (
-              <div key={tag.id} className="flex items-center justify-between p-3 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
-                <div className="flex items-center gap-2">
+              <div key={tag.id} className="flex items-center justify-between p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+                <div className="flex items-center gap-3">
                   <div 
-                    className="w-4 h-4 rounded"
+                    className="w-5 h-5 rounded-lg shadow-sm"
                     style={{ backgroundColor: tag.color }}
                   />
                   <span className="text-surface-900 dark:text-surface-100">{tag.name}</span>
@@ -597,7 +603,7 @@ export const CommunityManager: React.FC = () => {
                       toast.error('删除失败');
                     }
                   }}
-                  className="text-error-500"
+                  className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -614,12 +620,12 @@ export const CommunityManager: React.FC = () => {
         size="lg"
       >
         {sourceDetailModal.source && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-start gap-4">
               {sourceDetailModal.source.sourceIcon ? (
-                <img src={sourceDetailModal.source.sourceIcon} alt="" className="w-16 h-16 rounded" />
+                <img src={sourceDetailModal.source.sourceIcon} alt="" className="w-16 h-16 rounded-xl shadow-md" />
               ) : (
-                <div className="w-16 h-16 rounded bg-surface-200 dark:bg-surface-700 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-surface-200 to-surface-300 dark:from-surface-700 dark:to-surface-600 flex items-center justify-center">
                   <Globe className="w-8 h-8 text-surface-500" />
                 </div>
               )}
@@ -641,36 +647,36 @@ export const CommunityManager: React.FC = () => {
               </div>
             </div>
             
-            <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
+            <div className="p-4 bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800 rounded-xl">
               <p className="text-surface-700 dark:text-surface-300">
                 {sourceDetailModal.source.description || '暂无描述'}
               </p>
             </div>
             
             <div className="grid grid-cols-4 gap-4">
-              <div className="text-center p-3 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
-                <Eye className="w-5 h-5 mx-auto text-surface-400 mb-1" />
+              <div className="text-center p-4 bg-gradient-to-br from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800 rounded-xl">
+                <Eye className="w-6 h-6 mx-auto text-primary-500 mb-2" />
                 <p className="text-lg font-bold text-surface-900 dark:text-surface-100">
                   {sourceDetailModal.source.viewCount}
                 </p>
                 <p className="text-xs text-surface-500">浏览</p>
               </div>
-              <div className="text-center p-3 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
-                <Download className="w-5 h-5 mx-auto text-surface-400 mb-1" />
+              <div className="text-center p-4 bg-gradient-to-br from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800 rounded-xl">
+                <Download className="w-6 h-6 mx-auto text-success-500 mb-2" />
                 <p className="text-lg font-bold text-surface-900 dark:text-surface-100">
                   {sourceDetailModal.source.downloadCount}
                 </p>
                 <p className="text-xs text-surface-500">下载</p>
               </div>
-              <div className="text-center p-3 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
-                <Heart className="w-5 h-5 mx-auto text-surface-400 mb-1" />
+              <div className="text-center p-4 bg-gradient-to-br from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800 rounded-xl">
+                <Heart className="w-6 h-6 mx-auto text-error-500 mb-2" />
                 <p className="text-lg font-bold text-surface-900 dark:text-surface-100">
                   {sourceDetailModal.source.likeCount}
                 </p>
                 <p className="text-xs text-surface-500">点赞</p>
               </div>
-              <div className="text-center p-3 bg-surface-50 dark:bg-surface-800/50 rounded-lg">
-                <User className="w-5 h-5 mx-auto text-surface-400 mb-1" />
+              <div className="text-center p-4 bg-gradient-to-br from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800 rounded-xl">
+                <User className="w-6 h-6 mx-auto text-accent-500 mb-2" />
                 <p className="text-sm font-bold text-surface-900 dark:text-surface-100">
                   {sourceDetailModal.source.authorName}
                 </p>
@@ -702,8 +708,8 @@ export const CommunityManager: React.FC = () => {
                   handleDownloadSource(sourceDetailModal.source!.id);
                   setSourceDetailModal({ isOpen: false, source: null });
                 }}
+                leftIcon={<Download className="w-4 h-4" />}
               >
-                <Download className="w-4 h-4 mr-2" />
                 导入到我的列表
               </Button>
             </div>

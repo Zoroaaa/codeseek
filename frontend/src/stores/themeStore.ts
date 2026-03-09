@@ -97,6 +97,13 @@ export const useThemeStore = create<ThemeState>()(
         sidebarCollapsed: state.sidebarCollapsed,
         sidebarWidth: state.sidebarWidth,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const resolvedTheme = resolveTheme(state.theme);
+          applyTheme(resolvedTheme);
+          state.resolvedTheme = resolvedTheme;
+        }
+      },
     }
   )
 );

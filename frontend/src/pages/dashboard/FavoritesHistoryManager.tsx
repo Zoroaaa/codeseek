@@ -10,6 +10,7 @@ import {
   SortAsc,
   SortDesc,
   MoreVertical,
+  Calendar,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, EmptyState, Dropdown } from '@/components/ui';
 import { userApi } from '@/services/api';
@@ -155,14 +156,19 @@ export const FavoritesManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
-            我的收藏
-          </h2>
-          <p className="text-surface-500 dark:text-surface-400 mt-1">
-            共 {favorites.length} 个收藏
-          </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-error-500 to-pink-500 flex items-center justify-center shadow-lg shadow-error-500/25">
+            <Heart className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+              我的收藏
+            </h2>
+            <p className="text-surface-500 dark:text-surface-400">
+              共 {favorites.length} 个收藏
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -183,7 +189,7 @@ export const FavoritesManager: React.FC = () => {
         </div>
       </div>
 
-      <Card className="p-4">
+      <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Input
@@ -198,7 +204,7 @@ export const FavoritesManager: React.FC = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'date' | 'title')}
-              className="px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100"
+              className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
             >
               <option value="date">按日期排序</option>
               <option value="title">按标题排序</option>
@@ -214,9 +220,9 @@ export const FavoritesManager: React.FC = () => {
       </Card>
 
       {selectedItems.size > 0 && (
-        <Card className="p-4 bg-error-50 dark:bg-error-900/20 border-error-200 dark:border-error-800">
+        <Card className="p-4 bg-gradient-to-r from-error-50 to-error-100/50 dark:from-error-900/20 dark:to-error-800/20 border-error-200 dark:border-error-800 shadow-lg">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-error-700 dark:text-error-300">
+            <span className="text-sm font-medium text-error-700 dark:text-error-300">
               已选择 {selectedItems.size} 个收藏
             </span>
             <div className="flex gap-2">
@@ -224,6 +230,7 @@ export const FavoritesManager: React.FC = () => {
                 variant="danger"
                 size="sm"
                 onClick={handleBatchRemove}
+                leftIcon={<Trash2 className="w-4 h-4" />}
               >
                 批量删除
               </Button>
@@ -242,7 +249,7 @@ export const FavoritesManager: React.FC = () => {
       {filteredFavorites.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredFavorites.map(favorite => (
-            <Card key={favorite.id} className="p-4 hover:shadow-lg transition-shadow">
+            <Card key={favorite.id} className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
               <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
@@ -255,13 +262,14 @@ export const FavoritesManager: React.FC = () => {
                     {favorite.title}
                   </h3>
                   {favorite.subtitle && (
-                    <p className="text-sm text-surface-500 dark:text-surface-400 truncate">
+                    <p className="text-sm text-surface-500 dark:text-surface-400 truncate mt-1">
                       {favorite.subtitle}
                     </p>
                   )}
-                  <p className="text-xs text-surface-400 mt-1">
+                  <div className="flex items-center gap-2 mt-3 text-xs text-surface-400">
+                    <Calendar className="w-3 h-3" />
                     {formatDate(favorite.createdAt)}
-                  </p>
+                  </div>
                 </div>
                 <Dropdown
                   trigger={
@@ -471,14 +479,19 @@ export const HistoryManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
-            搜索历史
-          </h2>
-          <p className="text-surface-500 dark:text-surface-400 mt-1">
-            共 {history.length} 条记录
-          </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/25">
+            <Clock className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+              搜索历史
+            </h2>
+            <p className="text-surface-500 dark:text-surface-400">
+              共 {history.length} 条记录
+            </p>
+          </div>
         </div>
         <Button
           variant="danger"
@@ -490,7 +503,7 @@ export const HistoryManager: React.FC = () => {
         </Button>
       </div>
 
-      <Card className="p-4">
+      <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Input
@@ -505,7 +518,7 @@ export const HistoryManager: React.FC = () => {
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value as 'all' | 'today' | 'week' | 'month')}
-              className="px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100"
+              className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">全部时间</option>
               <option value="today">今天</option>
@@ -517,9 +530,9 @@ export const HistoryManager: React.FC = () => {
       </Card>
 
       {selectedItems.size > 0 && (
-        <Card className="p-4 bg-error-50 dark:bg-error-900/20 border-error-200 dark:border-error-800">
+        <Card className="p-4 bg-gradient-to-r from-error-50 to-error-100/50 dark:from-error-900/20 dark:to-error-800/20 border-error-200 dark:border-error-800 shadow-lg">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-error-700 dark:text-error-300">
+            <span className="text-sm font-medium text-error-700 dark:text-error-300">
               已选择 {selectedItems.size} 条记录
             </span>
             <div className="flex gap-2">
@@ -527,6 +540,7 @@ export const HistoryManager: React.FC = () => {
                 variant="danger"
                 size="sm"
                 onClick={handleBatchDelete}
+                leftIcon={<Trash2 className="w-4 h-4" />}
               >
                 批量删除
               </Button>
@@ -546,7 +560,8 @@ export const HistoryManager: React.FC = () => {
         <div className="space-y-6">
           {Object.entries(groupedHistory).map(([date, items]) => (
             <div key={date}>
-              <h3 className="text-sm font-medium text-surface-500 dark:text-surface-400 mb-3">
+              <h3 className="text-sm font-medium text-surface-500 dark:text-surface-400 mb-3 flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
                 {new Date(date).toLocaleDateString('zh-CN', { 
                   weekday: 'long', 
                   year: 'numeric', 
@@ -554,11 +569,11 @@ export const HistoryManager: React.FC = () => {
                   day: 'numeric' 
                 })}
               </h3>
-              <Card className="divide-y divide-surface-200 dark:divide-surface-700">
+              <Card className="divide-y divide-surface-200 dark:divide-surface-700 border-surface-200/50 dark:border-surface-700/50 shadow-lg overflow-hidden">
                 {items.map(item => (
                   <div 
                     key={item.id}
-                    className="flex items-center gap-4 p-4 hover:bg-surface-50 dark:hover:bg-surface-800/50"
+                    className="flex items-center gap-4 p-4 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
                   >
                     <input
                       type="checkbox"
@@ -570,10 +585,12 @@ export const HistoryManager: React.FC = () => {
                       <p className="font-medium text-surface-900 dark:text-surface-100">
                         {item.query}
                       </p>
-                      <div className="flex items-center gap-3 text-sm text-surface-500 dark:text-surface-400">
+                      <div className="flex items-center gap-3 text-sm text-surface-500 dark:text-surface-400 mt-1">
                         <span>{formatDate(item.createdAt)}</span>
                         {item.resultsCount !== undefined && (
-                          <span>{item.resultsCount} 条结果</span>
+                          <span className="px-2 py-0.5 bg-surface-100 dark:bg-surface-800 rounded">
+                            {item.resultsCount} 条结果
+                          </span>
                         )}
                         {item.source && (
                           <Badge variant="outline">{item.source}</Badge>
@@ -584,7 +601,7 @@ export const HistoryManager: React.FC = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteItem(item.id)}
-                      className="text-error-500 hover:text-error-600"
+                      className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

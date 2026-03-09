@@ -12,6 +12,7 @@ import {
   Globe,
   Tag,
   ChevronDown,
+  Filter,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, Dropdown, EmptyState } from '@/components/ui';
 import { sourceApi } from '@/services/api';
@@ -310,14 +311,19 @@ export const SourceManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
-            搜索源管理
-          </h2>
-          <p className="text-surface-500 dark:text-surface-400 mt-1">
-            管理和配置您的搜索源
-          </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/25">
+            <Database className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+              搜索源管理
+            </h2>
+            <p className="text-surface-500 dark:text-surface-400">
+              管理和配置您的搜索源
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Dropdown
@@ -345,53 +351,53 @@ export const SourceManager: React.FC = () => {
 
       {stats && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                <Database className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+          <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-md">
+                <Database className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">总搜索源</p>
-                <p className="text-xl font-bold text-surface-900 dark:text-surface-100">
+                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
                   {stats.totalSources}
                 </p>
               </div>
             </div>
           </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-success-600 dark:text-success-400" />
+          <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-success-400 to-success-600 flex items-center justify-center shadow-md">
+                <CheckCircle className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">可搜索</p>
-                <p className="text-xl font-bold text-surface-900 dark:text-surface-100">
+                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
                   {stats.searchableSources}
                 </p>
               </div>
             </div>
           </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
-                <Tag className="w-5 h-5 text-accent-600 dark:text-accent-400" />
+          <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center shadow-md">
+                <Tag className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">分类数</p>
-                <p className="text-xl font-bold text-surface-900 dark:text-surface-100">
+                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
                   {stats.totalCategories}
                 </p>
               </div>
             </div>
           </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-warning-100 dark:bg-warning-900/30 flex items-center justify-center">
-                <Globe className="w-5 h-5 text-warning-600 dark:text-warning-400" />
+          <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-warning-400 to-warning-600 flex items-center justify-center shadow-md">
+                <Globe className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">大类数</p>
-                <p className="text-xl font-bold text-surface-900 dark:text-surface-100">
+                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
                   {stats.totalMajorCategories}
                 </p>
               </div>
@@ -400,8 +406,8 @@ export const SourceManager: React.FC = () => {
         </div>
       )}
 
-      <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
+        <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <Input
               placeholder="搜索搜索源..."
@@ -411,24 +417,27 @@ export const SourceManager: React.FC = () => {
               fullWidth
             />
           </div>
-          <div className="flex gap-3">
-            <select
-              value={selectedMajorCategory}
-              onChange={(e) => {
-                setSelectedMajorCategory(e.target.value);
-                setSelectedCategory('all');
-              }}
-              className="px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100"
-            >
-              <option value="all">所有大类</option>
-              {majorCategories.map(mc => (
-                <option key={mc.id} value={mc.id}>{mc.name}</option>
-              ))}
-            </select>
+          <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-surface-400" />
+              <select
+                value={selectedMajorCategory}
+                onChange={(e) => {
+                  setSelectedMajorCategory(e.target.value);
+                  setSelectedCategory('all');
+                }}
+                className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="all">所有大类</option>
+                {majorCategories.map(mc => (
+                  <option key={mc.id} value={mc.id}>{mc.name}</option>
+                ))}
+              </select>
+            </div>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100"
+              className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">所有分类</option>
               {filteredCategories.map(c => (
@@ -438,7 +447,7 @@ export const SourceManager: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-              className="px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100"
+              className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">全部状态</option>
               <option value="active">已启用</option>
@@ -449,9 +458,9 @@ export const SourceManager: React.FC = () => {
       </Card>
 
       {selectedSources.size > 0 && (
-        <Card className="p-4 bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800">
+        <Card className="p-4 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-900/20 dark:to-accent-900/20 border-primary-200 dark:border-primary-800 shadow-lg">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-primary-700 dark:text-primary-300">
+            <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
               已选择 {selectedSources.size} 个搜索源
             </span>
             <div className="flex gap-2">
@@ -459,6 +468,7 @@ export const SourceManager: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => handleBatchToggle(true)}
+                leftIcon={<CheckCircle className="w-4 h-4" />}
               >
                 批量启用
               </Button>
@@ -466,6 +476,7 @@ export const SourceManager: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => handleBatchToggle(false)}
+                leftIcon={<XCircle className="w-4 h-4" />}
               >
                 批量禁用
               </Button>
@@ -481,12 +492,12 @@ export const SourceManager: React.FC = () => {
         </Card>
       )}
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border-surface-200/50 dark:border-surface-700/50 shadow-lg">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-surface-50 dark:bg-surface-800/50">
+            <thead className="bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800">
               <tr>
-                <th className="px-4 py-3 text-left">
+                <th className="px-4 py-4 text-left">
                   <input
                     type="checkbox"
                     checked={selectedSources.size === filteredSources.length && filteredSources.length > 0}
@@ -494,30 +505,30 @@ export const SourceManager: React.FC = () => {
                     className="rounded border-surface-300 dark:border-surface-600"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-surface-500 dark:text-surface-400">
+                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
                   名称
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-surface-500 dark:text-surface-400">
+                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
                   分类
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-surface-500 dark:text-surface-400">
+                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
                   类型
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-surface-500 dark:text-surface-400">
+                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
                   状态
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-surface-500 dark:text-surface-400">
+                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
                   使用次数
                 </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-surface-500 dark:text-surface-400">
+                <th className="px-4 py-4 text-right text-sm font-semibold text-surface-600 dark:text-surface-400">
                   操作
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-200 dark:divide-surface-700">
               {filteredSources.map(source => (
-                <tr key={source.id} className="hover:bg-surface-50 dark:hover:bg-surface-800/50">
-                  <td className="px-4 py-3">
+                <tr key={source.id} className="hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors">
+                  <td className="px-4 py-4">
                     <input
                       type="checkbox"
                       checked={selectedSources.has(source.id)}
@@ -525,13 +536,13 @@ export const SourceManager: React.FC = () => {
                       className="rounded border-surface-300 dark:border-surface-600"
                     />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
                       {source.icon ? (
-                        <img src={source.icon} alt="" className="w-8 h-8 rounded" />
+                        <img src={source.icon} alt="" className="w-10 h-10 rounded-lg shadow-sm" />
                       ) : (
-                        <div className="w-8 h-8 rounded bg-surface-200 dark:bg-surface-700 flex items-center justify-center">
-                          <Globe className="w-4 h-4 text-surface-500" />
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-surface-200 to-surface-300 dark:from-surface-700 dark:to-surface-600 flex items-center justify-center">
+                          <Globe className="w-5 h-5 text-surface-500" />
                         </div>
                       )}
                       <div>
@@ -546,7 +557,7 @@ export const SourceManager: React.FC = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     <div>
                       <p className="text-sm text-surface-900 dark:text-surface-100">
                         {getCategoryName(source.categoryId)}
@@ -556,17 +567,17 @@ export const SourceManager: React.FC = () => {
                       </p>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     <Badge variant={source.siteType === 'search' ? 'primary' : source.siteType === 'browse' ? 'accent' : 'default'}>
                       {source.siteType === 'search' ? '搜索' : source.siteType === 'browse' ? '浏览' : '参考'}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     <button
                       onClick={() => handleToggleSource(source.id, source.userConfig?.isEnabled === false)}
-                      className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+                      className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                         source.userConfig?.isEnabled !== false
-                          ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
+                          ? 'bg-gradient-to-r from-success-100 to-success-200 text-success-700 dark:from-success-900/30 dark:to-success-800/30 dark:text-success-400'
                           : 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400'
                       }`}
                     >
@@ -583,16 +594,19 @@ export const SourceManager: React.FC = () => {
                       )}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-sm text-surface-600 dark:text-surface-400">
-                    {source.usageCount}
+                  <td className="px-4 py-4 text-sm text-surface-600 dark:text-surface-400">
+                    <span className="px-2 py-1 bg-surface-100 dark:bg-surface-800 rounded">
+                      {source.usageCount}
+                    </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-4 py-4">
+                    <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleCheckStatus(source.id)}
                         title="检测状态"
+                        className="hover:bg-primary-50 dark:hover:bg-primary-900/20"
                       >
                         <RefreshCw className="w-4 h-4" />
                       </Button>
@@ -616,6 +630,7 @@ export const SourceManager: React.FC = () => {
                           setEditModal({ isOpen: true, source });
                         }}
                         title="编辑"
+                        className="hover:bg-accent-50 dark:hover:bg-accent-900/20"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -624,7 +639,7 @@ export const SourceManager: React.FC = () => {
                         size="sm"
                         onClick={() => handleDeleteSource(source.id)}
                         title="删除"
-                        className="text-error-500 hover:text-error-600"
+                        className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

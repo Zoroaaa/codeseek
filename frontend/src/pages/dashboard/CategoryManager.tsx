@@ -282,14 +282,19 @@ export const CategoryManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
-            分类管理
-          </h2>
-          <p className="text-surface-500 dark:text-surface-400 mt-1">
-            管理搜索源的大类和分类
-          </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-500 to-primary-500 flex items-center justify-center shadow-lg shadow-accent-500/25">
+            <Layers className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+              分类管理
+            </h2>
+            <p className="text-surface-500 dark:text-surface-400">
+              管理搜索源的大类和分类
+            </p>
+          </div>
         </div>
         <Button
           variant="primary"
@@ -309,7 +314,7 @@ export const CategoryManager: React.FC = () => {
         </Button>
       </div>
 
-      <Card className="p-4">
+      <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
         <Input
           placeholder="搜索分类..."
           value={searchQuery}
@@ -325,25 +330,25 @@ export const CategoryManager: React.FC = () => {
           const isExpanded = expandedMajor.has(majorCategory.id);
           
           return (
-            <Card key={majorCategory.id} className="overflow-hidden">
+            <Card key={majorCategory.id} className="overflow-hidden border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
               <div 
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800/50"
+                className="flex items-center justify-between p-5 cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
                 onClick={() => toggleMajorCategory(majorCategory.id)}
               >
-                <div className="flex items-center gap-3">
-                  <ChevronRight className={`w-5 h-5 text-surface-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                <div className="flex items-center gap-4">
+                  <ChevronRight className={`w-5 h-5 text-surface-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                   <div 
-                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white"
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md"
                     style={{ backgroundColor: majorCategory.color || '#3B82F6' }}
                   >
                     {majorCategory.icon ? (
-                      <span className="text-xl">{majorCategory.icon}</span>
+                      <span className="text-2xl">{majorCategory.icon}</span>
                     ) : (
-                      <Layers className="w-5 h-5" />
+                      <Layers className="w-6 h-6" />
                     )}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-surface-900 dark:text-surface-100">
+                    <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
                       {majorCategory.name}
                     </h3>
                     <p className="text-sm text-surface-500 dark:text-surface-400">
@@ -351,7 +356,7 @@ export const CategoryManager: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <Badge variant={majorCategory.requiresKeyword ? 'primary' : 'default'}>
                     {majorCategory.requiresKeyword ? '需要关键词' : '无需关键词'}
                   </Badge>
@@ -377,17 +382,17 @@ export const CategoryManager: React.FC = () => {
                       {subCategories.map(category => (
                         <div 
                           key={category.id}
-                          className="flex items-center justify-between p-4 pl-12 hover:bg-surface-50 dark:hover:bg-surface-800/50"
+                          className="flex items-center justify-between p-4 pl-16 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-4">
                             <div 
-                              className="w-8 h-8 rounded flex items-center justify-center text-white"
+                              className="w-10 h-10 rounded-lg flex items-center justify-center text-white shadow-sm"
                               style={{ backgroundColor: category.color || '#3B82F6' }}
                             >
                               {category.icon ? (
-                                <span>{category.icon}</span>
+                                <span className="text-lg">{category.icon}</span>
                               ) : (
-                                <FolderOpen className="w-4 h-4" />
+                                <FolderOpen className="w-5 h-5" />
                               )}
                             </div>
                             <div>
@@ -414,6 +419,7 @@ export const CategoryManager: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => openEditCategoryModal(category)}
+                                className="hover:bg-accent-50 dark:hover:bg-accent-900/20"
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -421,7 +427,7 @@ export const CategoryManager: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDeleteCategory(category.id)}
-                                className="text-error-500 hover:text-error-600"
+                                className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -432,14 +438,15 @@ export const CategoryManager: React.FC = () => {
                     </div>
                   ) : (
                     <div className="p-8 text-center">
-                      <FolderOpen className="w-8 h-8 mx-auto text-surface-300 dark:text-surface-600 mb-2" />
-                      <p className="text-surface-500 dark:text-surface-400 mb-3">
+                      <FolderOpen className="w-10 h-10 mx-auto text-surface-300 dark:text-surface-600 mb-3" />
+                      <p className="text-surface-500 dark:text-surface-400 mb-4">
                         暂无分类
                       </p>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => openCreateCategoryModal(majorCategory.id)}
+                        leftIcon={<Plus className="w-4 h-4" />}
                       >
                         添加分类
                       </Button>
