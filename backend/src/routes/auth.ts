@@ -794,16 +794,17 @@ authRoutes.post('/request-email-change', async (c) => {
     const requestId = generateId();
     const expiresAt = Date.now() + 30 * 60 * 1000;
     const expiresIn = 1800;
+    const newEmailHash = await hashPassword(newEmail);
 
     await c.env.DB.prepare(`
-      INSERT INTO email_change_requests (id, user_id, old_email, new_email, status, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(requestId, user.id, user.email, newEmail, 'pending', expiresAt, Date.now()).run();
+      INSERT INTO email_change_requests (id, user_id, old_email, new_email, new_email_hash, status, expires_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(requestId, user.id, user.email, newEmail, newEmailHash, 'pending', expiresAt, Date.now()).run();
 
     return c.json(success({
       requestId,
-      oldEmail: user.email.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      newEmail: newEmail.replace(/(.{2}).*(@.*)/, '$1***$2'),
+      oldEmail: emailVerificationUtils.maskEmail(user.email),
+      newEmail: emailVerificationUtils.maskEmail(newEmail),
       expiresIn
     }, '邮箱更改请求已创建，请验证新邮箱'));
   } catch (err) {
