@@ -815,8 +815,8 @@ export class EmailVerificationService {
   private getTemplateType(verificationType: VerificationType): string {
     const mapping: Record<string, string> = {
       registration: 'registration',
-      password_reset: 'password_reset',
-      forgot_password: 'password_reset',
+      password_reset: 'forgot_password',
+      forgot_password: 'forgot_password',
       email_change_old: 'email_change',
       email_change_new: 'email_change',
       account_delete: 'account_delete',
