@@ -70,11 +70,21 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initAuth = async () => {
-      // 等待 zustand persist rehydrate 完成
-      const currentToken = useAuthStore.getState().token;
-      if (currentToken) {
+      // 直接从 localStorage 读取 token，绕过 zustand persist 的异步 hydration 时序问题
+      let token: string | null = null;
+      try {
+        const stored = localStorage.getItem('auth-storage');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          token = parsed?.state?.token || null;
+        }
+      } catch {
+        token = null;
+      }
+
+      if (token) {
         try {
-          apiClient.setToken(currentToken);
+          apiClient.setToken(token);
           const user = await apiClient.get('/auth/me');
           setUser(user as import('@/types').User);
         } catch {
@@ -85,20 +95,7 @@ const App: React.FC = () => {
       }
     };
 
-    // 订阅 store，等待 token rehydrate 后再执行
-    const unsub = useAuthStore.persist.onFinishHydration(() => {
-      initAuth();
-    });
-
-    // 如果已经 hydrated（比如同步存储），直接执行
-    if (useAuthStore.persist.hasHydrated()) {
-      initAuth();
-      unsub();
-    }
-
-    return () => {
-      unsub();
-    };
+    initAuth();
   }, []);
 
   return (

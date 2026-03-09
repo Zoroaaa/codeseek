@@ -7,7 +7,7 @@ import { Button } from '@/components/ui';
 
 export const MainLayout: React.FC = () => {
   const { isAuthenticated, user } = useAuthStore();
-  const { theme, toggleTheme } = useThemeStore();
+  const { resolvedTheme, toggleTheme } = useThemeStore();
   const { isSidebarOpen, setSidebarOpen } = useUIStore();
   const navigate = useNavigate();
 
@@ -46,12 +46,10 @@ export const MainLayout: React.FC = () => {
                 className="p-2 rounded-lg text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-200 dark:hover:bg-surface-800 transition-colors"
                 aria-label="切换主题"
               >
-                {theme === 'dark' ? (
+                {resolvedTheme === 'dark' ? (
                   <Sun className="w-5 h-5" />
-                ) : theme === 'light' ? (
-                  <Moon className="w-5 h-5" />
                 ) : (
-                  <Sun className="w-5 h-5" />
+                  <Moon className="w-5 h-5" />
                 )}
               </button>
 

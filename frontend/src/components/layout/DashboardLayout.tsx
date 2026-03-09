@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
 
 export const DashboardLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
-  const { theme, toggleTheme, sidebarCollapsed, toggleSidebar } = useThemeStore();
+  const { theme, resolvedTheme, toggleTheme, sidebarCollapsed, toggleSidebar } = useThemeStore();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -181,7 +181,7 @@ export const DashboardLayout: React.FC = () => {
                 onClick={toggleTheme}
                 className="p-2 rounded-lg text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-200 dark:hover:bg-surface-800 transition-colors"
               >
-                {theme === 'dark' ? (
+                {resolvedTheme === 'dark' ? (
                   <Sun className="w-5 h-5" />
                 ) : (
                   <Moon className="w-5 h-5" />

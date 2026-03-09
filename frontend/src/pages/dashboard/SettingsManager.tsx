@@ -31,6 +31,16 @@ export const SettingsManager: React.FC = () => {
     username: user?.username || '',
     email: user?.email || '',
   });
+
+  // user 异步加载后同步更新 profileForm（刷新页面时 user 可能延迟到来）
+  useEffect(() => {
+    if (user) {
+      setProfileForm((prev) => ({
+        username: prev.username || user.username || '',
+        email: prev.email || user.email || '',
+      }));
+    }
+  }, [user?.username, user?.email]);
   
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',

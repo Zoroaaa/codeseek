@@ -74,11 +74,11 @@ export const useThemeStore = create<ThemeState>()(
       },
       
       toggleTheme: () => {
-        const { theme } = get();
-        const newTheme: Theme = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
-        const resolvedTheme = resolveTheme(newTheme);
-        applyTheme(resolvedTheme);
-        set({ theme: newTheme, resolvedTheme });
+        const { resolvedTheme } = get();
+        // 直接基于当前实际显示的主题切换，避免 system 状态导致第一次点击无视觉变化
+        const newTheme: Theme = resolvedTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme);
+        set({ theme: newTheme, resolvedTheme: newTheme });
       },
       
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
