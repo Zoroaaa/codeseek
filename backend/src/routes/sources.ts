@@ -128,89 +128,6 @@ sourceRoutes.get('/', async (c) => {
   }
 });
 
-sourceRoutes.get('/:id', async (c) => {
-  const sourceId = c.req.param('id');
-
-  try {
-    const source = await c.env.DB.prepare(
-      'SELECT * FROM search_sources WHERE id = ? AND is_active = 1'
-    ).bind(sourceId).first<SearchSource>();
-
-    if (!source) {
-      return c.json(error('NOT_FOUND', '搜索源不存在'), 404);
-    }
-
-    return c.json(success({ source }));
-  } catch (err) {
-    console.error('Get source error:', err);
-    return c.json(error('SERVER_ERROR', '获取搜索源失败'), 500);
-  }
-});
-
-sourceRoutes.post('/:id/increment-usage', async (c) => {
-  const sourceId = c.req.param('id');
-
-  try {
-    await c.env.DB.prepare(`
-      UPDATE search_sources 
-      SET usage_count = usage_count + 1, last_used_at = ? 
-      WHERE id = ?
-    `).bind(Date.now(), sourceId).run();
-
-    return c.json(success(null, '使用次数已更新'));
-  } catch (err) {
-    console.error('Increment usage error:', err);
-    return c.json(error('SERVER_ERROR', '更新失败'), 500);
-  }
-});
-
-sourceRoutes.get('/user-configs/:userId', async (c) => {
-  const userId = c.req.param('userId');
-
-  try {
-    const configs = await c.env.DB.prepare(
-      'SELECT * FROM user_search_source_configs WHERE user_id = ?'
-    ).bind(userId).all<UserSearchSourceConfig>();
-
-    return c.json(success({
-      configs: configs.results || [],
-    }));
-  } catch (err) {
-    console.error('Get user configs error:', err);
-    return c.json(error('SERVER_ERROR', '获取用户配置失败'), 500);
-  }
-});
-
-sourceRoutes.get('/with-user-config/:userId', async (c) => {
-  const userId = c.req.param('userId');
-
-  try {
-    const sources = await c.env.DB.prepare(
-      'SELECT * FROM search_sources WHERE is_active = 1 ORDER BY search_priority DESC, display_order ASC'
-    ).all<SearchSource>();
-
-    const userConfigs = await c.env.DB.prepare(
-      'SELECT * FROM user_search_source_configs WHERE user_id = ?'
-    ).bind(userId).all<UserSearchSourceConfig>();
-
-    const configMap = new Map(
-      (userConfigs.results || []).map(config => [config.source_id, config])
-    );
-
-    const sourcesWithConfig = (sources.results || []).map(source => ({
-      ...source,
-      userConfig: configMap.get(source.id) || null,
-    }));
-
-    return c.json(success({
-      sources: sourcesWithConfig,
-    }));
-  } catch (err) {
-    console.error('Get sources with user config error:', err);
-    return c.json(error('SERVER_ERROR', '获取搜索源失败'), 500);
-  }
-});
-
 sourceRoutes.get('/popular', async (c) => {
   try {
     const limit = parseInt(c.req.query('limit') || '20', 10);
@@ -396,6 +313,53 @@ ${sourcesList.map(s => `    <outline type="link" text="${s.name}" htmlUrl="${s.u
   }
 });
 
+sourceRoutes.get('/user-configs/:userId', async (c) => {
+  const userId = c.req.param('userId');
+
+  try {
+    const configs = await c.env.DB.prepare(
+      'SELECT * FROM user_search_source_configs WHERE user_id = ?'
+    ).bind(userId).all<UserSearchSourceConfig>();
+
+    return c.json(success({
+      configs: configs.results || [],
+    }));
+  } catch (err) {
+    console.error('Get user configs error:', err);
+    return c.json(error('SERVER_ERROR', '获取用户配置失败'), 500);
+  }
+});
+
+sourceRoutes.get('/with-user-config/:userId', async (c) => {
+  const userId = c.req.param('userId');
+
+  try {
+    const sources = await c.env.DB.prepare(
+      'SELECT * FROM search_sources WHERE is_active = 1 ORDER BY search_priority DESC, display_order ASC'
+    ).all<SearchSource>();
+
+    const userConfigs = await c.env.DB.prepare(
+      'SELECT * FROM user_search_source_configs WHERE user_id = ?'
+    ).bind(userId).all<UserSearchSourceConfig>();
+
+    const configMap = new Map(
+      (userConfigs.results || []).map(config => [config.source_id, config])
+    );
+
+    const sourcesWithConfig = (sources.results || []).map(source => ({
+      ...source,
+      userConfig: configMap.get(source.id) || null,
+    }));
+
+    return c.json(success({
+      sources: sourcesWithConfig,
+    }));
+  } catch (err) {
+    console.error('Get sources with user config error:', err);
+    return c.json(error('SERVER_ERROR', '获取搜索源失败'), 500);
+  }
+});
+
 sourceRoutes.get('/export-user-configs/:userId', async (c) => {
   const userId = c.req.param('userId');
 
@@ -417,6 +381,42 @@ sourceRoutes.get('/export-user-configs/:userId', async (c) => {
   } catch (err) {
     console.error('Export user configs error:', err);
     return c.json(error('SERVER_ERROR', '导出失败'), 500);
+  }
+});
+
+sourceRoutes.get('/:id', async (c) => {
+  const sourceId = c.req.param('id');
+
+  try {
+    const source = await c.env.DB.prepare(
+      'SELECT * FROM search_sources WHERE id = ? AND is_active = 1'
+    ).bind(sourceId).first<SearchSource>();
+
+    if (!source) {
+      return c.json(error('NOT_FOUND', '搜索源不存在'), 404);
+    }
+
+    return c.json(success({ source }));
+  } catch (err) {
+    console.error('Get source error:', err);
+    return c.json(error('SERVER_ERROR', '获取搜索源失败'), 500);
+  }
+});
+
+sourceRoutes.post('/:id/increment-usage', async (c) => {
+  const sourceId = c.req.param('id');
+
+  try {
+    await c.env.DB.prepare(`
+      UPDATE search_sources 
+      SET usage_count = usage_count + 1, last_used_at = ? 
+      WHERE id = ?
+    `).bind(Date.now(), sourceId).run();
+
+    return c.json(success(null, '使用次数已更新'));
+  } catch (err) {
+    console.error('Increment usage error:', err);
+    return c.json(error('SERVER_ERROR', '更新失败'), 500);
   }
 });
 

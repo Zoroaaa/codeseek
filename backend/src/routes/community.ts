@@ -222,6 +222,247 @@ communityRoutes.get('/sources', async (c) => {
   }
 });
 
+communityRoutes.get('/sources/my-sources', async (c) => {
+  const userId = await getUserId(c);
+  if (!userId) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = parseInt(c.req.query('pageSize') || '20');
+  const status = c.req.query('status');
+
+  try {
+    let query = 'SELECT * FROM community_shared_sources WHERE user_id = ?';
+    const params: (string | number)[] = [userId];
+
+    if (status) {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM (${query})`
+    ).bind(...params).first<{ total: number }>();
+
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(pageSize, (page - 1) * pageSize);
+
+    const sources = await c.env.DB.prepare(query).bind(...params).all<CommunitySharedSource>();
+
+    return c.json(success({
+      items: sources.results || [],
+      total: countResult?.total || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((countResult?.total || 0) / pageSize),
+    }));
+  } catch (err) {
+    console.error('Get my sources error:', err);
+    return c.json(error('SERVER_ERROR', '获取失败'), 500);
+  }
+});
+
+communityRoutes.get('/sources/popular', async (c) => {
+  const limit = parseInt(c.req.query('limit') || '10');
+
+  try {
+    const sources = await c.env.DB.prepare(
+      `SELECT * FROM community_shared_sources 
+       WHERE status = 'active' 
+       ORDER BY view_count DESC, like_count DESC 
+       LIMIT ?`
+    ).bind(limit).all<CommunitySharedSource>();
+
+    return c.json(success(sources.results || []));
+  } catch (err) {
+    console.error('Get popular sources error:', err);
+    return c.json(error('SERVER_ERROR', '获取失败'), 500);
+  }
+});
+
+communityRoutes.get('/sources/recent', async (c) => {
+  const limit = parseInt(c.req.query('limit') || '10');
+
+  try {
+    const sources = await c.env.DB.prepare(
+      `SELECT * FROM community_shared_sources 
+       WHERE status = 'active' 
+       ORDER BY created_at DESC 
+       LIMIT ?`
+    ).bind(limit).all<CommunitySharedSource>();
+
+    return c.json(success(sources.results || []));
+  } catch (err) {
+    console.error('Get recent sources error:', err);
+    return c.json(error('SERVER_ERROR', '获取失败'), 500);
+  }
+});
+
+communityRoutes.get('/sources/search', async (c) => {
+  const keyword = c.req.query('keyword');
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = parseInt(c.req.query('pageSize') || '20');
+
+  if (!keyword) {
+    return c.json(error('VALIDATION_ERROR', '请提供搜索关键词'), 400);
+  }
+
+  try {
+    const searchPattern = `%${keyword}%`;
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM community_shared_sources 
+       WHERE status = 'active' AND (source_name LIKE ? OR description LIKE ?)`
+    ).bind(searchPattern, searchPattern).first<{ total: number }>();
+
+    const sources = await c.env.DB.prepare(
+      `SELECT * FROM community_shared_sources 
+       WHERE status = 'active' AND (source_name LIKE ? OR description LIKE ?)
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`
+    ).bind(searchPattern, searchPattern, pageSize, (page - 1) * pageSize).all<CommunitySharedSource>();
+
+    return c.json(success({
+      items: sources.results || [],
+      total: countResult?.total || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((countResult?.total || 0) / pageSize),
+    }));
+  } catch (err) {
+    console.error('Search sources error:', err);
+    return c.json(error('SERVER_ERROR', '搜索失败'), 500);
+  }
+});
+
+communityRoutes.get('/sources/user-stats', async (c) => {
+  const userId = await getUserId(c);
+  if (!userId) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  try {
+    const sharedCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM community_shared_sources WHERE user_id = ? AND status = ?'
+    ).bind(userId, 'active').first<{ count: number }>();
+
+    const pendingCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM community_shared_sources WHERE user_id = ? AND status = ?'
+    ).bind(userId, 'pending').first<{ count: number }>();
+
+    const totalDownloads = await c.env.DB.prepare(
+      `SELECT COALESCE(SUM(download_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
+    ).bind(userId).first<{ total: number }>();
+
+    const totalLikes = await c.env.DB.prepare(
+      `SELECT COALESCE(SUM(like_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
+    ).bind(userId).first<{ total: number }>();
+
+    const totalViews = await c.env.DB.prepare(
+      `SELECT COALESCE(SUM(view_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
+    ).bind(userId).first<{ total: number }>();
+
+    const avgRating = await c.env.DB.prepare(
+      `SELECT AVG(rating_score) as avg FROM community_shared_sources WHERE user_id = ? AND rating_count > 0`
+    ).bind(userId).first<{ avg: number }>();
+
+    const reviewsGiven = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM community_source_reviews WHERE user_id = ?'
+    ).bind(userId).first<{ count: number }>();
+
+    const tagsCreated = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM community_source_tags WHERE created_by = ?'
+    ).bind(userId).first<{ count: number }>();
+
+    const recentShares = await c.env.DB.prepare(
+      `SELECT id, source_name, status, download_count, like_count, view_count, rating_score, created_at 
+       FROM community_shared_sources 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 10`
+    ).bind(userId).all();
+
+    return c.json(success({
+      general: {
+        sharedSources: sharedCount?.count || 0,
+        pendingSources: pendingCount?.count || 0,
+        totalDownloads: totalDownloads?.total || 0,
+        totalLikes: totalLikes?.total || 0,
+        totalViews: totalViews?.total || 0,
+        avgRating: avgRating?.avg || 0,
+        reviewsGiven: reviewsGiven?.count || 0,
+        tagsCreated: tagsCreated?.count || 0,
+      },
+      recentShares: recentShares.results || []
+    }));
+  } catch (err) {
+    console.error('Get user stats error:', err);
+    return c.json(error('SERVER_ERROR', '获取用户统计失败'), 500);
+  }
+});
+
+communityRoutes.get('/sources/stats', async (c) => {
+  try {
+    const totalSources = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM community_shared_sources WHERE status = ?'
+    ).bind('active').first<{ count: number }>();
+
+    const totalDownloads = await c.env.DB.prepare(
+      'SELECT COALESCE(SUM(download_count), 0) as total FROM community_shared_sources'
+    ).first<{ total: number }>();
+
+    const totalUsers = await c.env.DB.prepare(
+      'SELECT COUNT(DISTINCT user_id) as count FROM community_shared_sources'
+    ).first<{ count: number }>();
+
+    const totalReviews = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM community_source_reviews'
+    ).first<{ count: number }>();
+
+    const avgRating = await c.env.DB.prepare(
+      'SELECT AVG(rating_score) as avg FROM community_shared_sources WHERE rating_count > 0'
+    ).first<{ avg: number }>();
+
+    const categoriesCount = await c.env.DB.prepare(
+      'SELECT COUNT(DISTINCT source_category) as count FROM community_shared_sources WHERE status = ?'
+    ).bind('active').first<{ count: number }>();
+
+    const topCategories = await c.env.DB.prepare(`
+      SELECT source_category as category, COUNT(*) as count 
+      FROM community_shared_sources 
+      WHERE status = 'active' 
+      GROUP BY source_category 
+      ORDER BY count DESC 
+      LIMIT 10
+    `).all<{ category: string; count: number }>();
+
+    const recentActivity = await c.env.DB.prepare(`
+      SELECT id, 'share' as type, source_name as sourceName, created_at as createdAt 
+      FROM community_shared_sources 
+      WHERE status = 'active' 
+      ORDER BY created_at DESC 
+      LIMIT 10
+    `).all<{ id: string; type: string; sourceName: string; createdAt: number }>();
+
+    return c.json(success({
+      totalSources: totalSources?.count || 0,
+      totalDownloads: totalDownloads?.total || 0,
+      totalUsers: totalUsers?.count || 0,
+      totalReviews: totalReviews?.count || 0,
+      averageRating: avgRating?.avg || 0,
+      categoriesCount: categoriesCount?.count || 0,
+      topCategories: topCategories.results || [],
+      recentActivity: (recentActivity.results || []).map(item => ({
+        ...item,
+        createdAt: new Date(item.createdAt).toISOString()
+      }))
+    }));
+  } catch (err) {
+    console.error('Get community stats error:', err);
+    return c.json(error('SERVER_ERROR', '获取社区统计失败'), 500);
+  }
+});
+
 communityRoutes.get('/sources/:id', async (c) => {
   const id = c.req.param('id');
 
@@ -638,246 +879,5 @@ communityRoutes.post('/sources/:id/download', async (c) => {
   } catch (err) {
     console.error('Download count error:', err);
     return c.json(error('SERVER_ERROR', '操作失败'), 500);
-  }
-});
-
-communityRoutes.get('/my-sources', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const page = parseInt(c.req.query('page') || '1');
-  const pageSize = parseInt(c.req.query('pageSize') || '20');
-  const status = c.req.query('status');
-
-  try {
-    let query = 'SELECT * FROM community_shared_sources WHERE user_id = ?';
-    const params: (string | number)[] = [userId];
-
-    if (status) {
-      query += ' AND status = ?';
-      params.push(status);
-    }
-
-    const countResult = await c.env.DB.prepare(
-      `SELECT COUNT(*) as total FROM (${query})`
-    ).bind(...params).first<{ total: number }>();
-
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(pageSize, (page - 1) * pageSize);
-
-    const sources = await c.env.DB.prepare(query).bind(...params).all<CommunitySharedSource>();
-
-    return c.json(success({
-      items: sources.results || [],
-      total: countResult?.total || 0,
-      page,
-      pageSize,
-      totalPages: Math.ceil((countResult?.total || 0) / pageSize),
-    }));
-  } catch (err) {
-    console.error('Get my sources error:', err);
-    return c.json(error('SERVER_ERROR', '获取失败'), 500);
-  }
-});
-
-communityRoutes.get('/popular', async (c) => {
-  const limit = parseInt(c.req.query('limit') || '10');
-
-  try {
-    const sources = await c.env.DB.prepare(
-      `SELECT * FROM community_shared_sources 
-       WHERE status = 'active' 
-       ORDER BY view_count DESC, like_count DESC 
-       LIMIT ?`
-    ).bind(limit).all<CommunitySharedSource>();
-
-    return c.json(success(sources.results || []));
-  } catch (err) {
-    console.error('Get popular sources error:', err);
-    return c.json(error('SERVER_ERROR', '获取失败'), 500);
-  }
-});
-
-communityRoutes.get('/recent', async (c) => {
-  const limit = parseInt(c.req.query('limit') || '10');
-
-  try {
-    const sources = await c.env.DB.prepare(
-      `SELECT * FROM community_shared_sources 
-       WHERE status = 'active' 
-       ORDER BY created_at DESC 
-       LIMIT ?`
-    ).bind(limit).all<CommunitySharedSource>();
-
-    return c.json(success(sources.results || []));
-  } catch (err) {
-    console.error('Get recent sources error:', err);
-    return c.json(error('SERVER_ERROR', '获取失败'), 500);
-  }
-});
-
-communityRoutes.get('/search', async (c) => {
-  const keyword = c.req.query('keyword');
-  const page = parseInt(c.req.query('page') || '1');
-  const pageSize = parseInt(c.req.query('pageSize') || '20');
-
-  if (!keyword) {
-    return c.json(error('VALIDATION_ERROR', '请提供搜索关键词'), 400);
-  }
-
-  try {
-    const searchPattern = `%${keyword}%`;
-    const countResult = await c.env.DB.prepare(
-      `SELECT COUNT(*) as total FROM community_shared_sources 
-       WHERE status = 'active' AND (source_name LIKE ? OR description LIKE ?)`
-    ).bind(searchPattern, searchPattern).first<{ total: number }>();
-
-    const sources = await c.env.DB.prepare(
-      `SELECT * FROM community_shared_sources 
-       WHERE status = 'active' AND (source_name LIKE ? OR description LIKE ?)
-       ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`
-    ).bind(searchPattern, searchPattern, pageSize, (page - 1) * pageSize).all<CommunitySharedSource>();
-
-    return c.json(success({
-      items: sources.results || [],
-      total: countResult?.total || 0,
-      page,
-      pageSize,
-      totalPages: Math.ceil((countResult?.total || 0) / pageSize),
-    }));
-  } catch (err) {
-    console.error('Search sources error:', err);
-    return c.json(error('SERVER_ERROR', '搜索失败'), 500);
-  }
-});
-
-communityRoutes.get('/user-stats', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  try {
-    const sharedCount = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_shared_sources WHERE user_id = ? AND status = ?'
-    ).bind(userId, 'active').first<{ count: number }>();
-
-    const pendingCount = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_shared_sources WHERE user_id = ? AND status = ?'
-    ).bind(userId, 'pending').first<{ count: number }>();
-
-    const totalDownloads = await c.env.DB.prepare(
-      `SELECT COALESCE(SUM(download_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
-    ).bind(userId).first<{ total: number }>();
-
-    const totalLikes = await c.env.DB.prepare(
-      `SELECT COALESCE(SUM(like_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
-    ).bind(userId).first<{ total: number }>();
-
-    const totalViews = await c.env.DB.prepare(
-      `SELECT COALESCE(SUM(view_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
-    ).bind(userId).first<{ total: number }>();
-
-    const avgRating = await c.env.DB.prepare(
-      `SELECT AVG(rating_score) as avg FROM community_shared_sources WHERE user_id = ? AND rating_count > 0`
-    ).bind(userId).first<{ avg: number }>();
-
-    const reviewsGiven = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_source_reviews WHERE user_id = ?'
-    ).bind(userId).first<{ count: number }>();
-
-    const tagsCreated = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_source_tags WHERE created_by = ?'
-    ).bind(userId).first<{ count: number }>();
-
-    const recentShares = await c.env.DB.prepare(
-      `SELECT id, source_name, status, download_count, like_count, view_count, rating_score, created_at 
-       FROM community_shared_sources 
-       WHERE user_id = ? 
-       ORDER BY created_at DESC 
-       LIMIT 10`
-    ).bind(userId).all();
-
-    return c.json(success({
-      general: {
-        sharedSources: sharedCount?.count || 0,
-        pendingSources: pendingCount?.count || 0,
-        totalDownloads: totalDownloads?.total || 0,
-        totalLikes: totalLikes?.total || 0,
-        totalViews: totalViews?.total || 0,
-        avgRating: avgRating?.avg || 0,
-        reviewsGiven: reviewsGiven?.count || 0,
-        tagsCreated: tagsCreated?.count || 0,
-      },
-      recentShares: recentShares.results || []
-    }));
-  } catch (err) {
-    console.error('Get user stats error:', err);
-    return c.json(error('SERVER_ERROR', '获取用户统计失败'), 500);
-  }
-});
-
-communityRoutes.get('/stats', async (c) => {
-  try {
-    const totalSources = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_shared_sources WHERE status = ?'
-    ).bind('active').first<{ count: number }>();
-
-    const totalDownloads = await c.env.DB.prepare(
-      'SELECT COALESCE(SUM(download_count), 0) as total FROM community_shared_sources'
-    ).first<{ total: number }>();
-
-    const totalUsers = await c.env.DB.prepare(
-      'SELECT COUNT(DISTINCT user_id) as count FROM community_shared_sources'
-    ).first<{ count: number }>();
-
-    const totalReviews = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_source_reviews'
-    ).first<{ count: number }>();
-
-    const avgRating = await c.env.DB.prepare(
-      'SELECT AVG(rating_score) as avg FROM community_shared_sources WHERE rating_count > 0'
-    ).first<{ avg: number }>();
-
-    const categoriesCount = await c.env.DB.prepare(
-      'SELECT COUNT(DISTINCT source_category) as count FROM community_shared_sources WHERE status = ?'
-    ).bind('active').first<{ count: number }>();
-
-    const topCategories = await c.env.DB.prepare(`
-      SELECT source_category as category, COUNT(*) as count 
-      FROM community_shared_sources 
-      WHERE status = 'active' 
-      GROUP BY source_category 
-      ORDER BY count DESC 
-      LIMIT 10
-    `).all<{ category: string; count: number }>();
-
-    const recentActivity = await c.env.DB.prepare(`
-      SELECT id, 'share' as type, source_name as sourceName, created_at as createdAt 
-      FROM community_shared_sources 
-      WHERE status = 'active' 
-      ORDER BY created_at DESC 
-      LIMIT 10
-    `).all<{ id: string; type: string; sourceName: string; createdAt: number }>();
-
-    return c.json(success({
-      totalSources: totalSources?.count || 0,
-      totalDownloads: totalDownloads?.total || 0,
-      totalUsers: totalUsers?.count || 0,
-      totalReviews: totalReviews?.count || 0,
-      averageRating: avgRating?.avg || 0,
-      categoriesCount: categoriesCount?.count || 0,
-      topCategories: topCategories.results || [],
-      recentActivity: (recentActivity.results || []).map(item => ({
-        ...item,
-        createdAt: new Date(item.createdAt).toISOString()
-      }))
-    }));
-  } catch (err) {
-    console.error('Get community stats error:', err);
-    return c.json(error('SERVER_ERROR', '获取社区统计失败'), 500);
   }
 });
