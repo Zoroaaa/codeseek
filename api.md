@@ -1,0 +1,1924 @@
+# CodeSeek API 文档
+
+## 基础信息
+
+- **基础URL**: `/api`
+- **认证方式**: JWT Bearer Token（在请求头中添加 `Authorization: Bearer <token>`）
+- **响应格式**: JSON
+
+## 统一响应格式
+
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+```
+
+---
+
+## 认证接口 `/api/auth`
+
+### `POST /api/auth/register` - 用户注册
+
+注册新用户账号。
+
+**请求体**:
+```json
+{
+  "username": "string (3-20字符，字母数字下划线)",
+  "email": "string (有效邮箱格式)",
+  "password": "string (6-100字符)"
+}
+```
+
+**返回**: 用户信息和JWT令牌
+
+---
+
+### `POST /api/auth/login` - 用户登录
+
+使用用户名或邮箱登录。
+
+**请求体**:
+```json
+{
+  "identifier": "string",
+  "password": "string"
+}
+```
+
+**说明**: `identifier` 可以是用户名或邮箱地址
+
+**返回**: 用户信息和JWT令牌
+
+---
+
+### `POST /api/auth/logout` - 用户登出
+
+登出当前会话。
+
+**认证**: 需要
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/auth/me` - 获取当前用户信息
+
+获取当前登录用户的详细信息。
+
+**认证**: 需要
+
+**返回**: 用户信息对象
+
+---
+
+### `POST /api/auth/verify-token` - Token验证
+
+验证当前Token是否有效。
+
+**认证**: 需要
+
+**返回**: 验证结果和用户基本信息
+
+---
+
+### `POST /api/auth/refresh` - Token刷新
+
+刷新当前Token，延长会话有效期。
+
+**认证**: 需要
+
+**返回**: 新的JWT令牌
+
+---
+
+### `POST /api/auth/forgot-password` - 忘记密码
+
+发送密码重置验证码到邮箱。
+
+**请求体**:
+```json
+{
+  "email": "string"
+}
+```
+
+**返回**: 操作结果提示
+
+---
+
+### `POST /api/auth/reset-password` - 重置密码
+
+使用验证码重置密码。
+
+**请求体**:
+```json
+{
+  "email": "string",
+  "code": "string (6位验证码)",
+  "newPassword": "string (6-100字符)"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `POST /api/auth/change-password` - 更改密码
+
+修改当前用户密码。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "currentPassword": "string",
+  "newPassword": "string (6-100字符)"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `DELETE /api/auth/account` - 删除账户
+
+删除当前用户账户（需要密码确认）。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "password": "string"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `POST /api/auth/send-registration-code` - 发送注册验证码
+
+向指定邮箱发送注册验证码。
+
+**请求体**:
+```json
+{
+  "email": "string"
+}
+```
+
+**返回**: 脱敏邮箱、过期时间
+
+---
+
+### `POST /api/auth/send-password-reset-code` - 发送密码重置验证码
+
+向当前用户邮箱发送密码重置验证码。
+
+**认证**: 需要
+
+**返回**: 脱敏邮箱、过期时间
+
+---
+
+### `POST /api/auth/request-email-change` - 申请更改邮箱
+
+创建邮箱更改请求。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "newEmail": "string",
+  "currentPassword": "string"
+}
+```
+
+**返回**: 请求ID、脱敏邮箱、过期时间
+
+---
+
+### `POST /api/auth/send-email-change-code` - 发送邮箱更改验证码
+
+向原邮箱或新邮箱发送验证码。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "requestId": "string",
+  "emailType": "old | new"
+}
+```
+
+**返回**: 脱敏邮箱、过期时间
+
+---
+
+### `POST /api/auth/verify-email-change-code` - 验证邮箱更改验证码
+
+验证并完成邮箱更改流程。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "requestId": "string",
+  "emailType": "old | new",
+  "code": "string"
+}
+```
+
+**返回**: 是否完成、新邮箱（脱敏）
+
+---
+
+### `POST /api/auth/send-account-delete-code` - 发送账户删除验证码
+
+向当前用户邮箱发送账户删除确认验证码。
+
+**认证**: 需要
+
+**返回**: 脱敏邮箱、过期时间
+
+---
+
+### `GET /api/auth/verification-status` - 检查验证状态
+
+检查指定邮箱的验证码状态。
+
+**查询参数**:
+- `email` - 邮箱地址
+- `type` - 验证类型（registration/password_reset/email_change_old/email_change_new/account_delete）
+
+**返回**: 是否有待验证的验证码、是否可重发、剩余时间
+
+---
+
+### `GET /api/auth/user-verification-status` - 获取用户验证状态
+
+获取当前用户的所有待处理验证。
+
+**认证**: 需要
+
+**返回**: 待处理验证列表、邮箱更改请求
+
+---
+
+### `POST /api/auth/smart-send-code` - 智能发送验证码
+
+根据验证类型智能发送验证码，自动处理重发间隔。
+
+**请求体**:
+```json
+{
+  "email": "string",
+  "verificationType": "registration | password_reset | email_change_old | email_change_new | account_delete",
+  "force": "boolean?"
+}
+```
+
+**返回**: 脱敏邮箱、过期时间、是否可重发
+
+---
+
+## 用户数据接口 `/api/user`
+
+### `GET /api/user/settings` - 获取用户设置
+
+获取当前用户的设置信息。
+
+**认证**: 需要
+
+**返回**: 用户设置对象
+
+---
+
+### `PUT /api/user/settings` - 更新用户设置
+
+更新当前用户的设置。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "settings": {}
+}
+```
+
+**返回**: 更新后的设置
+
+---
+
+### `GET /api/user/favorites` - 获取收藏列表
+
+获取当前用户的所有收藏。
+
+**认证**: 需要
+
+**返回**: 收藏列表
+
+---
+
+### `POST /api/user/favorites` - 添加收藏
+
+添加一个新的收藏。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "title": "string (必填，最多100字符)",
+  "subtitle": "string? (最多200字符)",
+  "url": "string (必填，有效URL，最多500字符)",
+  "icon": "string? (最多50字符)",
+  "keyword": "string? (最多100字符)"
+}
+```
+
+**返回**: 新创建的收藏信息
+
+---
+
+### `POST /api/user/favorites/sync` - 同步收藏数据
+
+批量同步收藏数据（覆盖式同步）。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "favorites": [
+    {
+      "id": "string?",
+      "title": "string",
+      "subtitle": "string?",
+      "url": "string",
+      "icon": "string?",
+      "keyword": "string?",
+      "createdAt": "number?"
+    }
+  ]
+}
+```
+
+**返回**: 同步结果（包含同步数量）
+
+---
+
+### `DELETE /api/user/favorites/:id` - 删除收藏
+
+删除指定的收藏项。
+
+**认证**: 需要
+
+**URL参数**: `id` - 收藏项ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/user/search-history` - 获取搜索历史
+
+获取当前用户的搜索历史记录。
+
+**认证**: 需要
+
+**查询参数**:
+- `limit` - 返回数量限制（默认50，最大200）
+
+**返回**: 搜索历史记录列表
+
+---
+
+### `POST /api/user/search-history` - 保存搜索记录
+
+保存一条搜索历史记录。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "query": "string (必填，最多200字符)",
+  "source": "string? (最多100字符)",
+  "resultsCount": "number?"
+}
+```
+
+**返回**: 新创建的历史记录
+
+---
+
+### `DELETE /api/user/search-history` - 清空搜索历史
+
+清空当前用户的所有搜索历史。
+
+**认证**: 需要
+
+**返回**: 操作结果
+
+---
+
+### `DELETE /api/user/search-history/:id` - 删除单条搜索历史
+
+删除指定的搜索历史记录。
+
+**认证**: 需要
+
+**URL参数**: `id` - 历史记录ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/user/search-stats` - 获取搜索统计
+
+获取当前用户的搜索统计数据。
+
+**认证**: 需要
+
+**返回**: 
+- 总搜索次数
+- 常用搜索源（Top 5）
+- 最近搜索记录（10条）
+
+---
+
+### `GET /api/user/source-configs` - 获取用户搜索源配置
+
+获取当前用户对所有搜索源的个性化配置。
+
+**认证**: 需要
+
+**返回**: 搜索源配置列表
+
+---
+
+### `PUT /api/user/source-configs/:sourceId` - 更新搜索源配置
+
+更新用户对特定搜索源的个性化配置。
+
+**认证**: 需要
+
+**URL参数**: `sourceId` - 搜索源ID
+
+**请求体**:
+```json
+{
+  "isEnabled": "boolean?",
+  "customPriority": "number? (1-10)",
+  "customName": "string?",
+  "customSubtitle": "string?",
+  "customIcon": "string?",
+  "notes": "string?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+## 搜索接口 `/api/search`
+
+### `POST /api/search` - 执行搜索
+
+执行搜索并返回搜索源列表，自动记录搜索历史。
+
+**认证**: 可选（认证后记录历史）
+
+**请求体**:
+```json
+{
+  "keyword": "string (必填，最多200字符)",
+  "sourceIds": "string[]? (最多50个)",
+  "page": "number? (默认1，最大1000)",
+  "pageSize": "number? (默认20，最大100)"
+}
+```
+
+**返回**: 
+- 搜索关键词
+- 搜索结果列表（包含搜索源信息和生成的URL）
+- 分页信息
+
+---
+
+### `GET /api/search/history` - 获取搜索历史
+
+获取当前用户的搜索历史记录。
+
+**认证**: 需要
+
+**查询参数**:
+- `limit` - 返回数量限制（默认50，最大200）
+
+**返回**: 搜索历史记录列表（包含搜索源名称和图标）
+
+---
+
+### `DELETE /api/search/history` - 清空搜索历史
+
+清空当前用户的所有搜索历史。
+
+**认证**: 需要
+
+**返回**: 操作结果
+
+---
+
+### `DELETE /api/search/history/:id` - 删除单条搜索历史
+
+删除指定的搜索历史记录。
+
+**认证**: 需要
+
+**URL参数**: `id` - 历史记录ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/search/favorites` - 获取收藏列表
+
+获取当前用户的收藏列表。
+
+**认证**: 需要
+
+**返回**: 收藏列表
+
+---
+
+### `POST /api/search/favorites` - 添加收藏
+
+添加一个新的收藏。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "title": "string (必填)",
+  "subtitle": "string?",
+  "url": "string (必填，有效URL)",
+  "icon": "string?",
+  "keyword": "string?"
+}
+```
+
+**返回**: 新创建的收藏信息
+
+---
+
+### `DELETE /api/search/favorites/:id` - 删除收藏
+
+删除指定的收藏项。
+
+**认证**: 需要
+
+**URL参数**: `id` - 收藏项ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/search/suggestions` - 获取搜索建议
+
+根据关键词获取搜索建议。
+
+**查询参数**:
+- `keyword` - 搜索关键词（至少2个字符）
+- `limit` - 返回数量（默认10，最大20）
+
+**返回**: 建议关键词列表及搜索次数
+
+---
+
+### `GET /api/search/trending` - 获取热门搜索
+
+获取热门搜索关键词。
+
+**查询参数**:
+- `limit` - 返回数量（默认20，最大50）
+- `hours` - 时间范围（默认24小时，最大168小时/7天）
+
+**返回**: 热门关键词列表及搜索次数
+
+---
+
+## 搜索源管理接口 `/api/search-sources`
+
+### `GET /api/search-sources/major-categories` - 获取主分类列表
+
+获取所有激活的主分类。
+
+**返回**: 主分类列表（按显示顺序排序）
+
+---
+
+### `GET /api/search-sources/major-categories/:id` - 获取单个主分类
+
+获取指定主分类的详细信息。
+
+**URL参数**: `id` - 主分类ID
+
+**返回**: 主分类详情
+
+---
+
+### `POST /api/search-sources/major-categories` - 创建主分类
+
+创建新的搜索源大类。
+
+**认证**: 需要（管理员权限）
+
+**请求体**:
+```json
+{
+  "name": "string (1-30字符)",
+  "description": "string?",
+  "icon": "string?",
+  "color": "string? (格式: #RRGGBB)",
+  "requiresKeyword": "boolean?"
+}
+```
+
+**返回**: 新创建的主分类信息
+
+---
+
+### `PUT /api/search-sources/major-categories/:id` - 更新主分类
+
+更新指定主分类的信息。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 主分类ID
+
+**请求体**:
+```json
+{
+  "name": "string?",
+  "description": "string?",
+  "icon": "string?",
+  "color": "string?",
+  "requiresKeyword": "boolean?",
+  "displayOrder": "number?",
+  "isActive": "boolean?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `DELETE /api/search-sources/major-categories/:id` - 删除主分类
+
+删除指定主分类（分类下不能有子分类）。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 主分类ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/search-sources/categories` - 获取分类列表
+
+获取所有激活的分类。
+
+**查询参数**:
+- `majorCategoryId` - 主分类ID（可选，用于筛选）
+
+**返回**: 分类列表（包含所属主分类名称）
+
+---
+
+### `GET /api/search-sources/categories/:id` - 获取单个分类
+
+获取指定分类的详细信息。
+
+**URL参数**: `id` - 分类ID
+
+**返回**: 分类详情
+
+---
+
+### `POST /api/search-sources/categories` - 创建分类
+
+创建新的搜索源分类。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "majorCategoryId": "string (必填)",
+  "name": "string (1-50字符)",
+  "description": "string?",
+  "icon": "string?",
+  "color": "string?",
+  "defaultSearchable": "boolean?",
+  "defaultSiteType": "search | browse | reference?",
+  "searchPriority": "number? (1-10)"
+}
+```
+
+**返回**: 新创建的分类信息
+
+---
+
+### `PUT /api/search-sources/categories/:id` - 更新分类
+
+更新指定分类的信息。
+
+**认证**: 需要
+
+**URL参数**: `id` - 分类ID
+
+**请求体**:
+```json
+{
+  "name": "string?",
+  "description": "string?",
+  "icon": "string?",
+  "color": "string?",
+  "defaultSearchable": "boolean?",
+  "defaultSiteType": "string?",
+  "searchPriority": "number?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `DELETE /api/search-sources/categories/:id` - 删除分类
+
+删除指定分类（分类下不能有搜索源）。
+
+**认证**: 需要
+
+**URL参数**: `id` - 分类ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/search-sources/` - 获取搜索源列表
+
+获取所有激活的搜索源。
+
+**查询参数**:
+- `categoryId` - 分类ID（可选）
+- `searchable` - 是否可搜索（可选，`true`/`false`）
+- `siteType` - 站点类型（可选）
+
+**返回**: 搜索源列表（按搜索优先级和显示顺序排序）
+
+---
+
+### `GET /api/search-sources/:id` - 获取单个搜索源
+
+获取指定搜索源的详细信息。
+
+**URL参数**: `id` - 搜索源ID
+
+**返回**: 搜索源详情
+
+---
+
+### `POST /api/search-sources/` - 创建搜索源
+
+创建新的搜索源。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "categoryId": "string (必填)",
+  "name": "string (必填，最多100字符)",
+  "subtitle": "string?",
+  "description": "string?",
+  "icon": "string?",
+  "urlTemplate": "string (必填，有效URL模板)",
+  "homepageUrl": "string?",
+  "siteType": "search | browse | reference?",
+  "searchable": "boolean?",
+  "requiresKeyword": "boolean?",
+  "searchPriority": "number? (1-10)"
+}
+```
+
+**返回**: 新创建的搜索源信息
+
+---
+
+### `PUT /api/search-sources/:id` - 更新搜索源
+
+更新指定搜索源的信息。
+
+**认证**: 需要
+
+**URL参数**: `id` - 搜索源ID
+
+**请求体**:
+```json
+{
+  "categoryId": "string?",
+  "name": "string?",
+  "subtitle": "string?",
+  "description": "string?",
+  "icon": "string?",
+  "urlTemplate": "string?",
+  "homepageUrl": "string?",
+  "siteType": "string?",
+  "searchable": "boolean?",
+  "requiresKeyword": "boolean?",
+  "searchPriority": "number?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `DELETE /api/search-sources/:id` - 删除搜索源
+
+删除指定搜索源。
+
+**认证**: 需要
+
+**URL参数**: `id` - 搜索源ID
+
+**返回**: 操作结果
+
+---
+
+### `POST /api/search-sources/:id/increment-usage` - 增加使用次数
+
+增加指定搜索源的使用计数。
+
+**URL参数**: `id` - 搜索源ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/search-sources/user-configs/:userId` - 获取用户配置
+
+获取指定用户的搜索源配置。
+
+**URL参数**: `userId` - 用户ID
+
+**返回**: 用户配置列表
+
+---
+
+### `DELETE /api/search-sources/user-configs/:sourceId` - 删除用户配置
+
+删除用户对指定搜索源的配置。
+
+**认证**: 需要
+
+**URL参数**: `sourceId` - 搜索源ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/search-sources/with-user-config/:userId` - 获取带用户配置的搜索源
+
+获取所有搜索源并附带用户的个性化配置。
+
+**URL参数**: `userId` - 用户ID
+
+**返回**: 带用户配置的搜索源列表
+
+---
+
+### `POST /api/search-sources/user-configs/batch` - 批量更新用户配置
+
+批量更新用户对多个搜索源的个性化配置。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "configs": [
+    {
+      "sourceId": "string (必填)",
+      "isEnabled": "boolean?",
+      "customPriority": "number?",
+      "customName": "string?",
+      "customSubtitle": "string?",
+      "customIcon": "string?",
+      "notes": "string?"
+    }
+  ]
+}
+```
+
+**返回**: 更新数量统计
+
+---
+
+### `GET /api/search-sources/popular` - 获取热门搜索源
+
+获取使用量最高的搜索源。
+
+**查询参数**:
+- `limit` - 返回数量（默认20）
+
+**返回**: 热门搜索源列表
+
+---
+
+### `GET /api/search-sources/search` - 搜索搜索源
+
+根据关键词搜索搜索源。
+
+**查询参数**:
+- `keyword` - 搜索关键词（必填）
+
+**返回**: 匹配的搜索源列表（最多20条）
+
+---
+
+### `GET /api/search-sources/stats` - 获取搜索源统计
+
+获取搜索源的整体统计数据。
+
+**返回**: 
+- 总搜索源数、可搜索数
+- 总分类数、总主分类数
+- 使用量Top 10搜索源
+- 各分类搜索源数量
+- 各站点类型数量
+
+---
+
+### `GET /api/search-sources/export` - 导出搜索源
+
+导出搜索源数据。
+
+**查询参数**:
+- `format` - 导出格式（`json`/`csv`/`opml`，默认`json`）
+- `categoryId` - 分类ID（可选，用于筛选）
+
+**返回**: 
+- JSON格式：搜索源列表
+- CSV格式：CSV文件下载
+- OPML格式：OPML文件下载
+
+---
+
+### `GET /api/search-sources/export-user-configs/:userId` - 导出用户配置
+
+导出用户的搜索源配置。
+
+**URL参数**: `userId` - 用户ID
+
+**返回**: 用户配置列表
+
+---
+
+## 社区接口 `/api/community`
+
+### `GET /api/community/tags` - 获取标签列表
+
+获取所有激活的标签。
+
+**返回**: 标签列表（按使用量和名称排序）
+
+---
+
+### `POST /api/community/tags` - 创建标签
+
+创建一个新标签。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "name": "string (2-20字符)",
+  "description": "string?",
+  "color": "string? (格式: #RRGGBB)"
+}
+```
+
+**返回**: 新创建的标签信息
+
+---
+
+### `PUT /api/community/tags/:id` - 更新标签
+
+更新指定标签的信息。
+
+**认证**: 需要
+
+**URL参数**: `id` - 标签ID
+
+**请求体**:
+```json
+{
+  "name": "string?",
+  "description": "string?",
+  "color": "string?",
+  "isActive": "boolean?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `DELETE /api/community/tags/:id` - 删除标签
+
+删除指定标签（不能删除正在使用的标签）。
+
+**认证**: 需要
+
+**URL参数**: `id` - 标签ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/community/sources` - 获取社区搜索源列表
+
+获取社区分享的搜索源列表。
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20）
+- `status` - 状态筛选（默认`active`）
+
+**返回**: 分页的搜索源列表
+
+---
+
+### `GET /api/community/sources/:id` - 获取搜索源详情
+
+获取指定社区搜索源的详细信息。
+
+**URL参数**: `id` - 搜索源ID
+
+**返回**: 搜索源详情（同时增加浏览计数）
+
+---
+
+### `POST /api/community/sources` - 提交搜索源
+
+向社区提交一个新的搜索源。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "sourceName": "string (2-100字符)",
+  "sourceSubtitle": "string?",
+  "sourceIcon": "string?",
+  "sourceUrlTemplate": "string (必填，有效URL模板)",
+  "sourceCategory": "string (必填)",
+  "description": "string?",
+  "tags": "string[]? (最多10个)"
+}
+```
+
+**返回**: 新创建的搜索源信息
+
+---
+
+### `PUT /api/community/sources/:id` - 更新搜索源
+
+更新自己提交的搜索源信息。
+
+**认证**: 需要
+
+**URL参数**: `id` - 搜索源ID
+
+**请求体**:
+```json
+{
+  "sourceName": "string?",
+  "sourceSubtitle": "string?",
+  "sourceIcon": "string?",
+  "description": "string?",
+  "tags": "string[]?",
+  "sourceCategory": "string?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `DELETE /api/community/sources/:id` - 删除搜索源
+
+删除自己提交的搜索源。
+
+**认证**: 需要
+
+**URL参数**: `id` - 搜索源ID
+
+**返回**: 操作结果
+
+---
+
+### `POST /api/community/sources/:id/like` - 点赞/取消点赞
+
+对搜索源进行点赞或取消点赞操作。
+
+**认证**: 需要
+
+**URL参数**: `id` - 搜索源ID
+
+**返回**: 当前点赞状态
+
+---
+
+### `GET /api/community/sources/:id/reviews` - 获取评论列表
+
+获取指定搜索源的评论列表。
+
+**URL参数**: `id` - 搜索源ID
+
+**返回**: 评论列表（包含用户名）
+
+---
+
+### `POST /api/community/reviews` - 创建评论
+
+对搜索源发表评价。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "sharedSourceId": "string (必填)",
+  "rating": "number (1-5)",
+  "comment": "string? (最多1000字符)"
+}
+```
+
+**返回**: 新创建的评论信息
+
+---
+
+### `PUT /api/community/reviews/:id` - 更新评论
+
+更新自己发表的评论。
+
+**认证**: 需要
+
+**URL参数**: `id` - 评论ID
+
+**请求体**:
+```json
+{
+  "rating": "number? (1-5)",
+  "comment": "string? (最多1000字符)"
+}
+```
+
+**返回**: 更新后的评论信息
+
+---
+
+### `DELETE /api/community/reviews/:id` - 删除评论
+
+删除自己发表的评论。
+
+**认证**: 需要
+
+**URL参数**: `id` - 评论ID
+
+**返回**: 操作结果
+
+---
+
+### `POST /api/community/sources/:id/report` - 举报搜索源
+
+举报违规搜索源。
+
+**认证**: 需要
+
+**URL参数**: `id` - 搜索源ID
+
+**请求体**:
+```json
+{
+  "reason": "string (必填，最多100字符)",
+  "details": "string? (最多1000字符)"
+}
+```
+
+**返回**: 举报ID
+
+---
+
+### `POST /api/community/sources/:id/download` - 记录下载
+
+记录搜索源的下载行为。
+
+**认证**: 可选
+
+**URL参数**: `id` - 搜索源ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/community/my-sources` - 获取我的分享
+
+获取当前用户分享的搜索源列表。
+
+**认证**: 需要
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20）
+- `status` - 状态筛选（可选）
+
+**返回**: 分页的搜索源列表
+
+---
+
+### `GET /api/community/popular` - 获取热门分享
+
+获取社区热门搜索源。
+
+**查询参数**:
+- `limit` - 返回数量（默认10）
+
+**返回**: 热门搜索源列表
+
+---
+
+### `GET /api/community/recent` - 获取最新分享
+
+获取社区最新分享的搜索源。
+
+**查询参数**:
+- `limit` - 返回数量（默认10）
+
+**返回**: 最新搜索源列表
+
+---
+
+### `GET /api/community/search` - 搜索社区资源
+
+在社区中搜索搜索源。
+
+**查询参数**:
+- `keyword` - 搜索关键词（必填）
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20）
+
+**返回**: 分页的搜索结果
+
+---
+
+### `GET /api/community/user-stats` - 获取用户统计
+
+获取当前用户在社区的统计数据。
+
+**认证**: 需要
+
+**返回**: 
+- 分享数量、待审核数量
+- 总下载量、总点赞、总浏览
+- 平均评分、评论数、创建标签数
+- 最近分享记录
+
+---
+
+## 管理员接口 `/api/admin`
+
+所有管理员接口需要管理员或超级管理员权限。
+
+### `GET /api/admin/users` - 获取用户列表
+
+获取系统用户列表。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20，最大100）
+- `search` - 搜索关键词（用户名/邮箱）
+- `status` - 状态筛选（`active`/`inactive`）
+
+**返回**: 
+- 用户列表（ID、用户名、邮箱、状态、登录次数等）
+- 分页信息
+
+---
+
+### `GET /api/admin/users/:id` - 获取用户详情
+
+获取指定用户的详细信息。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 用户ID
+
+**返回**: 
+- 用户详细信息
+- 统计数据（收藏数、历史数、活跃会话数）
+- 最近会话列表
+
+---
+
+### `PUT /api/admin/users/:id/status` - 更新用户状态
+
+启用或禁用用户账户。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 用户ID
+
+**请求体**:
+```json
+{
+  "isActive": "boolean",
+  "reason": "string?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `PUT /api/admin/users/:id/permissions` - 更新用户权限
+
+更新用户的权限列表。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 用户ID
+
+**请求体**:
+```json
+{
+  "permissions": "string[]"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/admin/reports` - 获取举报列表
+
+获取社区举报列表。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20，最大100）
+- `status` - 状态筛选（默认`pending`）
+
+**返回**: 
+- 举报列表（包含搜索源名称、举报人信息）
+- 分页信息
+
+---
+
+### `PUT /api/admin/reports/:id` - 处理举报
+
+处理举报并执行相应操作。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 举报ID
+
+**请求体**:
+```json
+{
+  "status": "resolved | dismissed",
+  "action": "remove_source | warning | ignore?",
+  "notes": "string?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/admin/stats` - 获取系统统计
+
+获取系统整体统计数据。
+
+**认证**: 需要（管理员权限）
+
+**返回**: 
+- 用户统计（总数、活跃、已验证、本周新增、日活）
+- 搜索源统计（总数、活跃、可搜索、总使用量）
+- 搜索统计（总数、独立用户、独立关键词）
+- 社区统计（分享数、标签数、评论数、待处理举报）
+- Top搜索关键词（10条）
+- Top使用搜索源（10条）
+
+---
+
+### `GET /api/admin/logs` - 获取行为日志
+
+获取用户行为日志。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认50，最大200）
+- `userId` - 用户ID筛选
+- `action` - 行为类型筛选
+
+**返回**: 
+- 日志列表（包含用户名）
+- 分页信息
+
+---
+
+### `POST /api/admin/cleanup` - 清理过期数据
+
+清理系统中的过期数据。
+
+**认证**: 需要（管理员权限）
+
+**返回**: 
+- 过期会话数
+- 过期验证码数
+- 旧密码重置日志数
+- 过期安全锁定数
+
+---
+
+## 系统配置接口 `/api/config`
+
+### `GET /api/config/public` - 获取公开配置
+
+获取系统公开配置信息（无需认证）。
+
+**返回**: 公开配置键值对
+
+---
+
+### `GET /api/config/all` - 获取所有配置
+
+获取所有系统配置。
+
+**认证**: 需要（管理员权限）
+
+**返回**: 配置列表
+
+---
+
+### `PUT /api/config/:key` - 更新配置
+
+更新指定配置项。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `key` - 配置键名
+
+**请求体**:
+```json
+{
+  "value": "string",
+  "description": "string?",
+  "configType": "string | number | boolean | json?",
+  "isPublic": "boolean?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `DELETE /api/config/:key` - 删除配置
+
+删除指定配置项。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `key` - 配置键名
+
+**返回**: 操作结果
+
+---
+
+## 分析接口 `/api/analytics`
+
+### `POST /api/analytics/events` - 记录分析事件
+
+记录用户行为分析事件。
+
+**请求体**:
+```json
+{
+  "userId": "string?",
+  "sessionId": "string?",
+  "eventType": "string (必填)",
+  "eventData": "object?",
+  "referer": "string?"
+}
+```
+
+**返回**: 事件ID
+
+---
+
+### `GET /api/analytics/stats` - 获取分析统计
+
+获取分析事件统计数据。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `days` - 统计天数（默认7，最大30）
+
+**返回**: 
+- 总事件数
+- 独立用户数
+- 独立会话数
+- 按类型分组统计
+- 每日事件统计
+
+---
+
+## 缓存接口 `/api/cache`
+
+### `GET /api/cache/search` - 获取搜索缓存
+
+获取搜索结果缓存。
+
+**查询参数**:
+- `keyword` - 搜索关键词
+
+**返回**: 缓存的搜索结果或null
+
+---
+
+### `POST /api/cache/search` - 设置搜索缓存
+
+设置搜索结果缓存。
+
+**请求体**:
+```json
+{
+  "keyword": "string (必填)",
+  "results": "array (必填)",
+  "ttlMinutes": "number? (默认60)"
+}
+```
+
+**返回**: 缓存状态
+
+---
+
+### `POST /api/cache/cleanup` - 清理过期缓存
+
+清理过期的搜索缓存。
+
+**返回**: 删除数量
+
+---
+
+## 邮件接口 `/api/email`
+
+### `GET /api/email/logs` - 获取邮件发送日志
+
+获取邮件发送日志。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认50，最大200）
+- `type` - 邮件类型筛选
+- `status` - 发送状态筛选
+
+**返回**: 
+- 日志列表（包含用户名）
+- 分页信息
+
+---
+
+## 系统接口 `/api`
+
+### `GET /` - API信息
+
+获取API基本信息。
+
+**返回**: API名称、版本、状态
+
+---
+
+### `GET /health` - 健康检查
+
+检查服务健康状态。
+
+**返回**: 状态和时间戳
+
+---
+
+### `GET /api/public-config` - 获取公开配置
+
+获取系统公开配置信息（无需认证）。
+
+**返回**: 
+- 应用版本
+- 是否允许注册
+- 用户名/密码长度限制
+- 收藏/历史/标签数量限制
+- 是否启用行为日志
+
+---
+
+### `GET /api/config` - 获取系统配置
+
+获取系统配置信息。
+
+**返回**: 同公开配置
+
+---
+
+### `GET /api/stats` - 获取统计信息
+
+获取系统统计数据。
+
+**返回**: 
+- 活跃用户数
+- 活跃搜索源数
+- 总搜索次数
+
+---
+
+### `GET /api/source-status-check` - 搜索源状态检查
+
+检查指定搜索源的可用状态。
+
+**查询参数**:
+- `sourceId` - 搜索源ID（必填）
+- `keyword` - 测试关键词（可选，默认`test`）
+
+**返回**: 
+- 状态（online/offline/error/unknown）
+- 是否可用
+- 响应时间
+- 错误信息（如有）
+
+---
+
+### `GET /api/source-status-history/:sourceId` - 获取状态检查历史
+
+获取指定搜索源的状态检查历史记录。
+
+**URL参数**: `sourceId` - 搜索源ID
+
+**查询参数**:
+- `limit` - 返回数量（默认50）
+- `hours` - 时间范围（默认24小时）
+
+**返回**: 
+- 搜索源信息
+- 历史记录列表
+- 统计摘要（可用率、平均响应时间等）
+
+---
+
+### `GET /api/source-status-batch` - 批量状态检查
+
+批量检查多个搜索源的状态。
+
+**查询参数**:
+- `sourceIds` - 搜索源ID列表（逗号分隔，最多50个）
+
+**返回**: 各搜索源状态列表
+
+---
+
+### `DELETE /api/source-status-cache/:sourceId` - 清除状态缓存
+
+清除指定搜索源的状态检查缓存。
+
+**URL参数**: `sourceId` - 搜索源ID
+
+**返回**: 操作结果
+
+---
+
+### `POST /api/record-action` - 记录用户行为
+
+记录用户行为日志。
+
+**请求体**:
+```json
+{
+  "userId": "string?",
+  "action": "string",
+  "data": "object?"
+}
+```
+
+**返回**: 行为记录ID
+
+---
+
+### `GET /api/user-actions` - 获取行为日志
+
+查询用户行为日志。
+
+**查询参数**:
+- `userId` - 用户ID（可选）
+- `action` - 行为类型（可选）
+- `limit` - 返回数量（默认100）
+- `offset` - 偏移量（默认0）
+
+**返回**: 行为日志列表、总数
+
+---
+
+## 错误码说明
+
+| 错误码 | 说明 |
+|--------|------|
+| `VALIDATION_ERROR` | 参数验证失败 |
+| `AUTH_ERROR` | 认证失败 |
+| `FORBIDDEN` | 权限不足 |
+| `NOT_FOUND` | 资源不存在 |
+| `DUPLICATE_ERROR` | 资源已存在 |
+| `SERVER_ERROR` | 服务器内部错误 |
+
+---
+
+## API调用示例
+
+```javascript
+const API_BASE = '/api';
+
+async function login(identifier, password) {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier, password })
+  });
+  const data = await response.json();
+  if (data.success) {
+    localStorage.setItem('authToken', data.data.token);
+    return data.data.user;
+  }
+  throw new Error(data.error?.message || '登录失败');
+}
+
+async function fetchWithAuth(url, options = {}) {
+  const token = localStorage.getItem('authToken');
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`
+    }
+  });
+}
+
+async function search(keyword, sourceIds = []) {
+  const response = await fetchWithAuth(`${API_BASE}/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keyword, sourceIds })
+  });
+  return response.json();
+}
+
+async function getFavorites() {
+  const response = await fetchWithAuth(`${API_BASE}/user/favorites`);
+  return response.json();
+}
+
+async function addFavorite(favorite) {
+  const response = await fetchWithAuth(`${API_BASE}/user/favorites`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(favorite)
+  });
+  return response.json();
+}
+
+async function getSearchSources(categoryId) {
+  const url = categoryId 
+    ? `${API_BASE}/search-sources/?categoryId=${categoryId}`
+    : `${API_BASE}/search-sources/`;
+  const response = await fetch(url);
+  return response.json();
+}
+
+async function createSearchSource(sourceData) {
+  const response = await fetchWithAuth(`${API_BASE}/search-sources/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sourceData)
+  });
+  return response.json();
+}
+
+async function batchUpdateConfigs(configs) {
+  const response = await fetchWithAuth(`${API_BASE}/search-sources/user-configs/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ configs })
+  });
+  return response.json();
+}
+
+async function exportSources(format = 'json') {
+  const response = await fetch(`${API_BASE}/search-sources/export?format=${format}`);
+  if (format === 'json') {
+    return response.json();
+  }
+  return response.blob();
+}
+
+async function checkSourceStatus(sourceId) {
+  const response = await fetch(`${API_BASE}/source-status-check?sourceId=${sourceId}`);
+  return response.json();
+}
+
+async function sendVerificationCode(email, type) {
+  const response = await fetch(`${API_BASE}/auth/smart-send-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, verificationType: type })
+  });
+  return response.json();
+}
+
+async function getTrendingSearches(hours = 24) {
+  const response = await fetch(`${API_BASE}/search/trending?hours=${hours}`);
+  return response.json();
+}
+
+async function getSearchSuggestions(keyword) {
+  const response = await fetch(`${API_BASE}/search/suggestions?keyword=${encodeURIComponent(keyword)}`);
+  return response.json();
+}
+
+async function getAdminStats() {
+  const response = await fetchWithAuth(`${API_BASE}/admin/stats`);
+  return response.json();
+}
+
+async function getAdminUsers(page = 1, search = '') {
+  const url = `${API_BASE}/admin/users?page=${page}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
+  const response = await fetchWithAuth(url);
+  return response.json();
+}
+
+async function updateUserStatus(userId, isActive, reason = '') {
+  const response = await fetchWithAuth(`${API_BASE}/admin/users/${userId}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isActive, reason })
+  });
+  return response.json();
+}
+
+async function getAdminReports(status = 'pending') {
+  const response = await fetchWithAuth(`${API_BASE}/admin/reports?status=${status}`);
+  return response.json();
+}
+
+async function handleReport(reportId, status, action, notes = '') {
+  const response = await fetchWithAuth(`${API_BASE}/admin/reports/${reportId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, action, notes })
+  });
+  return response.json();
+}
+```
