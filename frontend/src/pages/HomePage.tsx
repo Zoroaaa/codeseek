@@ -15,8 +15,6 @@ import {
   ShieldAlert,
   Loader2,
   Settings,
-  Menu,
-  X,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { Button } from '@/components/ui';
@@ -25,7 +23,7 @@ import { useNavigate, Link } from 'react-router-dom';
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
-  const { theme, toggleTheme } = useThemeStore();
+  const { resolvedTheme, toggleTheme } = useThemeStore();
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy, initializeProxy } = useProxyStore();
 
   useEffect(() => {
@@ -117,7 +115,7 @@ export const HomePage: React.FC = () => {
                 onClick={toggleTheme}
                 className="p-2 rounded-lg text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-200 dark:hover:bg-surface-800 transition-colors"
               >
-                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               {isAuthenticated ? (
                 <Button variant="primary" onClick={() => navigate('/main')}>
@@ -293,45 +291,6 @@ export const HomePage: React.FC = () => {
           </p>
         </div>
       </footer>
-
-      <button
-        onClick={() => {
-          const menu = document.getElementById('mobile-menu');
-          menu?.classList.toggle('hidden');
-        }}
-        className="fixed bottom-6 right-6 z-50 p-4 rounded-full bg-primary-500 text-white shadow-lg md:hidden"
-      >
-        <Menu className="w-6 h-6" />
-      </button>
-
-      <div id="mobile-menu" className="fixed inset-0 z-50 hidden md:hidden">
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => {
-          const menu = document.getElementById('mobile-menu');
-          menu?.classList.add('hidden');
-        }} />
-        <div className="absolute right-0 top-0 bottom-0 w-72 bg-white dark:bg-surface-900 shadow-xl">
-          <div className="p-4 border-b border-surface-200 dark:border-surface-800">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-surface-900 dark:text-surface-100">菜单</span>
-              <button
-                onClick={() => {
-                  const menu = document.getElementById('mobile-menu');
-                  menu?.classList.add('hidden');
-                }}
-                className="p-2 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          <div className="p-4 space-y-2">
-            <Link to="/" className="block p-3 rounded-lg text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800">首页</Link>
-            <Link to="/main" className="block p-3 rounded-lg text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800">主页</Link>
-            <Link to="/dashboard" className="block p-3 rounded-lg text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800">控制台</Link>
-            <Link to="/dashboard/settings" className="block p-3 rounded-lg text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800">设置</Link>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

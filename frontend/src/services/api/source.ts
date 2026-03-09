@@ -463,7 +463,14 @@ export const sourceApi = {
     success: boolean; 
     data: UserSourceConfig[] 
   }> => {
-    return apiClient.get('/search-sources/export-user-configs');
+    const token = apiClient.getToken();
+    if (!token) return { success: false, data: [] };
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return apiClient.get(`/search-sources/export-user-configs/${payload.userId}`);
+    } catch {
+      return { success: false, data: [] };
+    }
   },
 
   checkSourceStatus: async (sourceId: string, keyword = 'test'): Promise<{ 
@@ -508,7 +515,8 @@ export const sourceApi = {
       responseTime: number;
     }> 
   }> => {
-    return apiClient.post('/source-status-batch', { sourceIds });
+    const params = sourceIds.map(id => `sourceIds=${encodeURIComponent(id)}`).join('&');
+    return apiClient.get(`/source-status-batch?${params}`);
   },
 
   clearSourceStatusCache: async (sourceId: string): Promise<{ success: boolean; message: string }> => {

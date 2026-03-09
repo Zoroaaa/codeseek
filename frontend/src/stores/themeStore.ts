@@ -97,15 +97,13 @@ export const useThemeStore = create<ThemeState>()(
         sidebarCollapsed: state.sidebarCollapsed,
         sidebarWidth: state.sidebarWidth,
       }),
-      onRehydrateStorage: () => () => {
-        setTimeout(() => {
-          const state = useThemeStore.getState();
-          if (state) {
-            const resolvedTheme = resolveTheme(state.theme);
-            applyTheme(resolvedTheme);
-            useThemeStore.setState({ resolvedTheme });
-          }
-        }, 0);
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const resolvedTheme = resolveTheme(state.theme);
+          applyTheme(resolvedTheme);
+          // 同步更新 resolvedTheme，避免第一次点击无响应
+          state.resolvedTheme = resolvedTheme;
+        }
       },
     }
   )

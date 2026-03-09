@@ -19,7 +19,7 @@ export const searchRoutes = new Hono<{ Bindings: Env }>();
 searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
   const userPayload = c.get('user');
   const body = await c.req.json();
-  const { keyword, sourceIds, page = 1, pageSize = 20 } = body;
+  const { keyword, page = 1, pageSize = 20 } = body;
 
   if (!keyword || !keyword.trim()) {
     return c.json(error('VALIDATION_ERROR', '搜索关键词不能为空'), 400);
@@ -28,24 +28,39 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
   const trimmedKeyword = keyword.trim();
   const limitPageSize = Math.min(Math.max(1, pageSize), 100);
   const limitPage = Math.max(1, page);
+  const { majorCategoryId } = body;
 
   try {
     if (userPayload) {
-      const sources = sourceIds && sourceIds.length > 0 ? sourceIds : [];
-
-      for (const sourceId of sources.slice(0, 5)) {
-        const historyId = generateId();
-        await c.env.DB.prepare(
-          `INSERT INTO user_search_history (id, user_id, query, source, results_count, created_at)
-           VALUES (?, ?, ?, ?, 0, ?)`
-        ).bind(historyId, userPayload.userId, trimmedKeyword, sourceId, Date.now()).run();
-      }
+      // 记录搜索历史（无论是否有 sourceIds）
+      const historyId = generateId();
+      await c.env.DB.prepare(
+        `INSERT INTO user_search_history (id, user_id, query, source, results_count, created_at)
+         VALUES (?, ?, ?, ?, 0, ?)`
+      ).bind(historyId, userPayload.userId, trimmedKeyword, majorCategoryId || 'all', Date.now()).run();
     }
 
-    const sources = await c.env.DB.prepare(
-      `SELECT * FROM search_sources WHERE is_active = 1 AND searchable = 1 
-       ORDER BY search_priority DESC, display_order ASC`
-    ).all<SearchSource>();
+    // 根据 majorCategoryId 过滤搜索源
+    let query: string;
+    let params: (string | number)[];
+
+    if (majorCategoryId) {
+      query = `
+        SELECT s.* FROM search_sources s
+        INNER JOIN search_source_categories c ON s.category_id = c.id
+        WHERE s.is_active = 1 AND s.searchable = 1 AND c.major_category_id = ?
+        ORDER BY s.search_priority DESC, s.display_order ASC
+      `;
+      params = [majorCategoryId];
+    } else {
+      query = `SELECT * FROM search_sources WHERE is_active = 1 AND searchable = 1 
+               ORDER BY search_priority DESC, display_order ASC`;
+      params = [];
+    }
+
+    const sources = params.length > 0
+      ? await c.env.DB.prepare(query).bind(...params).all<SearchSource>()
+      : await c.env.DB.prepare(query).all<SearchSource>();
 
     const searchResults = (sources.results || []).map(source => ({
       id: source.id,
