@@ -39,6 +39,26 @@ const applyTheme = (resolvedTheme: 'light' | 'dark') => {
   }
 };
 
+const initializeTheme = () => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const stored = localStorage.getItem('theme-storage');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const theme = parsed.state?.theme || 'system';
+      const resolvedTheme = resolveTheme(theme);
+      applyTheme(resolvedTheme);
+    } else {
+      applyTheme(resolveTheme('system'));
+    }
+  } catch {
+    applyTheme(resolveTheme('system'));
+  }
+};
+
+initializeTheme();
+
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({

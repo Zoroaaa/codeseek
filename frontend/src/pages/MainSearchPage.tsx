@@ -18,8 +18,15 @@ import {
   Sun,
   LogOut,
   LayoutDashboard,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Loader2,
+  Sparkles,
+  TrendingUp,
+  Zap,
 } from 'lucide-react';
-import { useSearchStore, useSourceStore, useAuthStore, useThemeStore } from '@/stores';
+import { useSearchStore, useSourceStore, useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { searchApi, sourceApi, userApi } from '@/services/api';
 import { Button, Input, Card, Badge, Loading, EmptyState } from '@/components/ui';
 import { useToast } from '@/components/ui/Toast';
@@ -42,6 +49,7 @@ export const MainSearchPage: React.FC = () => {
   const { theme, toggleTheme } = useThemeStore();
   const { keyword, setKeyword, setResults, isSearching, setSearching } = useSearchStore();
   const { majorCategories, setMajorCategories, sources, setSources, categories, setCategories } = useSourceStore();
+  const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy, initializeProxy } = useProxyStore();
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -78,7 +86,8 @@ export const MainSearchPage: React.FC = () => {
       }
     };
     loadData();
-  }, [setMajorCategories, setSources, setCategories]);
+    initializeProxy();
+  }, [setMajorCategories, setSources, setCategories, initializeProxy]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -238,28 +247,67 @@ export const MainSearchPage: React.FC = () => {
     });
   };
 
+  const handleNavigateToDashboard = () => {
+    navigate('/dashboard');
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
   return (
-    <div className="min-h-screen bg-surface-50 dark:bg-surface-950">
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-surface-900/80 backdrop-blur-lg border-b border-surface-200 dark:border-surface-800">
+    <div className="min-h-screen bg-gradient-to-br from-surface-50 via-white to-primary-50/30 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950/30">
+      <header className="sticky top-0 z-40 bg-white/80 dark:bg-surface-900/80 backdrop-blur-xl border-b border-surface-200/50 dark:border-surface-700/50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-8">
-              <Link to="/main" className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center">
-                  <Search className="w-4 h-4 text-white" />
-                </div>
-                <span className="font-bold gradient-text">磁力快搜</span>
+            <Link to="/main" className="flex items-center gap-2 group">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/25 group-hover:shadow-primary-500/40 transition-shadow">
+                <Search className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent hidden sm:block">
+                磁力快搜
+              </span>
+            </Link>
+
+            <nav className="hidden md:flex items-center gap-1 bg-surface-100/50 dark:bg-surface-800/50 rounded-full px-2 py-1">
+              <Link 
+                to="/main" 
+                className="px-4 py-2 text-sm font-medium rounded-lg text-primary-600 dark:text-primary-400 bg-white dark:bg-surface-800 shadow-sm"
+              >
+                主页
               </Link>
-              <nav className="hidden md:flex items-center gap-1">
-                <Link to="/main" className="px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400">
-                  主页
-                </Link>
-                <Link to="/dashboard" className="px-3 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100">
-                  控制台
-                </Link>
-              </nav>
-            </div>
-            <div className="flex items-center gap-3">
+              <Link 
+                to="/dashboard" 
+                className="px-4 py-2 text-sm font-medium rounded-lg text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 hover:bg-white dark:hover:bg-surface-700"
+              >
+                控制台
+              </Link>
+            </nav>
+
+            <div className="flex items-center gap-2 sm:gap-1">
+              <button
+                onClick={toggleProxy}
+                disabled={isProxyLoading}
+                className={`p-2 rounded-lg transition-all duration-200 ${
+                  isProxyEnabled 
+                    ? 'text-success-600 hover:text-success-700 hover:bg-success-50 dark:text-success-400 dark:hover:bg-success-900/20' 
+                    : proxyStatus === 'error'
+                    ? 'text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20'
+                    : 'text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-200 dark:hover:bg-surface-800'
+                }`}
+                title={isProxyEnabled ? '代理已启用 - 点击关闭' : '代理已关闭 - 点击启用'}
+              >
+                {isProxyLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : isProxyEnabled ? (
+                  <ShieldCheck className="w-5 h-5" />
+                ) : proxyStatus === 'error' ? (
+                  <ShieldAlert className="w-5 h-5" />
+                ) : (
+                  <Shield className="w-5 h-5" />
+                )}
+              </button>
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-lg text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-200 dark:hover:bg-surface-800 transition-colors"
@@ -269,39 +317,44 @@ export const MainSearchPage: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate('/dashboard')}
+                onClick={handleNavigateToDashboard}
                 leftIcon={<LayoutDashboard className="w-4 h-4" />}
+                className="hidden sm:flex"
               >
                 控制台
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  logout();
-                  navigate('/');
-                }}
+                onClick={handleLogout}
                 leftIcon={<LogOut className="w-4 h-4" />}
               >
-                退出
+                <span className="hidden sm:inline">退出</span>
               </Button>
             </div>
           </div>
         </div>
       </header>
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
-            欢迎回来，{user?.username}
-          </h1>
-          <p className="text-surface-600 dark:text-surface-400">
-            开始搜索您需要的资源
-          </p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+                欢迎回来，{user?.username}
+              </h1>
+              <p className="text-surface-600 dark:text-surface-400">
+                开始搜索您需要的资源
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-surface-900 rounded-2xl shadow-soft border border-surface-200 dark:border-surface-800 p-4 mb-6">
-          <div className="flex items-center gap-4">
+        <div className="bg-white dark:bg-surface-900 rounded-2xl shadow-xl border border-surface-200/50 dark:border-surface-700/50 p-6 mb-8 backdrop-blur-sm">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
             <div className="flex-1 relative">
               <Input
                 type="text"
@@ -319,19 +372,21 @@ export const MainSearchPage: React.FC = () => {
               size="lg"
               onClick={handleSearch}
               isLoading={isSearching}
+              leftIcon={<Search className="w-5 h-5" />}
+              className="w-full sm:w-auto"
             >
               搜索
             </Button>
           </div>
 
           {majorCategories.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 mt-4">
-              <span className="text-sm text-surface-500 dark:text-surface-400">分类:</span>
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-surface-200/50 dark:border-surface-700/50">
+              <span className="text-sm text-surface-500 dark:text-surface-400 font-medium">分类:</span>
               <button
                 onClick={() => setSelectedCategory(null)}
-                className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                className={`px-4 py-1.5 text-sm rounded-full transition-all duration-200 ${
                   selectedCategory === null
-                    ? 'bg-primary-500 text-white'
+                    ? 'bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-md'
                     : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-700'
                 }`}
               >
@@ -341,9 +396,9 @@ export const MainSearchPage: React.FC = () => {
                 <button
                   key={category.id}
                   onClick={() => setSelectedCategory(category.id)}
-                  className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                  className={`px-4 py-1.5 text-sm rounded-full transition-all duration-200 ${
                     selectedCategory === category.id
-                      ? 'bg-primary-500 text-white'
+                      ? 'bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-md'
                       : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-700'
                   }`}
                 >
@@ -355,23 +410,25 @@ export const MainSearchPage: React.FC = () => {
         </div>
 
         {searchResults.length > 0 && (
-          <Card className="p-4 mb-6">
-            <div className="flex items-center justify-between mb-4">
+          <Card className="p-6 mb-8 border-surface-200/50 dark:border-surface-700/50 shadow-xl">
+            <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 flex items-center gap-2">
-                <Search className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                  <Search className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                </div>
                 搜索结果
-                <Badge variant="primary">{searchResults.length}</Badge>
+                <Badge variant="primary" className="ml-2">{searchResults.length}</Badge>
               </h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600' : 'text-surface-400'}`}
+                  className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600' : 'text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'}`}
                 >
                   <List className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600' : 'text-surface-400'}`}
+                  className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600' : 'text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'}`}
                 >
                   <Grid className="w-4 h-4" />
                 </button>
@@ -382,17 +439,20 @@ export const MainSearchPage: React.FC = () => {
             </div>
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-3'}>
               {searchResults.map((result, index) => (
-                <Card key={index} hover className="p-4">
+                <Card key={index} hover className="p-4 border-surface-200/50 dark:border-surface-700/50 hover:shadow-lg transition-all duration-200">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-surface-900 dark:text-surface-100 truncate">
                         {result.title || result.sourceName}
                       </h3>
                       <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-surface-500 dark:text-surface-400">
-                        {result.size && <span>{result.size}</span>}
+                        {result.size && <span className="px-2 py-0.5 bg-surface-100 dark:bg-surface-800 rounded">{result.size}</span>}
                         {result.date && <span>• {result.date}</span>}
                         {result.seeders !== undefined && (
-                          <span className="text-success-600 dark:text-success-400">↑{result.seeders}</span>
+                          <span className="text-success-600 dark:text-success-400 flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            {result.seeders}
+                          </span>
                         )}
                         {result.leechers !== undefined && (
                           <span className="text-warning-600 dark:text-warning-400">↓{result.leechers}</span>
@@ -400,7 +460,7 @@ export const MainSearchPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Badge variant="outline">{result.sourceName}</Badge>
+                      <Badge variant="outline" className="text-xs">{result.sourceName}</Badge>
                       {result.magnetLink && (
                         <Button variant="ghost" size="sm" onClick={() => handleCopyMagnet(result.magnetLink!)} title="复制磁力链接">
                           <Copy className="w-4 h-4" />
@@ -424,23 +484,25 @@ export const MainSearchPage: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Card className="overflow-hidden">
+            <Card className="overflow-hidden border-surface-200/50 dark:border-surface-700/50 shadow-lg">
               <button
                 onClick={() => setShowHistory(!showHistory)}
-                className="w-full flex items-center justify-between p-4 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-primary-500" />
+                  <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                  </div>
                   <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">搜索历史</h2>
                   {searchHistory.length > 0 && (
                     <Badge variant="primary">{searchHistory.length}</Badge>
                   )}
                 </div>
-                {showHistory ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                {showHistory ? <ChevronDown className="w-5 h-5 text-surface-400" /> : <ChevronRight className="w-5 h-5 text-surface-400" />}
               </button>
               
               {showHistory && (
-                <div className="border-t border-surface-200 dark:border-surface-700">
+                <div className="border-t border-surface-200/50 dark:border-surface-700/50">
                   {isLoadingHistory ? (
                     <div className="p-8 flex justify-center">
                       <Loading />
@@ -451,7 +513,7 @@ export const MainSearchPage: React.FC = () => {
                         {searchHistory.map((item) => (
                           <div
                             key={item.id}
-                            className="flex items-center justify-between p-3 hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer"
+                            className="flex items-center justify-between p-3 hover:bg-surface-50 dark:hover:bg-surface-800/50 cursor-pointer transition-colors"
                             onClick={() => {
                               setKeyword(item.query);
                               handleSearch();
@@ -483,13 +545,15 @@ export const MainSearchPage: React.FC = () => {
               )}
             </Card>
 
-            <Card className="overflow-hidden">
+            <Card className="overflow-hidden border-surface-200/50 dark:border-surface-700/50 shadow-lg">
               <button
                 onClick={() => setShowFavorites(!showFavorites)}
-                className="w-full flex items-center justify-between p-4 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <Heart className="w-5 h-5 text-error-500" />
+                  <div className="w-10 h-10 rounded-xl bg-error-100 dark:bg-error-900/30 flex items-center justify-center">
+                    <Heart className="w-5 h-5 text-error-600 dark:text-error-400" />
+                  </div>
                   <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">我的收藏</h2>
                   {favorites.length > 0 && (
                     <Badge variant="error">{favorites.length}</Badge>
@@ -501,12 +565,12 @@ export const MainSearchPage: React.FC = () => {
                       <Download className="w-4 h-4" />
                     </Button>
                   )}
-                  {showFavorites ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                  {showFavorites ? <ChevronDown className="w-5 h-5 text-surface-400" /> : <ChevronRight className="w-5 h-5 text-surface-400" />}
                 </div>
               </button>
               
               {showFavorites && (
-                <div className="border-t border-surface-200 dark:border-surface-700">
+                <div className="border-t border-surface-200/50 dark:border-surface-700/50">
                   {isLoadingFavorites ? (
                     <div className="p-8 flex justify-center">
                       <Loading />
@@ -514,7 +578,7 @@ export const MainSearchPage: React.FC = () => {
                   ) : favorites.length > 0 ? (
                     <div className="divide-y divide-surface-100 dark:divide-surface-800 max-h-64 overflow-y-auto">
                       {favorites.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between p-3 hover:bg-surface-50 dark:hover:bg-surface-800">
+                        <div key={item.id} className="flex items-center justify-between p-3 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors">
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
                             {item.subtitle && (
@@ -544,22 +608,24 @@ export const MainSearchPage: React.FC = () => {
             </Card>
           </div>
 
-          <div className="lg:col-span-1">
-            <Card className="overflow-hidden">
+          <div className="lg:col-span-1 space-y-6">
+            <Card className="overflow-hidden border-surface-200/50 dark:border-surface-700/50 shadow-lg">
               <button
                 onClick={() => setShowSites(!showSites)}
-                className="w-full flex items-center justify-between p-4 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <Globe className="w-5 h-5 text-accent-500" />
+                  <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+                    <Globe className="w-5 h-5 text-accent-600 dark:text-accent-400" />
+                  </div>
                   <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">站点导航</h2>
                   <Badge variant="accent">{sources.length}</Badge>
                 </div>
-                {showSites ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                {showSites ? <ChevronDown className="w-5 h-5 text-surface-400" /> : <ChevronRight className="w-5 h-5 text-surface-400" />}
               </button>
               
               {showSites && (
-                <div className="border-t border-surface-200 dark:border-surface-700 max-h-[500px] overflow-y-auto">
+                <div className="border-t border-surface-200/50 dark:border-surface-700/50 max-h-[500px] overflow-y-auto">
                   {majorCategories.map((category) => {
                     const categorySources = getSourcesByMajorCategory(category.id);
                     if (categorySources.length === 0) return null;
@@ -568,7 +634,7 @@ export const MainSearchPage: React.FC = () => {
                       <div key={category.id} className="border-b border-surface-100 dark:border-surface-800 last:border-b-0">
                         <button
                           onClick={() => toggleCategory(category.id)}
-                          className="w-full flex items-center justify-between p-3 hover:bg-surface-50 dark:hover:bg-surface-800"
+                          className="w-full flex items-center justify-between p-3 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-lg">{category.icon || '📁'}</span>
@@ -587,10 +653,14 @@ export const MainSearchPage: React.FC = () => {
                             {categorySources.map((source) => (
                               <div
                                 key={source.id}
-                                className="flex items-center justify-between p-2 bg-surface-50 dark:bg-surface-800 rounded-lg"
+                                className="flex items-center justify-between p-2 bg-surface-50 dark:bg-surface-800/50 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
                               >
                                 <div className="flex items-center gap-2">
-                                  <span>{source.icon || '🔗'}</span>
+                                  {source.icon && (source.icon.startsWith('http') || source.icon.startsWith('/') || source.icon.startsWith('data:')) ? (
+                                    <img src={source.icon} alt={source.name} className="w-5 h-5 rounded" />
+                                  ) : (
+                                    <span className="text-base">{source.icon || '🔗'}</span>
+                                  )}
                                   <span className="text-sm text-surface-700 dark:text-surface-300">{source.name}</span>
                                 </div>
                                 <Button
@@ -611,16 +681,20 @@ export const MainSearchPage: React.FC = () => {
               )}
             </Card>
 
-            <Card className="mt-6 p-4">
-              <h3 className="font-semibold text-surface-900 dark:text-surface-100 mb-3 flex items-center gap-2">
-                <Database className="w-5 h-5 text-primary-500" />
+            <Card className="p-4 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
+              <h3 className="font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                </div>
                 快捷操作
               </h3>
               <div className="space-y-2">
-                <Button variant="outline" fullWidth onClick={() => navigate('/dashboard/sources')}>
+                <Button variant="outline" fullWidth onClick={() => navigate('/dashboard/sources')} className="justify-start">
+                  <Database className="w-4 h-4 mr-2" />
                   管理搜索源
                 </Button>
-                <Button variant="outline" fullWidth onClick={() => navigate('/dashboard/settings')}>
+                <Button variant="outline" fullWidth onClick={() => navigate('/dashboard/settings')} className="justify-start">
+                  <LayoutDashboard className="w-4 h-4 mr-2" />
                   系统设置
                 </Button>
               </div>
