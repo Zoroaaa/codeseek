@@ -92,7 +92,7 @@ authRoutes.post('/register', async (c) => {
   }
 
   const body = await c.req.json();
-  const { username, email, password } = body;
+  const { username, email, password, verificationCode } = body;
 
   if (!username || !email || !password) {
     return c.json(error('VALIDATION_ERROR', '请填写所有必填项'), 400);
@@ -119,6 +119,25 @@ authRoutes.post('/register', async (c) => {
       return c.json(error('VALIDATION_ERROR', '用户名或邮箱已被注册'), 400);
     }
 
+    let emailVerified = 0;
+    if (verificationCode) {
+      const verification = await c.env.DB.prepare(`
+        SELECT * FROM email_verifications 
+        WHERE email = ? AND verification_code = ? AND verification_type = 'registration' AND expires_at > ?
+        ORDER BY created_at DESC LIMIT 1
+      `).bind(email, verificationCode, Date.now()).first<EmailVerification>();
+
+      if (!verification) {
+        return c.json(error('VALIDATION_ERROR', '验证码无效或已过期'), 400);
+      }
+
+      emailVerified = 1;
+      
+      await c.env.DB.prepare(
+        'DELETE FROM email_verifications WHERE id = ?'
+      ).bind(verification.id).run();
+    }
+
     const userId = generateId();
     const now = Date.now();
     const passwordHash = await hashPassword(password);
@@ -137,7 +156,7 @@ authRoutes.post('/register', async (c) => {
       JSON.stringify({}),
       1,
       0,
-      0
+      emailVerified
     ).run();
 
     const expiryDays = parseInt(c.env.JWT_EXPIRY_DAYS || '30', 10);
@@ -171,7 +190,7 @@ authRoutes.post('/register', async (c) => {
         permissions: ['search', 'favorite', 'history', 'sync'],
         settings: {},
         isActive: true,
-        emailVerified: false,
+        emailVerified: emailVerified === 1,
         createdAt: now,
         lastLogin: now,
         loginCount: 1,
@@ -315,16 +334,26 @@ authRoutes.post('/forgot-password', async (c) => {
     return c.json(error('VALIDATION_ERROR', '请输入邮箱地址'), 400);
   }
 
+  if (!validateEmail(email)) {
+    return c.json(error('VALIDATION_ERROR', '请输入有效的邮箱地址'), 400);
+  }
+
   try {
     const user = await c.env.DB.prepare(
       'SELECT id, username, email FROM users WHERE email = ?'
     ).bind(email).first<User>();
 
+    const maskedEmail = email.replace(/(.{2}).*(@.*)/, '$1***$2');
+    const expiresIn = 900;
+
     if (!user) {
-      return c.json(success(null, '如果该邮箱已注册，您将收到密码重置邮件'));
+      return c.json(success({ 
+        maskedEmail,
+        expiresIn 
+      }, '如果该邮箱已注册，您将收到密码重置邮件'));
     }
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
 
@@ -368,7 +397,10 @@ authRoutes.post('/forgot-password', async (c) => {
 
     await logUserAction(c.env, user.id, 'forgot_password', { email }, c);
 
-    return c.json(success(null, '如果该邮箱已注册，您将收到密码重置邮件'));
+    return c.json(success({ 
+      maskedEmail,
+      expiresIn 
+    }, '如果该邮箱已注册，您将收到密码重置邮件'));
   } catch (err) {
     console.error('Forgot password error:', err);
     return c.json(error('SERVER_ERROR', '请求失败，请稍后重试'), 500);
@@ -377,9 +409,11 @@ authRoutes.post('/forgot-password', async (c) => {
 
 authRoutes.post('/reset-password', async (c) => {
   const body = await c.req.json();
-  const { email, code, newPassword } = body;
+  const { email, code, verificationCode, newPassword } = body;
+  
+  const actualCode = code || verificationCode;
 
-  if (!email || !code || !newPassword) {
+  if (!email || !actualCode || !newPassword) {
     return c.json(error('VALIDATION_ERROR', '请填写所有必填项'), 400);
   }
 
@@ -392,7 +426,7 @@ authRoutes.post('/reset-password', async (c) => {
       SELECT * FROM email_verifications 
       WHERE email = ? AND verification_code = ? AND verification_type = 'password_reset' AND expires_at > ?
       ORDER BY created_at DESC LIMIT 1
-    `).bind(email, code, Date.now()).first<EmailVerification>();
+    `).bind(email, actualCode, Date.now()).first<EmailVerification>();
 
     if (!verification) {
       return c.json(error('VALIDATION_ERROR', '验证码无效或已过期'), 400);
@@ -490,10 +524,14 @@ authRoutes.delete('/account', async (c) => {
   }
 
   const body = await c.req.json();
-  const { password } = body;
+  const { password, verificationCode, confirmText } = body;
 
-  if (!password) {
-    return c.json(error('VALIDATION_ERROR', '请输入密码确认删除'), 400);
+  if (!verificationCode) {
+    return c.json(error('VALIDATION_ERROR', '请输入验证码'), 400);
+  }
+
+  if (confirmText !== '删除我的账户') {
+    return c.json(error('VALIDATION_ERROR', '请输入正确的确认文字'), 400);
   }
 
   try {
@@ -505,9 +543,23 @@ authRoutes.delete('/account', async (c) => {
       return c.json(error('AUTH_ERROR', '用户不存在'), 404);
     }
 
-    const isValid = await verifyPassword(password, user.password_hash);
-    if (!isValid) {
-      return c.json(error('AUTH_ERROR', '密码错误'), 400);
+    const verification = await c.env.DB.prepare(`
+      SELECT * FROM email_verifications 
+      WHERE user_id = ? AND email = ? AND verification_code = ? AND verification_type = 'account_delete' AND expires_at > ?
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(user.id, user.email, verificationCode, Date.now()).first<EmailVerification>();
+
+    if (!verification) {
+      return c.json(error('VALIDATION_ERROR', '验证码无效或已过期'), 400);
+    }
+
+    await c.env.DB.prepare('DELETE FROM email_verifications WHERE id = ?').bind(verification.id).run();
+
+    if (password) {
+      const isValid = await verifyPassword(password, user.password_hash);
+      if (!isValid) {
+        return c.json(error('AUTH_ERROR', '密码错误'), 400);
+      }
     }
 
     await c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(user.id).run();
@@ -583,9 +635,10 @@ authRoutes.post('/send-registration-code', async (c) => {
       return c.json(error('VALIDATION_ERROR', '该邮箱已被注册'), 400);
     }
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
+    const expiresIn = 900;
 
     await c.env.DB.prepare(`
       INSERT INTO email_verifications (id, email, verification_code, verification_type, expires_at, created_at)
@@ -620,7 +673,7 @@ authRoutes.post('/send-registration-code', async (c) => {
 
     return c.json(success({ 
       maskedEmail: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresAt 
+      expiresIn 
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send registration code error:', err);
@@ -650,9 +703,10 @@ authRoutes.post('/send-password-reset-code', async (c) => {
       return c.json(error('AUTH_ERROR', '用户不存在'), 404);
     }
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
+    const expiresIn = 900;
 
     await c.env.DB.prepare(`
       INSERT INTO email_verifications (id, user_id, email, verification_code, verification_type, expires_at, created_at)
@@ -688,7 +742,7 @@ authRoutes.post('/send-password-reset-code', async (c) => {
 
     return c.json(success({ 
       maskedEmail: user.email.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresAt 
+      expiresIn 
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send password reset code error:', err);
@@ -757,6 +811,7 @@ authRoutes.post('/request-email-change', async (c) => {
 
     const requestId = generateId();
     const expiresAt = Date.now() + 30 * 60 * 1000;
+    const expiresIn = 1800;
 
     await c.env.DB.prepare(`
       INSERT INTO email_change_requests (id, user_id, old_email, new_email, status, expires_at, created_at)
@@ -767,7 +822,7 @@ authRoutes.post('/request-email-change', async (c) => {
       requestId,
       oldEmail: user.email.replace(/(.{2}).*(@.*)/, '$1***$2'),
       newEmail: newEmail.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresAt
+      expiresIn
     }, '邮箱更改请求已创建，请验证新邮箱'));
   } catch (err) {
     console.error('Request email change error:', err);
@@ -808,9 +863,10 @@ authRoutes.post('/send-email-change-code', async (c) => {
     const targetEmail = emailType === 'old' ? changeRequest.old_email : changeRequest.new_email;
     const verificationType = emailType === 'old' ? 'email_change_old' : 'email_change_new';
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
+    const expiresIn = 900;
 
     await c.env.DB.prepare(`
       INSERT INTO email_verifications (id, user_id, email, verification_code, verification_type, expires_at, created_at)
@@ -846,7 +902,7 @@ authRoutes.post('/send-email-change-code', async (c) => {
     return c.json(success({ 
       emailType,
       maskedEmail: targetEmail.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresAt 
+      expiresIn 
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send email change code error:', err);
@@ -960,9 +1016,10 @@ authRoutes.post('/send-account-delete-code', async (c) => {
       return c.json(error('AUTH_ERROR', '用户不存在'), 404);
     }
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
+    const expiresIn = 900;
 
     await c.env.DB.prepare(`
       INSERT INTO email_verifications (id, user_id, email, verification_code, verification_type, expires_at, created_at)
@@ -999,7 +1056,7 @@ authRoutes.post('/send-account-delete-code', async (c) => {
 
     return c.json(success({ 
       maskedEmail: user.email.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresAt 
+      expiresIn 
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send account delete code error:', err);
@@ -1135,9 +1192,10 @@ authRoutes.post('/smart-send-code', async (c) => {
       }
     }
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationId = generateId();
     const expiresAt = Date.now() + 15 * 60 * 1000;
+    const expiresIn = 900;
 
     await c.env.DB.prepare(`
       INSERT INTO email_verifications (id, user_id, email, verification_code, verification_type, expires_at, created_at)
@@ -1180,7 +1238,7 @@ authRoutes.post('/smart-send-code', async (c) => {
 
     return c.json(success({
       maskedEmail: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresAt
+      expiresIn
     }, '验证码已发送'));
   } catch (err) {
     console.error('Smart send code error:', err);

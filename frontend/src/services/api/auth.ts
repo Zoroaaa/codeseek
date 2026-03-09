@@ -57,8 +57,16 @@ export const authApi = {
     return response;
   },
 
-  forgotPassword: async (data: ForgotPasswordRequest): Promise<{ success: boolean; message: string }> => {
-    return apiClient.post<{ success: boolean; message: string }>('/auth/forgot-password', data);
+  forgotPassword: async (data: ForgotPasswordRequest): Promise<{ 
+    success: boolean; 
+    data?: { maskedEmail: string; expiresIn: number };
+    message?: string;
+  }> => {
+    return apiClient.post<{ 
+      success: boolean; 
+      data?: { maskedEmail: string; expiresIn: number };
+      message?: string;
+    }>('/auth/forgot-password', data);
   },
 
   resetPassword: async (data: ResetPasswordRequest): Promise<{ success: boolean; message: string }> => {

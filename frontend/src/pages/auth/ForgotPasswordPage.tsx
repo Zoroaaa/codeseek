@@ -59,14 +59,14 @@ export const ForgotPasswordPage: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const response = await authApi.sendPasswordResetCode(email);
+      const response = await authApi.forgotPassword({ email });
       if (response.success && response.data) {
         setMaskedEmail(response.data.maskedEmail || maskEmail(email));
         setCountdown(response.data.expiresIn || 300);
         setCurrentStep('verify');
         toast.success('验证码已发送', '请检查您的邮箱');
       } else {
-        toast.error('发送失败', '请稍后重试');
+        toast.error('发送失败', response.message || '请稍后重试');
       }
     } catch (error: any) {
       toast.error('发送失败', error.message || '请稍后重试');
@@ -80,7 +80,7 @@ export const ForgotPasswordPage: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const response = await authApi.sendPasswordResetCode(email);
+      const response = await authApi.forgotPassword({ email });
       if (response.success && response.data) {
         setCountdown(response.data.expiresIn || 300);
         toast.success('验证码已重新发送');
