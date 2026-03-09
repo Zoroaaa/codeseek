@@ -6,19 +6,28 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Heart,
-  TrendingUp,
   Activity,
   Zap,
   Globe,
-  Shield,
   RefreshCw,
   Sparkles,
+  Award,
+  BarChart2,
+  Tag,
 } from 'lucide-react';
 import { Card, Badge, Loading, Button } from '@/components/ui';
 import { systemApi, userApi, sourceApi } from '@/services/api';
 import { useAuthStore } from '@/stores';
 import { useNavigate } from 'react-router-dom';
 import type { SystemStats, FavoriteItem, SearchHistoryItem, SearchSource, UserSourceConfig } from '@/types';
+
+const getUserLevel = (total: number) => {
+  if (total < 10)  return { label: '新手',   color: 'from-slate-400 to-slate-500',   icon: '🌱', next: 10,  prev: 0   };
+  if (total < 50)  return { label: '熟练',   color: 'from-green-400 to-emerald-500', icon: '⚡', next: 50,  prev: 10  };
+  if (total < 200) return { label: '专业',   color: 'from-blue-400 to-cyan-500',     icon: '🎯', next: 200, prev: 50  };
+  if (total < 500) return { label: '专家',   color: 'from-purple-400 to-violet-500', icon: '🔥', next: 500, prev: 200 };
+  return             { label: '大师',   color: 'from-amber-400 to-orange-500',   icon: '👑', next: Infinity, prev: 500 };
+};
 
 interface StatCardProps {
   title: string;
@@ -383,98 +392,125 @@ export const OverviewManager: React.FC = () => {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-success-600 dark:text-success-400" />
-            </div>
-            系统状态
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-success-500 animate-pulse shadow-lg shadow-success-500/50" />
-                <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
-                  API 服务
-                </span>
+        {/* 用户等级卡 */}
+        {(() => {
+          const totalActions = (userSearchStats?.totalSearches || searchHistory.length) + favorites.length;
+          const level = getUserLevel(totalActions);
+          const progress = level.next === Infinity
+            ? 100
+            : Math.min(100, Math.round(((totalActions - level.prev) / (level.next - level.prev)) * 100));
+          return (
+            <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-primary-50 dark:bg-primary-900/20 -translate-y-16 translate-x-16 pointer-events-none" />
+              <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                用户成就
+              </h3>
+              <div className={`relative rounded-2xl bg-gradient-to-br ${level.color} p-5 text-white mb-4`}>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-3xl">{level.icon}</span>
+                  <div>
+                    <p className="text-xs text-white/70 font-medium">当前等级</p>
+                    <p className="text-2xl font-bold">{level.label}</p>
+                  </div>
+                  <div className="ml-auto text-right">
+                    <p className="text-xs text-white/70">累计操作</p>
+                    <p className="text-xl font-bold">{totalActions}</p>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-white/70 mb-1">
+                    <span>等级进度</span>
+                    {level.next !== Infinity
+                      ? <span>还差 {level.next - totalActions} 次升级</span>
+                      : <span>🎉 已达最高等级</span>}
+                  </div>
+                  <div className="h-2 rounded-full bg-white/20">
+                    <div className="h-full rounded-full bg-white/60 transition-all duration-700" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
               </div>
-              <Badge variant="success">正常</Badge>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-success-500 animate-pulse shadow-lg shadow-success-500/50" />
-                <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
-                  数据库连接
-                </span>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
+                  <p className="text-lg font-bold text-surface-900 dark:text-surface-100">{userStats.searchCount}</p>
+                  <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">搜索次数</p>
+                </div>
+                <div className="text-center p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
+                  <p className="text-lg font-bold text-surface-900 dark:text-surface-100">{userStats.favoriteCount}</p>
+                  <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">收藏数量</p>
+                </div>
+                <div className="text-center p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
+                  <p className="text-lg font-bold text-surface-900 dark:text-surface-100">
+                    {new Set(searchHistory.map(h => h.query)).size}
+                  </p>
+                  <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">不同词</p>
+                </div>
               </div>
-              <Badge variant="success">正常</Badge>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-warning-500 animate-pulse shadow-lg shadow-warning-500/50" />
-                <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
-                  搜索源状态
-                </span>
-              </div>
-              <Badge variant="warning">部分异常</Badge>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-success-500 animate-pulse shadow-lg shadow-success-500/50" />
-                <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
-                  邮件服务
-                </span>
-              </div>
-              <Badge variant="success">正常</Badge>
-            </div>
-          </div>
-        </Card>
+            </Card>
+          );
+        })()}
 
+        {/* 热门搜索 + 快速操作 */}
         <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
           <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-warning-100 dark:bg-warning-900/30 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-warning-600 dark:text-warning-400" />
+            <div className="w-8 h-8 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
+              <Zap className="w-4 h-4 text-accent-600 dark:text-accent-400" />
             </div>
-            功能特性
+            快速操作
           </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-gradient-to-br from-primary-50 to-primary-100/50 dark:from-primary-900/20 dark:to-primary-800/20 rounded-xl">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white mb-3 shadow-md">
-                <Zap className="w-5 h-5" />
-              </div>
-              <h4 className="font-medium text-surface-900 dark:text-surface-100">极速搜索</h4>
-              <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-                多源并发，毫秒级响应
-              </p>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-success-50 to-success-100/50 dark:from-success-900/20 dark:to-success-800/20 rounded-xl">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-success-500 to-success-600 flex items-center justify-center text-white mb-3 shadow-md">
-                <Shield className="w-5 h-5" />
-              </div>
-              <h4 className="font-medium text-surface-900 dark:text-surface-100">安全可靠</h4>
-              <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-                智能过滤有害内容
-              </p>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-accent-50 to-accent-100/50 dark:from-accent-900/20 dark:to-accent-800/20 rounded-xl">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center text-white mb-3 shadow-md">
-                <Globe className="w-5 h-5" />
-              </div>
-              <h4 className="font-medium text-surface-900 dark:text-surface-100">全球资源</h4>
-              <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-                聚合全球优质站点
-              </p>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-warning-50 to-warning-100/50 dark:from-warning-900/20 dark:to-warning-800/20 rounded-xl">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-warning-500 to-warning-600 flex items-center justify-center text-white mb-3 shadow-md">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <h4 className="font-medium text-surface-900 dark:text-surface-100">数据分析</h4>
-              <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-                搜索趋势可视化
-              </p>
-            </div>
+          <div className="space-y-3 mb-4">
+            <QuickAction
+              icon={<Search className="w-5 h-5" />}
+              title="开始搜索"
+              description="搜索磁力资源"
+              onClick={() => navigate('/main')}
+              gradient="bg-gradient-to-br from-primary-500 to-primary-600"
+            />
+            <QuickAction
+              icon={<BarChart2 className="w-5 h-5" />}
+              title="数据统计"
+              description="查看搜索趋势与关键词分析"
+              onClick={() => navigate('/dashboard/stats')}
+              gradient="bg-gradient-to-br from-violet-500 to-purple-600"
+            />
+            <QuickAction
+              icon={<Database className="w-5 h-5" />}
+              title="管理搜索源"
+              description="添加或编辑搜索源"
+              onClick={() => navigate('/dashboard/sources')}
+              gradient="bg-gradient-to-br from-accent-500 to-accent-600"
+            />
+            <QuickAction
+              icon={<Globe className="w-5 h-5" />}
+              title="社区分享"
+              description="发现优质搜索源"
+              onClick={() => navigate('/dashboard/community')}
+              gradient="bg-gradient-to-br from-success-500 to-success-600"
+            />
           </div>
+
+          {/* 最近搜索词速览 */}
+          {searchHistory.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Tag className="w-3.5 h-3.5 text-surface-400" />
+                <span className="text-xs text-surface-500 dark:text-surface-400 font-medium">最近搜索</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[...new Set(searchHistory.slice(0, 10).map(h => h.query))].slice(0, 8).map(q => (
+                  <button
+                    key={q}
+                    onClick={() => navigate('/main')}
+                    className="text-xs px-2.5 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 transition-colors border border-surface-200 dark:border-surface-700 truncate max-w-[120px]"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     </div>

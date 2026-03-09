@@ -6,6 +6,7 @@ import { CategoryManager } from './CategoryManager';
 import { CommunityManager } from './CommunityManager';
 import { FavoritesManager, HistoryManager } from './FavoritesHistoryManager';
 import { SettingsManager } from './SettingsManager';
+import { StatsManager } from './StatsManager';
 
 export const DashboardPage: React.FC = () => {
   const location = useLocation();
@@ -13,6 +14,10 @@ export const DashboardPage: React.FC = () => {
 
   if (path === '/dashboard' || path === '/dashboard/') {
     return <OverviewManager />;
+  }
+  
+  if (path.startsWith('/dashboard/stats')) {
+    return <StatsManager />;
   }
   
   if (path.startsWith('/dashboard/sources')) {

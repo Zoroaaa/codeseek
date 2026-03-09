@@ -114,6 +114,7 @@ const App: React.FC = () => {
         <Route path="/main" element={<ProtectedRoute><MainSearchPage /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route index element={<DashboardPage />} />
+          <Route path="stats" element={<DashboardPage />} />
           <Route path="sources" element={<DashboardPage />} />
           <Route path="categories" element={<DashboardPage />} />
           <Route path="community" element={<DashboardPage />} />

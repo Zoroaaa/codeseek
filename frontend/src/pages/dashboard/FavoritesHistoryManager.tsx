@@ -11,15 +11,18 @@ import {
   SortDesc,
   MoreVertical,
   Calendar,
+  Tag,
+  BarChart2,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, EmptyState, Dropdown } from '@/components/ui';
 import { userApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
+import { useNavigate } from 'react-router-dom';
 import type { FavoriteItem, SearchHistoryItem } from '@/types';
 
 export const FavoritesManager: React.FC = () => {
   const toast = useToast();
-  
+  const navigate = useNavigate();
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -249,8 +252,8 @@ export const FavoritesManager: React.FC = () => {
       {filteredFavorites.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredFavorites.map(favorite => (
-            <Card key={favorite.id} className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-              <div className="flex items-start gap-3">
+            <Card key={favorite.id} className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col">
+              <div className="flex items-start gap-3 flex-1">
                 <input
                   type="checkbox"
                   checked={selectedItems.has(favorite.id)}
@@ -266,7 +269,16 @@ export const FavoritesManager: React.FC = () => {
                       {favorite.subtitle}
                     </p>
                   )}
-                  <div className="flex items-center gap-2 mt-3 text-xs text-surface-400">
+                  {/* 关键词标签 */}
+                  {favorite.keyword && (
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <Tag className="w-3 h-3 text-primary-400 flex-shrink-0" />
+                      <span className="text-xs text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-2 py-0.5 rounded-full truncate max-w-[160px]">
+                        {favorite.keyword}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mt-2 text-xs text-surface-400">
                     <Calendar className="w-3 h-3" />
                     {formatDate(favorite.createdAt)}
                   </div>
@@ -290,6 +302,11 @@ export const FavoritesManager: React.FC = () => {
                         toast.success('已复制到剪贴板');
                       }
                     },
+                    ...(favorite.keyword ? [{
+                      label: '用关键词重新搜索',
+                      onClick: () => navigate(`/main?q=${encodeURIComponent(favorite.keyword!)}`),
+                      icon: <Search className="w-4 h-4" />,
+                    }] : []),
                     { 
                       label: '删除', 
                       onClick: () => handleRemoveFavorite(favorite.id),
@@ -298,6 +315,25 @@ export const FavoritesManager: React.FC = () => {
                     },
                   ]}
                 />
+              </div>
+              {/* 底部快捷操作 */}
+              <div className="flex gap-2 mt-3 pt-3 border-t border-surface-100 dark:border-surface-800">
+                <button
+                  onClick={() => window.open(favorite.url, '_blank')}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg bg-surface-50 dark:bg-surface-800 hover:bg-primary-50 dark:hover:bg-primary-900/30 text-surface-600 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  访问
+                </button>
+                {favorite.keyword && (
+                  <button
+                    onClick={() => navigate(`/main`)}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg bg-surface-50 dark:bg-surface-800 hover:bg-accent-50 dark:hover:bg-accent-900/30 text-surface-600 dark:text-surface-400 hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    重搜
+                  </button>
+                )}
               </div>
             </Card>
           ))}
@@ -346,12 +382,14 @@ export const FavoritesManager: React.FC = () => {
 
 export const HistoryManager: React.FC = () => {
   const toast = useToast();
+  const navigate = useNavigate();
   
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [showKeywordCloud, setShowKeywordCloud] = useState(false);
 
   const loadHistory = useCallback(async () => {
     setIsLoading(true);
@@ -469,6 +507,37 @@ export const HistoryManager: React.FC = () => {
     return groups;
   }, {} as Record<string, SearchHistoryItem[]>);
 
+  // ── 统计计算 ──
+  const uniqueKeywords = new Set(history.map(h => h.query)).size;
+  const activeDays = new Set(history.map(h => new Date(h.createdAt).toDateString())).size;
+  const todayCount = history.filter(h => new Date(h.createdAt).toDateString() === new Date().toDateString()).length;
+
+  const kwFreq: Record<string, number> = {};
+  history.forEach(h => {
+    const kw = h.query?.trim();
+    if (kw) kwFreq[kw] = (kwFreq[kw] || 0) + 1;
+  });
+  const topKeywords = Object.entries(kwFreq)
+    .map(([keyword, count]) => ({ keyword, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 20);
+
+  const handleExportHistory = () => {
+    const data = JSON.stringify({
+      searchHistory: history,
+      stats: { total: history.length, uniqueKeywords, activeDays },
+      exportTime: new Date().toISOString(),
+    }, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `search-history-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('导出成功');
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -493,15 +562,83 @@ export const HistoryManager: React.FC = () => {
             </p>
           </div>
         </div>
-        <Button
-          variant="danger"
-          leftIcon={<Trash2 className="w-4 h-4" />}
-          onClick={handleClearHistory}
-          disabled={history.length === 0}
-        >
-          清空历史
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Download className="w-4 h-4" />}
+            onClick={handleExportHistory}
+            disabled={history.length === 0}
+          >
+            导出
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<BarChart2 className="w-4 h-4" />}
+            onClick={() => setShowKeywordCloud(v => !v)}
+          >
+            {showKeywordCloud ? '隐藏' : '关键词云'}
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            leftIcon={<Trash2 className="w-4 h-4" />}
+            onClick={handleClearHistory}
+            disabled={history.length === 0}
+          >
+            清空
+          </Button>
+        </div>
       </div>
+
+      {/* 统计小卡 */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: '总记录', value: history.length, color: 'from-primary-500 to-primary-600' },
+          { label: '今日搜索', value: todayCount, color: 'from-accent-500 to-accent-600' },
+          { label: '不同关键词', value: uniqueKeywords, color: 'from-success-500 to-emerald-600' },
+          { label: '活跃天数', value: activeDays, color: 'from-warning-500 to-orange-600' },
+        ].map(stat => (
+          <div key={stat.label} className="flex items-center gap-3 p-3 bg-surface-50 dark:bg-surface-800/60 rounded-xl border border-surface-200/50 dark:border-surface-700/30">
+            <div className={`w-2 h-8 rounded-full bg-gradient-to-b ${stat.color} flex-shrink-0`} />
+            <div>
+              <p className="text-xs text-surface-500 dark:text-surface-400">{stat.label}</p>
+              <p className="text-lg font-bold text-surface-900 dark:text-surface-100">{stat.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 关键词云 */}
+      {showKeywordCloud && topKeywords.length > 0 && (
+        <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <Tag className="w-4 h-4 text-surface-400" />
+            <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300">热门搜索关键词</h3>
+            <Badge variant="outline" className="ml-auto text-xs">{topKeywords.length} 个</Badge>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {topKeywords.map(({ keyword, count }) => {
+              const max = topKeywords[0].count;
+              const min = topKeywords[topKeywords.length - 1].count;
+              const ratio = max === min ? 0.5 : (count - min) / (max - min);
+              const size = 11 + Math.round(ratio * 12);
+              return (
+                <button
+                  key={keyword}
+                  onClick={() => navigate('/main')}
+                  className="px-2.5 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 border border-surface-200 dark:border-surface-700 hover:border-primary-300 dark:hover:border-primary-700 transition-all"
+                  style={{ fontSize: size }}
+                  title={`搜索 ${count} 次`}
+                >
+                  {keyword}
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -600,8 +737,17 @@ export const HistoryManager: React.FC = () => {
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => navigate('/main')}
+                      title="重新搜索此关键词"
+                      className="text-primary-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 flex-shrink-0"
+                    >
+                      <Search className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleDeleteItem(item.id)}
-                      className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
+                      className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20 flex-shrink-0"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

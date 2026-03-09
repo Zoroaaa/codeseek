@@ -15,6 +15,7 @@ import {
   LogOut,
   Search,
   ChevronLeft,
+  BarChart2,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
 
@@ -24,16 +25,20 @@ interface NavItem {
   icon: React.ReactNode;
   path: string;
   badge?: number;
+  group?: string;
 }
 
+const navGroups = ['个人中心', '资源管理', '社区', '设置'];
+
 const navItems: NavItem[] = [
-  { id: 'overview', label: '概览', icon: <LayoutDashboard className="w-5 h-5" />, path: '/dashboard' },
-  { id: 'sources', label: '搜索源管理', icon: <Database className="w-5 h-5" />, path: '/dashboard/sources' },
-  { id: 'categories', label: '分类管理', icon: <FolderTree className="w-5 h-5" />, path: '/dashboard/categories' },
-  { id: 'community', label: '社区管理', icon: <Users className="w-5 h-5" />, path: '/dashboard/community' },
-  { id: 'favorites', label: '我的收藏', icon: <Heart className="w-5 h-5" />, path: '/dashboard/favorites' },
-  { id: 'history', label: '搜索历史', icon: <History className="w-5 h-5" />, path: '/dashboard/history' },
-  { id: 'settings', label: '系统设置', icon: <Settings className="w-5 h-5" />, path: '/dashboard/settings' },
+  { id: 'overview',    label: '概览',       icon: <LayoutDashboard className="w-5 h-5" />, path: '/dashboard',            group: '个人中心' },
+  { id: 'stats',       label: '数据统计',   icon: <BarChart2 className="w-5 h-5" />,       path: '/dashboard/stats',      group: '个人中心' },
+  { id: 'favorites',   label: '我的收藏',   icon: <Heart className="w-5 h-5" />,           path: '/dashboard/favorites',  group: '个人中心' },
+  { id: 'history',     label: '搜索历史',   icon: <History className="w-5 h-5" />,         path: '/dashboard/history',    group: '个人中心' },
+  { id: 'sources',     label: '搜索源管理', icon: <Database className="w-5 h-5" />,        path: '/dashboard/sources',    group: '资源管理' },
+  { id: 'categories',  label: '分类管理',   icon: <FolderTree className="w-5 h-5" />,      path: '/dashboard/categories', group: '资源管理' },
+  { id: 'community',   label: '社区管理',   icon: <Users className="w-5 h-5" />,           path: '/dashboard/community',  group: '社区' },
+  { id: 'settings',    label: '系统设置',   icon: <Settings className="w-5 h-5" />,        path: '/dashboard/settings',   group: '设置' },
 ];
 
 export const DashboardLayout: React.FC = () => {
@@ -90,46 +95,64 @@ export const DashboardLayout: React.FC = () => {
         </div>
 
         <nav className="flex-1 py-4 px-3 overflow-y-auto scrollbar-thin">
-          <ul className="space-y-1">
-            {navItems.map((item) => (
-              <li key={item.id}>
-                <Link
-                  to={item.path}
-                  className={clsx(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
-                    'group relative',
-                    isActive(item.path)
-                      ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
-                      : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-200 dark:hover:bg-surface-800'
-                  )}
-                >
-                  <span
-                    className={clsx(
-                      'flex-shrink-0',
-                      isActive(item.path)
-                        ? 'text-primary-600 dark:text-primary-400'
-                        : 'text-surface-400 group-hover:text-surface-600 dark:group-hover:text-surface-300'
-                    )}
-                  >
-                    {item.icon}
-                  </span>
-                  {!sidebarCollapsed && (
-                    <>
-                      <span className="font-medium">{item.label}</span>
-                      {item.badge && (
-                        <span className="ml-auto px-2 py-0.5 text-xs font-medium bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 rounded-full">
-                          {item.badge}
+          {navGroups.map((group) => {
+            const groupItems = navItems.filter(i => i.group === group);
+            if (groupItems.length === 0) return null;
+            return (
+              <div key={group} className="mb-4">
+                {!sidebarCollapsed && (
+                  <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-surface-400 dark:text-surface-500">
+                    {group}
+                  </p>
+                )}
+                <ul className="space-y-0.5">
+                  {groupItems.map((item) => (
+                    <li key={item.id}>
+                      <Link
+                        to={item.path}
+                        className={clsx(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+                          'group relative',
+                          isActive(item.path)
+                            ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
+                            : 'text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-200 dark:hover:bg-surface-800'
+                        )}
+                      >
+                        <span
+                          className={clsx(
+                            'flex-shrink-0',
+                            isActive(item.path)
+                              ? 'text-primary-600 dark:text-primary-400'
+                              : 'text-surface-400 group-hover:text-surface-600 dark:group-hover:text-surface-300'
+                          )}
+                        >
+                          {item.icon}
                         </span>
-                      )}
-                    </>
-                  )}
-                  {isActive(item.path) && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-500 rounded-r-full" />
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
+                        {!sidebarCollapsed && (
+                          <>
+                            <span className="font-medium">{item.label}</span>
+                            {item.badge && (
+                              <span className="ml-auto px-2 py-0.5 text-xs font-medium bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 rounded-full">
+                                {item.badge}
+                              </span>
+                            )}
+                          </>
+                        )}
+                        {isActive(item.path) && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-500 rounded-r-full" />
+                        )}
+                        {sidebarCollapsed && (
+                          <div className="absolute left-full ml-2 px-2 py-1 bg-surface-900 dark:bg-surface-100 text-surface-100 dark:text-surface-900 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg">
+                            {item.label}
+                          </div>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-surface-200 dark:border-surface-800">
