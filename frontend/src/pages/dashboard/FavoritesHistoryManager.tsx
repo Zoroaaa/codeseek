@@ -41,7 +41,7 @@ export const FavoritesManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     loadFavorites();
@@ -348,7 +348,7 @@ export const HistoryManager: React.FC = () => {
   const loadHistory = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await userApi.getSearchHistory(100);
+      const response = await userApi.getSearchHistory();
       if (response.success && response.data) {
         setHistory(response.data.history);
       }
@@ -357,7 +357,7 @@ export const HistoryManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     loadHistory();
