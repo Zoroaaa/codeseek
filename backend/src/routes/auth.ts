@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Env, User, EmailVerification, EmailChangeRequest } from '../types';
 import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP } from '../utils';
+import { EmailVerificationService, emailVerificationUtils } from '../services/email-verification';
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
@@ -334,17 +335,18 @@ authRoutes.post('/forgot-password', async (c) => {
     return c.json(error('VALIDATION_ERROR', '请输入邮箱地址'), 400);
   }
 
-  if (!validateEmail(email)) {
+  if (!emailVerificationUtils.isValidEmail(email)) {
     return c.json(error('VALIDATION_ERROR', '请输入有效的邮箱地址'), 400);
   }
 
+  const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
+  const maskedEmail = emailVerificationUtils.maskEmail(normalizedEmail);
+  const expiresIn = 900;
+
   try {
     const user = await c.env.DB.prepare(
-      'SELECT id, username, email FROM users WHERE email = ?'
-    ).bind(email).first<User>();
-
-    const maskedEmail = email.replace(/(.{2}).*(@.*)/, '$1***$2');
-    const expiresIn = 900;
+      'SELECT id, username, email FROM users WHERE email = ? AND is_active = 1'
+    ).bind(normalizedEmail).first<User>();
 
     if (!user) {
       return c.json(success({ 
@@ -353,52 +355,30 @@ authRoutes.post('/forgot-password', async (c) => {
       }, '如果该邮箱已注册，您将收到密码重置邮件'));
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationId = generateId();
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-    
-    const emailHash = await hashPassword(email);
-    const codeHash = await hashPassword(code);
+    const emailService = new EmailVerificationService(c.env);
+    const ipAddress = getClientIP(c);
 
-    await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, user_id, email, email_hash, verification_code, code_hash, verification_type, status, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).bind(verificationId, user.id, user.email, emailHash, code, codeHash, 'password_reset', expiresAt, Date.now()).run();
+    try {
+      await emailService.checkEmailRateLimit(normalizedEmail, ipAddress);
 
-    if (c.env.RESEND_API_KEY) {
-      try {
-        const resendResponse = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${c.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'CodeSeek <noreply@codeseek.pp.ua>',
-            to: user.email,
-            subject: '密码重置验证码',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>密码重置</h2>
-                <p>您好，${user.username}！</p>
-                <p>您收到这封邮件是因为您请求重置密码。</p>
-                <p>您的验证码是：<strong style="font-size: 24px; color: #007bff;">${code}</strong></p>
-                <p>验证码将在15分钟后过期。</p>
-                <p>如果您没有请求重置密码，请忽略此邮件。</p>
-              </div>
-            `,
-          }),
-        });
-        
-        if (!resendResponse.ok) {
-          console.error('Failed to send email:', await resendResponse.text());
-        }
-      } catch (emailError) {
-        console.error('Email send error:', emailError);
-      }
+      const verification = await emailService.createEmailVerification(
+        normalizedEmail, 
+        'forgot_password', 
+        user.id, 
+        { ipAddress, requestedAt: Date.now() }
+      );
+
+      await emailService.sendVerificationEmail(
+        normalizedEmail,
+        verification.code,
+        'forgot_password',
+        { username: user.username }
+      );
+
+      await logUserAction(c.env, user.id, 'forgot_password', { email: normalizedEmail }, c);
+    } catch (sendError) {
+      console.error('发送密码重置邮件失败:', sendError);
     }
-
-    await logUserAction(c.env, user.id, 'forgot_password', { email }, c);
 
     return c.json(success({ 
       maskedEmail,
@@ -420,19 +400,31 @@ authRoutes.post('/reset-password', async (c) => {
     return c.json(error('VALIDATION_ERROR', '请填写所有必填项'), 400);
   }
 
+  if (!emailVerificationUtils.isValidEmail(email)) {
+    return c.json(error('VALIDATION_ERROR', '请输入有效的邮箱地址'), 400);
+  }
+
   if (!validatePassword(newPassword)) {
     return c.json(error('VALIDATION_ERROR', '密码至少需要6个字符'), 400);
   }
 
-  try {
-    const verification = await c.env.DB.prepare(`
-      SELECT * FROM email_verifications 
-      WHERE email = ? AND verification_code = ? AND verification_type = 'password_reset' AND expires_at > ?
-      ORDER BY created_at DESC LIMIT 1
-    `).bind(email, actualCode, Date.now()).first<EmailVerification>();
+  const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
 
-    if (!verification) {
-      return c.json(error('VALIDATION_ERROR', '验证码无效或已过期'), 400);
+  try {
+    const user = await c.env.DB.prepare(
+      'SELECT * FROM users WHERE email = ? AND is_active = 1'
+    ).bind(normalizedEmail).first<User>();
+
+    if (!user) {
+      return c.json(error('VALIDATION_ERROR', '用户不存在或已被禁用'), 400);
+    }
+
+    const emailService = new EmailVerificationService(c.env);
+
+    try {
+      await emailService.verifyCode(normalizedEmail, actualCode, 'forgot_password', user.id);
+    } catch (verifyError) {
+      return c.json(error('VALIDATION_ERROR', (verifyError as Error).message || '验证码无效或已过期'), 400);
     }
 
     const passwordHash = await hashPassword(newPassword);
@@ -440,17 +432,13 @@ authRoutes.post('/reset-password', async (c) => {
 
     await c.env.DB.prepare(`
       UPDATE users SET password_hash = ?, last_password_change = ?, updated_at = ? WHERE id = ?
-    `).bind(passwordHash, now, now, verification.user_id).run();
-
-    await c.env.DB.prepare(
-      'DELETE FROM email_verifications WHERE id = ?'
-    ).bind(verification.id).run();
+    `).bind(passwordHash, now, now, user.id).run();
 
     await c.env.DB.prepare(
       'DELETE FROM user_sessions WHERE user_id = ?'
-    ).bind(verification.user_id).run();
+    ).bind(user.id).run();
 
-    await logUserAction(c.env, verification.user_id, 'reset_password', { email }, c);
+    await logUserAction(c.env, user.id, 'reset_password', { email: normalizedEmail }, c);
 
     return c.json(success(null, '密码重置成功，请重新登录'));
   } catch (err) {
@@ -625,61 +613,56 @@ authRoutes.post('/send-registration-code', async (c) => {
   const body = await c.req.json();
   const { email } = body;
 
-  if (!email || !validateEmail(email)) {
+  if (!email || !emailVerificationUtils.isValidEmail(email)) {
     return c.json(error('VALIDATION_ERROR', '请输入有效的邮箱地址'), 400);
+  }
+
+  const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
+
+  if (emailVerificationUtils.isTempEmail(normalizedEmail)) {
+    return c.json(error('VALIDATION_ERROR', '不支持临时邮箱，请使用常用邮箱'), 400);
   }
 
   try {
     const existingUser = await c.env.DB.prepare(
       'SELECT id FROM users WHERE email = ?'
-    ).bind(email).first();
+    ).bind(normalizedEmail).first();
 
     if (existingUser) {
       return c.json(error('VALIDATION_ERROR', '该邮箱已被注册'), 400);
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationId = generateId();
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-    const expiresIn = 900;
-    
-    const emailHash = await hashPassword(email);
-    const codeHash = await hashPassword(code);
+    const emailService = new EmailVerificationService(c.env);
+    const ipAddress = getClientIP(c);
 
-    await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, email, email_hash, verification_code, code_hash, verification_type, status, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).bind(verificationId, email, emailHash, code, codeHash, 'registration', expiresAt, Date.now()).run();
+    try {
+      await emailService.checkEmailRateLimit(normalizedEmail, ipAddress);
+    } catch (rateLimitError) {
+      return c.json(error('RATE_LIMIT', (rateLimitError as Error).message), 429);
+    }
 
-    if (c.env.RESEND_API_KEY) {
-      try {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${c.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'CodeSeek <noreply@codeseek.pp.ua>',
-            to: email,
-            subject: '注册验证码',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>欢迎注册 CodeSeek</h2>
-                <p>您的验证码是：<strong style="font-size: 24px; color: #007bff;">${code}</strong></p>
-                <p>验证码将在15分钟后过期。</p>
-              </div>
-            `,
-          }),
-        });
-      } catch (emailError) {
-        console.error('Email send error:', emailError);
-      }
+    const verification = await emailService.createEmailVerification(
+      normalizedEmail, 
+      'registration', 
+      null, 
+      { ipAddress }
+    );
+
+    try {
+      await emailService.sendVerificationEmail(
+        normalizedEmail,
+        verification.code,
+        'registration',
+        { username: '新用户' }
+      );
+    } catch (sendError) {
+      console.error('发送注册验证码失败:', sendError);
+      return c.json(error('SERVER_ERROR', '验证码发送失败，请稍后重试'), 500);
     }
 
     return c.json(success({ 
-      maskedEmail: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresIn 
+      maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail),
+      expiresIn: 900 
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send registration code error:', err);
@@ -709,49 +692,37 @@ authRoutes.post('/send-password-reset-code', async (c) => {
       return c.json(error('AUTH_ERROR', '用户不存在'), 404);
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationId = generateId();
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-    const expiresIn = 900;
-    
-    const emailHash = await hashPassword(user.email);
-    const codeHash = await hashPassword(code);
+    const emailService = new EmailVerificationService(c.env);
+    const ipAddress = getClientIP(c);
 
-    await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, user_id, email, email_hash, verification_code, code_hash, verification_type, status, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).bind(verificationId, user.id, user.email, emailHash, code, codeHash, 'password_reset', expiresAt, Date.now()).run();
+    try {
+      await emailService.checkEmailRateLimit(user.email, ipAddress);
+    } catch (rateLimitError) {
+      return c.json(error('RATE_LIMIT', (rateLimitError as Error).message), 429);
+    }
 
-    if (c.env.RESEND_API_KEY) {
-      try {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${c.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'CodeSeek <noreply@codeseek.pp.ua>',
-            to: user.email,
-            subject: '密码重置验证码',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>密码重置</h2>
-                <p>您好，${user.username}！</p>
-                <p>您的验证码是：<strong style="font-size: 24px; color: #007bff;">${code}</strong></p>
-                <p>验证码将在15分钟后过期。</p>
-              </div>
-            `,
-          }),
-        });
-      } catch (emailError) {
-        console.error('Email send error:', emailError);
-      }
+    const verification = await emailService.createEmailVerification(
+      user.email, 
+      'password_reset', 
+      user.id, 
+      { ipAddress }
+    );
+
+    try {
+      await emailService.sendVerificationEmail(
+        user.email,
+        verification.code,
+        'password_reset',
+        { username: user.username }
+      );
+    } catch (sendError) {
+      console.error('发送密码重置验证码失败:', sendError);
+      return c.json(error('SERVER_ERROR', '验证码发送失败，请稍后重试'), 500);
     }
 
     return c.json(success({ 
-      maskedEmail: user.email.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresIn 
+      maskedEmail: emailVerificationUtils.maskEmail(user.email),
+      expiresIn: 900 
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send password reset code error:', err);
@@ -872,49 +843,46 @@ authRoutes.post('/send-email-change-code', async (c) => {
     const targetEmail = emailType === 'old' ? changeRequest.old_email : changeRequest.new_email;
     const verificationType = emailType === 'old' ? 'email_change_old' : 'email_change_new';
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationId = generateId();
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-    const expiresIn = 900;
-    
-    const emailHash = await hashPassword(targetEmail);
-    const codeHash = await hashPassword(code);
+    const emailService = new EmailVerificationService(c.env);
+    const ipAddress = getClientIP(c);
 
-    await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, user_id, email, email_hash, verification_code, code_hash, verification_type, status, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).bind(verificationId, payload.userId, targetEmail, emailHash, code, codeHash, verificationType, expiresAt, Date.now()).run();
+    try {
+      await emailService.checkEmailRateLimit(targetEmail, ipAddress);
+    } catch (rateLimitError) {
+      return c.json(error('RATE_LIMIT', (rateLimitError as Error).message), 429);
+    }
 
-    if (c.env.RESEND_API_KEY) {
-      try {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${c.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'CodeSeek <noreply@codeseek.pp.ua>',
-            to: targetEmail,
-            subject: '邮箱更改验证码',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>邮箱更改验证</h2>
-                <p>您的验证码是：<strong style="font-size: 24px; color: #007bff;">${code}</strong></p>
-                <p>验证码将在15分钟后过期。</p>
-              </div>
-            `,
-          }),
-        });
-      } catch (emailError) {
-        console.error('Email send error:', emailError);
-      }
+    const verification = await emailService.createEmailVerification(
+      targetEmail, 
+      verificationType, 
+      payload.userId, 
+      { requestId, emailType, ipAddress }
+    );
+
+    const user = await c.env.DB.prepare(
+      'SELECT username FROM users WHERE id = ?'
+    ).bind(payload.userId).first<User>();
+
+    try {
+      await emailService.sendVerificationEmail(
+        targetEmail,
+        verification.code,
+        verificationType as 'email_change_old' | 'email_change_new',
+        { 
+          username: user?.username || '用户',
+          oldEmail: changeRequest.old_email,
+          newEmail: changeRequest.new_email
+        }
+      );
+    } catch (sendError) {
+      console.error('发送邮箱更改验证码失败:', sendError);
+      return c.json(error('SERVER_ERROR', '验证码发送失败，请稍后重试'), 500);
     }
 
     return c.json(success({ 
       emailType,
-      maskedEmail: targetEmail.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresIn 
+      maskedEmail: emailVerificationUtils.maskEmail(targetEmail),
+      expiresIn: 900 
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send email change code error:', err);
@@ -1028,47 +996,37 @@ authRoutes.post('/send-account-delete-code', async (c) => {
       return c.json(error('AUTH_ERROR', '用户不存在'), 404);
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationId = generateId();
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-    const expiresIn = 900;
+    const emailService = new EmailVerificationService(c.env);
+    const ipAddress = getClientIP(c);
 
-    await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, user_id, email, verification_code, verification_type, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(verificationId, user.id, user.email, code, 'account_delete', expiresAt, Date.now()).run();
+    try {
+      await emailService.checkEmailRateLimit(user.email, ipAddress);
+    } catch (rateLimitError) {
+      return c.json(error('RATE_LIMIT', (rateLimitError as Error).message), 429);
+    }
 
-    if (c.env.RESEND_API_KEY) {
-      try {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${c.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'CodeSeek <noreply@codeseek.pp.ua>',
-            to: user.email,
-            subject: '账户删除验证码',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>账户删除确认</h2>
-                <p>您好，${user.username}！</p>
-                <p>您正在申请删除账户，验证码是：<strong style="font-size: 24px; color: #dc3545;">${code}</strong></p>
-                <p>验证码将在15分钟后过期。</p>
-                <p>如果这不是您本人的操作，请忽略此邮件。</p>
-              </div>
-            `,
-          }),
-        });
-      } catch (emailError) {
-        console.error('Email send error:', emailError);
-      }
+    const verification = await emailService.createEmailVerification(
+      user.email, 
+      'account_delete', 
+      user.id, 
+      { ipAddress }
+    );
+
+    try {
+      await emailService.sendVerificationEmail(
+        user.email,
+        verification.code,
+        'account_delete',
+        { username: user.username }
+      );
+    } catch (sendError) {
+      console.error('发送账户删除验证码失败:', sendError);
+      return c.json(error('SERVER_ERROR', '验证码发送失败，请稍后重试'), 500);
     }
 
     return c.json(success({ 
-      maskedEmail: user.email.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresIn 
+      maskedEmail: emailVerificationUtils.maskEmail(user.email),
+      expiresIn: 900 
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send account delete code error:', err);
@@ -1162,11 +1120,13 @@ authRoutes.post('/smart-send-code', async (c) => {
     return c.json(error('VALIDATION_ERROR', '缺少必要参数'), 400);
   }
 
-  if (!validateEmail(email)) {
+  if (!emailVerificationUtils.isValidEmail(email)) {
     return c.json(error('VALIDATION_ERROR', '邮箱格式不正确'), 400);
   }
 
-  let userId = null;
+  const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
+
+  let userId: string | null = null;
   const authHeader = c.req.header('Authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
@@ -1181,76 +1141,59 @@ authRoutes.post('/smart-send-code', async (c) => {
   }
 
   try {
+    const emailService = new EmailVerificationService(c.env);
+    const ipAddress = getClientIP(c);
+
     if (!force) {
-      const existing = await c.env.DB.prepare(`
-        SELECT * FROM email_verifications 
-        WHERE email = ? AND verification_type = ? AND expires_at > ?
-        ORDER BY created_at DESC LIMIT 1
-      `).bind(email, verificationType, Date.now()).first<EmailVerification>();
-
-      if (existing) {
-        const remainingTime = existing.expires_at - Date.now();
-        const timeSinceCreated = Date.now() - existing.created_at;
-        const minResendInterval = 60000;
-
-        if (timeSinceCreated < minResendInterval) {
-          return c.json(success({
-            canResend: false,
-            reason: 'too_soon',
-            waitTime: minResendInterval - timeSinceCreated,
-            remainingTime
-          }, '存在有效的验证码'));
-        }
+      const canResend = await emailService.canResendVerification(normalizedEmail, verificationType, userId);
+      if (!canResend.canResend) {
+        return c.json(success({
+          canResend: false,
+          reason: canResend.reason,
+          waitTime: canResend.waitTime,
+          remainingTime: canResend.remainingTime
+        }, '存在有效的验证码'));
       }
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationId = generateId();
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-    const expiresIn = 900;
+    try {
+      await emailService.checkEmailRateLimit(normalizedEmail, ipAddress);
+    } catch (rateLimitError) {
+      return c.json(error('RATE_LIMIT', (rateLimitError as Error).message), 429);
+    }
 
-    await c.env.DB.prepare(`
-      INSERT INTO email_verifications (id, user_id, email, verification_code, verification_type, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(verificationId, userId, email, code, verificationType, expiresAt, Date.now()).run();
+    const verification = await emailService.createEmailVerification(
+      normalizedEmail, 
+      verificationType, 
+      userId, 
+      { ipAddress }
+    );
 
-    if (c.env.RESEND_API_KEY) {
-      const subjects: Record<string, string> = {
-        registration: '注册验证码',
-        password_reset: '密码重置验证码',
-        email_change_old: '邮箱更改验证码',
-        email_change_new: '邮箱更改验证码',
-        account_delete: '账户删除验证码'
-      };
-
-      try {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${c.env.RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'CodeSeek <noreply@codeseek.pp.ua>',
-            to: email,
-            subject: subjects[verificationType] || '验证码',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>${subjects[verificationType] || '验证码'}</h2>
-                <p>您的验证码是：<strong style="font-size: 24px; color: #007bff;">${code}</strong></p>
-                <p>验证码将在15分钟后过期。</p>
-              </div>
-            `,
-          }),
-        });
-      } catch (emailError) {
-        console.error('Email send error:', emailError);
+    let username = '用户';
+    if (userId) {
+      const user = await c.env.DB.prepare(
+        'SELECT username FROM users WHERE id = ?'
+      ).bind(userId).first<User>();
+      if (user) {
+        username = user.username;
       }
+    }
+
+    try {
+      await emailService.sendVerificationEmail(
+        normalizedEmail,
+        verification.code,
+        verificationType as 'registration' | 'password_reset' | 'forgot_password' | 'email_change_old' | 'email_change_new' | 'account_delete',
+        { username }
+      );
+    } catch (sendError) {
+      console.error('发送验证码失败:', sendError);
+      return c.json(error('SERVER_ERROR', '验证码发送失败，请稍后重试'), 500);
     }
 
     return c.json(success({
-      maskedEmail: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
-      expiresIn
+      maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail),
+      expiresIn: 900
     }, '验证码已发送'));
   } catch (err) {
     console.error('Smart send code error:', err);
