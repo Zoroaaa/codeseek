@@ -20,6 +20,17 @@ export interface Env {
   MAX_TAGS_PER_USER?: string;
   ENABLE_ACTION_LOGGING?: string;
   JWT_EXPIRY_DAYS?: string;
+  // Email configuration (defined in wrangler.toml [vars])
+  DEFAULT_FROM_EMAIL?: string;
+  DEFAULT_FROM_NAME?: string;
+  SITE_URL?: string;
+  EMAIL_VERIFICATION_ENABLED?: string;
+  EMAIL_VERIFICATION_REQUIRED?: string;
+  COMMUNITY_REQUIRE_APPROVAL?: string;
+  COMMUNITY_MAX_SHARES_PER_USER?: string;
+  ENABLE_SOURCE_STATUS_CHECK?: string;
+  SOURCE_STATUS_CHECK_TIMEOUT?: string;
+  SOURCE_STATUS_CACHE_DURATION?: string;
 }
 
 export interface User {

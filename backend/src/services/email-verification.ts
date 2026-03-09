@@ -148,9 +148,9 @@ export class EmailVerificationService {
   constructor(env: Env) {
     this.env = env;
     this.resendApiKey = env.RESEND_API_KEY;
-    this.defaultFromEmail = 'noreply@codeseek.pp.ua';
-    this.defaultFromName = '磁力快搜';
-    this.siteUrl = 'https://codeseek.pp.ua';
+    this.defaultFromEmail = env.DEFAULT_FROM_EMAIL || 'noreply@codeseek.pp.ua';
+    this.defaultFromName = env.DEFAULT_FROM_NAME || '磁力快搜';
+    this.siteUrl = env.SITE_URL || 'https://codeseek.pp.ua';
   }
 
   async getPendingVerification(

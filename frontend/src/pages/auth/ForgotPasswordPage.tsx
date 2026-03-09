@@ -62,7 +62,8 @@ export const ForgotPasswordPage: React.FC = () => {
       const response = await authApi.forgotPassword({ email });
       if (response.success && response.data) {
         setMaskedEmail(response.data.maskedEmail || maskEmail(email));
-        setCountdown(response.data.expiresIn || 300);
+        // 倒计时 60 秒后允许重发，而不是等待整个验证码有效期（900秒）
+        setCountdown(60);
         setCurrentStep('verify');
         toast.success('验证码已发送', '请检查您的邮箱');
       } else {
@@ -82,8 +83,11 @@ export const ForgotPasswordPage: React.FC = () => {
     try {
       const response = await authApi.forgotPassword({ email });
       if (response.success && response.data) {
-        setCountdown(response.data.expiresIn || 300);
+        // 重发后重新开始 60 秒倒计时
+        setCountdown(60);
         toast.success('验证码已重新发送');
+      } else {
+        toast.error('发送失败', response.message || '请稍后重试');
       }
     } catch (error: any) {
       toast.error('发送失败', error.message || '请稍后重试');
@@ -214,11 +218,11 @@ export const ForgotPasswordPage: React.FC = () => {
 
       {countdown > 0 ? (
         <p className="text-center text-sm text-surface-500 dark:text-surface-400">
-          验证码 {formatCountdown(countdown)} 后过期
+          验证码有效期 15 分钟，{formatCountdown(countdown)} 后可重新发送
         </p>
       ) : (
-        <p className="text-center text-sm text-error-500">
-          验证码已过期
+        <p className="text-center text-sm text-surface-500 dark:text-surface-400">
+          未收到验证码？可以重新发送
         </p>
       )}
 

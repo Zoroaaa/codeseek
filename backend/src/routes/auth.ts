@@ -378,6 +378,8 @@ authRoutes.post('/forgot-password', async (c) => {
       await logUserAction(c.env, user.id, 'forgot_password', { email: normalizedEmail }, c);
     } catch (sendError) {
       console.error('发送密码重置邮件失败:', sendError);
+      // 邮件发送失败时返回错误，而不是静默成功
+      return c.json(error('SERVER_ERROR', '验证码发送失败，请稍后重试'), 500);
     }
 
     return c.json(success({ 
