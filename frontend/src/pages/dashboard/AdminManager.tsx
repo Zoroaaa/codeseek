@@ -12,7 +12,6 @@ import {
   Ban,
   CheckCircle,
   Eye,
-  TrendingUp,
   MapPin,
   Monitor,
   Award,
@@ -175,7 +174,7 @@ const UsersTab: React.FC = () => {
             placeholder="搜索用户名或邮箱..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            icon={<Search className="w-4 h-4" />}
+            leftIcon={<Search className="w-4 h-4" />}
           />
         </div>
         <select
@@ -485,7 +484,7 @@ const ActivityTab: React.FC = () => {
               <div className="flex items-center gap-6 text-sm">
                 <div className="text-center">
                   <div className="font-bold text-surface-900 dark:text-surface-100">
-                    {user.totalLoginCount}
+                    {user.loginCount}
                   </div>
                   <div className="text-xs text-surface-500">总登录</div>
                 </div>

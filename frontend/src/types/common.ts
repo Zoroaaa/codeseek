@@ -97,31 +97,6 @@ export interface PaginationParams {
   sortOrder?: 'asc' | 'desc';
 }
 
-export interface AdminUser {
-  id: string;
-  username: string;
-  email: string;
-  isActive: boolean;
-  emailVerified: boolean;
-  permissions: string[];
-  loginCount: number;
-  lastLogin: number | null;
-  createdAt: number;
-}
-
-export interface AdminUserDetail extends AdminUser {
-  favoritesCount: number;
-  historyCount: number;
-  activeSessionsCount: number;
-  recentSessions: Array<{
-    id: string;
-    ip: string;
-    userAgent: string;
-    createdAt: string;
-    expiresAt: string;
-  }>;
-}
-
 export interface Report {
   id: string;
   sharedSourceId: string;

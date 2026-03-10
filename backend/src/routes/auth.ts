@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env, User, EmailVerification, EmailChangeRequest, Role } from '../types';
+import { Env, User, EmailVerification, EmailChangeRequest } from '../types';
 import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP } from '../utils';
 import { EmailVerificationService, emailVerificationUtils } from '../services/email-verification';
 

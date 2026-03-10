@@ -143,3 +143,13 @@ export interface TokenVerifyResponse {
   userId: string;
   username: string;
 }
+
+export interface UserLoginLog {
+  id: string;
+  loginTime: number;
+  ipAddress: string | null;
+  userAgent: string | null;
+  loginStatus: 'success' | 'failed';
+  loginMethod: string;
+  failureReason: string | null;
+}

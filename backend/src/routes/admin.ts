@@ -294,7 +294,7 @@ adminRoutes.get('/users/:id/login-logs', async (c) => {
 
     return c.json(success({
       logs: (logs.results || []).map(l => {
-        const data = l.data ? JSON.parse(l.data) : {};
+        const data = l.data ? JSON.parse(l.data as string) : {};
         return {
           id: l.id,
           loginTime: l.created_at,

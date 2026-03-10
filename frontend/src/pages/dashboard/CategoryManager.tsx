@@ -473,7 +473,9 @@ export const CategoryManager: React.FC = () => {
                               </div>
                             )}
                             {category.isSystem && !isAdmin && (
-                              <Lock className="w-4 h-4 text-surface-400" title="系统数据，仅管理员可编辑" />
+                              <span title="系统数据，仅管理员可编辑">
+                                <Lock className="w-4 h-4 text-surface-400" />
+                              </span>
                             )}
                           </div>
                         </div>
