@@ -464,8 +464,8 @@ sourceRoutes.post('/major-categories', async (c) => {
     await c.env.DB.prepare(`
       INSERT INTO search_major_categories (
         id, name, description, icon, color, requires_keyword, 
-        is_active, display_order, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
+        is_system, is_active, display_order, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 1, 0, ?, ?)
     `).bind(
       categoryId,
       name.trim(),
@@ -484,6 +484,7 @@ sourceRoutes.post('/major-categories', async (c) => {
       icon: icon?.trim() || '🌟',
       color: color?.trim() || '#6b7280',
       requiresKeyword: requiresKeyword !== false,
+      isSystem: false,
     }, '大类创建成功'));
   } catch (err) {
     console.error('Create major category error:', err);
@@ -503,6 +504,10 @@ sourceRoutes.post('/categories', async (c) => {
 
   if (!payload) {
     return c.json(error('AUTH_ERROR', '无效的Token'), 401);
+  }
+
+  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
   try {
@@ -541,8 +546,8 @@ sourceRoutes.post('/categories', async (c) => {
       INSERT INTO search_source_categories (
         id, major_category_id, name, description, icon, color,
         default_searchable, default_site_type, search_priority,
-        is_active, display_order, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
+        is_system, is_active, display_order, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 0, ?, ?)
     `).bind(
       categoryId,
       majorCategoryId.trim(),
@@ -567,6 +572,7 @@ sourceRoutes.post('/categories', async (c) => {
       defaultSearchable: defaultSearchable !== false,
       defaultSiteType: defaultSiteType || 'search',
       searchPriority: Math.min(Math.max(parseInt(searchPriority) || 5, 1), 10),
+      isSystem: false,
     }, '分类创建成功'));
   } catch (err) {
     console.error('Create category error:', err);
