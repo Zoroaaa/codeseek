@@ -1,6 +1,8 @@
-# 磁力快搜 - CodeSeek
-
 <div align="center">
+
+<img src="frontend/images/logo.png" alt="CodeSeek Logo" width="120" height="120">
+
+# 磁力快搜 - CodeSeek
 
 **现代化的磁力搜索聚合平台 - 基于 Cloudflare 边缘计算的无服务器架构**
 
