@@ -348,43 +348,47 @@ export const CategoryManager: React.FC = () => {
           return (
             <Card key={majorCategory.id} className="overflow-hidden border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
               <div 
-                className="flex items-center justify-between p-5 cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
+                className="flex items-center justify-between p-4 sm:p-5 cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
                 onClick={() => toggleMajorCategory(majorCategory.id)}
               >
-                <div className="flex items-center gap-4">
-                  <ChevronRight className={`w-5 h-5 text-surface-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <ChevronRight className={`w-4 h-4 shrink-0 text-surface-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                   <div 
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md"
+                    className="w-9 h-9 sm:w-12 sm:h-12 shrink-0 rounded-xl flex items-center justify-center text-white shadow-md"
                     style={{ backgroundColor: majorCategory.color || '#3B82F6' }}
                   >
                     {majorCategory.icon ? (
-                      <span className="text-2xl">{majorCategory.icon}</span>
+                      <span className="text-lg sm:text-2xl">{majorCategory.icon}</span>
                     ) : (
-                      <Layers className="w-6 h-6" />
+                      <Layers className="w-5 h-5 sm:w-6 sm:h-6" />
                     )}
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-lg font-semibold text-surface-900 dark:text-surface-100 truncate">
                       {majorCategory.name}
                     </h3>
-                    <p className="text-sm text-surface-500 dark:text-surface-400">
+                    <p className="text-xs sm:text-sm text-surface-500 dark:text-surface-400">
                       {subCategories.length} 个分类
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                  <Badge variant={majorCategory.requiresKeyword ? 'primary' : 'default'}>
+                <div className="shrink-0 flex items-center gap-2 ml-2" onClick={(e) => e.stopPropagation()}>
+                  {/* Keyword badge — hide text on mobile */}
+                  <Badge variant={majorCategory.requiresKeyword ? 'primary' : 'default'} className="hidden sm:inline-flex">
                     {majorCategory.requiresKeyword ? '需要关键词' : '无需关键词'}
                   </Badge>
+                  <Badge variant={majorCategory.requiresKeyword ? 'primary' : 'default'} className="sm:hidden text-xs px-1.5 py-0.5">
+                    {majorCategory.requiresKeyword ? '搜索型' : '浏览型'}
+                  </Badge>
                   {majorCategory.isSystem && (
-                    <Badge variant="accent" className="flex items-center gap-1">
+                    <Badge variant="accent" className="hidden sm:flex items-center gap-1">
                       <Shield className="w-3 h-3" />
                       系统
                     </Badge>
                   )}
                   <Dropdown
                     trigger={
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="p-1.5">
                         <MoreVertical className="w-4 h-4" />
                       </Button>
                     }
@@ -406,59 +410,65 @@ export const CategoryManager: React.FC = () => {
                       {subCategories.map(category => (
                         <div 
                           key={category.id}
-                          className="flex items-center justify-between p-4 pl-16 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
+                          className="flex items-center gap-3 p-3 sm:p-4 sm:pl-16 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
                         >
-                          <div className="flex items-center gap-4">
-                            <div 
-                              className="w-10 h-10 rounded-lg flex items-center justify-center text-white shadow-sm"
-                              style={{ backgroundColor: category.color || '#3B82F6' }}
-                            >
-                              {category.icon ? (
-                                <span className="text-lg">{category.icon}</span>
-                              ) : (
-                                <FolderOpen className="w-5 h-5" />
+                          {/* Icon */}
+                          <div 
+                            className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-lg flex items-center justify-center text-white shadow-sm"
+                            style={{ backgroundColor: category.color || '#3B82F6' }}
+                          >
+                            {category.icon ? (
+                              <span className="text-base sm:text-lg">{category.icon}</span>
+                            ) : (
+                              <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+                            )}
+                          </div>
+
+                          {/* Name + description + badges */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-medium text-sm text-surface-900 dark:text-surface-100 truncate">
+                                {category.name}
+                              </p>
+                              {category.isSystem && (
+                                <Badge variant="accent" className="hidden sm:flex items-center gap-1 text-xs shrink-0">
+                                  <Shield className="w-2.5 h-2.5" />
+                                  系统
+                                </Badge>
                               )}
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-surface-900 dark:text-surface-100">
-                                  {category.name}
-                                </p>
-                                {category.isSystem && (
-                                  <Badge variant="accent" className="flex items-center gap-1 text-xs">
-                                    <Shield className="w-2.5 h-2.5" />
-                                    系统
-                                  </Badge>
-                                )}
-                              </div>
+                            {/* Badges on mobile go below name */}
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {majorCategory.requiresKeyword ? (
+                                <Badge variant={category.defaultSearchable ? 'success' : 'default'} className="text-xs">
+                                  {category.defaultSearchable ? '可搜索' : '不可搜索'}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs bg-surface-100 dark:bg-surface-700">
+                                  不参与搜索
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="text-xs">
+                                {category.defaultSiteType === 'search' ? '搜索' : 
+                                 category.defaultSiteType === 'browse' ? '浏览' : '参考'}
+                              </Badge>
                               {category.description && (
-                                <p className="text-sm text-surface-500 dark:text-surface-400">
+                                <span className="text-xs text-surface-500 dark:text-surface-400 truncate hidden sm:inline">
                                   {category.description}
-                                </p>
+                                </span>
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            {majorCategory.requiresKeyword ? (
-                              <Badge variant={category.defaultSearchable ? 'success' : 'default'}>
-                                {category.defaultSearchable ? '可搜索' : '不可搜索'}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-surface-100 dark:bg-surface-700">
-                                不参与搜索
-                              </Badge>
-                            )}
-                            <Badge variant="outline">
-                              {category.defaultSiteType === 'search' ? '搜索' : 
-                               category.defaultSiteType === 'browse' ? '浏览' : '参考'}
-                            </Badge>
+
+                          {/* Actions */}
+                          <div className="shrink-0 flex items-center gap-0.5">
                             {(isAdmin || !category.isSystem) && (
-                              <div className="flex items-center gap-1">
+                              <>
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => openEditCategoryModal(category)}
-                                  className="hover:bg-accent-50 dark:hover:bg-accent-900/20"
+                                  className="p-1.5 hover:bg-accent-50 dark:hover:bg-accent-900/20"
                                 >
                                   <Edit className="w-4 h-4" />
                                 </Button>
@@ -466,14 +476,14 @@ export const CategoryManager: React.FC = () => {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleDeleteCategory(category.id)}
-                                  className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
+                                  className="p-1.5 text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
-                              </div>
+                              </>
                             )}
                             {category.isSystem && !isAdmin && (
-                              <span title="系统数据，仅管理员可编辑">
+                              <span title="系统数据，仅管理员可编辑" className="p-1.5">
                                 <Lock className="w-4 h-4 text-surface-400" />
                               </span>
                             )}

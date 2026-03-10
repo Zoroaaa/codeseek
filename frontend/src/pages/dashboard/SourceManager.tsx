@@ -490,73 +490,71 @@ export const SourceManager: React.FC = () => {
           
           return (
             <Card key={majorCategory.id} className="overflow-hidden border-surface-200/50 dark:border-surface-700/50 shadow-lg">
-              <div className="flex items-center justify-between p-5 bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800">
-                <button
-                  onClick={() => toggleMajorCategoryExpand(majorCategory.id)}
-                  className="flex items-center gap-4 flex-1 text-left"
-                >
-                  <ChevronRight className={`w-5 h-5 text-surface-400 transition-transform duration-200 ${isMajorExpanded ? 'rotate-90' : ''}`} />
-                  <div 
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md"
-                    style={{ backgroundColor: majorCategory.color || '#3B82F6' }}
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800">
+                <div className="flex items-center gap-3">
+                  {/* Expand toggle + icon + title — takes available space */}
+                  <button
+                    onClick={() => toggleMajorCategoryExpand(majorCategory.id)}
+                    className="flex items-center gap-3 flex-1 text-left min-w-0"
                   >
-                    {majorCategory.icon ? (
-                      <span className="text-2xl">{majorCategory.icon}</span>
+                    <ChevronRight className={`w-4 h-4 shrink-0 text-surface-400 transition-transform duration-200 ${isMajorExpanded ? 'rotate-90' : ''}`} />
+                    <div 
+                      className="w-9 h-9 sm:w-12 sm:h-12 shrink-0 rounded-xl flex items-center justify-center text-white shadow-md"
+                      style={{ backgroundColor: majorCategory.color || '#3B82F6' }}
+                    >
+                      {majorCategory.icon ? (
+                        <span className="text-lg sm:text-2xl">{majorCategory.icon}</span>
+                      ) : (
+                        <Layers className="w-5 h-5 sm:w-6 sm:h-6" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base sm:text-lg font-semibold text-surface-900 dark:text-surface-100 truncate">
+                        {majorCategory.name}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-surface-500 dark:text-surface-400">
+                        {majorCategory.categories.length} 个分类 · {majorCategory.totalCount} 个搜索源
+                      </p>
+                    </div>
+                  </button>
+                  
+                  {/* Controls: shrink-0 so they never wrap into the title */}
+                  <div className="shrink-0 flex items-center gap-2">
+                    {isSearchCategory ? (
+                      <>
+                        {/* Count badge — hide on very small screens */}
+                        <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-lg bg-surface-100 dark:bg-surface-700 text-xs text-surface-600 dark:text-surface-300 whitespace-nowrap">
+                          {majorCategory.enabledCount}/{majorCategory.totalCount}
+                        </span>
+                        <button
+                          onClick={() => handleToggleMajorCategory(majorCategory.id, !majorCategory.isAllEnabled)}
+                          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                            majorCategory.isAllEnabled
+                              ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
+                              : majorCategory.isAllDisabled
+                              ? 'bg-surface-200 text-surface-600 dark:bg-surface-700 dark:text-surface-400'
+                              : 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
+                          }`}
+                        >
+                          {majorCategory.isAllEnabled ? (
+                            <><CheckCircle className="w-3.5 h-3.5" /><span className="hidden sm:inline">全部启用</span></>
+                          ) : majorCategory.isAllDisabled ? (
+                            <><XCircle className="w-3.5 h-3.5" /><span className="hidden sm:inline">全部禁用</span></>
+                          ) : (
+                            <><CheckCircle className="w-3.5 h-3.5" /><span className="hidden sm:inline">部分启用</span></>
+                          )}
+                          {/* Mobile: show count inline since badge is hidden */}
+                          <span className="sm:hidden text-xs">
+                            {majorCategory.enabledCount}/{majorCategory.totalCount}
+                          </span>
+                        </button>
+                      </>
                     ) : (
-                      <Layers className="w-6 h-6" />
+                      <Badge variant="outline" className="text-xs bg-surface-100 dark:bg-surface-700 whitespace-nowrap">
+                        <span className="hidden sm:inline">浏览型 · </span>不参与搜索
+                      </Badge>
                     )}
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
-                      {majorCategory.name}
-                    </h3>
-                    <p className="text-sm text-surface-500 dark:text-surface-400">
-                      {majorCategory.categories.length} 个分类 · {majorCategory.totalCount} 个搜索源
-                    </p>
-                  </div>
-                </button>
-                
-                <div className="flex items-center gap-3">
-                  {isSearchCategory ? (
-                    <>
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-700">
-                        <span className="text-sm text-surface-600 dark:text-surface-300">
-                          {majorCategory.enabledCount}/{majorCategory.totalCount} 启用
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleToggleMajorCategory(majorCategory.id, !majorCategory.isAllEnabled)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                          majorCategory.isAllEnabled
-                            ? 'bg-gradient-to-r from-success-100 to-success-200 text-success-700 dark:from-success-900/30 dark:to-success-800/30 dark:text-success-400'
-                            : majorCategory.isAllDisabled
-                            ? 'bg-surface-200 text-surface-600 dark:bg-surface-700 dark:text-surface-400'
-                            : 'bg-gradient-to-r from-warning-100 to-warning-200 text-warning-700 dark:from-warning-900/30 dark:to-warning-800/30 dark:text-warning-400'
-                        }`}
-                      >
-                        {majorCategory.isAllEnabled ? (
-                          <>
-                            <CheckCircle className="w-4 h-4" />
-                            全部启用
-                          </>
-                        ) : majorCategory.isAllDisabled ? (
-                          <>
-                            <XCircle className="w-4 h-4" />
-                            全部禁用
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="w-4 h-4" />
-                            部分启用
-                          </>
-                        )}
-                      </button>
-                    </>
-                  ) : (
-                    <Badge variant="outline" className="text-xs bg-surface-100 dark:bg-surface-700">
-                      浏览型 · 不参与搜索
-                    </Badge>
-                  )}
                 </div>
               </div>
               
@@ -568,39 +566,39 @@ export const SourceManager: React.FC = () => {
                     return (
                       <div key={category.id} className="border-b border-surface-100 dark:border-surface-800 last:border-b-0">
                         <div 
-                          className="flex items-center justify-between px-5 py-3 pl-12 hover:bg-surface-50 dark:hover:bg-surface-800/50 cursor-pointer transition-colors"
+                          className="flex items-center justify-between px-4 py-3 sm:pl-12 hover:bg-surface-50 dark:hover:bg-surface-800/50 cursor-pointer transition-colors"
                           onClick={() => toggleCategoryExpand(category.id)}
                         >
-                          <div className="flex items-center gap-3">
-                            <ChevronRight className={`w-4 h-4 text-surface-400 transition-transform duration-200 ${isCategoryExpanded ? 'rotate-90' : ''}`} />
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <ChevronRight className={`w-4 h-4 shrink-0 text-surface-400 transition-transform duration-200 ${isCategoryExpanded ? 'rotate-90' : ''}`} />
                             <div 
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm"
+                              className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-white shadow-sm"
                               style={{ backgroundColor: category.color || '#6366f1' }}
                             >
                               {category.icon ? (
-                                <span className="text-base">{category.icon}</span>
+                                <span className="text-sm">{category.icon}</span>
                               ) : (
-                                <FolderOpen className="w-4 h-4" />
+                                <FolderOpen className="w-3.5 h-3.5" />
                               )}
                             </div>
-                            <div>
-                              <span className="font-medium text-surface-800 dark:text-surface-200">
+                            <div className="min-w-0">
+                              <span className="font-medium text-sm text-surface-800 dark:text-surface-200 truncate block">
                                 {category.name}
                               </span>
-                              <span className="text-sm text-surface-400 ml-2">
+                              <span className="text-xs text-surface-400">
                                 {category.totalCount} 个源
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="shrink-0 flex items-center gap-2 ml-2" onClick={(e) => e.stopPropagation()}>
                             {isSearchCategory ? (
                               <>
-                                <span className="text-xs text-surface-500 dark:text-surface-400">
-                                  {category.enabledCount}/{category.totalCount} 启用
+                                <span className="hidden sm:inline text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap">
+                                  {category.enabledCount}/{category.totalCount}
                                 </span>
                                 <button
                                   onClick={() => handleToggleCategory(category.id, !category.isAllEnabled)}
-                                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
                                     category.isAllEnabled
                                       ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
                                       : category.isAllDisabled
@@ -609,21 +607,18 @@ export const SourceManager: React.FC = () => {
                                   }`}
                                 >
                                   {category.isAllEnabled ? (
-                                    <>
-                                      <CheckCircle className="w-3 h-3" />
-                                      全部启用
-                                    </>
+                                    <CheckCircle className="w-3 h-3" />
                                   ) : category.isAllDisabled ? (
-                                    <>
-                                      <XCircle className="w-3 h-3" />
-                                      全部禁用
-                                    </>
+                                    <XCircle className="w-3 h-3" />
                                   ) : (
-                                    <>
-                                      <CheckCircle className="w-3 h-3" />
-                                      部分启用
-                                    </>
+                                    <CheckCircle className="w-3 h-3" />
                                   )}
+                                  <span className="hidden sm:inline ml-1">
+                                    {category.isAllEnabled ? '全部启用' : category.isAllDisabled ? '全部禁用' : '部分启用'}
+                                  </span>
+                                  <span className="sm:hidden ml-0.5 text-xs">
+                                    {category.enabledCount}/{category.totalCount}
+                                  </span>
                                 </button>
                               </>
                             ) : (
@@ -643,108 +638,115 @@ export const SourceManager: React.FC = () => {
                               return (
                                 <div 
                                   key={source.id}
-                                  className={`flex items-center justify-between px-5 py-3 pl-16 hover:bg-surface-100/50 dark:hover:bg-surface-800/30 transition-colors ${
+                                  className={`px-4 py-3 sm:pl-16 hover:bg-surface-100/50 dark:hover:bg-surface-800/30 transition-colors border-b border-surface-100/80 dark:border-surface-800/50 last:border-b-0 ${
                                     !isEnabled ? 'opacity-60' : ''
                                   }`}
                                 >
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <SourceIcon
-                                      icon={source.icon}
-                                      name={source.name}
-                                      size="sm"
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2">
+                                  {/* Mobile: stacked layout; Desktop: single row */}
+                                  <div className="flex items-start gap-3">
+                                    <div className="shrink-0 mt-0.5">
+                                      <SourceIcon
+                                        icon={source.icon}
+                                        name={source.name}
+                                        size="sm"
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      {/* Name + system badge row */}
+                                      <div className="flex items-center gap-1.5 flex-wrap">
                                         <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">
                                           {source.userConfig?.customName || source.name}
                                         </p>
-                                        <Badge variant={siteType.variant} className="text-xs">
+                                        <Badge variant={siteType.variant} className="text-xs shrink-0">
                                           {siteType.label}
                                         </Badge>
                                         {source.isSystem && (
-                                          <Badge variant="accent" className="flex items-center gap-1 text-xs">
+                                          <Badge variant="accent" className="flex items-center gap-1 text-xs shrink-0">
                                             <Shield className="w-2.5 h-2.5" />
                                             系统
                                           </Badge>
                                         )}
                                       </div>
+                                      {/* Subtitle */}
                                       {(source.userConfig?.customSubtitle || source.subtitle) && (
-                                        <p className="text-xs text-surface-500 dark:text-surface-400 truncate">
+                                        <p className="text-xs text-surface-500 dark:text-surface-400 truncate mt-0.5">
                                           {source.userConfig?.customSubtitle || source.subtitle}
                                         </p>
                                       )}
+                                      {/* Actions row — always on its own line on mobile */}
+                                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                        {isSearchCategory ? (
+                                          <button
+                                            onClick={() => handleToggleSource(source.id, !isEnabled)}
+                                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                                              isEnabled
+                                                ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
+                                                : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
+                                            }`}
+                                          >
+                                            {isEnabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                            {isEnabled ? '已启用' : '已禁用'}
+                                          </button>
+                                        ) : (
+                                          <span className="text-xs text-surface-400 dark:text-surface-500 px-2 py-1 bg-surface-100 dark:bg-surface-800 rounded-lg">
+                                            不参与搜索
+                                          </span>
+                                        )}
+                                        <div className="flex items-center gap-0.5 ml-auto">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleCheckStatus(source.id)}
+                                            title="检测状态"
+                                            className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20"
+                                          >
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                          </Button>
+                                          {(isAdmin || !source.isSystem) && (
+                                            <>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                  setFormData({
+                                                    name: source.name,
+                                                    subtitle: source.subtitle || '',
+                                                    description: source.description || '',
+                                                    icon: source.icon || '',
+                                                    urlTemplate: source.urlTemplate,
+                                                    homepageUrl: source.homepageUrl || '',
+                                                    categoryId: source.categoryId,
+                                                    siteType: source.siteType,
+                                                    searchable: source.searchable,
+                                                    requiresKeyword: source.requiresKeyword,
+                                                    searchPriority: source.searchPriority,
+                                                  });
+                                                  setEditModal({ isOpen: true, source });
+                                                }}
+                                                title="编辑"
+                                                className="p-1.5 hover:bg-accent-50 dark:hover:bg-accent-900/20"
+                                              >
+                                                <Edit className="w-3.5 h-3.5" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleDeleteSource(source.id)}
+                                                title="删除"
+                                                className="p-1.5 text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </Button>
+                                            </>
+                                          )}
+                                          {source.isSystem && !isAdmin && (
+                                            <span title="系统数据，仅管理员可编辑" className="p-1.5">
+                                              <LockKeyhole className="w-3.5 h-3.5 text-surface-400" />
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                  
-                                  <div className="flex items-center gap-2 shrink-0 ml-4">
-                                    {isSearchCategory ? (
-                                      <button
-                                        onClick={() => handleToggleSource(source.id, !isEnabled)}
-                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
-                                          isEnabled
-                                            ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
-                                            : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
-                                        }`}
-                                      >
-                                        {isEnabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                        {isEnabled ? '启用' : '禁用'}
-                                      </button>
-                                    ) : (
-                                      <span className="text-xs text-surface-400 dark:text-surface-500 px-2 py-1">
-                                        不参与搜索
-                                      </span>
-                                    )}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleCheckStatus(source.id)}
-                                      title="检测状态"
-                                      className="p-1 hover:bg-primary-50 dark:hover:bg-primary-900/20"
-                                    >
-                                      <RefreshCw className="w-3.5 h-3.5" />
-                                    </Button>
-                                    {(isAdmin || !source.isSystem) && (
-                                      <>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => {
-                                            setFormData({
-                                              name: source.name,
-                                              subtitle: source.subtitle || '',
-                                              description: source.description || '',
-                                              icon: source.icon || '',
-                                              urlTemplate: source.urlTemplate,
-                                              homepageUrl: source.homepageUrl || '',
-                                              categoryId: source.categoryId,
-                                              siteType: source.siteType,
-                                              searchable: source.searchable,
-                                              requiresKeyword: source.requiresKeyword,
-                                              searchPriority: source.searchPriority,
-                                            });
-                                            setEditModal({ isOpen: true, source });
-                                          }}
-                                          title="编辑"
-                                          className="p-1 hover:bg-accent-50 dark:hover:bg-accent-900/20"
-                                        >
-                                          <Edit className="w-3.5 h-3.5" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleDeleteSource(source.id)}
-                                          title="删除"
-                                          className="p-1 text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </Button>
-                                      </>
-                                    )}
-                                    {source.isSystem && !isAdmin && (
-                                      <span title="系统数据，仅管理员可编辑">
-                                        <LockKeyhole className="w-3.5 h-3.5 text-surface-400" />
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
                               );
