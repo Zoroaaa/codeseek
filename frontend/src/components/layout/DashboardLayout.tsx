@@ -16,6 +16,7 @@ import {
   Search,
   ChevronLeft,
   BarChart2,
+  Shield,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
 
@@ -26,9 +27,10 @@ interface NavItem {
   path: string;
   badge?: number;
   group?: string;
+  adminOnly?: boolean;
 }
 
-const navGroups = ['个人中心', '资源管理', '社区', '设置'];
+const navGroups = ['个人中心', '资源管理', '社区', '设置', '管理员'];
 
 const navItems: NavItem[] = [
   { id: 'overview',    label: '概览',       icon: <LayoutDashboard className="w-5 h-5" />, path: '/dashboard',            group: '个人中心' },
@@ -36,9 +38,10 @@ const navItems: NavItem[] = [
   { id: 'favorites',   label: '我的收藏',   icon: <Heart className="w-5 h-5" />,           path: '/dashboard/favorites',  group: '个人中心' },
   { id: 'history',     label: '搜索历史',   icon: <History className="w-5 h-5" />,         path: '/dashboard/history',    group: '个人中心' },
   { id: 'sources',     label: '搜索源管理', icon: <Database className="w-5 h-5" />,        path: '/dashboard/sources',    group: '资源管理' },
-  { id: 'categories',  label: '分类管理',   icon: <FolderTree className="w-5 h-5" />,      path: '/dashboard/categories', group: '资源管理' },
   { id: 'community',   label: '社区管理',   icon: <Users className="w-5 h-5" />,           path: '/dashboard/community',  group: '社区' },
   { id: 'settings',    label: '系统设置',   icon: <Settings className="w-5 h-5" />,        path: '/dashboard/settings',   group: '设置' },
+  { id: 'categories',  label: '分类管理',   icon: <FolderTree className="w-5 h-5" />,      path: '/dashboard/categories', group: '管理员', adminOnly: true },
+  { id: 'admin',       label: '管理员面板', icon: <Shield className="w-5 h-5" />,          path: '/admin',                group: '管理员', adminOnly: true },
 ];
 
 export const DashboardLayout: React.FC = () => {
@@ -46,6 +49,8 @@ export const DashboardLayout: React.FC = () => {
   const { resolvedTheme, toggleTheme, sidebarCollapsed, toggleSidebar } = useThemeStore();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
 
   const handleLogout = () => {
     logout();
@@ -56,8 +61,17 @@ export const DashboardLayout: React.FC = () => {
     if (path === '/dashboard') {
       return location.pathname === '/dashboard';
     }
+    if (path === '/admin') {
+      return location.pathname.startsWith('/admin');
+    }
     return location.pathname.startsWith(path);
   };
+
+  const filteredNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  const filteredNavGroups = navGroups.filter(group => {
+    const groupItems = filteredNavItems.filter(i => i.group === group);
+    return groupItems.length > 0;
+  });
 
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex">
@@ -95,8 +109,8 @@ export const DashboardLayout: React.FC = () => {
         </div>
 
         <nav className="flex-1 py-4 px-3 overflow-y-auto scrollbar-thin">
-          {navGroups.map((group) => {
-            const groupItems = navItems.filter(i => i.group === group);
+          {filteredNavGroups.map((group) => {
+            const groupItems = filteredNavItems.filter(i => i.group === group);
             if (groupItems.length === 0) return null;
             return (
               <div key={group} className="mb-4">
@@ -171,7 +185,7 @@ export const DashboardLayout: React.FC = () => {
                   {user?.username}
                 </p>
                 <p className="text-xs text-surface-500 dark:text-surface-400 truncate">
-                  {user?.email}
+                  {user?.roleDisplayName || user?.email}
                 </p>
               </div>
             )}
@@ -197,7 +211,7 @@ export const DashboardLayout: React.FC = () => {
         <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-surface-900/80 backdrop-blur-lg border-b border-surface-200 dark:border-surface-800">
           <div className="flex items-center justify-between h-full px-6">
             <h1 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
-              {navItems.find((item) => isActive(item.path))?.label || '控制台'}
+              {filteredNavItems.find((item) => isActive(item.path))?.label || '控制台'}
             </h1>
             <div className="flex items-center gap-2">
               <button

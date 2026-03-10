@@ -47,6 +47,19 @@ export interface User {
   login_count: number;
   email_verified: number;
   last_password_change?: number | null;
+  role_id?: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  permissions: string;
+  is_system: number;
+  priority: number;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface UserSession {

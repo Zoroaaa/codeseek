@@ -7,12 +7,13 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { HomePage } from '@/pages/HomePage';
 import { MainSearchPage } from '@/pages/MainSearchPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
+import { AdminManager } from '@/pages/dashboard/AdminManager';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, user } = useAuthStore();
   
   if (isLoading) {
     return (
@@ -24,6 +25,28 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading, user } = useAuthStore();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+    return <Navigate to="/dashboard" replace />;
   }
   
   return <>{children}</>;
@@ -121,6 +144,9 @@ const App: React.FC = () => {
           <Route path="favorites" element={<DashboardPage />} />
           <Route path="history" element={<DashboardPage />} />
           <Route path="settings" element={<DashboardPage />} />
+        </Route>
+        <Route path="/admin" element={<AdminRoute><DashboardLayout /></AdminRoute>}>
+          <Route index element={<AdminManager />} />
         </Route>
       </Routes>
     </BrowserRouter>

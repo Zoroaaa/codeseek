@@ -1,10 +1,11 @@
 import { Context, Next } from 'hono';
-import { Env, JwtPayload } from '../types';
+import { Env, JwtPayload, User, Role } from '../types';
 import { verifyToken, error } from '../utils';
 
 declare module 'hono' {
   interface ContextVariableMap {
     user: JwtPayload;
+    userRole: Role;
   }
 }
 
@@ -26,6 +27,31 @@ export const authMiddleware = async (c: Context<{ Bindings: Env }>, next: Next) 
   await next();
 };
 
+export const roleMiddleware = async (c: Context<{ Bindings: Env }>, next: Next) => {
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json(error('UNAUTHORIZED', '未认证'), 401);
+  }
+  
+  try {
+    const userWithRole = await c.env.DB.prepare(
+      'SELECT u.role_id, r.* FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = ?'
+    ).bind(user.userId).first<{ role_id: string } & Role>();
+    
+    if (!userWithRole || !userWithRole.id) {
+      c.set('userRole', { id: 'user', name: 'user', display_name: '普通用户', permissions: '["search","favorite","history","sync"]', is_system: 1, priority: 10, created_at: Date.now(), updated_at: Date.now(), description: null });
+    } else {
+      c.set('userRole', userWithRole as Role);
+    }
+    
+    await next();
+  } catch {
+    c.set('userRole', { id: 'user', name: 'user', display_name: '普通用户', permissions: '["search","favorite","history","sync"]', is_system: 1, priority: 10, created_at: Date.now(), updated_at: Date.now(), description: null });
+    await next();
+  }
+};
+
 export const adminMiddleware = async (c: Context<{ Bindings: Env }>, next: Next) => {
   const user = c.get('user');
   
@@ -44,6 +70,27 @@ export const superAdminMiddleware = async (c: Context<{ Bindings: Env }>, next: 
   }
   
   await next();
+};
+
+export const permissionMiddleware = (requiredPermission: string) => {
+  return async (c: Context<{ Bindings: Env }>, next: Next) => {
+    const userRole = c.get('userRole');
+    
+    if (!userRole) {
+      return c.json(error('FORBIDDEN', '无权限'), 403);
+    }
+    
+    const permissions = JSON.parse(userRole.permissions || '[]') as string[];
+    const hasWildcard = permissions.includes('*');
+    const hasPermission = permissions.includes(requiredPermission) || 
+                          permissions.some(p => requiredPermission.startsWith(p.replace('*', '')));
+    
+    if (!hasWildcard && !hasPermission) {
+      return c.json(error('FORBIDDEN', `需要权限: ${requiredPermission}`), 403);
+    }
+    
+    await next();
+  };
 };
 
 export const optionalAuthMiddleware = async (c: Context<{ Bindings: Env }>, next: Next) => {

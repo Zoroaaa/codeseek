@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { Env, User, EmailVerification, EmailChangeRequest } from '../types';
+import { Env, User, EmailVerification, EmailChangeRequest, Role } from '../types';
 import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP } from '../utils';
 import { EmailVerificationService, emailVerificationUtils } from '../services/email-verification';
 
@@ -13,6 +13,9 @@ authRoutes.post('/login', async (c) => {
     return c.json(error('VALIDATION_ERROR', '请输入用户名/邮箱和密码'), 400);
   }
 
+  const clientIP = getClientIP(c);
+  const userAgent = c.req.header('User-Agent') || '';
+
   try {
     let queryField = 'username';
     const queryValue = identifier;
@@ -22,19 +25,24 @@ authRoutes.post('/login', async (c) => {
     }
     
     const user = await c.env.DB.prepare(
-      `SELECT * FROM users WHERE ${queryField} = ?`
-    ).bind(queryValue).first<User>();
+      `SELECT u.*, r.name as role_name, r.display_name as role_display_name, r.permissions as role_permissions 
+       FROM users u 
+       LEFT JOIN roles r ON u.role_id = r.id 
+       WHERE u.${queryField} = ?`
+    ).bind(queryValue).first<User & { role_name?: string; role_display_name?: string; role_permissions?: string }>();
 
     if (!user) {
       return c.json(error('AUTH_ERROR', '用户名/邮箱或密码错误'), 401);
     }
 
     if (!user.is_active) {
+      await logUserAction(c.env, user.id, 'login_failed', { reason: '账号已被禁用', ip: clientIP }, c);
       return c.json(error('AUTH_ERROR', '账号已被禁用'), 403);
     }
 
     const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) {
+      await logUserAction(c.env, user.id, 'login_failed', { reason: '密码错误', ip: clientIP }, c);
       return c.json(error('AUTH_ERROR', '用户名/邮箱或密码错误'), 401);
     }
 
@@ -43,8 +51,9 @@ authRoutes.post('/login', async (c) => {
       'UPDATE users SET last_login = ?, login_count = login_count + 1, updated_at = ? WHERE id = ?'
     ).bind(now, now, user.id).run();
 
+    const userRole = user.role_name || 'user';
     const expiryDays = parseInt(c.env.JWT_EXPIRY_DAYS || '30', 10);
-    const token = await generateToken(user.id, user.username, c.env.JWT_SECRET, expiryDays);
+    const token = await generateToken(user.id, user.username, c.env.JWT_SECRET, expiryDays, userRole);
 
     const tokenHash = await hashPassword(token);
     const sessionId = generateId();
@@ -60,11 +69,11 @@ authRoutes.post('/login', async (c) => {
       expiresAt,
       now,
       now,
-      getClientIP(c),
-      c.req.header('User-Agent') || ''
+      clientIP,
+      userAgent
     ).run();
 
-    await logUserAction(c.env, user.id, 'login', { method: 'password' }, c);
+    await logUserAction(c.env, user.id, 'login', { method: 'password', ip: clientIP }, c);
 
     return c.json(success({
       user: {
@@ -78,6 +87,8 @@ authRoutes.post('/login', async (c) => {
         createdAt: user.created_at,
         lastLogin: now,
         loginCount: user.login_count + 1,
+        role: userRole,
+        roleDisplayName: user.role_display_name || '普通用户',
       },
       token,
     }, '登录成功'));
@@ -247,8 +258,11 @@ authRoutes.get('/me', async (c) => {
 
   try {
     const user = await c.env.DB.prepare(
-      'SELECT * FROM users WHERE id = ?'
-    ).bind(payload.userId).first<User>();
+      `SELECT u.*, r.name as role_name, r.display_name as role_display_name 
+       FROM users u 
+       LEFT JOIN roles r ON u.role_id = r.id 
+       WHERE u.id = ?`
+    ).bind(payload.userId).first<User & { role_name?: string; role_display_name?: string }>();
 
     if (!user) {
       return c.json(error('AUTH_ERROR', '用户不存在'), 404);
@@ -278,6 +292,8 @@ authRoutes.get('/me', async (c) => {
       createdAt: user.created_at,
       lastLogin: user.last_login,
       loginCount: user.login_count,
+      role: user.role_name || 'user',
+      roleDisplayName: user.role_display_name || '普通用户',
     }));
   } catch (err) {
     console.error('Get me error:', err);

@@ -30,9 +30,13 @@ export const verifyPassword = async (password: string, hash: string): Promise<bo
   return passwordHash === hash;
 };
 
-export const generateToken = async (userId: string, username: string, secret: string, expiryDays: number = 30): Promise<string> => {
+export const generateToken = async (userId: string, username: string, secret: string, expiryDays: number = 30, role?: string): Promise<string> => {
   const secretKey = new TextEncoder().encode(secret);
-  const token = await new jose.SignJWT({ userId, username })
+  const payload: { userId: string; username: string; role?: string } = { userId, username };
+  if (role) {
+    payload.role = role;
+  }
+  const token = await new jose.SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${expiryDays}d`)

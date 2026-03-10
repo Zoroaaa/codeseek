@@ -599,8 +599,8 @@ sourceRoutes.put('/categories/:id', async (c) => {
       return c.json(error('NOT_FOUND', '分类不存在'), 404);
     }
 
-    if (existingCategory.is_system) {
-      return c.json(error('FORBIDDEN', '系统分类不允许修改'), 403);
+    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return c.json(error('FORBIDDEN', '系统分类仅管理员可修改'), 403);
     }
 
     const body = await c.req.json();
@@ -673,8 +673,8 @@ sourceRoutes.delete('/categories/:id', async (c) => {
       return c.json(error('NOT_FOUND', '分类不存在'), 404);
     }
 
-    if (existingCategory.is_system) {
-      return c.json(error('FORBIDDEN', '系统分类不允许删除'), 403);
+    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return c.json(error('FORBIDDEN', '系统分类仅管理员可删除'), 403);
     }
 
     const sourceCount = await c.env.DB.prepare(
@@ -822,8 +822,8 @@ sourceRoutes.put('/:id', async (c) => {
       return c.json(error('NOT_FOUND', '搜索源不存在'), 404);
     }
 
-    if (existingSource.is_system) {
-      return c.json(error('FORBIDDEN', '系统搜索源不允许修改'), 403);
+    if (existingSource.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return c.json(error('FORBIDDEN', '系统搜索源仅管理员可修改'), 403);
     }
 
     const body = await c.req.json();
@@ -910,8 +910,8 @@ sourceRoutes.delete('/:id', async (c) => {
       return c.json(error('NOT_FOUND', '搜索源不存在'), 404);
     }
 
-    if (existingSource.is_system) {
-      return c.json(error('FORBIDDEN', '系统搜索源不允许删除'), 403);
+    if (existingSource.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return c.json(error('FORBIDDEN', '系统搜索源仅管理员可删除'), 403);
     }
 
     await c.env.DB.prepare(
@@ -1051,8 +1051,8 @@ sourceRoutes.put('/major-categories/:id', async (c) => {
       return c.json(error('NOT_FOUND', '大类不存在'), 404);
     }
 
-    if (existingCategory.is_system) {
-      return c.json(error('FORBIDDEN', '系统大类不允许修改'), 403);
+    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return c.json(error('FORBIDDEN', '系统大类仅管理员可修改'), 403);
     }
 
     const body = await c.req.json();
@@ -1165,8 +1165,8 @@ sourceRoutes.delete('/major-categories/:id', async (c) => {
       return c.json(error('NOT_FOUND', '大类不存在'), 404);
     }
 
-    if (existingCategory.is_system) {
-      return c.json(error('FORBIDDEN', '不能删除系统大类'), 403);
+    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return c.json(error('FORBIDDEN', '系统大类仅管理员可删除'), 403);
     }
 
     const categoryCount = await c.env.DB.prepare(

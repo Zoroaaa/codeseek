@@ -10,10 +10,12 @@ import {
   Search,
   MoreVertical,
   Shield,
+  Lock,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, EmptyState, Dropdown } from '@/components/ui';
 import { sourceApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
+import { useAuthStore } from '@/stores';
 import type { 
   MajorCategory, 
   Category, 
@@ -25,6 +27,8 @@ import type {
 
 export const CategoryManager: React.FC = () => {
   const toast = useToast();
+  const { user } = useAuthStore();
+  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
   
   const [majorCategories, setMajorCategories] = useState<MajorCategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -386,7 +390,7 @@ export const CategoryManager: React.FC = () => {
                     }
                     items={[
                       { label: '添加分类', onClick: () => openCreateCategoryModal(majorCategory.id) },
-                      ...(!majorCategory.isSystem ? [
+                      ...(isAdmin || !majorCategory.isSystem ? [
                         { label: '编辑', onClick: () => openEditMajorCategoryModal(majorCategory) },
                         { label: '删除', onClick: () => handleDeleteMajorCategory(majorCategory.id), danger: true },
                       ] : []),
@@ -448,7 +452,7 @@ export const CategoryManager: React.FC = () => {
                               {category.defaultSiteType === 'search' ? '搜索' : 
                                category.defaultSiteType === 'browse' ? '浏览' : '参考'}
                             </Badge>
-                            {!category.isSystem && (
+                            {(isAdmin || !category.isSystem) && (
                               <div className="flex items-center gap-1">
                                 <Button
                                   variant="ghost"
@@ -467,6 +471,9 @@ export const CategoryManager: React.FC = () => {
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               </div>
+                            )}
+                            {category.isSystem && !isAdmin && (
+                              <Lock className="w-4 h-4 text-surface-400" title="系统数据，仅管理员可编辑" />
                             )}
                           </div>
                         </div>

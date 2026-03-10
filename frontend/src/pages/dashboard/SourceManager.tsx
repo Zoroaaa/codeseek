@@ -16,10 +16,12 @@ import {
   Layers,
   FolderOpen,
   Shield,
+  Lock,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, Dropdown, EmptyState, SourceIcon } from '@/components/ui';
 import { sourceApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
+import { useAuthStore } from '@/stores';
 import type { 
   SearchSource, 
   MajorCategory, 
@@ -48,6 +50,8 @@ interface MajorCategoryWithCategories extends MajorCategory {
 
 export const SourceManager: React.FC = () => {
   const toast = useToast();
+  const { user } = useAuthStore();
+  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
   
   const [sources, setSources] = useState<Array<SearchSource & { userConfig?: UserSourceConfig | null }>>([]);
   const [majorCategories, setMajorCategories] = useState<MajorCategory[]>([]);
@@ -699,7 +703,7 @@ export const SourceManager: React.FC = () => {
                                     >
                                       <RefreshCw className="w-3.5 h-3.5" />
                                     </Button>
-                                    {!source.isSystem && (
+                                    {(isAdmin || !source.isSystem) && (
                                       <>
                                         <Button
                                           variant="ghost"
@@ -735,6 +739,9 @@ export const SourceManager: React.FC = () => {
                                           <Trash2 className="w-3.5 h-3.5" />
                                         </Button>
                                       </>
+                                    )}
+                                    {source.isSystem && !isAdmin && (
+                                      <Lock className="w-3.5 h-3.5 text-surface-400" title="系统数据，仅管理员可编辑" />
                                     )}
                                   </div>
                                 </div>
