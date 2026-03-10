@@ -41,6 +41,7 @@ import type { SearchResult, FavoriteItem, SearchHistoryItem, MajorCategory, Cate
 interface SearchResultItem extends SearchResult {
   subtitle?: string;
   siteType?: string;
+  category?: string;
 }
 
 interface SourceWithUserConfig extends SearchSource {
@@ -73,10 +74,27 @@ export const MainSearchPage: React.FC = () => {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768 ? 'grid' : 'list';
+    }
+    return 'list';
+  });
   const [expandedMajorCategories, setExpandedMajorCategories] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [allSources, setAllSources] = useState<SourceWithUserConfig[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) {
+        setViewMode('list');
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -111,6 +129,12 @@ export const MainSearchPage: React.FC = () => {
       loadFavorites();
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (hasSearched && keyword.trim()) {
+      handleSearch();
+    }
+  }, [selectedCategory]);
 
   const loadHistory = async () => {
     if (!isAuthenticated) return;
@@ -149,6 +173,7 @@ export const MainSearchPage: React.FC = () => {
     }
 
     setSearching(true);
+    setHasSearched(true);
     try {
       const response = await searchApi.search({
         keyword: keyword.trim(),
@@ -162,6 +187,7 @@ export const MainSearchPage: React.FC = () => {
           url: r.url,
           subtitle: r.subtitle,
           siteType: r.siteType,
+          category: r.category,
         }));
         setResults(mappedResults as unknown as SearchResult[]);
         setSearchResults(mappedResults);
@@ -302,6 +328,34 @@ export const MainSearchPage: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const getCategoryBadge = (categoryId?: string) => {
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) {
+      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+    }
+    const majorCategory = majorCategories.find(mc => mc.id === category.majorCategoryId);
+    if (majorCategory?.color) {
+      return `bg-opacity-20 text-opacity-90`;
+    }
+    return 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300';
+  };
+
+  const getCategoryLabel = (categoryId?: string) => {
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) return '搜索';
+    return category.name;
+  };
+
+  const getCategoryStyle = (categoryId?: string) => {
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) return {};
+    const majorCategory = majorCategories.find(mc => mc.id === category.majorCategoryId);
+    if (majorCategory?.color) {
+      return { backgroundColor: `${majorCategory.color}20`, color: majorCategory.color };
+    }
+    return {};
   };
 
   const getSiteTypeBadge = (siteType?: string) => {
@@ -498,8 +552,11 @@ export const MainSearchPage: React.FC = () => {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                           <h3 className="font-semibold text-surface-900 dark:text-surface-100 text-xs sm:text-sm">{result.sourceName}</h3>
-                          <span className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md font-medium ${getSiteTypeBadge(result.siteType)}`}>
-                            {getSiteTypeLabel(result.siteType)}
+                          <span 
+                            className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md font-medium ${getCategoryBadge(result.category)}`}
+                            style={getCategoryStyle(result.category)}
+                          >
+                            {getCategoryLabel(result.category)}
                           </span>
                           {isProxyEnabled && (
                             <span className="hidden sm:flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md font-medium bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400">
