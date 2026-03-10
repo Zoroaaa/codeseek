@@ -512,12 +512,13 @@ const ActivityTab: React.FC = () => {
 const LogsTab: React.FC = () => {
   const [logs, setLogs] = useState<Array<{
     id: string;
-    loginTime: number;
-    ipAddress: string | null;
-    userAgent: string | null;
-    loginStatus: string;
-    loginMethod: string;
-    failureReason: string | null;
+    user_id: string | null;
+    action: string;
+    data: string;
+    ip_address: string | null;
+    user_agent: string | null;
+    created_at: number;
+    username: string | null;
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -527,8 +528,8 @@ const LogsTab: React.FC = () => {
     const loadLogs = async () => {
       setLoading(true);
       try {
-        const result = await adminApi.getLogs({ page, pageSize: 20 });
-        setLogs(result.items as unknown as typeof logs);
+        const result = await adminApi.getLogs({ page, pageSize: 20, action: 'login,login_failed' });
+        setLogs(result.items);
         setTotalPages(result.totalPages);
       } catch (err) {
         console.error('加载日志失败:', err);
@@ -543,6 +544,10 @@ const LogsTab: React.FC = () => {
     return new Date(timestamp).toLocaleString('zh-CN');
   };
 
+  const getLoginStatus = (action: string): 'success' | 'failed' => {
+    return action === 'login' ? 'success' : 'failed';
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 overflow-hidden">
@@ -551,6 +556,7 @@ const LogsTab: React.FC = () => {
             <thead className="bg-surface-50 dark:bg-surface-900">
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-surface-600 dark:text-surface-400">时间</th>
+                <th className="px-4 py-3 text-left font-medium text-surface-600 dark:text-surface-400">用户</th>
                 <th className="px-4 py-3 text-left font-medium text-surface-600 dark:text-surface-400">IP地址</th>
                 <th className="px-4 py-3 text-left font-medium text-surface-600 dark:text-surface-400">状态</th>
                 <th className="px-4 py-3 text-left font-medium text-surface-600 dark:text-surface-400">设备信息</th>
@@ -559,13 +565,13 @@ const LogsTab: React.FC = () => {
             <tbody className="divide-y divide-surface-100 dark:divide-surface-700">
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-surface-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-surface-500">
                     加载中...
                   </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-surface-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-surface-500">
                     暂无数据
                   </td>
                 </tr>
@@ -573,30 +579,35 @@ const LogsTab: React.FC = () => {
                 logs.map((log) => (
                   <tr key={log.id} className="hover:bg-surface-50 dark:hover:bg-surface-700/50">
                     <td className="px-4 py-3 text-surface-500">
-                      {formatDate(log.loginTime)}
+                      {formatDate(log.created_at)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-surface-900 dark:text-surface-100">
+                        {log.username || '-'}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <MapPin className="w-3 h-3 text-surface-400" />
-                        <span>{log.ipAddress || '-'}</span>
+                        <span>{log.ip_address || '-'}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={clsx(
                           'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                          log.loginStatus === 'success'
+                          getLoginStatus(log.action) === 'success'
                             ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
                             : 'bg-error-100 text-error-700 dark:bg-error-900/30 dark:text-error-400'
                         )}
                       >
-                        {log.loginStatus === 'success' ? '成功' : '失败'}
+                        {getLoginStatus(log.action) === 'success' ? '成功' : '失败'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-surface-500">
                       <div className="flex items-center gap-2">
                         <Monitor className="w-3 h-3 text-surface-400" />
-                        <span className="truncate max-w-[200px]">{log.userAgent || '-'}</span>
+                        <span className="truncate max-w-[200px]">{log.user_agent || '-'}</span>
                       </div>
                     </td>
                   </tr>

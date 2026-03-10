@@ -719,8 +719,12 @@ adminRoutes.get('/logs', async (c) => {
     }
 
     if (action) {
-      whereClause += ' AND action = ?';
-      params.push(action);
+      const actions = action.split(',').map(a => a.trim()).filter(Boolean);
+      if (actions.length > 0) {
+        const placeholders = actions.map(() => '?').join(', ');
+        whereClause += ` AND action IN (${placeholders})`;
+        params.push(...actions);
+      }
     }
 
     const countResult = await c.env.DB.prepare(
