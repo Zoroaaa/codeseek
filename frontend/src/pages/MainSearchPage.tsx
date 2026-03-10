@@ -34,15 +34,19 @@ import { Button, Input, Loading, SourceIcon } from '@/components/ui';
 import { convertToProxyUrl } from '@/services/proxy/ProxyService';
 import { useToast } from '@/components/ui/Toast';
 import { useNavigate, Link } from 'react-router-dom';
-import type { SearchResult, FavoriteItem, SearchHistoryItem, MajorCategory, Category, SearchSource } from '@/types';
+import type { SearchResult, FavoriteItem, SearchHistoryItem, MajorCategory, Category, SearchSource, UserSourceConfig } from '@/types';
 
 interface SearchResultItem extends SearchResult {
   subtitle?: string;
   siteType?: string;
 }
 
+interface SourceWithUserConfig extends SearchSource {
+  userConfig?: UserSourceConfig | null;
+}
+
 interface CategoryWithSources extends Category {
-  sources: SearchSource[];
+  sources: SourceWithUserConfig[];
 }
 
 interface MajorCategoryWithCategories extends MajorCategory {
@@ -55,14 +59,13 @@ export const MainSearchPage: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { resolvedTheme, toggleTheme } = useThemeStore();
   const { keyword, setKeyword, setResults, isSearching, setSearching } = useSearchStore();
-  const { majorCategories, setMajorCategories, sources, setSources, categories, setCategories } = useSourceStore();
+  const { majorCategories, setMajorCategories, categories, setCategories } = useSourceStore();
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy, initializeProxy } = useProxyStore();
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(true);
   const [showFavorites, setShowFavorites] = useState(true);
   const [showSources, setShowSources] = useState(true);
-  const [showAllSources, setShowAllSources] = useState(true);
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
@@ -71,36 +74,23 @@ export const MainSearchPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [expandedMajorCategories, setExpandedMajorCategories] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [sourceConfigs, setSourceConfigs] = useState<Map<string, boolean>>(new Map());
-  const [allSources, setAllSources] = useState<Array<SearchSource & { userConfig?: { isEnabled: boolean } | null }>>([]);
+  const [allSources, setAllSources] = useState<SourceWithUserConfig[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [majorCategoriesData, sourcesData, allCategoriesData, userConfigsData, allSourcesData] = await Promise.all([
+        const [majorCategoriesData, allCategoriesData, allSourcesData] = await Promise.all([
           sourceApi.getMajorCategories(),
-          sourceApi.getActiveSources(),
           sourceApi.getCategories(),
-          isAuthenticated ? sourceApi.getUserSourceConfigs() : Promise.resolve({ success: false, data: [] }),
           sourceApi.getSourcesWithUserConfig(),
         ]);
         if (majorCategoriesData.success && majorCategoriesData.data) {
           setMajorCategories(majorCategoriesData.data);
           setExpandedMajorCategories(new Set(majorCategoriesData.data.map(c => c.id)));
         }
-        if (sourcesData.success && sourcesData.data) {
-          setSources(sourcesData.data);
-        }
         if (allCategoriesData.success && allCategoriesData.data) {
           setCategories(allCategoriesData.data);
           setExpandedCategories(new Set(allCategoriesData.data.map(c => c.id)));
-        }
-        if (userConfigsData.success && userConfigsData.data) {
-          const configMap = new Map<string, boolean>();
-          userConfigsData.data.forEach(config => {
-            configMap.set(config.sourceId, config.isEnabled);
-          });
-          setSourceConfigs(configMap);
         }
         if (allSourcesData.success && allSourcesData.data) {
           setAllSources(allSourcesData.data);
@@ -111,7 +101,7 @@ export const MainSearchPage: React.FC = () => {
     };
     loadData();
     initializeProxy();
-  }, [setMajorCategories, setSources, setCategories, initializeProxy, isAuthenticated]);
+  }, [setMajorCategories, setCategories, initializeProxy, isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -203,6 +193,7 @@ export const MainSearchPage: React.FC = () => {
         title: result.sourceName,
         url: result.url || '',
         subtitle: result.subtitle,
+        keyword: keyword.trim() || undefined,
       });
       toast.success('已添加到收藏');
       loadFavorites();
@@ -269,7 +260,7 @@ export const MainSearchPage: React.FC = () => {
       const majorCategories = categories.filter(c => c.majorCategoryId === mc.id);
       
       const categoriesWithSources: CategoryWithSources[] = majorCategories.map(cat => {
-        const categorySources = sources.filter(s => s.categoryId === cat.id);
+        const categorySources = allSources.filter(s => s.categoryId === cat.id);
         return {
           ...cat,
           sources: categorySources,
@@ -300,15 +291,6 @@ export const MainSearchPage: React.FC = () => {
   const getSiteTypeLabel = (siteType?: string) => {
     const map: Record<string, string> = { search: '搜索', browse: '浏览', reference: '参考' };
     return map[siteType || 'search'] || '搜索';
-  };
-
-  const isSourceEnabled = (sourceId: string): boolean => {
-    const source = allSources.find(s => s.id === sourceId);
-    if (source?.userConfig !== undefined && source?.userConfig !== null) {
-      return source.userConfig.isEnabled !== false;
-    }
-    const config = sourceConfigs.get(sourceId);
-    return config !== false;
   };
 
   return (
@@ -632,7 +614,7 @@ export const MainSearchPage: React.FC = () => {
                   <Globe className="w-4 h-4 text-violet-600 dark:text-violet-400" />
                 </div>
                 <span className="font-semibold text-surface-900 dark:text-surface-100">搜索源管理</span>
-                <span className="px-2 py-0.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-full">{sources.length}</span>
+                <span className="px-2 py-0.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-full">{allSources.length}</span>
               </div>
               {showSources ? <ChevronDown className="w-4 h-4 text-surface-400" /> : <ChevronRight className="w-4 h-4 text-surface-400" />}
             </button>
@@ -642,7 +624,7 @@ export const MainSearchPage: React.FC = () => {
                   const isMajorExpanded = expandedMajorCategories.has(majorCategory.id);
                   const totalSources = majorCategory.categories.reduce((sum, c) => sum + c.sources.length, 0);
                   const enabledSources = majorCategory.categories.reduce((sum, c) => 
-                    sum + c.sources.filter(s => isSourceEnabled(s.id)).length, 0
+                    sum + c.sources.filter(s => s.userConfig?.isEnabled !== false).length, 0
                   );
                   
                   return (
@@ -685,7 +667,7 @@ export const MainSearchPage: React.FC = () => {
                         <div className="bg-surface-50/30 dark:bg-surface-900/20">
                           {majorCategory.categories.map((category) => {
                             const isCategoryExpanded = expandedCategories.has(category.id);
-                            const categoryEnabledCount = category.sources.filter(s => isSourceEnabled(s.id)).length;
+                            const categoryEnabledCount = category.sources.filter(s => s.userConfig?.isEnabled !== false).length;
                             
                             return (
                               <div key={category.id}>
@@ -723,53 +705,74 @@ export const MainSearchPage: React.FC = () => {
                                 
                                 {isCategoryExpanded && (
                                   <div className="px-4 pb-3 pl-16">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    <div className="space-y-2">
                                       {category.sources.map((source) => {
-                                        const isEnabled = isSourceEnabled(source.id);
+                                        const isEnabled = source.userConfig?.isEnabled !== false;
+                                        const sourceName = source.userConfig?.customName || source.name;
+                                        const sourceSubtitle = source.userConfig?.customSubtitle || source.subtitle;
+                                        
                                         return (
                                           <div 
                                             key={source.id} 
-                                            className={`flex items-center justify-between p-2.5 rounded-xl transition-all ${
+                                            className={`p-3 rounded-xl transition-all border ${
                                               isEnabled 
-                                                ? 'bg-white/60 dark:bg-surface-800/40 hover:bg-white dark:hover:bg-surface-800' 
-                                                : 'bg-surface-100/40 dark:bg-surface-900/40 opacity-60'
+                                                ? 'bg-white/80 dark:bg-surface-800/60 border-surface-200/60 dark:border-surface-700/60 hover:border-primary-200 dark:hover:border-primary-700' 
+                                                : 'bg-surface-100/40 dark:bg-surface-900/40 border-surface-200/40 dark:border-surface-700/40 opacity-60'
                                             }`}
                                           >
-                                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                                              <SourceIcon
-                                                icon={source.icon}
-                                                name={source.name}
-                                                size="sm"
-                                              />
-                                              <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-1">
-                                                  <span className={`text-sm font-medium truncate ${isEnabled ? 'text-surface-700 dark:text-surface-300' : 'text-surface-400'}`}>
-                                                    {source.name}
-                                                  </span>
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex items-start gap-3 min-w-0 flex-1">
+                                                <SourceIcon
+                                                  icon={source.icon}
+                                                  name={sourceName}
+                                                  size="md"
+                                                />
+                                                <div className="min-w-0 flex-1">
+                                                  <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={`text-sm font-semibold ${isEnabled ? 'text-surface-800 dark:text-surface-200' : 'text-surface-500'}`}>
+                                                      {sourceName}
+                                                    </span>
+                                                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${getSiteTypeBadge(source.siteType)}`}>
+                                                      {getSiteTypeLabel(source.siteType)}
+                                                    </span>
+                                                    {majorCategory.requiresKeyword && (
+                                                      <span className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium ${
+                                                        isEnabled 
+                                                          ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' 
+                                                          : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
+                                                      }`}>
+                                                        {isEnabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                                        {isEnabled ? '已启用' : '已禁用'}
+                                                      </span>
+                                                    )}
+                                                    {!majorCategory.requiresKeyword && (
+                                                      <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                        不参与搜索
+                                                      </span>
+                                                    )}
+                                                    {!source.searchable && (
+                                                      <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400">
+                                                        不可搜索
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                  {sourceSubtitle && (
+                                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 truncate">{sourceSubtitle}</p>
+                                                  )}
+                                                  {source.description && (
+                                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 line-clamp-2">{source.description}</p>
+                                                  )}
                                                 </div>
                                               </div>
-                                            </div>
-                                            <div className="flex items-center gap-1 shrink-0 ml-1">
-                                              {majorCategory.requiresKeyword ? (
-                                                <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${
-                                                  isEnabled 
-                                                    ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' 
-                                                    : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
-                                                }`}>
-                                                  {isEnabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                                </div>
-                                              ) : (
-                                                <span className="text-xs text-surface-400 dark:text-surface-500">
-                                                  不参与
-                                                </span>
-                                              )}
-                                              <button 
-                                                onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(source.urlTemplate.replace('{keyword}', '')) : source.urlTemplate.replace('{keyword}', ''), '_blank')} 
-                                                className="p-1 rounded text-surface-400 hover:text-primary-500 hover:bg-white dark:hover:bg-surface-700 transition-colors"
-                                                title="访问站点"
-                                              >
-                                                <ExternalLink className="w-3 h-3" />
-                                              </button>
+                                              <div className="flex items-center gap-1 shrink-0">
+                                                <button 
+                                                  onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(source.urlTemplate.replace('{keyword}', '')) : source.urlTemplate.replace('{keyword}', ''), '_blank')} 
+                                                  className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                                                  title="访问站点"
+                                                >
+                                                  <ExternalLink className="w-4 h-4" />
+                                                </button>
+                                              </div>
                                             </div>
                                           </div>
                                         );
@@ -782,95 +785,6 @@ export const MainSearchPage: React.FC = () => {
                           })}
                         </div>
                       )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-sm border border-surface-200/60 dark:border-surface-700/60 overflow-hidden backdrop-blur-sm">
-            <button onClick={() => setShowAllSources(!showAllSources)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
-                  <Database className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                </div>
-                <span className="font-semibold text-surface-900 dark:text-surface-100">所有源</span>
-                <span className="px-2 py-0.5 text-xs font-semibold bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-full">{allSources.length}</span>
-              </div>
-              {showAllSources ? <ChevronDown className="w-4 h-4 text-surface-400" /> : <ChevronRight className="w-4 h-4 text-surface-400" />}
-            </button>
-            {showAllSources && (
-              <div className="border-t border-surface-100 dark:border-surface-800 max-h-[500px] overflow-y-auto scrollbar-thin">
-                {majorCategories.map((majorCategory) => {
-                  const majorCategorySources = allSources.filter(s => {
-                    const cat = categories.find(c => c.id === s.categoryId);
-                    return cat?.majorCategoryId === majorCategory.id;
-                  });
-                  
-                  if (majorCategorySources.length === 0) return null;
-                  
-                  const isSearchCategory = majorCategory.requiresKeyword;
-                  const enabledCount = majorCategorySources.filter(s => s.userConfig?.isEnabled !== false).length;
-                  
-                  return (
-                    <div key={majorCategory.id} className="border-b border-surface-50 dark:border-surface-800/60 last:border-b-0 p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm"
-                            style={{ backgroundColor: majorCategory.color || '#6366f1' }}
-                          >
-                            {majorCategory.icon ? (
-                              <span className="text-sm">{majorCategory.icon}</span>
-                            ) : (
-                              <Database className="w-4 h-4" />
-                            )}
-                          </div>
-                          <span className="text-sm font-semibold text-surface-800 dark:text-surface-200">{majorCategory.name}</span>
-                          <span className="text-xs text-surface-400">{majorCategorySources.length} 个源</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isSearchCategory ? (
-                            <span className="text-xs px-2 py-1 bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400 rounded-lg font-medium">
-                              {enabledCount}/{majorCategorySources.length} 启用
-                            </span>
-                          ) : (
-                            <span className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-lg font-medium">
-                              不参与搜索
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                        {majorCategorySources.map((source) => {
-                          const isEnabled = source.userConfig?.isEnabled !== false;
-                          return (
-                            <div 
-                              key={source.id} 
-                              className={`flex items-center gap-2 p-2 rounded-lg transition-all ${
-                                isEnabled 
-                                  ? 'bg-surface-50 dark:bg-surface-800/40' 
-                                  : 'bg-surface-100/40 dark:bg-surface-900/40 opacity-50'
-                              }`}
-                            >
-                              <SourceIcon
-                                icon={source.icon}
-                                name={source.name}
-                                size="sm"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <span className={`text-xs font-medium truncate block ${isEnabled ? 'text-surface-700 dark:text-surface-300' : 'text-surface-400'}`}>
-                                  {source.name}
-                                </span>
-                              </div>
-                              {!isSearchCategory && (
-                                <span className="text-xs text-amber-500 dark:text-amber-400 shrink-0">不参与</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
                     </div>
                   );
                 })}
