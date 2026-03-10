@@ -79,14 +79,18 @@ const BarChart: React.FC<{
 }> = ({ data, labels, color, height = 80 }) => {
   const max = Math.max(...data, 1);
   const showEvery = Math.ceil(labels.length / 10);
+  const labelHeight = 16;
+  const gap = 2;
+  const chartHeight = height - labelHeight - gap;
+  
   return (
     <div className="flex items-end gap-0.5 w-full" style={{ height }}>
       {data.map((val, i) => {
-        const pct = max > 0 ? (val / max) * 100 : 0;
-        const barHeight = val > 0 ? Math.max(pct, 5) : 0;
+        const barHeight = max > 0 && val > 0 
+          ? Math.max((val / max) * chartHeight, 4) 
+          : 0;
         return (
           <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
-            {/* Tooltip */}
             <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
               <div className="bg-surface-900 dark:bg-surface-100 text-surface-100 dark:text-surface-900 text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg">
                 {labels[i]}: {val}次
@@ -94,7 +98,7 @@ const BarChart: React.FC<{
             </div>
             <div
               className={`w-full rounded-t transition-all duration-500 ${color}`}
-              style={{ height: `${barHeight}%`, minHeight: val > 0 ? 4 : 0 }}
+              style={{ height: barHeight }}
             />
             {i % showEvery === 0 && (
               <span className="text-[9px] text-surface-400 dark:text-surface-500 truncate w-full text-center">
