@@ -9,8 +9,7 @@
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
     <title>磁力快搜 - 高效磁力搜索引擎</title>
-    <style>
-      /* Prevent FOUC - apply dark class immediately if needed */
+    <script>
       (function() {
         try {
           const theme = JSON.parse(localStorage.getItem('theme-storage') || '{}');
@@ -20,7 +19,7 @@
           }
         } catch(e) {}
       })();
-    </style>
+    </script>
   </head>
   <body>
     <div id="root"></div>

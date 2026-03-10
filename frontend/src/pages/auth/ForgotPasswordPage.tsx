@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, Send, Lock, ShieldCheck, CheckCircle, Eye, EyeOff, Search } from 'lucide-react';
 import { authApi } from '@/services/api';
-import { Button, Input, Card } from '@/components/ui';
+import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
 
 type Step = 'email' | 'verify' | 'success';

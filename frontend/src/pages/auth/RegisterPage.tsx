@@ -7,7 +7,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Send, ShieldCheck, CheckCircle, Search } from 'lucide-react';
 import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
-import { Button, Input, Card } from '@/components/ui';
+import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
 
 type Step = 'form' | 'verify' | 'success';

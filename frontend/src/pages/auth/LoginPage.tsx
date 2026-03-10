@@ -7,7 +7,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock, User, ArrowLeft, Search } from 'lucide-react';
 import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
-import { Button, Input, Card } from '@/components/ui';
+import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
 
 export const LoginPage: React.FC = () => {
