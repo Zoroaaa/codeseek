@@ -817,7 +817,20 @@ export const SourceManager: React.FC = () => {
               </label>
               <select
                 value={formData.categoryId}
-                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                onChange={(e) => {
+                  const newCategoryId = e.target.value;
+                  const selectedCategory = categories.find(c => c.id === newCategoryId);
+                  const parentMajorCategory = selectedCategory 
+                    ? majorCategories.find(mc => mc.id === selectedCategory.majorCategoryId)
+                    : null;
+                  
+                  setFormData({ 
+                    ...formData, 
+                    categoryId: newCategoryId,
+                    searchable: parentMajorCategory?.requiresKeyword ?? true,
+                    requiresKeyword: parentMajorCategory?.requiresKeyword ?? true,
+                  });
+                }}
                 className="w-full px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100"
               >
                 <option value="">选择分类</option>
@@ -868,31 +881,53 @@ export const SourceManager: React.FC = () => {
           </div>
           
           <div className="grid grid-cols-3 gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.searchable}
-                onChange={(e) => setFormData({ ...formData, searchable: e.target.checked })}
-                className="rounded border-surface-300 dark:border-surface-600"
-              />
-              <span className="text-sm text-surface-700 dark:text-surface-300">可搜索</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.requiresKeyword}
-                onChange={(e) => setFormData({ ...formData, requiresKeyword: e.target.checked })}
-                className="rounded border-surface-300 dark:border-surface-600"
-              />
-              <span className="text-sm text-surface-700 dark:text-surface-300">需要关键词</span>
-            </label>
-            <Input
-              label="优先级"
-              type="number"
-              value={formData.searchPriority}
-              onChange={(e) => setFormData({ ...formData, searchPriority: parseInt(e.target.value) || 0 })}
-              fullWidth
-            />
+            {(() => {
+              const selectedCategory = categories.find(c => c.id === formData.categoryId);
+              const parentMajorCategory = selectedCategory 
+                ? majorCategories.find(mc => mc.id === selectedCategory.majorCategoryId)
+                : null;
+              const isSearchCategory = parentMajorCategory?.requiresKeyword ?? true;
+              
+              if (!isSearchCategory) {
+                return (
+                  <div className="col-span-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      该分类属于浏览型大类（无需关键词），搜索源不参与搜索功能
+                    </p>
+                  </div>
+                );
+              }
+              
+              return (
+                <>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.searchable}
+                      onChange={(e) => setFormData({ ...formData, searchable: e.target.checked })}
+                      className="rounded border-surface-300 dark:border-surface-600"
+                    />
+                    <span className="text-sm text-surface-700 dark:text-surface-300">可搜索</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.requiresKeyword}
+                      onChange={(e) => setFormData({ ...formData, requiresKeyword: e.target.checked })}
+                      className="rounded border-surface-300 dark:border-surface-600"
+                    />
+                    <span className="text-sm text-surface-700 dark:text-surface-300">需要关键词</span>
+                  </label>
+                  <Input
+                    label="优先级"
+                    type="number"
+                    value={formData.searchPriority}
+                    onChange={(e) => setFormData({ ...formData, searchPriority: parseInt(e.target.value) || 0 })}
+                    fullWidth
+                  />
+                </>
+              );
+            })()}
           </div>
           
           <div className="flex justify-end gap-3 pt-4">

@@ -367,7 +367,7 @@ export const CategoryManager: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                   <Badge variant={majorCategory.requiresKeyword ? 'primary' : 'default'}>
                     {majorCategory.requiresKeyword ? '需要关键词' : '无需关键词'}
                   </Badge>

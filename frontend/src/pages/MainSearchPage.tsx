@@ -59,9 +59,10 @@ export const MainSearchPage: React.FC = () => {
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy, initializeProxy } = useProxyStore();
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
-  const [showFavorites, setShowFavorites] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
+  const [showFavorites, setShowFavorites] = useState(true);
   const [showSources, setShowSources] = useState(true);
+  const [showAllSources, setShowAllSources] = useState(true);
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
@@ -71,15 +72,17 @@ export const MainSearchPage: React.FC = () => {
   const [expandedMajorCategories, setExpandedMajorCategories] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [sourceConfigs, setSourceConfigs] = useState<Map<string, boolean>>(new Map());
+  const [allSources, setAllSources] = useState<Array<SearchSource & { userConfig?: { isEnabled: boolean } | null }>>([]);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [majorCategoriesData, sourcesData, allCategoriesData, userConfigsData] = await Promise.all([
+        const [majorCategoriesData, sourcesData, allCategoriesData, userConfigsData, allSourcesData] = await Promise.all([
           sourceApi.getMajorCategories(),
           sourceApi.getActiveSources(),
           sourceApi.getCategories(),
           isAuthenticated ? sourceApi.getUserSourceConfigs() : Promise.resolve({ success: false, data: [] }),
+          sourceApi.getSourcesWithUserConfig(),
         ]);
         if (majorCategoriesData.success && majorCategoriesData.data) {
           setMajorCategories(majorCategoriesData.data);
@@ -98,6 +101,9 @@ export const MainSearchPage: React.FC = () => {
             configMap.set(config.sourceId, config.isEnabled);
           });
           setSourceConfigs(configMap);
+        }
+        if (allSourcesData.success && allSourcesData.data) {
+          setAllSources(allSourcesData.data);
         }
       } catch (error) {
         console.error('Failed to load data:', error);
@@ -277,16 +283,6 @@ export const MainSearchPage: React.FC = () => {
     }).filter(mc => mc.categories.length > 0);
   };
 
-  const formatDate = (timestamp: number | string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('zh-CN', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -307,6 +303,10 @@ export const MainSearchPage: React.FC = () => {
   };
 
   const isSourceEnabled = (sourceId: string): boolean => {
+    const source = allSources.find(s => s.id === sourceId);
+    if (source?.userConfig !== undefined && source?.userConfig !== null) {
+      return source.userConfig.isEnabled !== false;
+    }
     const config = sourceConfigs.get(sourceId);
     return config !== false;
   };
@@ -474,6 +474,12 @@ export const MainSearchPage: React.FC = () => {
                           <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${getSiteTypeBadge(result.siteType)}`}>
                             {getSiteTypeLabel(result.siteType)}
                           </span>
+                          {isProxyEnabled && (
+                            <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md font-medium bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400">
+                              <ShieldCheck className="w-3 h-3" />
+                              代理
+                            </span>
+                          )}
                         </div>
                         {result.subtitle && (
                           <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 truncate">{result.subtitle}</p>
@@ -489,7 +495,11 @@ export const MainSearchPage: React.FC = () => {
                       {result.url && (
                         <button
                           onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(result.url) : result.url, '_blank')}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 transition-all shadow-sm shadow-primary-500/25"
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all shadow-sm ${
+                            isProxyEnabled 
+                              ? 'bg-gradient-to-r from-success-500 to-teal-500 hover:from-success-600 hover:to-teal-600 shadow-success-500/25' 
+                              : 'bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 shadow-primary-500/25'
+                          }`}
                         >
                           <span className="hidden sm:inline">前往</span>
                           <ExternalLink className="w-3.5 h-3.5" />
@@ -525,16 +535,19 @@ export const MainSearchPage: React.FC = () => {
                       <div className="p-8 flex justify-center"><Loading /></div>
                     ) : searchHistory.length > 0 ? (
                       <>
-                        <div className="divide-y divide-surface-50 dark:divide-surface-800/60 max-h-60 overflow-y-auto scrollbar-thin">
-                          {searchHistory.map((item) => (
-                            <div key={item.id} className="flex items-center justify-between px-5 py-3 hover:bg-surface-50 dark:hover:bg-surface-800/40 cursor-pointer transition-colors" onClick={() => setKeyword(item.query)}>
-                              <div className="flex items-center gap-3">
+                        <div className="p-4 max-h-60 overflow-y-auto scrollbar-thin">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                            {searchHistory.map((item) => (
+                              <div 
+                                key={item.id} 
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800/60 cursor-pointer transition-colors border border-surface-100 dark:border-surface-800"
+                                onClick={() => setKeyword(item.query)}
+                              >
                                 <Search className="w-3.5 h-3.5 text-surface-400 shrink-0" />
-                                <span className="text-sm text-surface-800 dark:text-surface-200">{item.query}</span>
+                                <span className="text-sm text-surface-800 dark:text-surface-200 truncate">{item.query}</span>
                               </div>
-                              <span className="text-xs text-surface-400 shrink-0 ml-3">{formatDate(new Date(item.createdAt).toISOString())}</span>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                         <div className="px-5 py-3 border-t border-surface-50 dark:border-surface-800/60">
                           <button onClick={handleClearHistory} className="flex items-center gap-1.5 text-sm text-error-500 hover:text-error-700 transition-colors">
@@ -577,23 +590,28 @@ export const MainSearchPage: React.FC = () => {
                     {isLoadingFavorites ? (
                       <div className="p-8 flex justify-center"><Loading /></div>
                     ) : favorites.length > 0 ? (
-                      <div className="divide-y divide-surface-50 dark:divide-surface-800/60 max-h-64 overflow-y-auto scrollbar-thin">
-                        {favorites.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between px-5 py-3 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
-                              {item.subtitle && <p className="text-xs text-surface-400 truncate mt-0.5">{item.subtitle}</p>}
+                      <div className="p-4 max-h-64 overflow-y-auto scrollbar-thin">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {favorites.map((item) => (
+                            <div 
+                              key={item.id} 
+                              className="flex items-center justify-between p-3 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors border border-surface-100 dark:border-surface-800"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
+                                {item.subtitle && <p className="text-xs text-surface-400 truncate mt-0.5">{item.subtitle}</p>}
+                              </div>
+                              <div className="flex items-center gap-1 ml-2 shrink-0">
+                                <button onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')} className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => handleRemoveFavorite(item.id)} className="p-1.5 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1 ml-3 shrink-0">
-                              <button onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')} className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
-                                <ExternalLink className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => handleRemoveFavorite(item.id)} className="p-1.5 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <div className="px-5 py-8 text-center">
@@ -704,64 +722,59 @@ export const MainSearchPage: React.FC = () => {
                                 </button>
                                 
                                 {isCategoryExpanded && (
-                                  <div className="px-4 pb-3 pl-16 space-y-1.5">
-                                    {category.sources.map((source) => {
-                                      const isEnabled = isSourceEnabled(source.id);
-                                      return (
-                                        <div 
-                                          key={source.id} 
-                                          className={`flex items-center justify-between p-2.5 rounded-xl transition-all ${
-                                            isEnabled 
-                                              ? 'bg-white/60 dark:bg-surface-800/40 hover:bg-white dark:hover:bg-surface-800' 
-                                              : 'bg-surface-100/40 dark:bg-surface-900/40 opacity-60'
-                                          }`}
-                                        >
-                                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                            <SourceIcon
-                                              icon={source.icon}
-                                              name={source.name}
-                                              size="sm"
-                                            />
-                                            <div className="min-w-0 flex-1">
-                                              <div className="flex items-center gap-1.5">
-                                                <span className={`text-sm font-medium truncate ${isEnabled ? 'text-surface-700 dark:text-surface-300' : 'text-surface-400'}`}>
-                                                  {source.name}
-                                                </span>
-                                                <span className={`text-xs px-1 py-0.5 rounded-md font-medium ${getSiteTypeBadge(source.siteType)}`}>
-                                                  {getSiteTypeLabel(source.siteType)}
-                                                </span>
+                                  <div className="px-4 pb-3 pl-16">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                      {category.sources.map((source) => {
+                                        const isEnabled = isSourceEnabled(source.id);
+                                        return (
+                                          <div 
+                                            key={source.id} 
+                                            className={`flex items-center justify-between p-2.5 rounded-xl transition-all ${
+                                              isEnabled 
+                                                ? 'bg-white/60 dark:bg-surface-800/40 hover:bg-white dark:hover:bg-surface-800' 
+                                                : 'bg-surface-100/40 dark:bg-surface-900/40 opacity-60'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                              <SourceIcon
+                                                icon={source.icon}
+                                                name={source.name}
+                                                size="sm"
+                                              />
+                                              <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-1">
+                                                  <span className={`text-sm font-medium truncate ${isEnabled ? 'text-surface-700 dark:text-surface-300' : 'text-surface-400'}`}>
+                                                    {source.name}
+                                                  </span>
+                                                </div>
                                               </div>
-                                              {source.subtitle && (
-                                                <p className="text-xs text-surface-400 truncate mt-0.5">{source.subtitle}</p>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0 ml-1">
+                                              {majorCategory.requiresKeyword ? (
+                                                <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${
+                                                  isEnabled 
+                                                    ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' 
+                                                    : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
+                                                }`}>
+                                                  {isEnabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                                </div>
+                                              ) : (
+                                                <span className="text-xs text-surface-400 dark:text-surface-500">
+                                                  不参与
+                                                </span>
                                               )}
+                                              <button 
+                                                onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(source.urlTemplate.replace('{keyword}', '')) : source.urlTemplate.replace('{keyword}', ''), '_blank')} 
+                                                className="p-1 rounded text-surface-400 hover:text-primary-500 hover:bg-white dark:hover:bg-surface-700 transition-colors"
+                                                title="访问站点"
+                                              >
+                                                <ExternalLink className="w-3 h-3" />
+                                              </button>
                                             </div>
                                           </div>
-                                          <div className="flex items-center gap-2 shrink-0 ml-2">
-                                            {majorCategory.requiresKeyword ? (
-                                              <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
-                                                isEnabled 
-                                                  ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' 
-                                                  : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
-                                              }`}>
-                                                {isEnabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                                {isEnabled ? '启用' : '禁用'}
-                                              </div>
-                                            ) : (
-                                              <span className="text-xs text-surface-400 dark:text-surface-500 px-2 py-1">
-                                                不参与搜索
-                                              </span>
-                                            )}
-                                            <button 
-                                              onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(source.urlTemplate.replace('{keyword}', '')) : source.urlTemplate.replace('{keyword}', ''), '_blank')} 
-                                              className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-white dark:hover:bg-surface-700 transition-colors"
-                                              title="访问站点"
-                                            >
-                                              <ExternalLink className="w-3.5 h-3.5" />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
+                                        );
+                                      })}
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -769,6 +782,95 @@ export const MainSearchPage: React.FC = () => {
                           })}
                         </div>
                       )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-sm border border-surface-200/60 dark:border-surface-700/60 overflow-hidden backdrop-blur-sm">
+            <button onClick={() => setShowAllSources(!showAllSources)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
+                  <Database className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                </div>
+                <span className="font-semibold text-surface-900 dark:text-surface-100">所有源</span>
+                <span className="px-2 py-0.5 text-xs font-semibold bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-full">{allSources.length}</span>
+              </div>
+              {showAllSources ? <ChevronDown className="w-4 h-4 text-surface-400" /> : <ChevronRight className="w-4 h-4 text-surface-400" />}
+            </button>
+            {showAllSources && (
+              <div className="border-t border-surface-100 dark:border-surface-800 max-h-[500px] overflow-y-auto scrollbar-thin">
+                {majorCategories.map((majorCategory) => {
+                  const majorCategorySources = allSources.filter(s => {
+                    const cat = categories.find(c => c.id === s.categoryId);
+                    return cat?.majorCategoryId === majorCategory.id;
+                  });
+                  
+                  if (majorCategorySources.length === 0) return null;
+                  
+                  const isSearchCategory = majorCategory.requiresKeyword;
+                  const enabledCount = majorCategorySources.filter(s => s.userConfig?.isEnabled !== false).length;
+                  
+                  return (
+                    <div key={majorCategory.id} className="border-b border-surface-50 dark:border-surface-800/60 last:border-b-0 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm"
+                            style={{ backgroundColor: majorCategory.color || '#6366f1' }}
+                          >
+                            {majorCategory.icon ? (
+                              <span className="text-sm">{majorCategory.icon}</span>
+                            ) : (
+                              <Database className="w-4 h-4" />
+                            )}
+                          </div>
+                          <span className="text-sm font-semibold text-surface-800 dark:text-surface-200">{majorCategory.name}</span>
+                          <span className="text-xs text-surface-400">{majorCategorySources.length} 个源</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isSearchCategory ? (
+                            <span className="text-xs px-2 py-1 bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400 rounded-lg font-medium">
+                              {enabledCount}/{majorCategorySources.length} 启用
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-lg font-medium">
+                              不参与搜索
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                        {majorCategorySources.map((source) => {
+                          const isEnabled = source.userConfig?.isEnabled !== false;
+                          return (
+                            <div 
+                              key={source.id} 
+                              className={`flex items-center gap-2 p-2 rounded-lg transition-all ${
+                                isEnabled 
+                                  ? 'bg-surface-50 dark:bg-surface-800/40' 
+                                  : 'bg-surface-100/40 dark:bg-surface-900/40 opacity-50'
+                              }`}
+                            >
+                              <SourceIcon
+                                icon={source.icon}
+                                name={source.name}
+                                size="sm"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <span className={`text-xs font-medium truncate block ${isEnabled ? 'text-surface-700 dark:text-surface-300' : 'text-surface-400'}`}>
+                                  {source.name}
+                                </span>
+                              </div>
+                              {!isSearchCategory && (
+                                <span className="text-xs text-amber-500 dark:text-amber-400 shrink-0">不参与</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}
