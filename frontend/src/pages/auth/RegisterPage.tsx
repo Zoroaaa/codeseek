@@ -1,6 +1,10 @@
+/**
+ * RegisterPage - 注册页
+ * 视觉优化：多步骤精美流程，保持全部功能逻辑不变
+ */
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Send, ShieldCheck, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Send, ShieldCheck, CheckCircle, Search } from 'lucide-react';
 import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
 import { Button, Input, Card } from '@/components/ui';
@@ -38,51 +42,28 @@ export const RegisterPage: React.FC = () => {
   const maskEmail = (email: string): string => {
     if (!email) return '';
     const [localPart, domain] = email.split('@');
-    if (localPart.length <= 2) {
-      return `${localPart[0]}***@${domain}`;
-    }
+    if (localPart.length <= 2) return `${localPart[0]}***@${domain}`;
     const masked = localPart[0] + '*'.repeat(localPart.length - 2) + localPart[localPart.length - 1];
     return `${masked}@${domain}`;
   };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
-    if (!formData.username.trim()) {
-      newErrors.username = '请输入用户名';
-    } else if (formData.username.length < 3) {
-      newErrors.username = '用户名至少3个字符';
-    } else if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(formData.username)) {
-      newErrors.username = '用户名只能包含字母、数字、下划线和中文';
-    }
-    
-    if (!formData.email.trim()) {
-      newErrors.email = '请输入邮箱';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = '请输入有效的邮箱地址';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = '请输入密码';
-    } else if (formData.password.length < 6) {
-      newErrors.password = '密码至少6个字符';
-    }
-    
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = '两次密码输入不一致';
-    }
-    
-    if (!agreed) {
-      notification.common.validationError('服务条款');
-    }
-    
+    if (!formData.username.trim()) newErrors.username = '请输入用户名';
+    else if (formData.username.length < 3) newErrors.username = '用户名至少3个字符';
+    else if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(formData.username)) newErrors.username = '用户名只能包含字母、数字、下划线和中文';
+    if (!formData.email.trim()) newErrors.email = '请输入邮箱';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = '请输入有效的邮箱地址';
+    if (!formData.password) newErrors.password = '请输入密码';
+    else if (formData.password.length < 6) newErrors.password = '密码至少6个字符';
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = '两次密码输入不一致';
+    if (!agreed) notification.common.validationError('服务条款');
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0 && agreed;
   };
 
   const handleSendCode = async () => {
     if (!validateForm()) return;
-    
     setIsLoading(true);
     try {
       const response = await authApi.sendRegistrationCode(formData.email);
@@ -103,7 +84,6 @@ export const RegisterPage: React.FC = () => {
 
   const handleResendCode = async () => {
     if (countdown > 0) return;
-    
     setIsLoading(true);
     try {
       const response = await authApi.sendRegistrationCode(formData.email);
@@ -135,7 +115,6 @@ export const RegisterPage: React.FC = () => {
       notification.error('验证码错误', '请输入6位验证码');
       return;
     }
-
     setIsLoading(true);
     try {
       const response = await authApi.register({
@@ -144,16 +123,12 @@ export const RegisterPage: React.FC = () => {
         password: formData.password,
         verificationCode: cleanCode,
       });
-      
       if (response.success && response.data) {
         setUser(response.data.user);
         setToken(response.data.token);
         setCurrentStep('success');
         notification.auth.registerSuccess();
-        
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 2000);
+        setTimeout(() => navigate('/dashboard'), 2000);
       } else {
         notification.auth.registerFailed(response.message || '验证码错误或已过期');
       }
@@ -166,11 +141,8 @@ export const RegisterPage: React.FC = () => {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      if (currentStep === 'form') {
-        handleSendCode();
-      } else if (currentStep === 'verify') {
-        handleVerifyAndRegister();
-      }
+      if (currentStep === 'form') handleSendCode();
+      else if (currentStep === 'verify') handleVerifyAndRegister();
     }
   };
 
@@ -192,7 +164,6 @@ export const RegisterPage: React.FC = () => {
         leftIcon={<User className="w-5 h-5" />}
         fullWidth
       />
-
       <Input
         label="邮箱"
         type="email"
@@ -203,7 +174,6 @@ export const RegisterPage: React.FC = () => {
         leftIcon={<Mail className="w-5 h-5" />}
         fullWidth
       />
-
       <Input
         label="密码"
         type={showPassword ? 'text' : 'password'}
@@ -213,17 +183,12 @@ export const RegisterPage: React.FC = () => {
         error={errors.password}
         leftIcon={<Lock className="w-5 h-5" />}
         rightIcon={
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
-          >
+          <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>
         }
         fullWidth
       />
-
       <Input
         label="确认密码"
         type={showPassword ? 'text' : 'password'}
@@ -235,49 +200,44 @@ export const RegisterPage: React.FC = () => {
         fullWidth
       />
 
-      <label className="flex items-start gap-3 cursor-pointer">
+      <label className="flex items-start gap-3 cursor-pointer select-none">
         <input
           type="checkbox"
           checked={agreed}
           onChange={(e) => setAgreed(e.target.checked)}
-          className="mt-1 rounded border-surface-300 dark:border-surface-600"
+          className="mt-1 rounded border-slate-300 dark:border-slate-600 text-blue-500 focus:ring-blue-500"
         />
-        <span className="text-sm text-surface-600 dark:text-surface-400">
+        <span className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
           我已阅读并同意{' '}
-          <a href="#" className="text-primary-600 hover:underline">
-            服务条款
-          </a>{' '}
-          和{' '}
-          <a href="#" className="text-primary-600 hover:underline">
-            隐私政策
-          </a>
+          <a href="#" className="text-blue-600 dark:text-blue-400 hover:underline">服务条款</a>
+          {' '}和{' '}
+          <a href="#" className="text-blue-600 dark:text-blue-400 hover:underline">隐私政策</a>
         </span>
       </label>
 
-      <Button
+      <button
         type="submit"
-        variant="primary"
-        size="lg"
-        fullWidth
-        isLoading={isLoading}
-        leftIcon={<Send className="w-5 h-5" />}
+        disabled={isLoading}
+        className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-semibold text-white btn-gradient disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        发送验证码
-      </Button>
+        {isLoading
+          ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />发送中...</>
+          : <><Send className="w-4 h-4" />发送验证码</>
+        }
+      </button>
     </form>
   );
 
   const renderVerifyStep = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-          <ShieldCheck className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+    <div className="space-y-6" onKeyDown={handleKeyDown}>
+      <div className="text-center py-2">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 flex items-center justify-center">
+          <ShieldCheck className="w-8 h-8 text-blue-600 dark:text-blue-400" />
         </div>
-        <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">
-          验证邮箱地址
-        </h3>
-        <p className="text-sm text-surface-600 dark:text-surface-400">
-          验证码已发送到 <span className="font-medium text-surface-900 dark:text-surface-100">{maskedEmail}</span>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-1.5 tracking-tight">验证邮箱地址</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          验证码已发送到{' '}
+          <span className="font-semibold text-slate-900 dark:text-slate-100">{maskedEmail}</span>
         </p>
       </div>
 
@@ -288,38 +248,36 @@ export const RegisterPage: React.FC = () => {
           placeholder="请输入6位验证码"
           value={verificationCode}
           onChange={handleCodeChange}
-          onKeyDown={handleKeyDown}
           fullWidth
-          className="text-center text-2xl tracking-widest"
+          className="text-center text-2xl tracking-[0.5em] font-mono"
           maxLength={7}
         />
 
         {countdown > 0 ? (
-          <p className="text-center text-sm text-surface-500 dark:text-surface-400">
-            验证码 {formatCountdown(countdown)} 后过期
-          </p>
+          <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
+            <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            验证码将在 <span className="font-semibold text-blue-600 dark:text-blue-400 tabular-nums">{formatCountdown(countdown)}</span> 后过期
+          </div>
         ) : (
-          <p className="text-center text-sm text-error-500">
-            验证码已过期
-          </p>
+          <p className="text-center text-sm text-red-500 dark:text-red-400">验证码已过期</p>
         )}
 
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            fullWidth
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
             onClick={() => setCurrentStep('form')}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl font-medium text-sm border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200"
           >
             返回修改
-          </Button>
-          <Button
-            variant="primary"
-            fullWidth
+          </button>
+          <button
+            type="button"
             onClick={handleVerifyAndRegister}
-            isLoading={isLoading}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm text-white btn-gradient disabled:opacity-60"
           >
-            验证并注册
-          </Button>
+            {isLoading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />验证中</> : '验证并注册'}
+          </button>
         </div>
 
         <div className="text-center">
@@ -327,7 +285,7 @@ export const RegisterPage: React.FC = () => {
             type="button"
             onClick={handleResendCode}
             disabled={countdown > 0 || isLoading}
-            className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {countdown > 0 ? `重新发送 (${formatCountdown(countdown)})` : '重新发送验证码'}
           </button>
@@ -338,94 +296,89 @@ export const RegisterPage: React.FC = () => {
 
   const renderSuccessStep = () => (
     <div className="text-center py-8">
-      <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
-        <CheckCircle className="w-10 h-10 text-success-600 dark:text-success-400" />
+      <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center">
+        <CheckCircle className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
       </div>
-      <h3 className="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-2">
-        注册成功！
-      </h3>
-      <p className="text-surface-600 dark:text-surface-400 mb-6">
-        欢迎加入磁力快搜，即将跳转到控制台...
-      </p>
-      <div className="flex items-center justify-center gap-2 text-surface-500 dark:text-surface-400">
-        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+      <h3 className="display-font text-xl font-bold text-slate-900 dark:text-slate-100 mb-2 tracking-tight">注册成功！</h3>
+      <p className="text-slate-600 dark:text-slate-400 mb-6">欢迎加入磁力快搜，即将跳转到控制台...</p>
+      <div className="flex items-center justify-center gap-2">
+        {[0, 150, 300].map((delay, i) => (
+          <div key={i} className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+        ))}
       </div>
     </div>
   );
 
   const getStepTitle = () => {
-    switch (currentStep) {
-      case 'form':
-        return '创建账号';
-      case 'verify':
-        return '验证邮箱';
-      case 'success':
-        return '注册成功';
-    }
+    if (currentStep === 'form') return '创建账号';
+    if (currentStep === 'verify') return '验证邮箱';
+    return '注册成功';
   };
 
   const getStepDescription = () => {
-    switch (currentStep) {
-      case 'form':
-        return '注册即可享受更多功能';
-      case 'verify':
-        return '请输入邮箱验证码';
-      case 'success':
-        return '';
-    }
+    if (currentStep === 'form') return '注册即可享受更多功能';
+    if (currentStep === 'verify') return '请输入邮箱验证码';
+    return '';
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-surface-50 via-white to-primary-50/30 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950/30">
-      <div className="w-full max-w-md">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-200 mb-8 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50 dark:bg-slate-950 relative overflow-hidden">
+      {/* Ambient bg */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-400/6 dark:bg-blue-500/5 rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-violet-400/6 dark:bg-violet-500/4 rounded-full blur-[100px]" />
+        <div className="absolute inset-0 grid-dots opacity-50" />
+      </div>
+
+      <div className="w-full max-w-md relative">
+
+        <Link to="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 mb-8 transition-colors text-sm font-medium group">
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
           返回首页
         </Link>
 
-        <Card className="p-8">
+        <div className="rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/50 p-7 sm:p-8"
+          style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)' }}>
+
+          {/* Step indicators */}
           {currentStep !== 'success' && (
-            <>
-              <div className="flex items-center justify-center gap-2 mb-6">
-                {(['form', 'verify'] as const).map((step, index) => (
+            <div className="flex items-center justify-center gap-3 mb-7">
+              {(['form', 'verify'] as const).map((step, index) => {
+                const isActive = currentStep === step;
+                const isDone = ['form', 'verify'].indexOf(currentStep) > index;
+                return (
                   <React.Fragment key={step}>
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                        currentStep === step
-                          ? 'bg-primary-600 text-white'
-                          : index < ['form', 'verify'].indexOf(currentStep)
-                          ? 'bg-success-500 text-white'
-                          : 'bg-surface-200 dark:bg-surface-700 text-surface-500'
-                      }`}
-                    >
-                      {index + 1}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${
+                      isActive
+                        ? 'bg-gradient-to-br from-blue-500 to-violet-600 text-white shadow-lg'
+                        : isDone
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
+                    }`}>
+                      {isDone ? <CheckCircle className="w-4 h-4" /> : index + 1}
                     </div>
                     {index < 1 && (
-                      <div className={`w-12 h-0.5 ${
-                        ['form', 'verify'].indexOf(currentStep) > index
-                          ? 'bg-success-500'
-                          : 'bg-surface-200 dark:bg-surface-700'
+                      <div className={`h-px w-16 transition-all duration-500 ${
+                        isDone ? 'bg-emerald-400' : 'bg-slate-200 dark:bg-slate-700'
                       }`} />
                     )}
                   </React.Fragment>
-                ))}
-              </div>
-            </>
+                );
+              })}
+            </div>
           )}
 
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
+          <div className="text-center mb-7">
+            <h1 className="display-font text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight mb-1.5">
               {getStepTitle()}
             </h1>
-            <p className="text-surface-600 dark:text-surface-400">
-              {getStepDescription()}
-            </p>
+            {getStepDescription() && (
+              <p className="text-sm text-slate-500 dark:text-slate-400">{getStepDescription()}</p>
+            )}
           </div>
+
+          {/* Accent line */}
+          {currentStep !== 'success' && <div className="accent-line mb-6" />}
 
           {currentStep === 'form' && renderFormStep()}
           {currentStep === 'verify' && renderVerifyStep()}
@@ -433,18 +386,23 @@ export const RegisterPage: React.FC = () => {
 
           {currentStep === 'form' && (
             <div className="mt-6 text-center">
-              <p className="text-surface-600 dark:text-surface-400">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 已有账号？{' '}
-                <Link
-                  to="/login"
-                  className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
-                >
+                <Link to="/login" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition-colors">
                   立即登录
                 </Link>
               </p>
             </div>
           )}
-        </Card>
+        </div>
+
+        {/* Brand */}
+        <div className="mt-6 flex items-center justify-center gap-2 text-slate-400 dark:text-slate-600">
+          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+            <Search className="w-3 h-3 text-white" />
+          </div>
+          <span className="text-xs font-medium">磁力快搜</span>
+        </div>
       </div>
     </div>
   );

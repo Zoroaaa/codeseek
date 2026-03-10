@@ -1,3 +1,7 @@
+/**
+ * Card - 视觉优化版
+ * 功能逻辑不变，优化视觉样式和阴影
+ */
 import React from 'react';
 import { clsx } from 'clsx';
 
@@ -26,13 +30,20 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       className={clsx(
-        'bg-white dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700',
-        'shadow-soft transition-all duration-200',
+        'bg-white dark:bg-slate-900/80',
+        'rounded-2xl border border-slate-200/80 dark:border-slate-700/50',
+        'transition-all duration-200',
         paddingStyles[padding],
-        hover && 'hover:shadow-soft-lg hover:border-primary-300 dark:hover:border-primary-600 cursor-pointer',
+        hover && [
+          'cursor-pointer',
+          'hover:-translate-y-0.5',
+          'hover:shadow-lg hover:shadow-blue-500/8 dark:hover:shadow-blue-500/5',
+          'hover:border-blue-200 dark:hover:border-blue-700/50',
+        ],
         onClick && 'cursor-pointer',
         className
       )}
+      style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)' }}
       onClick={onClick}
     >
       {children}
@@ -56,11 +67,11 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   return (
     <div className={clsx('flex items-start justify-between', className)}>
       <div>
-        <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
           {title}
         </h3>
         {subtitle && (
-          <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             {subtitle}
           </p>
         )}
@@ -88,7 +99,7 @@ export const CardFooter: React.FC<CardFooterProps> = ({ children, className }) =
   return (
     <div
       className={clsx(
-        'mt-4 pt-4 border-t border-surface-200 dark:border-surface-700',
+        'mt-4 pt-4 border-t border-slate-100 dark:border-slate-800',
         className
       )}
     >

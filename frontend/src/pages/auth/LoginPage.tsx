@@ -1,6 +1,10 @@
+/**
+ * LoginPage - 登录页
+ * 视觉优化：精美表单设计，保持全部功能逻辑不变
+ */
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, Lock, User, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, ArrowLeft, Search } from 'lucide-react';
 import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
 import { Button, Input, Card } from '@/components/ui';
@@ -21,33 +25,22 @@ export const LoginPage: React.FC = () => {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
-    if (!formData.identifier.trim()) {
-      newErrors.identifier = '请输入用户名或邮箱';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = '请输入密码';
-    } else if (formData.password.length < 6) {
-      newErrors.password = '密码至少6个字符';
-    }
-    
+    if (!formData.identifier.trim()) newErrors.identifier = '请输入用户名或邮箱';
+    if (!formData.password) newErrors.password = '请输入密码';
+    else if (formData.password.length < 6) newErrors.password = '密码至少6个字符';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
-    
     setIsLoading(true);
     try {
       const response = await authApi.login({
         identifier: formData.identifier,
         password: formData.password,
       });
-      
       if (response.success && response.data) {
         setUser(response.data.user);
         setToken(response.data.token);
@@ -65,30 +58,47 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-3 sm:px-4 py-8 sm:py-12 bg-gradient-to-br from-surface-50 via-white to-primary-50/30 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950/30">
-      <div className="w-full max-w-md">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-200 mb-6 sm:mb-8 transition-colors text-sm sm:text-base"
-        >
-          <ArrowLeft className="w-4 h-4" />
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50 dark:bg-slate-950 relative overflow-hidden">
+
+      {/* Ambient background */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-400/6 dark:bg-blue-500/5 rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-violet-400/6 dark:bg-violet-500/4 rounded-full blur-[100px]" />
+        {/* Grid dots */}
+        <div className="absolute inset-0 grid-dots opacity-50" />
+      </div>
+
+      <div className="w-full max-w-md relative">
+
+        {/* Back link */}
+        <Link to="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 mb-8 transition-colors text-sm font-medium group">
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
           返回首页
         </Link>
 
-        <Card className="p-6 sm:p-8 shadow-xl shadow-surface-900/5 dark:shadow-surface-950/20 border-surface-200/60 dark:border-surface-700/60">
-          <div className="text-center mb-6 sm:mb-8">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/25">
-              <Lock className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+        {/* Card */}
+        <div className="rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/50 p-7 sm:p-8"
+          style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)' }}>
+
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center"
+              style={{ boxShadow: '0 8px 24px rgba(79,158,255,0.35)' }}>
+              <Lock className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1.5 sm:mb-2">
+            <h1 className="display-font text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight mb-1.5">
               欢迎回来
             </h1>
-            <p className="text-sm sm:text-base text-surface-600 dark:text-surface-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               登录您的账号继续使用
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+          {/* Accent line */}
+          <div className="accent-line mb-7" />
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               label="用户名或邮箱"
               type="text"
@@ -112,7 +122,7 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
                 </button>
@@ -121,42 +131,43 @@ export const LoginPage: React.FC = () => {
             />
 
             <div className="flex items-center justify-between text-xs sm:text-sm">
-              <label className="flex items-center gap-2 text-surface-600 dark:text-surface-400 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-500 focus:ring-primary-500" />
+              <label className="flex items-center gap-2 text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-500 focus:ring-blue-500" />
                 记住我
               </label>
-              <Link
-                to="/forgot-password"
-                className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
-              >
+              <Link to="/forgot-password" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors font-medium">
                 忘记密码？
               </Link>
             </div>
 
-            <Button
+            <button
               type="submit"
-              variant="primary"
-              size="lg"
-              fullWidth
-              isLoading={isLoading}
-              className="mt-2"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-semibold text-white btn-gradient disabled:opacity-60 disabled:cursor-not-allowed mt-2"
             >
-              登录
-            </Button>
+              {isLoading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {isLoading ? '登录中...' : '登录'}
+            </button>
           </form>
 
-          <div className="mt-5 sm:mt-6 text-center">
-            <p className="text-sm sm:text-base text-surface-600 dark:text-surface-400">
+          {/* Footer */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               还没有账号？{' '}
-              <Link
-                to="/register"
-                className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium transition-colors"
-              >
+              <Link to="/register" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition-colors">
                 立即注册
               </Link>
             </p>
           </div>
-        </Card>
+        </div>
+
+        {/* Brand watermark */}
+        <div className="mt-6 flex items-center justify-center gap-2 text-slate-400 dark:text-slate-600">
+          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+            <Search className="w-3 h-3 text-white" />
+          </div>
+          <span className="text-xs font-medium">磁力快搜</span>
+        </div>
       </div>
     </div>
   );
