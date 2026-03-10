@@ -8,12 +8,13 @@
 
 版本2.0是CodeSeek项目的重大架构升级版本，主要变化包括：
 
-- **前端技术栈升级**: 从原生ES6 JavaScript迁移到React 18 + TypeScript
-- **后端技术栈升级**: 从原生JavaScript迁移到Hono框架 + TypeScript
-- **构建工具引入**: 使用Vite进行现代化构建
+- **前端技术栈升级**: 从原生ES6 JavaScript迁移到React 18.3.1 + TypeScript 5.5.3
+- **后端技术栈升级**: 从原生JavaScript迁移到Hono 4.6.0 + TypeScript 5.5.3
+- **构建工具引入**: 使用Vite 5.4.1进行现代化构建
 - **类型安全**: 全面引入TypeScript类型系统
-- **状态管理**: 引入Zustand状态管理库
-- **样式方案**: 从原生CSS迁移到Tailwind CSS
+- **状态管理**: 引入Zustand 4.5.5状态管理库
+- **样式方案**: 从原生CSS迁移到Tailwind CSS 3.4.11
+- **数据库增强**: 新增角色权限管理、安全审计等功能
 
 ---
 
@@ -21,13 +22,15 @@
 
 | 类别 | 版本1.0 | 版本2.0 | 变化 |
 |------|---------|---------|------|
-| 前端技术栈 | 原生ES6 JS | React 18 + TS | 完全重构 |
-| 后端技术栈 | 原生JS | Hono + TS | 框架升级 |
-| 构建工具 | 无 | Vite 5 | 新增 |
-| 类型系统 | 无 | TypeScript | 新增 |
-| 状态管理 | 自定义Store | Zustand | 重构 |
-| 样式方案 | 原生CSS | Tailwind CSS | 重构 |
-| 路由管理 | 无 | React Router 6 | 新增 |
+| 前端技术栈 | 原生ES6 JS | React 18.3.1 + TS 5.5.3 | 完全重构 |
+| 后端技术栈 | 原生JS | Hono 4.6.0 + TS 5.5.3 | 框架升级 |
+| 构建工具 | 无 | Vite 5.4.1 | 新增 |
+| 类型系统 | 无 | TypeScript 5.5.3 | 新增 |
+| 状态管理 | 自定义Store | Zustand 4.5.5 | 重构 |
+| 样式方案 | 原生CSS | Tailwind CSS 3.4.11 | 重构 |
+| 路由管理 | 无 | React Router 6.26.2 | 新增 |
+| 数据库模块 | 7个 | 8个 | 新增角色管理 |
+| 预置搜索源 | ~20个 | 50+ | 大幅增加 |
 
 ---
 

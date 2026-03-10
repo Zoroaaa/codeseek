@@ -3,23 +3,25 @@
 ## 技术栈版本
 
 ### 前端技术栈
-- **核心**: React 18 + TypeScript
-- **构建工具**: Vite 5
-- **样式框架**: Tailwind CSS 3
-- **状态管理**: Zustand 4
-- **路由管理**: React Router 6
-- **图标库**: Lucide React
-- **日期处理**: date-fns
+- **核心**: React 18.3.1 + TypeScript 5.5.3
+- **构建工具**: Vite 5.4.1
+- **样式框架**: Tailwind CSS 3.4.11
+- **状态管理**: Zustand 4.5.5 (支持持久化)
+- **路由管理**: React Router 6.26.2
+- **图标库**: Lucide React 0.441.0
+- **日期处理**: date-fns 3.6.0
+- **工具库**: clsx 2.1.1 (类名合并)
 - **部署**: Cloudflare Pages
 - **版本**: v2.0.0
 
 ### 后端技术栈
 - **运行时**: Cloudflare Workers
-- **框架**: Hono 4
-- **语言**: TypeScript
+- **框架**: Hono 4.6.0 (轻量级Web框架)
+- **语言**: TypeScript 5.5.3
 - **数据库**: Cloudflare D1 (SQLite)
-- **认证**: JWT (jose库)
+- **认证**: JWT (jose 5.9.0)
 - **API**: RESTful 风格
+- **开发工具**: Wrangler 3.78.0
 - **版本**: v2.0.0
 
 ### 代理服务
@@ -250,32 +252,58 @@ backend/
 ### 模块依赖关系
 
 ```
-01_user_management.sql (基础模块)
+01_user_management.sql (基础模块 - 必须首先执行)
         │
-        ├──► 02_search_engine.sql
+        ├──► 02_search_engine.sql (搜索引擎核心)
         │
-        ├──► 03_community.sql
+        ├──► 03_community.sql (社区功能 - 依赖用户表)
         │
-        ├──► 04_search_source.sql
+        ├──► 04_search_source.sql (搜索源管理 - 包含50+预置源)
         │
-        ├──► 05_email_security.sql
+        ├──► 05_email_security.sql (邮箱验证与安全机制)
         │
-        ├──► 06_system_analytics.sql
+        ├──► 06_system_analytics.sql (系统配置与分析)
         │
-        └──► 07_initialization_data.sql
+        ├──► 07_initialization_data.sql (初始化数据)
+        │
+        └──► 08_role_management.sql (角色权限管理)
 ```
 
-### 数据表说明
+### 数据表详细说明
 
 | 模块文件 | 核心数据表 | 说明 |
 |---------|-----------|------|
-| 01_user_management.sql | users, user_settings, sessions | 用户管理基础模块 |
-| 02_search_engine.sql | search_history, favorites | 搜索引擎核心 |
-| 03_community.sql | community_sources, community_tags, reviews | 社区功能 |
-| 04_search_source.sql | search_sources, source_categories, major_categories | 搜索源管理 |
-| 05_email_security.sql | verification_codes, security_locks | 邮箱验证与安全 |
-| 06_system_analytics.sql | system_config, user_actions, analytics_events | 系统配置与分析 |
-| 07_initialization_data.sql | - | 初始化数据 |
+| 01_user_management.sql | users, user_sessions, user_favorites, user_search_history, user_actions | 用户管理基础模块，包含会话、收藏、历史 |
+| 02_search_engine.sql | search_cache, search_analytics | 搜索缓存与分析统计 |
+| 03_community.sql | community_source_tags, community_shared_sources, community_source_reviews, community_source_likes, community_source_downloads, community_source_reports, community_user_stats | 完整社区功能：标签、分享、评论、点赞、下载、举报 |
+| 04_search_source.sql | search_major_categories, search_source_categories, search_sources, user_search_source_configs | 搜索源管理，含50+预置源和用户配置 |
+| 05_email_security.sql | email_verifications, email_change_requests, password_reset_logs, security_lockouts, user_security_events, email_send_logs, email_templates | 邮箱验证、安全锁定、审计日志 |
+| 06_system_analytics.sql | system_config, analytics_events, source_status_cache, source_health_stats | 系统配置、事件分析、源状态监控 |
+| 07_initialization_data.sql | - | 系统初始化数据 |
+| 08_role_management.sql | roles | 角色定义：super_admin, admin, user, guest |
+
+### 搜索源预置数据
+
+项目预置了 **50+ 搜索源**，分为以下类别：
+
+**番号资料站 (searchable=1)**
+- JavBus, JavDB, JavLibrary, r/JAV
+
+**在线播放平台 (searchable=1)**
+- Jable, JavMost, JavGuru, AV01, JavGG
+- MissAV, SupJAV, BestJavPorn, JAV.sb, JAVLeak
+- JAVSeen, JAVTsunami, JAV Subtitled, JAVOut, JAVCL
+- JavDoe, JAV Desu, JavyNow, JAVHDPorn.net, JAV Ass Lover, JAV Subtitle
+
+**磁力种子站 (site_type=browse)**
+- BTSOW, MagnetDL, TorrentKitty, Sukebei
+- OneJAV, Project Jav, NextJAV, JavJunkies, JAVBEE
+- iJavTorrent, Empornium, 141PPV, LoveTorrent, XXXClub, My JAV Bay
+
+**社区论坛 (site_type=browse)**
+- 色花堂98堂, T66Y草榴社区, 5278.cc, SexInSex
+- SIS001, South-Plus, 52AV, JKForum, EYNY
+- 夯鸭论坛, OurSogo, Cool18, 141HongKong, HJD2048, 91论坛, Sex8.cc
 
 ---
 

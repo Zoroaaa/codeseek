@@ -9,7 +9,8 @@
 - **基础URL**: `/api`
 - **认证方式**: JWT Bearer Token（在请求头中添加 `Authorization: Bearer <token>`）
 - **响应格式**: JSON
-- **API框架**: Hono
+- **API框架**: Hono 4.6.0
+- **运行时**: Cloudflare Workers
 
 ## 统一响应格式
 
@@ -24,6 +25,18 @@ interface ApiResponse<T> {
   };
 }
 ```
+
+## 错误码说明
+
+| 错误码 | HTTP状态码 | 说明 |
+|--------|-----------|------|
+| `VALIDATION_ERROR` | 400 | 参数验证失败 |
+| `AUTH_ERROR` | 401 | 认证失败/未授权 |
+| `FORBIDDEN` | 403 | 权限不足 |
+| `NOT_FOUND` | 404 | 资源不存在 |
+| `DUPLICATE_ERROR` | 400 | 资源已存在 |
+| `RATE_LIMIT` | 429 | 请求频率超限 |
+| `SERVER_ERROR` | 500 | 服务器内部错误 |
 
 ---
 

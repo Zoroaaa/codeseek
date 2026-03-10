@@ -11,6 +11,7 @@
 - [环境变量](#环境变量)
 - [代理服务配置](#代理服务配置)
 - [数据库配置](#数据库配置)
+- [角色权限配置](#角色权限配置)
 
 ---
 
@@ -21,9 +22,15 @@
 ```typescript
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
+  },
   build: {
     outDir: 'dist',
     sourcemap: true,
@@ -348,10 +355,11 @@ database/
 ├── 01_user_management.sql      # 用户管理（基础模块）
 ├── 02_search_engine.sql        # 搜索引擎核心
 ├── 03_community.sql            # 社区功能
-├── 04_search_source.sql        # 搜索源管理
+├── 04_search_source.sql        # 搜索源管理（含50+预置源）
 ├── 05_email_security.sql       # 邮箱验证与安全
 ├── 06_system_analytics.sql     # 系统配置与分析
-└── 07_initialization_data.sql  # 初始化数据
+├── 07_initialization_data.sql  # 初始化数据
+└── 08_role_management.sql      # 角色权限管理
 ```
 
 ### 数据库初始化
@@ -368,10 +376,71 @@ wrangler d1 execute codeseek-db --local --file="../database/04_search_source.sql
 wrangler d1 execute codeseek-db --local --file="../database/05_email_security.sql"
 wrangler d1 execute codeseek-db --local --file="../database/06_system_analytics.sql"
 wrangler d1 execute codeseek-db --local --file="../database/07_initialization_data.sql"
+wrangler d1 execute codeseek-db --local --file="../database/08_role_management.sql"
 
 # 生产环境
 wrangler d1 execute codeseek-db --remote --file="../database/01_user_management.sql"
-# ... 其他文件
+# ... 其他文件（按相同顺序执行）
+```
+
+---
+
+## 角色权限配置
+
+### 系统角色
+
+系统内置四种角色：
+
+| 角色 | 权限级别 | 说明 |
+|------|---------|------|
+| super_admin | 100 | 超级管理员，拥有所有权限 |
+| admin | 50 | 管理员，可管理用户和内容 |
+| user | 10 | 普通用户，基本功能权限 |
+| guest | 1 | 访客，仅搜索权限 |
+
+### 权限列表
+
+```typescript
+// 超级管理员权限
+const SUPER_ADMIN_PERMISSIONS = ['*'];
+
+// 管理员权限
+const ADMIN_PERMISSIONS = [
+  'user:read', 'user:write',
+  'stats:read',
+  'report:read', 'report:write',
+  'source:read', 'source:write',
+  'community:read', 'community:write'
+];
+
+// 普通用户权限
+const USER_PERMISSIONS = [
+  'search', 'favorite', 'history', 'sync',
+  'community:share', 'community:review'
+];
+
+// 访客权限
+const GUEST_PERMISSIONS = ['search'];
+```
+
+### 权限中间件使用
+
+```typescript
+import { authMiddleware, roleMiddleware, permissionMiddleware } from './middleware';
+
+// 需要认证的路由
+app.use('/api/user/*', authMiddleware);
+
+// 需要管理员权限的路由
+app.use('/api/admin/*', authMiddleware, adminMiddleware);
+
+// 需要特定权限的路由
+app.post('/api/sources', 
+  authMiddleware, 
+  roleMiddleware, 
+  permissionMiddleware('source:write'),
+  createSourceHandler
+);
 ```
 
 ---

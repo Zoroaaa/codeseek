@@ -195,20 +195,67 @@ backend/src/
 
 ### 数据库设计
 
-使用 Cloudflare D1 (SQLite) 作为数据持久化方案：
+使用 Cloudflare D1 (SQLite) 作为数据持久化方案，采用模块化SQL文件管理：
 
-**核心数据表：**
-- `users` - 用户信息表
-- `user_settings` - 用户设置表
-- `search_sources` - 搜索源配置表
-- `source_categories` - 搜索源分类表
-- `major_categories` - 主要分类表
-- `user_source_configs` - 用户搜索源配置表
-- `favorites` - 收藏记录表
-- `search_history` - 搜索历史表
-- `community_sources` - 社区共享搜索源表
-- `community_tags` - 社区标签表
-- `source_status_checks` - 搜索源状态检查表
+**数据库模块结构：**
+```
+database/
+├── 01_user_management.sql    # 用户管理（基础模块）
+│   ├── users                 # 用户信息表
+│   ├── user_sessions         # 会话管理表
+│   ├── user_favorites        # 用户收藏表
+│   ├── user_search_history   # 搜索历史表
+│   └── user_actions          # 行为日志表
+├── 02_search_engine.sql      # 搜索引擎核心
+│   ├── search_cache          # 搜索缓存表
+│   └── search_analytics      # 搜索分析表
+├── 03_community.sql          # 社区功能
+│   ├── community_source_tags        # 社区标签表
+│   ├── community_shared_sources     # 共享搜索源表
+│   ├── community_source_reviews     # 评论表
+│   ├── community_source_likes       # 点赞表
+│   ├── community_source_downloads   # 下载记录表
+│   ├── community_source_reports     # 举报表
+│   └── community_user_stats         # 用户统计表
+├── 04_search_source.sql      # 搜索源管理
+│   ├── search_major_categories      # 主分类表
+│   ├── search_source_categories     # 子分类表
+│   ├── search_sources               # 搜索源表
+│   └── user_search_source_configs   # 用户配置表
+├── 05_email_security.sql     # 邮箱验证与安全
+│   ├── email_verifications   # 验证码表
+│   ├── email_change_requests # 邮箱更改请求表
+│   ├── password_reset_logs   # 密码重置日志
+│   ├── security_lockouts     # 安全锁定表
+│   ├── user_security_events  # 安全事件表
+│   ├── email_send_logs       # 邮件发送日志
+│   └── email_templates       # 邮件模板表
+├── 06_system_analytics.sql   # 系统配置与分析
+│   ├── system_config         # 系统配置表
+│   ├── analytics_events      # 分析事件表
+│   ├── source_status_cache   # 源状态缓存
+│   └── source_health_stats   # 源健康统计
+├── 07_initialization_data.sql # 初始化数据
+└── 08_role_management.sql    # 角色权限管理
+    └── roles                 # 角色定义表
+```
+
+**核心数据表说明：**
+
+| 模块 | 表名 | 说明 |
+|------|------|------|
+| 用户管理 | users | 用户基础信息、权限、设置 |
+| 用户管理 | user_sessions | JWT会话管理 |
+| 用户管理 | user_favorites | 用户收藏记录 |
+| 用户管理 | user_search_history | 搜索历史记录 |
+| 搜索源 | search_sources | 搜索源配置（50+预置源） |
+| 搜索源 | search_source_categories | 搜索源分类 |
+| 搜索源 | search_major_categories | 主分类（搜索源/浏览站点） |
+| 社区 | community_shared_sources | 社区分享的搜索源 |
+| 社区 | community_source_tags | 社区标签管理 |
+| 安全 | email_verifications | 邮箱验证码管理 |
+| 安全 | security_lockouts | 安全锁定机制 |
+| 系统 | roles | 角色权限定义 |
 
 👉 [查看完整架构说明](docs/backend-frontend-tree.md)
 

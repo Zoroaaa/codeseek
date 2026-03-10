@@ -25,7 +25,7 @@
 | Node.js | >= 20.0.0 | JavaScript运行时 |
 | npm | >= 10.0.0 | 包管理器 |
 | Git | >= 2.0.0 | 版本控制 |
-| Wrangler | >= 3.0.0 | Cloudflare CLI工具 |
+| Wrangler | >= 3.78.0 | Cloudflare CLI工具 |
 
 ### 账户要求
 
@@ -41,6 +41,9 @@ npm install -g wrangler
 
 # 验证安装
 wrangler --version
+
+# 登录Cloudflare
+wrangler login
 ```
 
 ---
@@ -78,6 +81,7 @@ wrangler d1 execute codeseek-db --local --file="../database/04_search_source.sql
 wrangler d1 execute codeseek-db --local --file="../database/05_email_security.sql"
 wrangler d1 execute codeseek-db --local --file="../database/06_system_analytics.sql"
 wrangler d1 execute codeseek-db --local --file="../database/07_initialization_data.sql"
+wrangler d1 execute codeseek-db --local --file="../database/08_role_management.sql"
 
 # 启动开发服务器
 npm run dev
@@ -147,6 +151,7 @@ wrangler d1 execute codeseek-db --remote --file="../database/04_search_source.sq
 wrangler d1 execute codeseek-db --remote --file="../database/05_email_security.sql"
 wrangler d1 execute codeseek-db --remote --file="../database/06_system_analytics.sql"
 wrangler d1 execute codeseek-db --remote --file="../database/07_initialization_data.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/08_role_management.sql"
 ```
 
 ### 4. 设置环境变量
