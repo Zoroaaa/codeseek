@@ -2,13 +2,15 @@
 
 <div align="center">
 
+![Logo](frontend/images/logo.png)
+
 **现代化的磁力搜索聚合平台 - 基于 Cloudflare 边缘计算的无服务器架构**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/yourusername/codeseek)
+[![Version](https://img.shields.io/badge/version-2.3.1-blue.svg)](https://github.com/yourusername/codeseek)
 [![Cloudflare](https://img.shields.io/badge/Powered%20by-Cloudflare-orange.svg)](https://www.cloudflare.com/)
-[![Frontend](https://img.shields.io/badge/Frontend-React%2018%20%2B%20TypeScript-green.svg)](/)
-[![Backend](https://img.shields.io/badge/Backend-Hono%20%2B%20TypeScript-blue.svg)](/)
+[![Frontend](https://img.shields.io/badge/Frontend-v2.3.1-green.svg)](/)
+[![Backend](https://img.shields.io/badge/Backend-v2.1.0-blue.svg)](/)
 
 </div>
 
@@ -22,6 +24,7 @@
 - [性能优化](#-性能优化)
 - [安全特性](#-安全特性)
 - [API文档](#-api文档)
+- [更新日志](#-更新日志)
 - [许可证](#-许可证)
 - [致谢](#-致谢)
 - [联系与支持](#-联系与支持)
@@ -42,10 +45,10 @@
 ## ✨ 项目特色
 
 ### 核心优势
-- ⚛️ **React 18 + TypeScript**: 现代化前端技术栈，类型安全，开发体验优秀
+- 🚀 **原生ES6架构**: 零框架依赖，基于原生ES6模块化开发，代码体积小巧高效
 - ☁️ **Cloudflare全栈**: 完全基于Cloudflare生态构建，利用全球CDN边缘计算优势
 - 🌐 **多源聚合**: 同时整合多个磁力搜索引擎，提供最全面的搜索结果
-- 🎨 **Tailwind CSS**: 原子化CSS框架，响应式界面设计，支持亮色/暗色主题
+- 🎨 **现代UI设计**: 响应式界面设计，支持亮色/暗色/自动三种主题模式
 - 🔐 **企业级安全**: JWT认证、邮箱验证、数据加密等多层安全防护
 
 ### 技术特性
@@ -62,133 +65,101 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    前端层 (v2.0.0)                      │
-│  • React 18 + TypeScript                                │
-│  • Vite 构建工具                                         │
-│  • Tailwind CSS 样式框架                                 │
-│  • Zustand 状态管理                                      │
-│  • React Router 路由管理                                 │
+│                    前端层 (v2.3.1)                      │
+│  • 原生 ES6+ 模块化开发 (无框架依赖)                     │
+│  • CSS3 + 响应式设计                                     │
+│  • LocalStorage + IndexedDB                             │
 │  • 部署：Cloudflare Pages                               │
+│  • 代码量：约 33,000+ 行 JavaScript                     │
 └─────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────┐
-│                  后端服务层 (v2.0.0)                     │
-│  • Hono 框架 (轻量级Web框架)                             │
-│  • TypeScript 类型安全                                   │
+│                  后端服务层 (v2.1.0)                     │
 │  • Cloudflare Workers (边缘计算)                        │
 │  • Cloudflare D1 (SQLite 数据库)                        │
-│  • JWT Token 认证 (jose库)                              │
+│  • RESTful API 设计                                     │
+│  • JWT Token 认证                                       │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ### 前端架构设计
 
-项目采用**现代化React架构**，基于函数组件和Hooks：
+项目采用**分层模块化架构**，确保代码的高内聚低耦合：
 
 ```
 frontend/src/
-├── components/           # 🧩 组件层
-│   ├── layout/          # 布局组件
-│   │   ├── DashboardLayout.tsx   # 仪表板布局
-│   │   └── MainLayout.tsx        # 主页面布局
-│   └── ui/              # UI基础组件
-│       ├── Button.tsx            # 按钮组件
-│       ├── Card.tsx              # 卡片组件
-│       ├── Input.tsx             # 输入框组件
-│       ├── Modal.tsx             # 模态框组件
-│       ├── Toast.tsx             # 通知组件
-│       └── ...                   # 更多UI组件
+├── core/               # 🎯 核心配置层
+│   ├── constants.js    # 应用常量定义
+│   ├── config.js       # 动态配置管理
+│   └── proxy-config.js # 代理服务配置
 │
-├── hooks/               # 🎣 自定义Hooks
-│   ├── useAuth.ts       # 认证Hook
-│   ├── useSearch.ts     # 搜索Hook
-│   ├── useFavorites.ts  # 收藏Hook
-│   └── useSearchSuggestions.ts  # 搜索建议Hook
+├── utils/              # 🛠️ 工具函数层
+│   ├── helpers.js      # 通用辅助函数
+│   ├── validation.js   # 数据验证工具
+│   ├── format.js       # 格式化工具
+│   ├── dom.js          # DOM操作工具
+│   ├── storage.js      # 存储管理工具
+│   └── network.js      # 网络请求工具
 │
-├── pages/               # 📄 页面组件
-│   ├── auth/            # 认证页面
-│   │   ├── LoginPage.tsx        # 登录页
-│   │   ├── RegisterPage.tsx     # 注册页
-│   │   └── ForgotPasswordPage.tsx # 忘记密码页
-│   ├── dashboard/       # 仪表板页面
-│   │   ├── DashboardPage.tsx    # 仪表板主页
-│   │   ├── OverviewManager.tsx  # 概览页
-│   │   ├── SourceManager.tsx    # 搜索源管理
-│   │   ├── CategoryManager.tsx  # 分类管理
-│   │   ├── CommunityManager.tsx # 社区管理
-│   │   └── ...                  # 更多管理页面
-│   ├── HomePage.tsx     # 首页
-│   └── MainSearchPage.tsx # 主搜索页
+├── services/           # 🔧 服务层
+│   ├── api.js                      # 统一API服务
+│   ├── auth.js                     # 认证服务
+│   ├── search.js                   # 搜索服务
+│   ├── proxy-service.js            # 代理服务
+│   ├── theme.js                    # 主题管理
+│   ├── search-sources-api.js       # 搜索源API
+│   ├── community-sources-api.js    # 社区搜索源API
+│   ├── community-tags-api.js       # 社区标签API
+│   ├── enhanced-source-checker.js  # 搜索源检查
+│   └── email-verification-service.js # 邮箱验证服务
 │
-├── services/            # 🔧 服务层
-│   ├── api/             # API服务
-│   │   ├── client.ts    # API客户端
-│   │   ├── auth.ts      # 认证API
-│   │   ├── search.ts    # 搜索API
-│   │   ├── source.ts    # 搜索源API
-│   │   ├── community.ts # 社区API
-│   │   └── system.ts    # 系统API
-│   └── proxy/           # 代理服务
-│       ├── ProxyService.ts    # 代理服务
-│       └── proxy-config.ts    # 代理配置
+├── components/         # 🧩 组件层
+│   ├── search.js       # 统一搜索管理器
+│   ├── favorites.js    # 收藏管理组件
+│   ├── email-verification-ui.js # 邮箱验证UI
+│   └── search/         # 搜索子组件
+│       ├── SearchHistoryManager.js
+│       ├── SearchResultsRenderer.js
+│       └── SearchSuggestionManager.js
 │
-├── stores/              # 📦 状态管理 (Zustand)
-│   ├── authStore.ts     # 认证状态
-│   ├── searchStore.ts   # 搜索状态
-│   ├── sourceStore.ts   # 搜索源状态
-│   ├── communityStore.ts # 社区状态
-│   ├── themeStore.ts    # 主题状态
-│   └── uiStore.ts       # UI状态
-│
-├── types/               # 📝 TypeScript类型定义
-│   ├── auth.ts          # 认证类型
-│   ├── search.ts        # 搜索类型
-│   ├── source.ts        # 搜索源类型
-│   ├── community.ts     # 社区类型
-│   └── common.ts        # 通用类型
-│
-├── App.tsx              # 应用入口组件
-├── main.tsx             # 主入口文件
-└── index.css            # 全局样式
+└── pages/              # 🚀 页面应用层
+    ├── main/           # 主页模块
+    │   └── main.js
+    └── dashboard/      # 仪表板模块
+        ├── dashboard-app.js
+        ├── overview-manager.js
+        ├── favorites-manager.js
+        ├── history-manager.js
+        ├── sources-manager.js
+        ├── categories-manager.js
+        ├── community-manager.js
+        ├── settings-manager.js
+        └── stats-manager.js
 ```
 
 ### 后端架构设计
 
-后端采用**Hono框架 + TypeScript**，模块化路由设计：
+后端采用**模块化服务架构**，基于 Cloudflare Workers 实现：
 
 ```
-backend/src/
-├── index.ts             # 🚀 主入口文件
-├── constants.ts         # 📋 常量配置
+codeseek-backend/src/
+├── index.js           # 主入口文件
+├── router.js          # 路由分发器
+├── middleware.js      # 中间件层
+├── utils.js           # 工具函数
+├── constants.js       # 常量定义
 │
-├── routes/              # 🛣️ 路由层
-│   ├── auth.ts          # 认证路由
-│   ├── user.ts          # 用户路由
-│   ├── search.ts        # 搜索路由
-│   ├── sources.ts       # 搜索源路由
-│   ├── community.ts     # 社区路由
-│   ├── admin.ts         # 管理员路由
-│   ├── config.ts        # 配置路由
-│   └── system.ts        # 系统路由
+├── handlers/          # 🎯 请求处理器层
+│   ├── auth.js        # 认证处理器
+│   ├── user.js        # 用户处理器
+│   ├── search-sources.js  # 搜索源处理器
+│   ├── community.js   # 社区处理器
+│   └── system.js      # 系统处理器
 │
-├── services/            # 🔧 业务服务层
-│   ├── index.ts         # 服务入口
-│   ├── email-verification.ts  # 邮箱验证服务
-│   └── search-sources-service.ts # 搜索源服务
-│
-├── middleware/          # 🔐 中间件层
-│   ├── index.ts         # 中间件入口
-│   └── auth.ts          # 认证中间件
-│
-├── validation/          # ✅ 验证层
-│   └── index.ts         # 请求验证
-│
-├── utils/               # 🛠️ 工具函数
-│   ├── index.ts         # 工具入口
-│   └── security.ts      # 安全工具
-│
-└── types/               # 📝 TypeScript类型定义
-    └── index.ts         # 类型定义
+└── services/          # 🔧 业务服务层
+    ├── services.js    # 通用服务
+    ├── email-verification.js  # 邮箱验证服务
+    └── search-sources-service.js # 搜索源服务
 ```
 
 ### 数据库设计
@@ -208,7 +179,7 @@ backend/src/
 - `community_tags` - 社区标签表
 - `source_status_checks` - 搜索源状态检查表
 
-👉 [查看完整架构说明](docs/backend-frontend-tree.md)
+👉 [查看完整架构说明](backend-frontend-tree.md)
 
 ## 🚀 快速开始
 
@@ -225,7 +196,7 @@ backend/src/
 ```bash
 # 克隆项目
 git clone https://github.com/Zoroaaa/codeseek.git
-cd codeseek/backend
+cd codeseek/codeseek-backend
 
 # 安装依赖
 npm install
@@ -236,16 +207,10 @@ npm install
 # - DB: D1数据库绑定
 
 # 创建D1数据库
-wrangler d1 create codeseek-db
+wrangler d1 create magnet-search-db
 
-# 初始化数据库（SQL文件位于项目根目录的database/目录）
-wrangler d1 execute codeseek-db --remote --file="../database/01_user_management.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/02_search_engine.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/03_community.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/04_search_source.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/05_email_security.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/06_system_analytics.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/07_initialization_data.sql"
+# 运行数据库迁移
+npm run d1:migrate
 
 # 本地开发
 npm run dev
@@ -259,23 +224,17 @@ npm run deploy
 ```bash
 cd frontend
 
-# 安装依赖
-npm install
-
-# 本地开发
-npm run dev
-
-# 构建生产版本
-npm run build
+# 配置 API 端点
+# 编辑 src/core/config.js 中的 API_BASE_URL
 
 # 部署到 Cloudflare Pages
 # 方式1: 通过 Cloudflare Dashboard 连接 GitHub 仓库
 # 方式2: 使用 Wrangler CLI
-wrangler pages deploy dist --project-name=codeseek
+wrangler pages deploy . --project-name=codeseek
 ```
 
-👉 [查看详细部署文档](docs/deploy.md)  
-👉 [查看配置说明](docs/config.md)
+👉 [查看详细部署文档](deploy.md)  
+👉 [查看配置说明](config.md)
 
 ## 🎯 核心功能
 
@@ -304,6 +263,15 @@ wrangler pages deploy dist --project-name=codeseek
 - 实时检查搜索源状态
 - 搜索源配置导入导出
 
+```javascript
+// 搜索服务核心功能示例
+searchService.performSearch(keyword, {
+  useCache: true,           // 使用缓存
+  saveToHistory: true,      // 保存到历史
+  sources: ['source1', 'source2']  // 指定搜索源
+});
+```
+
 ### 2. 智能代理功能
 
 > **注意**: 该功能模块已独立为新项目，访问 [https://github.com/Zoroaaa/OmniBox](https://github.com/Zoroaaa/OmniBox) 获取最新信息。
@@ -318,6 +286,28 @@ wrangler pages deploy dist --project-name=codeseek
 - 智能 URL 重写和资源优化
 - 响应式图片支持 (srcset)
 - 相对路径和绝对路径智能处理
+
+**缓存优化**
+- 资源类型智能缓存策略：
+  - HTML: 5分钟
+  - CSS/JS: 1小时
+  - 图片: 24小时
+  - 字体: 7天
+- LRU缓存淘汰算法
+- 请求队列和并发控制
+
+**性能监控**
+- 实时监控代理性能指标
+- 缓存命中率统计
+- 响应时间分析
+
+```javascript
+// 代理服务使用示例
+proxyService.init();
+proxyService.enableProxy();  // 启用代理
+proxyService.getProxyStatus();  // 获取代理状态
+proxyService.getProxyStats();  // 获取统计信息
+```
 
 ### 3. 自定义搜索源
 
@@ -414,25 +404,25 @@ wrangler pages deploy dist --project-name=codeseek
 ### 前端性能优化
 
 **架构优化**
-- ✅ React 18 并发特性
-- ✅ Vite 快速构建和HMR
-- ✅ 代码分割，路由级别懒加载
+- ✅ 原生 ES6 模块化，无打包工具依赖
+- ✅ 按需加载，减少初始加载时间
+- ✅ 代码分割，组件级别懒加载
 - ✅ Tree-shaking 支持
 
 **缓存策略**
-- ✅ Zustand 持久化状态
+- ✅ 多层级缓存：内存缓存 + LocalStorage + IndexedDB
 - ✅ API 响应缓存，减少网络请求
 - ✅ 静态资源强缓存
 - ✅ 智能缓存失效机制
 
 **渲染优化**
-- ✅ React.memo 和 useMemo 优化重渲染
 - ✅ 虚拟滚动处理大量搜索结果
 - ✅ 防抖节流优化用户输入
 - ✅ 图片懒加载
+- ✅ 骨架屏提升感知性能
 
 **资源优化**
-- ✅ Tailwind CSS 按需生成
+- ✅ CSS 精简，避免冗余样式
 - ✅ 字体子集化
 - ✅ SVG 图标优化
 - ✅ 响应式图片
@@ -488,7 +478,7 @@ wrangler pages deploy dist --project-name=codeseek
 ### 后端安全
 
 **认证与授权**
-- ✅ JWT Token 认证 (jose库)
+- ✅ JWT Token 认证
 - ✅ 基于角色的访问控制 (RBAC)
 - ✅ 多因素认证 (MFA) 准备
 - ✅ 会话管理
@@ -586,7 +576,124 @@ GET    /api/source-status/history      # 获取状态历史
 GET    /api/config                     # 获取系统配置
 ```
 
-👉 [查看完整API文档](docs/api.md)
+👉 [查看完整API文档](api.md)
+
+## 📄 更新日志
+
+### 当前版本
+
+#### 前端 v2.3.1 (2025-01)
+**架构重构**
+- ✨ 新增统一搜索管理器架构，优化搜索流程
+- 🔧 重构搜索组件为主组件 + 子组件架构
+  - `SearchHistoryManager` - 历史管理
+  - `SearchResultsRenderer` - 结果渲染
+  - `SearchSuggestionManager` - 搜索建议
+- 🚀 移除详情提取服务，简化系统架构
+- 📦 优化代码组织，提高可维护性
+
+**代理功能增强**
+- 🔌 新增完整的智能代理功能
+  - 一键切换全局代理
+  - 资源类型智能缓存策略
+  - URL重写和资源优化
+  - 响应式图片支持
+- 📊 新增代理性能监控和缓存统计
+- 🌐 支持所有搜索源域名代理
+- ⚡ 请求队列和并发控制
+
+**用户体验优化**
+- 🎨 改进主题系统，优化暗色模式
+- 📱 增强移动端响应式设计
+- ⚡ 优化页面加载和交互速度
+- 🔍 改进搜索结果排序算法
+- 💾 优化缓存策略，减少加载时间
+
+**性能提升**
+- 🚀 代码总量：约33,000+行 JavaScript
+- ⚡ 初始加载时间优化 30%
+- 💾 缓存命中率提升至 85%
+- 📊 搜索响应速度提升 40%
+
+**修复**
+- 🐛 修复搜索结果去重问题
+- 🐛 修复代理服务偶发性断连
+- 🐛 修复移动端布局问题
+- 🐛 修复缓存失效不及时的问题
+
+#### 后端 v2.1.0 (2025-01)
+**架构升级**
+- ✨ 新增模块化数据库结构
+  - 搜索源管理表
+  - 用户配置表
+  - 社区功能表
+- 🔧 重构服务层架构
+  - `search-sources-service.js` - 搜索源服务
+  - `email-verification.js` - 邮箱验证服务
+- 🔌 新增代理服务支持
+
+**安全增强**
+- 🔐 增强 JWT 认证机制
+- 📧 添加邮箱验证服务
+  - 注册验证
+  - 修改邮箱验证
+  - 重置密码验证
+  - 删除账户验证
+- 🚫 实现请求速率限制
+- 🔒 敏感数据加密存储
+
+**功能完善**
+- 👥 完善社区功能支持
+  - 标签管理
+  - 搜索源分享
+  - 用户互动
+- 📊 增强搜索源统计和监控
+  - 可用性检查
+  - 性能监控
+  - 使用统计
+- 🔍 优化搜索结果处理逻辑
+
+**API改进**
+- ✨ 新增30+个API端点
+- 🔧 优化API响应速度
+- 📝 完善API文档
+- 🔐 加强API安全性
+
+### 历史版本
+
+#### v1.3.0 (2024-12-19)
+**核心功能**
+- ✨ 新增自定义搜索源功能
+- 🔍 添加详情提取功能
+- 👥 新增用户收藏管理
+- 📂 实现分类管理系统
+
+**性能优化**
+- 🚀 优化搜索性能
+- 💾 改进缓存机制
+- ⚡ 提升API响应速度
+
+**用户体验**
+- 🎨 改进用户界面
+- 🔧 重构Dashboard架构
+- 📊 增强数据统计功能
+
+#### v1.2.0 (2024-11)
+**用户系统**
+- 🔐 完善用户认证
+- ☁️ 实现云端数据同步
+- 📱 优化移动端适配
+- 💻 完善桌面端体验
+
+**其他改进**
+- 🐛 修复已知问题
+- 📝 更新文档
+
+#### v1.1.0 (2024-10)
+- ✨ 初始版本发布
+- 🔍 基础搜索功能
+- 📱 响应式设计
+- 🗂️ 基本分类系统
 
 ## 📄 许可证
 

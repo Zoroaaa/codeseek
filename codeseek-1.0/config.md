@@ -67,7 +67,7 @@ const ttlMap = {
 ```
 
 ### 后端常量配置
-后端系统在`backend/src/constants.js`中定义了系统级别的不可变配置：
+后端系统在`codeseek-backend/src/constants.js`中定义了系统级别的不可变配置：
 ```javascript
 // 系统级别的最大限制（安全相关，不可修改）
 MAX_TAGS_PER_USER: 50,

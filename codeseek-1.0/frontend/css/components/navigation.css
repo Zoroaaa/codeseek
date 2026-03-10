@@ -1,0 +1,262 @@
+/* ================================================================
+   导航系统 - Navigation System
+   包含：导航栏、面包屑、菜单、下拉列表
+   ================================================================ */
+
+/* ============= 主导航栏 ============= */
+.navbar {
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+}
+
+.nav-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1.5rem;
+  height: 72px;
+}
+
+/* 品牌标识 */
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  transition: var(--transition-base);
+}
+
+.nav-brand:hover {
+  transform: scale(1.02);
+}
+
+.nav-brand a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* 导航菜单 */
+.nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.nav-link {
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  transition: var(--transition-base);
+}
+
+.nav-link:hover {
+  color: var(--accent-primary);
+  background: var(--bg-tertiary);
+}
+
+/* 主题切换按钮 */
+.theme-btn {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-base);
+  color: var(--text-secondary);
+}
+
+.theme-btn:hover {
+  background: var(--bg-tertiary);
+  transform: scale(1.1);
+}
+
+/* 登录按钮 */
+.login-btn {
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  transition: var(--transition-base);
+}
+
+.login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* 用户信息 */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.username {
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+/* 下拉菜单 */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: var(--text-secondary);
+  transition: var(--transition-base);
+  border-radius: var(--radius-sm);
+}
+
+.dropdown-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.dropdown-content {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 160px;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: var(--transition-base);
+}
+
+.dropdown:hover .dropdown-content {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.dropdown-content a {
+  display: block;
+  padding: 0.75rem 1.25rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: var(--transition-base);
+}
+
+.dropdown-content a:hover,
+.dropdown-content a.active {
+  background: var(--bg-tertiary);
+  color: var(--accent-primary);
+}
+
+/* GitHub链接 */
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin-right: 1rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: var(--transition-base);
+  background: var(--bg-primary);
+}
+
+.github-link:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.github-link svg {
+  flex-shrink: 0;
+}
+
+.github-link span {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* ============= 响应式设计 ============= */
+
+@media (max-width: 768px) {
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .action-buttons .action-btn {
+    min-width: auto;
+  }
+  
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .history-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .favorites-controls {
+    flex-direction: column;
+  }
+  
+  .history-controls {
+    flex-direction: column;
+  }
+  
+  .time-range-selector {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .error-content {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .github-link span {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .favorites-list {
+    grid-template-columns: 1fr;
+  }
+  
+  .time-btn {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+  }
+}

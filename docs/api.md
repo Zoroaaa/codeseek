@@ -1,10 +1,15 @@
-# CodeSeek API 文档
+# CodeSeek API 文档 (v2.0.0)
+
+本文档详细说明CodeSeek项目的所有API接口。
+
+---
 
 ## 基础信息
 
 - **基础URL**: `/api`
 - **认证方式**: JWT Bearer Token（在请求头中添加 `Authorization: Bearer <token>`）
 - **响应格式**: JSON
+- **API框架**: Hono
 
 ## 统一响应格式
 
@@ -1779,10 +1784,10 @@ interface ApiResponse<T> {
 
 ## API调用示例
 
-```javascript
+```typescript
 const API_BASE = '/api';
 
-async function login(identifier, password) {
+async function login(identifier: string, password: string) {
   const response = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1796,7 +1801,7 @@ async function login(identifier, password) {
   throw new Error(data.error?.message || '登录失败');
 }
 
-async function fetchWithAuth(url, options = {}) {
+async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const token = localStorage.getItem('authToken');
   return fetch(url, {
     ...options,
@@ -1807,7 +1812,7 @@ async function fetchWithAuth(url, options = {}) {
   });
 }
 
-async function search(keyword, sourceIds = []) {
+async function search(keyword: string, sourceIds: string[] = []) {
   const response = await fetchWithAuth(`${API_BASE}/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1821,7 +1826,7 @@ async function getFavorites() {
   return response.json();
 }
 
-async function addFavorite(favorite) {
+async function addFavorite(favorite: { title: string; url: string; subtitle?: string; icon?: string; keyword?: string }) {
   const response = await fetchWithAuth(`${API_BASE}/user/favorites`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1830,7 +1835,7 @@ async function addFavorite(favorite) {
   return response.json();
 }
 
-async function getSearchSources(categoryId) {
+async function getSearchSources(categoryId?: string) {
   const url = categoryId 
     ? `${API_BASE}/search-sources/?categoryId=${categoryId}`
     : `${API_BASE}/search-sources/`;
@@ -1838,7 +1843,7 @@ async function getSearchSources(categoryId) {
   return response.json();
 }
 
-async function createSearchSource(sourceData) {
+async function createSearchSource(sourceData: object) {
   const response = await fetchWithAuth(`${API_BASE}/search-sources/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1847,7 +1852,7 @@ async function createSearchSource(sourceData) {
   return response.json();
 }
 
-async function batchUpdateConfigs(configs) {
+async function batchUpdateConfigs(configs: object[]) {
   const response = await fetchWithAuth(`${API_BASE}/search-sources/user-configs/batch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1856,7 +1861,7 @@ async function batchUpdateConfigs(configs) {
   return response.json();
 }
 
-async function exportSources(format = 'json') {
+async function exportSources(format: string = 'json') {
   const response = await fetch(`${API_BASE}/search-sources/export?format=${format}`);
   if (format === 'json') {
     return response.json();
@@ -1864,12 +1869,12 @@ async function exportSources(format = 'json') {
   return response.blob();
 }
 
-async function checkSourceStatus(sourceId) {
+async function checkSourceStatus(sourceId: string) {
   const response = await fetch(`${API_BASE}/source-status-check?sourceId=${sourceId}`);
   return response.json();
 }
 
-async function sendVerificationCode(email, type) {
+async function sendVerificationCode(email: string, type: string) {
   const response = await fetch(`${API_BASE}/auth/smart-send-code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1878,12 +1883,12 @@ async function sendVerificationCode(email, type) {
   return response.json();
 }
 
-async function getTrendingSearches(hours = 24) {
+async function getTrendingSearches(hours: number = 24) {
   const response = await fetch(`${API_BASE}/search/trending?hours=${hours}`);
   return response.json();
 }
 
-async function getSearchSuggestions(keyword) {
+async function getSearchSuggestions(keyword: string) {
   const response = await fetch(`${API_BASE}/search/suggestions?keyword=${encodeURIComponent(keyword)}`);
   return response.json();
 }
@@ -1893,13 +1898,13 @@ async function getAdminStats() {
   return response.json();
 }
 
-async function getAdminUsers(page = 1, search = '') {
+async function getAdminUsers(page: number = 1, search: string = '') {
   const url = `${API_BASE}/admin/users?page=${page}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
   const response = await fetchWithAuth(url);
   return response.json();
 }
 
-async function updateUserStatus(userId, isActive, reason = '') {
+async function updateUserStatus(userId: string, isActive: boolean, reason: string = '') {
   const response = await fetchWithAuth(`${API_BASE}/admin/users/${userId}/status`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -1908,12 +1913,12 @@ async function updateUserStatus(userId, isActive, reason = '') {
   return response.json();
 }
 
-async function getAdminReports(status = 'pending') {
+async function getAdminReports(status: string = 'pending') {
   const response = await fetchWithAuth(`${API_BASE}/admin/reports?status=${status}`);
   return response.json();
 }
 
-async function handleReport(reportId, status, action, notes = '') {
+async function handleReport(reportId: string, status: string, action: string, notes: string = '') {
   const response = await fetchWithAuth(`${API_BASE}/admin/reports/${reportId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

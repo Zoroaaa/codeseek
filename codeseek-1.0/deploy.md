@@ -21,7 +21,7 @@ npx http-server frontend -p 3000
 #### 后端开发
 ```bash
 # 进入后端目录
-cd backend
+cd codeseek-backend
 
 # 安装依赖
 npm install
@@ -79,7 +79,7 @@ wrangler d1 execute codeseek --file=./sqllite\ d1/07_initialization_data.sql
 wrangler d1 execute codeseek --file=./sqllite\ d1/08_search_source.sql
 
 # 部署Worker
-cd backend
+cd codeseek-backend
 wrangler deploy
 ```
 
@@ -106,7 +106,7 @@ SITE_URL=https://yourdomain.com
 #### 数据库初始化
 ```bash
 # 运行数据库迁移（按顺序执行模块化SQL文件）
-cd backend
+cd codeseek-backend
 wrangler d1 execute codeseek --file=./sqllite\ d1/01_user_management.sql
 wrangler d1 execute codeseek --file=./sqllite\ d1/02_search_engine.sql
 wrangler d1 execute codeseek --file=./sqllite\ d1/03_community.sql

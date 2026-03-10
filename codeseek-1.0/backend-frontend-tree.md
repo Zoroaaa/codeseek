@@ -24,7 +24,7 @@
 ## 项目根目录结构
 ```
 磁力快搜/
-├── 📁 backend/                    # 后端代码 (Cloudflare Workers)
+├── 📁 codeseek-backend/          # 后端代码 (Cloudflare Workers)
 ├── 📁 frontend/                  # 前端代码
 ├── 📄 backend-frontend-tree.md   # 项目架构文档
 ├── 📄 readme.md                  # 项目说明文档
@@ -128,7 +128,7 @@ frontend/
 
 ## 后端架构 (部署在Cloudflare Workers v2.1.0)
 ```
-backend/
+codeseek-backend/
 ├── 📁 .github/                        # 🤖 GitHub配置
 │   └── 📁 workflows/                  # CI/CD工作流配置
 │       └── 📄 deploy_backend.yml      # 🚀 自动部署配置
