@@ -4,6 +4,7 @@ import { useAuthStore, useThemeStore } from '@/stores';
 import { apiClient } from '@/services/api';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { ToastContainer } from '@/components/ui/Toast';
 import { HomePage } from '@/pages/HomePage';
 import { MainSearchPage } from '@/pages/MainSearchPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
@@ -149,6 +150,7 @@ const App: React.FC = () => {
           <Route index element={<AdminManager />} />
         </Route>
       </Routes>
+      <ToastContainer />
     </BrowserRouter>
   );
 };
