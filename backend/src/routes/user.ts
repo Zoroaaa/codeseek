@@ -117,6 +117,22 @@ userRoutes.post('/favorites', async (c) => {
       return c.json(error('VALIDATION_ERROR', '标题和URL是必填项'), 400);
     }
 
+    const existing = await c.env.DB.prepare(
+      'SELECT id, title, subtitle, url, icon, keyword, created_at FROM user_favorites WHERE user_id = ? AND url = ?'
+    ).bind(payload.userId, url).first<UserFavorite>();
+
+    if (existing) {
+      return c.json(success({
+        id: existing.id,
+        title: existing.title,
+        subtitle: existing.subtitle,
+        url: existing.url,
+        icon: existing.icon,
+        keyword: existing.keyword,
+        createdAt: existing.created_at,
+      }, '已收藏该链接'));
+    }
+
     const maxFavorites = parseInt(c.env.MAX_FAVORITES_PER_USER || '1000', 10);
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_favorites WHERE user_id = ?'

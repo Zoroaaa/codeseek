@@ -19,7 +19,7 @@ export const searchRoutes = new Hono<{ Bindings: Env }>();
 searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
   const userPayload = c.get('user');
   const body = await c.req.json();
-  const { keyword, page = 1, pageSize = 20 } = body;
+  const { keyword, page = 1, pageSize = 20, majorCategoryId, categoryId } = body;
 
   if (!keyword || !keyword.trim()) {
     return c.json(error('VALIDATION_ERROR', '搜索关键词不能为空'), 400);
@@ -28,19 +28,17 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
   const trimmedKeyword = keyword.trim();
   const limitPageSize = Math.min(Math.max(1, pageSize), 100);
   const limitPage = Math.max(1, page);
-  const { majorCategoryId } = body;
 
   try {
+    let historyId: string | null = null;
     if (userPayload) {
-      // 记录搜索历史（无论是否有 sourceIds）
-      const historyId = generateId();
+      historyId = generateId();
       await c.env.DB.prepare(
         `INSERT INTO user_search_history (id, user_id, query, source, results_count, created_at)
          VALUES (?, ?, ?, ?, 0, ?)`
-      ).bind(historyId, userPayload.userId, trimmedKeyword, majorCategoryId || 'all', Date.now()).run();
+      ).bind(historyId, userPayload.userId, trimmedKeyword, categoryId || majorCategoryId || 'all', Date.now()).run();
     }
 
-    // 获取用户的搜索源配置（如果用户已登录）
     let userEnabledSources: Set<string> | null = null;
     if (userPayload) {
       const userConfigs = await c.env.DB.prepare(
@@ -53,11 +51,19 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
       }
     }
 
-    // 根据 majorCategoryId 过滤搜索源，同时过滤 requires_keyword 和用户配置
     let query: string;
     let params: (string | number)[];
 
-    if (majorCategoryId) {
+    if (categoryId) {
+      query = `
+        SELECT s.* FROM search_sources s
+        INNER JOIN search_source_categories c ON s.category_id = c.id
+        INNER JOIN search_major_categories mc ON c.major_category_id = mc.id
+        WHERE s.is_active = 1 AND s.searchable = 1 AND s.category_id = ? AND mc.requires_keyword = 1
+        ORDER BY s.search_priority DESC, s.display_order ASC
+      `;
+      params = [categoryId];
+    } else if (majorCategoryId) {
       query = `
         SELECT s.* FROM search_sources s
         INNER JOIN search_source_categories c ON s.category_id = c.id
@@ -81,7 +87,6 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
       ? await c.env.DB.prepare(query).bind(...params).all<SearchSource>()
       : await c.env.DB.prepare(query).all<SearchSource>();
 
-    // 如果用户已登录且有配置，过滤未启用的搜索源
     const filteredSources = userEnabledSources
       ? (sources.results || []).filter(s => userEnabledSources.has(s.id))
       : (sources.results || []);
@@ -95,6 +100,12 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
       siteType: source.site_type,
       category: source.category_id,
     }));
+
+    if (historyId && userPayload) {
+      await c.env.DB.prepare(
+        `UPDATE user_search_history SET results_count = ? WHERE id = ? AND user_id = ?`
+      ).bind(searchResults.length, historyId, userPayload.userId).run();
+    }
 
     return c.json(success({
       keyword: trimmedKeyword,

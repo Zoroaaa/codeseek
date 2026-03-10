@@ -27,6 +27,7 @@ import {
   CheckCircle,
   XCircle,
   FolderOpen,
+  Tag,
 } from 'lucide-react';
 import { useSearchStore, useSourceStore, useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { searchApi, sourceApi, userApi } from '@/services/api';
@@ -150,7 +151,7 @@ export const MainSearchPage: React.FC = () => {
     try {
       const response = await searchApi.search({
         keyword: keyword.trim(),
-        majorCategoryId: selectedCategory || undefined,
+        categoryId: selectedCategory || undefined,
       }) as unknown as { success: boolean; data: { keyword: string; results: Array<{ id: string; name: string; subtitle?: string; icon?: string; url: string; siteType: string; category: string }> } };
       if (response.success && response.data) {
         const mappedResults: SearchResultItem[] = response.data.results.map(r => ({
@@ -182,23 +183,46 @@ export const MainSearchPage: React.FC = () => {
     }
   };
 
-  const handleAddFavorite = async (result: SearchResultItem) => {
+  const isFavorite = (url: string) => {
+    return favorites.some(f => f.url === url);
+  };
+
+  const getFavoriteId = (url: string) => {
+    return favorites.find(f => f.url === url)?.id;
+  };
+
+  const handleToggleFavorite = async (result: SearchResultItem) => {
     if (!isAuthenticated) {
       toast.warning('请先登录');
       navigate('/login');
       return;
     }
-    try {
-      await userApi.addFavorite({
-        title: result.sourceName,
-        url: result.url || '',
-        subtitle: result.subtitle,
-        keyword: keyword.trim() || undefined,
-      });
-      toast.success('已添加到收藏');
-      loadFavorites();
-    } catch (error) {
-      toast.error('收藏失败', '请稍后重试');
+    
+    const existingFavoriteId = getFavoriteId(result.url || '');
+    
+    if (existingFavoriteId) {
+      try {
+        await userApi.removeFavorite(existingFavoriteId);
+        setFavorites(prev => prev.filter(f => f.id !== existingFavoriteId));
+        toast.success('已取消收藏');
+      } catch (error) {
+        toast.error('取消收藏失败', '请稍后重试');
+      }
+    } else {
+      try {
+        const response = await userApi.addFavorite({
+          title: result.sourceName,
+          url: result.url || '',
+          subtitle: result.subtitle,
+          keyword: keyword.trim() || undefined,
+        });
+        if (response.success && response.data) {
+          setFavorites(prev => [response.data, ...prev]);
+        }
+        toast.success('已添加到收藏');
+      } catch (error) {
+        toast.error('收藏失败', '请稍后重试');
+      }
     }
   };
 
@@ -394,22 +418,30 @@ export const MainSearchPage: React.FC = () => {
             </Button>
           </div>
 
-          {majorCategories.length > 0 && (
+          {categories.filter(cat => {
+            const majorCategory = majorCategories.find(mc => mc.id === cat.majorCategoryId);
+            return majorCategory?.requiresKeyword === true;
+          }).length > 0 && (
             <div className="flex items-center gap-2 mt-4 pt-4 border-t border-surface-100 dark:border-surface-800 overflow-x-auto no-scrollbar">
               <div className="flex items-center gap-1.5 shrink-0">
                 <Filter className="w-3.5 h-3.5 text-surface-400" />
-                <span className="text-xs text-surface-400 font-medium">筛选</span>
+                <span className="text-xs text-surface-400 font-medium">分类</span>
               </div>
               <div className="flex items-center gap-1.5 flex-nowrap">
                 <button onClick={() => setSelectedCategory(null)} className={`nav-pill shrink-0 ${selectedCategory === null ? 'active' : ''}`}>
                   全部
                 </button>
-                {majorCategories.map((category) => (
-                  <button key={category.id} onClick={() => setSelectedCategory(category.id)} className={`nav-pill shrink-0 ${selectedCategory === category.id ? 'active' : ''}`}>
-                    {category.icon && <span className="mr-1">{category.icon}</span>}
-                    {category.name}
-                  </button>
-                ))}
+                {categories
+                  .filter(cat => {
+                    const majorCategory = majorCategories.find(mc => mc.id === cat.majorCategoryId);
+                    return majorCategory?.requiresKeyword === true;
+                  })
+                  .map((category) => (
+                    <button key={category.id} onClick={() => setSelectedCategory(category.id)} className={`nav-pill shrink-0 ${selectedCategory === category.id ? 'active' : ''}`}>
+                      {category.icon && <span className="mr-1">{category.icon}</span>}
+                      {category.name}
+                    </button>
+                  ))}
               </div>
             </div>
           )}
@@ -470,8 +502,16 @@ export const MainSearchPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {isAuthenticated && (
-                        <button onClick={() => handleAddFavorite(result)} className="p-1.5 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors" title="收藏">
-                          <Heart className="w-4 h-4" />
+                        <button 
+                          onClick={() => handleToggleFavorite(result)} 
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            isFavorite(result.url || '') 
+                              ? 'text-error-500 bg-error-50 dark:bg-error-900/20' 
+                              : 'text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20'
+                          }`} 
+                          title={isFavorite(result.url || '') ? '取消收藏' : '收藏'}
+                        >
+                          <Heart className={`w-4 h-4 ${isFavorite(result.url || '') ? 'fill-current' : ''}`} />
                         </button>
                       )}
                       {result.url && (
@@ -582,6 +622,14 @@ export const MainSearchPage: React.FC = () => {
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
                                 {item.subtitle && <p className="text-xs text-surface-400 truncate mt-0.5">{item.subtitle}</p>}
+                                {item.keyword && (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <Tag className="w-3 h-3 text-primary-400 flex-shrink-0" />
+                                    <span className="text-xs text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded truncate max-w-[120px]">
+                                      {item.keyword}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center gap-1 ml-2 shrink-0">
                                 <button onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')} className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors">
@@ -705,7 +753,7 @@ export const MainSearchPage: React.FC = () => {
                                 
                                 {isCategoryExpanded && (
                                   <div className="px-4 pb-3 pl-16">
-                                    <div className="space-y-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                       {category.sources.map((source) => {
                                         const isEnabled = source.userConfig?.isEnabled !== false;
                                         const sourceName = source.userConfig?.customName || source.name;
@@ -720,57 +768,44 @@ export const MainSearchPage: React.FC = () => {
                                                 : 'bg-surface-100/40 dark:bg-surface-900/40 border-surface-200/40 dark:border-surface-700/40 opacity-60'
                                             }`}
                                           >
-                                            <div className="flex items-start justify-between gap-3">
-                                              <div className="flex items-start gap-3 min-w-0 flex-1">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <div className="flex items-start gap-2 min-w-0 flex-1">
                                                 <SourceIcon
                                                   icon={source.icon}
                                                   name={sourceName}
-                                                  size="md"
+                                                  size="sm"
                                                 />
                                                 <div className="min-w-0 flex-1">
-                                                  <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className={`text-sm font-semibold ${isEnabled ? 'text-surface-800 dark:text-surface-200' : 'text-surface-500'}`}>
+                                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className={`text-xs font-semibold ${isEnabled ? 'text-surface-800 dark:text-surface-200' : 'text-surface-500'}`}>
                                                       {sourceName}
                                                     </span>
-                                                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${getSiteTypeBadge(source.siteType)}`}>
+                                                    <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${getSiteTypeBadge(source.siteType)}`}>
                                                       {getSiteTypeLabel(source.siteType)}
                                                     </span>
                                                     {majorCategory.requiresKeyword && (
-                                                      <span className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium ${
+                                                      <span className={`flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded font-medium ${
                                                         isEnabled 
                                                           ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' 
                                                           : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
                                                       }`}>
-                                                        {isEnabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                                        {isEnabled ? '已启用' : '已禁用'}
-                                                      </span>
-                                                    )}
-                                                    {!majorCategory.requiresKeyword && (
-                                                      <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                                        不参与搜索
-                                                      </span>
-                                                    )}
-                                                    {!source.searchable && (
-                                                      <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400">
-                                                        不可搜索
+                                                        {isEnabled ? <CheckCircle className="w-2.5 h-2.5" /> : <XCircle className="w-2.5 h-2.5" />}
+                                                        {isEnabled ? '启用' : '禁用'}
                                                       </span>
                                                     )}
                                                   </div>
                                                   {sourceSubtitle && (
-                                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 truncate">{sourceSubtitle}</p>
-                                                  )}
-                                                  {source.description && (
-                                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 line-clamp-2">{source.description}</p>
+                                                    <p className="text-[10px] text-surface-500 dark:text-surface-400 mt-0.5 truncate">{sourceSubtitle}</p>
                                                   )}
                                                 </div>
                                               </div>
-                                              <div className="flex items-center gap-1 shrink-0">
+                                              <div className="flex items-center gap-0.5 shrink-0">
                                                 <button 
                                                   onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(source.urlTemplate.replace('{keyword}', '')) : source.urlTemplate.replace('{keyword}', ''), '_blank')} 
-                                                  className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                                                  className="p-1 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
                                                   title="访问站点"
                                                 >
-                                                  <ExternalLink className="w-4 h-4" />
+                                                  <ExternalLink className="w-3 h-3" />
                                                 </button>
                                               </div>
                                             </div>

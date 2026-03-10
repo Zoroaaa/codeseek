@@ -31,6 +31,7 @@ export interface SearchRequest {
   page?: number;
   pageSize?: number;
   majorCategoryId?: string;
+  categoryId?: string;
 }
 
 export interface SearchResponse {
