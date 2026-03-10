@@ -1,278 +1,450 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Shield, CheckCircle } from 'lucide-react';
-import { Button, Input } from '@/components/ui';
+import { useNavigate, Link } from 'react-router-dom';
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Send, ShieldCheck, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
-import { useToast } from '@/components/ui/Toast';
+import { Button, Input, Card } from '@/components/ui';
+import { useNotification } from '@/hooks';
+
+type Step = 'form' | 'verify' | 'success';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const toast = useToast();
-  const { isAuthenticated } = useAuthStore();
+  const { setUser, setToken } = useAuthStore();
+  const notification = useNotification();
   
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentStep, setCurrentStep] = useState<Step>('form');
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [verificationCode, setVerificationCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{
-    username?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-  }>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [agreed, setAgreed] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [maskedEmail, setMaskedEmail] = useState('');
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/main');
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, navigate]);
+  }, [countdown]);
+
+  const maskEmail = (email: string): string => {
+    if (!email) return '';
+    const [localPart, domain] = email.split('@');
+    if (localPart.length <= 2) {
+      return `${localPart[0]}***@${domain}`;
+    }
+    const masked = localPart[0] + '*'.repeat(localPart.length - 2) + localPart[localPart.length - 1];
+    return `${masked}@${domain}`;
+  };
 
   const validateForm = () => {
-    const newErrors: typeof errors = {};
+    const newErrors: Record<string, string> = {};
     
-    if (!username.trim()) {
+    if (!formData.username.trim()) {
       newErrors.username = '请输入用户名';
-    } else if (username.length < 2) {
-      newErrors.username = '用户名至少需要2个字符';
-    } else if (username.length > 20) {
-      newErrors.username = '用户名不能超过20个字符';
+    } else if (formData.username.length < 3) {
+      newErrors.username = '用户名至少3个字符';
+    } else if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(formData.username)) {
+      newErrors.username = '用户名只能包含字母、数字、下划线和中文';
     }
     
-    if (!email.trim()) {
-      newErrors.email = '请输入邮箱地址';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!formData.email.trim()) {
+      newErrors.email = '请输入邮箱';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = '请输入有效的邮箱地址';
     }
     
-    if (!password) {
+    if (!formData.password) {
       newErrors.password = '请输入密码';
-    } else if (password.length < 6) {
-      newErrors.password = '密码至少需要6个字符';
+    } else if (formData.password.length < 6) {
+      newErrors.password = '密码至少6个字符';
     }
     
-    if (!confirmPassword) {
-      newErrors.confirmPassword = '请确认密码';
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = '两次输入的密码不一致';
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = '两次密码输入不一致';
+    }
+    
+    if (!agreed) {
+      notification.common.validationError('服务条款');
     }
     
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0 && agreed;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSendCode = async () => {
     if (!validateForm()) return;
     
     setIsLoading(true);
     try {
-      const response = await authApi.register({ username, email, password });
-      if (response.success) {
-        toast.success('注册成功', '请登录您的账户');
-        navigate('/login');
+      const response = await authApi.sendRegistrationCode(formData.email);
+      if (response.success && response.data) {
+        setMaskedEmail(response.data.maskedEmail || maskEmail(formData.email));
+        setCountdown(response.data.expiresIn || 300);
+        setCurrentStep('verify');
+        notification.auth.emailCodeSent();
       } else {
-        toast.error('注册失败', response.message || '请检查您的输入');
+        notification.auth.emailCodeFailed('验证码发送失败');
       }
-    } catch (error) {
-      toast.error('注册失败', '网络错误，请稍后重试');
+    } catch (error: any) {
+      notification.auth.emailCodeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const passwordStrength = () => {
-    if (!password) return { level: 0, text: '', color: '' };
-    let strength = 0;
-    if (password.length >= 6) strength++;
-    if (password.length >= 10) strength++;
-    if (/[A-Z]/.test(password)) strength++;
-    if (/[0-9]/.test(password)) strength++;
-    if (/[^A-Za-z0-9]/.test(password)) strength++;
+  const handleResendCode = async () => {
+    if (countdown > 0) return;
     
-    if (strength <= 2) return { level: strength, text: '弱', color: 'bg-error-500' };
-    if (strength <= 3) return { level: strength, text: '中', color: 'bg-warning-500' };
-    return { level: strength, text: '强', color: 'bg-success-500' };
+    setIsLoading(true);
+    try {
+      const response = await authApi.sendRegistrationCode(formData.email);
+      if (response.success && response.data) {
+        setCountdown(response.data.expiresIn || 300);
+        notification.auth.emailCodeResent();
+      }
+    } catch (error: any) {
+      notification.auth.emailCodeFailed(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const strength = passwordStrength();
+  const formatVerificationCode = (value: string): string => {
+    const cleaned = value.replace(/\D/g, '');
+    const limited = cleaned.substring(0, 6);
+    return limited.replace(/(\d{3})(\d{1,3})?/, '$1 $2').trim();
+  };
 
-  return (
-    <div className="min-h-screen flex">
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent-500 via-primary-500 to-primary-600" />
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJWMTZoMnYxOHptLTQtMGgtMlYxNmgydjE4em0tNCAwaC0yVjE2aDJ2MTh6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-20" />
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatVerificationCode(e.target.value);
+    setVerificationCode(formatted);
+  };
+
+  const handleVerifyAndRegister = async () => {
+    const cleanCode = verificationCode.replace(/\s/g, '');
+    if (cleanCode.length !== 6) {
+      notification.error('验证码错误', '请输入6位验证码');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await authApi.register({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        verificationCode: cleanCode,
+      });
+      
+      if (response.success && response.data) {
+        setUser(response.data.user);
+        setToken(response.data.token);
+        setCurrentStep('success');
+        notification.auth.registerSuccess();
         
-        <div className="relative z-10 flex flex-col justify-center items-center w-full p-12 text-white">
-          <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-8 shadow-2xl">
-            <Shield className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-4xl font-bold mb-4 text-center">加入我们</h1>
-          <p className="text-xl text-white/80 text-center max-w-md">
-            创建账户，开启您的磁力搜索之旅
-          </p>
-          
-          <div className="mt-12 space-y-4 w-full max-w-sm">
-            {[
-              { icon: <CheckCircle className="w-5 h-5" />, text: '100+ 优质搜索源' },
-              { icon: <CheckCircle className="w-5 h-5" />, text: '云端同步收藏与历史' },
-              { icon: <CheckCircle className="w-5 h-5" />, text: '个性化搜索源配置' },
-            ].map((item, index) => (
-              <div key={index} className="flex items-center gap-3 text-white/90">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                  {item.icon}
-                </div>
-                <span className="text-lg">{item.text}</span>
-              </div>
-            ))}
-          </div>
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
+      } else {
+        notification.auth.registerFailed(response.message || '验证码错误或已过期');
+      }
+    } catch (error: any) {
+      notification.auth.registerFailed(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (currentStep === 'form') {
+        handleSendCode();
+      } else if (currentStep === 'verify') {
+        handleVerifyAndRegister();
+      }
+    }
+  };
+
+  const formatCountdown = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const renderFormStep = () => (
+    <form onSubmit={(e) => { e.preventDefault(); handleSendCode(); }} className="space-y-4">
+      <Input
+        label="用户名"
+        type="text"
+        placeholder="请输入用户名"
+        value={formData.username}
+        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+        error={errors.username}
+        leftIcon={<User className="w-5 h-5" />}
+        fullWidth
+      />
+
+      <Input
+        label="邮箱"
+        type="email"
+        placeholder="请输入邮箱"
+        value={formData.email}
+        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+        error={errors.email}
+        leftIcon={<Mail className="w-5 h-5" />}
+        fullWidth
+      />
+
+      <Input
+        label="密码"
+        type={showPassword ? 'text' : 'password'}
+        placeholder="请输入密码"
+        value={formData.password}
+        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+        error={errors.password}
+        leftIcon={<Lock className="w-5 h-5" />}
+        rightIcon={
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        }
+        fullWidth
+      />
+
+      <Input
+        label="确认密码"
+        type={showPassword ? 'text' : 'password'}
+        placeholder="请再次输入密码"
+        value={formData.confirmPassword}
+        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+        error={errors.confirmPassword}
+        leftIcon={<Lock className="w-5 h-5" />}
+        fullWidth
+      />
+
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+          className="mt-1 rounded border-surface-300 dark:border-surface-600"
+        />
+        <span className="text-sm text-surface-600 dark:text-surface-400">
+          我已阅读并同意{' '}
+          <a href="#" className="text-primary-600 hover:underline">
+            服务条款
+          </a>{' '}
+          和{' '}
+          <a href="#" className="text-primary-600 hover:underline">
+            隐私政策
+          </a>
+        </span>
+      </label>
+
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        fullWidth
+        isLoading={isLoading}
+        leftIcon={<Send className="w-5 h-5" />}
+      >
+        发送验证码
+      </Button>
+    </form>
+  );
+
+  const renderVerifyStep = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+          <ShieldCheck className="w-8 h-8 text-primary-600 dark:text-primary-400" />
         </div>
+        <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">
+          验证邮箱地址
+        </h3>
+        <p className="text-sm text-surface-600 dark:text-surface-400">
+          验证码已发送到 <span className="font-medium text-surface-900 dark:text-surface-100">{maskedEmail}</span>
+        </p>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-surface-50 dark:bg-surface-950">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 mb-4 shadow-lg shadow-primary-500/25">
-              <Shield className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold gradient-text">磁力快搜</h1>
+      <div className="space-y-4">
+        <Input
+          label="验证码"
+          type="text"
+          placeholder="请输入6位验证码"
+          value={verificationCode}
+          onChange={handleCodeChange}
+          onKeyDown={handleKeyDown}
+          fullWidth
+          className="text-center text-2xl tracking-widest"
+          maxLength={7}
+        />
+
+        {countdown > 0 ? (
+          <p className="text-center text-sm text-surface-500 dark:text-surface-400">
+            验证码 {formatCountdown(countdown)} 后过期
+          </p>
+        ) : (
+          <p className="text-center text-sm text-error-500">
+            验证码已过期
+          </p>
+        )}
+
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            fullWidth
+            onClick={() => setCurrentStep('form')}
+          >
+            返回修改
+          </Button>
+          <Button
+            variant="primary"
+            fullWidth
+            onClick={handleVerifyAndRegister}
+            isLoading={isLoading}
+          >
+            验证并注册
+          </Button>
+        </div>
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={handleResendCode}
+            disabled={countdown > 0 || isLoading}
+            className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {countdown > 0 ? `重新发送 (${formatCountdown(countdown)})` : '重新发送验证码'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSuccessStep = () => (
+    <div className="text-center py-8">
+      <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
+        <CheckCircle className="w-10 h-10 text-success-600 dark:text-success-400" />
+      </div>
+      <h3 className="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-2">
+        注册成功！
+      </h3>
+      <p className="text-surface-600 dark:text-surface-400 mb-6">
+        欢迎加入磁力快搜，即将跳转到控制台...
+      </p>
+      <div className="flex items-center justify-center gap-2 text-surface-500 dark:text-surface-400">
+        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+      </div>
+    </div>
+  );
+
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case 'form':
+        return '创建账号';
+      case 'verify':
+        return '验证邮箱';
+      case 'success':
+        return '注册成功';
+    }
+  };
+
+  const getStepDescription = () => {
+    switch (currentStep) {
+      case 'form':
+        return '注册即可享受更多功能';
+      case 'verify':
+        return '请输入邮箱验证码';
+      case 'success':
+        return '';
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-br from-surface-50 via-white to-primary-50/30 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950/30">
+      <div className="w-full max-w-md">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-200 mb-8 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          返回首页
+        </Link>
+
+        <Card className="p-8">
+          {currentStep !== 'success' && (
+            <>
+              <div className="flex items-center justify-center gap-2 mb-6">
+                {(['form', 'verify'] as const).map((step, index) => (
+                  <React.Fragment key={step}>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                        currentStep === step
+                          ? 'bg-primary-600 text-white'
+                          : index < ['form', 'verify'].indexOf(currentStep)
+                          ? 'bg-success-500 text-white'
+                          : 'bg-surface-200 dark:bg-surface-700 text-surface-500'
+                      }`}
+                    >
+                      {index + 1}
+                    </div>
+                    {index < 1 && (
+                      <div className={`w-12 h-0.5 ${
+                        ['form', 'verify'].indexOf(currentStep) > index
+                          ? 'bg-success-500'
+                          : 'bg-surface-200 dark:bg-surface-700'
+                      }`} />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
+              {getStepTitle()}
+            </h1>
+            <p className="text-surface-600 dark:text-surface-400">
+              {getStepDescription()}
+            </p>
           </div>
 
-          <div className="bg-white dark:bg-surface-900 rounded-3xl shadow-elevated-lg p-6 sm:p-8">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">
-                创建账户
-              </h2>
-              <p className="text-surface-500 dark:text-surface-400">
-                填写以下信息完成注册
-              </p>
-            </div>
+          {currentStep === 'form' && renderFormStep()}
+          {currentStep === 'verify' && renderVerifyStep()}
+          {currentStep === 'success' && renderSuccessStep()}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                type="text"
-                label="用户名"
-                placeholder="请输入用户名"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                error={errors.username}
-                leftIcon={<User className="w-5 h-5" />}
-                fullWidth
-              />
-
-              <Input
-                type="email"
-                label="邮箱地址"
-                placeholder="请输入邮箱"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                error={errors.email}
-                leftIcon={<Mail className="w-5 h-5" />}
-                fullWidth
-              />
-
-              <div>
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  label="密码"
-                  placeholder="请输入密码"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  error={errors.password}
-                  leftIcon={<Lock className="w-5 h-5" />}
-                  rightIcon={
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  }
-                  fullWidth
-                />
-                {password && (
-                  <div className="mt-2">
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div
-                          key={i}
-                          className={`h-1 flex-1 rounded-full transition-colors ${
-                            i <= strength.level ? strength.color : 'bg-surface-200 dark:bg-surface-700'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-xs text-surface-500 mt-1">
-                      密码强度：<span className={`font-medium ${strength.color.replace('bg-', 'text-')}`}>{strength.text}</span>
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <Input
-                type={showConfirmPassword ? 'text' : 'password'}
-                label="确认密码"
-                placeholder="请再次输入密码"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                error={errors.confirmPassword}
-                leftIcon={<Lock className="w-5 h-5" />}
-                rightIcon={
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                }
-                fullWidth
-              />
-
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 mt-0.5 rounded border-surface-300 text-primary-500 focus:ring-primary-500"
-                />
-                <span className="text-sm text-surface-600 dark:text-surface-400">
-                  我已阅读并同意 <a href="#" className="text-primary-500 hover:underline">服务条款</a> 和 <a href="#" className="text-primary-500 hover:underline">隐私政策</a>
-                </span>
-              </label>
-
-              <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                fullWidth
-                isLoading={isLoading}
-                rightIcon={<ArrowRight className="w-5 h-5" />}
-              >
-                注册
-              </Button>
-            </form>
-
+          {currentStep === 'form' && (
             <div className="mt-6 text-center">
-              <p className="text-surface-500 dark:text-surface-400">
-                已有账户？{' '}
+              <p className="text-surface-600 dark:text-surface-400">
+                已有账号？{' '}
                 <Link
                   to="/login"
-                  className="text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 font-semibold transition-colors"
+                  className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
                 >
                   立即登录
                 </Link>
               </p>
             </div>
-          </div>
-
-          <p className="mt-6 text-center text-xs text-surface-400 dark:text-surface-500">
-            注册即表示您同意我们的服务条款和隐私政策
-          </p>
-        </div>
+          )}
+        </Card>
       </div>
     </div>
   );

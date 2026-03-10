@@ -28,7 +28,6 @@ import {
   XCircle,
   FolderOpen,
   Tag,
-  LayoutDashboard,
 } from 'lucide-react';
 import { useSearchStore, useSourceStore, useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { searchApi, sourceApi, userApi } from '@/services/api';
@@ -320,41 +319,33 @@ export const MainSearchPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-surface-50 via-white to-primary-50/20 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950/20">
-      <header className="sticky top-0 z-40 glass-nav">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-12 sm:h-14">
-            <Link to="/main" className="flex items-center gap-2 group">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-md shadow-primary-500/20 group-hover:shadow-primary-500/40 transition-all">
+      <header className="sticky top-0 z-40 bg-white/85 dark:bg-surface-900/85 backdrop-blur-2xl border-b border-surface-200/40 dark:border-surface-700/40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14">
+            <Link to="/main" className="flex items-center gap-2.5 group">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-md shadow-primary-500/20 group-hover:shadow-primary-500/40 transition-all">
                 <Search className="w-4 h-4 text-white" strokeWidth={2.5} />
               </div>
-              <span className="text-base sm:text-lg font-bold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent hidden sm:block tracking-tight">
+              <span className="text-lg font-bold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent hidden sm:block tracking-tight">
                 磁力快搜
               </span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-1">
-              <Link to="/main" className="px-3.5 py-1.5 text-sm font-semibold rounded-xl text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20">
+              <Link to="/main" className="px-3.5 py-1.5 text-sm font-semibold rounded-lg text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20">
                 搜索
               </Link>
-              <Link to="/dashboard" className="px-3.5 py-1.5 text-sm font-medium rounded-xl text-surface-500 dark:text-surface-400 hover:text-surface-800 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+              <Link to="/dashboard" className="px-3.5 py-1.5 text-sm font-medium rounded-lg text-surface-500 dark:text-surface-400 hover:text-surface-800 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
                 控制台
               </Link>
             </nav>
 
-            <div className="flex items-center gap-0.5 sm:gap-1">
-              <Link
-                to="/dashboard"
-                className="md:hidden p-2 rounded-xl text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-                title="控制台"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-              </Link>
-              
+            <div className="flex items-center gap-1">
               {isAuthenticated && (
                 <button
                   onClick={toggleProxy}
                   disabled={isProxyLoading}
-                  className={`p-2 rounded-xl transition-all duration-200 ${
+                  className={`p-2 rounded-lg transition-all duration-200 ${
                     isProxyEnabled
                       ? 'text-success-600 hover:bg-success-50 dark:text-success-400 dark:hover:bg-success-900/20'
                       : proxyStatus === 'error'
@@ -367,7 +358,7 @@ export const MainSearchPage: React.FC = () => {
                 </button>
               )}
 
-              <button onClick={toggleTheme} className="p-2 rounded-xl text-surface-400 hover:text-surface-700 hover:bg-surface-100 dark:hover:text-surface-200 dark:hover:bg-surface-800 transition-colors">
+              <button onClick={toggleTheme} className="p-2 rounded-lg text-surface-400 hover:text-surface-700 hover:bg-surface-100 dark:hover:text-surface-200 dark:hover:bg-surface-800 transition-colors">
                 {resolvedTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
 
@@ -379,12 +370,12 @@ export const MainSearchPage: React.FC = () => {
                     </div>
                     <span className="text-sm font-medium text-surface-700 dark:text-surface-300 max-w-[80px] truncate">{user?.username}</span>
                   </div>
-                  <button onClick={handleLogout} className="p-2 rounded-xl text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors ml-1" title="退出登录">
+                  <button onClick={handleLogout} className="p-2 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors ml-1" title="退出登录">
                     <LogOut className="w-4 h-4" />
                   </button>
                 </>
               ) : (
-                <Link to="/login" className="ml-1 px-3 py-1.5 text-sm font-medium rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-colors">
+                <Link to="/login" className="ml-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors">
                   登录
                 </Link>
               )}
@@ -393,15 +384,15 @@ export const MainSearchPage: React.FC = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-        <div className="mb-4 sm:mb-6">
-          <h1 className="text-lg sm:text-xl font-bold text-surface-900 dark:text-surface-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-surface-900 dark:text-surface-100">
             👋 嗨，<span className="text-primary-600 dark:text-primary-400">{isAuthenticated ? user?.username : '访客'}</span>
           </h1>
-          <p className="text-xs sm:text-sm text-surface-500 dark:text-surface-400 mt-0.5">搜索全网资源，一步直达</p>
+          <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">搜索全网资源，一步直达</p>
         </div>
 
-        <div className="card-base p-4 sm:p-5 mb-4 sm:mb-6">
+        <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-lg shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 p-5 mb-6 backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex-1">
               <Input
@@ -431,7 +422,7 @@ export const MainSearchPage: React.FC = () => {
             const majorCategory = majorCategories.find(mc => mc.id === cat.majorCategoryId);
             return majorCategory?.requiresKeyword === true;
           }).length > 0 && (
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-surface-100 dark:border-surface-800 overflow-x-auto no-scrollbar -mx-4 sm:mx-0 px-4 sm:px-0">
+            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-surface-100 dark:border-surface-800 overflow-x-auto no-scrollbar">
               <div className="flex items-center gap-1.5 shrink-0">
                 <Filter className="w-3.5 h-3.5 text-surface-400" />
                 <span className="text-xs text-surface-400 font-medium">分类</span>
@@ -457,7 +448,7 @@ export const MainSearchPage: React.FC = () => {
         </div>
 
         {searchResults.length > 0 && (
-          <div className="card-base p-4 sm:p-5 mb-4 sm:mb-6">
+          <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-lg shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 p-5 mb-6 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
@@ -483,7 +474,7 @@ export const MainSearchPage: React.FC = () => {
 
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : 'space-y-2'}>
               {searchResults.map((result, index) => (
-                <div key={index} className="result-card p-3 sm:p-4">
+                <div key={index} className="result-card p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <SourceIcon
@@ -526,7 +517,7 @@ export const MainSearchPage: React.FC = () => {
                       {result.url && (
                         <button
                           onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(result.url) : result.url, '_blank')}
-                          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all shadow-sm ${
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all shadow-sm ${
                             isProxyEnabled 
                               ? 'bg-gradient-to-r from-success-500 to-teal-500 hover:from-success-600 hover:to-teal-600 shadow-success-500/25' 
                               : 'bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 shadow-primary-500/25'
@@ -544,16 +535,16 @@ export const MainSearchPage: React.FC = () => {
           </div>
         )}
 
-        <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-4">
           {isAuthenticated && (
             <>
-              <div className="card-base overflow-hidden">
-                <button onClick={() => setShowHistory(!showHistory)} className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors">
+              <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-sm border border-surface-200/60 dark:border-surface-700/60 overflow-hidden backdrop-blur-sm">
+                <button onClick={() => setShowHistory(!showHistory)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                       <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base">搜索历史</span>
+                    <span className="font-semibold text-surface-900 dark:text-surface-100">搜索历史</span>
                     {searchHistory.length > 0 && (
                       <span className="px-2 py-0.5 text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">{searchHistory.length}</span>
                     )}
@@ -566,7 +557,7 @@ export const MainSearchPage: React.FC = () => {
                       <div className="p-8 flex justify-center"><Loading /></div>
                     ) : searchHistory.length > 0 ? (
                       <>
-                        <div className="p-3 sm:p-4 max-h-60 overflow-y-auto scrollbar-thin">
+                        <div className="p-4 max-h-60 overflow-y-auto scrollbar-thin">
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                             {searchHistory.map((item) => (
                               <div 
@@ -580,14 +571,14 @@ export const MainSearchPage: React.FC = () => {
                             ))}
                           </div>
                         </div>
-                        <div className="px-4 sm:px-5 py-3 border-t border-surface-50 dark:border-surface-800/60">
+                        <div className="px-5 py-3 border-t border-surface-50 dark:border-surface-800/60">
                           <button onClick={handleClearHistory} className="flex items-center gap-1.5 text-sm text-error-500 hover:text-error-700 transition-colors">
                             <Trash2 className="w-3.5 h-3.5" />清空历史
                           </button>
                         </div>
                       </>
                     ) : (
-                      <div className="px-4 sm:px-5 py-8 text-center">
+                      <div className="px-5 py-8 text-center">
                         <Clock className="w-8 h-8 text-surface-300 dark:text-surface-600 mx-auto mb-2" />
                         <p className="text-sm text-surface-400">暂无搜索历史</p>
                       </div>
@@ -596,13 +587,13 @@ export const MainSearchPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="card-base overflow-hidden">
-                <button onClick={() => setShowFavorites(!showFavorites)} className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors">
+              <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-sm border border-surface-200/60 dark:border-surface-700/60 overflow-hidden backdrop-blur-sm">
+                <button onClick={() => setShowFavorites(!showFavorites)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
                       <Heart className="w-4 h-4 text-rose-600 dark:text-rose-400" />
                     </div>
-                    <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base">我的收藏</span>
+                    <span className="font-semibold text-surface-900 dark:text-surface-100">我的收藏</span>
                     {favorites.length > 0 && (
                       <span className="px-2 py-0.5 text-xs font-semibold bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-full">{favorites.length}</span>
                     )}
@@ -621,7 +612,7 @@ export const MainSearchPage: React.FC = () => {
                     {isLoadingFavorites ? (
                       <div className="p-8 flex justify-center"><Loading /></div>
                     ) : favorites.length > 0 ? (
-                      <div className="p-3 sm:p-4 max-h-64 overflow-y-auto scrollbar-thin">
+                      <div className="p-4 max-h-64 overflow-y-auto scrollbar-thin">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                           {favorites.map((item) => (
                             <div 
@@ -653,7 +644,7 @@ export const MainSearchPage: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="px-4 sm:px-5 py-8 text-center">
+                      <div className="px-5 py-8 text-center">
                         <Heart className="w-8 h-8 text-surface-300 dark:text-surface-600 mx-auto mb-2" />
                         <p className="text-sm text-surface-400">暂无收藏，搜索后点击收藏按钮</p>
                       </div>
@@ -664,19 +655,19 @@ export const MainSearchPage: React.FC = () => {
             </>
           )}
 
-          <div className="card-base overflow-hidden">
-            <button onClick={() => setShowSources(!showSources)} className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors">
+          <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-sm border border-surface-200/60 dark:border-surface-700/60 overflow-hidden backdrop-blur-sm">
+            <button onClick={() => setShowSources(!showSources)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
                   <Globe className="w-4 h-4 text-violet-600 dark:text-violet-400" />
                 </div>
-                <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base">搜索源管理</span>
+                <span className="font-semibold text-surface-900 dark:text-surface-100">搜索源管理</span>
                 <span className="px-2 py-0.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-full">{allSources.length}</span>
               </div>
               {showSources ? <ChevronDown className="w-4 h-4 text-surface-400" /> : <ChevronRight className="w-4 h-4 text-surface-400" />}
             </button>
             {showSources && (
-              <div className="border-t border-surface-100 dark:border-surface-800 max-h-[500px] sm:max-h-[600px] overflow-y-auto scrollbar-thin">
+              <div className="border-t border-surface-100 dark:border-surface-800 max-h-[600px] overflow-y-auto scrollbar-thin">
                 {getMajorCategoriesWithCategories().map((majorCategory) => {
                   const isMajorExpanded = expandedMajorCategories.has(majorCategory.id);
                   const totalSources = majorCategory.categories.reduce((sum, c) => sum + c.sources.length, 0);
@@ -688,32 +679,32 @@ export const MainSearchPage: React.FC = () => {
                     <div key={majorCategory.id} className="border-b border-surface-50 dark:border-surface-800/60 last:border-b-0">
                       <button 
                         onClick={() => toggleMajorCategory(majorCategory.id)} 
-                        className="w-full flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors"
+                        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-colors"
                       >
-                        <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="flex items-center gap-3">
                           <ChevronRight className={`w-4 h-4 text-surface-400 transition-transform duration-200 ${isMajorExpanded ? 'rotate-90' : ''}`} />
                           <div 
-                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-white shadow-sm"
+                            className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm"
                             style={{ backgroundColor: majorCategory.color || '#6366f1' }}
                           >
                             {majorCategory.icon ? (
-                              <span className="text-base sm:text-lg">{majorCategory.icon}</span>
+                              <span className="text-lg">{majorCategory.icon}</span>
                             ) : (
-                              <Database className="w-4 h-4 sm:w-5 sm:h-5" />
+                              <Database className="w-5 h-5" />
                             )}
                           </div>
                           <div className="text-left">
-                            <span className="text-xs sm:text-sm font-semibold text-surface-800 dark:text-surface-200">{majorCategory.name}</span>
-                            <p className="text-[10px] sm:text-xs text-surface-400">{majorCategory.categories.length} 个分类 · {totalSources} 个搜索源</p>
+                            <span className="text-sm font-semibold text-surface-800 dark:text-surface-200">{majorCategory.name}</span>
+                            <p className="text-xs text-surface-400">{majorCategory.categories.length} 个分类 · {totalSources} 个搜索源</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {majorCategory.requiresKeyword ? (
-                            <span className="text-[10px] sm:text-xs px-2 py-1 bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400 rounded-lg font-medium">
+                            <span className="text-xs px-2 py-1 bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400 rounded-lg font-medium">
                               {enabledSources}/{totalSources} 启用
                             </span>
                           ) : (
-                            <span className="text-[10px] sm:text-xs px-2 py-1 bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500 rounded-lg font-medium hidden sm:block">
+                            <span className="text-xs px-2 py-1 bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500 rounded-lg font-medium">
                               浏览型 · 不参与搜索
                             </span>
                           )}
@@ -730,30 +721,30 @@ export const MainSearchPage: React.FC = () => {
                               <div key={category.id}>
                                 <button
                                   onClick={() => toggleCategory(category.id)}
-                                  className="w-full flex items-center justify-between px-4 sm:px-5 py-2 sm:py-2.5 pl-10 sm:pl-12 hover:bg-surface-100/50 dark:hover:bg-surface-800/30 transition-colors"
+                                  className="w-full flex items-center justify-between px-5 py-2.5 pl-12 hover:bg-surface-100/50 dark:hover:bg-surface-800/30 transition-colors"
                                 >
-                                  <div className="flex items-center gap-2 sm:gap-2.5">
+                                  <div className="flex items-center gap-2.5">
                                     <ChevronRight className={`w-3.5 h-3.5 text-surface-400 transition-transform duration-200 ${isCategoryExpanded ? 'rotate-90' : ''}`} />
                                     <div 
-                                      className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg flex items-center justify-center text-white shadow-sm"
+                                      className="w-6 h-6 rounded-lg flex items-center justify-center text-white shadow-sm"
                                       style={{ backgroundColor: category.color || '#8b5cf6' }}
                                     >
                                       {category.icon ? (
-                                        <span className="text-xs sm:text-sm">{category.icon}</span>
+                                        <span className="text-sm">{category.icon}</span>
                                       ) : (
-                                        <FolderOpen className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                        <FolderOpen className="w-3.5 h-3.5" />
                                       )}
                                     </div>
-                                    <span className="text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300">{category.name}</span>
-                                    <span className="text-[10px] sm:text-xs text-surface-400">{category.sources.length} 个源</span>
+                                    <span className="text-sm font-medium text-surface-700 dark:text-surface-300">{category.name}</span>
+                                    <span className="text-xs text-surface-400">{category.sources.length} 个源</span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     {majorCategory.requiresKeyword ? (
-                                      <span className="text-[10px] sm:text-xs text-surface-500 dark:text-surface-400">
+                                      <span className="text-xs text-surface-500 dark:text-surface-400">
                                         {categoryEnabledCount}/{category.sources.length} 启用
                                       </span>
                                     ) : (
-                                      <span className="text-[10px] sm:text-xs text-surface-400 dark:text-surface-500 hidden sm:block">
+                                      <span className="text-xs text-surface-400 dark:text-surface-500">
                                         不参与搜索
                                       </span>
                                     )}
@@ -761,7 +752,7 @@ export const MainSearchPage: React.FC = () => {
                                 </button>
                                 
                                 {isCategoryExpanded && (
-                                  <div className="px-3 sm:px-4 pb-3 pl-12 sm:pl-16">
+                                  <div className="px-4 pb-3 pl-16">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                       {category.sources.map((source) => {
                                         const isEnabled = source.userConfig?.isEnabled !== false;
@@ -771,7 +762,7 @@ export const MainSearchPage: React.FC = () => {
                                         return (
                                           <div 
                                             key={source.id} 
-                                            className={`p-2.5 sm:p-3 rounded-xl transition-all border ${
+                                            className={`p-3 rounded-xl transition-all border ${
                                               isEnabled 
                                                 ? 'bg-white/80 dark:bg-surface-800/60 border-surface-200/60 dark:border-surface-700/60 hover:border-primary-200 dark:hover:border-primary-700' 
                                                 : 'bg-surface-100/40 dark:bg-surface-900/40 border-surface-200/40 dark:border-surface-700/40 opacity-60'
@@ -786,14 +777,14 @@ export const MainSearchPage: React.FC = () => {
                                                 />
                                                 <div className="min-w-0 flex-1">
                                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className={`text-[10px] sm:text-xs font-semibold ${isEnabled ? 'text-surface-800 dark:text-surface-200' : 'text-surface-500'}`}>
+                                                    <span className={`text-xs font-semibold ${isEnabled ? 'text-surface-800 dark:text-surface-200' : 'text-surface-500'}`}>
                                                       {sourceName}
                                                     </span>
-                                                    <span className={`text-[9px] sm:text-[10px] px-1 py-0.5 rounded font-medium ${getSiteTypeBadge(source.siteType)}`}>
+                                                    <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${getSiteTypeBadge(source.siteType)}`}>
                                                       {getSiteTypeLabel(source.siteType)}
                                                     </span>
                                                     {majorCategory.requiresKeyword && (
-                                                      <span className={`flex items-center gap-0.5 text-[9px] sm:text-[10px] px-1 py-0.5 rounded font-medium ${
+                                                      <span className={`flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded font-medium ${
                                                         isEnabled 
                                                           ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' 
                                                           : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
@@ -804,7 +795,7 @@ export const MainSearchPage: React.FC = () => {
                                                     )}
                                                   </div>
                                                   {sourceSubtitle && (
-                                                    <p className="text-[9px] sm:text-[10px] text-surface-500 dark:text-surface-400 mt-0.5 truncate">{sourceSubtitle}</p>
+                                                    <p className="text-[10px] text-surface-500 dark:text-surface-400 mt-0.5 truncate">{sourceSubtitle}</p>
                                                   )}
                                                 </div>
                                               </div>
@@ -836,18 +827,18 @@ export const MainSearchPage: React.FC = () => {
             )}
           </div>
 
-          <div className="card-base p-3 sm:p-4">
+          <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-sm border border-surface-200/60 dark:border-surface-700/60 p-4 backdrop-blur-sm">
             <div className="flex items-center gap-2.5 mb-3">
               <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                 <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               </div>
-              <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base">快捷操作</span>
+              <span className="font-semibold text-surface-900 dark:text-surface-100">快捷操作</span>
             </div>
             <div className="space-y-2">
-              <button onClick={() => navigate('/dashboard/sources')} className="w-full flex items-center gap-2.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300 border border-surface-200/60 dark:border-surface-700/60 hover:bg-surface-50 dark:hover:bg-surface-800/60 hover:border-primary-200 dark:hover:border-primary-800/60 transition-all text-left">
+              <button onClick={() => navigate('/dashboard/sources')} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium text-surface-700 dark:text-surface-300 border border-surface-200/60 dark:border-surface-700/60 hover:bg-surface-50 dark:hover:bg-surface-800/60 hover:border-primary-200 dark:hover:border-primary-800/60 transition-all text-left">
                 <Database className="w-4 h-4 text-surface-400" />管理搜索源
               </button>
-              <button onClick={() => navigate('/dashboard/settings')} className="w-full flex items-center gap-2.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300 border border-surface-200/60 dark:border-surface-700/60 hover:bg-surface-50 dark:hover:bg-surface-800/60 hover:border-primary-200 dark:hover:border-primary-800/60 transition-all text-left">
+              <button onClick={() => navigate('/dashboard/settings')} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium text-surface-700 dark:text-surface-300 border border-surface-200/60 dark:border-surface-700/60 hover:bg-surface-50 dark:hover:bg-surface-800/60 hover:border-primary-200 dark:hover:border-primary-800/60 transition-all text-left">
                 <Settings className="w-4 h-4 text-surface-400" />系统设置
               </button>
             </div>
