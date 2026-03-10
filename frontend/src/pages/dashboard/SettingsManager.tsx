@@ -17,11 +17,11 @@ import {
 import { Card, Button, Input, Tabs, Modal } from '@/components/ui';
 import { useAuthStore, useThemeStore } from '@/stores';
 import { userApi, authApi } from '@/services/api';
-import { useToast } from '@/components/ui/Toast';
+import { useNotification } from '@/hooks';
 
 export const SettingsManager: React.FC = () => {
   const navigate = useNavigate();
-  const toast = useToast();
+  const notification = useNotification();
   const { user, updateUserSettings, logout } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
   const [activeTab, setActiveTab] = useState('profile');
@@ -117,9 +117,9 @@ export const SettingsManager: React.FC = () => {
           username: profileForm.username,
         } 
       });
-      toast.success('更新成功', '个人资料已更新');
+      notification.auth.profileUpdateSuccess();
     } catch (error: any) {
-      toast.error('更新失败', error.message || '请稍后重试');
+      notification.auth.profileUpdateFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -129,12 +129,12 @@ export const SettingsManager: React.FC = () => {
     e.preventDefault();
     
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error('密码不匹配', '两次输入的密码不一致');
+      notification.error('密码不匹配', '两次输入的密码不一致');
       return;
     }
 
     if (passwordForm.newPassword.length < 6) {
-      toast.error('密码太短', '密码至少需要6个字符');
+      notification.error('密码太短', '密码至少需要6个字符');
       return;
     }
     
@@ -144,14 +144,14 @@ export const SettingsManager: React.FC = () => {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
-      toast.success('密码已更新', '请重新登录');
+      notification.auth.passwordChangeSuccess();
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setTimeout(() => {
         logout();
         navigate('/login');
       }, 2000);
     } catch (error: any) {
-      toast.error('修改失败', error.message || '当前密码可能不正确');
+      notification.auth.passwordChangeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -162,9 +162,9 @@ export const SettingsManager: React.FC = () => {
     try {
       await userApi.updateSettings({ notifications: notificationSettings });
       updateUserSettings({ notifications: notificationSettings });
-      toast.success('设置已保存');
+      notification.settings.saved();
     } catch (error: any) {
-      toast.error('保存失败', error.message || '请稍后重试');
+      notification.settings.saveFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -172,15 +172,15 @@ export const SettingsManager: React.FC = () => {
 
   const handleRequestEmailChange = async () => {
     if (!emailChangeForm.newEmail) {
-      toast.error('请输入新邮箱');
+      notification.error('请输入新邮箱');
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailChangeForm.newEmail)) {
-      toast.error('请输入有效的邮箱地址');
+      notification.error('请输入有效的邮箱地址');
       return;
     }
     if (!emailChangeForm.currentPassword) {
-      toast.error('请输入当前密码');
+      notification.error('请输入当前密码');
       return;
     }
 
@@ -196,7 +196,6 @@ export const SettingsManager: React.FC = () => {
         setEmailChangeRequestId(requestId);
         setEmailChangeMaskedEmail(response.data.maskedEmail);
 
-        // 创建请求后立即发送验证码到新邮箱
         const sendResponse = await authApi.sendEmailChangeCode({
           requestId,
           emailType: 'new',
@@ -209,10 +208,10 @@ export const SettingsManager: React.FC = () => {
         }
 
         setEmailChangeStep('verify');
-        toast.success('验证码已发送到新邮箱');
+        notification.settings.emailChangeCodeSent();
       }
     } catch (error: any) {
-      toast.error('请求失败', error.message || '请稍后重试');
+      notification.settings.emailChangeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -230,10 +229,10 @@ export const SettingsManager: React.FC = () => {
       
       if (response.success && response.data) {
         setEmailChangeCountdown(response.data.expiresIn || 300);
-        toast.success('验证码已重新发送');
+        notification.auth.emailCodeResent();
       }
     } catch (error: any) {
-      toast.error('发送失败', error.message || '请稍后重试');
+      notification.auth.emailCodeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -242,7 +241,7 @@ export const SettingsManager: React.FC = () => {
   const handleVerifyEmailChange = async () => {
     const cleanCode = emailChangeForm.verificationCode.replace(/\s/g, '');
     if (cleanCode.length !== 6) {
-      toast.error('请输入6位验证码');
+      notification.error('请输入6位验证码');
       return;
     }
 
@@ -255,7 +254,7 @@ export const SettingsManager: React.FC = () => {
       });
       
       if (response.success && response.data?.completed) {
-        toast.success('邮箱更改成功', '请重新登录');
+        notification.settings.emailChangeSuccess();
         setEmailChangeModal(false);
         setEmailChangeStep('request');
         setEmailChangeForm({ newEmail: '', currentPassword: '', verificationCode: '' });
@@ -264,10 +263,10 @@ export const SettingsManager: React.FC = () => {
           navigate('/login');
         }, 2000);
       } else {
-        toast.error('验证失败', response.message || '验证码错误');
+        notification.settings.emailChangeFailed(response.message);
       }
     } catch (error: any) {
-      toast.error('验证失败', error.message || '请稍后重试');
+      notification.settings.emailChangeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -282,10 +281,10 @@ export const SettingsManager: React.FC = () => {
         setDeleteMaskedEmail(response.data.maskedEmail);
         setDeleteCountdown(response.data.expiresIn || 300);
         setDeleteAccountStep('verify');
-        toast.success('验证码已发送到您的邮箱');
+        notification.auth.emailCodeSent();
       }
     } catch (error: any) {
-      toast.error('发送失败', error.message || '请稍后重试');
+      notification.auth.emailCodeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -298,13 +297,13 @@ export const SettingsManager: React.FC = () => {
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== '删除我的账户') {
-      toast.error('请输入正确的确认文字');
+      notification.error('请输入正确的确认文字');
       return;
     }
 
     const cleanCode = deleteVerificationCode.replace(/\s/g, '');
     if (cleanCode.length !== 6) {
-      toast.error('请输入6位验证码');
+      notification.error('请输入6位验证码');
       return;
     }
 
@@ -316,17 +315,17 @@ export const SettingsManager: React.FC = () => {
       });
       
       if (response.success) {
-        toast.success('账户已删除');
+        notification.auth.accountDeleted();
         setDeleteAccountModal(false);
         setTimeout(() => {
           logout();
           navigate('/');
         }, 2000);
       } else {
-        toast.error('删除失败', response.message || '验证码错误');
+        notification.error('删除失败', response.message || '验证码错误');
       }
     } catch (error: any) {
-      toast.error('删除失败', error.message || '请稍后重试');
+      notification.error('删除失败', error.message);
     } finally {
       setIsLoading(false);
     }

@@ -16,11 +16,11 @@ import {
   Layers,
   FolderOpen,
   Shield,
-  Lock,
+  LockKeyhole,
 } from 'lucide-react';
-import { Card, Button, Input, Badge, Modal, Loading, Dropdown, EmptyState, SourceIcon } from '@/components/ui';
+import { Card, Button, Input, Badge, Modal, Loading, EmptyState, SourceIcon, Dropdown } from '@/components/ui';
 import { sourceApi } from '@/services/api';
-import { useToast } from '@/components/ui/Toast';
+import { useNotification } from '@/hooks';
 import { useAuthStore } from '@/stores';
 import type { 
   SearchSource, 
@@ -49,7 +49,7 @@ interface MajorCategoryWithCategories extends MajorCategory {
 }
 
 export const SourceManager: React.FC = () => {
-  const toast = useToast();
+  const notification = useNotification();
   const { user } = useAuthStore();
   const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
   
@@ -107,7 +107,7 @@ export const SourceManager: React.FC = () => {
         setStats(statsRes.data);
       }
     } catch (error) {
-      toast.error('加载失败', '无法加载搜索源数据');
+      notification.source.loadFailed();
     } finally {
       setIsLoading(false);
     }
@@ -178,20 +178,20 @@ export const SourceManager: React.FC = () => {
           : s
       ));
       
-      toast.success(`已${enable ? '启用' : '禁用'} ${mc.name} 下所有搜索源`);
+      notification.source.batchEnabled(allSources.length);
     } catch (error) {
-      toast.error('操作失败', '请稍后重试');
+      notification.source.createFailed();
     }
   };
 
   const handleToggleCategory = async (categoryId: string, enable: boolean) => {
-    const cat = categories.find(c => c.id === categoryId);
+    const cat = getMajorCategoriesWithCategories()
+      .flatMap(mc => mc.categories)
+      .find(c => c.id === categoryId);
     if (!cat) return;
     
-    const categorySources = sources.filter(s => s.categoryId === categoryId);
-    
     try {
-      const configs = categorySources.map(source => ({
+      const configs = cat.sources.map(source => ({
         sourceId: source.id,
         isEnabled: enable,
       }));
@@ -199,14 +199,14 @@ export const SourceManager: React.FC = () => {
       await sourceApi.batchUpdateUserSourceConfigs({ configs });
       
       setSources(prev => prev.map(s => 
-        s.categoryId === categoryId
+        configs.some(c => c.sourceId === s.id)
           ? { ...s, userConfig: { ...s.userConfig, isEnabled: enable } as UserSourceConfig }
           : s
       ));
       
-      toast.success(`已${enable ? '启用' : '禁用'} ${cat.name} 下所有搜索源`);
+      notification.source.batchEnabled(cat.sources.length);
     } catch (error) {
-      toast.error('操作失败', '请稍后重试');
+      notification.source.createFailed();
     }
   };
 
@@ -218,22 +218,22 @@ export const SourceManager: React.FC = () => {
           ? { ...s, userConfig: { ...s.userConfig, isEnabled } as UserSourceConfig }
           : s
       ));
-      toast.success(isEnabled ? '已启用' : '已禁用');
+      notification.source.enabled(isEnabled ? '搜索源' : undefined);
     } catch (error) {
-      toast.error('操作失败', '请稍后重试');
+      notification.source.createFailed();
     }
   };
 
   const handleCreateSource = async () => {
     if (!formData.name || !formData.urlTemplate || !formData.categoryId) {
-      toast.error('请填写必填字段');
+      notification.common.validationError();
       return;
     }
     
     try {
       const response = await sourceApi.createSource(formData);
       if (response.success) {
-        toast.success('创建成功');
+        notification.source.created(formData.name);
         setCreateModal(false);
         setFormData({
           name: '',
@@ -251,7 +251,7 @@ export const SourceManager: React.FC = () => {
         loadData();
       }
     } catch (error) {
-      toast.error('创建失败', '请稍后重试');
+        notification.source.createFailed();
     }
   };
 
@@ -274,11 +274,11 @@ export const SourceManager: React.FC = () => {
       };
       
       await sourceApi.updateSource(editModal.source.id, updateData);
-      toast.success('更新成功');
+      notification.source.updated();
       setEditModal({ isOpen: false, source: null });
       loadData();
     } catch (error) {
-      toast.error('更新失败', '请稍后重试');
+      notification.source.updateFailed();
     }
   };
 
@@ -287,10 +287,10 @@ export const SourceManager: React.FC = () => {
     
     try {
       await sourceApi.deleteSource(sourceId);
-      toast.success('删除成功');
+      notification.source.deleted();
       loadData();
     } catch (error) {
-      toast.error('删除失败', '请稍后重试');
+      notification.source.deleteFailed();
     }
   };
 
@@ -298,13 +298,13 @@ export const SourceManager: React.FC = () => {
     try {
       const response = await sourceApi.checkSourceStatus(sourceId);
       if (response.success && response.data) {
-        toast.success(
-          response.data.available ? '状态正常' : '状态异常',
+        notification.source.testSuccess(
+          editModal.source?.name || '搜索源',
           `响应时间: ${response.data.responseTime}ms`
         );
       }
     } catch (error) {
-      toast.error('检测失败', '请稍后重试');
+      notification.source.testFailed(editModal.source?.name || '搜索源');
     }
   };
 
@@ -330,9 +330,9 @@ export const SourceManager: React.FC = () => {
         URL.revokeObjectURL(url);
       }
       
-      toast.success('导出成功');
+      notification.source.exported();
     } catch (error) {
-      toast.error('导出失败', '请稍后重试');
+      notification.source.exportFailed();
     }
   };
 
@@ -742,7 +742,7 @@ export const SourceManager: React.FC = () => {
                                     )}
                                     {source.isSystem && !isAdmin && (
                                       <span title="系统数据，仅管理员可编辑">
-                                        <Lock className="w-3.5 h-3.5 text-surface-400" />
+                                        <LockKeyhole className="w-3.5 h-3.5 text-surface-400" />
                                       </span>
                                     )}
                                   </div>

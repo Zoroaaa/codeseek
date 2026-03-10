@@ -3,13 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, Send, Lock, ShieldCheck, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { authApi } from '@/services/api';
 import { Button, Input, Card } from '@/components/ui';
-import { useToast } from '@/components/ui/Toast';
+import { useNotification } from '@/hooks';
 
 type Step = 'email' | 'verify' | 'success';
 
 export const ForgotPasswordPage: React.FC = () => {
   const navigate = useNavigate();
-  const toast = useToast();
+  const notification = useNotification();
   
   const [currentStep, setCurrentStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -62,15 +62,14 @@ export const ForgotPasswordPage: React.FC = () => {
       const response = await authApi.forgotPassword({ email });
       if (response.success && response.data) {
         setMaskedEmail(response.data.maskedEmail || maskEmail(email));
-        // 倒计时 60 秒后允许重发，而不是等待整个验证码有效期（900秒）
         setCountdown(60);
         setCurrentStep('verify');
-        toast.success('验证码已发送', '请检查您的邮箱');
+        notification.auth.emailCodeSent();
       } else {
-        toast.error('发送失败', response.message || '请稍后重试');
+        notification.auth.emailCodeFailed(response.message);
       }
     } catch (error: any) {
-      toast.error('发送失败', error.message || '请稍后重试');
+      notification.auth.emailCodeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -83,14 +82,13 @@ export const ForgotPasswordPage: React.FC = () => {
     try {
       const response = await authApi.forgotPassword({ email });
       if (response.success && response.data) {
-        // 重发后重新开始 60 秒倒计时
         setCountdown(60);
-        toast.success('验证码已重新发送');
+        notification.auth.emailCodeResent();
       } else {
-        toast.error('发送失败', response.message || '请稍后重试');
+        notification.auth.emailCodeFailed(response.message);
       }
     } catch (error: any) {
-      toast.error('发送失败', error.message || '请稍后重试');
+      notification.auth.emailCodeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -113,22 +111,22 @@ export const ForgotPasswordPage: React.FC = () => {
     const cleanCode = verificationCode.replace(/\s/g, '');
     
     if (cleanCode.length !== 6) {
-      toast.error('验证码错误', '请输入6位验证码');
+      notification.error('验证码错误', '请输入6位验证码');
       return;
     }
 
     if (!newPassword) {
-      toast.error('密码错误', '请输入新密码');
+      notification.error('密码错误', '请输入新密码');
       return;
     }
 
     if (newPassword.length < 6) {
-      toast.error('密码错误', '密码至少6个字符');
+      notification.error('密码错误', '密码至少6个字符');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error('密码错误', '两次输入的密码不一致');
+      notification.error('密码错误', '两次输入的密码不一致');
       return;
     }
     
@@ -142,12 +140,12 @@ export const ForgotPasswordPage: React.FC = () => {
       
       if (response.success) {
         setCurrentStep('success');
-        toast.success('密码重置成功', '请使用新密码登录');
+        notification.auth.passwordResetSuccess();
       } else {
-        toast.error('重置失败', response.message || '验证码错误或已过期');
+        notification.auth.passwordResetFailed(response.message || '验证码错误或已过期');
       }
     } catch (error: any) {
-      toast.error('重置失败', error.message || '请稍后重试');
+      notification.auth.passwordResetFailed(error.message);
     } finally {
       setIsLoading(false);
     }

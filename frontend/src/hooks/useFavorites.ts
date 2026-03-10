@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchStore, useAuthStore } from '@/stores';
 import { userApi } from '@/services/api';
-import { useToast } from '@/components/ui/Toast';
+import { useNotification } from './useNotification';
 import type { FavoriteItem, AddFavoriteRequest, SyncFavoritesRequest } from '@/types';
 
 interface UseFavoritesReturn {
@@ -16,7 +16,7 @@ interface UseFavoritesReturn {
 }
 
 export function useFavorites(): UseFavoritesReturn {
-  const toast = useToast();
+  const notification = useNotification();
   const { isAuthenticated } = useAuthStore();
   const { favorites, setFavorites, addToFavorites, removeFromFavorites } = useSearchStore();
   const [isLoading, setIsLoading] = useState(false);
@@ -32,15 +32,15 @@ export function useFavorites(): UseFavoritesReturn {
       }
     } catch (error) {
       console.error('Failed to load favorites:', error);
-      toast.error('加载失败', '无法加载收藏列表');
+      notification.favorite.loadFailed();
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, setFavorites, toast]);
+  }, [isAuthenticated, setFavorites, notification]);
 
   const addFavorite = useCallback(async (data: AddFavoriteRequest): Promise<boolean> => {
     if (!isAuthenticated) {
-      toast.warning('请先登录', '登录后才能收藏');
+      notification.common.loginRequired();
       return false;
     }
 
@@ -48,55 +48,55 @@ export function useFavorites(): UseFavoritesReturn {
       const response = await userApi.addFavorite(data);
       if (response.success && response.data) {
         addToFavorites(response.data);
-        toast.success('收藏成功');
+        notification.favorite.added();
         return true;
       }
-      toast.error('收藏失败', response.message || '无法添加收藏');
+      notification.favorite.addFailed(response.message);
       return false;
     } catch (error) {
       console.error('Failed to add favorite:', error);
-      toast.error('收藏失败', '无法添加收藏');
+      notification.favorite.addFailed();
       return false;
     }
-  }, [isAuthenticated, addToFavorites, toast]);
+  }, [isAuthenticated, addToFavorites, notification]);
 
   const removeFavorite = useCallback(async (id: string): Promise<boolean> => {
     try {
       const response = await userApi.removeFavorite(id);
       if (response.success) {
         removeFromFavorites(id);
-        toast.success('已取消收藏');
+        notification.favorite.removed();
         return true;
       }
-      toast.error('操作失败', '无法取消收藏');
+      notification.favorite.removeFailed(response.message);
       return false;
     } catch (error) {
       console.error('Failed to remove favorite:', error);
-      toast.error('操作失败', '无法取消收藏');
+      notification.favorite.removeFailed();
       return false;
     }
-  }, [removeFromFavorites, toast]);
+  }, [removeFromFavorites, notification]);
 
   const syncFavorites = useCallback(async (data: SyncFavoritesRequest): Promise<boolean> => {
     if (!isAuthenticated) {
-      toast.warning('请先登录', '登录后才能同步收藏');
+      notification.common.loginRequired();
       return false;
     }
 
     try {
       const response = await userApi.syncFavorites(data);
       if (response.success) {
-        toast.success('同步成功', `已同步 ${response.data?.count || 0} 个收藏`);
+        notification.favorite.syncSuccess(response.data?.count || 0);
         return true;
       }
-      toast.error('同步失败', response.message || '无法同步收藏');
+      notification.favorite.syncFailed(response.message);
       return false;
     } catch (error) {
       console.error('Failed to sync favorites:', error);
-      toast.error('同步失败', '无法同步收藏');
+      notification.favorite.syncFailed();
       return false;
     }
-  }, [isAuthenticated, toast]);
+  }, [isAuthenticated, notification]);
 
   const isFavorited = useCallback((url: string): boolean => {
     return favorites.some(f => f.url === url);

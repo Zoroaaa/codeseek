@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { proxyService } from '@/services/proxy/ProxyService';
+import { NotificationTemplates } from '@/utils/notificationTemplates';
+import { useUIStore } from './uiStore';
 
 interface ProxyState {
   isEnabled: boolean;
@@ -65,12 +67,33 @@ export const useProxyStore = create<ProxyState>()(
                 cacheHits: proxyStatus.stats.cacheHits,
               },
             });
+            
+            const template = proxyStatus.enabled 
+              ? NotificationTemplates.proxy.enabled()
+              : NotificationTemplates.proxy.disabled();
+            useUIStore.getState().addToast({
+              type: template.type,
+              title: template.title,
+              message: template.message,
+            });
           } else {
             set({ status: 'error' });
+            const template = NotificationTemplates.proxy.toggleFailed();
+            useUIStore.getState().addToast({
+              type: template.type,
+              title: template.title,
+              message: template.message,
+            });
           }
         } catch (error) {
           console.error('Toggle proxy failed:', error);
           set({ status: 'error' });
+          const template = NotificationTemplates.proxy.toggleFailed();
+          useUIStore.getState().addToast({
+            type: template.type,
+            title: template.title,
+            message: template.message,
+          });
         } finally {
           set({ isLoading: false });
         }

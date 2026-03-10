@@ -4,12 +4,12 @@ import { Eye, EyeOff, Lock, User, ArrowLeft } from 'lucide-react';
 import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
 import { Button, Input, Card } from '@/components/ui';
-import { useToast } from '@/components/ui/Toast';
+import { useNotification } from '@/hooks';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { setUser, setToken } = useAuthStore();
-  const toast = useToast();
+  const notification = useNotification();
   
   const [formData, setFormData] = useState({
     identifier: '',
@@ -51,14 +51,14 @@ export const LoginPage: React.FC = () => {
       if (response.success && response.data) {
         setUser(response.data.user);
         setToken(response.data.token);
-        toast.success('登录成功', `欢迎回来，${response.data.user.username}`);
+        notification.auth.loginSuccess(response.data.user.username);
         navigate('/dashboard');
       } else {
-        toast.error('登录失败', response.message || '登录失败');
+        notification.auth.loginFailed(response.message);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '网络错误，请稍后重试';
-      toast.error('登录失败', message);
+      notification.auth.loginFailed(message);
     } finally {
       setIsLoading(false);
     }

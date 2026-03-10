@@ -4,14 +4,14 @@ import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Send, ShieldCheck, CheckCircl
 import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
 import { Button, Input, Card } from '@/components/ui';
-import { useToast } from '@/components/ui/Toast';
+import { useNotification } from '@/hooks';
 
 type Step = 'form' | 'verify' | 'success';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const { setUser, setToken } = useAuthStore();
-  const toast = useToast();
+  const notification = useNotification();
   
   const [currentStep, setCurrentStep] = useState<Step>('form');
   const [formData, setFormData] = useState({
@@ -73,7 +73,7 @@ export const RegisterPage: React.FC = () => {
     }
     
     if (!agreed) {
-      toast.warning('请阅读并同意服务条款');
+      notification.common.validationError('服务条款');
     }
     
     setErrors(newErrors);
@@ -90,12 +90,12 @@ export const RegisterPage: React.FC = () => {
         setMaskedEmail(response.data.maskedEmail || maskEmail(formData.email));
         setCountdown(response.data.expiresIn || 300);
         setCurrentStep('verify');
-        toast.success('验证码已发送', '请检查您的邮箱');
+        notification.auth.emailCodeSent();
       } else {
-        toast.error('发送失败', '验证码发送失败，请稍后重试');
+        notification.auth.emailCodeFailed('验证码发送失败');
       }
     } catch (error: any) {
-      toast.error('发送失败', error.message || '网络错误，请稍后重试');
+      notification.auth.emailCodeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -109,10 +109,10 @@ export const RegisterPage: React.FC = () => {
       const response = await authApi.sendRegistrationCode(formData.email);
       if (response.success && response.data) {
         setCountdown(response.data.expiresIn || 300);
-        toast.success('验证码已重新发送');
+        notification.auth.emailCodeResent();
       }
     } catch (error: any) {
-      toast.error('发送失败', error.message || '请稍后重试');
+      notification.auth.emailCodeFailed(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -132,7 +132,7 @@ export const RegisterPage: React.FC = () => {
   const handleVerifyAndRegister = async () => {
     const cleanCode = verificationCode.replace(/\s/g, '');
     if (cleanCode.length !== 6) {
-      toast.error('验证码错误', '请输入6位验证码');
+      notification.error('验证码错误', '请输入6位验证码');
       return;
     }
 
@@ -149,16 +149,16 @@ export const RegisterPage: React.FC = () => {
         setUser(response.data.user);
         setToken(response.data.token);
         setCurrentStep('success');
-        toast.success('注册成功', '欢迎加入磁力快搜');
+        notification.auth.registerSuccess();
         
         setTimeout(() => {
           navigate('/dashboard');
         }, 2000);
       } else {
-        toast.error('注册失败', response.message || '验证码错误或已过期');
+        notification.auth.registerFailed(response.message || '验证码错误或已过期');
       }
     } catch (error: any) {
-      toast.error('注册失败', error.message || '网络错误，请稍后重试');
+      notification.auth.registerFailed(error.message);
     } finally {
       setIsLoading(false);
     }
