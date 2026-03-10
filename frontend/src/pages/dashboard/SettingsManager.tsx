@@ -272,6 +272,31 @@ export const SettingsManager: React.FC = () => {
     }
   };
 
+  const handleCancelEmailChange = async () => {
+    if (!emailChangeRequestId) return;
+
+    setIsLoading(true);
+    try {
+      const response = await authApi.cancelEmailChangeRequest(emailChangeRequestId);
+      
+      if (response.success) {
+        notification.success('邮箱更改请求已取消');
+        setEmailChangeModal(false);
+        setEmailChangeStep('request');
+        setEmailChangeForm({ newEmail: '', currentPassword: '', verificationCode: '' });
+        setEmailChangeRequestId('');
+        setEmailChangeMaskedEmail('');
+        setEmailChangeCountdown(0);
+      } else {
+        notification.error(response.message || '取消失败');
+      }
+    } catch (error: any) {
+      notification.error(error.message || '取消失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSendDeleteCode = async () => {
     setIsLoading(true);
     try {
@@ -438,6 +463,18 @@ export const SettingsManager: React.FC = () => {
               isLoading={isLoading}
             >
               验证并更改
+            </Button>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="ghost"
+              fullWidth
+              onClick={handleCancelEmailChange}
+              isLoading={isLoading}
+              className="text-error-600 hover:text-error-700 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-900/20"
+            >
+              取消此次更换
             </Button>
           </div>
 

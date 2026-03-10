@@ -218,4 +218,14 @@ export const authApi = {
     }>('/auth/verify-email-change-code', data);
   },
 
+  cancelEmailChangeRequest: async (requestId: string): Promise<{ 
+    success: boolean; 
+    message?: string;
+  }> => {
+    return apiClient.post<{ 
+      success: boolean; 
+      message?: string;
+    }>('/auth/cancel-email-change-request', { requestId });
+  },
+
 };

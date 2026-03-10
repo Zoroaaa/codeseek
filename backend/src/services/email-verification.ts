@@ -757,6 +757,46 @@ export class EmailVerificationService {
     }
   }
 
+  async cancelEmailChangeRequest(requestId: string, userId: string): Promise<{ success: boolean; message: string }> {
+    const request = await this.env.DB.prepare(
+      `SELECT * FROM email_change_requests 
+       WHERE id = ? AND user_id = ? AND status = 'pending'`
+    )
+      .bind(requestId, userId)
+      .first();
+
+    if (!request) {
+      throw new Error('邮箱更改请求不存在或已处理');
+    }
+
+    await this.env.DB.prepare(
+      `UPDATE email_change_requests 
+       SET status = 'cancelled', updated_at = ?
+       WHERE id = ?`
+    )
+      .bind(Date.now(), requestId)
+      .run();
+
+    return {
+      success: true,
+      message: '邮箱更改请求已取消',
+    };
+  }
+
+  async cancelExpiredPendingRequests(userId: string, expireAfterMinutes: number = 15): Promise<number> {
+    const expireThreshold = Date.now() - expireAfterMinutes * 60 * 1000;
+
+    const result = await this.env.DB.prepare(
+      `UPDATE email_change_requests 
+       SET status = 'cancelled', updated_at = ?
+       WHERE user_id = ? AND status = 'pending' AND created_at < ?`
+    )
+      .bind(Date.now(), userId, expireThreshold)
+      .run();
+
+    return (result.meta as { changes?: number })?.changes || 0;
+  }
+
   async markEmailVerificationCompleted(requestId: string, verificationType: string): Promise<void> {
     const updateField = verificationType === 'email_change_old' ? 'old_email_verified = 1' : 'new_email_verified = 1';
 

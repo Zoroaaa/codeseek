@@ -798,13 +798,19 @@ authRoutes.post('/request-email-change', async (c) => {
       return c.json(error('VALIDATION_ERROR', '该邮箱已被其他用户使用'), 400);
     }
 
+    const emailService = new EmailVerificationService(c.env);
+    await emailService.cancelExpiredPendingRequests(user.id, 15);
+
     const activeRequest = await c.env.DB.prepare(`
-      SELECT id FROM email_change_requests 
+      SELECT id, created_at FROM email_change_requests 
       WHERE user_id = ? AND status = 'pending' AND expires_at > ?
     `).bind(user.id, Date.now()).first();
 
     if (activeRequest) {
-      return c.json(error('VALIDATION_ERROR', '您已有进行中的邮箱更改请求，请先完成或等待过期'), 400);
+      const createdAt = (activeRequest as { created_at: number }).created_at;
+      const elapsedMinutes = Math.floor((Date.now() - createdAt) / 60000);
+      const remainingMinutes = 15 - elapsedMinutes;
+      return c.json(error('VALIDATION_ERROR', `您已有进行中的邮箱更改请求，请等待${remainingMinutes > 0 ? remainingMinutes : 1}分钟后再试或手动取消`), 400);
     }
 
     const requestId = generateId();
@@ -990,6 +996,42 @@ authRoutes.post('/verify-email-change-code', async (c) => {
   } catch (err) {
     console.error('Verify email change code error:', err);
     return c.json(error('SERVER_ERROR', '验证失败'), 500);
+  }
+});
+
+authRoutes.post('/cancel-email-change-request', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload) {
+    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
+  }
+
+  const body = await c.req.json();
+  const { requestId } = body;
+
+  if (!requestId) {
+    return c.json(error('VALIDATION_ERROR', '缺少请求ID'), 400);
+  }
+
+  try {
+    const emailService = new EmailVerificationService(c.env);
+    const result = await emailService.cancelEmailChangeRequest(requestId, payload.userId);
+
+    await logUserAction(c.env, payload.userId, 'email_change_cancelled', {
+      requestId
+    }, c);
+
+    return c.json(success(result, result.message));
+  } catch (err) {
+    console.error('Cancel email change request error:', err);
+    const errorMessage = err instanceof Error ? err.message : '取消失败';
+    return c.json(error('SERVER_ERROR', errorMessage), 500);
   }
 });
 
