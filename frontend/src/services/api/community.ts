@@ -331,7 +331,7 @@ export const communityApi = {
         pageSize: number;
         totalPages: number;
       }
-    }>(`/community/my-sources?${params.toString()}`);
+    }>(`/community/sources/my-sources?${params.toString()}`);
     
     if (response.success && response.data) {
       return {
@@ -389,7 +389,7 @@ export const communityApi = {
         created_at: number;
         updated_at: number;
       }>
-    }>(`/community/popular?limit=${limit}`);
+    }>(`/community/sources/popular?limit=${limit}`);
     
     if (response.success && response.data) {
       return {
@@ -441,7 +441,7 @@ export const communityApi = {
         created_at: number;
         updated_at: number;
       }>
-    }>(`/community/recent?limit=${limit}`);
+    }>(`/community/sources/recent?limit=${limit}`);
     
     if (response.success && response.data) {
       return {
@@ -502,7 +502,7 @@ export const communityApi = {
         pageSize: number;
         totalPages: number;
       }
-    }>(`/community/search?keyword=${encodeURIComponent(keyword)}&page=${page}&pageSize=${pageSize}`);
+    }>(`/community/sources/search?keyword=${encodeURIComponent(keyword)}&page=${page}&pageSize=${pageSize}`);
     
     if (response.success && response.data) {
       return {
@@ -635,190 +635,5 @@ export const communityApi = {
       };
     }
     return { success: false, data: {} as CommunityStats };
-  },
-};
-
-export const adminApi = {
-  getUsers: async (page = 1, pageSize = 20, search?: string, status?: string): Promise<{ 
-    success: boolean; 
-    data: {
-      users: Array<{
-        id: string;
-        username: string;
-        email: string;
-        isActive: boolean;
-        emailVerified: boolean;
-        permissions: string[];
-        loginCount: number;
-        lastLogin: number | null;
-        createdAt: number;
-      }>;
-      pagination: {
-        page: number;
-        pageSize: number;
-        total: number;
-        totalPages: number;
-      };
-    } 
-  }> => {
-    const params = new URLSearchParams();
-    params.append('page', String(page));
-    params.append('pageSize', String(pageSize));
-    if (search) params.append('search', search);
-    if (status) params.append('status', status);
-    return apiClient.get(`/admin/users?${params.toString()}`);
-  },
-
-  getUserDetail: async (id: string): Promise<{ 
-    success: boolean; 
-    data: {
-      user: {
-        id: string;
-        username: string;
-        email: string;
-        isActive: boolean;
-        emailVerified: boolean;
-        permissions: string[];
-        loginCount: number;
-        lastLogin: number | null;
-        createdAt: number;
-      };
-      stats: {
-        favoritesCount: number;
-        historyCount: number;
-        activeSessionsCount: number;
-      };
-      recentSessions: Array<{
-        id: string;
-        ip: string;
-        userAgent: string;
-        createdAt: string;
-        expiresAt: string;
-      }>;
-    } 
-  }> => {
-    return apiClient.get(`/admin/users/${id}`);
-  },
-
-  updateUserStatus: async (id: string, data: { isActive: boolean; reason?: string }): Promise<{ 
-    success: boolean; 
-    message: string 
-  }> => {
-    return apiClient.put(`/admin/users/${id}/status`, data);
-  },
-
-  updateUserPermissions: async (id: string, data: { permissions: string[] }): Promise<{ 
-    success: boolean; 
-    message: string 
-  }> => {
-    return apiClient.put(`/admin/users/${id}/permissions`, data);
-  },
-
-  getReports: async (page = 1, pageSize = 20, status = 'pending'): Promise<{ 
-    success: boolean; 
-    data: {
-      reports: Array<{
-        id: string;
-        sharedSourceId: string;
-        sharedSourceName: string;
-        reporterId: string;
-        reporterName: string;
-        reason: string;
-        details?: string;
-        status: string;
-        createdAt: string;
-      }>;
-      pagination: {
-        page: number;
-        pageSize: number;
-        total: number;
-        totalPages: number;
-      };
-    } 
-  }> => {
-    return apiClient.get(`/admin/reports?page=${page}&pageSize=${pageSize}&status=${status}`);
-  },
-
-  handleReport: async (id: string, data: { 
-    status: 'resolved' | 'dismissed'; 
-    action?: 'remove_source' | 'warning' | 'ignore'; 
-    notes?: string 
-  }): Promise<{ success: boolean; message: string }> => {
-    return apiClient.put(`/admin/reports/${id}`, data);
-  },
-
-  getStats: async (): Promise<{ 
-    success: boolean; 
-    data: {
-      users: {
-        total: number;
-        active: number;
-        verified: number;
-        newThisWeek: number;
-        dailyActive: number;
-      };
-      sources: {
-        total: number;
-        active: number;
-        searchable: number;
-        totalUsage: number;
-      };
-      searches: {
-        total: number;
-        uniqueUsers: number;
-        uniqueKeywords: number;
-      };
-      community: {
-        sharedSources: number;
-        tags: number;
-        reviews: number;
-        pendingReports: number;
-      };
-      topKeywords: Array<{ keyword: string; count: number }>;
-      topUsedSources: Array<{ id: string; name: string; usageCount: number }>;
-    } 
-  }> => {
-    return apiClient.get('/admin/stats');
-  },
-
-  getLogs: async (page = 1, pageSize = 50, userId?: string, action?: string): Promise<{ 
-    success: boolean; 
-    data: {
-      logs: Array<{
-        id: string;
-        userId: string;
-        userName: string;
-        action: string;
-        target: string;
-        details: string;
-        ip: string;
-        createdAt: string;
-      }>;
-      pagination: {
-        page: number;
-        pageSize: number;
-        total: number;
-        totalPages: number;
-      };
-    } 
-  }> => {
-    const params = new URLSearchParams();
-    params.append('page', String(page));
-    params.append('pageSize', String(pageSize));
-    if (userId) params.append('userId', userId);
-    if (action) params.append('action', action);
-    return apiClient.get(`/admin/logs?${params.toString()}`);
-  },
-
-  cleanup: async (): Promise<{ 
-    success: boolean; 
-    data: {
-      expiredSessions: number;
-      expiredVerificationCodes: number;
-      oldPasswordResetLogs: number;
-      expiredSecurityLocks: number;
-    } 
-  }> => {
-    return apiClient.post('/admin/cleanup', {});
   },
 };

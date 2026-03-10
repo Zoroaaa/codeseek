@@ -56,59 +56,6 @@ export const systemApi = {
     return apiClient.get('/config/public');
   },
 
-  checkSourceStatus: async (sourceId: string, keyword = 'test'): Promise<{ 
-    success: boolean; 
-    data: {
-      status: string;
-      available: boolean;
-      responseTime: number;
-      error: string | null;
-    } 
-  }> => {
-    return apiClient.get(`/source-status-check?sourceId=${sourceId}&keyword=${encodeURIComponent(keyword)}`);
-  },
-
-  getSourceStatusHistory: async (sourceId: string, limit = 50, hours = 24): Promise<{ 
-    success: boolean; 
-    data: {
-      source: {
-        id: string;
-        name: string;
-        urlTemplate: string;
-      };
-      history: Array<{
-        status: string;
-        available: boolean;
-        responseTime: number;
-        checkedAt: string;
-        error: string | null;
-      }>;
-      summary: {
-        uptime: number;
-        avgResponseTime: number;
-        lastChecked: string;
-      };
-    } 
-  }> => {
-    return apiClient.get(`/source-status-history/${sourceId}?limit=${limit}&hours=${hours}`);
-  },
-
-  batchCheckSourceStatus: async (sourceIds: string[]): Promise<{ 
-    success: boolean; 
-    data: Array<{
-      sourceId: string;
-      status: string;
-      available: boolean;
-      responseTime: number;
-    }> 
-  }> => {
-    return apiClient.post('/source-status-batch', { sourceIds });
-  },
-
-  clearSourceStatusCache: async (sourceId: string): Promise<{ success: boolean; message: string }> => {
-    return apiClient.delete(`/source-status-cache/${sourceId}`);
-  },
-
   recordAction: async (data: RecordActionRequest): Promise<{ 
     success: boolean; 
     data: { id: string }; 

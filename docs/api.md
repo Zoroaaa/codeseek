@@ -1270,7 +1270,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/community/my-sources` - 获取我的分享
+### `GET /api/community/sources/my-sources` - 获取我的分享
 
 获取当前用户分享的搜索源列表。
 
@@ -1285,7 +1285,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/community/popular` - 获取热门分享
+### `GET /api/community/sources/popular` - 获取热门分享
 
 获取社区热门搜索源。
 
@@ -1296,7 +1296,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/community/recent` - 获取最新分享
+### `GET /api/community/sources/recent` - 获取最新分享
 
 获取社区最新分享的搜索源。
 
@@ -1307,7 +1307,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/community/search` - 搜索社区资源
+### `GET /api/community/sources/search` - 搜索社区资源
 
 在社区中搜索搜索源。
 
@@ -1320,7 +1320,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/community/user-stats` - 获取用户统计
+### `GET /api/community/sources/user-stats` - 获取用户统计
 
 获取当前用户在社区的统计数据。
 
@@ -1331,6 +1331,22 @@ interface ApiResponse<T> {
 - 总下载量、总点赞、总浏览
 - 平均评分、评论数、创建标签数
 - 最近分享记录
+
+---
+
+### `GET /api/community/sources/stats` - 获取社区统计
+
+获取社区整体统计数据。
+
+**返回**: 
+- 总搜索源数
+- 总下载量
+- 总用户数
+- 总评论数
+- 平均评分
+- 分类数量
+- 热门分类
+- 最近活动
 
 ---
 
@@ -1489,10 +1505,86 @@ interface ApiResponse<T> {
 **认证**: 需要（管理员权限）
 
 **返回**: 
-- 过期会话数
-- 过期验证码数
-- 旧密码重置日志数
-- 过期安全锁定数
+- expiredSessions - 过期会话数
+- expiredVerifications - 过期验证码数
+- oldPasswordResetLogs - 旧密码重置日志数
+- oldSecurityLockouts - 过期安全锁定数
+- oldActions - 旧行为日志数
+
+---
+
+### `GET /api/admin/roles` - 获取角色列表
+
+获取系统中所有角色列表。
+
+**认证**: 需要（管理员权限）
+
+**返回**: 角色列表（包含权限、优先级等）
+
+---
+
+### `PUT /api/admin/users/:id/role` - 更新用户角色
+
+更新指定用户的角色。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 用户ID
+
+**请求体**:
+```json
+{
+  "roleId": "string"
+}
+```
+
+**返回**: 更新后的角色信息
+
+---
+
+### `GET /api/admin/users/:id/login-logs` - 获取用户登录日志
+
+获取指定用户的登录日志记录。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 用户ID
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20）
+
+**返回**: 登录日志列表
+
+---
+
+### `GET /api/admin/active-users` - 获取活跃用户排行
+
+获取指定时间范围内的活跃用户排行。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `limit` - 返回数量（默认20）
+- `days` - 统计天数（默认7）
+
+**返回**: 活跃用户列表
+
+---
+
+### `GET /api/admin/login-stats` - 获取登录统计
+
+获取系统登录统计数据。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `days` - 统计天数（默认7）
+
+**返回**: 
+- dailyStats - 每日登录统计
+- topIPs - 登录最多的IP
+- failedAttempts - 失败尝试最多的IP
 
 ---
 
