@@ -60,7 +60,7 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
         INNER JOIN search_source_categories c ON s.category_id = c.id
         INNER JOIN search_major_categories mc ON c.major_category_id = mc.id
         WHERE s.is_active = 1 AND s.searchable = 1 AND s.category_id = ? AND mc.requires_keyword = 1
-        ORDER BY s.search_priority DESC, s.display_order ASC
+        ORDER BY c.search_priority ASC, s.search_priority ASC, s.display_order ASC
       `;
       params = [categoryId];
     } else if (majorCategoryId) {
@@ -69,7 +69,7 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
         INNER JOIN search_source_categories c ON s.category_id = c.id
         INNER JOIN search_major_categories mc ON c.major_category_id = mc.id
         WHERE s.is_active = 1 AND s.searchable = 1 AND c.major_category_id = ? AND mc.requires_keyword = 1
-        ORDER BY s.search_priority DESC, s.display_order ASC
+        ORDER BY c.search_priority ASC, s.search_priority ASC, s.display_order ASC
       `;
       params = [majorCategoryId];
     } else {
@@ -78,7 +78,7 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
         INNER JOIN search_source_categories c ON s.category_id = c.id
         INNER JOIN search_major_categories mc ON c.major_category_id = mc.id
         WHERE s.is_active = 1 AND s.searchable = 1 AND mc.requires_keyword = 1
-        ORDER BY s.search_priority DESC, s.display_order ASC
+        ORDER BY c.search_priority ASC, s.search_priority ASC, s.display_order ASC
       `;
       params = [];
     }
