@@ -15,6 +15,7 @@ import {
   Filter,
   Layers,
   FolderOpen,
+  Shield,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, Dropdown, EmptyState, SourceIcon } from '@/components/ui';
 import { sourceApi } from '@/services/api';
@@ -656,6 +657,12 @@ export const SourceManager: React.FC = () => {
                                         <Badge variant={siteType.variant} className="text-xs">
                                           {siteType.label}
                                         </Badge>
+                                        {source.isSystem && (
+                                          <Badge variant="accent" className="flex items-center gap-1 text-xs">
+                                            <Shield className="w-2.5 h-2.5" />
+                                            系统
+                                          </Badge>
+                                        )}
                                       </div>
                                       {(source.userConfig?.customSubtitle || source.subtitle) && (
                                         <p className="text-xs text-surface-500 dark:text-surface-400 truncate">
@@ -692,39 +699,43 @@ export const SourceManager: React.FC = () => {
                                     >
                                       <RefreshCw className="w-3.5 h-3.5" />
                                     </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setFormData({
-                                          name: source.name,
-                                          subtitle: source.subtitle || '',
-                                          description: source.description || '',
-                                          icon: source.icon || '',
-                                          urlTemplate: source.urlTemplate,
-                                          homepageUrl: source.homepageUrl || '',
-                                          categoryId: source.categoryId,
-                                          siteType: source.siteType,
-                                          searchable: source.searchable,
-                                          requiresKeyword: source.requiresKeyword,
-                                          searchPriority: source.searchPriority,
-                                        });
-                                        setEditModal({ isOpen: true, source });
-                                      }}
-                                      title="编辑"
-                                      className="p-1 hover:bg-accent-50 dark:hover:bg-accent-900/20"
-                                    >
-                                      <Edit className="w-3.5 h-3.5" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteSource(source.id)}
-                                      title="删除"
-                                      className="p-1 text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
+                                    {!source.isSystem && (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setFormData({
+                                              name: source.name,
+                                              subtitle: source.subtitle || '',
+                                              description: source.description || '',
+                                              icon: source.icon || '',
+                                              urlTemplate: source.urlTemplate,
+                                              homepageUrl: source.homepageUrl || '',
+                                              categoryId: source.categoryId,
+                                              siteType: source.siteType,
+                                              searchable: source.searchable,
+                                              requiresKeyword: source.requiresKeyword,
+                                              searchPriority: source.searchPriority,
+                                            });
+                                            setEditModal({ isOpen: true, source });
+                                          }}
+                                          title="编辑"
+                                          className="p-1 hover:bg-accent-50 dark:hover:bg-accent-900/20"
+                                        >
+                                          <Edit className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleDeleteSource(source.id)}
+                                          title="删除"
+                                          className="p-1 text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               );

@@ -9,6 +9,7 @@ import {
   Layers,
   Search,
   MoreVertical,
+  Shield,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, EmptyState, Dropdown } from '@/components/ui';
 import { sourceApi } from '@/services/api';
@@ -371,6 +372,12 @@ export const CategoryManager: React.FC = () => {
                   <Badge variant={majorCategory.requiresKeyword ? 'primary' : 'default'}>
                     {majorCategory.requiresKeyword ? '需要关键词' : '无需关键词'}
                   </Badge>
+                  {majorCategory.isSystem && (
+                    <Badge variant="accent" className="flex items-center gap-1">
+                      <Shield className="w-3 h-3" />
+                      系统
+                    </Badge>
+                  )}
                   <Dropdown
                     trigger={
                       <Button variant="ghost" size="sm">
@@ -379,8 +386,10 @@ export const CategoryManager: React.FC = () => {
                     }
                     items={[
                       { label: '添加分类', onClick: () => openCreateCategoryModal(majorCategory.id) },
-                      { label: '编辑', onClick: () => openEditMajorCategoryModal(majorCategory) },
-                      { label: '删除', onClick: () => handleDeleteMajorCategory(majorCategory.id), danger: true },
+                      ...(!majorCategory.isSystem ? [
+                        { label: '编辑', onClick: () => openEditMajorCategoryModal(majorCategory) },
+                        { label: '删除', onClick: () => handleDeleteMajorCategory(majorCategory.id), danger: true },
+                      ] : []),
                     ]}
                   />
                 </div>
@@ -407,9 +416,17 @@ export const CategoryManager: React.FC = () => {
                               )}
                             </div>
                             <div>
-                              <p className="font-medium text-surface-900 dark:text-surface-100">
-                                {category.name}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-surface-900 dark:text-surface-100">
+                                  {category.name}
+                                </p>
+                                {category.isSystem && (
+                                  <Badge variant="accent" className="flex items-center gap-1 text-xs">
+                                    <Shield className="w-2.5 h-2.5" />
+                                    系统
+                                  </Badge>
+                                )}
+                              </div>
                               {category.description && (
                                 <p className="text-sm text-surface-500 dark:text-surface-400">
                                   {category.description}
@@ -431,24 +448,26 @@ export const CategoryManager: React.FC = () => {
                               {category.defaultSiteType === 'search' ? '搜索' : 
                                category.defaultSiteType === 'browse' ? '浏览' : '参考'}
                             </Badge>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openEditCategoryModal(category)}
-                                className="hover:bg-accent-50 dark:hover:bg-accent-900/20"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteCategory(category.id)}
-                                className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
+                            {!category.isSystem && (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditCategoryModal(category)}
+                                  className="hover:bg-accent-50 dark:hover:bg-accent-900/20"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteCategory(category.id)}
+                                  className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}

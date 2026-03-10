@@ -17,6 +17,7 @@ export interface SearchSource {
   searchPriority: number;
   status: SourceStatus;
   isActive: boolean;
+  isSystem?: boolean;
   usageCount: number;
   displayOrder: number;
   createdAt: string;
@@ -35,6 +36,7 @@ export interface Category {
   defaultSiteType: SiteType;
   searchPriority: number;
   isActive: boolean;
+  isSystem?: boolean;
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -49,6 +51,7 @@ export interface MajorCategory {
   color?: string;
   requiresKeyword: boolean;
   isActive: boolean;
+  isSystem?: boolean;
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
