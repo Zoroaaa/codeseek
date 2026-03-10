@@ -40,7 +40,20 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
       ).bind(historyId, userPayload.userId, trimmedKeyword, majorCategoryId || 'all', Date.now()).run();
     }
 
-    // 根据 majorCategoryId 过滤搜索源
+    // 获取用户的搜索源配置（如果用户已登录）
+    let userEnabledSources: Set<string> | null = null;
+    if (userPayload) {
+      const userConfigs = await c.env.DB.prepare(
+        `SELECT source_id FROM user_search_source_configs 
+         WHERE user_id = ? AND is_enabled = 1`
+      ).bind(userPayload.userId).all<{ source_id: string }>();
+      
+      if (userConfigs.results && userConfigs.results.length > 0) {
+        userEnabledSources = new Set(userConfigs.results.map(c => c.source_id));
+      }
+    }
+
+    // 根据 majorCategoryId 过滤搜索源，同时过滤 requires_keyword 和用户配置
     let query: string;
     let params: (string | number)[];
 
@@ -48,13 +61,19 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
       query = `
         SELECT s.* FROM search_sources s
         INNER JOIN search_source_categories c ON s.category_id = c.id
-        WHERE s.is_active = 1 AND s.searchable = 1 AND c.major_category_id = ?
+        INNER JOIN search_major_categories mc ON c.major_category_id = mc.id
+        WHERE s.is_active = 1 AND s.searchable = 1 AND c.major_category_id = ? AND mc.requires_keyword = 1
         ORDER BY s.search_priority DESC, s.display_order ASC
       `;
       params = [majorCategoryId];
     } else {
-      query = `SELECT * FROM search_sources WHERE is_active = 1 AND searchable = 1 
-               ORDER BY search_priority DESC, display_order ASC`;
+      query = `
+        SELECT s.* FROM search_sources s
+        INNER JOIN search_source_categories c ON s.category_id = c.id
+        INNER JOIN search_major_categories mc ON c.major_category_id = mc.id
+        WHERE s.is_active = 1 AND s.searchable = 1 AND mc.requires_keyword = 1
+        ORDER BY s.search_priority DESC, s.display_order ASC
+      `;
       params = [];
     }
 
@@ -62,7 +81,12 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
       ? await c.env.DB.prepare(query).bind(...params).all<SearchSource>()
       : await c.env.DB.prepare(query).all<SearchSource>();
 
-    const searchResults = (sources.results || []).map(source => ({
+    // 如果用户已登录且有配置，过滤未启用的搜索源
+    const filteredSources = userEnabledSources
+      ? (sources.results || []).filter(s => userEnabledSources.has(s.id))
+      : (sources.results || []);
+
+    const searchResults = filteredSources.map(source => ({
       id: source.id,
       name: source.name,
       subtitle: source.subtitle,

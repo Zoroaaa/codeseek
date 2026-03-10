@@ -63,13 +63,15 @@ export const CategoryManager: React.FC = () => {
     searchPriority: 0,
   });
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (preserveExpandedState = false) => {
     setIsLoading(true);
     try {
       const majorCategoriesRes = await sourceApi.getMajorCategories();
       if (majorCategoriesRes.success && majorCategoriesRes.data) {
         setMajorCategories(majorCategoriesRes.data);
-        setExpandedMajor(new Set(majorCategoriesRes.data.map(m => m.id)));
+        if (!preserveExpandedState) {
+          setExpandedMajor(new Set(majorCategoriesRes.data.map(m => m.id)));
+        }
       }
       
       const categoriesRes = await sourceApi.getCategories();
@@ -115,7 +117,7 @@ export const CategoryManager: React.FC = () => {
           color: '#3B82F6',
           requiresKeyword: true,
         });
-        loadData();
+        loadData(true);
       }
     } catch (error) {
       toast.error('创建失败', '请稍后重试');
@@ -140,7 +142,7 @@ export const CategoryManager: React.FC = () => {
       await sourceApi.updateMajorCategory(majorCategoryModal.data.id, updateData);
       toast.success('更新成功');
       setMajorCategoryModal({ isOpen: false, mode: 'create', data: null });
-      loadData();
+      loadData(true);
     } catch (error) {
       toast.error('更新失败', '请稍后重试');
     }
@@ -152,7 +154,7 @@ export const CategoryManager: React.FC = () => {
     try {
       await sourceApi.deleteMajorCategory(id);
       toast.success('删除成功');
-      loadData();
+      loadData(true);
     } catch (error) {
       toast.error('删除失败', '请稍后重试');
     }
@@ -168,6 +170,7 @@ export const CategoryManager: React.FC = () => {
       const response = await sourceApi.createCategory(categoryForm);
       if (response.success) {
         toast.success('创建成功');
+        const currentMajorCategoryId = categoryForm.majorCategoryId;
         setCategoryModal({ isOpen: false, mode: 'create', data: null, majorCategoryId: null });
         setCategoryForm({
           majorCategoryId: '',
@@ -179,7 +182,12 @@ export const CategoryManager: React.FC = () => {
           defaultSiteType: 'search',
           searchPriority: 0,
         });
-        loadData();
+        setExpandedMajor(prev => {
+          const newSet = new Set(prev);
+          newSet.add(currentMajorCategoryId);
+          return newSet;
+        });
+        loadData(true);
       }
     } catch (error) {
       toast.error('创建失败', '请稍后重试');
@@ -206,7 +214,7 @@ export const CategoryManager: React.FC = () => {
       await sourceApi.updateCategory(categoryModal.data.id, updateData);
       toast.success('更新成功');
       setCategoryModal({ isOpen: false, mode: 'create', data: null, majorCategoryId: null });
-      loadData();
+      loadData(true);
     } catch (error) {
       toast.error('更新失败', '请稍后重试');
     }
@@ -218,7 +226,7 @@ export const CategoryManager: React.FC = () => {
     try {
       await sourceApi.deleteCategory(id);
       toast.success('删除成功');
-      loadData();
+      loadData(true);
     } catch (error) {
       toast.error('删除失败', '请稍后重试');
     }
@@ -236,14 +244,17 @@ export const CategoryManager: React.FC = () => {
   };
 
   const openCreateCategoryModal = (majorCategoryId: string) => {
+    const majorCategory = majorCategories.find(mc => mc.id === majorCategoryId);
+    const isSearchCategory = majorCategory?.requiresKeyword ?? true;
+    
     setCategoryForm({
       majorCategoryId,
       name: '',
       description: '',
       icon: '',
       color: '#3B82F6',
-      defaultSearchable: true,
-      defaultSiteType: 'search',
+      defaultSearchable: isSearchCategory,
+      defaultSiteType: isSearchCategory ? 'search' : 'browse',
       searchPriority: 0,
     });
     setCategoryModal({ isOpen: true, mode: 'create', data: null, majorCategoryId });
@@ -407,9 +418,15 @@ export const CategoryManager: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <Badge variant={category.defaultSearchable ? 'success' : 'default'}>
-                              {category.defaultSearchable ? '可搜索' : '不可搜索'}
-                            </Badge>
+                            {majorCategory.requiresKeyword ? (
+                              <Badge variant={category.defaultSearchable ? 'success' : 'default'}>
+                                {category.defaultSearchable ? '可搜索' : '不可搜索'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-surface-100 dark:bg-surface-700">
+                                不参与搜索
+                              </Badge>
+                            )}
                             <Badge variant="outline">
                               {category.defaultSiteType === 'search' ? '搜索' : 
                                category.defaultSiteType === 'browse' ? '浏览' : '参考'}
@@ -554,6 +571,11 @@ export const CategoryManager: React.FC = () => {
         title={categoryModal.mode === 'edit' ? '编辑分类' : '添加分类'}
         size="md"
       >
+        {(() => {
+          const currentMajorCategory = majorCategories.find(mc => mc.id === categoryModal.majorCategoryId);
+          const isSearchCategory = currentMajorCategory?.requiresKeyword ?? true;
+          
+          return (
         <div className="space-y-4">
           <Input
             label="名称 *"
@@ -621,15 +643,21 @@ export const CategoryManager: React.FC = () => {
             />
           </div>
           
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={categoryForm.defaultSearchable}
-              onChange={(e) => setCategoryForm({ ...categoryForm, defaultSearchable: e.target.checked })}
-              className="rounded border-surface-300 dark:border-surface-600"
-            />
-            <span className="text-sm text-surface-700 dark:text-surface-300">默认可搜索</span>
-          </label>
+          {isSearchCategory ? (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={categoryForm.defaultSearchable}
+                onChange={(e) => setCategoryForm({ ...categoryForm, defaultSearchable: e.target.checked })}
+                className="rounded border-surface-300 dark:border-surface-600"
+              />
+              <span className="text-sm text-surface-700 dark:text-surface-300">默认可搜索</span>
+            </label>
+          ) : (
+            <div className="p-3 rounded-lg bg-surface-100 dark:bg-surface-800 text-sm text-surface-500 dark:text-surface-400">
+              <span className="font-medium">提示：</span>该大类为浏览型（无需关键词），分类下的搜索源不参与搜索
+            </div>
+          )}
           
           <div className="flex justify-end gap-3 pt-4">
             <Button
@@ -646,6 +674,8 @@ export const CategoryManager: React.FC = () => {
             </Button>
           </div>
         </div>
+          );
+        })()}
       </Modal>
     </div>
   );

@@ -13,7 +13,7 @@ import {
   MoreVertical,
   Trash2,
 } from 'lucide-react';
-import { Card, Button, Input, Badge, Modal, Loading, Tabs, EmptyState, Dropdown } from '@/components/ui';
+import { Card, Button, Input, Badge, Modal, Loading, Tabs, EmptyState, Dropdown, SourceIcon } from '@/components/ui';
 import { communityApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import type { 
@@ -348,13 +348,11 @@ export const CommunityManager: React.FC = () => {
             <Card key={source.id} className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  {source.sourceIcon ? (
-                    <img src={source.sourceIcon} alt="" className="w-12 h-12 rounded-xl shadow-sm" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-surface-200 to-surface-300 dark:from-surface-700 dark:to-surface-600 flex items-center justify-center">
-                      <Globe className="w-6 h-6 text-surface-500" />
-                    </div>
-                  )}
+                  <SourceIcon
+                    icon={source.sourceIcon}
+                    name={source.sourceName}
+                    size="lg"
+                  />
                   <div>
                     <h3 className="font-semibold text-surface-900 dark:text-surface-100">
                       {source.sourceName}
@@ -622,13 +620,11 @@ export const CommunityManager: React.FC = () => {
         {sourceDetailModal.source && (
           <div className="space-y-6">
             <div className="flex items-start gap-4">
-              {sourceDetailModal.source.sourceIcon ? (
-                <img src={sourceDetailModal.source.sourceIcon} alt="" className="w-16 h-16 rounded-xl shadow-md" />
-              ) : (
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-surface-200 to-surface-300 dark:from-surface-700 dark:to-surface-600 flex items-center justify-center">
-                  <Globe className="w-8 h-8 text-surface-500" />
-                </div>
-              )}
+              <SourceIcon
+                icon={sourceDetailModal.source.sourceIcon}
+                name={sourceDetailModal.source.sourceName}
+                size="xl"
+              />
               <div>
                 <h3 className="text-xl font-bold text-surface-900 dark:text-surface-100">
                   {sourceDetailModal.source.sourceName}

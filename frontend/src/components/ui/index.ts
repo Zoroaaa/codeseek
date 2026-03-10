@@ -11,3 +11,4 @@ export { Badge } from './Badge';
 export { Tabs, TabPanel } from './Tabs';
 export { EmptyState } from './EmptyState';
 export { Dropdown } from './Dropdown';
+export { SourceIcon } from './SourceIcon';

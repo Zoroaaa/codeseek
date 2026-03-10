@@ -9,12 +9,14 @@ import {
   Download,
   CheckCircle,
   XCircle,
-  Globe,
   Tag,
   ChevronDown,
+  ChevronRight,
   Filter,
+  Layers,
+  FolderOpen,
 } from 'lucide-react';
-import { Card, Button, Input, Badge, Modal, Loading, Dropdown, EmptyState } from '@/components/ui';
+import { Card, Button, Input, Badge, Modal, Loading, Dropdown, EmptyState, SourceIcon } from '@/components/ui';
 import { sourceApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import type { 
@@ -27,6 +29,22 @@ import type {
   UpdateSourceRequest,
 } from '@/types';
 
+interface CategoryWithSources extends Category {
+  sources: Array<SearchSource & { userConfig?: UserSourceConfig | null }>;
+  enabledCount: number;
+  totalCount: number;
+  isAllEnabled: boolean;
+  isAllDisabled: boolean;
+}
+
+interface MajorCategoryWithCategories extends MajorCategory {
+  categories: CategoryWithSources[];
+  enabledCount: number;
+  totalCount: number;
+  isAllEnabled: boolean;
+  isAllDisabled: boolean;
+}
+
 export const SourceManager: React.FC = () => {
   const toast = useToast();
   
@@ -36,10 +54,8 @@ export const SourceManager: React.FC = () => {
   const [stats, setStats] = useState<SourceStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMajorCategory, setSelectedMajorCategory] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const [expandedMajorCategories, setExpandedMajorCategories] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   const [editModal, setEditModal] = useState<{ isOpen: boolean; source: SearchSource | null }>({
     isOpen: false,
@@ -72,11 +88,13 @@ export const SourceManager: React.FC = () => {
       const majorCategoriesRes = await sourceApi.getMajorCategories();
       if (majorCategoriesRes.success && majorCategoriesRes.data) {
         setMajorCategories(majorCategoriesRes.data);
+        setExpandedMajorCategories(new Set(majorCategoriesRes.data.map(m => m.id)));
       }
       
       const categoriesRes = await sourceApi.getCategories();
       if (categoriesRes.success && categoriesRes.data) {
         setCategories(categoriesRes.data);
+        setExpandedCategories(new Set(categoriesRes.data.map(c => c.id)));
       }
       
       const statsRes = await sourceApi.getSourceStats();
@@ -94,22 +112,98 @@ export const SourceManager: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const filteredSources = sources.filter(source => {
-    const matchesSearch = source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (source.subtitle?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-    
-    const category = categories.find(c => c.id === source.categoryId);
-    const matchesMajorCategory = selectedMajorCategory === 'all' || 
-      category?.majorCategoryId === selectedMajorCategory;
-    
-    const matchesCategory = selectedCategory === 'all' || source.categoryId === selectedCategory;
-    
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'active' && source.userConfig?.isEnabled !== false) ||
-      (statusFilter === 'inactive' && source.userConfig?.isEnabled === false);
-    
-    return matchesSearch && matchesMajorCategory && matchesCategory && matchesStatus;
+  const getMajorCategoriesWithCategories = (): MajorCategoryWithCategories[] => {
+    return majorCategories.map(mc => {
+      const majorCategoryCategories = categories.filter(c => c.majorCategoryId === mc.id);
+      
+      const categoriesWithSources: CategoryWithSources[] = majorCategoryCategories.map(cat => {
+        const categorySources = sources.filter(s => s.categoryId === cat.id);
+        const enabledCount = categorySources.filter(s => s.userConfig?.isEnabled !== false).length;
+        
+        return {
+          ...cat,
+          sources: categorySources,
+          enabledCount,
+          totalCount: categorySources.length,
+          isAllEnabled: enabledCount === categorySources.length && categorySources.length > 0,
+          isAllDisabled: enabledCount === 0 && categorySources.length > 0,
+        };
+      }).filter(c => c.sources.length > 0);
+      
+      const totalSources = categoriesWithSources.reduce((sum, c) => sum + c.totalCount, 0);
+      const enabledSources = categoriesWithSources.reduce((sum, c) => sum + c.enabledCount, 0);
+      
+      return {
+        ...mc,
+        categories: categoriesWithSources,
+        enabledCount: enabledSources,
+        totalCount: totalSources,
+        isAllEnabled: enabledSources === totalSources && totalSources > 0,
+        isAllDisabled: enabledSources === 0 && totalSources > 0,
+      };
+    }).filter(mc => mc.categories.length > 0);
+  };
+
+  const filteredMajorCategories = getMajorCategoriesWithCategories().filter(mc => {
+    if (!searchQuery) return true;
+    return mc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           mc.categories.some(cat => 
+             cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             cat.sources.some(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+           );
   });
+
+  const handleToggleMajorCategory = async (majorCategoryId: string, enable: boolean) => {
+    const mc = getMajorCategoriesWithCategories().find(m => m.id === majorCategoryId);
+    if (!mc) return;
+    
+    const allSources = mc.categories.flatMap(c => c.sources);
+    
+    try {
+      const configs = allSources.map(source => ({
+        sourceId: source.id,
+        isEnabled: enable,
+      }));
+      
+      await sourceApi.batchUpdateUserSourceConfigs({ configs });
+      
+      setSources(prev => prev.map(s => 
+        allSources.some(as => as.id === s.id)
+          ? { ...s, userConfig: { ...s.userConfig, isEnabled: enable } as UserSourceConfig }
+          : s
+      ));
+      
+      toast.success(`已${enable ? '启用' : '禁用'} ${mc.name} 下所有搜索源`);
+    } catch (error) {
+      toast.error('操作失败', '请稍后重试');
+    }
+  };
+
+  const handleToggleCategory = async (categoryId: string, enable: boolean) => {
+    const cat = categories.find(c => c.id === categoryId);
+    if (!cat) return;
+    
+    const categorySources = sources.filter(s => s.categoryId === categoryId);
+    
+    try {
+      const configs = categorySources.map(source => ({
+        sourceId: source.id,
+        isEnabled: enable,
+      }));
+      
+      await sourceApi.batchUpdateUserSourceConfigs({ configs });
+      
+      setSources(prev => prev.map(s => 
+        s.categoryId === categoryId
+          ? { ...s, userConfig: { ...s.userConfig, isEnabled: enable } as UserSourceConfig }
+          : s
+      ));
+      
+      toast.success(`已${enable ? '启用' : '禁用'} ${cat.name} 下所有搜索源`);
+    } catch (error) {
+      toast.error('操作失败', '请稍后重试');
+    }
+  };
 
   const handleToggleSource = async (sourceId: string, isEnabled: boolean) => {
     try {
@@ -122,33 +216,6 @@ export const SourceManager: React.FC = () => {
       toast.success(isEnabled ? '已启用' : '已禁用');
     } catch (error) {
       toast.error('操作失败', '请稍后重试');
-    }
-  };
-
-  const handleBatchToggle = async (isEnabled: boolean) => {
-    if (selectedSources.size === 0) {
-      toast.warning('请先选择搜索源');
-      return;
-    }
-    
-    try {
-      const configs = Array.from(selectedSources).map(sourceId => ({
-        sourceId,
-        isEnabled,
-      }));
-      
-      await sourceApi.batchUpdateUserSourceConfigs({ configs });
-      
-      setSources(prev => prev.map(s => 
-        selectedSources.has(s.id)
-          ? { ...s, userConfig: { ...s.userConfig, isEnabled } as UserSourceConfig }
-          : s
-      ));
-      
-      setSelectedSources(new Set());
-      toast.success(`已${isEnabled ? '启用' : '禁用'} ${configs.length} 个搜索源`);
-    } catch (error) {
-      toast.error('批量操作失败', '请稍后重试');
     }
   };
 
@@ -223,9 +290,6 @@ export const SourceManager: React.FC = () => {
   };
 
   const handleCheckStatus = async (sourceId: string) => {
-    const source = sources.find(s => s.id === sourceId);
-    if (!source) return;
-    
     try {
       const response = await sourceApi.checkSourceStatus(sourceId);
       if (response.success && response.data) {
@@ -241,7 +305,7 @@ export const SourceManager: React.FC = () => {
 
   const handleExport = async (format: 'json' | 'csv' | 'opml') => {
     try {
-      const data = await sourceApi.exportSources(format, selectedCategory !== 'all' ? selectedCategory : undefined);
+      const data = await sourceApi.exportSources(format);
       
       if (format === 'json') {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -267,39 +331,34 @@ export const SourceManager: React.FC = () => {
     }
   };
 
-  const handleSelectAll = () => {
-    if (selectedSources.size === filteredSources.length) {
-      setSelectedSources(new Set());
+  const toggleMajorCategoryExpand = (id: string) => {
+    const newExpanded = new Set(expandedMajorCategories);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
     } else {
-      setSelectedSources(new Set(filteredSources.map(s => s.id)));
+      newExpanded.add(id);
     }
+    setExpandedMajorCategories(newExpanded);
   };
 
-  const handleSelectSource = (sourceId: string) => {
-    const newSelected = new Set(selectedSources);
-    if (newSelected.has(sourceId)) {
-      newSelected.delete(sourceId);
+  const toggleCategoryExpand = (id: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
     } else {
-      newSelected.add(sourceId);
+      newExpanded.add(id);
     }
-    setSelectedSources(newSelected);
+    setExpandedCategories(newExpanded);
   };
 
-  const getCategoryName = (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId);
-    return category?.name || '未分类';
+  const getSiteTypeBadge = (siteType: string) => {
+    const map: Record<string, { variant: 'primary' | 'accent' | 'default'; label: string }> = {
+      search: { variant: 'primary', label: '搜索' },
+      browse: { variant: 'accent', label: '浏览' },
+      reference: { variant: 'default', label: '参考' },
+    };
+    return map[siteType] || map.search;
   };
-
-  const getMajorCategoryName = (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId);
-    if (!category) return '';
-    const majorCategory = majorCategories.find(m => m.id === category.majorCategoryId);
-    return majorCategory?.name || '';
-  };
-
-  const filteredCategories = selectedMajorCategory === 'all'
-    ? categories
-    : categories.filter(c => c.majorCategoryId === selectedMajorCategory);
 
   if (isLoading) {
     return (
@@ -321,7 +380,7 @@ export const SourceManager: React.FC = () => {
               搜索源管理
             </h2>
             <p className="text-surface-500 dark:text-surface-400">
-              管理和配置您的搜索源
+              按大类、分类管理搜索源的启用状态
             </p>
           </div>
         </div>
@@ -370,9 +429,9 @@ export const SourceManager: React.FC = () => {
                 <CheckCircle className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-surface-500 dark:text-surface-400">可搜索</p>
+                <p className="text-sm text-surface-500 dark:text-surface-400">已启用</p>
                 <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
-                  {stats.searchableSources}
+                  {sources.filter(s => s.userConfig?.isEnabled !== false).length}
                 </p>
               </div>
             </div>
@@ -393,7 +452,7 @@ export const SourceManager: React.FC = () => {
           <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-warning-400 to-warning-600 flex items-center justify-center shadow-md">
-                <Globe className="w-6 h-6 text-white" />
+                <Layers className="w-6 h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-surface-500 dark:text-surface-400">大类数</p>
@@ -407,263 +466,293 @@ export const SourceManager: React.FC = () => {
       )}
 
       <Card className="p-5 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1">
-            <Input
-              placeholder="搜索搜索源..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              leftIcon={<Search className="w-5 h-5" />}
-              fullWidth
-            />
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-surface-400" />
-              <select
-                value={selectedMajorCategory}
-                onChange={(e) => {
-                  setSelectedMajorCategory(e.target.value);
-                  setSelectedCategory('all');
-                }}
-                className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="all">所有大类</option>
-                {majorCategories.map(mc => (
-                  <option key={mc.id} value={mc.id}>{mc.name}</option>
-                ))}
-              </select>
-            </div>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">所有分类</option>
-              {filteredCategories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-              className="px-4 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">全部状态</option>
-              <option value="active">已启用</option>
-              <option value="inactive">已禁用</option>
-            </select>
-          </div>
+        <div className="flex items-center gap-3">
+          <Filter className="w-5 h-5 text-surface-400" />
+          <Input
+            placeholder="搜索大类、分类或搜索源..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            leftIcon={<Search className="w-5 h-5" />}
+            fullWidth
+          />
         </div>
       </Card>
 
-      {selectedSources.size > 0 && (
-        <Card className="p-4 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-900/20 dark:to-accent-900/20 border-primary-200 dark:border-primary-800 shadow-lg">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
-              已选择 {selectedSources.size} 个搜索源
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleBatchToggle(true)}
-                leftIcon={<CheckCircle className="w-4 h-4" />}
-              >
-                批量启用
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleBatchToggle(false)}
-                leftIcon={<XCircle className="w-4 h-4" />}
-              >
-                批量禁用
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedSources(new Set())}
-              >
-                取消选择
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      <Card className="overflow-hidden border-surface-200/50 dark:border-surface-700/50 shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800">
-              <tr>
-                <th className="px-4 py-4 text-left">
-                  <input
-                    type="checkbox"
-                    checked={selectedSources.size === filteredSources.length && filteredSources.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-surface-300 dark:border-surface-600"
-                  />
-                </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
-                  名称
-                </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
-                  分类
-                </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
-                  类型
-                </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
-                  状态
-                </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold text-surface-600 dark:text-surface-400">
-                  使用次数
-                </th>
-                <th className="px-4 py-4 text-right text-sm font-semibold text-surface-600 dark:text-surface-400">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-200 dark:divide-surface-700">
-              {filteredSources.map(source => (
-                <tr key={source.id} className="hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors">
-                  <td className="px-4 py-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedSources.has(source.id)}
-                      onChange={() => handleSelectSource(source.id)}
-                      className="rounded border-surface-300 dark:border-surface-600"
-                    />
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      {source.icon ? (
-                        <img src={source.icon} alt="" className="w-10 h-10 rounded-lg shadow-sm" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-surface-200 to-surface-300 dark:from-surface-700 dark:to-surface-600 flex items-center justify-center">
-                          <Globe className="w-5 h-5 text-surface-500" />
+      <div className="space-y-4">
+        {filteredMajorCategories.map((majorCategory) => {
+          const isMajorExpanded = expandedMajorCategories.has(majorCategory.id);
+          const isSearchCategory = majorCategory.requiresKeyword;
+          
+          return (
+            <Card key={majorCategory.id} className="overflow-hidden border-surface-200/50 dark:border-surface-700/50 shadow-lg">
+              <div className="flex items-center justify-between p-5 bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800">
+                <button
+                  onClick={() => toggleMajorCategoryExpand(majorCategory.id)}
+                  className="flex items-center gap-4 flex-1 text-left"
+                >
+                  <ChevronRight className={`w-5 h-5 text-surface-400 transition-transform duration-200 ${isMajorExpanded ? 'rotate-90' : ''}`} />
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md"
+                    style={{ backgroundColor: majorCategory.color || '#3B82F6' }}
+                  >
+                    {majorCategory.icon ? (
+                      <span className="text-2xl">{majorCategory.icon}</span>
+                    ) : (
+                      <Layers className="w-6 h-6" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+                      {majorCategory.name}
+                    </h3>
+                    <p className="text-sm text-surface-500 dark:text-surface-400">
+                      {majorCategory.categories.length} 个分类 · {majorCategory.totalCount} 个搜索源
+                    </p>
+                  </div>
+                </button>
+                
+                <div className="flex items-center gap-3">
+                  {isSearchCategory ? (
+                    <>
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-700">
+                        <span className="text-sm text-surface-600 dark:text-surface-300">
+                          {majorCategory.enabledCount}/{majorCategory.totalCount} 启用
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleToggleMajorCategory(majorCategory.id, !majorCategory.isAllEnabled)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          majorCategory.isAllEnabled
+                            ? 'bg-gradient-to-r from-success-100 to-success-200 text-success-700 dark:from-success-900/30 dark:to-success-800/30 dark:text-success-400'
+                            : majorCategory.isAllDisabled
+                            ? 'bg-surface-200 text-surface-600 dark:bg-surface-700 dark:text-surface-400'
+                            : 'bg-gradient-to-r from-warning-100 to-warning-200 text-warning-700 dark:from-warning-900/30 dark:to-warning-800/30 dark:text-warning-400'
+                        }`}
+                      >
+                        {majorCategory.isAllEnabled ? (
+                          <>
+                            <CheckCircle className="w-4 h-4" />
+                            全部启用
+                          </>
+                        ) : majorCategory.isAllDisabled ? (
+                          <>
+                            <XCircle className="w-4 h-4" />
+                            全部禁用
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4" />
+                            部分启用
+                          </>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <Badge variant="outline" className="text-xs bg-surface-100 dark:bg-surface-700">
+                      浏览型 · 不参与搜索
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              
+              {isMajorExpanded && (
+                <div className="border-t border-surface-200 dark:border-surface-700">
+                  {majorCategory.categories.map((category) => {
+                    const isCategoryExpanded = expandedCategories.has(category.id);
+                    
+                    return (
+                      <div key={category.id} className="border-b border-surface-100 dark:border-surface-800 last:border-b-0">
+                        <div 
+                          className="flex items-center justify-between px-5 py-3 pl-12 hover:bg-surface-50 dark:hover:bg-surface-800/50 cursor-pointer transition-colors"
+                          onClick={() => toggleCategoryExpand(category.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <ChevronRight className={`w-4 h-4 text-surface-400 transition-transform duration-200 ${isCategoryExpanded ? 'rotate-90' : ''}`} />
+                            <div 
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm"
+                              style={{ backgroundColor: category.color || '#6366f1' }}
+                            >
+                              {category.icon ? (
+                                <span className="text-base">{category.icon}</span>
+                              ) : (
+                                <FolderOpen className="w-4 h-4" />
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-medium text-surface-800 dark:text-surface-200">
+                                {category.name}
+                              </span>
+                              <span className="text-sm text-surface-400 ml-2">
+                                {category.totalCount} 个源
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                            {isSearchCategory ? (
+                              <>
+                                <span className="text-xs text-surface-500 dark:text-surface-400">
+                                  {category.enabledCount}/{category.totalCount} 启用
+                                </span>
+                                <button
+                                  onClick={() => handleToggleCategory(category.id, !category.isAllEnabled)}
+                                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                                    category.isAllEnabled
+                                      ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
+                                      : category.isAllDisabled
+                                      ? 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
+                                      : 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
+                                  }`}
+                                >
+                                  {category.isAllEnabled ? (
+                                    <>
+                                      <CheckCircle className="w-3 h-3" />
+                                      全部启用
+                                    </>
+                                  ) : category.isAllDisabled ? (
+                                    <>
+                                      <XCircle className="w-3 h-3" />
+                                      全部禁用
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="w-3 h-3" />
+                                      部分启用
+                                    </>
+                                  )}
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-xs text-surface-400 dark:text-surface-500">
+                                不参与搜索
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <div>
-                        <p className="font-medium text-surface-900 dark:text-surface-100">
-                          {source.userConfig?.customName || source.name}
-                        </p>
-                        {source.subtitle && (
-                          <p className="text-sm text-surface-500 dark:text-surface-400">
-                            {source.userConfig?.customSubtitle || source.subtitle}
-                          </p>
+                        
+                        {isCategoryExpanded && (
+                          <div className="bg-surface-50/50 dark:bg-surface-900/30">
+                            {category.sources.map((source) => {
+                              const isEnabled = source.userConfig?.isEnabled !== false;
+                              const siteType = getSiteTypeBadge(source.siteType);
+                              
+                              return (
+                                <div 
+                                  key={source.id}
+                                  className={`flex items-center justify-between px-5 py-3 pl-16 hover:bg-surface-100/50 dark:hover:bg-surface-800/30 transition-colors ${
+                                    !isEnabled ? 'opacity-60' : ''
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <SourceIcon
+                                      icon={source.icon}
+                                      name={source.name}
+                                      size="sm"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">
+                                          {source.userConfig?.customName || source.name}
+                                        </p>
+                                        <Badge variant={siteType.variant} className="text-xs">
+                                          {siteType.label}
+                                        </Badge>
+                                      </div>
+                                      {(source.userConfig?.customSubtitle || source.subtitle) && (
+                                        <p className="text-xs text-surface-500 dark:text-surface-400 truncate">
+                                          {source.userConfig?.customSubtitle || source.subtitle}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2 shrink-0 ml-4">
+                                    {isSearchCategory ? (
+                                      <button
+                                        onClick={() => handleToggleSource(source.id, !isEnabled)}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+                                          isEnabled
+                                            ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
+                                            : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
+                                        }`}
+                                      >
+                                        {isEnabled ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                        {isEnabled ? '启用' : '禁用'}
+                                      </button>
+                                    ) : (
+                                      <span className="text-xs text-surface-400 dark:text-surface-500 px-2 py-1">
+                                        不参与搜索
+                                      </span>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleCheckStatus(source.id)}
+                                      title="检测状态"
+                                      className="p-1 hover:bg-primary-50 dark:hover:bg-primary-900/20"
+                                    >
+                                      <RefreshCw className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setFormData({
+                                          name: source.name,
+                                          subtitle: source.subtitle || '',
+                                          description: source.description || '',
+                                          icon: source.icon || '',
+                                          urlTemplate: source.urlTemplate,
+                                          homepageUrl: source.homepageUrl || '',
+                                          categoryId: source.categoryId,
+                                          siteType: source.siteType,
+                                          searchable: source.searchable,
+                                          requiresKeyword: source.requiresKeyword,
+                                          searchPriority: source.searchPriority,
+                                        });
+                                        setEditModal({ isOpen: true, source });
+                                      }}
+                                      title="编辑"
+                                      className="p-1 hover:bg-accent-50 dark:hover:bg-accent-900/20"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteSource(source.id)}
+                                      title="删除"
+                                      className="p-1 text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div>
-                      <p className="text-sm text-surface-900 dark:text-surface-100">
-                        {getCategoryName(source.categoryId)}
-                      </p>
-                      <p className="text-xs text-surface-500 dark:text-surface-400">
-                        {getMajorCategoryName(source.categoryId)}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <Badge variant={source.siteType === 'search' ? 'primary' : source.siteType === 'browse' ? 'accent' : 'default'}>
-                      {source.siteType === 'search' ? '搜索' : source.siteType === 'browse' ? '浏览' : '参考'}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-4">
-                    <button
-                      onClick={() => handleToggleSource(source.id, source.userConfig?.isEnabled === false)}
-                      className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                        source.userConfig?.isEnabled !== false
-                          ? 'bg-gradient-to-r from-success-100 to-success-200 text-success-700 dark:from-success-900/30 dark:to-success-800/30 dark:text-success-400'
-                          : 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400'
-                      }`}
-                    >
-                      {source.userConfig?.isEnabled !== false ? (
-                        <>
-                          <CheckCircle className="w-4 h-4" />
-                          启用
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="w-4 h-4" />
-                          禁用
-                        </>
-                      )}
-                    </button>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-surface-600 dark:text-surface-400">
-                    <span className="px-2 py-1 bg-surface-100 dark:bg-surface-800 rounded">
-                      {source.usageCount}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCheckStatus(source.id)}
-                        title="检测状态"
-                        className="hover:bg-primary-50 dark:hover:bg-primary-900/20"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setFormData({
-                            name: source.name,
-                            subtitle: source.subtitle || '',
-                            description: source.description || '',
-                            icon: source.icon || '',
-                            urlTemplate: source.urlTemplate,
-                            homepageUrl: source.homepageUrl || '',
-                            categoryId: source.categoryId,
-                            siteType: source.siteType,
-                            searchable: source.searchable,
-                            requiresKeyword: source.requiresKeyword,
-                            searchPriority: source.searchPriority,
-                          });
-                          setEditModal({ isOpen: true, source });
-                        }}
-                        title="编辑"
-                        className="hover:bg-accent-50 dark:hover:bg-accent-900/20"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteSource(source.id)}
-                        title="删除"
-                        className="text-error-500 hover:text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {filteredSources.length === 0 && (
-            <EmptyState
-              icon={<Database className="w-12 h-12" />}
-              title="没有找到搜索源"
-              description="尝试调整筛选条件或添加新的搜索源"
-              action={
-                <Button variant="primary" onClick={() => setCreateModal(true)}>
-                  添加搜索源
-                </Button>
-              }
-            />
-          )}
-        </div>
-      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+        
+        {filteredMajorCategories.length === 0 && (
+          <EmptyState
+            icon={<Database className="w-12 h-12" />}
+            title="没有找到搜索源"
+            description="尝试调整搜索条件或添加新的搜索源"
+            action={
+              <Button variant="primary" onClick={() => setCreateModal(true)}>
+                添加搜索源
+              </Button>
+            }
+          />
+        )}
+      </div>
 
       <Modal
         isOpen={createModal || editModal.isOpen}
@@ -732,8 +821,12 @@ export const SourceManager: React.FC = () => {
                 className="w-full px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100"
               >
                 <option value="">选择分类</option>
-                {categories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                {majorCategories.map(mc => (
+                  <optgroup key={mc.id} label={mc.name}>
+                    {categories.filter(c => c.majorCategoryId === mc.id).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
