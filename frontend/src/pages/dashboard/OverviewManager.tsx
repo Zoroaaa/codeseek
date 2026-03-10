@@ -107,6 +107,9 @@ export const OverviewManager: React.FC = () => {
     totalSearches: number;
     topSources: Array<{ source: string; count: number }>;
     recentSearches: Array<{ query: string; createdAt: number }>;
+    searchGrowthPercent: number;
+    thisWeekSearches: number;
+    lastWeekSearches: number;
   } | null>(null);
   const [recentActivities, setRecentActivities] = useState<Array<{
     id: string;
@@ -132,7 +135,7 @@ export const OverviewManager: React.FC = () => {
         userApi.getSearchHistory(50),
         sourceApi.getSourcesWithUserConfig(),
         userApi.getSearchStats(),
-        systemApi.getUserActions({ limit: 10 })
+        systemApi.getUserActions({ userId: user?.id, limit: 10 })
       ]);
       
       if (statsResponse.success && statsResponse.data) {
@@ -266,7 +269,7 @@ export const OverviewManager: React.FC = () => {
         <StatCard
           title="我的搜索次数"
           value={userStats.searchCount}
-          change={8}
+          change={userSearchStats?.searchGrowthPercent}
           icon={<Search className="w-6 h-6" />}
           color="primary"
           onClick={() => navigate('/dashboard/history')}
@@ -288,7 +291,7 @@ export const OverviewManager: React.FC = () => {
         <StatCard
           title="活跃用户"
           value={stats?.activeUsers ?? 0}
-          change={23}
+          change={stats?.activeUsersGrowthPercent}
           icon={<Users className="w-6 h-6" />}
           color="success"
         />

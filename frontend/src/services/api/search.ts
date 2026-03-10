@@ -190,9 +190,50 @@ export const userApi = {
       totalSearches: number;
       topSources: Array<{ source: string; count: number }>;
       recentSearches: Array<{ query: string; createdAt: number }>;
+      searchGrowthPercent: number;
+      thisWeekSearches: number;
+      lastWeekSearches: number;
     } 
   }> => {
-    return apiClient.get('/user/search-stats');
+    const response = await apiClient.get<{
+      success: boolean;
+      data: {
+        totalSearches: number;
+        topSources: Array<{ source: string; count: number }>;
+        recentSearches: Array<{ query: string; created_at: number }>;
+        searchGrowthPercent: number;
+        thisWeekSearches: number;
+        lastWeekSearches: number;
+      };
+    }>('/user/search-stats');
+    
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: {
+          totalSearches: response.data.totalSearches || 0,
+          topSources: response.data.topSources || [],
+          recentSearches: (response.data.recentSearches || []).map(r => ({
+            query: r.query,
+            createdAt: r.created_at,
+          })),
+          searchGrowthPercent: response.data.searchGrowthPercent || 0,
+          thisWeekSearches: response.data.thisWeekSearches || 0,
+          lastWeekSearches: response.data.lastWeekSearches || 0,
+        }
+      };
+    }
+    return { 
+      success: false, 
+      data: {
+        totalSearches: 0,
+        topSources: [],
+        recentSearches: [],
+        searchGrowthPercent: 0,
+        thisWeekSearches: 0,
+        lastWeekSearches: 0,
+      }
+    };
   },
 
   getSourceConfigs: async (): Promise<{ 

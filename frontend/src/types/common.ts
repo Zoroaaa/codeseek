@@ -2,6 +2,7 @@ export interface SystemStats {
   activeUsers: number;
   activeSources: number;
   totalSearches: number;
+  activeUsersGrowthPercent?: number;
 }
 
 export interface AdminSystemStats {

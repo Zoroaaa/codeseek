@@ -166,10 +166,33 @@ systemRoutes.get('/stats', async (c) => {
       'SELECT COUNT(*) as count FROM user_search_history'
     ).first<{ count: number }>();
 
+    const now = Date.now();
+    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
+
+    const thisWeekActiveUsers = await c.env.DB.prepare(
+      'SELECT COUNT(DISTINCT user_id) as count FROM user_search_history WHERE created_at >= ?'
+    ).bind(oneWeekAgo).first<{ count: number }>();
+
+    const lastWeekActiveUsers = await c.env.DB.prepare(
+      'SELECT COUNT(DISTINCT user_id) as count FROM user_search_history WHERE created_at >= ? AND created_at < ?'
+    ).bind(twoWeeksAgo, oneWeekAgo).first<{ count: number }>();
+
+    const thisWeekActive = thisWeekActiveUsers?.count || 0;
+    const lastWeekActive = lastWeekActiveUsers?.count || 0;
+    let activeUsersGrowthPercent = 0;
+    if (lastWeekActive > 0) {
+      activeUsersGrowthPercent = Math.round(((thisWeekActive - lastWeekActive) / lastWeekActive) * 100);
+    } else if (thisWeekActive > 0) {
+      activeUsersGrowthPercent = 100;
+    }
+
     return c.json(success({
       users: userCount?.count || 0,
       sources: sourceCount?.count || 0,
       searches: searchCount?.count || 0,
+      activeUsers: thisWeekActive,
+      activeUsersGrowthPercent,
     }));
   } catch (err) {
     console.error('Get stats error:', err);

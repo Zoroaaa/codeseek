@@ -447,10 +447,34 @@ userRoutes.get('/search-stats', async (c) => {
       'SELECT query, created_at FROM user_search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 10'
     ).bind(payload.userId).all<{ query: string; created_at: number }>();
 
+    const now = Date.now();
+    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
+
+    const thisWeekSearches = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ? AND created_at >= ?'
+    ).bind(payload.userId, oneWeekAgo).first<{ count: number }>();
+
+    const lastWeekSearches = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ? AND created_at >= ? AND created_at < ?'
+    ).bind(payload.userId, twoWeeksAgo, oneWeekAgo).first<{ count: number }>();
+
+    const thisWeek = thisWeekSearches?.count || 0;
+    const lastWeek = lastWeekSearches?.count || 0;
+    let searchGrowthPercent = 0;
+    if (lastWeek > 0) {
+      searchGrowthPercent = Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
+    } else if (thisWeek > 0) {
+      searchGrowthPercent = 100;
+    }
+
     return c.json(success({
       totalSearches: totalSearches?.count || 0,
       topSources: topSources.results || [],
       recentSearches: recentSearches.results || [],
+      searchGrowthPercent,
+      thisWeekSearches: thisWeek,
+      lastWeekSearches: lastWeek,
     }));
   } catch (err) {
     console.error('Get search stats error:', err);

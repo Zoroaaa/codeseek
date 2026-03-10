@@ -22,15 +22,18 @@ export const systemApi = {
       users: number;
       sources: number;
       searches: number;
+      activeUsers: number;
+      activeUsersGrowthPercent: number;
     } }>('/stats');
     
     if (response.success && response.data) {
       return {
         success: true,
         data: {
-          activeUsers: response.data.users || 0,
+          activeUsers: response.data.activeUsers || response.data.users || 0,
           activeSources: response.data.sources || 0,
           totalSearches: response.data.searches || 0,
+          activeUsersGrowthPercent: response.data.activeUsersGrowthPercent || 0,
         }
       };
     }
@@ -40,6 +43,7 @@ export const systemApi = {
         activeUsers: 0,
         activeSources: 0,
         totalSearches: 0,
+        activeUsersGrowthPercent: 0,
       }
     };
   },
