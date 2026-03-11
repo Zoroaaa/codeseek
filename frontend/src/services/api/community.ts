@@ -110,6 +110,8 @@ export const communityApi = {
           status: string;
           created_at: number;
           updated_at: number;
+          author_name?: string;
+          is_liked?: number;
         }>;
         total: number;
         page: number;
@@ -132,7 +134,7 @@ export const communityApi = {
             description: s.description || undefined,
             tags: JSON.parse(s.tags || '[]'),
             authorId: s.user_id,
-            authorName: '',
+            authorName: s.author_name || '',
             viewCount: s.view_count,
             downloadCount: s.download_count,
             likeCount: s.like_count,
@@ -141,6 +143,7 @@ export const communityApi = {
             status: s.status as 'pending' | 'active' | 'rejected',
             createdAt: new Date(s.created_at).toISOString(),
             updatedAt: new Date(s.updated_at).toISOString(),
+            isLiked: s.is_liked === 1,
           })),
           total: response.data.total,
           page: response.data.page,
@@ -435,7 +438,10 @@ export const communityApi = {
     return { success: false, data: { items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 } };
   },
 
-  getPopularSources: async (limit = 10): Promise<{ success: boolean; data: SharedSource[] }> => {
+  getPopularSources: async (limit = 10, tag?: string): Promise<{ success: boolean; data: SharedSource[] }> => {
+    let url = `/community/sources/popular?limit=${limit}`;
+    if (tag) url += `&tag=${encodeURIComponent(tag)}`;
+    
     const response = await apiClient.get<{ 
       success: boolean; 
       data: Array<{
@@ -456,8 +462,9 @@ export const communityApi = {
         status: string;
         created_at: number;
         updated_at: number;
+        author_name?: string;
       }>
-    }>(`/community/sources/popular?limit=${limit}`);
+    }>(url);
     
     if (response.success && response.data) {
       return {
@@ -472,7 +479,7 @@ export const communityApi = {
           description: s.description || undefined,
           tags: JSON.parse(s.tags || '[]'),
           authorId: s.user_id,
-          authorName: '',
+          authorName: s.author_name || '',
           viewCount: s.view_count,
           downloadCount: s.download_count,
           likeCount: s.like_count,

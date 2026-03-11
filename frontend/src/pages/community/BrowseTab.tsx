@@ -10,13 +10,15 @@ import {
   MessageSquare,
   RefreshCw,
   Flag,
+  Plus,
+  Share2,
 } from 'lucide-react';
 import { Card, Button, Input, Modal, Loading, EmptyState, SourceIcon } from '@/components/ui';
 import { communityApi } from '@/services/api';
 import { sourceApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores';
-import type { SharedSource, Tag } from '@/types';
+import type { SharedSource, Tag, CreateSharedSourceRequest } from '@/types';
 import type { CreateSourceRequest } from '@/types';
 import { StarRating, Pagination } from './shared';
 
@@ -49,6 +51,13 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
   const [reportModal, setReportModal] = useState<{ open: boolean; sourceId: string }>({ open: false, sourceId: '' });
   const [reportReason, setReportReason] = useState('');
 
+  // Share modal state
+  const [shareModal, setShareModal] = useState(false);
+  const [shareForm, setShareForm] = useState<CreateSharedSourceRequest>({
+    sourceName: '', sourceSubtitle: '', sourceIcon: '', sourceUrlTemplate: '', sourceCategory: '', description: '', tags: [],
+  });
+  const [shareLoading, setShareLoading] = useState(false);
+
   // Import modal state
   const [importModal, setImportModal] = useState<{ open: boolean; source: SharedSource | null }>({ open: false, source: null });
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
@@ -74,6 +83,11 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
         setSources(res.data.items);
         setTotalPages(res.data.totalPages);
         setTotal(res.data.total);
+        const likedSet = new Set<string>();
+        res.data.items.forEach(s => {
+          if (s.isLiked) likedSet.add(s.id);
+        });
+        setLikedIds(likedSet);
       }
     } catch { toast.error('加载失败'); } finally { setLoading(false); }
   }, [page, search, selectedTag, sortBy]);
@@ -186,6 +200,32 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
       setReportModal({ open: false, sourceId: '' });
       setReportReason('');
     } catch { toast.error('提交失败'); }
+  };
+
+  const handleShare = async () => {
+    if (!isAuthenticated) { toast.warning('请先登录'); return; }
+    if (!shareForm.sourceName || !shareForm.sourceUrlTemplate || !shareForm.sourceCategory) { 
+      toast.error('请填写必填字段（名称、URL模板、分类）'); 
+      return; 
+    }
+    setShareLoading(true);
+    try {
+      const res = await communityApi.createSharedSource(shareForm);
+      if (res.success) { 
+        toast.success('分享成功！'); 
+        setShareModal(false); 
+        setShareForm({ 
+          sourceName: '', 
+          sourceSubtitle: '', 
+          sourceIcon: '', 
+          sourceUrlTemplate: '', 
+          sourceCategory: '', 
+          description: '', 
+          tags: [] 
+        }); 
+        loadSources(); 
+      }
+    } catch { toast.error('分享失败'); } finally { setShareLoading(false); }
   };
 
   if (loading) return <div className="flex justify-center py-16"><Loading size="lg" text="加载社区内容..." /></div>;
@@ -464,6 +504,55 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
           </div>
         </div>
       </Modal>
+
+      {/* 分享搜索源弹窗 */}
+      <Modal isOpen={shareModal} onClose={() => setShareModal(false)} title="分享搜索源" size="lg">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="名称 *" value={shareForm.sourceName} onChange={e => setShareForm(f => ({ ...f, sourceName: e.target.value }))} placeholder="搜索源名称" fullWidth />
+            <Input label="副标题" value={shareForm.sourceSubtitle || ''} onChange={e => setShareForm(f => ({ ...f, sourceSubtitle: e.target.value }))} placeholder="简短描述" fullWidth />
+          </div>
+          <Input label="URL模板 *" value={shareForm.sourceUrlTemplate} onChange={e => setShareForm(f => ({ ...f, sourceUrlTemplate: e.target.value }))} placeholder="https://example.com/search?q={keyword}" fullWidth />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="分类 *" value={shareForm.sourceCategory} onChange={e => setShareForm(f => ({ ...f, sourceCategory: e.target.value }))} placeholder="视频、音乐、软件..." fullWidth />
+            <Input label="图标URL" value={shareForm.sourceIcon || ''} onChange={e => setShareForm(f => ({ ...f, sourceIcon: e.target.value }))} placeholder="https://..." fullWidth />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">描述</label>
+            <textarea value={shareForm.description} onChange={e => setShareForm(f => ({ ...f, description: e.target.value }))} rows={3} className="w-full px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-sm" placeholder="详细描述搜索源特点..." />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">标签</label>
+            <div className="flex flex-wrap gap-2">
+              {tags.map(tag => (
+                <button key={tag.id} type="button" onClick={() => setShareForm(f => ({ ...f, tags: f.tags?.includes(tag.id) ? f.tags.filter(t => t !== tag.id) : [...(f.tags || []), tag.id] }))} className={clsx('px-3 py-1 rounded-full text-sm transition-all', shareForm.tags?.includes(tag.id) ? 'text-white shadow-md' : 'bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-600')} style={shareForm.tags?.includes(tag.id) ? { backgroundColor: tag.color } : {}}>
+                  {tag.name}
+                </button>
+              ))}
+              {tags.length === 0 && <span className="text-sm text-surface-400">暂无标签</span>}
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" onClick={() => setShareModal(false)}>取消</Button>
+            <Button variant="primary" onClick={handleShare} disabled={shareLoading} leftIcon={<Share2 className="w-4 h-4" />}>
+              {shareLoading ? '提交中...' : '提交分享'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 悬浮分享按钮 */}
+      <button
+        onClick={() => {
+          if (!isAuthenticated) { toast.warning('请先登录'); return; }
+          setShareForm({ sourceName: '', sourceSubtitle: '', sourceIcon: '', sourceUrlTemplate: '', sourceCategory: '', description: '', tags: [] });
+          setShareModal(true);
+        }}
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-50 group"
+        title="分享搜索源"
+      >
+        <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+      </button>
     </div>
   );
 };

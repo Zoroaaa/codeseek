@@ -197,20 +197,82 @@ communityRoutes.get('/sources', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
   const pageSize = parseInt(c.req.query('pageSize') || '20');
   const status = c.req.query('status') || 'active';
+  const search = c.req.query('search');
+  const tags = c.req.query('tags');
+  const sort = c.req.query('sort') || 'popular';
+  const category = c.req.query('category');
+  const userId = await getUserId(c);
 
   try {
+    let whereClauses: string[] = ['s.status = ?'];
+    let params: (string | number)[] = [status];
+
+    if (search) {
+      whereClauses.push('(s.source_name LIKE ? OR s.description LIKE ?)');
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern);
+    }
+
+    if (category) {
+      whereClauses.push('s.source_category = ?');
+      params.push(category);
+    }
+
+    if (tags) {
+      const tagList = tags.split(',').filter(t => t.trim());
+      if (tagList.length > 0) {
+        tagList.forEach(tag => {
+          whereClauses.push('s.tags LIKE ?');
+          params.push(`%"${tag}"%`);
+        });
+      }
+    }
+
+    let orderBy = 's.view_count DESC, s.like_count DESC';
+    if (sort === 'recent') {
+      orderBy = 's.created_at DESC';
+    } else if (sort === 'rating') {
+      orderBy = 's.rating_score DESC, s.rating_count DESC';
+    } else if (sort === 'downloads') {
+      orderBy = 's.download_count DESC';
+    }
+
+    const whereClause = whereClauses.join(' AND ');
+
     const countResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as total FROM community_shared_sources WHERE status = ?'
-    ).bind(status).first<{ total: number }>();
+      `SELECT COUNT(*) as total FROM community_shared_sources s WHERE ${whereClause}`
+    ).bind(...params).first<{ total: number }>();
 
     const total = countResult?.total || 0;
 
     const sources = await c.env.DB.prepare(
-      'SELECT * FROM community_shared_sources WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    ).bind(status, pageSize, (page - 1) * pageSize).all<CommunitySharedSource>();
+      `SELECT s.*, u.username as author_name 
+       FROM community_shared_sources s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       WHERE ${whereClause} 
+       ORDER BY ${orderBy} 
+       LIMIT ? OFFSET ?`
+    ).bind(...params, pageSize, (page - 1) * pageSize).all<CommunitySharedSource & { author_name?: string }>();
+
+    let likedSourceIds: Set<string> = new Set();
+    if (userId && sources.results && sources.results.length > 0) {
+      const sourceIds = sources.results.map(s => s.id);
+      const inClause = sourceIds.map(() => '?').join(',');
+      const likes = await c.env.DB.prepare(
+        `SELECT shared_source_id FROM community_source_likes 
+         WHERE user_id = ? AND like_type = 'like' AND shared_source_id IN (${inClause})`
+      ).bind(userId, ...sourceIds).all<{ shared_source_id: string }>();
+      
+      (likes.results || []).forEach(l => likedSourceIds.add(l.shared_source_id));
+    }
+
+    const items = (sources.results || []).map(s => ({
+      ...s,
+      is_liked: likedSourceIds.has(s.id) ? 1 : 0,
+    }));
 
     return c.json(success({
-      items: sources.results || [],
+      items,
       total,
       page,
       pageSize,
@@ -303,14 +365,24 @@ communityRoutes.get('/sources/my-sources', async (c) => {
 
 communityRoutes.get('/sources/popular', async (c) => {
   const limit = parseInt(c.req.query('limit') || '10');
+  const tag = c.req.query('tag');
 
   try {
-    const sources = await c.env.DB.prepare(
-      `SELECT * FROM community_shared_sources 
-       WHERE status = 'active' 
-       ORDER BY view_count DESC, like_count DESC 
-       LIMIT ?`
-    ).bind(limit).all<CommunitySharedSource>();
+    let query = `SELECT s.*, u.username as author_name 
+       FROM community_shared_sources s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       WHERE s.status = 'active'`;
+    const params: (string | number)[] = [];
+
+    if (tag) {
+      query += ` AND s.tags LIKE ?`;
+      params.push(`%"${tag}"%`);
+    }
+
+    query += ` ORDER BY s.view_count DESC, s.like_count DESC LIMIT ?`;
+    params.push(limit);
+
+    const sources = await c.env.DB.prepare(query).bind(...params).all<CommunitySharedSource & { author_name?: string }>();
 
     return c.json(success(sources.results || []));
   } catch (err) {

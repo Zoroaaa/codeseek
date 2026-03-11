@@ -28,6 +28,7 @@ export interface SharedSource {
   status: 'pending' | 'active' | 'rejected';
   createdAt: string;
   updatedAt: string;
+  isLiked?: boolean;
 }
 
 export interface Review {
