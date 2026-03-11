@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import { Env, SearchSource } from '../types';
 import { success, error, generateId } from '../utils';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware';
+import { CONFIG } from '../constants';
 
 export const searchRoutes = new Hono<{ Bindings: Env }>();
 
@@ -26,7 +27,7 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
   }
 
   const trimmedKeyword = keyword.trim();
-  const limitPageSize = Math.min(Math.max(1, pageSize), 100);
+  const limitPageSize = Math.min(Math.max(1, pageSize), CONFIG.Pagination.MAX_PAGE_SIZE);
   const limitPage = Math.max(1, page);
 
   try {
@@ -128,7 +129,7 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
  */
 searchRoutes.get('/history', authMiddleware, async (c) => {
   const userPayload = c.get('user');
-  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || '50')), 200);
+  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || String(CONFIG.Pagination.DEFAULT_HISTORY_LIMIT))), CONFIG.Pagination.MAX_HISTORY_LIMIT);
 
   try {
     const history = await c.env.DB.prepare(
@@ -297,9 +298,9 @@ searchRoutes.delete('/favorites/:id', authMiddleware, async (c) => {
  */
 searchRoutes.get('/suggestions', async (c) => {
   const keyword = c.req.query('keyword');
-  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || '10')), 20);
+  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || '10')), CONFIG.Search.SUGGESTIONS_MAX_LIMIT);
 
-  if (!keyword || keyword.length < 2) {
+  if (!keyword || keyword.length < CONFIG.Search.SUGGESTIONS_MIN_KEYWORD_LENGTH) {
     return c.json(success([]));
   }
 
@@ -326,11 +327,11 @@ searchRoutes.get('/suggestions', async (c) => {
  * 公开接口
  */
 searchRoutes.get('/trending', async (c) => {
-  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || '20')), 50);
-  const hours = Math.min(Math.max(1, parseInt(c.req.query('hours') || '24')), 168);
+  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || String(CONFIG.Search.TRENDING_DEFAULT_LIMIT))), CONFIG.Search.TRENDING_MAX_LIMIT);
+  const hours = Math.min(Math.max(1, parseInt(c.req.query('hours') || String(CONFIG.Search.TRENDING_DEFAULT_HOURS))), CONFIG.Search.TRENDING_MAX_HOURS);
 
   try {
-    const since = Date.now() - hours * 60 * 60 * 1000;
+    const since = Date.now() - hours * CONFIG.Stats.HOUR_IN_MS;
     
     const trending = await c.env.DB.prepare(
       `SELECT query as keyword, COUNT(*) as count 

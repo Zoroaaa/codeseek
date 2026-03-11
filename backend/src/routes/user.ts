@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Env, User, UserFavorite, UserSearchHistory } from '../types';
 import { success, error, generateId, verifyToken, logUserAction } from '../utils';
+import { CONFIG } from '../constants';
 
 export const userRoutes = new Hono<{ Bindings: Env }>();
 
@@ -133,7 +134,7 @@ userRoutes.post('/favorites', async (c) => {
       }, '已收藏该链接'));
     }
 
-    const maxFavorites = parseInt(c.env.MAX_FAVORITES_PER_USER || '1000', 10);
+    const maxFavorites = parseInt(c.env.MAX_FAVORITES_PER_USER || String(CONFIG.MAX_FAVORITES_PER_USER), 10);
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_favorites WHERE user_id = ?'
     ).bind(payload.userId).first<{ count: number }>();
@@ -198,7 +199,7 @@ userRoutes.post('/favorites/sync', async (c) => {
       return c.json(error('VALIDATION_ERROR', '收藏数据格式错误'), 400);
     }
 
-    const maxFavorites = parseInt(c.env.MAX_FAVORITES_PER_USER || '1000', 10);
+    const maxFavorites = parseInt(c.env.MAX_FAVORITES_PER_USER || String(CONFIG.MAX_FAVORITES_PER_USER), 10);
     if (favorites.length > maxFavorites) {
       return c.json(error('VALIDATION_ERROR', `最多只能同步${maxFavorites}个收藏`), 400);
     }
@@ -282,7 +283,7 @@ userRoutes.get('/search-history', async (c) => {
   }
 
   try {
-    const limit = parseInt(c.req.query('limit') || '50', 10);
+    const limit = parseInt(c.req.query('limit') || String(CONFIG.Pagination.DEFAULT_HISTORY_LIMIT), 10);
     const history = await c.env.DB.prepare(
       'SELECT * FROM user_search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
     ).bind(payload.userId, limit).all<UserSearchHistory>();
@@ -317,7 +318,7 @@ userRoutes.post('/search-history', async (c) => {
       return c.json(error('VALIDATION_ERROR', '搜索关键词是必填项'), 400);
     }
 
-    const maxHistory = parseInt(c.env.MAX_HISTORY_PER_USER || '1000', 10);
+    const maxHistory = parseInt(c.env.MAX_HISTORY_PER_USER || String(CONFIG.MAX_HISTORY_PER_USER), 10);
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?'
     ).bind(payload.userId).first<{ count: number }>();
@@ -448,8 +449,8 @@ userRoutes.get('/search-stats', async (c) => {
     ).bind(payload.userId).all<{ query: string; created_at: number }>();
 
     const now = Date.now();
-    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
-    const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
+    const oneWeekAgo = now - CONFIG.Stats.WEEK_IN_MS;
+    const twoWeeksAgo = now - CONFIG.Stats.TWO_WEEKS_IN_MS;
 
     const thisWeekSearches = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ? AND created_at >= ?'

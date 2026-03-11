@@ -76,18 +76,18 @@ export const getClientIP = (c: Context<{ Bindings: Env }>): string => {
          'unknown';
 };
 
+import { CONFIG } from '../constants';
+
 export const validateEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  return CONFIG.VALIDATION.EMAIL_REGEX.test(email);
 };
 
 export const validateUsername = (username: string): boolean => {
-  const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-  return usernameRegex.test(username);
+  return CONFIG.VALIDATION.USERNAME_REGEX.test(username);
 };
 
 export const validatePassword = (password: string): boolean => {
-  return password.length >= 6;
+  return password.length >= CONFIG.VALIDATION.PASSWORD_MIN_LENGTH;
 };
 
 export const paginate = <T>(items: T[], page: number, pageSize: number) => {

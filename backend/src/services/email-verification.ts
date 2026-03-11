@@ -1,5 +1,6 @@
 import { Env } from '../types';
 import { generateId, hashPassword } from '../utils';
+import { CONFIG } from '../constants';
 
 export type VerificationType =
   | 'registration'
@@ -63,36 +64,12 @@ export interface EmailTemplate {
 
 export const emailVerificationUtils = {
   isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return CONFIG.VALIDATION.EMAIL_REGEX.test(email);
   },
 
   isTempEmail(email: string): boolean {
-    const tempDomains = [
-      '10minutemail.com',
-      'guerrillamail.com',
-      'tempmail.org',
-      'temp-mail.org',
-      'throwaway.email',
-      'mailinator.com',
-      'yopmail.com',
-      'maildrop.cc',
-      'tempail.com',
-      '10min.email',
-      'sharklasers.com',
-      'guerrillamailblock.com',
-      'pokemail.net',
-      'spam4.me',
-      'bccto.me',
-      'chacuo.net',
-      'dispostable.com',
-      'tempinbox.com',
-      'mohmal.com',
-      'emailondeck.com',
-    ];
-
     const domain = email.split('@')[1]?.toLowerCase();
-    return tempDomains.includes(domain);
+    return CONFIG.TempEmail.DOMAINS.includes(domain as typeof CONFIG.TempEmail.DOMAINS[number]);
   },
 
   normalizeEmail(email: string): string {
@@ -110,27 +87,12 @@ export const emailVerificationUtils = {
   },
 
   isValidVerificationCode(code: string): boolean {
-    return /^\d{6}$/.test(code);
+    return CONFIG.VALIDATION.VERIFICATION_CODE_REGEX.test(code);
   },
 
   isTrustedEmailDomain(email: string): boolean {
-    const trustedDomains = [
-      'gmail.com',
-      'outlook.com',
-      'hotmail.com',
-      'yahoo.com',
-      'qq.com',
-      '163.com',
-      '126.com',
-      'sina.com',
-      'sohu.com',
-      'foxmail.com',
-      '139.com',
-      'yeah.net',
-    ];
-
     const domain = email.split('@')[1]?.toLowerCase();
-    return trustedDomains.includes(domain);
+    return CONFIG.TrustedEmail.DOMAINS.includes(domain as typeof CONFIG.TrustedEmail.DOMAINS[number]);
   },
 
   generateSecureEmailLink(baseUrl: string, action: string, token: string): string {
@@ -148,9 +110,9 @@ export class EmailVerificationService {
   constructor(env: Env) {
     this.env = env;
     this.resendApiKey = env.RESEND_API_KEY;
-    this.defaultFromEmail = env.DEFAULT_FROM_EMAIL || 'noreply@codeseek.pp.ua';
-    this.defaultFromName = env.DEFAULT_FROM_NAME || '磁力快搜';
-    this.siteUrl = env.SITE_URL || 'https://codeseek.pp.ua';
+    this.defaultFromEmail = env.DEFAULT_FROM_EMAIL || CONFIG.Email.DEFAULT_FROM_EMAIL;
+    this.defaultFromName = env.DEFAULT_FROM_NAME || CONFIG.Email.DEFAULT_FROM_NAME;
+    this.siteUrl = env.SITE_URL || CONFIG.Defaults.SITE_URL;
   }
 
   async getPendingVerification(
@@ -189,7 +151,7 @@ export class EmailVerificationService {
     };
 
     const remainingTime = v.expires_at - now;
-    const canResend = remainingTime <= 60000;
+    const canResend = remainingTime <= CONFIG.Email.RESEND_INTERVAL_MS;
 
     return {
       id: v.id,
@@ -310,13 +272,12 @@ export class EmailVerificationService {
     }
 
     const timeSinceCreated = Date.now() - pending.createdAt;
-    const minResendInterval = 60000;
 
-    if (timeSinceCreated < minResendInterval) {
+    if (timeSinceCreated < CONFIG.Email.RESEND_INTERVAL_MS) {
       return {
         canResend: false,
         reason: 'too_soon',
-        waitTime: minResendInterval - timeSinceCreated,
+        waitTime: CONFIG.Email.RESEND_INTERVAL_MS - timeSinceCreated,
         remainingTime: pending.remainingTime,
       };
     }
@@ -359,8 +320,8 @@ export class EmailVerificationService {
 
   async checkEmailRateLimit(email: string, ipAddress: string): Promise<boolean> {
     const now = Date.now();
-    const oneHourAgo = now - 3600000;
-    const oneDayAgo = now - 86400000;
+    const oneHourAgo = now - CONFIG.Stats.HOUR_IN_MS;
+    const oneDayAgo = now - CONFIG.Stats.DAY_IN_MS;
 
     const hourlyCount = (await this.env.DB.prepare(
       `SELECT COUNT(*) as count FROM email_send_logs 
@@ -370,9 +331,8 @@ export class EmailVerificationService {
       .bind(email, ipAddress, oneHourAgo)
       .first()) as { count: number };
 
-    const hourlyLimit = 5;
-    if (hourlyCount.count >= hourlyLimit) {
-      throw new Error(`发送频率过快，请1小时后再试（每小时限制${hourlyLimit}次）`);
+    if (hourlyCount.count >= CONFIG.Email.HOURLY_LIMIT) {
+      throw new Error(`发送频率过快，请1小时后再试（每小时限制${CONFIG.Email.HOURLY_LIMIT}次）`);
     }
 
     const dailyCount = (await this.env.DB.prepare(
@@ -383,9 +343,8 @@ export class EmailVerificationService {
       .bind(email, ipAddress, oneDayAgo)
       .first()) as { count: number };
 
-    const dailyLimit = 20;
-    if (dailyCount.count >= dailyLimit) {
-      throw new Error(`今日发送次数已达上限，请明天再试（每日限制${dailyLimit}次）`);
+    if (dailyCount.count >= CONFIG.Email.DAILY_LIMIT) {
+      throw new Error(`今日发送次数已达上限，请明天再试（每日限制${CONFIG.Email.DAILY_LIMIT}次）`);
     }
 
     return true;
@@ -410,7 +369,7 @@ export class EmailVerificationService {
 
     const verificationCode = this.generateVerificationCode();
     const codeHash = await hashPassword(verificationCode);
-    const expiryTime = Date.now() + 900000;
+    const expiryTime = Date.now() + CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS;
 
     const verificationId = generateId();
 
@@ -529,10 +488,10 @@ export class EmailVerificationService {
     }
 
     const vars = {
-      siteName: '磁力快搜',
+      siteName: CONFIG.Email.DEFAULT_FROM_NAME,
       siteUrl: this.siteUrl,
       verificationCode,
-      expiryMinutes: 15,
+      expiryMinutes: Math.floor(CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS / 60000),
       ...templateVars,
     };
 
@@ -691,7 +650,7 @@ export class EmailVerificationService {
   ): Promise<{ id: string; expiresAt: number }> {
     const requestId = generateId();
     const newEmailHash = await hashPassword(newEmail);
-    const expiryTime = Date.now() + 1800000;
+    const expiryTime = Date.now() + CONFIG.Email.CHANGE_REQUEST_EXPIRY_MS;
 
     await this.env.DB.prepare(
       `INSERT INTO email_change_requests (
@@ -783,7 +742,7 @@ export class EmailVerificationService {
     };
   }
 
-  async cancelExpiredPendingRequests(userId: string, expireAfterMinutes: number = 15): Promise<number> {
+  async cancelExpiredPendingRequests(userId: string, expireAfterMinutes: number = CONFIG.Email.CHANGE_PENDING_EXPIRY_MINUTES): Promise<number> {
     const expireThreshold = Date.now() - expireAfterMinutes * 60 * 1000;
 
     const result = await this.env.DB.prepare(
@@ -815,9 +774,9 @@ export class EmailVerificationService {
     period: string;
   }> {
     const timeMap: Record<string, number> = {
-      day: Date.now() - 86400000,
-      week: Date.now() - 604800000,
-      month: Date.now() - 2592000000,
+      day: Date.now() - CONFIG.Stats.DAY_IN_MS,
+      week: Date.now() - CONFIG.Stats.WEEK_IN_MS,
+      month: Date.now() - 30 * CONFIG.Stats.DAY_IN_MS,
     };
 
     const since = timeMap[timeRange] || timeMap.day;
@@ -926,8 +885,8 @@ export class EmailVerificationService {
     };
   }
 
-  async cleanupOldVerifications(daysOld = 7): Promise<number> {
-    const cutoffTime = Date.now() - daysOld * 24 * 60 * 60 * 1000;
+  async cleanupOldVerifications(daysOld = CONFIG.Cleanup.EMAIL_VERIFICATION_RETENTION_DAYS): Promise<number> {
+    const cutoffTime = Date.now() - daysOld * CONFIG.Stats.DAY_IN_MS;
 
     const deleted = await this.env.DB.prepare(
       `DELETE FROM email_verifications 

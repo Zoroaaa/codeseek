@@ -15,36 +15,31 @@ import { systemRoutes } from './routes/system';
 import { searchRoutes } from './routes/search';
 import { adminRoutes } from './routes/admin';
 import { configRoutes } from './routes/config';
+import { CONFIG } from './constants';
 
 const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', cors({
   origin: (origin) => {
-    const allowedOrigins = [
-      'https://codeseek.pp.ua',
-      'https://www.codeseek.pp.ua',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-    ];
-    if (allowedOrigins.includes(origin)) {
+    if (CONFIG.CORS.ALLOWED_ORIGINS.includes(origin)) {
       return origin;
     }
     if (origin.endsWith('.pages.dev') || origin.includes('cloudflare')) {
       return origin;
     }
-    return allowedOrigins[0];
+    return CONFIG.CORS.ALLOWED_ORIGINS[0];
   },
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposeHeaders: ['Content-Length', 'X-Request-Id'],
+  allowMethods: CONFIG.CORS.ALLOW_METHODS,
+  allowHeaders: CONFIG.CORS.ALLOW_HEADERS,
+  exposeHeaders: CONFIG.CORS.EXPOSE_HEADERS,
   credentials: true,
-  maxAge: 86400,
+  maxAge: CONFIG.CORS.MAX_AGE,
 }));
 
 app.get('/', (c) => {
   return c.json({
     name: 'CodeSeek API',
-    version: c.env.APP_VERSION || '2.0.0',
+    version: c.env.APP_VERSION || CONFIG.Defaults.APP_VERSION,
     status: 'running',
   });
 });
@@ -66,14 +61,14 @@ app.get('/api/config', async (c) => {
   return c.json({
     success: true,
     data: {
-      appVersion: c.env.APP_VERSION || '1.0.0',
+      appVersion: c.env.APP_VERSION || CONFIG.Defaults.APP_VERSION,
       allowRegistration: c.env.ALLOW_REGISTRATION === 'true',
-      minUsernameLength: parseInt(c.env.MIN_USERNAME_LENGTH || '3', 10),
-      maxUsernameLength: parseInt(c.env.MAX_USERNAME_LENGTH || '20', 10),
-      minPasswordLength: parseInt(c.env.MIN_PASSWORD_LENGTH || '6', 10),
-      maxFavoritesPerUser: parseInt(c.env.MAX_FAVORITES_PER_USER || '1000', 10),
-      maxHistoryPerUser: parseInt(c.env.MAX_HISTORY_PER_USER || '1000', 10),
-      maxTagsPerUser: parseInt(c.env.MAX_TAGS_PER_USER || '50', 10),
+      minUsernameLength: parseInt(c.env.MIN_USERNAME_LENGTH || String(CONFIG.VALIDATION.USERNAME_MIN_LENGTH), 10),
+      maxUsernameLength: parseInt(c.env.MAX_USERNAME_LENGTH || String(CONFIG.VALIDATION.USERNAME_MAX_LENGTH), 10),
+      minPasswordLength: parseInt(c.env.MIN_PASSWORD_LENGTH || String(CONFIG.VALIDATION.PASSWORD_MIN_LENGTH), 10),
+      maxFavoritesPerUser: parseInt(c.env.MAX_FAVORITES_PER_USER || String(CONFIG.MAX_FAVORITES_PER_USER), 10),
+      maxHistoryPerUser: parseInt(c.env.MAX_HISTORY_PER_USER || String(CONFIG.MAX_HISTORY_PER_USER), 10),
+      maxTagsPerUser: parseInt(c.env.MAX_TAGS_PER_USER || String(CONFIG.MAX_TAGS_PER_USER), 10),
       enableActionLogging: c.env.ENABLE_ACTION_LOGGING === 'true',
     },
   });
@@ -83,14 +78,14 @@ app.get('/api/public-config', async (c) => {
   return c.json({
     success: true,
     data: {
-      appVersion: c.env.APP_VERSION || '1.0.0',
+      appVersion: c.env.APP_VERSION || CONFIG.Defaults.APP_VERSION,
       allowRegistration: c.env.ALLOW_REGISTRATION === 'true',
-      minUsernameLength: parseInt(c.env.MIN_USERNAME_LENGTH || '3', 10),
-      maxUsernameLength: parseInt(c.env.MAX_USERNAME_LENGTH || '20', 10),
-      minPasswordLength: parseInt(c.env.MIN_PASSWORD_LENGTH || '6', 10),
-      maxFavoritesPerUser: parseInt(c.env.MAX_FAVORITES_PER_USER || '1000', 10),
-      maxHistoryPerUser: parseInt(c.env.MAX_HISTORY_PER_USER || '1000', 10),
-      maxTagsPerUser: parseInt(c.env.MAX_TAGS_PER_USER || '50', 10),
+      minUsernameLength: parseInt(c.env.MIN_USERNAME_LENGTH || String(CONFIG.VALIDATION.USERNAME_MIN_LENGTH), 10),
+      maxUsernameLength: parseInt(c.env.MAX_USERNAME_LENGTH || String(CONFIG.VALIDATION.USERNAME_MAX_LENGTH), 10),
+      minPasswordLength: parseInt(c.env.MIN_PASSWORD_LENGTH || String(CONFIG.VALIDATION.PASSWORD_MIN_LENGTH), 10),
+      maxFavoritesPerUser: parseInt(c.env.MAX_FAVORITES_PER_USER || String(CONFIG.MAX_FAVORITES_PER_USER), 10),
+      maxHistoryPerUser: parseInt(c.env.MAX_HISTORY_PER_USER || String(CONFIG.MAX_HISTORY_PER_USER), 10),
+      maxTagsPerUser: parseInt(c.env.MAX_TAGS_PER_USER || String(CONFIG.MAX_TAGS_PER_USER), 10),
       enableActionLogging: c.env.ENABLE_ACTION_LOGGING === 'true',
     },
   });
@@ -152,7 +147,7 @@ app.get('/api/source-status/check', async (c) => {
     try {
       const response = await fetch(url, {
         method: 'HEAD',
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(CONFIG.SourceStatus.CHECK_TIMEOUT_MS),
       });
       
       responseTime = Date.now() - startTime;

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { Env, SearchSource, SearchSourceCategory, MajorCategory, UserSearchSourceConfig } from '../types';
 import { success, error, generateId } from '../utils';
+import { CONFIG } from '../constants';
 
 export const sourceRoutes = new Hono<{ Bindings: Env }>();
 
@@ -130,7 +131,7 @@ sourceRoutes.get('/', async (c) => {
 
 sourceRoutes.get('/popular', async (c) => {
   try {
-    const limit = parseInt(c.req.query('limit') || '20', 10);
+    const limit = parseInt(c.req.query('limit') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE), 10);
     
     const sources = await c.env.DB.prepare(`
       SELECT * FROM search_sources 
@@ -957,8 +958,8 @@ sourceRoutes.post('/user-configs/batch', async (c) => {
       return c.json(error('VALIDATION_ERROR', '配置列表不能为空'), 400);
     }
 
-    if (configs.length > 100) {
-      return c.json(error('VALIDATION_ERROR', '批量更新不能超过100个配置'), 400);
+    if (configs.length > CONFIG.VALIDATION.MAX_BATCH_CONFIG_UPDATE) {
+      return c.json(error('VALIDATION_ERROR', `批量更新不能超过${CONFIG.VALIDATION.MAX_BATCH_CONFIG_UPDATE}个配置`), 400);
     }
 
     const now = Date.now();

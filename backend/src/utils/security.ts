@@ -7,11 +7,15 @@
 import { SecurityLockout, UserSecurityEvent } from '../types';
 import { generateId } from '../utils';
 
-const MAX_LOGIN_ATTEMPTS = 5;
-const MAX_VERIFICATION_ATTEMPTS = 5;
-const MAX_PASSWORD_RESET_ATTEMPTS = 3;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
-const PASSWORD_RESET_LOCKOUT_MS = 60 * 60 * 1000;
+import { CONFIG } from '../constants';
+
+const { 
+  MAX_LOGIN_ATTEMPTS, 
+  MAX_VERIFICATION_ATTEMPTS, 
+  MAX_PASSWORD_RESET_ATTEMPTS,
+  LOCKOUT_DURATION_MS,
+  PASSWORD_RESET_LOCKOUT_MS 
+} = CONFIG.SECURITY;
 
 export interface LockoutCheckResult {
   isLocked: boolean;
@@ -308,45 +312,45 @@ export async function detectSuspiciousActivity(
 
   try {
     const recentFailedLogins = await db.prepare(
-      `SELECT COUNT(*) as count FROM user_security_events 
-       WHERE user_id = ? AND event_type = 'login' AND event_status = 'failed' AND created_at > ?`
-    ).bind(userId, Date.now() - 24 * 60 * 60 * 1000).first<{ count: number }>();
+    `SELECT COUNT(*) as count FROM user_security_events 
+     WHERE user_id = ? AND event_type = 'login' AND event_status = 'failed' AND created_at > ?`
+  ).bind(userId, Date.now() - CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
 
-    if (recentFailedLogins && recentFailedLogins.count >= 3) {
-      factors.push('多次登录失败');
-      riskScore += 20;
-    }
+  if (recentFailedLogins && recentFailedLogins.count >= CONFIG.SECURITY.RECENT_FAILED_LOGINS_THRESHOLD) {
+    factors.push('多次登录失败');
+    riskScore += 20;
+  }
 
-    const recentIpLogins = await db.prepare(
-      `SELECT COUNT(DISTINCT ip_address) as count FROM user_security_events 
-       WHERE user_id = ? AND event_type = 'login' AND event_status = 'success' AND created_at > ? AND ip_address IS NOT NULL`
-    ).bind(userId, Date.now() - 7 * 24 * 60 * 60 * 1000).first<{ count: number }>();
+  const recentIpLogins = await db.prepare(
+    `SELECT COUNT(DISTINCT ip_address) as count FROM user_security_events 
+     WHERE user_id = ? AND event_type = 'login' AND event_status = 'success' AND created_at > ? AND ip_address IS NOT NULL`
+  ).bind(userId, Date.now() - CONFIG.Stats.WEEK_IN_MS).first<{ count: number }>();
 
-    const knownIpLogin = await db.prepare(
-      `SELECT COUNT(*) as count FROM user_security_events 
-       WHERE user_id = ? AND event_type = 'login' AND event_status = 'success' AND ip_address = ? AND created_at > ?`
-    ).bind(userId, ipAddress, Date.now() - 30 * 24 * 60 * 60 * 1000).first<{ count: number }>();
+  const knownIpLogin = await db.prepare(
+    `SELECT COUNT(*) as count FROM user_security_events 
+     WHERE user_id = ? AND event_type = 'login' AND event_status = 'success' AND ip_address = ? AND created_at > ?`
+  ).bind(userId, ipAddress, Date.now() - 30 * CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
 
-    if (recentIpLogins && recentIpLogins.count >= 3 && (!knownIpLogin || knownIpLogin.count === 0)) {
-      factors.push('新IP地址登录');
-      riskScore += 15;
-    }
+  if (recentIpLogins && recentIpLogins.count >= CONFIG.SECURITY.RECENT_IP_LOGINS_THRESHOLD && (!knownIpLogin || knownIpLogin.count === 0)) {
+    factors.push('新IP地址登录');
+    riskScore += 15;
+  }
 
-    const recentPasswordChanges = await db.prepare(
-      `SELECT COUNT(*) as count FROM user_security_events 
-       WHERE user_id = ? AND event_type = 'password_change' AND created_at > ?`
-    ).bind(userId, Date.now() - 24 * 60 * 60 * 1000).first<{ count: number }>();
+  const recentPasswordChanges = await db.prepare(
+    `SELECT COUNT(*) as count FROM user_security_events 
+     WHERE user_id = ? AND event_type = 'password_change' AND created_at > ?`
+  ).bind(userId, Date.now() - CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
 
-    if (recentPasswordChanges && recentPasswordChanges.count >= 2) {
-      factors.push('频繁修改密码');
-      riskScore += 30;
-    }
+  if (recentPasswordChanges && recentPasswordChanges.count >= CONFIG.SECURITY.RECENT_PASSWORD_CHANGES_THRESHOLD) {
+    factors.push('频繁修改密码');
+    riskScore += 30;
+  }
 
-    return {
-      isSuspicious: riskScore >= 50,
-      riskScore: Math.min(riskScore, 100),
-      factors,
-    };
+  return {
+    isSuspicious: riskScore >= CONFIG.SECURITY.SUSPICIOUS_ACTIVITY_THRESHOLD,
+    riskScore: Math.min(riskScore, 100),
+    factors,
+  };
   } catch (err) {
     console.error('Detect suspicious activity error:', err);
     return { isSuspicious: false, riskScore: 0, factors: [] };

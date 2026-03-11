@@ -7,6 +7,7 @@
 import { Hono } from 'hono';
 import { Env, User, CommunitySourceReport, UserAction, JwtPayload, Role } from '../types';
 import { success, error, verifyToken, logUserAction } from '../utils';
+import { CONFIG } from '../constants';
 
 export const adminRoutes = new Hono<{ Bindings: Env }>();
 
@@ -74,7 +75,7 @@ adminRoutes.get('/roles', async (c) => {
  */
 adminRoutes.get('/users', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || '20'), 100);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
   const search = c.req.query('search');
   const status = c.req.query('status');
   const roleId = c.req.query('roleId');
@@ -277,7 +278,7 @@ adminRoutes.put('/users/:id/role', async (c) => {
 adminRoutes.get('/users/:id/login-logs', async (c) => {
   const userId = c.req.param('id');
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || '20'), 100);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
 
   try {
     const countResult = await c.env.DB.prepare(
@@ -321,11 +322,11 @@ adminRoutes.get('/users/:id/login-logs', async (c) => {
  * GET /api/admin/active-users
  */
 adminRoutes.get('/active-users', async (c) => {
-  const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100);
+  const limit = Math.min(parseInt(c.req.query('limit') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
   const days = parseInt(c.req.query('days') || '7');
 
   try {
-    const startTime = Date.now() - days * 24 * 60 * 60 * 1000;
+    const startTime = Date.now() - days * CONFIG.Stats.DAY_IN_MS;
 
     const users = await c.env.DB.prepare(`
       SELECT u.id, u.username, u.email, u.role_id, u.login_count,
@@ -367,7 +368,7 @@ adminRoutes.get('/login-stats', async (c) => {
 
   try {
     const now = Date.now();
-    const startTime = now - days * 24 * 60 * 60 * 1000;
+    const startTime = now - days * CONFIG.Stats.DAY_IN_MS;
 
     const dailyStats = await c.env.DB.prepare(`
       SELECT 
@@ -504,7 +505,7 @@ adminRoutes.put('/users/:id/permissions', async (c) => {
  */
 adminRoutes.get('/reports', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || '20'), 100);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
   const status = c.req.query('status') || 'pending';
 
   try {
@@ -601,7 +602,7 @@ adminRoutes.get('/stats', async (c) => {
         SUM(CASE WHEN email_verified = 1 THEN 1 ELSE 0 END) as verified,
         SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as new_this_week
       FROM users
-    `).bind(Date.now() - 7 * 24 * 60 * 60 * 1000).first();
+    `).bind(Date.now() - CONFIG.Stats.WEEK_IN_MS).first();
 
     const roleStats = await c.env.DB.prepare(`
       SELECT r.id, r.name, r.display_name, COUNT(u.id) as user_count
@@ -640,7 +641,7 @@ adminRoutes.get('/stats', async (c) => {
       SELECT COUNT(DISTINCT user_id) as count
       FROM user_sessions
       WHERE last_activity > ?
-    `).bind(Date.now() - 24 * 60 * 60 * 1000).first<{ count: number }>();
+    `).bind(Date.now() - CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
 
     const topSearchKeywords = await c.env.DB.prepare(`
       SELECT query, COUNT(*) as count
@@ -649,7 +650,7 @@ adminRoutes.get('/stats', async (c) => {
       GROUP BY query
       ORDER BY count DESC
       LIMIT 10
-    `).bind(Date.now() - 7 * 24 * 60 * 60 * 1000).all();
+    `).bind(Date.now() - CONFIG.Stats.WEEK_IN_MS).all();
 
     const topUsedSources = await c.env.DB.prepare(`
       SELECT name, usage_count
@@ -705,7 +706,7 @@ adminRoutes.get('/stats', async (c) => {
  */
 adminRoutes.get('/logs', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || '50'), 200);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_LOG_PAGE_SIZE);
   const userId = c.req.query('userId');
   const action = c.req.query('action');
 
@@ -782,7 +783,7 @@ adminRoutes.post('/cleanup', async (c) => {
 
     const oldPasswordResetLogs = await c.env.DB.prepare(
       'DELETE FROM password_reset_logs WHERE created_at < ?'
-    ).bind(now - 30 * 24 * 60 * 60 * 1000).run();
+    ).bind(now - CONFIG.Cleanup.PASSWORD_RESET_LOG_RETENTION_DAYS * CONFIG.Stats.DAY_IN_MS).run();
     results.oldPasswordResetLogs = oldPasswordResetLogs.meta.changes || 0;
 
     const oldSecurityLockouts = await c.env.DB.prepare(
@@ -792,7 +793,7 @@ adminRoutes.post('/cleanup', async (c) => {
 
     const oldActions = await c.env.DB.prepare(
       'DELETE FROM user_actions WHERE created_at < ?'
-    ).bind(now - 90 * 24 * 60 * 60 * 1000).run();
+    ).bind(now - CONFIG.Cleanup.USER_ACTIONS_RETENTION_DAYS * CONFIG.Stats.DAY_IN_MS).run();
     results.oldActions = oldActions.meta.changes || 0;
 
     await logUserAction(c.env, adminUser.userId, 'admin_cleanup', results, c);

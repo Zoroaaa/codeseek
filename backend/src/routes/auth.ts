@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Env, User, EmailVerification, EmailChangeRequest } from '../types';
 import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP } from '../utils';
 import { EmailVerificationService, emailVerificationUtils } from '../services/email-verification';
+import { CONFIG } from '../constants';
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
@@ -111,7 +112,7 @@ authRoutes.post('/register', async (c) => {
   }
 
   if (!validateUsername(username)) {
-    return c.json(error('VALIDATION_ERROR', '用户名需要3-20个字符，只能包含字母、数字和下划线'), 400);
+    return c.json(error('VALIDATION_ERROR', `用户名需要${CONFIG.VALIDATION.USERNAME_MIN_LENGTH}-${CONFIG.VALIDATION.USERNAME_MAX_LENGTH}个字符，只能包含字母、数字和下划线`), 400);
   }
 
   if (!validateEmail(email)) {
@@ -119,7 +120,7 @@ authRoutes.post('/register', async (c) => {
   }
 
   if (!validatePassword(password)) {
-    return c.json(error('VALIDATION_ERROR', '密码至少需要6个字符'), 400);
+    return c.json(error('VALIDATION_ERROR', `密码至少需要${CONFIG.VALIDATION.PASSWORD_MIN_LENGTH}个字符`), 400);
   }
 
   try {
@@ -164,7 +165,7 @@ authRoutes.post('/register', async (c) => {
       passwordHash,
       now,
       now,
-      JSON.stringify(['search', 'favorite', 'history', 'sync']),
+      JSON.stringify([...CONFIG.Roles.DEFAULT_PERMISSIONS]),
       JSON.stringify({}),
       1,
       0,
@@ -199,7 +200,7 @@ authRoutes.post('/register', async (c) => {
         id: userId,
         username,
         email,
-        permissions: ['search', 'favorite', 'history', 'sync'],
+        permissions: [...CONFIG.Roles.DEFAULT_PERMISSIONS],
         settings: {},
         isActive: true,
         emailVerified: emailVerified === 1,
@@ -357,7 +358,7 @@ authRoutes.post('/forgot-password', async (c) => {
 
   const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
   const maskedEmail = emailVerificationUtils.maskEmail(normalizedEmail);
-  const expiresIn = 900;
+  const expiresIn = Math.floor(CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS / 1000);
 
   try {
     const user = await c.env.DB.prepare(
@@ -486,7 +487,7 @@ authRoutes.post('/change-password', async (c) => {
   }
 
   if (!validatePassword(newPassword)) {
-    return c.json(error('VALIDATION_ERROR', '新密码至少需要6个字符'), 400);
+    return c.json(error('VALIDATION_ERROR', `新密码至少需要${CONFIG.VALIDATION.PASSWORD_MIN_LENGTH}个字符`), 400);
   }
 
   try {
@@ -680,7 +681,7 @@ authRoutes.post('/send-registration-code', async (c) => {
 
     return c.json(success({ 
       maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail),
-      expiresIn: 900 
+      expiresIn: Math.floor(CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS / 1000)
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send registration code error:', err);
@@ -799,7 +800,7 @@ authRoutes.post('/request-email-change', async (c) => {
     }
 
     const emailService = new EmailVerificationService(c.env);
-    await emailService.cancelExpiredPendingRequests(user.id, 15);
+    await emailService.cancelExpiredPendingRequests(user.id, CONFIG.Email.CHANGE_PENDING_EXPIRY_MINUTES);
 
     const activeRequest = await c.env.DB.prepare(`
       SELECT id, created_at FROM email_change_requests 
@@ -809,13 +810,13 @@ authRoutes.post('/request-email-change', async (c) => {
     if (activeRequest) {
       const createdAt = (activeRequest as { created_at: number }).created_at;
       const elapsedMinutes = Math.floor((Date.now() - createdAt) / 60000);
-      const remainingMinutes = 15 - elapsedMinutes;
+      const remainingMinutes = CONFIG.Email.CHANGE_PENDING_EXPIRY_MINUTES - elapsedMinutes;
       return c.json(error('VALIDATION_ERROR', `您已有进行中的邮箱更改请求，请等待${remainingMinutes > 0 ? remainingMinutes : 1}分钟后再试或手动取消`), 400);
     }
 
     const requestId = generateId();
-    const expiresAt = Date.now() + 30 * 60 * 1000;
-    const expiresIn = 1800;
+    const expiresAt = Date.now() + CONFIG.Email.CHANGE_REQUEST_EXPIRY_MS;
+    const expiresIn = Math.floor(CONFIG.Email.CHANGE_REQUEST_EXPIRY_MS / 1000);
     const newEmailHash = await hashPassword(newEmail);
 
     await c.env.DB.prepare(`
@@ -907,7 +908,7 @@ authRoutes.post('/send-email-change-code', async (c) => {
     return c.json(success({ 
       emailType,
       maskedEmail: emailVerificationUtils.maskEmail(targetEmail),
-      expiresIn: 900 
+      expiresIn: Math.floor(CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS / 1000)
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send email change code error:', err);
@@ -1122,7 +1123,7 @@ authRoutes.get('/verification-status', async (c) => {
     }
 
     const remainingTime = verification.expires_at - Date.now();
-    const canResend = remainingTime <= 60000;
+    const canResend = remainingTime <= CONFIG.Email.RESEND_INTERVAL_MS;
 
     return c.json(success({
       hasPendingVerification: true,
@@ -1254,7 +1255,7 @@ authRoutes.post('/smart-send-code', async (c) => {
 
     return c.json(success({
       maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail),
-      expiresIn: 900
+      expiresIn: Math.floor(CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS / 1000)
     }, '验证码已发送'));
   } catch (err) {
     console.error('Smart send code error:', err);
