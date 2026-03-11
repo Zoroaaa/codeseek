@@ -31,7 +31,12 @@ export const CommunityManager: React.FC = () => {
   useEffect(() => { setActiveTab(getTabFromPath()); }, [location.pathname]);
 
   const loadTags = useCallback(async () => {
-    try { const res = await communityApi.getTags(); if (res.success) setTags(res.data); } catch {}
+    try {
+      const res = await communityApi.getTags();
+      if (res.success) setTags(res.data);
+    } catch (_error) {
+      console.error('加载标签失败:', _error);
+    }
   }, []);
 
   useEffect(() => {

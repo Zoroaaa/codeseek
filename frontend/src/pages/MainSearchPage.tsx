@@ -197,7 +197,7 @@ export const MainSearchPage: React.FC = () => {
           loadHistory();
         }
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('搜索失败', '请稍后重试');
     } finally {
       setSearching(false);
@@ -232,7 +232,7 @@ export const MainSearchPage: React.FC = () => {
         await userApi.removeFavorite(existingFavoriteId);
         setFavorites(prev => prev.filter(f => f.id !== existingFavoriteId));
         toast.success('已取消收藏');
-      } catch (error) {
+      } catch (_error) {
         toast.error('取消收藏失败', '请稍后重试');
       }
     } else {
@@ -247,7 +247,7 @@ export const MainSearchPage: React.FC = () => {
           setFavorites(prev => [response.data, ...prev]);
         }
         toast.success('已添加到收藏');
-      } catch (error) {
+      } catch (_error) {
         toast.error('收藏失败', '请稍后重试');
       }
     }
@@ -258,7 +258,7 @@ export const MainSearchPage: React.FC = () => {
       await userApi.removeFavorite(id);
       setFavorites(prev => prev.filter(f => f.id !== id));
       toast.success('已移除收藏');
-    } catch (error) {
+    } catch (_error) {
       toast.error('移除失败', '请稍后重试');
     }
   };
@@ -269,7 +269,7 @@ export const MainSearchPage: React.FC = () => {
       await userApi.clearSearchHistory();
       setSearchHistory([]);
       toast.success('历史已清空');
-    } catch (error) {
+    } catch (_error) {
       toast.error('清空失败', '请稍后重试');
     }
   };

@@ -55,7 +55,15 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
     try {
       const res = await communityApi.likeSharedSource(sourceId);
       if (res.success) {
-        setLikedIds(prev => { const next = new Set(prev); res.data.liked ? next.add(sourceId) : next.delete(sourceId); return next; });
+        setLikedIds(prev => {
+          const next = new Set(prev);
+          if (res.data.liked) {
+            next.add(sourceId);
+          } else {
+            next.delete(sourceId);
+          }
+          return next;
+        });
         setSources(prev => prev.map(s => s.id === sourceId ? { ...s, likeCount: s.likeCount + (res.data.liked ? 1 : -1) } : s));
         toast.success(res.data.liked ? '已点赞' : '已取消点赞');
       }
@@ -67,7 +75,9 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
     try {
       const res = await communityApi.getReviews(source.id);
       if (res.success && res.data) setReviews(res.data.items);
-    } catch {}
+    } catch (_error) {
+      console.error('加载评论失败:', _error);
+    }
   };
 
   const submitReview = async () => {

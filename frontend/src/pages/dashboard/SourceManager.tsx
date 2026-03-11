@@ -106,7 +106,7 @@ export const SourceManager: React.FC = () => {
       if (statsRes.success && statsRes.data) {
         setStats(statsRes.data);
       }
-    } catch (error) {
+    } catch (_error) {
       notification.source.loadFailed();
     } finally {
       setIsLoading(false);
@@ -179,7 +179,7 @@ export const SourceManager: React.FC = () => {
       ));
       
       notification.source.batchEnabled(allSources.length);
-    } catch (error) {
+    } catch (_error) {
       notification.source.createFailed();
     }
   };
@@ -205,7 +205,7 @@ export const SourceManager: React.FC = () => {
       ));
       
       notification.source.batchEnabled(cat.sources.length);
-    } catch (error) {
+    } catch (_error) {
       notification.source.createFailed();
     }
   };
@@ -219,7 +219,7 @@ export const SourceManager: React.FC = () => {
           : s
       ));
       notification.source.enabled(isEnabled ? '搜索源' : undefined);
-    } catch (error) {
+    } catch (_error) {
       notification.source.createFailed();
     }
   };
@@ -241,7 +241,7 @@ export const SourceManager: React.FC = () => {
       })));
       
       notification.source.batchEnabled(sources.length);
-    } catch (error) {
+    } catch (_error) {
       notification.source.createFailed();
     }
   };
@@ -272,7 +272,7 @@ export const SourceManager: React.FC = () => {
         });
         loadData();
       }
-    } catch (error) {
+    } catch (_error) {
         notification.source.createFailed();
     }
   };
@@ -299,7 +299,7 @@ export const SourceManager: React.FC = () => {
       notification.source.updated();
       setEditModal({ isOpen: false, source: null });
       loadData();
-    } catch (error) {
+    } catch (_error) {
       notification.source.updateFailed();
     }
   };
@@ -311,7 +311,7 @@ export const SourceManager: React.FC = () => {
       await sourceApi.deleteSource(sourceId);
       notification.source.deleted();
       loadData();
-    } catch (error) {
+    } catch (_error) {
       notification.source.deleteFailed();
     }
   };
@@ -325,7 +325,7 @@ export const SourceManager: React.FC = () => {
           `响应时间: ${response.data.responseTime}ms`
         );
       }
-    } catch (error) {
+    } catch (_error) {
       notification.source.testFailed(editModal.source?.name || '搜索源');
     }
   };
@@ -353,7 +353,7 @@ export const SourceManager: React.FC = () => {
       }
       
       notification.source.exported();
-    } catch (error) {
+    } catch (_error) {
       notification.source.exportFailed();
     }
   };

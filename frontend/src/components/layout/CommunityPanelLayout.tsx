@@ -17,6 +17,7 @@ import {
   X,
   LayoutDashboard,
   Shield,
+  Globe,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
 
@@ -242,7 +243,7 @@ export const CommunityPanelLayout: React.FC = () => {
               <Link to="/main"
                 className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 transition-all">
                 <Search className="w-4 h-4" />
-                搜索
+                返回首页
               </Link>
               <Link to="/dashboard"
                 className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700">
@@ -253,7 +254,7 @@ export const CommunityPanelLayout: React.FC = () => {
                 <Link to="/admin-panel"
                   className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700">
                   <Shield className="w-4 h-4" />
-                  <span className="hidden lg:inline">管理</span>
+                  <span className="hidden lg:inline">管理看板</span>
                 </Link>
               )}
               <Link to="/community"
@@ -261,6 +262,22 @@ export const CommunityPanelLayout: React.FC = () => {
                 <Users className="w-4 h-4" />
                 <span className="hidden lg:inline">社区</span>
               </Link>
+
+              <Link to="/main" className="mobile-header-btn md:hidden" title="搜索">
+                <Search className="w-5 h-5" />
+              </Link>
+              <Link to="/dashboard" className="mobile-header-btn md:hidden" title="控制台">
+                <LayoutDashboard className="w-5 h-5" />
+              </Link>
+              {isAdmin && (
+                <Link to="/admin-panel" className="mobile-header-btn md:hidden text-red-500 hover:text-red-600" title="管理看板">
+                  <Shield className="w-5 h-5" />
+                </Link>
+              )}
+              <Link to="/community" className="mobile-header-btn md:hidden" title="社区">
+                <Globe className="w-5 h-5" />
+              </Link>
+
               <button onClick={toggleTheme} className="theme-toggle-btn">
                 {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>

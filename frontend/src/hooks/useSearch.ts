@@ -178,7 +178,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
     try {
       await searchApi.deleteHistoryItem(id);
       removeFromHistory(id);
-    } catch (err) {
+    } catch (_err) {
       toast.error('删除失败', '无法删除搜索历史');
     }
   }, [removeFromHistory, toast]);
@@ -188,7 +188,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
       await searchApi.clearHistory();
       clearHistory();
       toast.success('已清空', '搜索历史已清空');
-    } catch (err) {
+    } catch (_err) {
       toast.error('清空失败', '无法清空搜索历史');
     }
   }, [clearHistory, toast]);

@@ -40,7 +40,7 @@ export const FavoritesManager: React.FC = () => {
       if (response.success && response.data) {
         setFavorites(response.data.favorites);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('加载失败', '无法加载收藏数据');
     } finally {
       setIsLoading(false);
@@ -56,7 +56,7 @@ export const FavoritesManager: React.FC = () => {
       await userApi.removeFavorite(id);
       setFavorites(prev => prev.filter(f => f.id !== id));
       toast.success('已移除收藏');
-    } catch (error) {
+    } catch (_error) {
       toast.error('移除失败', '请稍后重试');
     }
   };
@@ -74,7 +74,7 @@ export const FavoritesManager: React.FC = () => {
       setFavorites(prev => prev.filter(f => !selectedItems.has(f.id)));
       setSelectedItems(new Set());
       toast.success('批量删除成功');
-    } catch (error) {
+    } catch (_error) {
       toast.error('删除失败', '部分收藏可能未删除');
     }
   };
@@ -111,7 +111,7 @@ export const FavoritesManager: React.FC = () => {
         setImportData('');
         loadFavorites();
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('导入失败', '请检查数据格式');
     }
   };
@@ -398,7 +398,7 @@ export const HistoryManager: React.FC = () => {
       if (response.success && response.data) {
         setHistory(response.data.history);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('加载失败', '无法加载搜索历史');
     } finally {
       setIsLoading(false);
@@ -416,7 +416,7 @@ export const HistoryManager: React.FC = () => {
       await userApi.clearSearchHistory();
       setHistory([]);
       toast.success('历史已清空');
-    } catch (error) {
+    } catch (_error) {
       toast.error('清空失败', '请稍后重试');
     }
   };
@@ -426,7 +426,7 @@ export const HistoryManager: React.FC = () => {
       await userApi.deleteSearchHistoryItem(id);
       setHistory(prev => prev.filter(h => h.id !== id));
       toast.success('已删除');
-    } catch (error) {
+    } catch (_error) {
       toast.error('删除失败', '请稍后重试');
     }
   };
@@ -442,7 +442,7 @@ export const HistoryManager: React.FC = () => {
       setHistory(prev => prev.filter(h => !selectedItems.has(h.id)));
       setSelectedItems(new Set());
       toast.success('批量删除成功');
-    } catch (error) {
+    } catch (_error) {
       toast.error('删除失败', '部分记录可能未删除');
     }
   };

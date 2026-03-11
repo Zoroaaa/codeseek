@@ -83,7 +83,7 @@ export const CategoryManager: React.FC = () => {
       if (categoriesRes.success && categoriesRes.data) {
         setCategories(categoriesRes.data);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('加载失败', '无法加载分类数据');
     } finally {
       setIsLoading(false);
@@ -124,7 +124,7 @@ export const CategoryManager: React.FC = () => {
         });
         loadData(true);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('创建失败', '请稍后重试');
     }
   };
@@ -148,7 +148,7 @@ export const CategoryManager: React.FC = () => {
       toast.success('更新成功');
       setMajorCategoryModal({ isOpen: false, mode: 'create', data: null });
       loadData(true);
-    } catch (error) {
+    } catch (_error) {
       toast.error('更新失败', '请稍后重试');
     }
   };
@@ -160,7 +160,7 @@ export const CategoryManager: React.FC = () => {
       await sourceApi.deleteMajorCategory(id);
       toast.success('删除成功');
       loadData(true);
-    } catch (error) {
+    } catch (_error) {
       toast.error('删除失败', '请稍后重试');
     }
   };
@@ -194,7 +194,7 @@ export const CategoryManager: React.FC = () => {
         });
         loadData(true);
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('创建失败', '请稍后重试');
     }
   };
@@ -220,7 +220,7 @@ export const CategoryManager: React.FC = () => {
       toast.success('更新成功');
       setCategoryModal({ isOpen: false, mode: 'create', data: null, majorCategoryId: null });
       loadData(true);
-    } catch (error) {
+    } catch (_error) {
       toast.error('更新失败', '请稍后重试');
     }
   };
@@ -232,7 +232,7 @@ export const CategoryManager: React.FC = () => {
       await sourceApi.deleteCategory(id);
       toast.success('删除成功');
       loadData(true);
-    } catch (error) {
+    } catch (_error) {
       toast.error('删除失败', '请稍后重试');
     }
   };
