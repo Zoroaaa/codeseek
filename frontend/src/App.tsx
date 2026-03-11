@@ -9,13 +9,10 @@ import { CommunityPanelLayout } from '@/components/layout/CommunityPanelLayout';
 import { ToastContainer } from '@/components/ui/Toast';
 import { HomePage } from '@/pages/HomePage';
 import { MainSearchPage } from '@/pages/MainSearchPage';
-import { DashboardPage } from '@/pages/dashboard/DashboardPage';
-import { AdminManager } from '@/pages/dashboard/AdminManager';
-import { UserActivitiesPage } from '@/pages/dashboard/UserActivitiesPage';
-import { LoginPage } from '@/pages/auth/LoginPage';
-import { RegisterPage } from '@/pages/auth/RegisterPage';
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
-import { AdminPanelOverview } from '@/pages/admin/AdminPanelOverview';
+import { DashboardPage, UserActivitiesPage } from '@/pages/dashboard';
+import { AdminManager, AdminPanelOverview } from '@/pages/admin';
+import { CommunityManager } from '@/pages/community';
+import { LoginPage, RegisterPage, ForgotPasswordPage } from '@/pages/auth';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -153,12 +150,12 @@ const App: React.FC = () => {
         </Route>
         
         <Route path="/community" element={<ProtectedRoute><CommunityPanelLayout /></ProtectedRoute>}>
-          <Route index element={<DashboardPage />} />
-          <Route path="my-shares" element={<DashboardPage />} />
-          <Route path="my-favorites" element={<DashboardPage />} />
-          <Route path="tags" element={<DashboardPage />} />
-          <Route path="trending" element={<DashboardPage />} />
-          <Route path="reports" element={<DashboardPage />} />
+          <Route index element={<CommunityManager />} />
+          <Route path="my-shares" element={<CommunityManager />} />
+          <Route path="my-favorites" element={<CommunityManager />} />
+          <Route path="tags" element={<CommunityManager />} />
+          <Route path="trending" element={<CommunityManager />} />
+          <Route path="reports" element={<CommunityManager />} />
         </Route>
         
         <Route path="/admin-panel" element={<AdminRoute><AdminPanelLayout /></AdminRoute>}>

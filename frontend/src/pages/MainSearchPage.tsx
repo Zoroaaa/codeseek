@@ -399,6 +399,16 @@ export const MainSearchPage: React.FC = () => {
               <Link to="/dashboard" className="px-3.5 py-2 text-sm font-medium rounded-xl text-surface-500 dark:text-surface-400 hover:text-surface-800 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all">
                 控制台
               </Link>
+              <Link to="/community" className="px-3.5 py-2 text-sm font-medium rounded-xl text-surface-500 dark:text-surface-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
+                社区
+              </Link>
+              {isAuthenticated && user && (user.role === 'admin' || user.role === 'super_admin') && (
+                <Link to="/admin-panel" className="px-3.5 py-2 text-sm font-medium rounded-xl text-surface-500 dark:text-surface-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  管理
+                </Link>
+              )}
             </nav>
 
             <div className="mobile-header-actions">
@@ -424,6 +434,24 @@ export const MainSearchPage: React.FC = () => {
               >
                 <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5" />
               </Link>
+
+              <Link 
+                to="/community" 
+                className="mobile-header-btn md:hidden"
+                title="社区"
+              >
+                <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
+              </Link>
+
+              {isAuthenticated && user && (user.role === 'admin' || user.role === 'super_admin') && (
+                <Link 
+                  to="/admin-panel" 
+                  className="mobile-header-btn md:hidden text-red-500 hover:text-red-600"
+                  title="管理后台"
+                >
+                  <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
+                </Link>
+              )}
 
               {isAuthenticated ? (
                 <>
@@ -910,6 +938,14 @@ export const MainSearchPage: React.FC = () => {
               <button onClick={() => navigate('/dashboard/settings')} className="w-full flex items-center gap-2 sm:gap-2.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300 border border-surface-200/60 dark:border-surface-700/60 hover:bg-surface-50 dark:hover:bg-surface-800/60 hover:border-primary-200 dark:hover:border-primary-800/60 transition-all text-left active:scale-[0.99]">
                 <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-surface-400" />系统设置
               </button>
+              <button onClick={() => navigate("/community")} className="w-full flex items-center gap-2 sm:gap-2.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300 border border-surface-200/60 dark:border-surface-700/60 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200 hover:text-emerald-700 dark:hover:text-emerald-400 transition-all text-left active:scale-[0.99]">
+                <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-surface-400" />社区分享
+              </button>
+              {user && (user.role === "admin" || user.role === "super_admin") && (
+                <button onClick={() => navigate("/admin-panel")} className="w-full flex items-center gap-2 sm:gap-2.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300 border border-surface-200/60 dark:border-surface-700/60 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 hover:text-red-700 dark:hover:text-red-400 transition-all text-left active:scale-[0.99]">
+                  <ShieldAlert className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-surface-400" />管理后台
+                </button>
+              )}
             </div>
           </div>
         </div>
