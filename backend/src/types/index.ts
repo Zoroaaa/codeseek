@@ -392,46 +392,6 @@ export interface SourceStatusCache {
   access_count: number;
 }
 
-export interface SourceHealthStats {
-  id: string;
-  source_id: string;
-  total_checks: number;
-  successful_checks: number;
-  content_matches: number;
-  average_response_time: number;
-  last_success: number | null;
-  last_failure: number | null;
-  success_rate: number;
-  health_score: number;
-  updated_at: number;
-}
-
-export interface StatusCheckJob {
-  id: string;
-  user_id: string;
-  sources: string;
-  keyword: string;
-  status: string;
-  progress: number;
-  results: string;
-  error_message: string | null;
-  created_at: number;
-  started_at: number | null;
-  completed_at: number | null;
-  expires_at: number;
-}
-
-export interface SearchCache {
-  id: string;
-  keyword: string;
-  keyword_hash: string;
-  results: string;
-  expires_at: number;
-  created_at: number;
-  access_count: number;
-  last_accessed: number;
-}
-
 export interface SystemConfig {
   key: string;
   value: string;

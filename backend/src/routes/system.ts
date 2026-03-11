@@ -57,48 +57,94 @@ systemRoutes.get('/source-status-check', async (c) => {
       return c.json(error('NOT_FOUND', '搜索源不存在'), 404);
     }
 
-    const url = source.url_template.replace('{keyword}', encodeURIComponent(keyword));
+    const checkUrl = source.homepage_url || source.url_template.replace('{keyword}', encodeURIComponent(keyword));
     const startTime = Date.now();
     
     let status = 'unknown';
     let available = false;
     let contentMatch = false;
     let responseTime = 0;
-    let checkError = null;
+    let checkError: string | null = null;
 
     try {
-      const response = await fetch(url, {
-        method: 'HEAD',
-        signal: AbortSignal.timeout(10000),
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(checkUrl, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          'Cache-Control': 'no-cache',
+        },
       });
       
+      clearTimeout(timeoutId);
       responseTime = Date.now() - startTime;
-      available = response.ok;
-      status = available ? 'online' : 'error';
-      contentMatch = response.ok;
+      
+      available = response.ok || response.status < 500;
+      
+      if (response.ok) {
+        status = 'online';
+        contentMatch = true;
+        
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) {
+          try {
+            const text = await response.text();
+            contentMatch = text.length > 100;
+          } catch {
+            contentMatch = true;
+          }
+        }
+      } else if (response.status >= 400 && response.status < 500) {
+        status = 'restricted';
+        available = true;
+        contentMatch = false;
+        checkError = `HTTP ${response.status}`;
+      } else {
+        status = 'error';
+        checkError = `HTTP ${response.status}`;
+      }
     } catch (fetchError) {
       responseTime = Date.now() - startTime;
-      status = 'offline';
-      checkError = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+      
+      if (fetchError instanceof Error) {
+        if (fetchError.name === 'AbortError') {
+          status = 'timeout';
+          checkError = '请求超时';
+        } else {
+          status = 'offline';
+          checkError = fetchError.message;
+        }
+      } else {
+        status = 'offline';
+        checkError = 'Unknown error';
+      }
     }
 
     const qualityScore = available && contentMatch ? 100 : (available ? 50 : 0);
 
     const cacheId = generateId();
+    const now = Date.now();
     await c.env.DB.prepare(`
-      INSERT INTO source_status_cache (id, source_id, keyword, status, available, content_match, response_time, quality_score, check_error, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO source_status_cache (id, source_id, keyword, keyword_hash, status, available, content_match, response_time, quality_score, check_error, expires_at, created_at, last_accessed, access_count)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
     `).bind(
       cacheId,
       sourceId,
       keyword,
+      null,
       status,
       available ? 1 : 0,
       contentMatch ? 1 : 0,
       responseTime,
       qualityScore,
       checkError,
-      Date.now()
+      now + 5 * 60 * 1000,
+      now,
+      now
     ).run();
 
     return c.json(success({
@@ -113,6 +159,158 @@ systemRoutes.get('/source-status-check', async (c) => {
   } catch (err) {
     console.error('Source status check error:', err);
     return c.json(error('SERVER_ERROR', '状态检查失败'), 500);
+  }
+});
+
+systemRoutes.post('/source-status-batch', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { sourceIds, keyword = 'test' } = body;
+
+    if (!sourceIds || !Array.isArray(sourceIds) || sourceIds.length === 0) {
+      return c.json(error('VALIDATION_ERROR', '请提供搜索源ID列表'), 400);
+    }
+
+    if (sourceIds.length > 20) {
+      return c.json(error('VALIDATION_ERROR', '单次最多检查20个搜索源'), 400);
+    }
+
+    const results: Array<{
+      sourceId: string;
+      sourceName: string;
+      status: string;
+      available: boolean;
+      responseTime: number;
+      error: string | null;
+    }> = [];
+
+    const sources = await c.env.DB.prepare(
+      `SELECT id, name, url_template, homepage_url FROM search_sources WHERE id IN (${sourceIds.map(() => '?').join(',')})`
+    ).bind(...sourceIds).all<{ id: string; name: string; url_template: string; homepage_url: string | null }>();
+
+    const sourceMap = new Map(sources.results.map(s => [s.id, s]));
+
+    for (const sourceId of sourceIds) {
+      const source = sourceMap.get(sourceId);
+      
+      if (!source) {
+        results.push({
+          sourceId,
+          sourceName: '未知',
+          status: 'not_found',
+          available: false,
+          responseTime: 0,
+          error: '搜索源不存在',
+        });
+        continue;
+      }
+
+      const cached = await c.env.DB.prepare(`
+        SELECT * FROM source_status_cache 
+        WHERE source_id = ? AND keyword = ? AND created_at > ?
+      `).bind(sourceId, keyword, Date.now() - 5 * 60 * 1000).first<SourceStatusCache>();
+
+      if (cached) {
+        results.push({
+          sourceId,
+          sourceName: source.name,
+          status: cached.status,
+          available: cached.available === 1,
+          responseTime: cached.response_time,
+          error: cached.check_error,
+        });
+        continue;
+      }
+
+      const checkUrl = source.homepage_url || source.url_template.replace('{keyword}', encodeURIComponent(keyword));
+      const startTime = Date.now();
+      
+      let status = 'unknown';
+      let available = false;
+      let responseTime = 0;
+      let checkError: string | null = null;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const response = await fetch(checkUrl, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Cache-Control': 'no-cache',
+          },
+        });
+        
+        clearTimeout(timeoutId);
+        responseTime = Date.now() - startTime;
+        
+        available = response.ok || response.status < 500;
+        status = response.ok ? 'online' : (response.status >= 400 && response.status < 500 ? 'restricted' : 'error');
+        
+        if (!response.ok) {
+          checkError = `HTTP ${response.status}`;
+        }
+      } catch (fetchError) {
+        responseTime = Date.now() - startTime;
+        
+        if (fetchError instanceof Error) {
+          if (fetchError.name === 'AbortError') {
+            status = 'timeout';
+            checkError = '请求超时';
+          } else {
+            status = 'offline';
+            checkError = fetchError.message;
+          }
+        } else {
+          status = 'offline';
+          checkError = 'Unknown error';
+        }
+      }
+
+      const qualityScore = available ? 100 : 0;
+      const cacheId = generateId();
+      const now = Date.now();
+      
+      await c.env.DB.prepare(`
+        INSERT INTO source_status_cache (id, source_id, keyword, keyword_hash, status, available, content_match, response_time, quality_score, check_error, expires_at, created_at, last_accessed, access_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      `).bind(
+        cacheId,
+        sourceId,
+        keyword,
+        null,
+        status,
+        available ? 1 : 0,
+        available ? 1 : 0,
+        responseTime,
+        qualityScore,
+        checkError,
+        now + 5 * 60 * 1000,
+        now,
+        now
+      ).run();
+
+      results.push({
+        sourceId,
+        sourceName: source.name,
+        status,
+        available,
+        responseTime,
+        error: checkError,
+      });
+    }
+
+    return c.json(success({
+      results,
+      checkedAt: Date.now(),
+      keyword,
+    }));
+  } catch (err) {
+    console.error('Batch source status check error:', err);
+    return c.json(error('SERVER_ERROR', '批量检查失败'), 500);
   }
 });
 

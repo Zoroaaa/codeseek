@@ -1,24 +1,12 @@
 -- ===============================================
 -- 搜索引擎核心模块数据库结构
 -- 版本: 精简优化版本
--- 说明: 包含搜索缓存、搜索源状态检查等功能
+-- 说明: 包含搜索源状态检查功能
 -- ===============================================
 
 -- ===============================================
--- 1. 搜索结果缓存管理
+-- 1. 搜索源状态检查缓存
 -- ===============================================
-
--- 搜索结果缓存表
-CREATE TABLE IF NOT EXISTS search_cache (
-    id TEXT PRIMARY KEY,                        -- 缓存记录唯一标识
-    keyword TEXT NOT NULL,                      -- 搜索关键词
-    keyword_hash TEXT NOT NULL,                 -- 关键词哈希值（用于快速查找）
-    results TEXT NOT NULL,                      -- 搜索结果（JSON格式）
-    expires_at INTEGER NOT NULL,                -- 缓存过期时间
-    created_at INTEGER NOT NULL,                -- 创建时间戳
-    access_count INTEGER DEFAULT 0,             -- 访问次数统计
-    last_accessed INTEGER NOT NULL              -- 最后访问时间
-);
 
 -- 搜索源状态检查缓存表
 CREATE TABLE IF NOT EXISTS source_status_cache (
@@ -45,10 +33,9 @@ CREATE TABLE IF NOT EXISTS source_status_cache (
 -- ===============================================
 
 -- 搜索引擎核心模块索引
-CREATE INDEX IF NOT EXISTS idx_cache_keyword_hash ON search_cache(keyword_hash);
-CREATE INDEX IF NOT EXISTS idx_cache_expires ON search_cache(expires_at);
 CREATE INDEX IF NOT EXISTS idx_status_cache_source_keyword ON source_status_cache(source_id, keyword_hash);
 CREATE INDEX IF NOT EXISTS idx_status_cache_expires ON source_status_cache(expires_at);
+CREATE INDEX IF NOT EXISTS idx_status_cache_source ON source_status_cache(source_id);
 
 -- ===============================================
 -- 3. 触发器定义

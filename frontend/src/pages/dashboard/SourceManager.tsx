@@ -17,6 +17,8 @@ import {
   FolderOpen,
   Shield,
   LockKeyhole,
+  Activity,
+  Zap,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, EmptyState, SourceIcon, Dropdown } from '@/components/ui';
 import { sourceApi } from '@/services/api';
@@ -81,6 +83,14 @@ export const SourceManager: React.FC = () => {
     requiresKeyword: true,
     searchPriority: 0,
   });
+  
+  const [isBatchChecking, setIsBatchChecking] = useState(false);
+  const [batchCheckResults, setBatchCheckResults] = useState<Record<string, {
+    status: string;
+    available: boolean;
+    responseTime: number;
+    error: string | null;
+  }>>({});
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -320,13 +330,72 @@ export const SourceManager: React.FC = () => {
     try {
       const response = await sourceApi.checkSourceStatus(sourceId);
       if (response.success && response.data) {
+        setBatchCheckResults(prev => ({
+          ...prev,
+          [sourceId]: {
+            status: response.data.status,
+            available: response.data.available,
+            responseTime: response.data.responseTime,
+            error: response.data.error,
+          }
+        }));
+        
+        const source = sources.find(s => s.id === sourceId);
         notification.source.testSuccess(
-          editModal.source?.name || '搜索源',
+          source?.name || '搜索源',
           `响应时间: ${response.data.responseTime}ms`
         );
       }
     } catch (_error) {
-      notification.source.testFailed(editModal.source?.name || '搜索源');
+      const source = sources.find(s => s.id === sourceId);
+      notification.source.testFailed(source?.name || '搜索源');
+    }
+  };
+
+  const handleBatchCheckStatus = async () => {
+    const searchableSources = sources.filter(s => s.searchable && s.userConfig?.isEnabled !== false);
+    if (searchableSources.length === 0) {
+      notification.warning('没有可检查的搜索源');
+      return;
+    }
+
+    setIsBatchChecking(true);
+    setBatchCheckResults({});
+
+    try {
+      const sourceIds = searchableSources.map(s => s.id);
+      const batchSize = 10;
+      
+      for (let i = 0; i < sourceIds.length; i += batchSize) {
+        const batch = sourceIds.slice(i, i + batchSize);
+        const response = await sourceApi.batchCheckSourceStatus(batch);
+        
+        if (response.success && response.data) {
+          const newResults: Record<string, {
+            status: string;
+            available: boolean;
+            responseTime: number;
+            error: string | null;
+          }> = {};
+          
+          response.data.results.forEach(result => {
+            newResults[result.sourceId] = {
+              status: result.status,
+              available: result.available,
+              responseTime: result.responseTime,
+              error: result.error,
+            };
+          });
+          
+          setBatchCheckResults(prev => ({ ...prev, ...newResults }));
+        }
+      }
+      
+      notification.success(`检查完成`, `已完成 ${searchableSources.length} 个搜索源的健康检查`);
+    } catch (_error) {
+      notification.error('批量检查失败', '请稍后重试');
+    } finally {
+      setIsBatchChecking(false);
     }
   };
 
@@ -413,6 +482,16 @@ export const SourceManager: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleBatchCheckStatus}
+              disabled={isBatchChecking}
+              leftIcon={isBatchChecking ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+              className="text-primary-600 border-primary-300 hover:bg-primary-50 dark:border-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20"
+            >
+              {isBatchChecking ? '检查中...' : '批量检查'}
+            </Button>
             <Button 
               variant="outline" 
               size="sm"
@@ -663,6 +742,7 @@ export const SourceManager: React.FC = () => {
                             {category.sources.map((source) => {
                               const isEnabled = source.userConfig?.isEnabled !== false;
                               const siteType = getSiteTypeBadge(source.siteType);
+                              const checkResult = batchCheckResults[source.id];
                               
                               return (
                                 <div 
@@ -693,6 +773,28 @@ export const SourceManager: React.FC = () => {
                                           <Badge variant="accent" className="flex items-center gap-1 text-xs shrink-0">
                                             <Shield className="w-2.5 h-2.5" />
                                             系统
+                                          </Badge>
+                                        )}
+                                        {checkResult && (
+                                          <Badge 
+                                            variant={checkResult.available ? 'primary' : 'default'} 
+                                            className={`flex items-center gap-1 text-xs shrink-0 ${
+                                              checkResult.available 
+                                                ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' 
+                                                : 'bg-error-100 text-error-700 dark:bg-error-900/30 dark:text-error-400'
+                                            }`}
+                                          >
+                                            {checkResult.available ? (
+                                              <>
+                                                <Zap className="w-2.5 h-2.5" />
+                                                {checkResult.responseTime}ms
+                                              </>
+                                            ) : (
+                                              <>
+                                                <XCircle className="w-2.5 h-2.5" />
+                                                {checkResult.error || '不可用'}
+                                              </>
+                                            )}
                                           </Badge>
                                         )}
                                       </div>

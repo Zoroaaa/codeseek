@@ -5,7 +5,7 @@
  * 日期：2024
  */
 import { Hono } from 'hono';
-import { Env, SystemConfig, SearchCache, EmailSendLog } from '../types';
+import { Env, SystemConfig, EmailSendLog } from '../types';
 import { success, error, generateId } from '../utils';
 
 export const configRoutes = new Hono<{ Bindings: Env }>();
@@ -494,102 +494,6 @@ configRoutes.get('/analytics/stats', async (c) => {
 });
 
 /**
- * 获取搜索缓存
- * GET /api/cache/search
- */
-configRoutes.get('/cache/search', async (c) => {
-  const keyword = c.req.query('keyword');
-  if (!keyword) {
-    return c.json(success(null));
-  }
-
-  try {
-    const cache = await c.env.DB.prepare(
-      'SELECT * FROM search_cache WHERE keyword = ? AND expires_at > ?'
-    ).bind(keyword.trim(), Date.now()).first<SearchCache>();
-
-    if (cache) {
-      await c.env.DB.prepare(
-        'UPDATE search_cache SET access_count = access_count + 1, last_accessed = ? WHERE id = ?'
-      ).bind(Date.now(), cache.id).run();
-
-      return c.json(success({
-        keyword: cache.keyword,
-        results: JSON.parse(cache.results),
-        cachedAt: cache.created_at,
-      }));
-    }
-
-    return c.json(success(null));
-  } catch (err) {
-    console.error('Get search cache error:', err);
-    return c.json(success(null));
-  }
-});
-
-/**
- * 设置搜索缓存
- * POST /api/cache/search
- */
-configRoutes.post('/cache/search', async (c) => {
-  try {
-    const body = await c.req.json();
-    const { keyword, results, ttlMinutes = 60 } = body;
-
-    if (!keyword || !results) {
-      return c.json(error('VALIDATION_ERROR', '参数不完整'), 400);
-    }
-
-    const now = Date.now();
-    const expiresAt = now + ttlMinutes * 60 * 1000;
-
-    const existing = await c.env.DB.prepare(
-      'SELECT id FROM search_cache WHERE keyword = ?'
-    ).bind(keyword.trim()).first();
-
-    if (existing) {
-      await c.env.DB.prepare(`
-        UPDATE search_cache 
-        SET results = ?, expires_at = ?, created_at = ?, access_count = 0, last_accessed = ?
-        WHERE keyword = ?
-      `).bind(JSON.stringify(results), expiresAt, now, now, keyword.trim()).run();
-    } else {
-      const id = generateId();
-      const keywordHash = await hashKeyword(keyword.trim());
-
-      await c.env.DB.prepare(`
-        INSERT INTO search_cache (id, keyword, keyword_hash, results, expires_at, created_at, access_count, last_accessed)
-        VALUES (?, ?, ?, ?, ?, ?, 0, ?)
-      `).bind(id, keyword.trim(), keywordHash, JSON.stringify(results), expiresAt, now, now).run();
-    }
-
-    return c.json(success({ cached: true, expiresAt }));
-  } catch (err) {
-    console.error('Set search cache error:', err);
-    return c.json(error('SERVER_ERROR', '缓存失败'), 500);
-  }
-});
-
-/**
- * 清理过期缓存
- * POST /api/cache/cleanup
- */
-configRoutes.post('/cache/cleanup', async (c) => {
-  try {
-    const result = await c.env.DB.prepare(
-      'DELETE FROM search_cache WHERE expires_at < ?'
-    ).bind(Date.now()).run();
-
-    return c.json(success({
-      deletedCount: result.meta.changes || 0,
-    }, '缓存清理完成'));
-  } catch (err) {
-    console.error('Cleanup cache error:', err);
-    return c.json(error('SERVER_ERROR', '清理失败'), 500);
-  }
-});
-
-/**
  * 获取邮件发送日志
  * GET /api/email/logs
  */
@@ -650,11 +554,3 @@ configRoutes.get('/email/logs', async (c) => {
     return c.json(error('SERVER_ERROR', '获取日志失败'), 500);
   }
 });
-
-async function hashKeyword(keyword: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(keyword);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
-}

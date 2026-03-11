@@ -264,33 +264,3 @@ export const configApi = {
     return apiClient.post(`/config/reset/${encodeURIComponent(key)}`, {});
   },
 };
-
-export const cacheApi = {
-  getSearchCache: async (keyword: string): Promise<{ 
-    success: boolean; 
-    data: {
-      keyword: string;
-      results: unknown[];
-      cachedAt: string;
-      expiresAt: string;
-    } | null 
-  }> => {
-    return apiClient.get(`/cache/search?keyword=${encodeURIComponent(keyword)}`);
-  },
-
-  setSearchCache: async (data: { 
-    keyword: string; 
-    results: unknown[]; 
-    ttlMinutes?: number 
-  }): Promise<{ success: boolean; message: string }> => {
-    return apiClient.post('/cache/search', data);
-  },
-
-  cleanupCache: async (): Promise<{ success: boolean; data: { deletedCount: number } }> => {
-    return apiClient.post('/cache/cleanup', {});
-  },
-
-  clearAllCache: async (): Promise<{ success: boolean; message: string }> => {
-    return apiClient.delete('/cache/all');
-  },
-};

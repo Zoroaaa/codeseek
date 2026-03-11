@@ -511,17 +511,22 @@ export const sourceApi = {
     return apiClient.get(`/source-status-history/${sourceId}?limit=${limit}&hours=${hours}`);
   },
 
-  batchCheckSourceStatus: async (sourceIds: string[]): Promise<{ 
+  batchCheckSourceStatus: async (sourceIds: string[], keyword = 'test'): Promise<{ 
     success: boolean; 
-    data: Array<{
-      sourceId: string;
-      status: string;
-      available: boolean;
-      responseTime: number;
-    }> 
+    data: {
+      results: Array<{
+        sourceId: string;
+        sourceName: string;
+        status: string;
+        available: boolean;
+        responseTime: number;
+        error: string | null;
+      }>;
+      checkedAt: number;
+      keyword: string;
+    }
   }> => {
-    const params = sourceIds.map(id => `sourceIds=${encodeURIComponent(id)}`).join('&');
-    return apiClient.get(`/source-status-batch?${params}`);
+    return apiClient.post('/source-status-batch', { sourceIds, keyword });
   },
 
   clearSourceStatusCache: async (sourceId: string): Promise<{ success: boolean; message: string }> => {

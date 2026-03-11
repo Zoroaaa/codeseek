@@ -4,4 +4,4 @@ export { searchApi, userApi } from './search';
 export { sourceApi } from './source';
 export { communityApi } from './community';
 export { adminApi } from './admin';
-export { systemApi, analyticsApi, configApi, cacheApi } from './system';
+export { systemApi, analyticsApi, configApi } from './system';

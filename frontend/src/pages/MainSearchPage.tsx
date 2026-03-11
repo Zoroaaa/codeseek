@@ -29,6 +29,8 @@ import {
   FolderOpen,
   Tag,
   LayoutDashboard,
+  Activity,
+  RefreshCw,
 } from 'lucide-react';
 import { useSearchStore, useSourceStore, useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { searchApi, sourceApi, userApi, analyticsApi } from '@/services/api';
@@ -84,6 +86,13 @@ export const MainSearchPage: React.FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [allSources, setAllSources] = useState<SourceWithUserConfig[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isBatchChecking, setIsBatchChecking] = useState(false);
+  const [batchCheckResults, setBatchCheckResults] = useState<Record<string, {
+    status: string;
+    available: boolean;
+    responseTime: number;
+    error: string | null;
+  }>>({});
 
   useEffect(() => {
     const handleResize = () => {
@@ -341,6 +350,73 @@ export const MainSearchPage: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleBatchCheckSources = async () => {
+    const searchableSources = allSources.filter(s => s.searchable && s.userConfig?.isEnabled !== false);
+    if (searchableSources.length === 0) {
+      toast.warning('没有可检查的搜索源');
+      return;
+    }
+
+    setIsBatchChecking(true);
+    setBatchCheckResults({});
+
+    try {
+      const sourceIds = searchableSources.map(s => s.id);
+      const batchSize = 10;
+      
+      for (let i = 0; i < sourceIds.length; i += batchSize) {
+        const batch = sourceIds.slice(i, i + batchSize);
+        const response = await sourceApi.batchCheckSourceStatus(batch);
+        
+        if (response.success && response.data) {
+          const newResults: Record<string, {
+            status: string;
+            available: boolean;
+            responseTime: number;
+            error: string | null;
+          }> = {};
+          
+          response.data.results.forEach(result => {
+            newResults[result.sourceId] = {
+              status: result.status,
+              available: result.available,
+              responseTime: result.responseTime,
+              error: result.error,
+            };
+          });
+          
+          setBatchCheckResults(prev => ({ ...prev, ...newResults }));
+        }
+      }
+      
+      toast.success(`已完成 ${searchableSources.length} 个搜索源的健康检查`);
+    } catch (_error) {
+      toast.error('批量检查失败', '请稍后重试');
+    } finally {
+      setIsBatchChecking(false);
+    }
+  };
+
+  const handleCheckSingleSource = async (sourceId: string) => {
+    try {
+      const response = await sourceApi.checkSourceStatus(sourceId);
+      if (response.success && response.data) {
+        setBatchCheckResults(prev => ({
+          ...prev,
+          [sourceId]: {
+            status: response.data.status,
+            available: response.data.available,
+            responseTime: response.data.responseTime,
+            error: response.data.error,
+          }
+        }));
+        toast.success('检查完成', `响应时间: ${response.data.responseTime}ms`);
+      }
+    } catch (_error) {
+      toast.error('检查失败', '请稍后重试');
+    }
   };
 
   const getCategoryBadge = (categoryId?: string) => {
@@ -777,7 +853,28 @@ export const MainSearchPage: React.FC = () => {
                 <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base">搜索源管理</span>
                 <span className="px-2 py-0.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-full">{allSources.length}</span>
               </div>
-              {showSources ? <ChevronDown className="w-4 h-4 text-surface-400" /> : <ChevronRight className="w-4 h-4 text-surface-400" />}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {showSources && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleBatchCheckSources(); }} 
+                    disabled={isBatchChecking}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-all disabled:opacity-50"
+                  >
+                    {isBatchChecking ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        检查中
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="w-3 h-3" />
+                        批量检查
+                      </>
+                    )}
+                  </button>
+                )}
+                {showSources ? <ChevronDown className="w-4 h-4 text-surface-400" /> : <ChevronRight className="w-4 h-4 text-surface-400" />}
+              </div>
             </button>
             {showSources && (
               <div className="border-t border-surface-100 dark:border-surface-800 max-h-[400px] sm:max-h-[600px] overflow-y-auto scrollbar-thin">
@@ -871,6 +968,7 @@ export const MainSearchPage: React.FC = () => {
                                         const isEnabled = source.userConfig?.isEnabled !== false;
                                         const sourceName = source.userConfig?.customName || source.name;
                                         const sourceSubtitle = source.userConfig?.customSubtitle || source.subtitle;
+                                        const checkResult = batchCheckResults[source.id];
                                         
                                         return (
                                           <div 
@@ -902,6 +1000,25 @@ export const MainSearchPage: React.FC = () => {
                                                         {isEnabled ? '启用' : '禁用'}
                                                       </span>
                                                     )}
+                                                    {checkResult && (
+                                                      <span className={`flex items-center gap-0.5 text-[9px] sm:text-[10px] px-1 py-0.5 rounded font-medium ${
+                                                        checkResult.available 
+                                                          ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' 
+                                                          : 'bg-error-100 text-error-700 dark:bg-error-900/30 dark:text-error-400'
+                                                      }`}>
+                                                        {checkResult.available ? (
+                                                          <>
+                                                            <Zap className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
+                                                            {checkResult.responseTime}ms
+                                                          </>
+                                                        ) : (
+                                                          <>
+                                                            <XCircle className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
+                                                            异常
+                                                          </>
+                                                        )}
+                                                      </span>
+                                                    )}
                                                   </div>
                                                   {sourceSubtitle && (
                                                     <p className="text-[9px] sm:text-[10px] text-surface-500 dark:text-surface-400 mt-0.5 truncate">{sourceSubtitle}</p>
@@ -909,6 +1026,13 @@ export const MainSearchPage: React.FC = () => {
                                                 </div>
                                               </div>
                                               <div className="flex items-center gap-0.5 shrink-0">
+                                                <button 
+                                                  onClick={() => handleCheckSingleSource(source.id)}
+                                                  className="p-1 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
+                                                  title="健康检查"
+                                                >
+                                                  <RefreshCw className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                                </button>
                                                 <button 
                                                   onClick={() => {
                                                     const homepageUrl = source.homepageUrl || source.urlTemplate.replace('{keyword}', '');
