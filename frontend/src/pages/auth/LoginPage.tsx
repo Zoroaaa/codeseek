@@ -1,7 +1,3 @@
-/**
- * LoginPage - 登录页
- * 视觉优化：精美表单设计，保持全部功能逻辑不变
- */
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock, User, ArrowLeft, Search } from 'lucide-react';
@@ -9,6 +5,7 @@ import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
 import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
+import { VALIDATION_RULES, APP_INFO } from '@/constants';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -27,7 +24,7 @@ export const LoginPage: React.FC = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.identifier.trim()) newErrors.identifier = '请输入用户名或邮箱';
     if (!formData.password) newErrors.password = '请输入密码';
-    else if (formData.password.length < 6) newErrors.password = '密码至少6个字符';
+    else if (formData.password.length < VALIDATION_RULES.PASSWORD_MIN_LENGTH) newErrors.password = `密码至少${VALIDATION_RULES.PASSWORD_MIN_LENGTH}个字符`;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -166,7 +163,7 @@ export const LoginPage: React.FC = () => {
           <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
             <Search className="w-3 h-3 text-white" />
           </div>
-          <span className="text-xs font-medium">磁力快搜</span>
+          <span className="text-xs font-medium">{APP_INFO.NAME}</span>
         </div>
       </div>
     </div>

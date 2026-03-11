@@ -1,7 +1,3 @@
-/**
- * RegisterPage - 注册页
- * 视觉优化：多步骤精美流程，保持全部功能逻辑不变
- */
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Send, ShieldCheck, CheckCircle, Search } from 'lucide-react';
@@ -9,6 +5,7 @@ import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
 import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
+import { VALIDATION_RULES, APP_INFO } from '@/constants';
 
 type Step = 'form' | 'verify' | 'success';
 
@@ -50,12 +47,14 @@ export const RegisterPage: React.FC = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.username.trim()) newErrors.username = '请输入用户名';
-    else if (formData.username.length < 3) newErrors.username = '用户名至少3个字符';
-    else if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(formData.username)) newErrors.username = '用户名只能包含字母、数字、下划线和中文';
+    else if (formData.username.length < VALIDATION_RULES.USERNAME_MIN_LENGTH) newErrors.username = `用户名至少${VALIDATION_RULES.USERNAME_MIN_LENGTH}个字符`;
+    else if (formData.username.length > VALIDATION_RULES.USERNAME_MAX_LENGTH) newErrors.username = `用户名最多${VALIDATION_RULES.USERNAME_MAX_LENGTH}个字符`;
+    else if (!VALIDATION_RULES.USERNAME_REGEX.test(formData.username)) newErrors.username = '用户名只能包含字母、数字和下划线';
     if (!formData.email.trim()) newErrors.email = '请输入邮箱';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = '请输入有效的邮箱地址';
     if (!formData.password) newErrors.password = '请输入密码';
-    else if (formData.password.length < 6) newErrors.password = '密码至少6个字符';
+    else if (formData.password.length < VALIDATION_RULES.PASSWORD_MIN_LENGTH) newErrors.password = `密码至少${VALIDATION_RULES.PASSWORD_MIN_LENGTH}个字符`;
+    else if (formData.password.length > VALIDATION_RULES.PASSWORD_MAX_LENGTH) newErrors.password = `密码最多${VALIDATION_RULES.PASSWORD_MAX_LENGTH}个字符`;
     if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = '两次密码输入不一致';
     if (!agreed) notification.common.validationError('服务条款');
     setErrors(newErrors);
@@ -300,7 +299,7 @@ export const RegisterPage: React.FC = () => {
         <CheckCircle className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
       </div>
       <h3 className="display-font text-xl font-bold text-slate-900 dark:text-slate-100 mb-2 tracking-tight">注册成功！</h3>
-      <p className="text-slate-600 dark:text-slate-400 mb-6">欢迎加入磁力快搜，即将跳转到控制台...</p>
+      <p className="text-slate-600 dark:text-slate-400 mb-6">欢迎加入{APP_INFO.NAME}，即将跳转到控制台...</p>
       <div className="flex items-center justify-center gap-2">
         {[0, 150, 300].map((delay, i) => (
           <div key={i} className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: `${delay}ms` }} />
@@ -401,7 +400,7 @@ export const RegisterPage: React.FC = () => {
           <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
             <Search className="w-3 h-3 text-white" />
           </div>
-          <span className="text-xs font-medium">磁力快搜</span>
+          <span className="text-xs font-medium">{APP_INFO.NAME}</span>
         </div>
       </div>
     </div>

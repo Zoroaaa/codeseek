@@ -1,3 +1,5 @@
+import { TOAST_CONFIG } from '@/constants';
+
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
 export type ToastPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center';
@@ -36,8 +38,8 @@ export interface ToastConfig {
 }
 
 export const DEFAULT_TOAST_CONFIG: ToastConfig = {
-  maxToasts: 5,
-  defaultDuration: 5000,
+  maxToasts: TOAST_CONFIG.MAX_TOASTS,
+  defaultDuration: TOAST_CONFIG.DEFAULT_DURATION,
   defaultPosition: 'top-right',
   defaultShowProgress: true,
   defaultShowCloseButton: true,

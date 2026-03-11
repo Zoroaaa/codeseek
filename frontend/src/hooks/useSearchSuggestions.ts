@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchStore } from '@/stores';
 import { searchApi } from '@/services/api';
+import { PAGINATION_CONFIG, VALIDATION_RULES } from '@/constants';
 
 interface UseSearchSuggestionsOptions {
   debounceMs?: number;
@@ -9,7 +10,7 @@ interface UseSearchSuggestionsOptions {
 }
 
 export function useSearchSuggestions(options: UseSearchSuggestionsOptions = {}) {
-  const { debounceMs = 300, maxSuggestions = 10, minChars = 2 } = options;
+  const { debounceMs = 300, maxSuggestions = PAGINATION_CONFIG.SUGGESTIONS_LIMIT, minChars = VALIDATION_RULES.SEARCH_KEYWORD_MIN_LENGTH } = options;
   const { suggestions, setSuggestions, searchHistory, keyword } = useSearchStore();
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);

@@ -1,7 +1,3 @@
-/**
- * DashboardLayout - 仪表板布局
- * 视觉优化：精美侧边栏，精细的导航项，保持全部功能逻辑不变
- */
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
@@ -24,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
+import { SIDEBAR_CONFIG, APP_INFO } from '@/constants';
 
 interface NavItem {
   id: string;
@@ -95,7 +92,7 @@ export const DashboardLayout: React.FC = () => {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md group-hover:shadow-lg transition-all">
               <Search className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-base gradient-text display-font">磁力快搜</span>
+            <span className="font-bold text-base gradient-text display-font">{APP_INFO.NAME}</span>
           </Link>
         )}
         {mobile ? (
@@ -219,7 +216,7 @@ export const DashboardLayout: React.FC = () => {
       {/* ── Desktop Sidebar ── */}
       <aside className={clsx(
         'dashboard-sidebar hidden lg:flex',
-        sidebarCollapsed ? 'w-[72px]' : 'w-64'
+        sidebarCollapsed ? `w-[${SIDEBAR_CONFIG.COLLAPSED_WIDTH}px]` : 'w-64'
       )}>
         <SidebarContent />
       </aside>
@@ -245,7 +242,7 @@ export const DashboardLayout: React.FC = () => {
       {/* ── Main Content ── */}
       <div className={clsx(
         'flex-1 flex flex-col transition-all duration-300 min-w-0',
-        sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64'
+        sidebarCollapsed ? `lg:ml-[${SIDEBAR_CONFIG.COLLAPSED_WIDTH}px]` : 'lg:ml-64'
       )}>
 
         {/* Header */}

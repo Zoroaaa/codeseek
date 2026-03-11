@@ -1,8 +1,3 @@
-/**
- * HomePage - 首页 / Landing Page
- * 视觉优化：深空科技风格，霓虹辉光点缀，精妙动效
- * 功能逻辑保持原样，仅修改视觉表现层
- */
 import React, { useEffect } from 'react';
 import {
   Search,
@@ -25,6 +20,7 @@ import {
 import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { Button } from '@/components/ui';
 import { useNavigate, Link } from 'react-router-dom';
+import { APP_INFO } from '@/constants';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -111,7 +107,7 @@ export const HomePage: React.FC = () => {
                 </div>
               </div>
               <span className="text-lg sm:text-xl font-bold gradient-text display-font">
-                磁力快搜
+                {APP_INFO.NAME}
               </span>
             </Link>
 

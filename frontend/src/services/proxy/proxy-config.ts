@@ -1,3 +1,11 @@
+import {
+  PROXY_CONFIG,
+  PROXY_TIMEOUTS,
+  PROXY_CACHE_CONFIG,
+  PROXY_PERFORMANCE_CONFIG,
+  PROXY_ERROR_HANDLING,
+} from '@/constants';
+
 export type ProxyStatus = 'disabled' | 'enabled' | 'error' | 'checking' | 'degraded' | 'smart';
 
 export type ResourceType = 'html' | 'css' | 'javascript' | 'image' | 'font' | 'media' | 'api' | 'document' | 'other';
@@ -147,9 +155,9 @@ export const RESOURCE_TYPES: Record<string, ResourceType> = {
 };
 
 export const proxyConfig = {
-  proxyServer: 'https://omnibox.pp.ua',
+  proxyServer: PROXY_CONFIG.PROXY_SERVER,
   backupServers: [] as string[],
-  defaultEnabled: true,
+  defaultEnabled: PROXY_CONFIG.DEFAULT_ENABLED,
   proxyUrlFormat: '{proxy}/{target_url}',
   supportedDomains: ['ALL'],
 
@@ -179,35 +187,35 @@ export const proxyConfig = {
       redirect: 'follow'
     } as RequestInit,
     timeouts: {
-      default: 15000,
-      api: 10000,
-      html: 15000,
-      resource: 30000,
-      media: 60000,
-      healthCheck: 10000
+      default: PROXY_TIMEOUTS.HTML,
+      api: PROXY_TIMEOUTS.API,
+      html: PROXY_TIMEOUTS.HTML,
+      resource: PROXY_TIMEOUTS.STATIC,
+      media: PROXY_TIMEOUTS.MEDIA,
+      healthCheck: PROXY_TIMEOUTS.HEALTH_CHECK
     },
     retry: {
-      maxAttempts: 3,
-      delays: [1000, 2000, 5000],
+      maxAttempts: PROXY_ERROR_HANDLING.MAX_RETRIES,
+      delays: [...PROXY_ERROR_HANDLING.RETRY_DELAYS],
       retryOn: [408, 429, 500, 502, 503, 504]
     }
   } as RequestConfig,
 
   cacheStrategy: {
-    enabled: true,
-    maxSize: 100,
-    maxEntries: 500,
+    enabled: PROXY_CACHE_CONFIG.ENABLED,
+    maxSize: PROXY_CACHE_CONFIG.MAX_SIZE,
+    maxEntries: PROXY_CACHE_CONFIG.MAX_ENTRIES,
     ttl: {
-      html: 3600 * 1000,
-      css: 86400 * 1000,
-      javascript: 86400 * 1000,
-      image: 2592000 * 1000,
-      font: 2592000 * 1000,
-      api: 1800 * 1000,
-      media: 3600 * 1000,
-      document: 3600 * 1000,
-      other: 3600 * 1000,
-      default: 3600 * 1000
+      html: PROXY_CACHE_CONFIG.TTL.HTML,
+      css: PROXY_CACHE_CONFIG.TTL.CSS,
+      javascript: PROXY_CACHE_CONFIG.TTL.JAVASCRIPT,
+      image: PROXY_CACHE_CONFIG.TTL.IMAGE,
+      font: PROXY_CACHE_CONFIG.TTL.FONT,
+      api: PROXY_CACHE_CONFIG.TTL.API,
+      media: PROXY_CACHE_CONFIG.TTL.MEDIA,
+      document: PROXY_CACHE_CONFIG.TTL.DEFAULT,
+      other: PROXY_CACHE_CONFIG.TTL.DEFAULT,
+      default: PROXY_CACHE_CONFIG.TTL.DEFAULT
     },
     rules: {
       alwaysCache: ['image', 'font', 'css', 'javascript'] as ResourceType[],
@@ -220,7 +228,7 @@ export const proxyConfig = {
   } as CacheStrategy,
 
   performance: {
-    maxConcurrent: 6,
+    maxConcurrent: PROXY_PERFORMANCE_CONFIG.MAX_CONCURRENT,
     priority: {
       html: 10,
       css: 9,
@@ -233,14 +241,14 @@ export const proxyConfig = {
       other: 1
     },
     preload: {
-      enabled: true,
+      enabled: PROXY_PERFORMANCE_CONFIG.PRELOAD.ENABLED,
       resources: ['css', 'javascript', 'font'] as ResourceType[],
-      maxPreloads: 10
+      maxPreloads: PROXY_PERFORMANCE_CONFIG.PRELOAD.MAX_PRELOADS
     },
     lazyLoad: {
-      enabled: true,
+      enabled: PROXY_PERFORMANCE_CONFIG.LAZY_LOAD.ENABLED,
       resources: ['image', 'media'] as ResourceType[],
-      threshold: 100
+      threshold: PROXY_PERFORMANCE_CONFIG.LAZY_LOAD.THRESHOLD
     }
   } as PerformanceConfig,
 
@@ -263,23 +271,23 @@ export const proxyConfig = {
   } as Record<string, ProxyStatus>,
 
   timeouts: {
-    healthCheck: 10000,
-    request: 30000,
-    retry: 3,
-    retryDelay: 1000,
+    healthCheck: PROXY_TIMEOUTS.HEALTH_CHECK,
+    request: PROXY_TIMEOUTS.REQUEST,
+    retry: PROXY_TIMEOUTS.RETRY,
+    retryDelay: PROXY_TIMEOUTS.RETRY_DELAY,
     resourceTimeout: {
-      html: 15000,
-      api: 10000,
-      static: 30000,
-      media: 60000
+      html: PROXY_TIMEOUTS.HTML,
+      api: PROXY_TIMEOUTS.API,
+      static: PROXY_TIMEOUTS.STATIC,
+      media: PROXY_TIMEOUTS.MEDIA
     }
   },
 
   errorHandling: {
-    maxRetries: 3,
-    retryDelays: [1000, 2000, 5000],
-    fallbackToOriginal: true,
-    logErrors: true,
+    maxRetries: PROXY_ERROR_HANDLING.MAX_RETRIES,
+    retryDelays: [...PROXY_ERROR_HANDLING.RETRY_DELAYS],
+    fallbackToOriginal: PROXY_ERROR_HANDLING.FALLBACK_TO_ORIGINAL,
+    logErrors: PROXY_ERROR_HANDLING.LOG_ERRORS,
     strategies: {
       network: { retry: true, fallback: true, notify: false },
       timeout: { retry: true, fallback: true, notify: true },
@@ -299,8 +307,8 @@ export const proxyConfig = {
     }
   } as MonitoringConfig,
 
-  version: '2.2.0',
-  backendVersion: '2.0.0'
+  version: PROXY_CONFIG.VERSION,
+  backendVersion: PROXY_CONFIG.BACKEND_VERSION
 };
 
 export function validateProxyConfig(): {
@@ -556,7 +564,7 @@ export async function testProxyConnectivity(): Promise<{
 }
 
 class ErrorLogger {
-  maxLogs = 200;
+  maxLogs = PROXY_ERROR_HANDLING.MAX_ERROR_LOGS;
 
   log(error: Error, context: Record<string, unknown> = {}): void {
     if (!proxyConfig.errorHandling.logErrors) return;

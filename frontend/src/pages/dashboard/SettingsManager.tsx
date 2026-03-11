@@ -18,6 +18,7 @@ import { Card, Button, Input, Tabs, Modal } from '@/components/ui';
 import { useAuthStore, useThemeStore } from '@/stores';
 import { userApi, authApi } from '@/services/api';
 import { useNotification } from '@/hooks';
+import { VALIDATION_RULES } from '@/constants';
 
 export const SettingsManager: React.FC = () => {
   const navigate = useNavigate();
@@ -133,8 +134,12 @@ export const SettingsManager: React.FC = () => {
       return;
     }
 
-    if (passwordForm.newPassword.length < 6) {
-      notification.error('密码太短', '密码至少需要6个字符');
+    if (passwordForm.newPassword.length < VALIDATION_RULES.PASSWORD_MIN_LENGTH) {
+      notification.error('密码太短', `密码至少需要${VALIDATION_RULES.PASSWORD_MIN_LENGTH}个字符`);
+      return;
+    }
+    if (passwordForm.newPassword.length > VALIDATION_RULES.PASSWORD_MAX_LENGTH) {
+      notification.error('密码太长', `密码最多${VALIDATION_RULES.PASSWORD_MAX_LENGTH}个字符`);
       return;
     }
     

@@ -1,18 +1,20 @@
+import { API_BASE_URL, API_CONFIG } from '@/constants';
+
 const getApiBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return '/api';
+      return API_BASE_URL.LOCAL;
     }
     if (hostname.includes('pages.dev') || hostname.includes('cloudflare')) {
-      return 'https://backend.codeseek.pp.ua/api';
+      return API_BASE_URL.PRODUCTION;
     }
-    return 'https://backend.codeseek.pp.ua/api';
+    return API_BASE_URL.PRODUCTION;
   }
-  return '/api';
+  return API_BASE_URL.LOCAL;
 };
 
-const API_BASE_URL = getApiBaseUrl();
+const BASE_URL = getApiBaseUrl();
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -25,8 +27,8 @@ interface RequestOptions {
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
-  private maxRetries = 3;
-  private retryDelay = 1000;
+  private maxRetries = API_CONFIG.MAX_RETRIES;
+  private retryDelay = API_CONFIG.RETRY_DELAY;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -196,4 +198,4 @@ export class ApiError extends Error {
   }
 }
 
-export const apiClient = new ApiClient(API_BASE_URL);
+export const apiClient = new ApiClient(BASE_URL);
