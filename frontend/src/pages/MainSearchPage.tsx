@@ -867,7 +867,10 @@ export const MainSearchPage: React.FC = () => {
                                               </div>
                                               <div className="flex items-center gap-0.5 shrink-0">
                                                 <button 
-                                                  onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(source.urlTemplate.replace('{keyword}', '')) : source.urlTemplate.replace('{keyword}', ''), '_blank')} 
+                                                  onClick={() => {
+                                                    const homepageUrl = source.homepageUrl || source.urlTemplate.replace('{keyword}', '');
+                                                    window.open(isProxyEnabled ? convertToProxyUrl(homepageUrl) : homepageUrl, '_blank');
+                                                  }} 
                                                   className="p-1 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
                                                   title="访问站点"
                                                 >
