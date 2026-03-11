@@ -209,4 +209,9 @@ export const CONFIG = {
     TRENDING_DEFAULT_LIMIT: 20,
     TRENDING_MAX_LIMIT: 50,
   },
+
+  /** 用户数据限制配置 - [后备值] */
+  MAX_FAVORITES_PER_USER: 1000,
+  MAX_HISTORY_PER_USER: 500,
+  MAX_TAGS_PER_USER: 100,
 };

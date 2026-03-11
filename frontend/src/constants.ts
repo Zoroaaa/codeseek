@@ -112,6 +112,11 @@ export const SEARCH_CONFIG = {
   TRENDING_MAX_LIMIT: 50,
 } as const;
 
+/** 搜索历史配置 - [后备值] */
+export const SEARCH_HISTORY_CONFIG = {
+  MAX_HISTORY_ITEMS: 100,
+} as const;
+
 /* ==================== 时间配置 ==================== */
 
 /** 时间常量（毫秒）- [固定值] */
