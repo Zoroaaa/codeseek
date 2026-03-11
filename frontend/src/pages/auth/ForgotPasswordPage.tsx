@@ -8,13 +8,14 @@ import { ArrowLeft, Mail, Send, Lock, ShieldCheck, CheckCircle, Eye, EyeOff, Sea
 import { authApi } from '@/services/api';
 import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
-import { VALIDATION_RULES } from '@/constants';
+import { useValidationRules } from '@/contexts/ConfigContext';
 
 type Step = 'email' | 'verify' | 'success';
 
 export const ForgotPasswordPage: React.FC = () => {
   const navigate = useNavigate();
   const notification = useNotification();
+  const validationRules = useValidationRules();
   
   const [currentStep, setCurrentStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -101,10 +102,10 @@ export const ForgotPasswordPage: React.FC = () => {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = verificationCode.replace(/\s/g, '');
-    if (cleanCode.length !== VALIDATION_RULES.VERIFICATION_CODE_LENGTH) { notification.error('验证码错误', `请输入${VALIDATION_RULES.VERIFICATION_CODE_LENGTH}位验证码`); return; }
+    if (cleanCode.length !== validationRules.VERIFICATION_CODE_LENGTH) { notification.error('验证码错误', `请输入${validationRules.VERIFICATION_CODE_LENGTH}位验证码`); return; }
     if (!newPassword) { notification.error('密码错误', '请输入新密码'); return; }
-    if (newPassword.length < VALIDATION_RULES.PASSWORD_MIN_LENGTH) { notification.error('密码错误', `密码至少${VALIDATION_RULES.PASSWORD_MIN_LENGTH}个字符`); return; }
-    if (newPassword.length > VALIDATION_RULES.PASSWORD_MAX_LENGTH) { notification.error('密码错误', `密码最多${VALIDATION_RULES.PASSWORD_MAX_LENGTH}个字符`); return; }
+    if (newPassword.length < validationRules.PASSWORD_MIN_LENGTH) { notification.error('密码错误', `密码至少${validationRules.PASSWORD_MIN_LENGTH}个字符`); return; }
+    if (newPassword.length > validationRules.PASSWORD_MAX_LENGTH) { notification.error('密码错误', `密码最多${validationRules.PASSWORD_MAX_LENGTH}个字符`); return; }
     if (newPassword !== confirmPassword) { notification.error('密码错误', '两次输入的密码不一致'); return; }
     setIsLoading(true);
     try {

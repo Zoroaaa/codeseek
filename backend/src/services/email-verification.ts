@@ -1,6 +1,7 @@
 import { Env } from '../types';
 import { generateId, hashPassword } from '../utils';
 import { CONFIG } from '../constants';
+import { ConfigService } from './config';
 
 export type VerificationType =
   | 'registration'
@@ -104,14 +105,12 @@ export class EmailVerificationService {
   private env: Env;
   private resendApiKey: string | undefined;
   private defaultFromEmail: string;
-  private defaultFromName: string;
   private siteUrl: string;
 
   constructor(env: Env) {
     this.env = env;
     this.resendApiKey = env.RESEND_API_KEY;
     this.defaultFromEmail = env.DEFAULT_FROM_EMAIL || CONFIG.Email.DEFAULT_FROM_EMAIL;
-    this.defaultFromName = env.DEFAULT_FROM_NAME || CONFIG.Email.DEFAULT_FROM_NAME;
     this.siteUrl = env.SITE_URL || CONFIG.Defaults.SITE_URL;
   }
 
@@ -480,6 +479,10 @@ export class EmailVerificationService {
       throw new Error('邮件服务未配置');
     }
 
+    const configService = new ConfigService(this.env);
+    const verificationCodeExpiry = await configService.getInt('verification_code_expiry', CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS);
+    const defaultFromName = await configService.get('default_from_name', CONFIG.Email.DEFAULT_FROM_NAME);
+
     const mappedTemplateType = this.getTemplateType(templateType);
     const template = await this.getEmailTemplate(mappedTemplateType);
 
@@ -488,10 +491,10 @@ export class EmailVerificationService {
     }
 
     const vars = {
-      siteName: CONFIG.Email.DEFAULT_FROM_NAME,
+      siteName: defaultFromName,
       siteUrl: this.siteUrl,
       verificationCode,
-      expiryMinutes: Math.floor(CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS / 60000),
+      expiryMinutes: Math.floor(verificationCodeExpiry / 60000),
       ...templateVars,
     };
 
@@ -507,7 +510,7 @@ export class EmailVerificationService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: `${this.defaultFromName} <${this.defaultFromEmail}>`,
+          from: `${defaultFromName} <${this.defaultFromEmail}>`,
           to: [email],
           subject: subject,
           html: htmlContent,

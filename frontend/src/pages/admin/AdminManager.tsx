@@ -8,8 +8,9 @@ import { TrendsTab } from './TrendsTab';
 import { ReportsTab } from './ReportsTab';
 import { RolesTab } from './RolesTab';
 import { CleanupTab } from './CleanupTab';
+import { ConfigTab } from './ConfigTab';
 
-type TabType = 'users' | 'sessions' | 'actions' | 'analytics' | 'trends' | 'reports' | 'roles' | 'cleanup';
+type TabType = 'users' | 'sessions' | 'actions' | 'analytics' | 'trends' | 'reports' | 'roles' | 'config' | 'cleanup';
 
 export const AdminManager: React.FC = () => {
   const location = useLocation();
@@ -22,7 +23,8 @@ export const AdminManager: React.FC = () => {
     if (p.includes('/trends')) return 'trends';
     if (p.includes('/reports')) return 'reports';
     if (p.includes('/roles')) return 'roles';
-    if (p.includes('/config')) return 'cleanup';
+    if (p.includes('/config')) return 'config';
+    if (p.includes('/cleanup')) return 'cleanup';
     return 'users';
   };
 
@@ -38,6 +40,7 @@ export const AdminManager: React.FC = () => {
       {activeTab === 'trends' && <TrendsTab />}
       {activeTab === 'reports' && <ReportsTab />}
       {activeTab === 'roles' && <RolesTab />}
+      {activeTab === 'config' && <ConfigTab />}
       {activeTab === 'cleanup' && <CleanupTab />}
     </div>
   );

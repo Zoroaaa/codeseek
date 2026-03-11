@@ -98,9 +98,41 @@ CREATE TABLE IF NOT EXISTS system_config (
     value TEXT NOT NULL,                        -- 配置值
     description TEXT,                           -- 配置描述
     config_type TEXT DEFAULT 'string',          -- 配置类型（string/integer/boolean/json/float）
+    config_group TEXT DEFAULT 'other',          -- 配置分组
+    validation_rules TEXT,                      -- 配置验证规则（JSON格式）
+    options TEXT,                               -- 配置选项（用于下拉选择等，JSON格式）
     is_public INTEGER DEFAULT 0,                -- 是否公开（1:公开 0:私有）
+    is_resettable INTEGER DEFAULT 1,            -- 是否可重置
+    is_sensitive INTEGER DEFAULT 0,             -- 是否敏感配置
+    display_order INTEGER DEFAULT 0,            -- 排序顺序
     created_at INTEGER NOT NULL,                -- 创建时间戳
     updated_at INTEGER NOT NULL                 -- 更新时间戳
+);
+
+CREATE TABLE IF NOT EXISTS config_groups (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    description TEXT,
+    icon TEXT,
+    display_order INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS config_change_logs (
+    id TEXT PRIMARY KEY,                        -- 日志唯一标识
+    config_key TEXT NOT NULL,                   -- 配置键名
+    old_value TEXT,                             -- 旧值
+    new_value TEXT NOT NULL,                    -- 新值
+    change_type TEXT NOT NULL,                  -- 变更类型（create/update/delete/reset）
+    changed_by TEXT,                            -- 变更人用户ID
+    changed_by_username TEXT,                   -- 变更人用户名
+    change_reason TEXT,                         -- 变更原因
+    ip_address TEXT,                            -- 变更IP地址
+    user_agent TEXT,                            -- 用户代理
+    created_at INTEGER NOT NULL,                -- 创建时间戳
+    FOREIGN KEY (changed_by) REFERENCES users (id) ON DELETE SET NULL
 );
 
 -- ===============================================
@@ -149,6 +181,12 @@ CREATE INDEX IF NOT EXISTS idx_actions_action ON user_actions(action);
 CREATE INDEX IF NOT EXISTS idx_actions_login ON user_actions(action, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_config_public ON system_config(is_public);
+CREATE INDEX IF NOT EXISTS idx_config_group ON system_config(config_group);
+
+CREATE INDEX IF NOT EXISTS idx_config_logs_key ON config_change_logs(config_key);
+CREATE INDEX IF NOT EXISTS idx_config_logs_by ON config_change_logs(changed_by);
+CREATE INDEX IF NOT EXISTS idx_config_logs_created ON config_change_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_config_logs_type ON config_change_logs(change_type);
 
 CREATE INDEX IF NOT EXISTS idx_analytics_user_created ON analytics_events(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);

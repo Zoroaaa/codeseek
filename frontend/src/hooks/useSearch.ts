@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useSearchStore, useAuthStore } from '@/stores';
 import { searchApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
-import { SEARCH_HISTORY_CONFIG, PAGINATION_CONFIG, VALIDATION_RULES } from '@/constants';
+import { useValidationRules, useUserLimits, usePaginationConfig } from '@/contexts/ConfigContext';
 import type { SearchResult, SearchHistoryItem } from '@/types';
 
 interface UseSearchOptions {
@@ -36,7 +36,10 @@ interface UseSearchReturn {
 }
 
 export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
-  const { autoSaveHistory = true, maxHistoryItems = SEARCH_HISTORY_CONFIG.MAX_HISTORY_ITEMS } = options;
+  const validationRules = useValidationRules();
+  const userLimits = useUserLimits();
+  const paginationConfig = usePaginationConfig();
+  const { autoSaveHistory = true, maxHistoryItems = userLimits.maxSearchHistory } = options;
   const toast = useToast();
   const { isAuthenticated } = useAuthStore();
   const {
@@ -80,7 +83,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
         keyword: query.trim(),
         sourceIds: selectedSources.length > 0 ? selectedSources : undefined,
         page,
-        pageSize: PAGINATION_CONFIG.DEFAULT_PAGE_SIZE,
+        pageSize: paginationConfig.defaultPageSize,
       });
 
       if (response.success && response.data) {
@@ -194,7 +197,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
   }, [clearHistory, toast]);
 
   const loadSuggestions = useCallback(async (keyword: string) => {
-    if (!keyword || keyword.length < VALIDATION_RULES.SEARCH_KEYWORD_MIN_LENGTH) {
+    if (!keyword || keyword.length < validationRules.SEARCH_KEYWORD_MIN_LENGTH) {
       setSuggestions([]);
       return;
     }

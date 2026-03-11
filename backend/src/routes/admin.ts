@@ -7,9 +7,22 @@
 import { Hono } from 'hono';
 import { Env, User, CommunitySourceReport, UserAction, JwtPayload, Role } from '../types';
 import { success, error, verifyToken, logUserAction } from '../utils';
-import { CONFIG } from '../constants';
+import { ConfigService } from '../services/config';
 
 export const adminRoutes = new Hono<{ Bindings: Env }>();
+
+const TIME_CONSTANTS = {
+  DAY_IN_MS: 24 * 60 * 60 * 1000,
+  WEEK_IN_MS: 7 * 24 * 60 * 60 * 1000,
+  MONTH_IN_MS: 30 * 24 * 60 * 60 * 1000,
+};
+
+async function getPaginationConfig(configService: ConfigService) {
+  const defaultPageSize = await configService.getInt('default_page_size', 20);
+  const maxPageSize = await configService.getInt('max_page_size', 100);
+  const maxLogPageSize = await configService.getInt('max_log_page_size', 200);
+  return { defaultPageSize, maxPageSize, maxLogPageSize };
+}
 
 const getAdminUser = async (c: any): Promise<JwtPayload | null> => {
   const authHeader = c.req.header('Authorization');
@@ -75,7 +88,9 @@ adminRoutes.get('/roles', async (c) => {
  */
 adminRoutes.get('/users', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
+  const configService = new ConfigService(c.env);
+  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
   const search = c.req.query('search');
   const status = c.req.query('status');
   const roleId = c.req.query('roleId');
@@ -278,7 +293,9 @@ adminRoutes.put('/users/:id/role', async (c) => {
 adminRoutes.get('/users/:id/login-logs', async (c) => {
   const userId = c.req.param('id');
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
+  const configService = new ConfigService(c.env);
+  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
 
   try {
     const countResult = await c.env.DB.prepare(
@@ -322,11 +339,13 @@ adminRoutes.get('/users/:id/login-logs', async (c) => {
  * GET /api/admin/active-users
  */
 adminRoutes.get('/active-users', async (c) => {
-  const limit = Math.min(parseInt(c.req.query('limit') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
+  const configService = new ConfigService(c.env);
+  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const limit = Math.min(parseInt(c.req.query('limit') || String(defaultPageSize)), maxPageSize);
   const days = parseInt(c.req.query('days') || '7');
 
   try {
-    const startTime = Date.now() - days * CONFIG.Stats.DAY_IN_MS;
+    const startTime = Date.now() - days * TIME_CONSTANTS.DAY_IN_MS;
 
     const users = await c.env.DB.prepare(`
       SELECT u.id, u.username, u.email, u.role_id, u.login_count,
@@ -368,7 +387,7 @@ adminRoutes.get('/login-stats', async (c) => {
 
   try {
     const now = Date.now();
-    const startTime = now - days * CONFIG.Stats.DAY_IN_MS;
+    const startTime = now - days * TIME_CONSTANTS.DAY_IN_MS;
 
     const dailyStats = await c.env.DB.prepare(`
       SELECT 
@@ -505,7 +524,9 @@ adminRoutes.put('/users/:id/permissions', async (c) => {
  */
 adminRoutes.get('/reports', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
+  const configService = new ConfigService(c.env);
+  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
   const status = c.req.query('status') || 'pending';
 
   try {
@@ -602,7 +623,7 @@ adminRoutes.get('/stats', async (c) => {
         SUM(CASE WHEN email_verified = 1 THEN 1 ELSE 0 END) as verified,
         SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as new_this_week
       FROM users
-    `).bind(Date.now() - CONFIG.Stats.WEEK_IN_MS).first();
+    `).bind(Date.now() - TIME_CONSTANTS.WEEK_IN_MS).first();
 
     const roleStats = await c.env.DB.prepare(`
       SELECT r.id, r.name, r.display_name, COUNT(u.id) as user_count
@@ -641,7 +662,7 @@ adminRoutes.get('/stats', async (c) => {
       SELECT COUNT(DISTINCT user_id) as count
       FROM user_sessions
       WHERE last_activity > ?
-    `).bind(Date.now() - CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
+    `).bind(Date.now() - TIME_CONSTANTS.DAY_IN_MS).first<{ count: number }>();
 
     const topSearchKeywords = await c.env.DB.prepare(`
       SELECT query, COUNT(*) as count
@@ -650,7 +671,7 @@ adminRoutes.get('/stats', async (c) => {
       GROUP BY query
       ORDER BY count DESC
       LIMIT 10
-    `).bind(Date.now() - CONFIG.Stats.WEEK_IN_MS).all();
+    `).bind(Date.now() - TIME_CONSTANTS.WEEK_IN_MS).all();
 
     const topUsedSources = await c.env.DB.prepare(`
       SELECT name, usage_count
@@ -706,7 +727,9 @@ adminRoutes.get('/stats', async (c) => {
  */
 adminRoutes.get('/logs', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_LOG_PAGE_SIZE);
+  const configService = new ConfigService(c.env);
+  const { defaultPageSize, maxLogPageSize } = await getPaginationConfig(configService);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxLogPageSize);
   const userId = c.req.query('userId');
   const action = c.req.query('action');
 
@@ -762,6 +785,10 @@ adminRoutes.post('/cleanup', async (c) => {
   const adminUser = c.get('user') as JwtPayload;
 
   try {
+    const configService = new ConfigService(c.env);
+    const passwordResetRetentionDays = await configService.getInt('password_reset_log_retention_days', 30);
+    const userActionsRetentionDays = await configService.getInt('user_actions_retention_days', 90);
+
     const now = Date.now();
     const results = {
       expiredSessions: 0,
@@ -783,7 +810,7 @@ adminRoutes.post('/cleanup', async (c) => {
 
     const oldPasswordResetLogs = await c.env.DB.prepare(
       'DELETE FROM password_reset_logs WHERE created_at < ?'
-    ).bind(now - CONFIG.Cleanup.PASSWORD_RESET_LOG_RETENTION_DAYS * CONFIG.Stats.DAY_IN_MS).run();
+    ).bind(now - passwordResetRetentionDays * TIME_CONSTANTS.DAY_IN_MS).run();
     results.oldPasswordResetLogs = oldPasswordResetLogs.meta.changes || 0;
 
     const oldSecurityLockouts = await c.env.DB.prepare(
@@ -793,7 +820,7 @@ adminRoutes.post('/cleanup', async (c) => {
 
     const oldActions = await c.env.DB.prepare(
       'DELETE FROM user_actions WHERE created_at < ?'
-    ).bind(now - CONFIG.Cleanup.USER_ACTIONS_RETENTION_DAYS * CONFIG.Stats.DAY_IN_MS).run();
+    ).bind(now - userActionsRetentionDays * TIME_CONSTANTS.DAY_IN_MS).run();
     results.oldActions = oldActions.meta.changes || 0;
 
     await logUserAction(c.env, adminUser.userId, 'admin_cleanup', results, c);
@@ -811,7 +838,9 @@ adminRoutes.post('/cleanup', async (c) => {
  */
 adminRoutes.get('/sessions', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
+  const configService = new ConfigService(c.env);
+  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
   const userId = c.req.query('userId');
   const status = c.req.query('status');
 
@@ -916,7 +945,7 @@ adminRoutes.get('/analytics/stats', async (c) => {
 
   try {
     const now = Date.now();
-    const startTime = now - days * CONFIG.Stats.DAY_IN_MS;
+    const startTime = now - days * TIME_CONSTANTS.DAY_IN_MS;
 
     const totalEvents = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM analytics_events WHERE created_at > ?'
@@ -989,7 +1018,9 @@ adminRoutes.get('/analytics/stats', async (c) => {
  */
 adminRoutes.get('/analytics/events', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
+  const configService = new ConfigService(c.env);
+  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
   const eventType = c.req.query('eventType');
   const userId = c.req.query('userId');
 
@@ -1051,9 +1082,9 @@ adminRoutes.get('/analytics/events', async (c) => {
 adminRoutes.get('/dashboard/overview', async (c) => {
   try {
     const now = Date.now();
-    const oneDayAgo = now - CONFIG.Stats.DAY_IN_MS;
-    const oneWeekAgo = now - CONFIG.Stats.WEEK_IN_MS;
-    const oneMonthAgo = now - CONFIG.Stats.MONTH_IN_MS;
+    const oneDayAgo = now - TIME_CONSTANTS.DAY_IN_MS;
+    const oneWeekAgo = now - TIME_CONSTANTS.WEEK_IN_MS;
+    const oneMonthAgo = now - TIME_CONSTANTS.MONTH_IN_MS;
 
     const userStats = await c.env.DB.prepare(`
       SELECT 
@@ -1207,7 +1238,7 @@ adminRoutes.get('/dashboard/trends', async (c) => {
 
   try {
     const now = Date.now();
-    const startTime = now - days * CONFIG.Stats.DAY_IN_MS;
+    const startTime = now - days * TIME_CONSTANTS.DAY_IN_MS;
 
     const userRegistrations = await c.env.DB.prepare(`
       SELECT date(created_at / 1000, 'unixepoch') as date, COUNT(*) as count
@@ -1276,7 +1307,7 @@ adminRoutes.get('/dashboard/user-behavior', async (c) => {
 
   try {
     const now = Date.now();
-    const startTime = now - days * CONFIG.Stats.DAY_IN_MS;
+    const startTime = now - days * TIME_CONSTANTS.DAY_IN_MS;
 
     const actionsByType = await c.env.DB.prepare(`
       SELECT action, COUNT(*) as count

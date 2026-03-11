@@ -20,13 +20,14 @@ import {
 import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { Button } from '@/components/ui';
 import { useNavigate, Link } from 'react-router-dom';
-import { APP_INFO } from '@/constants';
+import { useAppInfo } from '@/contexts/ConfigContext';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const { resolvedTheme, toggleTheme } = useThemeStore();
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy, initializeProxy } = useProxyStore();
+  const appInfo = useAppInfo();
 
   useEffect(() => {
     initializeProxy();
@@ -107,7 +108,7 @@ export const HomePage: React.FC = () => {
                 </div>
               </div>
               <span className="text-lg sm:text-xl font-bold gradient-text display-font">
-                {APP_INFO.NAME}
+                {appInfo.NAME}
               </span>
             </Link>
 

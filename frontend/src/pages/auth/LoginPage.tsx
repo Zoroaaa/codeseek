@@ -5,12 +5,14 @@ import { useAuthStore } from '@/stores';
 import { authApi, analyticsApi } from '@/services/api';
 import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
-import { VALIDATION_RULES, APP_INFO } from '@/constants';
+import { useValidationRules, useAppInfo } from '@/contexts/ConfigContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { setUser, setToken } = useAuthStore();
   const notification = useNotification();
+  const validationRules = useValidationRules();
+  const appInfo = useAppInfo();
   
   const [formData, setFormData] = useState({
     identifier: '',
@@ -24,7 +26,7 @@ export const LoginPage: React.FC = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.identifier.trim()) newErrors.identifier = '请输入用户名或邮箱';
     if (!formData.password) newErrors.password = '请输入密码';
-    else if (formData.password.length < VALIDATION_RULES.PASSWORD_MIN_LENGTH) newErrors.password = `密码至少${VALIDATION_RULES.PASSWORD_MIN_LENGTH}个字符`;
+    else if (formData.password.length < validationRules.PASSWORD_MIN_LENGTH) newErrors.password = `密码至少${validationRules.PASSWORD_MIN_LENGTH}个字符`;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -175,7 +177,7 @@ export const LoginPage: React.FC = () => {
           <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
             <Search className="w-3 h-3 text-white" />
           </div>
-          <span className="text-xs font-medium">{APP_INFO.NAME}</span>
+          <span className="text-xs font-medium">{appInfo.NAME}</span>
         </div>
       </div>
     </div>

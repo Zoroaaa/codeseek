@@ -4,18 +4,26 @@
  * 作者：CodeSeek Team
  * 日期：2024
  */
-import { SecurityLockout, UserSecurityEvent } from '../types';
+import { SecurityLockout, UserSecurityEvent, Env } from '../types';
 import { generateId } from '../utils';
+import { ConfigService } from '../services/config';
 
-import { CONFIG } from '../constants';
+const TIME_CONSTANTS = {
+  DAY_IN_MS: 24 * 60 * 60 * 1000,
+  WEEK_IN_MS: 7 * 24 * 60 * 60 * 1000,
+};
 
-const { 
-  MAX_LOGIN_ATTEMPTS, 
-  MAX_VERIFICATION_ATTEMPTS, 
-  MAX_PASSWORD_RESET_ATTEMPTS,
-  LOCKOUT_DURATION_MS,
-  PASSWORD_RESET_LOCKOUT_MS 
-} = CONFIG.SECURITY;
+const DEFAULT_SECURITY_CONFIG = {
+  MAX_LOGIN_ATTEMPTS: 5,
+  MAX_VERIFICATION_ATTEMPTS: 3,
+  MAX_PASSWORD_RESET_ATTEMPTS: 5,
+  LOCKOUT_DURATION_MS: 15 * 60 * 1000,
+  PASSWORD_RESET_LOCKOUT_MS: 60 * 60 * 1000,
+  RECENT_FAILED_LOGINS_THRESHOLD: 3,
+  RECENT_IP_LOGINS_THRESHOLD: 3,
+  RECENT_PASSWORD_CHANGES_THRESHOLD: 2,
+  SUSPICIOUS_ACTIVITY_THRESHOLD: 50,
+};
 
 export interface LockoutCheckResult {
   isLocked: boolean;
@@ -61,7 +69,7 @@ export async function checkLockout(
 }
 
 export async function recordFailedAttempt(
-  db: D1Database,
+  env: Env,
   lockoutType: string,
   identifier: string,
   maxAttempts?: number,
@@ -69,14 +77,23 @@ export async function recordFailedAttempt(
   ipAddress?: string,
   userAgent?: string
 ): Promise<LockoutCheckResult> {
+  const configService = new ConfigService(env);
+  const db = env.DB;
   const now = Date.now();
+  
+  const configMaxLoginAttempts = await configService.getInt('max_login_attempts', DEFAULT_SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS);
+  const configMaxVerificationAttempts = await configService.getInt('max_verification_attempts', DEFAULT_SECURITY_CONFIG.MAX_VERIFICATION_ATTEMPTS);
+  const configMaxPasswordResetAttempts = await configService.getInt('password_reset_max_attempts', DEFAULT_SECURITY_CONFIG.MAX_PASSWORD_RESET_ATTEMPTS);
+  const configLockoutDuration = await configService.getInt('lockout_duration_ms', DEFAULT_SECURITY_CONFIG.LOCKOUT_DURATION_MS);
+  const configPasswordResetLockout = await configService.getInt('password_reset_lockout_duration', DEFAULT_SECURITY_CONFIG.PASSWORD_RESET_LOCKOUT_MS);
+
   const max = maxAttempts || (
-    lockoutType === 'password_reset' ? MAX_PASSWORD_RESET_ATTEMPTS :
-    lockoutType === 'verification' ? MAX_VERIFICATION_ATTEMPTS :
-    MAX_LOGIN_ATTEMPTS
+    lockoutType === 'password_reset' ? configMaxPasswordResetAttempts :
+    lockoutType === 'verification' ? configMaxVerificationAttempts :
+    configMaxLoginAttempts
   );
   const duration = lockoutDuration || (
-    lockoutType === 'password_reset' ? PASSWORD_RESET_LOCKOUT_MS : LOCKOUT_DURATION_MS
+    lockoutType === 'password_reset' ? configPasswordResetLockout : configLockoutDuration
   );
 
   try {
@@ -303,20 +320,27 @@ export async function getRecentSecurityEvents(
 }
 
 export async function detectSuspiciousActivity(
-  db: D1Database,
+  env: Env,
   userId: string,
   ipAddress: string
 ): Promise<{ isSuspicious: boolean; riskScore: number; factors: string[] }> {
   const factors: string[] = [];
   let riskScore = 0;
+  const db = env.DB;
+  const configService = new ConfigService(env);
 
   try {
+    const recentFailedLoginsThreshold = await configService.getInt('recent_failed_logins_threshold', DEFAULT_SECURITY_CONFIG.RECENT_FAILED_LOGINS_THRESHOLD);
+    const recentIpLoginsThreshold = await configService.getInt('recent_ip_logins_threshold', DEFAULT_SECURITY_CONFIG.RECENT_IP_LOGINS_THRESHOLD);
+    const recentPasswordChangesThreshold = await configService.getInt('recent_password_changes_threshold', DEFAULT_SECURITY_CONFIG.RECENT_PASSWORD_CHANGES_THRESHOLD);
+    const suspiciousActivityThreshold = await configService.getInt('high_risk_threshold', DEFAULT_SECURITY_CONFIG.SUSPICIOUS_ACTIVITY_THRESHOLD);
+
     const recentFailedLogins = await db.prepare(
     `SELECT COUNT(*) as count FROM user_security_events 
      WHERE user_id = ? AND event_type = 'login' AND event_status = 'failed' AND created_at > ?`
-  ).bind(userId, Date.now() - CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
+  ).bind(userId, Date.now() - TIME_CONSTANTS.DAY_IN_MS).first<{ count: number }>();
 
-  if (recentFailedLogins && recentFailedLogins.count >= CONFIG.SECURITY.RECENT_FAILED_LOGINS_THRESHOLD) {
+  if (recentFailedLogins && recentFailedLogins.count >= recentFailedLoginsThreshold) {
     factors.push('多次登录失败');
     riskScore += 20;
   }
@@ -324,14 +348,14 @@ export async function detectSuspiciousActivity(
   const recentIpLogins = await db.prepare(
     `SELECT COUNT(DISTINCT ip_address) as count FROM user_security_events 
      WHERE user_id = ? AND event_type = 'login' AND event_status = 'success' AND created_at > ? AND ip_address IS NOT NULL`
-  ).bind(userId, Date.now() - CONFIG.Stats.WEEK_IN_MS).first<{ count: number }>();
+  ).bind(userId, Date.now() - TIME_CONSTANTS.WEEK_IN_MS).first<{ count: number }>();
 
   const knownIpLogin = await db.prepare(
     `SELECT COUNT(*) as count FROM user_security_events 
      WHERE user_id = ? AND event_type = 'login' AND event_status = 'success' AND ip_address = ? AND created_at > ?`
-  ).bind(userId, ipAddress, Date.now() - 30 * CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
+  ).bind(userId, ipAddress, Date.now() - 30 * TIME_CONSTANTS.DAY_IN_MS).first<{ count: number }>();
 
-  if (recentIpLogins && recentIpLogins.count >= CONFIG.SECURITY.RECENT_IP_LOGINS_THRESHOLD && (!knownIpLogin || knownIpLogin.count === 0)) {
+  if (recentIpLogins && recentIpLogins.count >= recentIpLoginsThreshold && (!knownIpLogin || knownIpLogin.count === 0)) {
     factors.push('新IP地址登录');
     riskScore += 15;
   }
@@ -339,15 +363,15 @@ export async function detectSuspiciousActivity(
   const recentPasswordChanges = await db.prepare(
     `SELECT COUNT(*) as count FROM user_security_events 
      WHERE user_id = ? AND event_type = 'password_change' AND created_at > ?`
-  ).bind(userId, Date.now() - CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
+  ).bind(userId, Date.now() - TIME_CONSTANTS.DAY_IN_MS).first<{ count: number }>();
 
-  if (recentPasswordChanges && recentPasswordChanges.count >= CONFIG.SECURITY.RECENT_PASSWORD_CHANGES_THRESHOLD) {
+  if (recentPasswordChanges && recentPasswordChanges.count >= recentPasswordChangesThreshold) {
     factors.push('频繁修改密码');
     riskScore += 30;
   }
 
   return {
-    isSuspicious: riskScore >= CONFIG.SECURITY.SUSPICIOUS_ACTIVITY_THRESHOLD,
+    isSuspicious: riskScore >= suspiciousActivityThreshold,
     riskScore: Math.min(riskScore, 100),
     factors,
   };

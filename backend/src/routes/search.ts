@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import { Env, SearchSource } from '../types';
 import { success, error, generateId } from '../utils';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware';
-import { CONFIG } from '../constants';
+import { ConfigService } from '../services/config';
 
 export const searchRoutes = new Hono<{ Bindings: Env }>();
 
@@ -26,8 +26,11 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
     return c.json(error('VALIDATION_ERROR', '搜索关键词不能为空'), 400);
   }
 
+  const configService = new ConfigService(c.env);
+  const maxPageSize = await configService.getInt('max_page_size', 100);
+
   const trimmedKeyword = keyword.trim();
-  const limitPageSize = Math.min(Math.max(1, pageSize), CONFIG.Pagination.MAX_PAGE_SIZE);
+  const limitPageSize = Math.min(Math.max(1, pageSize), maxPageSize);
   const limitPage = Math.max(1, page);
 
   try {
@@ -129,7 +132,10 @@ searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
  */
 searchRoutes.get('/history', authMiddleware, async (c) => {
   const userPayload = c.get('user');
-  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || String(CONFIG.Pagination.DEFAULT_HISTORY_LIMIT))), CONFIG.Pagination.MAX_HISTORY_LIMIT);
+  const configService = new ConfigService(c.env);
+  const defaultHistoryLimit = await configService.getInt('default_history_limit', 50);
+  const maxHistoryLimit = await configService.getInt('max_history_limit', 200);
+  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || String(defaultHistoryLimit))), maxHistoryLimit);
 
   try {
     const history = await c.env.DB.prepare(
@@ -298,9 +304,12 @@ searchRoutes.delete('/favorites/:id', authMiddleware, async (c) => {
  */
 searchRoutes.get('/suggestions', async (c) => {
   const keyword = c.req.query('keyword');
-  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || '10')), CONFIG.Search.SUGGESTIONS_MAX_LIMIT);
+  const configService = new ConfigService(c.env);
+  const suggestionsMaxLimit = await configService.getInt('suggestions_max_limit', 20);
+  const suggestionsMinKeywordLength = await configService.getInt('suggestions_min_keyword_length', 2);
+  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || '10')), suggestionsMaxLimit);
 
-  if (!keyword || keyword.length < CONFIG.Search.SUGGESTIONS_MIN_KEYWORD_LENGTH) {
+  if (!keyword || keyword.length < suggestionsMinKeywordLength) {
     return c.json(success([]));
   }
 
@@ -327,11 +336,18 @@ searchRoutes.get('/suggestions', async (c) => {
  * 公开接口
  */
 searchRoutes.get('/trending', async (c) => {
-  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || String(CONFIG.Search.TRENDING_DEFAULT_LIMIT))), CONFIG.Search.TRENDING_MAX_LIMIT);
-  const hours = Math.min(Math.max(1, parseInt(c.req.query('hours') || String(CONFIG.Search.TRENDING_DEFAULT_HOURS))), CONFIG.Search.TRENDING_MAX_HOURS);
+  const configService = new ConfigService(c.env);
+  const trendingDefaultLimit = await configService.getInt('trending_default_limit', 20);
+  const trendingMaxLimit = await configService.getInt('trending_max_limit', 50);
+  const trendingDefaultHours = await configService.getInt('trending_default_hours', 24);
+  const trendingMaxHours = await configService.getInt('trending_max_hours', 168);
+  const hourInMs = 60 * 60 * 1000;
+
+  const limit = Math.min(Math.max(1, parseInt(c.req.query('limit') || String(trendingDefaultLimit))), trendingMaxLimit);
+  const hours = Math.min(Math.max(1, parseInt(c.req.query('hours') || String(trendingDefaultHours))), trendingMaxHours);
 
   try {
-    const since = Date.now() - hours * CONFIG.Stats.HOUR_IN_MS;
+    const since = Date.now() - hours * hourInMs;
     
     const trending = await c.env.DB.prepare(
       `SELECT query as keyword, COUNT(*) as count 

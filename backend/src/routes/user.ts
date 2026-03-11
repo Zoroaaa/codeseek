@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Env, User, UserFavorite, UserSearchHistory } from '../types';
 import { success, error, generateId, verifyToken, logUserAction } from '../utils';
 import { CONFIG } from '../constants';
+import { ConfigService } from '../services/config';
 
 export const userRoutes = new Hono<{ Bindings: Env }>();
 
@@ -134,7 +135,9 @@ userRoutes.post('/favorites', async (c) => {
       }, '已收藏该链接'));
     }
 
-    const maxFavorites = parseInt(c.env.MAX_FAVORITES_PER_USER || String(CONFIG.MAX_FAVORITES_PER_USER), 10);
+    const configService = new ConfigService(c.env);
+    const maxFavorites = await configService.getInt('max_favorites', CONFIG.MAX_FAVORITES_PER_USER);
+    
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_favorites WHERE user_id = ?'
     ).bind(payload.userId).first<{ count: number }>();
@@ -318,7 +321,9 @@ userRoutes.post('/search-history', async (c) => {
       return c.json(error('VALIDATION_ERROR', '搜索关键词是必填项'), 400);
     }
 
-    const maxHistory = parseInt(c.env.MAX_HISTORY_PER_USER || String(CONFIG.MAX_HISTORY_PER_USER), 10);
+    const configService = new ConfigService(c.env);
+    const maxHistory = await configService.getInt('max_search_history', CONFIG.MAX_HISTORY_PER_USER);
+    
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?'
     ).bind(payload.userId).first<{ count: number }>();

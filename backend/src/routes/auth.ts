@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
 import { Env, User, EmailVerification, EmailChangeRequest } from '../types';
-import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP, checkLockout, recordFailedAttempt, clearLockout, recordSecurityEvent } from '../utils';
+import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP, checkLockout, clearLockout, recordSecurityEvent } from '../utils';
+import { recordFailedAttempt } from '../utils/security';
 import { EmailVerificationService, emailVerificationUtils } from '../services/email-verification';
 import { CONFIG } from '../constants';
+import { ConfigService } from '../services/config';
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
@@ -39,7 +41,7 @@ authRoutes.post('/login', async (c) => {
     ).bind(queryValue).first<User & { role_name?: string; role_display_name?: string; role_permissions?: string }>();
 
     if (!user) {
-      const lockoutResult = await recordFailedAttempt(c.env.DB, 'login', identifier, undefined, undefined, clientIP, userAgent);
+      const lockoutResult = await recordFailedAttempt(c.env, 'login', identifier, undefined, undefined, clientIP, userAgent);
       return c.json(error('AUTH_ERROR', `用户名/邮箱或密码错误${lockoutResult.remainingAttempts ? `，剩余${lockoutResult.remainingAttempts}次尝试机会` : ''}`), 401);
     }
 
@@ -60,7 +62,7 @@ authRoutes.post('/login', async (c) => {
     if (!isValid) {
       await logUserAction(c.env, user.id, 'login_failed', { reason: '密码错误', ip: clientIP }, c);
       
-      const lockoutResult = await recordFailedAttempt(c.env.DB, 'login', identifier, undefined, undefined, clientIP, userAgent);
+      const lockoutResult = await recordFailedAttempt(c.env, 'login', identifier, undefined, undefined, clientIP, userAgent);
       
       await recordSecurityEvent(c.env.DB, {
         userId: user.id,
@@ -141,7 +143,10 @@ authRoutes.post('/login', async (c) => {
 });
 
 authRoutes.post('/register', async (c) => {
-  if (c.env.ALLOW_REGISTRATION !== 'true') {
+  const configService = new ConfigService(c.env);
+  const enableRegistration = await configService.getBoolean('enable_registration', true);
+  
+  if (!enableRegistration && c.env.ALLOW_REGISTRATION !== 'true') {
     return c.json(error('FORBIDDEN', '注册功能已关闭'), 403);
   }
 
@@ -152,8 +157,12 @@ authRoutes.post('/register', async (c) => {
     return c.json(error('VALIDATION_ERROR', '请填写所有必填项'), 400);
   }
 
+  const usernameMinLength = await configService.getInt('min_username_length', CONFIG.VALIDATION.USERNAME_MIN_LENGTH);
+  const usernameMaxLength = await configService.getInt('max_username_length', CONFIG.VALIDATION.USERNAME_MAX_LENGTH);
+  const passwordMinLength = await configService.getInt('min_password_length', CONFIG.VALIDATION.PASSWORD_MIN_LENGTH);
+
   if (!validateUsername(username)) {
-    return c.json(error('VALIDATION_ERROR', `用户名需要${CONFIG.VALIDATION.USERNAME_MIN_LENGTH}-${CONFIG.VALIDATION.USERNAME_MAX_LENGTH}个字符，只能包含字母、数字和下划线`), 400);
+    return c.json(error('VALIDATION_ERROR', `用户名需要${usernameMinLength}-${usernameMaxLength}个字符，只能包含字母、数字和下划线`), 400);
   }
 
   if (!validateEmail(email)) {
@@ -161,7 +170,7 @@ authRoutes.post('/register', async (c) => {
   }
 
   if (!validatePassword(password)) {
-    return c.json(error('VALIDATION_ERROR', `密码至少需要${CONFIG.VALIDATION.PASSWORD_MIN_LENGTH}个字符`), 400);
+    return c.json(error('VALIDATION_ERROR', `密码至少需要${passwordMinLength}个字符`), 400);
   }
 
   try {
@@ -397,9 +406,18 @@ authRoutes.post('/forgot-password', async (c) => {
     return c.json(error('VALIDATION_ERROR', '请输入有效的邮箱地址'), 400);
   }
 
+  const configService = new ConfigService(c.env);
+  const forgotPasswordEnabled = await configService.getBoolean('forgot_password_enabled', true);
+  
+  if (!forgotPasswordEnabled) {
+    return c.json(error('FORBIDDEN', '密码找回功能已关闭'), 403);
+  }
+
+  const verificationCodeExpiry = await configService.getInt('verification_code_expiry', CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS);
+  
   const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
   const maskedEmail = emailVerificationUtils.maskEmail(normalizedEmail);
-  const expiresIn = Math.floor(CONFIG.Email.VERIFICATION_CODE_EXPIRY_MS / 1000);
+  const expiresIn = Math.floor(verificationCodeExpiry / 1000);
 
   try {
     const user = await c.env.DB.prepare(

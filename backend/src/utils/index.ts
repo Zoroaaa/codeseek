@@ -78,14 +78,26 @@ export const getClientIP = (c: Context<{ Bindings: Env }>): string => {
 
 import { CONFIG } from '../constants';
 
+/**
+ * 验证邮箱格式
+ * 注意：使用 CONFIG 中定义的默认正则表达式，适用于前端基础验证
+ */
 export const validateEmail = (email: string): boolean => {
   return CONFIG.VALIDATION.EMAIL_REGEX.test(email);
 };
 
+/**
+ * 验证用户名格式
+ * 注意：使用 CONFIG 中定义的默认正则表达式，适用于前端基础验证
+ */
 export const validateUsername = (username: string): boolean => {
   return CONFIG.VALIDATION.USERNAME_REGEX.test(username);
 };
 
+/**
+ * 验证密码长度
+ * 注意：使用 CONFIG 中定义的默认最小长度，适用于前端基础验证
+ */
 export const validatePassword = (password: string): boolean => {
   return password.length >= CONFIG.VALIDATION.PASSWORD_MIN_LENGTH;
 };

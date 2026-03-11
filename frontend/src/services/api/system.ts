@@ -1,6 +1,52 @@
 import { apiClient } from './client';
 import type { SystemStats, SystemConfig, RecordActionRequest, AnalyticsEvent, AnalyticsStats } from '@/types';
 
+export interface SystemConfigItem {
+  key: string;
+  value: string;
+  description: string | null;
+  config_type: string;
+  config_group: string | null;
+  is_public: number;
+  is_sensitive: number;
+  is_resettable: number;
+  validation_rules: string | null;
+  options: string | null;
+  display_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ConfigChangeLog {
+  id: string;
+  config_key: string;
+  old_value: string | null;
+  new_value: string;
+  change_type: 'create' | 'update' | 'delete' | 'reset';
+  changed_by: string | null;
+  changed_by_username: string | null;
+  change_reason: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: number;
+}
+
+export interface ConfigGroup {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  icon: string | null;
+  display_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface GroupedConfigs {
+  info: ConfigGroup | null;
+  configs: SystemConfigItem[];
+}
+
 export const systemApi = {
   getApiInfo: async (): Promise<{ 
     success: boolean; 
@@ -187,26 +233,14 @@ export const configApi = {
 
   getAllConfigs: async (): Promise<{ 
     success: boolean; 
-    data: Array<{
-      key: string;
-      value: string;
-      description?: string;
-      configType: string;
-      isPublic: boolean;
-    }> 
+    data: SystemConfigItem[];
   }> => {
     return apiClient.get('/config/all');
   },
 
   getConfigByKey: async (key: string): Promise<{ 
     success: boolean; 
-    data: {
-      key: string;
-      value: string;
-      description?: string;
-      configType: string;
-      isPublic: boolean;
-    } 
+    data: SystemConfigItem;
   }> => {
     return apiClient.get(`/config/${encodeURIComponent(key)}`);
   },
@@ -215,7 +249,10 @@ export const configApi = {
     value: string; 
     description?: string; 
     configType?: string; 
-    isPublic?: boolean 
+    configGroup?: string;
+    isPublic?: boolean; 
+    isSensitive?: boolean;
+    changeReason?: string;
   }): Promise<{ success: boolean; message: string }> => {
     return apiClient.put(`/config/${encodeURIComponent(key)}`, data);
   },
@@ -229,29 +266,26 @@ export const configApi = {
     value: string;
     description?: string;
     configType?: string;
+    configGroup?: string;
     isPublic?: boolean;
-  }>): Promise<{ 
+    isSensitive?: boolean;
+  }>, changeReason?: string): Promise<{ 
     success: boolean; 
     data: { 
-      results: Array<{ key: string; success: boolean }>;
+      results: Array<{ key: string; success: boolean; error?: string }>;
       updated: number;
     };
     message: string;
   }> => {
-    return apiClient.put('/config/batch', { configs });
+    return apiClient.put('/config/batch', { configs, changeReason });
   },
 
   getConfigGroups: async (): Promise<{ 
     success: boolean; 
-    data: Record<string, Array<{
-      key: string;
-      value: string;
-      description: string | null;
-      config_type: string;
-      is_public: number;
-      created_at: number;
-      updated_at: number;
-    }>> 
+    data: {
+      groups: ConfigGroup[];
+      groupedConfigs: Record<string, GroupedConfigs>;
+    };
   }> => {
     return apiClient.get('/config/groups');
   },
@@ -262,5 +296,69 @@ export const configApi = {
     message: string;
   }> => {
     return apiClient.post(`/config/reset/${encodeURIComponent(key)}`, {});
+  },
+
+  getConfigLogs: async (params?: {
+    key?: string;
+    type?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<{
+    success: boolean;
+    data: {
+      logs: ConfigChangeLog[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
+  }> => {
+    const searchParams = new URLSearchParams();
+    if (params?.key) searchParams.append('key', params.key);
+    if (params?.type) searchParams.append('type', params.type);
+    if (params?.page) searchParams.append('page', String(params.page));
+    if (params?.pageSize) searchParams.append('pageSize', String(params.pageSize));
+    const queryString = searchParams.toString();
+    return apiClient.get(`/config/logs${queryString ? `?${queryString}` : ''}`);
+  },
+
+  exportConfig: async (): Promise<{
+    success: boolean;
+    data: {
+      version: string;
+      exportedAt: string;
+      exportedBy: string;
+      configs: Array<{
+        key: string;
+        value: string;
+        description: string | null;
+        configType: string;
+        configGroup: string | null;
+        isPublic: boolean;
+        isSensitive: boolean;
+      }>;
+    };
+  }> => {
+    return apiClient.get('/config/export');
+  },
+
+  importConfig: async (configs: Array<{
+    key: string;
+    value: string;
+    description?: string;
+    configType?: string;
+    configGroup?: string;
+    isPublic?: boolean;
+    isSensitive?: boolean;
+  }>, overwrite = false): Promise<{
+    success: boolean;
+    data: {
+      results: Array<{ key: string; success: boolean; action: string; error?: string }>;
+      created: number;
+      updated: number;
+      skipped: number;
+    };
+    message: string;
+  }> => {
+    return apiClient.post('/config/import', { configs, overwrite });
   },
 };

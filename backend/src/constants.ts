@@ -1,18 +1,17 @@
 /**
  * CodeSeek 后端常量统一管理
- * 功能：集中管理所有硬编码常量值
+ * 功能：集中管理固定常量值和后备默认值
  * 作者：CodeSeek Team
  * 日期：2024
+ * 
+ * 重要说明：
+ * - [固定值] 表示该配置为固定值，不需要动态调整
+ * - [后备值] 表示该配置作为数据库配置的后备默认值
+ * - 动态配置通过 ConfigService 从数据库 system_config 表读取
  */
 
 export const CONFIG = {
-  /** 用户限制配置 */
-  MAX_TAGS_PER_USER: 50,
-  MAX_SHARES_PER_USER: 50,
-  MAX_FAVORITES_PER_USER: 1000,
-  MAX_HISTORY_PER_USER: 1000,
-
-  /** 允许的用户行为类型 */
+  /** 允许的用户行为类型 - [固定值] */
   ALLOWED_ACTIONS: [
     'search', 'login', 'logout', 'register', 'visit_site', 'copy_url',
     'favorite_add', 'favorite_remove', 'settings_update', 'export_data',
@@ -25,7 +24,7 @@ export const CONFIG = {
     'user_source_config_update', 'search_sources_export'
   ] as const,
 
-  /** 验证相关配置 */
+  /** 验证相关配置 - [后备值] */
   VALIDATION: {
     USERNAME_MIN_LENGTH: 3,
     USERNAME_MAX_LENGTH: 20,
@@ -38,7 +37,7 @@ export const CONFIG = {
     MAX_SYNC_FAVORITES: 1000,
   },
 
-  /** 安全相关配置 */
+  /** 安全相关配置 - [后备值] */
   SECURITY: {
     MAX_LOGIN_ATTEMPTS: 5,
     MAX_VERIFICATION_ATTEMPTS: 5,
@@ -51,7 +50,7 @@ export const CONFIG = {
     RECENT_PASSWORD_CHANGES_THRESHOLD: 2,
   },
 
-  /** 邮件相关配置 */
+  /** 邮件相关配置 - [后备值] */
   Email: {
     VERIFICATION_CODE_EXPIRY_MS: 900000,
     VERIFICATION_CODE_LENGTH: 6,
@@ -64,7 +63,7 @@ export const CONFIG = {
     DEFAULT_FROM_NAME: '磁力快搜',
   },
 
-  /** CORS跨域配置 */
+  /** CORS跨域配置 - [固定值] */
   CORS: {
     MAX_AGE: 86400,
     ALLOW_METHODS: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -78,7 +77,7 @@ export const CONFIG = {
     ],
   },
 
-  /** 临时邮箱域名黑名单 */
+  /** 临时邮箱域名黑名单 - [固定值] */
   TempEmail: {
     DOMAINS: [
       '10minutemail.com',
@@ -104,7 +103,7 @@ export const CONFIG = {
     ] as const,
   },
 
-  /** 可信邮箱域名白名单 */
+  /** 可信邮箱域名白名单 - [固定值] */
   TrustedEmail: {
     DOMAINS: [
       'gmail.com',
@@ -122,7 +121,7 @@ export const CONFIG = {
     ] as const,
   },
 
-  /** 搜索源状态检查配置 */
+  /** 搜索源状态检查配置 - [后备值] */
   SourceStatus: {
     CHECK_TIMEOUT_MS: 10000,
     BATCH_CHECK_TIMEOUT_MS: 5000,
@@ -131,13 +130,13 @@ export const CONFIG = {
     MAX_CACHE_AGE_MS: 300000,
   },
 
-  /** 缓存配置 */
+  /** 缓存配置 - [固定值] */
   Cache: {
     SEARCH_DEFAULT_TTL_MINUTES: 60,
     STATUS_CACHE_DURATION_MS: 300000,
   },
 
-  /** 分页配置 */
+  /** 分页配置 - [后备值] */
   Pagination: {
     DEFAULT_PAGE_SIZE: 20,
     MAX_PAGE_SIZE: 100,
@@ -148,7 +147,7 @@ export const CONFIG = {
     MAX_SOURCES_CHECK: 50,
   },
 
-  /** 时间常量 */
+  /** 时间常量 - [固定值] */
   Stats: {
     WEEK_IN_MS: 7 * 24 * 60 * 60 * 1000,
     TWO_WEEKS_IN_MS: 14 * 24 * 60 * 60 * 1000,
@@ -157,7 +156,7 @@ export const CONFIG = {
     MONTH_IN_MS: 30 * 24 * 60 * 60 * 1000,
   },
 
-  /** 默认值配置 */
+  /** 默认值配置 - [固定值] */
   Defaults: {
     APP_VERSION: '2.0.0',
     SEARCH_PRIORITY: 5,
@@ -171,7 +170,7 @@ export const CONFIG = {
     SITE_URL: 'https://codeseek.pp.ua',
   },
 
-  /** 角色配置 */
+  /** 角色配置 - [固定值] */
   Roles: {
     DEFAULT_ROLE_ID: 'user',
     DEFAULT_ROLE_NAME: 'user',
@@ -180,14 +179,14 @@ export const CONFIG = {
     DEFAULT_PERMISSIONS: ['search', 'favorite', 'history', 'sync'] as const,
   },
 
-  /** 数据清理配置 */
+  /** 数据清理配置 - [后备值] */
   Cleanup: {
     PASSWORD_RESET_LOG_RETENTION_DAYS: 30,
     USER_ACTIONS_RETENTION_DAYS: 90,
     EMAIL_VERIFICATION_RETENTION_DAYS: 7,
   },
 
-  /** 社区功能配置 */
+  /** 社区功能配置 - [后备值] */
   Community: {
     MAX_TAGS_PER_SOURCE: 10,
     MAX_COMMENT_LENGTH: 1000,
@@ -199,7 +198,7 @@ export const CONFIG = {
     SOURCE_DESCRIPTION_MAX_LENGTH: 2000,
   },
 
-  /** 搜索功能配置 */
+  /** 搜索功能配置 - [后备值] */
   Search: {
     MAX_KEYWORD_LENGTH: 200,
     MAX_SOURCES_PER_SEARCH: 50,

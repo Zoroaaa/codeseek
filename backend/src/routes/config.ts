@@ -1,28 +1,179 @@
 /**
  * 系统配置与分析模块
- * 功能：系统配置管理、分析事件记录、缓存管理
+ * 功能：系统配置管理、分析事件记录、缓存管理、配置变更日志
  * 作者：CodeSeek Team
  * 日期：2024
  */
 import { Hono } from 'hono';
-import { Env, SystemConfig, EmailSendLog } from '../types';
-import { success, error, generateId } from '../utils';
+import { Env, SystemConfig, EmailSendLog, ConfigChangeLog, ConfigGroup } from '../types';
+import { success, error, generateId, verifyToken } from '../utils';
 
 export const configRoutes = new Hono<{ Bindings: Env }>();
 
-/**
- * 获取公开配置
- * GET /api/config/public
- */
+const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string; configType: string; configGroup: string; isPublic: number; isSensitive: number; validationRules?: string }> = {
+  'site_name': { value: '磁力快搜', description: '网站名称', configType: 'string', configGroup: 'basic', isPublic: 1, isSensitive: 0 },
+  'site_description': { value: '搜索全网资源，一步直达', description: '网站描述', configType: 'string', configGroup: 'basic', isPublic: 1, isSensitive: 0 },
+  'site_keywords': { value: '磁力搜索,资源搜索,网盘搜索', description: '网站关键词（SEO）', configType: 'string', configGroup: 'basic', isPublic: 1, isSensitive: 0 },
+  'enable_registration': { value: '1', description: '是否开放注册', configType: 'boolean', configGroup: 'basic', isPublic: 1, isSensitive: 0 },
+  'max_search_history': { value: '1000', description: '最大搜索历史记录数', configType: 'integer', configGroup: 'user_limits', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 10000}' },
+  'max_favorites': { value: '1000', description: '最大收藏数量', configType: 'integer', configGroup: 'user_limits', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 10000}' },
+  'min_username_length': { value: '3', description: '用户名最小长度', configType: 'integer', configGroup: 'user_limits', isPublic: 1, isSensitive: 0, validationRules: '{"min": 2, "max": 20}' },
+  'max_username_length': { value: '20', description: '用户名最大长度', configType: 'integer', configGroup: 'user_limits', isPublic: 1, isSensitive: 0, validationRules: '{"min": 10, "max": 50}' },
+  'min_password_length': { value: '6', description: '密码最小长度', configType: 'integer', configGroup: 'user_limits', isPublic: 1, isSensitive: 0, validationRules: '{"min": 4, "max": 32}' },
+  'source_check_enabled': { value: '1', description: '启用搜索源状态检查', configType: 'boolean', configGroup: 'source_check', isPublic: 1, isSensitive: 0 },
+  'max_concurrent_checks': { value: '3', description: '最大并发检查数', configType: 'integer', configGroup: 'source_check', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 10}' },
+  'default_check_timeout': { value: '10000', description: '默认检查超时时间（毫秒）', configType: 'integer', configGroup: 'source_check', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1000, "max": 60000}' },
+  'cache_duration_ms': { value: '300000', description: '状态缓存时间（毫秒）', configType: 'integer', configGroup: 'source_check', isPublic: 1, isSensitive: 0, validationRules: '{"min": 60000, "max": 86400000}' },
+  'max_cache_entries': { value: '10000', description: '最大缓存条目数', configType: 'integer', configGroup: 'source_check', isPublic: 1, isSensitive: 0 },
+  'health_update_interval': { value: '3600000', description: '健康度统计更新间隔（毫秒）', configType: 'integer', configGroup: 'source_check', isPublic: 1, isSensitive: 0 },
+  'community_enabled': { value: '1', description: '启用搜索源共享社区功能', configType: 'boolean', configGroup: 'community', isPublic: 1, isSensitive: 0 },
+  'community_require_approval': { value: '0', description: '新分享的搜索源需要审核', configType: 'boolean', configGroup: 'community', isPublic: 0, isSensitive: 0 },
+  'community_max_shares_per_user': { value: '50', description: '每个用户最大分享数量', configType: 'integer', configGroup: 'community', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 100}' },
+  'community_min_rating_to_feature': { value: '4.0', description: '推荐搜索源的最低评分', configType: 'float', configGroup: 'community', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 5.0}' },
+  'email_verification_enabled': { value: '1', description: '是否启用邮箱验证功能', configType: 'boolean', configGroup: 'email', isPublic: 1, isSensitive: 0 },
+  'email_verification_required': { value: '0', description: '注册时是否强制邮箱验证', configType: 'boolean', configGroup: 'email', isPublic: 1, isSensitive: 0 },
+  'verification_code_length': { value: '6', description: '验证码长度', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 4, "max": 8}' },
+  'verification_code_expiry': { value: '900000', description: '验证码过期时间（毫秒，默认15分钟）', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 60000, "max": 3600000}' },
+  'max_verification_attempts': { value: '3', description: '最大验证尝试次数', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 1, "max": 10}' },
+  'email_rate_limit_per_hour': { value: '5', description: '每小时最大发送邮件数', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 1, "max": 20}' },
+  'email_rate_limit_per_day': { value: '20', description: '每天最大发送邮件数', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 1, "max": 100}' },
+  'resend_api_key_set': { value: '0', description: 'Resend API密钥是否已配置', configType: 'boolean', configGroup: 'email', isPublic: 1, isSensitive: 1 },
+  'default_from_email': { value: 'noreply@codeseek.pp.ua', description: '默认发件人邮箱', configType: 'string', configGroup: 'email', isPublic: 0, isSensitive: 1 },
+  'default_from_name': { value: '磁力快搜', description: '默认发件人姓名', configType: 'string', configGroup: 'email', isPublic: 0, isSensitive: 0 },
+  'forgot_password_enabled': { value: '1', description: '是否启用忘记密码功能', configType: 'boolean', configGroup: 'password', isPublic: 1, isSensitive: 0 },
+  'forgot_password_rate_limit_per_hour': { value: '3', description: '忘记密码每小时最大请求次数', configType: 'integer', configGroup: 'password', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 10}' },
+  'forgot_password_rate_limit_per_day': { value: '10', description: '忘记密码每天最大请求次数', configType: 'integer', configGroup: 'password', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 50}' },
+  'reset_password_require_verification': { value: '1', description: '重置密码是否需要邮箱验证', configType: 'boolean', configGroup: 'password', isPublic: 1, isSensitive: 0 },
+  'reset_password_code_expiry': { value: '1800000', description: '重置密码验证码过期时间（毫秒，默认30分钟）', configType: 'integer', configGroup: 'password', isPublic: 1, isSensitive: 0, validationRules: '{"min": 60000, "max": 7200000}' },
+  'password_reset_max_attempts': { value: '5', description: '密码重置最大尝试次数', configType: 'integer', configGroup: 'password', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 10}' },
+  'password_reset_lockout_duration': { value: '3600000', description: '密码重置锁定持续时间（毫秒，默认1小时）', configType: 'integer', configGroup: 'password', isPublic: 1, isSensitive: 0, validationRules: '{"min": 300000, "max": 86400000}' },
+  'force_logout_after_password_reset': { value: '1', description: '密码重置后是否强制退出所有设备', configType: 'boolean', configGroup: 'password', isPublic: 1, isSensitive: 0 },
+  'forgot_password_email_subject': { value: '重置您的密码', description: '忘记密码邮件主题', configType: 'string', configGroup: 'password', isPublic: 0, isSensitive: 0 },
+  'forgot_password_success_message': { value: '如果该邮箱已注册，我们已发送重置链接', description: '忘记密码成功提示信息', configType: 'string', configGroup: 'password', isPublic: 1, isSensitive: 0 },
+  'security_monitoring_enabled': { value: '1', description: '是否启用安全事件监控', configType: 'boolean', configGroup: 'security', isPublic: 0, isSensitive: 0 },
+  'security_event_retention_days': { value: '90', description: '安全事件保留天数', configType: 'integer', configGroup: 'security', isPublic: 0, isSensitive: 0, validationRules: '{"min": 30, "max": 365}' },
+  'high_risk_threshold': { value: '70', description: '高风险事件阈值', configType: 'integer', configGroup: 'security', isPublic: 0, isSensitive: 1, validationRules: '{"min": 0, "max": 100}' },
+  'detect_unusual_login_location': { value: '1', description: '检测异常登录地点', configType: 'boolean', configGroup: 'security', isPublic: 0, isSensitive: 0 },
+  'detect_unusual_login_time': { value: '1', description: '检测异常登录时间', configType: 'boolean', configGroup: 'security', isPublic: 0, isSensitive: 0 },
+  'detect_multiple_failed_logins': { value: '1', description: '检测多次登录失败', configType: 'boolean', configGroup: 'security', isPublic: 0, isSensitive: 0 },
+  'notify_admin_on_suspicious_activity': { value: '1', description: '可疑活动时通知管理员', configType: 'boolean', configGroup: 'security', isPublic: 0, isSensitive: 0 },
+  'notify_user_on_password_reset': { value: '1', description: '密码重置时通知用户', configType: 'boolean', configGroup: 'security', isPublic: 0, isSensitive: 0 },
+  'enable_search_history': { value: '1', description: '启用搜索历史功能', configType: 'boolean', configGroup: 'features', isPublic: 1, isSensitive: 0 },
+  'enable_favorites': { value: '1', description: '启用收藏功能', configType: 'boolean', configGroup: 'features', isPublic: 1, isSensitive: 0 },
+  'enable_analytics': { value: '1', description: '启用统计分析功能', configType: 'boolean', configGroup: 'features', isPublic: 0, isSensitive: 0 },
+  'enable_user_profile': { value: '1', description: '启用用户个人资料编辑', configType: 'boolean', configGroup: 'features', isPublic: 1, isSensitive: 0 },
+  'enable_dark_mode': { value: '1', description: '启用深色模式切换', configType: 'boolean', configGroup: 'features', isPublic: 1, isSensitive: 0 },
+  'enable_proxy': { value: '1', description: '启用代理服务器', configType: 'boolean', configGroup: 'features', isPublic: 1, isSensitive: 0 },
+  'session_timeout_minutes': { value: '1440', description: '会话超时时间（分钟，默认24小时）', configType: 'integer', configGroup: 'session', isPublic: 0, isSensitive: 0, validationRules: '{"min": 30, "max": 10080}' },
+  'max_sessions_per_user': { value: '5', description: '每用户最大会话数', configType: 'integer', configGroup: 'session', isPublic: 0, isSensitive: 0, validationRules: '{"min": 1, "max": 20}' },
+  'remember_me_days': { value: '30', description: '记住我功能有效天数', configType: 'integer', configGroup: 'session', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 365}' },
+  'default_search_sources': { value: '20', description: '默认显示的搜索源数量', configType: 'integer', configGroup: 'search', isPublic: 1, isSensitive: 0, validationRules: '{"min": 5, "max": 50}' },
+  'search_debounce_ms': { value: '300', description: '搜索防抖延迟（毫秒）', configType: 'integer', configGroup: 'search', isPublic: 1, isSensitive: 0, validationRules: '{"min": 100, "max": 2000}' },
+  'enable_search_suggestions': { value: '1', description: '启用搜索建议', configType: 'boolean', configGroup: 'search', isPublic: 1, isSensitive: 0 },
+  'trending_searches_hours': { value: '24', description: '热门搜索统计时间范围（小时）', configType: 'integer', configGroup: 'search', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 168}' },
+};
+
+async function logConfigChange(
+  env: Env,
+  configKey: string,
+  oldValue: string | null,
+  newValue: string,
+  changeType: 'create' | 'update' | 'delete' | 'reset',
+  userId: string | null,
+  username: string | null,
+  reason: string | null,
+  ipAddress: string | null,
+  userAgent: string | null
+): Promise<void> {
+  try {
+    const logId = generateId();
+    await env.DB.prepare(`
+      INSERT INTO config_change_logs (
+        id, config_key, old_value, new_value, change_type, 
+        changed_by, changed_by_username, change_reason, 
+        ip_address, user_agent, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      logId, configKey, oldValue, newValue, changeType,
+      userId, username, reason, ipAddress, userAgent, Date.now()
+    ).run();
+  } catch (err) {
+    console.error('Log config change error:', err);
+  }
+}
+
+function validateConfigValue(value: string, configType: string, validationRules?: string | null): { valid: boolean; error?: string } {
+  if (!validationRules) return { valid: true };
+
+  try {
+    const rules = JSON.parse(validationRules);
+
+    switch (configType) {
+      case 'integer': {
+        const num = parseInt(value, 10);
+        if (isNaN(num)) return { valid: false, error: '值必须是整数' };
+        if (rules.min !== undefined && num < rules.min) {
+          return { valid: false, error: `值不能小于 ${rules.min}` };
+        }
+        if (rules.max !== undefined && num > rules.max) {
+          return { valid: false, error: `值不能大于 ${rules.max}` };
+        }
+        break;
+      }
+      case 'float': {
+        const num = parseFloat(value);
+        if (isNaN(num)) return { valid: false, error: '值必须是数字' };
+        if (rules.min !== undefined && num < rules.min) {
+          return { valid: false, error: `值不能小于 ${rules.min}` };
+        }
+        if (rules.max !== undefined && num > rules.max) {
+          return { valid: false, error: `值不能大于 ${rules.max}` };
+        }
+        break;
+      }
+      case 'boolean': {
+        if (!['0', '1', 'true', 'false'].includes(value.toLowerCase())) {
+          return { valid: false, error: '值必须是布尔值' };
+        }
+        break;
+      }
+      case 'string': {
+        if (rules.minLength !== undefined && value.length < rules.minLength) {
+          return { valid: false, error: `长度不能少于 ${rules.minLength} 个字符` };
+        }
+        if (rules.maxLength !== undefined && value.length > rules.maxLength) {
+          return { valid: false, error: `长度不能超过 ${rules.maxLength} 个字符` };
+        }
+        if (rules.pattern && !new RegExp(rules.pattern).test(value)) {
+          return { valid: false, error: rules.patternMessage || '格式不正确' };
+        }
+        break;
+      }
+    }
+
+    return { valid: true };
+  } catch {
+    return { valid: true };
+  }
+}
+
 configRoutes.get('/public', async (c) => {
   try {
     const configs = await c.env.DB.prepare(
-      `SELECT key, value FROM system_config WHERE is_public = 1`
+      `SELECT key, value, config_type FROM system_config WHERE is_public = 1`
     ).all<SystemConfig>();
 
-    const result: Record<string, string> = {};
+    const result: Record<string, unknown> = {};
     for (const config of configs.results || []) {
-      result[config.key] = config.value;
+      let parsedValue: unknown = config.value;
+      if (config.config_type === 'boolean') {
+        parsedValue = config.value === '1' || config.value === 'true';
+      } else if (config.config_type === 'integer') {
+        parsedValue = parseInt(config.value, 10);
+      } else if (config.config_type === 'float') {
+        parsedValue = parseFloat(config.value);
+      }
+      result[config.key] = parsedValue;
     }
 
     return c.json(success(result));
@@ -32,17 +183,12 @@ configRoutes.get('/public', async (c) => {
   }
 });
 
-/**
- * 获取所有配置（管理员）
- * GET /api/config/all
- */
 configRoutes.get('/all', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
   }
 
-  const { verifyToken } = await import('../utils');
   const token = authHeader.slice(7);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
 
@@ -52,7 +198,7 @@ configRoutes.get('/all', async (c) => {
 
   try {
     const configs = await c.env.DB.prepare(
-      'SELECT * FROM system_config ORDER BY key'
+      'SELECT * FROM system_config ORDER BY config_group, display_order, key'
     ).all<SystemConfig>();
 
     return c.json(success(configs.results || []));
@@ -62,17 +208,76 @@ configRoutes.get('/all', async (c) => {
   }
 });
 
-/**
- * 更新配置（管理员）
- * PUT /api/config/:key
- */
+configRoutes.get('/groups', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
+  }
+
+  try {
+    const configs = await c.env.DB.prepare(
+      'SELECT * FROM system_config ORDER BY config_group, display_order, key'
+    ).all<SystemConfig>();
+
+    const groups = await c.env.DB.prepare(
+      'SELECT * FROM config_groups ORDER BY display_order'
+    ).all<ConfigGroup>();
+
+    const groupedConfigs: Record<string, { info: ConfigGroup | null; configs: SystemConfig[] }> = {};
+
+    for (const config of configs.results || []) {
+      const group = config.config_group || 'other';
+      if (!groupedConfigs[group]) {
+        groupedConfigs[group] = { info: null, configs: [] };
+      }
+      groupedConfigs[group].configs.push(config);
+    }
+
+    for (const group of groups.results || []) {
+      if (groupedConfigs[group.name]) {
+        groupedConfigs[group.name].info = group;
+      }
+    }
+
+    return c.json(success({ groups: groups.results || [], groupedConfigs }));
+  } catch (err) {
+    console.error('Get config groups error:', err);
+    return c.json(error('SERVER_ERROR', '获取配置分组失败'), 500);
+  }
+});
+
+configRoutes.get('/:key', async (c) => {
+  const key = c.req.param('key');
+
+  try {
+    const config = await c.env.DB.prepare(
+      'SELECT * FROM system_config WHERE key = ?'
+    ).bind(key).first<SystemConfig>();
+
+    if (!config) {
+      return c.json(error('NOT_FOUND', '配置项不存在'), 404);
+    }
+
+    return c.json(success(config));
+  } catch (err) {
+    console.error('Get config error:', err);
+    return c.json(error('SERVER_ERROR', '获取配置失败'), 500);
+  }
+});
+
 configRoutes.put('/:key', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
   }
 
-  const { verifyToken } = await import('../utils');
   const token = authHeader.slice(7);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
 
@@ -82,28 +287,51 @@ configRoutes.put('/:key', async (c) => {
 
   const key = c.req.param('key');
   const body = await c.req.json();
-  const { value, description, configType, isPublic } = body;
+  const { value, description, configType, configGroup, isPublic, isSensitive, changeReason } = body;
 
   try {
     const existing = await c.env.DB.prepare(
       'SELECT * FROM system_config WHERE key = ?'
     ).bind(key).first<SystemConfig>();
 
+    const configTypeToUse = configType || existing?.config_type || 'string';
+    const validationRules = existing?.validation_rules || DEFAULT_CONFIG_VALUES[key]?.validationRules || null;
+
+    const validation = validateConfigValue(value, configTypeToUse, validationRules);
+    if (!validation.valid) {
+      return c.json(error('VALIDATION_ERROR', validation.error || '配置值验证失败'), 400);
+    }
+
     const now = Date.now();
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
+    const userAgent = c.req.header('User-Agent') || null;
 
     if (existing) {
       await c.env.DB.prepare(`
         UPDATE system_config 
         SET value = ?, description = COALESCE(?, description), 
-            config_type = COALESCE(?, config_type), is_public = COALESCE(?, is_public),
+            config_type = COALESCE(?, config_type), 
+            config_group = COALESCE(?, config_group),
+            is_public = COALESCE(?, is_public),
+            is_sensitive = COALESCE(?, is_sensitive),
             updated_at = ?
         WHERE key = ?
-      `).bind(value, description, configType, isPublic, now, key).run();
+      `).bind(value, description, configType, configGroup, isPublic, isSensitive, now, key).run();
+
+      await logConfigChange(
+        c.env, key, existing.value, value, 'update',
+        payload.userId, payload.username, changeReason, ipAddress, userAgent
+      );
     } else {
       await c.env.DB.prepare(`
-        INSERT INTO system_config (key, value, description, config_type, is_public, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).bind(key, value, description || null, configType || 'string', isPublic ? 1 : 0, now, now).run();
+        INSERT INTO system_config (key, value, description, config_type, config_group, is_public, is_sensitive, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(key, value, description || null, configTypeToUse, configGroup || 'other', isPublic ? 1 : 0, isSensitive ? 1 : 0, now, now).run();
+
+      await logConfigChange(
+        c.env, key, null, value, 'create',
+        payload.userId, payload.username, changeReason, ipAddress, userAgent
+      );
     }
 
     return c.json(success({ key, value }, '配置已更新'));
@@ -113,28 +341,40 @@ configRoutes.put('/:key', async (c) => {
   }
 });
 
-/**
- * 删除配置（管理员）
- * DELETE /api/config/:key
- */
 configRoutes.delete('/:key', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
   }
 
-  const { verifyToken } = await import('../utils');
   const token = authHeader.slice(7);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
 
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
-    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
+  if (!payload || payload.role !== 'super_admin') {
+    return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
   }
 
   const key = c.req.param('key');
 
   try {
+    const existing = await c.env.DB.prepare(
+      'SELECT * FROM system_config WHERE key = ?'
+    ).bind(key).first<SystemConfig>();
+
+    if (!existing) {
+      return c.json(error('NOT_FOUND', '配置项不存在'), 404);
+    }
+
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
+    const userAgent = c.req.header('User-Agent') || null;
+
+    await logConfigChange(
+      c.env, key, existing.value, '', 'delete',
+      payload.userId, payload.username, '删除配置', ipAddress, userAgent
+    );
+
     await c.env.DB.prepare('DELETE FROM system_config WHERE key = ?').bind(key).run();
+
     return c.json(success(null, '配置已删除'));
   } catch (err) {
     console.error('Delete config error:', err);
@@ -142,17 +382,12 @@ configRoutes.delete('/:key', async (c) => {
   }
 });
 
-/**
- * 批量更新配置（管理员）
- * PUT /api/config/batch
- */
 configRoutes.put('/batch', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
   }
 
-  const { verifyToken } = await import('../utils');
   const token = authHeader.slice(7);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
 
@@ -162,17 +397,19 @@ configRoutes.put('/batch', async (c) => {
 
   try {
     const body = await c.req.json();
-    const { configs } = body;
+    const { configs, changeReason } = body;
 
     if (!Array.isArray(configs)) {
       return c.json(error('VALIDATION_ERROR', '配置数据格式错误'), 400);
     }
 
     const now = Date.now();
-    const results: { key: string; success: boolean }[] = [];
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
+    const userAgent = c.req.header('User-Agent') || null;
+    const results: { key: string; success: boolean; error?: string }[] = [];
 
     for (const config of configs) {
-      const { key, value, description, configType, isPublic } = config;
+      const { key, value } = config;
 
       if (!key) continue;
 
@@ -181,24 +418,36 @@ configRoutes.put('/batch', async (c) => {
           'SELECT * FROM system_config WHERE key = ?'
         ).bind(key).first<SystemConfig>();
 
+        const validation = validateConfigValue(
+          value, 
+          existing?.config_type || 'string', 
+          existing?.validation_rules
+        );
+
+        if (!validation.valid) {
+          results.push({ key, success: false, error: validation.error });
+          continue;
+        }
+
         if (existing) {
           await c.env.DB.prepare(`
             UPDATE system_config 
-            SET value = ?, description = COALESCE(?, description), 
-                config_type = COALESCE(?, config_type), is_public = COALESCE(?, is_public),
-                updated_at = ?
+            SET value = ?, updated_at = ?
             WHERE key = ?
-          `).bind(value, description, configType, isPublic, now, key).run();
+          `).bind(value, now, key).run();
+
+          await logConfigChange(
+            c.env, key, existing.value, value, 'update',
+            payload.userId, payload.username, changeReason, ipAddress, userAgent
+          );
         } else {
-          await c.env.DB.prepare(`
-            INSERT INTO system_config (key, value, description, config_type, is_public, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-          `).bind(key, value, description || null, configType || 'string', isPublic ? 1 : 0, now, now).run();
+          results.push({ key, success: false, error: '配置项不存在' });
+          continue;
         }
 
         results.push({ key, success: true });
       } catch (err) {
-        results.push({ key, success: false });
+        results.push({ key, success: false, error: String(err) });
       }
     }
 
@@ -209,17 +458,114 @@ configRoutes.put('/batch', async (c) => {
   }
 });
 
-/**
- * 获取配置分组（管理员）
- * GET /api/config/groups
- */
-configRoutes.get('/groups', async (c) => {
+configRoutes.post('/reset/:key', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
   }
 
-  const { verifyToken } = await import('../utils');
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload || payload.role !== 'super_admin') {
+    return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
+  }
+
+  const key = c.req.param('key');
+  const defaultValue = DEFAULT_CONFIG_VALUES[key];
+
+  if (!defaultValue) {
+    return c.json(error('NOT_FOUND', '未找到该配置的默认值'), 404);
+  }
+
+  try {
+    const existing = await c.env.DB.prepare(
+      'SELECT * FROM system_config WHERE key = ?'
+    ).bind(key).first<SystemConfig>();
+
+    const now = Date.now();
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
+    const userAgent = c.req.header('User-Agent') || null;
+
+    await c.env.DB.prepare(`
+      UPDATE system_config 
+      SET value = ?, updated_at = ?
+      WHERE key = ?
+    `).bind(defaultValue.value, now, key).run();
+
+    await logConfigChange(
+      c.env, key, existing?.value || null, defaultValue.value, 'reset',
+      payload.userId, payload.username, '重置为默认值', ipAddress, userAgent
+    );
+
+    return c.json(success({ key, value: defaultValue.value }, '配置已重置为默认值'));
+  } catch (err) {
+    console.error('Reset config error:', err);
+    return c.json(error('SERVER_ERROR', '重置配置失败'), 500);
+  }
+});
+
+configRoutes.get('/logs', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
+  }
+
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || '50'), 200);
+  const configKey = c.req.query('key');
+  const changeType = c.req.query('type');
+
+  try {
+    let whereClause = 'WHERE 1=1';
+    const params: (string | number)[] = [];
+
+    if (configKey) {
+      whereClause += ' AND config_key = ?';
+      params.push(configKey);
+    }
+
+    if (changeType) {
+      whereClause += ' AND change_type = ?';
+      params.push(changeType);
+    }
+
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM config_change_logs ${whereClause}`
+    ).bind(...params).first<{ total: number }>();
+
+    const logs = await c.env.DB.prepare(`
+      SELECT * FROM config_change_logs 
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(...params, pageSize, (page - 1) * pageSize).all<ConfigChangeLog>();
+
+    return c.json(success({
+      logs: logs.results || [],
+      total: countResult?.total || 0,
+      page,
+      pageSize,
+    }));
+  } catch (err) {
+    console.error('Get config logs error:', err);
+    return c.json(error('SERVER_ERROR', '获取配置日志失败'), 500);
+  }
+});
+
+configRoutes.get('/export', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
   const token = authHeader.slice(7);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
 
@@ -229,97 +575,37 @@ configRoutes.get('/groups', async (c) => {
 
   try {
     const configs = await c.env.DB.prepare(
-      'SELECT * FROM system_config ORDER BY key'
+      'SELECT key, value, description, config_type, config_group, is_public, is_sensitive FROM system_config ORDER BY config_group, key'
     ).all<SystemConfig>();
 
-    const groups: Record<string, SystemConfig[]> = {
-      '基础配置': [],
-      '用户限制': [],
-      '搜索源检查': [],
-      '社区功能': [],
-      '邮箱验证': [],
-      '忘记密码': [],
-      '安全相关': [],
-      '邮件模板': [],
-      '安全监控': [],
-      '其他': [],
+    const exportData = {
+      version: '2.0.0',
+      exportedAt: new Date().toISOString(),
+      exportedBy: payload.username,
+      configs: (configs.results || []).map(c => ({
+        key: c.key,
+        value: c.is_sensitive ? '******' : c.value,
+        description: c.description,
+        configType: c.config_type,
+        configGroup: c.config_group,
+        isPublic: c.is_public === 1,
+        isSensitive: c.is_sensitive === 1,
+      })),
     };
 
-    const groupMapping: Record<string, string> = {
-      'site_name': '基础配置',
-      'enable_registration': '基础配置',
-      'max_search_history': '用户限制',
-      'max_favorites': '用户限制',
-      'min_username_length': '用户限制',
-      'max_username_length': '用户限制',
-      'min_password_length': '用户限制',
-      'source_check_enabled': '搜索源检查',
-      'max_concurrent_checks': '搜索源检查',
-      'default_check_timeout': '搜索源检查',
-      'cache_duration_ms': '搜索源检查',
-      'max_cache_entries': '搜索源检查',
-      'health_update_interval': '搜索源检查',
-      'community_enabled': '社区功能',
-      'community_require_approval': '社区功能',
-      'community_max_shares_per_user': '社区功能',
-      'community_min_rating_to_feature': '社区功能',
-      'email_verification_enabled': '邮箱验证',
-      'email_verification_required': '邮箱验证',
-      'verification_code_length': '邮箱验证',
-      'verification_code_expiry': '邮箱验证',
-      'max_verification_attempts': '邮箱验证',
-      'email_rate_limit_per_hour': '邮箱验证',
-      'email_rate_limit_per_day': '邮箱验证',
-      'resend_api_key_set': '邮箱验证',
-      'default_from_email': '邮箱验证',
-      'default_from_name': '邮箱验证',
-      'forgot_password_enabled': '忘记密码',
-      'forgot_password_rate_limit_per_hour': '忘记密码',
-      'forgot_password_rate_limit_per_day': '忘记密码',
-      'reset_password_require_verification': '忘记密码',
-      'reset_password_code_expiry': '忘记密码',
-      'password_reset_max_attempts': '安全相关',
-      'password_reset_lockout_duration': '安全相关',
-      'force_logout_after_password_reset': '安全相关',
-      'forgot_password_email_subject': '邮件模板',
-      'forgot_password_success_message': '邮件模板',
-      'security_monitoring_enabled': '安全监控',
-      'security_event_retention_days': '安全监控',
-      'high_risk_threshold': '安全监控',
-      'detect_unusual_login_location': '安全监控',
-      'detect_unusual_login_time': '安全监控',
-      'detect_multiple_failed_logins': '安全监控',
-      'notify_admin_on_suspicious_activity': '安全监控',
-      'notify_user_on_password_reset': '安全监控',
-    };
-
-    for (const config of configs.results || []) {
-      const group = groupMapping[config.key] || '其他';
-      if (groups[group]) {
-        groups[group].push(config);
-      } else {
-        groups['其他'].push(config);
-      }
-    }
-
-    return c.json(success(groups));
+    return c.json(success(exportData));
   } catch (err) {
-    console.error('Get config groups error:', err);
-    return c.json(error('SERVER_ERROR', '获取配置分组失败'), 500);
+    console.error('Export config error:', err);
+    return c.json(error('SERVER_ERROR', '导出配置失败'), 500);
   }
 });
 
-/**
- * 重置配置为默认值（管理员）
- * POST /api/config/reset/:key
- */
-configRoutes.post('/reset/:key', async (c) => {
+configRoutes.post('/import', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
   }
 
-  const { verifyToken } = await import('../utils');
   const token = authHeader.slice(7);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
 
@@ -327,75 +613,90 @@ configRoutes.post('/reset/:key', async (c) => {
     return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
   }
 
-  const key = c.req.param('key');
-
-  const defaultValues: Record<string, { value: string; description: string; configType: string; isPublic: number }> = {
-    'site_name': { value: '磁力快搜', description: '网站名称', configType: 'string', isPublic: 1 },
-    'enable_registration': { value: '1', description: '是否开放注册', configType: 'boolean', isPublic: 1 },
-    'max_search_history': { value: '1000', description: '最大搜索历史记录数', configType: 'integer', isPublic: 1 },
-    'max_favorites': { value: '1000', description: '最大收藏数量', configType: 'integer', isPublic: 1 },
-    'min_username_length': { value: '3', description: '用户名最小长度', configType: 'integer', isPublic: 1 },
-    'max_username_length': { value: '20', description: '用户名最大长度', configType: 'integer', isPublic: 1 },
-    'min_password_length': { value: '6', description: '密码最小长度', configType: 'integer', isPublic: 1 },
-    'source_check_enabled': { value: '1', description: '启用搜索源状态检查', configType: 'boolean', isPublic: 1 },
-    'max_concurrent_checks': { value: '3', description: '最大并发检查数', configType: 'integer', isPublic: 1 },
-    'default_check_timeout': { value: '10000', description: '默认检查超时时间（毫秒）', configType: 'integer', isPublic: 1 },
-    'cache_duration_ms': { value: '300000', description: '状态缓存时间（毫秒）', configType: 'integer', isPublic: 1 },
-    'max_cache_entries': { value: '10000', description: '最大缓存条目数', configType: 'integer', isPublic: 1 },
-    'health_update_interval': { value: '3600000', description: '健康度统计更新间隔（毫秒）', configType: 'integer', isPublic: 1 },
-    'community_enabled': { value: '1', description: '启用搜索源共享社区功能', configType: 'boolean', isPublic: 1 },
-    'community_require_approval': { value: '0', description: '新分享的搜索源需要审核', configType: 'boolean', isPublic: 0 },
-    'community_max_shares_per_user': { value: '50', description: '每个用户最大分享数量', configType: 'integer', isPublic: 1 },
-    'community_min_rating_to_feature': { value: '4.0', description: '推荐搜索源的最低评分', configType: 'float', isPublic: 1 },
-    'email_verification_enabled': { value: '1', description: '是否启用邮箱验证功能', configType: 'boolean', isPublic: 1 },
-    'email_verification_required': { value: '0', description: '注册时是否强制邮箱验证', configType: 'boolean', isPublic: 1 },
-    'verification_code_length': { value: '6', description: '验证码长度', configType: 'integer', isPublic: 0 },
-    'verification_code_expiry': { value: '900000', description: '验证码过期时间（毫秒，默认15分钟）', configType: 'integer', isPublic: 0 },
-    'max_verification_attempts': { value: '3', description: '最大验证尝试次数', configType: 'integer', isPublic: 0 },
-    'email_rate_limit_per_hour': { value: '5', description: '每小时最大发送邮件数', configType: 'integer', isPublic: 0 },
-    'email_rate_limit_per_day': { value: '20', description: '每天最大发送邮件数', configType: 'integer', isPublic: 0 },
-    'forgot_password_enabled': { value: '1', description: '是否启用忘记密码功能', configType: 'boolean', isPublic: 1 },
-    'forgot_password_rate_limit_per_hour': { value: '3', description: '忘记密码每小时最大请求次数', configType: 'integer', isPublic: 1 },
-    'forgot_password_rate_limit_per_day': { value: '10', description: '忘记密码每天最大请求次数', configType: 'integer', isPublic: 1 },
-    'reset_password_require_verification': { value: '1', description: '重置密码是否需要邮箱验证', configType: 'boolean', isPublic: 1 },
-    'reset_password_code_expiry': { value: '1800000', description: '重置密码验证码过期时间（毫秒，默认30分钟）', configType: 'integer', isPublic: 1 },
-    'password_reset_max_attempts': { value: '5', description: '密码重置最大尝试次数', configType: 'integer', isPublic: 1 },
-    'password_reset_lockout_duration': { value: '3600000', description: '密码重置锁定持续时间（毫秒，默认1小时）', configType: 'integer', isPublic: 1 },
-    'force_logout_after_password_reset': { value: '1', description: '密码重置后是否强制退出所有设备', configType: 'boolean', isPublic: 1 },
-    'security_monitoring_enabled': { value: '1', description: '是否启用安全事件监控', configType: 'boolean', isPublic: 0 },
-    'security_event_retention_days': { value: '90', description: '安全事件保留天数', configType: 'integer', isPublic: 0 },
-    'high_risk_threshold': { value: '70', description: '高风险事件阈值', configType: 'integer', isPublic: 0 },
-    'detect_unusual_login_location': { value: '1', description: '检测异常登录地点', configType: 'boolean', isPublic: 0 },
-    'detect_unusual_login_time': { value: '1', description: '检测异常登录时间', configType: 'boolean', isPublic: 0 },
-    'detect_multiple_failed_logins': { value: '1', description: '检测多次登录失败', configType: 'boolean', isPublic: 0 },
-    'notify_admin_on_suspicious_activity': { value: '1', description: '可疑活动时通知管理员', configType: 'boolean', isPublic: 0 },
-    'notify_user_on_password_reset': { value: '1', description: '密码重置时通知用户', configType: 'boolean', isPublic: 0 },
-  };
-
-  const defaultValue = defaultValues[key];
-  if (!defaultValue) {
-    return c.json(error('NOT_FOUND', '未找到该配置的默认值'), 404);
-  }
-
   try {
-    const now = Date.now();
-    await c.env.DB.prepare(`
-      UPDATE system_config 
-      SET value = ?, updated_at = ?
-      WHERE key = ?
-    `).bind(defaultValue.value, now, key).run();
+    const body = await c.req.json();
+    const { configs, overwrite = false } = body;
 
-    return c.json(success({ key, value: defaultValue.value }, '配置已重置为默认值'));
+    if (!Array.isArray(configs)) {
+      return c.json(error('VALIDATION_ERROR', '配置数据格式错误'), 400);
+    }
+
+    const now = Date.now();
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
+    const userAgent = c.req.header('User-Agent') || null;
+    const results: { key: string; success: boolean; action: string; error?: string }[] = [];
+
+    for (const config of configs) {
+      const { key, value, description, configType, configGroup, isPublic, isSensitive } = config;
+
+      if (!key || value === undefined) {
+        results.push({ key: key || 'unknown', success: false, action: 'skipped', error: '缺少必要字段' });
+        continue;
+      }
+
+      if (value === '******') {
+        results.push({ key, success: false, action: 'skipped', error: '敏感配置需要手动设置' });
+        continue;
+      }
+
+      try {
+        const existing = await c.env.DB.prepare(
+          'SELECT * FROM system_config WHERE key = ?'
+        ).bind(key).first<SystemConfig>();
+
+        if (existing && !overwrite) {
+          results.push({ key, success: false, action: 'skipped', error: '配置已存在' });
+          continue;
+        }
+
+        if (existing) {
+          await c.env.DB.prepare(`
+            UPDATE system_config 
+            SET value = ?, description = COALESCE(?, description),
+                config_type = COALESCE(?, config_type),
+                config_group = COALESCE(?, config_group),
+                is_public = COALESCE(?, is_public),
+                is_sensitive = COALESCE(?, is_sensitive),
+                updated_at = ?
+            WHERE key = ?
+          `).bind(value, description, configType, configGroup, isPublic ? 1 : 0, isSensitive ? 1 : 0, now, key).run();
+
+          await logConfigChange(
+            c.env, key, existing.value, value, 'update',
+            payload.userId, payload.username, '导入配置', ipAddress, userAgent
+          );
+
+          results.push({ key, success: true, action: 'updated' });
+        } else {
+          await c.env.DB.prepare(`
+            INSERT INTO system_config (key, value, description, config_type, config_group, is_public, is_sensitive, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(key, value, description || null, configType || 'string', configGroup || 'other', isPublic ? 1 : 0, isSensitive ? 1 : 0, now, now).run();
+
+          await logConfigChange(
+            c.env, key, null, value, 'create',
+            payload.userId, payload.username, '导入配置', ipAddress, userAgent
+          );
+
+          results.push({ key, success: true, action: 'created' });
+        }
+      } catch (err) {
+        results.push({ key, success: false, action: 'error', error: String(err) });
+      }
+    }
+
+    return c.json(success({
+      results,
+      created: results.filter(r => r.success && r.action === 'created').length,
+      updated: results.filter(r => r.success && r.action === 'updated').length,
+      skipped: results.filter(r => !r.success).length,
+    }, '配置导入完成'));
   } catch (err) {
-    console.error('Reset config error:', err);
-    return c.json(error('SERVER_ERROR', '重置配置失败'), 500);
+    console.error('Import config error:', err);
+    return c.json(error('SERVER_ERROR', '导入配置失败'), 500);
   }
 });
 
-/**
- * 记录分析事件
- * POST /api/analytics/events
- */
 configRoutes.post('/analytics/events', async (c) => {
   try {
     const body = await c.req.json();
@@ -425,17 +726,12 @@ configRoutes.post('/analytics/events', async (c) => {
   }
 });
 
-/**
- * 获取分析事件统计
- * GET /api/analytics/stats
- */
 configRoutes.get('/analytics/stats', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
   }
 
-  const { verifyToken } = await import('../utils');
   const token = authHeader.slice(7);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
 
@@ -493,17 +789,12 @@ configRoutes.get('/analytics/stats', async (c) => {
   }
 });
 
-/**
- * 获取邮件发送日志
- * GET /api/email/logs
- */
 configRoutes.get('/email/logs', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
   }
 
-  const { verifyToken } = await import('../utils');
   const token = authHeader.slice(7);
   const payload = await verifyToken(token, c.env.JWT_SECRET);
 

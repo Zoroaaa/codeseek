@@ -397,7 +397,38 @@ export interface SystemConfig {
   value: string;
   description: string | null;
   config_type: string;
+  config_group: string | null;
   is_public: number;
+  is_sensitive: number;
+  is_resettable: number;
+  validation_rules: string | null;
+  options: string | null;
+  display_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ConfigChangeLog {
+  id: string;
+  config_key: string;
+  old_value: string | null;
+  new_value: string;
+  change_type: 'create' | 'update' | 'delete' | 'reset';
+  changed_by: string | null;
+  changed_by_username: string | null;
+  change_reason: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: number;
+}
+
+export interface ConfigGroup {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  icon: string | null;
+  display_order: number;
   created_at: number;
   updated_at: number;
 }
