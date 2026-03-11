@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/Toast';
 import type { SharedSource, Tag } from '@/types';
 import { StarRating } from './shared';
 
-export const TrendingTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promise<void> }> = ({ tags, onImport }) => {
+export const TrendingTab: React.FC<{ tags: Tag[]; onImport: (source: SharedSource) => void }> = ({ tags, onImport }) => {
   const toast = useToast();
   const [popular, setPopular] = useState<SharedSource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +32,10 @@ export const TrendingTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Prom
     return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
   };
 
+  const handleImport = (source: SharedSource) => {
+    onImport(source);
+  };
+
   const SourceRow: React.FC<{ source: SharedSource; rank: number }> = ({ source, rank }) => (
     <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-all">
       <div className={clsx('w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0', rank <= 3 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30' : 'bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-400')}>{rank}</div>
@@ -49,7 +53,7 @@ export const TrendingTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Prom
         <p className="text-xs text-surface-400 flex items-center gap-1 justify-end"><Calendar className="w-3 h-3" />{formatDate(source.createdAt)}</p>
         <p className="text-xs text-surface-400 flex items-center gap-1 justify-end"><User className="w-3 h-3" />{source.authorName || '匿名'}</p>
       </div>
-      <Button variant="ghost" size="sm" onClick={() => onImport(source.id)}><Download className="w-4 h-4" /></Button>
+      <Button variant="primary" size="sm" onClick={() => handleImport(source)} leftIcon={<Download className="w-3.5 h-3.5" />}>导入</Button>
     </div>
   );
 

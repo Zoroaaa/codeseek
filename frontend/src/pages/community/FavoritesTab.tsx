@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores';
 import type { SharedSource, Tag } from '@/types';
 import { StarRating, Pagination } from './shared';
 
-export const FavoritesTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promise<void> }> = ({ onImport }) => {
+export const FavoritesTab: React.FC<{ tags: Tag[]; onImport: (source: SharedSource) => void }> = ({ onImport }) => {
   const toast = useToast();
   const { isAuthenticated } = useAuthStore();
   const [sources, setSources] = useState<SharedSource[]>([]);
@@ -30,6 +30,11 @@ export const FavoritesTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Pro
   }, [page, isAuthenticated]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleImport = (source: SharedSource) => {
+    if (!isAuthenticated) { toast.warning('请先登录'); return; }
+    onImport(source);
+  };
 
   if (!isAuthenticated) {
     return (
@@ -86,12 +91,12 @@ export const FavoritesTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Pro
                   {source.sourceCategory} · by {source.authorName || '匿名'}
                 </span>
                 <Button
-                  variant="ghost"
+                  variant="primary"
                   size="sm"
-                  onClick={() => onImport(source.id)}
-                  title="导入"
+                  onClick={() => handleImport(source)}
+                  leftIcon={<Download className="w-3.5 h-3.5" />}
                 >
-                  <Download className="w-4 h-4" />
+                  导入
                 </Button>
               </div>
             </Card>

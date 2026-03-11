@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { clsx } from 'clsx';
 import {
   Globe,
@@ -15,24 +15,12 @@ import {
 } from 'lucide-react';
 import { Card, Button, Input, Modal, Loading, EmptyState, SourceIcon } from '@/components/ui';
 import { communityApi } from '@/services/api';
-import { sourceApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores';
 import type { SharedSource, Tag, CreateSharedSourceRequest } from '@/types';
-import type { CreateSourceRequest } from '@/types';
 import { StarRating, Pagination } from './shared';
 
-interface ImportFormData {
-  categoryId: string;
-  name: string;
-  subtitle: string;
-  description: string;
-  icon: string;
-  urlTemplate: string;
-  homepageUrl: string;
-}
-
-export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promise<void> }> = ({ tags }) => {
+export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (source: SharedSource) => void }> = ({ tags, onImport }) => {
   const toast = useToast();
   const { isAuthenticated } = useAuthStore();
   const [sources, setSources] = useState<SharedSource[]>([]);
@@ -41,6 +29,7 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [selectedTag, setSelectedTag] = useState('all');
   const [sortBy, setSortBy] = useState<'popular' | 'recent' | 'rating'>('popular');
   const [detailSource, setDetailSource] = useState<SharedSource | null>(null);
@@ -51,32 +40,34 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
   const [reportModal, setReportModal] = useState<{ open: boolean; sourceId: string }>({ open: false, sourceId: '' });
   const [reportReason, setReportReason] = useState('');
 
-  // Share modal state
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearchDebounced(search);
+      setPage(1);
+    }, 500);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [search]);
+
   const [shareModal, setShareModal] = useState(false);
   const [shareForm, setShareForm] = useState<CreateSharedSourceRequest>({
     sourceName: '', sourceSubtitle: '', sourceIcon: '', sourceUrlTemplate: '', sourceCategory: '', description: '', tags: [],
   });
   const [shareLoading, setShareLoading] = useState(false);
 
-  // Import modal state
-  const [importModal, setImportModal] = useState<{ open: boolean; source: SharedSource | null }>({ open: false, source: null });
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [importForm, setImportForm] = useState<ImportFormData>({
-    categoryId: '',
-    name: '',
-    subtitle: '',
-    description: '',
-    icon: '',
-    urlTemplate: '',
-    homepageUrl: '',
-  });
-  const [importLoading, setImportLoading] = useState(false);
-
   const loadSources = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = { page, pageSize: 12, status: 'active', sort: sortBy };
-      if (search) params.search = search;
+      if (searchDebounced) params.search = searchDebounced;
       if (selectedTag !== 'all') params.tags = [selectedTag];
       const res = await communityApi.getSharedSources(params);
       if (res.success && res.data) {
@@ -90,18 +81,9 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
         setLikedIds(likedSet);
       }
     } catch { toast.error('加载失败'); } finally { setLoading(false); }
-  }, [page, search, selectedTag, sortBy]);
+  }, [page, searchDebounced, selectedTag, sortBy]);
 
   useEffect(() => { loadSources(); }, [loadSources]);
-
-  // Load categories for import form
-  useEffect(() => {
-    sourceApi.getCategories().then((res: any) => {
-      if (res.success && res.data) {
-        setCategories(res.data.map((c: any) => ({ id: c.id, name: c.name })));
-      }
-    }).catch(() => {});
-  }, []);
 
   const handleLike = async (e: React.MouseEvent, sourceId: string) => {
     e.stopPropagation();
@@ -133,49 +115,7 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
   const openImportModal = (e: React.MouseEvent, source: SharedSource) => {
     e.stopPropagation();
     if (!isAuthenticated) { toast.warning('请先登录'); return; }
-    setImportForm({
-      categoryId: '',
-      name: source.sourceName,
-      subtitle: source.sourceSubtitle || '',
-      description: source.description || '',
-      icon: source.sourceIcon || '',
-      urlTemplate: source.sourceUrlTemplate,
-      homepageUrl: '',
-    });
-    setImportModal({ open: true, source });
-  };
-
-  const handleImportSubmit = async () => {
-    if (!importModal.source) return;
-    if (!importForm.categoryId) { toast.error('请选择分类'); return; }
-    if (!importForm.name.trim()) { toast.error('请填写名称'); return; }
-    if (!importForm.urlTemplate.trim()) { toast.error('请填写URL模板'); return; }
-    setImportLoading(true);
-    try {
-      // Record download count on community side
-      await communityApi.downloadSharedSource(importModal.source.id);
-      // Create source in user's source manager
-      const createData: CreateSourceRequest = {
-        categoryId: importForm.categoryId,
-        name: importForm.name,
-        subtitle: importForm.subtitle || undefined,
-        description: importForm.description || undefined,
-        icon: importForm.icon || undefined,
-        urlTemplate: importForm.urlTemplate,
-        homepageUrl: importForm.homepageUrl || undefined,
-      };
-      const res = await sourceApi.createSource(createData);
-      if (res.success) {
-        toast.success('导入成功！搜索源已添加到你的搜索源列表');
-        setImportModal({ open: false, source: null });
-      } else {
-        toast.error('导入失败，请重试');
-      }
-    } catch (err: any) {
-      toast.error(err?.message || '导入失败，请稍后重试');
-    } finally {
-      setImportLoading(false);
-    }
+    onImport(source);
   };
 
   const submitReview = async () => {
@@ -235,7 +175,7 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
       <Card className="p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
-            <Input placeholder="搜索搜索源名称、描述..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} leftIcon={<Search className="w-4 h-4" />} fullWidth />
+            <Input placeholder="搜索搜索源名称、描述..." value={search} onChange={e => setSearch(e.target.value)} leftIcon={<Search className="w-4 h-4" />} fullWidth />
           </div>
           <div className="flex gap-2 flex-wrap">
             <select value={selectedTag} onChange={e => { setSelectedTag(e.target.value); setPage(1); }} className="px-3 py-2 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-sm">
@@ -271,7 +211,6 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
                     <div className="mt-1"><StarRating rating={Math.round(source.ratingScore)} /></div>
                   </div>
                 </div>
-                {/* 举报按钮放右上角，替换原来的 MoreVertical 下拉 */}
                 <button
                   onClick={e => { e.stopPropagation(); setReportModal({ open: true, sourceId: source.id }); setReportReason(''); }}
                   className="p-1.5 rounded-lg text-surface-300 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all flex-shrink-0"
@@ -325,7 +264,7 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
 
       <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
 
-      {/* 详情弹窗 - 点击卡片触发 */}
+      {/* 详情弹窗 */}
       <Modal isOpen={!!detailSource} onClose={() => setDetailSource(null)} title="搜索源详情" size="lg">
         {detailSource && (
           <div className="space-y-5">
@@ -396,89 +335,6 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
                 onClick={(e) => { openImportModal(e as any, detailSource); setDetailSource(null); }}
                 leftIcon={<Download className="w-4 h-4" />}
               >导入到我的列表</Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* 导入弹窗：预填社区信息，用户选择分类完成导入 */}
-      <Modal isOpen={importModal.open} onClose={() => setImportModal({ open: false, source: null })} title="导入搜索源" size="md">
-        {importModal.source && (
-          <div className="space-y-4">
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
-              将 <span className="font-semibold">「{importModal.source.sourceName}」</span> 导入到你的搜索源管理，请确认或修改以下信息：
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                分类 <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={importForm.categoryId}
-                onChange={e => setImportForm(f => ({ ...f, categoryId: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-              >
-                <option value="">请选择分类</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                名称 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={importForm.name}
-                onChange={e => setImportForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">副标题</label>
-              <input
-                type="text"
-                value={importForm.subtitle}
-                onChange={e => setImportForm(f => ({ ...f, subtitle: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                URL 模板 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={importForm.urlTemplate}
-                onChange={e => setImportForm(f => ({ ...f, urlTemplate: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm font-mono"
-              />
-              <p className="text-xs text-surface-400 mt-1">使用 {'{keyword}'} 作为搜索词占位符</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">主页链接</label>
-              <input
-                type="text"
-                value={importForm.homepageUrl}
-                onChange={e => setImportForm(f => ({ ...f, homepageUrl: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setImportModal({ open: false, source: null })}>取消</Button>
-              <Button
-                variant="primary"
-                onClick={handleImportSubmit}
-                disabled={importLoading}
-                leftIcon={<Download className="w-4 h-4" />}
-              >
-                {importLoading ? '导入中...' : '确认导入'}
-              </Button>
             </div>
           </div>
         )}
