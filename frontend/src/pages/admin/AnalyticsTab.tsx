@@ -12,7 +12,7 @@ export const AnalyticsTab: React.FC = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(false);
-  const [days, setDays] = useState(7);
+  const [days, setDays] = useState(30);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [eventTypeFilter, setEventTypeFilter] = useState('');
@@ -38,7 +38,7 @@ export const AnalyticsTab: React.FC = () => {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex gap-2">
-          {[7, 14, 30].map(d => (
+          {[7, 14, 30, 90].map(d => (
             <button key={d} onClick={() => setDays(d)} className={clsx('px-3 py-1.5 rounded-lg text-sm font-medium transition-colors', days === d ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400' : 'text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-800')}>近{d}天</button>
           ))}
         </div>

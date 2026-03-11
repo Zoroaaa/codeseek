@@ -6,3 +6,4 @@ export { TagsTab } from './TagsTab';
 export { TrendingTab } from './TrendingTab';
 export { StatsBanner } from './StatsBanner';
 export { StarRating, Pagination, StatusBadge } from './shared';
+export { NotificationsTab } from './NotificationsTab';

@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore, useThemeStore } from '@/stores';
 import { apiClient } from '@/services/api';
+import { analyticsApi } from '@/services/api';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AdminPanelLayout } from '@/components/layout/AdminPanelLayout';
@@ -72,6 +73,31 @@ const AuthRedirect: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   return <>{children}</>;
 };
 
+// 页面访问追踪组件（挂在 BrowserRouter 内部以使用 useLocation）
+const PageTracker: React.FC = () => {
+  const location = useLocation();
+  const { user } = useAuthStore();
+
+  useEffect(() => {
+    // 记录页面访问分析事件（静默失败，不影响用户体验）
+    const sessionId = sessionStorage.getItem('analytics_session_id') || (() => {
+      const id = Math.random().toString(36).slice(2);
+      sessionStorage.setItem('analytics_session_id', id);
+      return id;
+    })();
+
+    analyticsApi.recordEvent({
+      userId: user?.id,
+      sessionId,
+      eventType: 'page_view',
+      eventData: { path: location.pathname },
+      referer: document.referrer || undefined,
+    }).catch(() => {});
+  }, [location.pathname]);
+
+  return null;
+};
+
 const App: React.FC = () => {
   const { setUser, setLoading, logout } = useAuthStore();
   const { resolvedTheme } = useThemeStore();
@@ -129,6 +155,7 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
+      <PageTracker />
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<AuthRedirect><HomePage /></AuthRedirect>} />

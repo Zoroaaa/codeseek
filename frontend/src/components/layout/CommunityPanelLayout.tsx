@@ -12,7 +12,7 @@ import {
   Share2,
   Tag,
   Star,
-  Flag,
+  Bell,
   TrendingUp,
   X,
   LayoutDashboard,
@@ -35,7 +35,7 @@ const navItems: NavItem[] = [
   { id: 'my-favorites', label: '我的收藏', icon: <Star className="w-[18px] h-[18px]" />, path: '/community/my-favorites' },
   { id: 'tags', label: '标签管理', icon: <Tag className="w-[18px] h-[18px]" />, path: '/community/tags' },
   { id: 'trending', label: '热门推荐', icon: <TrendingUp className="w-[18px] h-[18px]" />, path: '/community/trending' },
-  { id: 'reports', label: '举报管理', icon: <Flag className="w-[18px] h-[18px]" />, path: '/community/reports' },
+  { id: 'reports', label: '消息通知', icon: <Bell className="w-[18px] h-[18px]" />, path: '/community/reports' },
 ];
 
 export const CommunityPanelLayout: React.FC = () => {

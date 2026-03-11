@@ -8,6 +8,7 @@ import { MySharesTab } from './MySharesTab';
 import { FavoritesTab } from './FavoritesTab';
 import { TagsTab } from './TagsTab';
 import { TrendingTab } from './TrendingTab';
+import { NotificationsTab } from './NotificationsTab';
 import { StatsBanner } from './StatsBanner';
 
 export const CommunityManager: React.FC = () => {
@@ -20,6 +21,7 @@ export const CommunityManager: React.FC = () => {
     if (p.includes('/my-favorites')) return 'favorites';
     if (p.includes('/tags')) return 'tags';
     if (p.includes('/trending')) return 'trending';
+    if (p.includes('/reports')) return 'notifications';
     return 'browse';
   };
 
@@ -48,7 +50,6 @@ export const CommunityManager: React.FC = () => {
   }, [loadTags]);
 
   const handleImport = async (sourceId: string) => {
-    // This is a fallback, actual import now handled in BrowseTab/FavoritesTab/TrendingTab
     try {
       const res = await communityApi.downloadSharedSource(sourceId);
       if (res.success) toast.success('操作成功');
@@ -66,6 +67,7 @@ export const CommunityManager: React.FC = () => {
       {activeTab === 'favorites' && <FavoritesTab tags={tags} onImport={handleImport} />}
       {activeTab === 'tags' && <TagsTab tags={tags} onRefresh={loadTags} />}
       {activeTab === 'trending' && <TrendingTab tags={tags} onImport={handleImport} />}
+      {activeTab === 'notifications' && <NotificationsTab />}
     </div>
   );
 };

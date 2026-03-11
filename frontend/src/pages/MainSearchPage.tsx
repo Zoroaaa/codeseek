@@ -31,7 +31,7 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 import { useSearchStore, useSourceStore, useAuthStore, useThemeStore, useProxyStore } from '@/stores';
-import { searchApi, sourceApi, userApi } from '@/services/api';
+import { searchApi, sourceApi, userApi, analyticsApi } from '@/services/api';
 import { Loading, SourceIcon } from '@/components/ui';
 import { convertToProxyUrl } from '@/services/proxy/ProxyService';
 import { useToast } from '@/components/ui/Toast';
@@ -171,6 +171,19 @@ export const MainSearchPage: React.FC = () => {
       toast.warning('请输入搜索关键词');
       return;
     }
+
+    // 记录搜索分析事件
+    const sessionId = sessionStorage.getItem('analytics_session_id') || (() => {
+      const id = Math.random().toString(36).slice(2);
+      sessionStorage.setItem('analytics_session_id', id);
+      return id;
+    })();
+    analyticsApi.recordEvent({
+      userId: user?.id,
+      sessionId,
+      eventType: 'search',
+      eventData: { keyword: keyword.trim() },
+    }).catch(() => {});
 
     setSearching(true);
     setHasSearched(true);

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock, User, ArrowLeft, Search } from 'lucide-react';
 import { useAuthStore } from '@/stores';
-import { authApi } from '@/services/api';
+import { authApi, analyticsApi } from '@/services/api';
 import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
 import { VALIDATION_RULES, APP_INFO } from '@/constants';
@@ -42,6 +42,18 @@ export const LoginPage: React.FC = () => {
         setUser(response.data.user);
         setToken(response.data.token);
         notification.auth.loginSuccess(response.data.user.username);
+        // 记录登录分析事件
+        const sessionId = sessionStorage.getItem('analytics_session_id') || (() => {
+          const id = Math.random().toString(36).slice(2);
+          sessionStorage.setItem('analytics_session_id', id);
+          return id;
+        })();
+        analyticsApi.recordEvent({
+          userId: response.data.user.id,
+          sessionId,
+          eventType: 'login',
+          eventData: { username: response.data.user.username },
+        }).catch(() => {});
         navigate('/dashboard');
       } else {
         notification.auth.loginFailed(response.message);
