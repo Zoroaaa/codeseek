@@ -224,6 +224,28 @@ export const SourceManager: React.FC = () => {
     }
   };
 
+  const handleToggleAll = async (enable: boolean) => {
+    if (sources.length === 0) return;
+    
+    try {
+      const configs = sources.map(source => ({
+        sourceId: source.id,
+        isEnabled: enable,
+      }));
+      
+      await sourceApi.batchUpdateUserSourceConfigs({ configs });
+      
+      setSources(prev => prev.map(s => ({ 
+        ...s, 
+        userConfig: { ...s.userConfig, isEnabled: enable } as UserSourceConfig 
+      })));
+      
+      notification.source.batchEnabled(sources.length);
+    } catch (error) {
+      notification.source.createFailed();
+    }
+  };
+
   const handleCreateSource = async () => {
     if (!formData.name || !formData.urlTemplate || !formData.categoryId) {
       notification.common.validationError();
@@ -390,6 +412,26 @@ export const SourceManager: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleToggleAll(true)}
+              leftIcon={<CheckCircle className="w-4 h-4" />}
+              className="text-success-600 border-success-300 hover:bg-success-50 dark:border-success-700 dark:text-success-400 dark:hover:bg-success-900/20"
+            >
+              全部启用
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleToggleAll(false)}
+              leftIcon={<XCircle className="w-4 h-4" />}
+              className="text-surface-600 border-surface-300 hover:bg-surface-50 dark:border-surface-600 dark:text-surface-400 dark:hover:bg-surface-800"
+            >
+              全部禁用
+            </Button>
+          </div>
           <Dropdown
             trigger={
               <Button variant="outline" leftIcon={<Download className="w-4 h-4" />}>
@@ -522,32 +564,26 @@ export const SourceManager: React.FC = () => {
                   <div className="shrink-0 flex items-center gap-2">
                     {isSearchCategory ? (
                       <>
-                        {/* Count badge — hide on very small screens */}
                         <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-lg bg-surface-100 dark:bg-surface-700 text-xs text-surface-600 dark:text-surface-300 whitespace-nowrap">
                           {majorCategory.enabledCount}/{majorCategory.totalCount}
                         </span>
                         <button
-                          onClick={() => handleToggleMajorCategory(majorCategory.id, !majorCategory.isAllEnabled)}
-                          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                            majorCategory.isAllEnabled
-                              ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
-                              : majorCategory.isAllDisabled
-                              ? 'bg-surface-200 text-surface-600 dark:bg-surface-700 dark:text-surface-400'
-                              : 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
-                          }`}
+                          onClick={(e) => { e.stopPropagation(); handleToggleMajorCategory(majorCategory.id, true); }}
+                          className="p-1.5 rounded-lg text-success-600 dark:text-success-400 hover:bg-success-50 dark:hover:bg-success-900/20 transition-all"
+                          title="启用全部"
                         >
-                          {majorCategory.isAllEnabled ? (
-                            <><CheckCircle className="w-3.5 h-3.5" /><span className="hidden sm:inline">全部启用</span></>
-                          ) : majorCategory.isAllDisabled ? (
-                            <><XCircle className="w-3.5 h-3.5" /><span className="hidden sm:inline">全部禁用</span></>
-                          ) : (
-                            <><CheckCircle className="w-3.5 h-3.5" /><span className="hidden sm:inline">部分启用</span></>
-                          )}
-                          {/* Mobile: show count inline since badge is hidden */}
-                          <span className="sm:hidden text-xs">
-                            {majorCategory.enabledCount}/{majorCategory.totalCount}
-                          </span>
+                          <CheckCircle className="w-4 h-4" />
                         </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleToggleMajorCategory(majorCategory.id, false); }}
+                          className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-700 transition-all"
+                          title="禁用全部"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                        <span className="sm:hidden text-xs text-surface-500">
+                          {majorCategory.enabledCount}/{majorCategory.totalCount}
+                        </span>
                       </>
                     ) : (
                       <Badge variant="outline" className="text-xs bg-surface-100 dark:bg-surface-700 whitespace-nowrap">
@@ -597,29 +633,22 @@ export const SourceManager: React.FC = () => {
                                   {category.enabledCount}/{category.totalCount}
                                 </span>
                                 <button
-                                  onClick={() => handleToggleCategory(category.id, !category.isAllEnabled)}
-                                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                                    category.isAllEnabled
-                                      ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
-                                      : category.isAllDisabled
-                                      ? 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400'
-                                      : 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
-                                  }`}
+                                  onClick={() => handleToggleCategory(category.id, true)}
+                                  className="p-1.5 rounded-lg text-success-600 dark:text-success-400 hover:bg-success-50 dark:hover:bg-success-900/20 transition-all"
+                                  title="启用全部"
                                 >
-                                  {category.isAllEnabled ? (
-                                    <CheckCircle className="w-3 h-3" />
-                                  ) : category.isAllDisabled ? (
-                                    <XCircle className="w-3 h-3" />
-                                  ) : (
-                                    <CheckCircle className="w-3 h-3" />
-                                  )}
-                                  <span className="hidden sm:inline ml-1">
-                                    {category.isAllEnabled ? '全部启用' : category.isAllDisabled ? '全部禁用' : '部分启用'}
-                                  </span>
-                                  <span className="sm:hidden ml-0.5 text-xs">
-                                    {category.enabledCount}/{category.totalCount}
-                                  </span>
+                                  <CheckCircle className="w-3.5 h-3.5" />
                                 </button>
+                                <button
+                                  onClick={() => handleToggleCategory(category.id, false)}
+                                  className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-700 transition-all"
+                                  title="禁用全部"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                </button>
+                                <span className="sm:hidden text-xs text-surface-500">
+                                  {category.enabledCount}/{category.totalCount}
+                                </span>
                               </>
                             ) : (
                               <span className="text-xs text-surface-400 dark:text-surface-500">
