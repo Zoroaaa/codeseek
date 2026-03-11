@@ -204,8 +204,8 @@ communityRoutes.get('/sources', async (c) => {
   const userId = await getUserId(c);
 
   try {
-    let whereClauses: string[] = ['s.status = ?'];
-    let params: (string | number)[] = [status];
+    const whereClauses: string[] = ['s.status = ?'];
+    const params: (string | number)[] = [status];
 
     if (search) {
       whereClauses.push('(s.source_name LIKE ? OR s.description LIKE ?)');
@@ -254,7 +254,7 @@ communityRoutes.get('/sources', async (c) => {
        LIMIT ? OFFSET ?`
     ).bind(...params, pageSize, (page - 1) * pageSize).all<CommunitySharedSource & { author_name?: string }>();
 
-    let likedSourceIds: Set<string> = new Set();
+    const likedSourceIds: Set<string> = new Set();
     if (userId && sources.results && sources.results.length > 0) {
       const sourceIds = sources.results.map(s => s.id);
       const inClause = sourceIds.map(() => '?').join(',');

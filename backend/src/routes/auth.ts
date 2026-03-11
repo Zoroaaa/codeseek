@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Env, User, EmailVerification, EmailChangeRequest } from '../types';
-import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP } from '../utils';
+import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP, checkLockout, recordFailedAttempt, clearLockout, recordSecurityEvent } from '../utils';
 import { EmailVerificationService, emailVerificationUtils } from '../services/email-verification';
 import { CONFIG } from '../constants';
 
@@ -18,6 +18,12 @@ authRoutes.post('/login', async (c) => {
   const userAgent = c.req.header('User-Agent') || '';
 
   try {
+    const lockoutCheck = await checkLockout(c.env.DB, 'login', identifier);
+    if (lockoutCheck.isLocked) {
+      const remainingTime = lockoutCheck.lockedUntil ? Math.ceil((lockoutCheck.lockedUntil - Date.now()) / 60000) : 0;
+      return c.json(error('LOCKED', `账户已锁定，请${remainingTime}分钟后再试`), 423);
+    }
+
     let queryField = 'username';
     const queryValue = identifier;
     
@@ -33,19 +39,46 @@ authRoutes.post('/login', async (c) => {
     ).bind(queryValue).first<User & { role_name?: string; role_display_name?: string; role_permissions?: string }>();
 
     if (!user) {
-      return c.json(error('AUTH_ERROR', '用户名/邮箱或密码错误'), 401);
+      const lockoutResult = await recordFailedAttempt(c.env.DB, 'login', identifier, undefined, undefined, clientIP, userAgent);
+      return c.json(error('AUTH_ERROR', `用户名/邮箱或密码错误${lockoutResult.remainingAttempts ? `，剩余${lockoutResult.remainingAttempts}次尝试机会` : ''}`), 401);
     }
 
     if (!user.is_active) {
       await logUserAction(c.env, user.id, 'login_failed', { reason: '账号已被禁用', ip: clientIP }, c);
+      await recordSecurityEvent(c.env.DB, {
+        userId: user.id,
+        eventType: 'login',
+        eventStatus: 'failed',
+        eventData: { reason: 'account_disabled' },
+        ipAddress: clientIP,
+        userAgent,
+      });
       return c.json(error('AUTH_ERROR', '账号已被禁用'), 403);
     }
 
     const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) {
       await logUserAction(c.env, user.id, 'login_failed', { reason: '密码错误', ip: clientIP }, c);
-      return c.json(error('AUTH_ERROR', '用户名/邮箱或密码错误'), 401);
+      
+      const lockoutResult = await recordFailedAttempt(c.env.DB, 'login', identifier, undefined, undefined, clientIP, userAgent);
+      
+      await recordSecurityEvent(c.env.DB, {
+        userId: user.id,
+        eventType: 'login',
+        eventStatus: 'failed',
+        eventData: { reason: 'wrong_password', remainingAttempts: lockoutResult.remainingAttempts },
+        ipAddress: clientIP,
+        userAgent,
+      });
+
+      if (lockoutResult.isLocked) {
+        return c.json(error('LOCKED', '登录失败次数过多，账户已锁定1小时'), 423);
+      }
+      
+      return c.json(error('AUTH_ERROR', `用户名/邮箱或密码错误${lockoutResult.remainingAttempts ? `，剩余${lockoutResult.remainingAttempts}次尝试机会` : ''}`), 401);
     }
+
+    await clearLockout(c.env.DB, 'login', identifier);
 
     const now = Date.now();
     await c.env.DB.prepare(
@@ -75,6 +108,14 @@ authRoutes.post('/login', async (c) => {
     ).run();
 
     await logUserAction(c.env, user.id, 'login', { method: 'password', ip: clientIP }, c);
+    
+    await recordSecurityEvent(c.env.DB, {
+      userId: user.id,
+      eventType: 'login',
+      eventStatus: 'success',
+      ipAddress: clientIP,
+      userAgent,
+    });
 
     return c.json(success({
       user: {
