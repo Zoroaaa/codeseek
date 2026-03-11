@@ -1,6 +1,6 @@
 # CodeSeek API 文档 (v2.0.0)
 
-本文档详细说明CodeSeek项目的所有API接口。
+本文档详细说明CodeSeek项目的所有API接口，100%基于实际后端代码。
 
 ---
 
@@ -11,6 +11,7 @@
 - **响应格式**: JSON
 - **API框架**: Hono 4.6.0
 - **运行时**: Cloudflare Workers
+- **数据库**: Cloudflare D1 (SQLite)
 
 ## 统一响应格式
 
@@ -37,6 +38,38 @@ interface ApiResponse<T> {
 | `DUPLICATE_ERROR` | 400 | 资源已存在 |
 | `RATE_LIMIT` | 429 | 请求频率超限 |
 | `SERVER_ERROR` | 500 | 服务器内部错误 |
+| `LOCKED_OUT` | 423 | 账户被锁定 |
+
+---
+
+## 根接口
+
+### `GET /` - API信息
+
+获取API基本信息。
+
+**返回**:
+```json
+{
+  "name": "CodeSeek API",
+  "version": "2.0.0",
+  "status": "running"
+}
+```
+
+---
+
+### `GET /health` - 健康检查
+
+检查服务健康状态。
+
+**返回**:
+```json
+{
+  "status": "ok",
+  "timestamp": 1234567890123
+}
+```
 
 ---
 
@@ -51,7 +84,8 @@ interface ApiResponse<T> {
 {
   "username": "string (3-20字符，字母数字下划线)",
   "email": "string (有效邮箱格式)",
-  "password": "string (6-100字符)"
+  "password": "string (6-100字符)",
+  "verificationCode": "string? (6位验证码，邮箱验证必填时需要)"
 }
 ```
 
@@ -169,14 +203,14 @@ interface ApiResponse<T> {
 
 ### `DELETE /api/auth/account` - 删除账户
 
-删除当前用户账户（需要密码确认）。
+删除当前用户账户（需要验证码确认）。
 
 **认证**: 需要
 
 **请求体**:
 ```json
 {
-  "password": "string"
+  "code": "string (6位验证码)"
 }
 ```
 
@@ -201,9 +235,14 @@ interface ApiResponse<T> {
 
 ### `POST /api/auth/send-password-reset-code` - 发送密码重置验证码
 
-向当前用户邮箱发送密码重置验证码。
+向指定邮箱发送密码重置验证码。
 
-**认证**: 需要
+**请求体**:
+```json
+{
+  "email": "string"
+}
+```
 
 **返回**: 脱敏邮箱、过期时间
 
@@ -261,6 +300,23 @@ interface ApiResponse<T> {
 ```
 
 **返回**: 是否完成、新邮箱（脱敏）
+
+---
+
+### `POST /api/auth/cancel-email-change-request` - 取消邮箱更改请求
+
+取消当前进行中的邮箱更改请求。
+
+**认证**: 需要
+
+**请求体**:
+```json
+{
+  "requestId": "string"
+}
+```
+
+**返回**: 操作结果
 
 ---
 
@@ -419,7 +475,7 @@ interface ApiResponse<T> {
 **认证**: 需要
 
 **查询参数**:
-- `limit` - 返回数量限制（默认50，最大200）
+- `limit` - 返回数量限制（默认50）
 
 **返回**: 搜索历史记录列表
 
@@ -473,9 +529,12 @@ interface ApiResponse<T> {
 **认证**: 需要
 
 **返回**: 
-- 总搜索次数
-- 常用搜索源（Top 5）
-- 最近搜索记录（10条）
+- totalSearches - 总搜索次数
+- topSources - 常用搜索源（Top 5）
+- recentSearches - 最近搜索记录（10条）
+- searchGrowthPercent - 搜索增长百分比
+- thisWeekSearches - 本周搜索次数
+- lastWeekSearches - 上周搜索次数
 
 ---
 
@@ -501,7 +560,7 @@ interface ApiResponse<T> {
 ```json
 {
   "isEnabled": "boolean?",
-  "customPriority": "number? (1-10)",
+  "customPriority": "number?",
   "customName": "string?",
   "customSubtitle": "string?",
   "customIcon": "string?",
@@ -510,6 +569,41 @@ interface ApiResponse<T> {
 ```
 
 **返回**: 操作结果
+
+---
+
+### `GET /api/user/activities` - 获取个人活动记录
+
+获取当前用户的活动记录。
+
+**认证**: 需要
+
+**查询参数**:
+- `limit` - 返回数量（默认100，最大100）
+- `offset` - 偏移量（默认0）
+- `action` - 行为类型筛选（可选）
+
+**返回**: 
+- activities - 活动列表（包含行为标签）
+- total - 总数
+- limit - 限制
+- offset - 偏移量
+
+---
+
+### `GET /api/user/activities/stats` - 获取个人活动统计
+
+获取当前用户的活动统计数据。
+
+**认证**: 需要
+
+**返回**: 
+- total - 总活动数
+- today - 今日活动数
+- week - 本周活动数
+- month - 本月活动数
+- actionsByType - 按类型分组统计
+- summary - 摘要（登录、失败登录、搜索、收藏操作次数）
 
 ---
 
@@ -524,17 +618,21 @@ interface ApiResponse<T> {
 **请求体**:
 ```json
 {
-  "keyword": "string (必填，最多200字符)",
-  "sourceIds": "string[]? (最多50个)",
-  "page": "number? (默认1，最大1000)",
-  "pageSize": "number? (默认20，最大100)"
+  "keyword": "string (必填)",
+  "page": "number? (默认1)",
+  "pageSize": "number? (默认20，最大100)",
+  "majorCategoryId": "string?",
+  "categoryId": "string?"
 }
 ```
 
 **返回**: 
-- 搜索关键词
-- 搜索结果列表（包含搜索源信息和生成的URL）
-- 分页信息
+- keyword - 搜索关键词
+- results - 搜索结果列表（包含搜索源信息和生成的URL）
+- total - 总数
+- page - 页码
+- pageSize - 每页数量
+- hasMore - 是否有更多
 
 ---
 
@@ -743,7 +841,7 @@ interface ApiResponse<T> {
 
 创建新的搜索源分类。
 
-**认证**: 需要
+**认证**: 需要（管理员权限）
 
 **请求体**:
 ```json
@@ -767,7 +865,7 @@ interface ApiResponse<T> {
 
 更新指定分类的信息。
 
-**认证**: 需要
+**认证**: 需要（登录用户即可，系统分类需要管理员权限）
 
 **URL参数**: `id` - 分类ID
 
@@ -792,7 +890,7 @@ interface ApiResponse<T> {
 
 删除指定分类（分类下不能有搜索源）。
 
-**认证**: 需要
+**认证**: 需要（登录用户即可，系统分类需要管理员权限）
 
 **URL参数**: `id` - 分类ID
 
@@ -827,7 +925,7 @@ interface ApiResponse<T> {
 
 创建新的搜索源。
 
-**认证**: 需要
+**认证**: 需要（登录用户即可）
 
 **请求体**:
 ```json
@@ -854,7 +952,7 @@ interface ApiResponse<T> {
 
 更新指定搜索源的信息。
 
-**认证**: 需要
+**认证**: 需要（登录用户即可，系统搜索源需要管理员权限）
 
 **URL参数**: `id` - 搜索源ID
 
@@ -883,7 +981,7 @@ interface ApiResponse<T> {
 
 删除指定搜索源。
 
-**认证**: 需要
+**认证**: 需要（登录用户即可，系统搜索源需要管理员权限）
 
 **URL参数**: `id` - 搜索源ID
 
@@ -987,11 +1085,13 @@ interface ApiResponse<T> {
 获取搜索源的整体统计数据。
 
 **返回**: 
-- 总搜索源数、可搜索数
-- 总分类数、总主分类数
-- 使用量Top 10搜索源
-- 各分类搜索源数量
-- 各站点类型数量
+- total - 总搜索源数
+- searchable - 可搜索数
+- totalCategories - 总分类数
+- totalMajorCategories - 总主分类数
+- topSources - 使用量Top 10搜索源
+- categoryCounts - 各分类搜索源数量
+- siteTypeCounts - 各站点类型数量
 
 ---
 
@@ -1270,6 +1370,16 @@ interface ApiResponse<T> {
 
 ---
 
+### `GET /api/community/sources/my-favorites` - 获取我的收藏
+
+获取当前用户在社区收藏的搜索源列表。
+
+**认证**: 需要
+
+**返回**: 收藏的搜索源列表
+
+---
+
 ### `GET /api/community/sources/my-sources` - 获取我的分享
 
 获取当前用户分享的搜索源列表。
@@ -1327,10 +1437,15 @@ interface ApiResponse<T> {
 **认证**: 需要
 
 **返回**: 
-- 分享数量、待审核数量
-- 总下载量、总点赞、总浏览
-- 平均评分、评论数、创建标签数
-- 最近分享记录
+- shareCount - 分享数量
+- pendingCount - 待审核数量
+- totalDownloads - 总下载量
+- totalLikes - 总点赞
+- totalViews - 总浏览
+- avgRating - 平均评分
+- reviewCount - 评论数
+- createdTagCount - 创建标签数
+- recentShares - 最近分享记录
 
 ---
 
@@ -1339,20 +1454,45 @@ interface ApiResponse<T> {
 获取社区整体统计数据。
 
 **返回**: 
-- 总搜索源数
-- 总下载量
-- 总用户数
-- 总评论数
-- 平均评分
-- 分类数量
-- 热门分类
-- 最近活动
+- totalSources - 总搜索源数
+- totalDownloads - 总下载量
+- totalUsers - 总用户数
+- totalReviews - 总评论数
+- avgRating - 平均评分
+- categoryCount - 分类数量
+- topCategories - 热门分类
+- recentActivity - 最近活动
+
+---
+
+### `GET /api/community/notifications` - 获取通知列表
+
+获取当前用户的通知列表。
+
+**认证**: 需要
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20）
+- `unreadOnly` - 仅未读（可选）
+
+**返回**: 分页的通知列表
 
 ---
 
 ## 管理员接口 `/api/admin`
 
 所有管理员接口需要管理员或超级管理员权限。
+
+### `GET /api/admin/roles` - 获取角色列表
+
+获取系统中所有角色列表。
+
+**认证**: 需要（管理员权限）
+
+**返回**: 角色列表（包含权限、优先级等）
+
+---
 
 ### `GET /api/admin/users` - 获取用户列表
 
@@ -1367,8 +1507,8 @@ interface ApiResponse<T> {
 - `status` - 状态筛选（`active`/`inactive`）
 
 **返回**: 
-- 用户列表（ID、用户名、邮箱、状态、登录次数等）
-- 分页信息
+- users - 用户列表（ID、用户名、邮箱、状态、登录次数等）
+- pagination - 分页信息
 
 ---
 
@@ -1384,142 +1524,6 @@ interface ApiResponse<T> {
 - 用户详细信息
 - 统计数据（收藏数、历史数、活跃会话数）
 - 最近会话列表
-
----
-
-### `PUT /api/admin/users/:id/status` - 更新用户状态
-
-启用或禁用用户账户。
-
-**认证**: 需要（管理员权限）
-
-**URL参数**: `id` - 用户ID
-
-**请求体**:
-```json
-{
-  "isActive": "boolean",
-  "reason": "string?"
-}
-```
-
-**返回**: 操作结果
-
----
-
-### `PUT /api/admin/users/:id/permissions` - 更新用户权限
-
-更新用户的权限列表。
-
-**认证**: 需要（管理员权限）
-
-**URL参数**: `id` - 用户ID
-
-**请求体**:
-```json
-{
-  "permissions": "string[]"
-}
-```
-
-**返回**: 操作结果
-
----
-
-### `GET /api/admin/reports` - 获取举报列表
-
-获取社区举报列表。
-
-**认证**: 需要（管理员权限）
-
-**查询参数**:
-- `page` - 页码（默认1）
-- `pageSize` - 每页数量（默认20，最大100）
-- `status` - 状态筛选（默认`pending`）
-
-**返回**: 
-- 举报列表（包含搜索源名称、举报人信息）
-- 分页信息
-
----
-
-### `PUT /api/admin/reports/:id` - 处理举报
-
-处理举报并执行相应操作。
-
-**认证**: 需要（管理员权限）
-
-**URL参数**: `id` - 举报ID
-
-**请求体**:
-```json
-{
-  "status": "resolved | dismissed",
-  "action": "remove_source | warning | ignore?",
-  "notes": "string?"
-}
-```
-
-**返回**: 操作结果
-
----
-
-### `GET /api/admin/stats` - 获取系统统计
-
-获取系统整体统计数据。
-
-**认证**: 需要（管理员权限）
-
-**返回**: 
-- 用户统计（总数、活跃、已验证、本周新增、日活）
-- 搜索源统计（总数、活跃、可搜索、总使用量）
-- 搜索统计（总数、独立用户、独立关键词）
-- 社区统计（分享数、标签数、评论数、待处理举报）
-- Top搜索关键词（10条）
-- Top使用搜索源（10条）
-
----
-
-### `GET /api/admin/logs` - 获取行为日志
-
-获取用户行为日志。
-
-**认证**: 需要（管理员权限）
-
-**查询参数**:
-- `page` - 页码（默认1）
-- `pageSize` - 每页数量（默认50，最大200）
-- `userId` - 用户ID筛选
-- `action` - 行为类型筛选
-
-**返回**: 
-- 日志列表（包含用户名）
-- 分页信息
-
----
-
-### `POST /api/admin/cleanup` - 清理过期数据
-
-清理系统中的过期数据。
-
-**认证**: 需要（管理员权限）
-
-**返回**: 
-- expiredSessions - 过期会话数
-- expiredVerifications - 过期验证码数
-- oldPasswordResetLogs - 旧密码重置日志数
-- oldSecurityLockouts - 过期安全锁定数
-- oldActions - 旧行为日志数
-
----
-
-### `GET /api/admin/roles` - 获取角色列表
-
-获取系统中所有角色列表。
-
-**认证**: 需要（管理员权限）
-
-**返回**: 角色列表（包含权限、优先级等）
 
 ---
 
@@ -1588,6 +1592,234 @@ interface ApiResponse<T> {
 
 ---
 
+### `PUT /api/admin/users/:id/status` - 更新用户状态
+
+启用或禁用用户账户。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 用户ID
+
+**请求体**:
+```json
+{
+  "isActive": "boolean",
+  "reason": "string?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `PUT /api/admin/users/:id/permissions` - 更新用户权限
+
+更新用户的权限列表。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 用户ID
+
+**请求体**:
+```json
+{
+  "permissions": "string[]"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/admin/reports` - 获取举报列表
+
+获取社区举报列表。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20，最大100）
+- `status` - 状态筛选（默认`pending`）
+
+**返回**: 
+- reports - 举报列表（包含搜索源名称、举报人信息）
+- pagination - 分页信息
+
+---
+
+### `PUT /api/admin/reports/:id` - 处理举报
+
+处理举报并执行相应操作。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 举报ID
+
+**请求体**:
+```json
+{
+  "status": "resolved | dismissed",
+  "action": "remove_source | warning | ignore?",
+  "notes": "string?"
+}
+```
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/admin/stats` - 获取系统统计
+
+获取系统整体统计数据。
+
+**认证**: 需要（管理员权限）
+
+**返回**: 
+- users - 用户统计（总数、活跃、已验证、本周新增、日活）
+- sources - 搜索源统计（总数、活跃、可搜索、总使用量）
+- searches - 搜索统计（总数、独立用户、独立关键词）
+- community - 社区统计（分享数、标签数、评论数、待处理举报）
+- topKeywords - Top搜索关键词（10条）
+- topSources - Top使用搜索源（10条）
+
+---
+
+### `GET /api/admin/logs` - 获取行为日志
+
+获取用户行为日志。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认50，最大200）
+- `userId` - 用户ID筛选
+- `action` - 行为类型筛选
+
+**返回**: 
+- logs - 日志列表（包含用户名）
+- pagination - 分页信息
+
+---
+
+### `POST /api/admin/cleanup` - 清理过期数据
+
+清理系统中的过期数据。
+
+**认证**: 需要（管理员权限）
+
+**返回**: 
+- expiredSessions - 过期会话数
+- expiredVerifications - 过期验证码数
+- oldPasswordResetLogs - 旧密码重置日志数
+- oldSecurityLockouts - 过期安全锁定数
+- oldActions - 旧行为日志数
+
+---
+
+### `GET /api/admin/sessions` - 获取会话列表
+
+获取系统会话列表。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20）
+- `userId` - 用户ID筛选
+
+**返回**: 会话列表
+
+---
+
+### `DELETE /api/admin/sessions/:id` - 终止会话
+
+终止指定会话。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 会话ID
+
+**返回**: 操作结果
+
+---
+
+### `GET /api/admin/analytics/stats` - 获取分析统计
+
+获取分析事件统计数据。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `days` - 统计天数（默认7）
+
+**返回**: 
+- totalEvents - 总事件数
+- uniqueUsers - 独立用户数
+- uniqueSessions - 独立会话数
+- eventsByType - 按类型分组统计
+- dailyEvents - 每日事件统计
+
+---
+
+### `GET /api/admin/analytics/events` - 获取分析事件
+
+获取分析事件列表。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认50）
+- `eventType` - 事件类型筛选
+
+**返回**: 分页的事件列表
+
+---
+
+### `GET /api/admin/dashboard/overview` - 仪表盘概览
+
+获取管理员仪表盘概览数据。
+
+**认证**: 需要（管理员权限）
+
+**返回**: 
+- users - 用户统计
+- sources - 搜索源统计
+- searches - 搜索统计
+- community - 社区统计
+- recentActivity - 最近活动
+
+---
+
+### `GET /api/admin/dashboard/trends` - 趋势分析
+
+获取系统趋势分析数据。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `days` - 统计天数（默认30）
+- `metric` - 指标类型（users/searches/sessions）
+
+**返回**: 趋势数据
+
+---
+
+### `GET /api/admin/dashboard/user-behavior` - 用户行为分析
+
+获取用户行为分析数据。
+
+**认证**: 需要（管理员权限）
+
+**查询参数**:
+- `days` - 统计天数（默认7）
+
+**返回**: 用户行为分析数据
+
+---
+
 ## 系统配置接口 `/api/config`
 
 ### `GET /api/config/public` - 获取公开配置
@@ -1642,9 +1874,64 @@ interface ApiResponse<T> {
 
 ---
 
-## 分析接口 `/api/analytics`
+### `PUT /api/config/batch` - 批量更新配置
 
-### `POST /api/analytics/events` - 记录分析事件
+批量更新多个配置项。
+
+**认证**: 需要（管理员权限）
+
+**请求体**:
+```json
+{
+  "configs": [
+    {
+      "key": "string",
+      "value": "string",
+      "description": "string?",
+      "configType": "string?",
+      "isPublic": "boolean?"
+    }
+  ]
+}
+```
+
+**返回**: 更新结果列表
+
+---
+
+### `GET /api/config/groups` - 获取配置分组
+
+获取按功能分组的配置列表。
+
+**认证**: 需要（管理员权限）
+
+**返回**: 分组配置对象
+- 基础配置
+- 用户限制
+- 搜索源检查
+- 社区功能
+- 邮箱验证
+- 忘记密码
+- 安全相关
+- 邮件模板
+- 安全监控
+- 其他
+
+---
+
+### `POST /api/config/reset/:key` - 重置配置为默认值
+
+将指定配置重置为系统默认值。
+
+**认证**: 需要（超级管理员权限）
+
+**URL参数**: `key` - 配置键名
+
+**返回**: 重置后的配置值
+
+---
+
+### `POST /api/config/analytics/events` - 记录分析事件
 
 记录用户行为分析事件。
 
@@ -1663,65 +1950,25 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/analytics/stats` - 获取分析统计
+### `GET /api/config/analytics/stats` - 获取分析统计
 
 获取分析事件统计数据。
 
 **认证**: 需要（管理员权限）
 
 **查询参数**:
-- `days` - 统计天数（默认7，最大30）
+- `days` - 统计天数（默认7）
 
 **返回**: 
-- 总事件数
-- 独立用户数
-- 独立会话数
-- 按类型分组统计
-- 每日事件统计
+- totalEvents - 总事件数
+- uniqueUsers - 独立用户数
+- uniqueSessions - 独立会话数
+- eventsByType - 按类型分组统计
+- dailyEvents - 每日事件统计
 
 ---
 
-## 缓存接口 `/api/cache`
-
-### `GET /api/cache/search` - 获取搜索缓存
-
-获取搜索结果缓存。
-
-**查询参数**:
-- `keyword` - 搜索关键词
-
-**返回**: 缓存的搜索结果或null
-
----
-
-### `POST /api/cache/search` - 设置搜索缓存
-
-设置搜索结果缓存。
-
-**请求体**:
-```json
-{
-  "keyword": "string (必填)",
-  "results": "array (必填)",
-  "ttlMinutes": "number? (默认60)"
-}
-```
-
-**返回**: 缓存状态
-
----
-
-### `POST /api/cache/cleanup` - 清理过期缓存
-
-清理过期的搜索缓存。
-
-**返回**: 删除数量
-
----
-
-## 邮件接口 `/api/email`
-
-### `GET /api/email/logs` - 获取邮件发送日志
+### `GET /api/config/email/logs` - 获取邮件发送日志
 
 获取邮件发送日志。
 
@@ -1734,26 +1981,29 @@ interface ApiResponse<T> {
 - `status` - 发送状态筛选
 
 **返回**: 
-- 日志列表（包含用户名）
-- 分页信息
+- logs - 日志列表（包含用户名）
+- total - 总数
+- page - 页码
+- pageSize - 每页数量
 
 ---
 
 ## 系统接口 `/api`
 
-### `GET /` - API信息
+### `GET /api/config` - 获取系统配置
 
-获取API基本信息。
+获取系统配置信息。
 
-**返回**: API名称、版本、状态
-
----
-
-### `GET /health` - 健康检查
-
-检查服务健康状态。
-
-**返回**: 状态和时间戳
+**返回**: 
+- appVersion - 应用版本
+- allowRegistration - 是否允许注册
+- minUsernameLength - 用户名最小长度
+- maxUsernameLength - 用户名最大长度
+- minPasswordLength - 密码最小长度
+- maxFavoritesPerUser - 每用户最大收藏数
+- maxHistoryPerUser - 每用户最大历史数
+- maxTagsPerUser - 每用户最大标签数
+- enableActionLogging - 是否启用行为日志
 
 ---
 
@@ -1761,20 +2011,7 @@ interface ApiResponse<T> {
 
 获取系统公开配置信息（无需认证）。
 
-**返回**: 
-- 应用版本
-- 是否允许注册
-- 用户名/密码长度限制
-- 收藏/历史/标签数量限制
-- 是否启用行为日志
-
----
-
-### `GET /api/config` - 获取系统配置
-
-获取系统配置信息。
-
-**返回**: 同公开配置
+**返回**: 同上
 
 ---
 
@@ -1783,13 +2020,13 @@ interface ApiResponse<T> {
 获取系统统计数据。
 
 **返回**: 
-- 活跃用户数
-- 活跃搜索源数
-- 总搜索次数
+- users - 活跃用户数
+- sources - 活跃搜索源数
+- searches - 总搜索次数
 
 ---
 
-### `GET /api/source-status-check` - 搜索源状态检查
+### `GET /api/source-status/check` - 搜索源状态检查
 
 检查指定搜索源的可用状态。
 
@@ -1798,10 +2035,121 @@ interface ApiResponse<T> {
 - `keyword` - 测试关键词（可选，默认`test`）
 
 **返回**: 
-- 状态（online/offline/error/unknown）
-- 是否可用
-- 响应时间
-- 错误信息（如有）
+- status - 状态（online/offline/error/timeout/unknown）
+- available - 是否可用
+- responseTime - 响应时间
+- error - 错误信息（如有）
+
+---
+
+### `POST /api/actions/record` - 记录用户行为
+
+记录用户行为日志。
+
+**请求体**:
+```json
+{
+  "userId": "string?",
+  "action": "string",
+  "data": "object?"
+}
+```
+
+**返回**: 行为记录ID
+
+---
+
+## 系统扩展接口
+
+### `GET /api/public-config` - 获取公开配置（系统模块）
+
+获取系统公开配置信息。
+
+**返回**: 
+- appVersion - 应用版本
+- allowRegistration - 是否允许注册
+- 用户名/密码长度限制
+- 收藏/历史/标签数量限制
+- enableActionLogging - 是否启用行为日志
+
+---
+
+### `GET /api/source-status-check` - 搜索源状态检查（系统模块）
+
+检查指定搜索源的可用状态（带缓存）。
+
+**查询参数**:
+- `sourceId` - 搜索源ID（必填）
+- `keyword` - 测试关键词（可选）
+
+**返回**: 
+- status - 状态
+- available - 是否可用
+- contentMatch - 内容是否匹配
+- responseTime - 响应时间
+- qualityScore - 质量分数
+- error - 错误信息
+- cached - 是否来自缓存
+
+---
+
+### `POST /api/source-status-batch` - 批量状态检查
+
+批量检查多个搜索源的状态。
+
+**请求体**:
+```json
+{
+  "sourceIds": ["string"],
+  "keyword": "string? (默认test)"
+}
+```
+
+**返回**: 
+- results - 各搜索源状态列表
+- checkedAt - 检查时间
+- keyword - 使用的关键词
+
+---
+
+### `POST /api/record-action` - 记录行为（系统模块）
+
+记录用户行为。
+
+**请求体**:
+```json
+{
+  "userId": "string?",
+  "action": "string",
+  "data": "object?"
+}
+```
+
+**返回**: 行为记录ID
+
+---
+
+### `GET /api/stats` - 获取统计（系统模块）
+
+获取系统统计数据。
+
+**返回**: 
+- users - 用户数
+- sources - 搜索源数
+- searches - 搜索次数
+- activeUsers - 活跃用户数
+- activeUsersGrowthPercent - 活跃用户增长率
+
+---
+
+### `GET /api/health` - 健康检查（系统模块）
+
+检查服务健康状态。
+
+**返回**: 
+- status - 状态
+- timestamp - 时间戳
+- version - 版本
 
 ---
 
@@ -1816,15 +2164,15 @@ interface ApiResponse<T> {
 - `hours` - 时间范围（默认24小时）
 
 **返回**: 
-- 搜索源信息
-- 历史记录列表
-- 统计摘要（可用率、平均响应时间等）
+- source - 搜索源信息
+- history - 历史记录列表
+- summary - 统计摘要（可用率、平均响应时间等）
 
 ---
 
-### `GET /api/source-status-batch` - 批量状态检查
+### `GET /api/source-status-batch` - 批量状态检查（GET方式）
 
-批量检查多个搜索源的状态。
+批量检查多个搜索源的状态（GET请求）。
 
 **查询参数**:
 - `sourceIds` - 搜索源ID列表（逗号分隔，最多50个）
@@ -1843,23 +2191,6 @@ interface ApiResponse<T> {
 
 ---
 
-### `POST /api/record-action` - 记录用户行为
-
-记录用户行为日志。
-
-**请求体**:
-```json
-{
-  "userId": "string?",
-  "action": "string",
-  "data": "object?"
-}
-```
-
-**返回**: 行为记录ID
-
----
-
 ### `GET /api/user-actions` - 获取行为日志
 
 查询用户行为日志。
@@ -1870,20 +2201,11 @@ interface ApiResponse<T> {
 - `limit` - 返回数量（默认100）
 - `offset` - 偏移量（默认0）
 
-**返回**: 行为日志列表、总数
-
----
-
-## 错误码说明
-
-| 错误码 | 说明 |
-|--------|------|
-| `VALIDATION_ERROR` | 参数验证失败 |
-| `AUTH_ERROR` | 认证失败 |
-| `FORBIDDEN` | 权限不足 |
-| `NOT_FOUND` | 资源不存在 |
-| `DUPLICATE_ERROR` | 资源已存在 |
-| `SERVER_ERROR` | 服务器内部错误 |
+**返回**: 
+- actions - 行为日志列表
+- total - 总数
+- limit - 限制
+- offset - 偏移量
 
 ---
 
@@ -1917,11 +2239,11 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
   });
 }
 
-async function search(keyword: string, sourceIds: string[] = []) {
-  const response = await fetchWithAuth(`${API_BASE}/search`, {
+async function search(keyword: string, majorCategoryId?: string, categoryId?: string) {
+  const response = await fetch(`${API_BASE}/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keyword, sourceIds })
+    body: JSON.stringify({ keyword, majorCategoryId, categoryId })
   });
   return response.json();
 }
@@ -1975,7 +2297,7 @@ async function exportSources(format: string = 'json') {
 }
 
 async function checkSourceStatus(sourceId: string) {
-  const response = await fetch(`${API_BASE}/source-status-check?sourceId=${sourceId}`);
+  const response = await fetch(`${API_BASE}/source-status/check?sourceId=${sourceId}`);
   return response.json();
 }
 
@@ -2031,4 +2353,85 @@ async function handleReport(reportId: string, status: string, action: string, no
   });
   return response.json();
 }
+
+async function getUserActivities(limit: number = 100, offset: number = 0) {
+  const response = await fetchWithAuth(`${API_BASE}/user/activities?limit=${limit}&offset=${offset}`);
+  return response.json();
+}
+
+async function getUserActivitiesStats() {
+  const response = await fetchWithAuth(`${API_BASE}/user/activities/stats`);
+  return response.json();
+}
+
+async function getCommunityNotifications(page: number = 1, unreadOnly: boolean = false) {
+  const response = await fetchWithAuth(`${API_BASE}/community/notifications?page=${page}&unreadOnly=${unreadOnly}`);
+  return response.json();
+}
+
+async function getDashboardOverview() {
+  const response = await fetchWithAuth(`${API_BASE}/admin/dashboard/overview`);
+  return response.json();
+}
+
+async function getConfigGroups() {
+  const response = await fetchWithAuth(`${API_BASE}/config/groups`);
+  return response.json();
+}
+
+async function resetConfig(key: string) {
+  const response = await fetchWithAuth(`${API_BASE}/config/reset/${key}`, {
+    method: 'POST'
+  });
+  return response.json();
+}
 ```
+
+---
+
+## 路由注册汇总
+
+后端路由注册顺序（index.ts）：
+
+```typescript
+app.route('/api/auth', authRoutes);        // 认证路由
+app.route('/api/user', userRoutes);        // 用户路由
+app.route('/api/search', searchRoutes);    // 搜索路由
+app.route('/api/search-sources', sourceRoutes);  // 搜索源路由
+app.route('/api/community', communityRoutes);    // 社区路由
+app.route('/api/admin', adminRoutes);      // 管理员路由
+app.route('/api', configRoutes);           // 配置路由
+app.route('/api', systemRoutes);           // 系统路由
+```
+
+---
+
+## 数据库表结构参考
+
+项目使用Cloudflare D1 (SQLite)，主要数据表：
+
+- `users` - 用户表
+- `roles` - 角色表
+- `user_roles` - 用户角色关联表
+- `search_major_categories` - 搜索源主分类表
+- `search_source_categories` - 搜索源分类表
+- `search_sources` - 搜索源表
+- `user_favorites` - 用户收藏表
+- `user_search_history` - 用户搜索历史表
+- `user_search_source_configs` - 用户搜索源配置表
+- `user_actions` - 用户行为日志表
+- `community_shared_sources` - 社区分享搜索源表
+- `community_source_reviews` - 社区评论表
+- `community_source_tags` - 社区标签表
+- `community_source_reports` - 社区举报表
+- `community_notifications` - 社区通知表
+- `email_verification_codes` - 邮箱验证码表
+- `email_change_requests` - 邮箱更改请求表
+- `password_reset_logs` - 密码重置日志表
+- `security_lockouts` - 安全锁定表
+- `login_logs` - 登录日志表
+- `user_sessions` - 用户会话表
+- `system_config` - 系统配置表
+- `analytics_events` - 分析事件表
+- `email_send_logs` - 邮件发送日志表
+- `source_status_cache` - 搜索源状态缓存表

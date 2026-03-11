@@ -73,15 +73,14 @@ wrangler login
 # 创建本地数据库
 wrangler d1 create codeseek-db --local
 
-# 初始化本地数据库
-wrangler d1 execute codeseek-db --local --file="../database/01_user_management.sql"
-wrangler d1 execute codeseek-db --local --file="../database/02_search_engine.sql"
-wrangler d1 execute codeseek-db --local --file="../database/03_community.sql"
-wrangler d1 execute codeseek-db --local --file="../database/04_search_source.sql"
-wrangler d1 execute codeseek-db --local --file="../database/05_email_security.sql"
-wrangler d1 execute codeseek-db --local --file="../database/06_system_analytics.sql"
-wrangler d1 execute codeseek-db --local --file="../database/07_initialization_data.sql"
-wrangler d1 execute codeseek-db --local --file="../database/08_role_management.sql"
+# 初始化本地数据库（按顺序执行）
+wrangler d1 execute codeseek-db --local --file="../database/01_schema_core.sql"
+wrangler d1 execute codeseek-db --local --file="../database/02_schema_search.sql"
+wrangler d1 execute codeseek-db --local --file="../database/03_schema_community.sql"
+wrangler d1 execute codeseek-db --local --file="../database/04_schema_security.sql"
+wrangler d1 execute codeseek-db --local --file="../database/05_data_system.sql"
+wrangler d1 execute codeseek-db --local --file="../database/06_data_search_sources.sql"
+wrangler d1 execute codeseek-db --local --file="../database/07_data_tags.sql"
 
 # 启动开发服务器
 npm run dev
@@ -144,14 +143,13 @@ database_id = "your-database-id-here"  # 替换为实际ID
 
 ```bash
 # 按顺序执行SQL文件
-wrangler d1 execute codeseek-db --remote --file="../database/01_user_management.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/02_search_engine.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/03_community.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/04_search_source.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/05_email_security.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/06_system_analytics.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/07_initialization_data.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/08_role_management.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/01_schema_core.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/02_schema_search.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/03_schema_community.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/04_schema_security.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/05_data_system.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/06_data_search_sources.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/07_data_tags.sql"
 ```
 
 ### 4. 设置环境变量
@@ -246,36 +244,46 @@ wrangler pages deploy dist --project-name=codeseek
 ┌─────────────────────────────────────────────────────────┐
 │                  Cloudflare D1 (SQLite)                 │
 ├─────────────────────────────────────────────────────────┤
-│  01_user_management.sql                                 │
+│  01_schema_core.sql                                     │
+│  ├── roles                    # 角色定义                │
 │  ├── users                    # 用户信息                │
-│  ├── user_settings            # 用户设置                │
-│  └── sessions                 # 会话管理                │
-├─────────────────────────────────────────────────────────┤
-│  02_search_engine.sql                                   │
-│  ├── search_history           # 搜索历史                │
-│  └── favorites                # 收藏记录                │
-├─────────────────────────────────────────────────────────┤
-│  03_community.sql                                       │
-│  ├── community_sources        # 社区搜索源              │
-│  ├── community_tags           # 社区标签                │
-│  └── reviews                  # 评论记录                │
-├─────────────────────────────────────────────────────────┤
-│  04_search_source.sql                                   │
-│  ├── search_sources           # 搜索源配置              │
-│  ├── source_categories        # 搜索源分类              │
-│  ├── major_categories         # 主要分类                │
-│  └── user_source_configs      # 用户搜索源配置          │
-├─────────────────────────────────────────────────────────┤
-│  05_email_security.sql                                  │
-│  ├── verification_codes       # 验证码记录              │
-│  └── security_locks           # 安全锁定                │
-├─────────────────────────────────────────────────────────┤
-│  06_system_analytics.sql                                │
+│  ├── user_sessions            # 会话管理                │
+│  ├── user_favorites           # 收藏记录                │
+│  ├── user_search_history      # 搜索历史                │
+│  ├── user_actions             # 行为日志                │
 │  ├── system_config            # 系统配置                │
-│  ├── user_actions             # 用户行为日志            │
 │  └── analytics_events         # 分析事件                │
 ├─────────────────────────────────────────────────────────┤
-│  07_initialization_data.sql   # 初始化数据              │
+│  02_schema_search.sql                                   │
+│  ├── search_major_categories  # 主分类                  │
+│  ├── search_source_categories # 子分类                  │
+│  ├── search_sources           # 搜索源配置              │
+│  ├── user_search_source_configs # 用户搜索源配置        │
+│  └── source_status_cache      # 状态缓存                │
+├─────────────────────────────────────────────────────────┤
+│  03_schema_community.sql                                │
+│  ├── community_source_tags    # 社区标签                │
+│  ├── community_shared_sources # 社区分享                │
+│  ├── community_source_reviews # 评论记录                │
+│  ├── community_source_likes   # 点赞记录                │
+│  ├── community_source_downloads # 下载记录              │
+│  ├── community_source_reports # 举报记录                │
+│  └── community_user_stats     # 用户统计                │
+├─────────────────────────────────────────────────────────┤
+│  04_schema_security.sql                                 │
+│  ├── email_verifications      # 验证码记录              │
+│  ├── email_change_requests    # 邮箱更改请求            │
+│  ├── password_reset_logs      # 密码重置日志            │
+│  ├── security_lockouts        # 安全锁定                │
+│  ├── user_security_events     # 安全事件                │
+│  ├── email_send_logs          # 邮件发送日志            │
+│  └── email_templates          # 邮件模板                │
+├─────────────────────────────────────────────────────────┤
+│  05_data_system.sql          # 系统初始化数据           │
+├─────────────────────────────────────────────────────────┤
+│  06_data_search_sources.sql  # 搜索源预置数据（50+）    │
+├─────────────────────────────────────────────────────────┤
+│  07_data_tags.sql            # 官方标签数据             │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -412,13 +420,13 @@ npm run lint
 **解决方案**:
 ```bash
 # 检查SQL语法
-cat "../database/01_user_management.sql"
+cat "../database/01_schema_core.sql"
 
 # 分步执行，定位问题
 wrangler d1 execute codeseek-db --remote --command "SELECT name FROM sqlite_master WHERE type='table'"
 
 # 查看执行日志
-wrangler d1 execute codeseek-db --remote --file="../database/01_user_management.sql" --verbose
+wrangler d1 execute codeseek-db --remote --file="../database/01_schema_core.sql" --verbose
 ```
 
 ---
@@ -428,7 +436,7 @@ wrangler d1 execute codeseek-db --remote --file="../database/01_user_management.
 - [ ] Node.js >= 20.0.0 已安装
 - [ ] Wrangler CLI 已安装并登录
 - [ ] D1数据库已创建
-- [ ] 数据库表已初始化
+- [ ] 数据库表已初始化（7个SQL文件按顺序执行）
 - [ ] JWT_SECRET 已设置
 - [ ] 后端Worker已部署
 - [ ] 后端API健康检查通过

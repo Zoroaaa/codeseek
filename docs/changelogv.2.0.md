@@ -14,7 +14,8 @@
 - **类型安全**: 全面引入TypeScript类型系统
 - **状态管理**: 引入Zustand 4.5.5状态管理库
 - **样式方案**: 从原生CSS迁移到Tailwind CSS 3.4.11
-- **数据库增强**: 新增角色权限管理、安全审计等功能
+- **数据库优化**: 模块化SQL文件结构，从8个文件优化为7个文件
+- **安全增强**: 完整的邮箱验证、安全锁定、登录失败锁定机制
 
 ---
 
@@ -29,7 +30,7 @@
 | 状态管理 | 自定义Store | Zustand 4.5.5 | 重构 |
 | 样式方案 | 原生CSS | Tailwind CSS 3.4.11 | 重构 |
 | 路由管理 | 无 | React Router 6.26.2 | 新增 |
-| 数据库模块 | 7个 | 8个 | 新增角色管理 |
+| 数据库模块 | 8个 | 7个 | 优化整合 |
 | 预置搜索源 | ~20个 | 50+ | 大幅增加 |
 
 ---
@@ -48,13 +49,13 @@
 
 #### 版本2.0
 ```
-- 核心: React 18 + TypeScript
-- 构建: Vite 5
-- 样式: Tailwind CSS 3
-- 状态: Zustand 4
-- 路由: React Router 6
-- 图标: Lucide React
-- 日期: date-fns
+- 核心: React 18.3.1 + TypeScript 5.5.3
+- 构建: Vite 5.4.1
+- 样式: Tailwind CSS 3.4.11
+- 状态: Zustand 4.5.5
+- 路由: React Router 6.26.2
+- 图标: Lucide React 0.441.0
+- 日期: date-fns 3.6.0
 - 部署: Cloudflare Pages
 ```
 
@@ -95,7 +96,9 @@ frontend/
 │   │   └── ui/
 │   ├── hooks/
 │   ├── pages/
+│   │   ├── admin/
 │   │   ├── auth/
+│   │   ├── community/
 │   │   └── dashboard/
 │   ├── services/
 │   │   ├── api/
@@ -288,10 +291,11 @@ async function login(request: LoginRequest): Promise<LoginResponse> {
 #### 版本2.0
 ```
 - 运行时: Cloudflare Workers
-- 框架: Hono 4
-- 语言: TypeScript
+- 框架: Hono 4.6.0
+- 语言: TypeScript 5.5.3
 - 数据库: Cloudflare D1
-- 认证: JWT (jose库)
+- 认证: JWT (jose 5.9.0)
+- 邮件: Resend
 ```
 
 ### 目录结构变化
@@ -349,7 +353,6 @@ backend/
 │   │   └── security.ts
 │   └── types/
 │       └── index.ts
-├── database/
 ├── package.json
 ├── tsconfig.json
 ├── eslint.config.js
@@ -573,6 +576,41 @@ async function getUser(userId: string): Promise<User | null> {
 
 #### 移除依赖
 - 无（版本1.0无npm依赖）
+
+---
+
+## 🗄️ 数据库变更
+
+### 模块结构优化
+
+版本2.0将数据库文件从8个优化整合为7个：
+
+| 版本1.0 | 版本2.0 | 变化 |
+|---------|---------|------|
+| 01_user_management.sql | 01_schema_core.sql | 重命名，整合角色表 |
+| 02_search_engine.sql | 02_schema_search.sql | 重命名 |
+| 03_community.sql | 03_schema_community.sql | 重命名 |
+| 04_search_source.sql | - | 合并到02 |
+| 05_email_security.sql | 04_schema_security.sql | 重命名 |
+| 06_system_analytics.sql | - | 合并到01 |
+| 07_initialization_data.sql | 05_data_system.sql | 重命名 |
+| 08_role_management.sql | - | 合并到01 |
+
+### 新增数据表
+
+- `roles` - 角色定义表（super_admin, admin, user, guest）
+- `email_change_requests` - 邮箱更改请求表
+- `user_security_events` - 用户安全事件表
+- `email_send_logs` - 邮件发送日志表
+- `email_templates` - 邮件模板表
+
+### 安全功能增强
+
+- 邮箱验证机制
+- 登录失败锁定
+- 安全锁定机制
+- 邮箱更改流程
+- 账户删除验证
 
 ---
 

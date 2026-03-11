@@ -20,6 +20,7 @@
 - **语言**: TypeScript 5.5.3
 - **数据库**: Cloudflare D1 (SQLite)
 - **认证**: JWT (jose 5.9.0)
+- **邮件服务**: Resend
 - **API**: RESTful 风格
 - **开发工具**: Wrangler 3.78.0
 - **版本**: v2.0.0
@@ -62,6 +63,8 @@ frontend/
 │   │
 │   ├── 📁 components/                    # 🧩 组件层
 │   │   ├── 📁 layout/                    # 布局组件
+│   │   │   ├── 📄 AdminPanelLayout.tsx   # 管理面板布局组件
+│   │   │   ├── 📄 CommunityPanelLayout.tsx # 社区面板布局组件
 │   │   │   ├── 📄 DashboardLayout.tsx    # 仪表板布局组件
 │   │   │   ├── 📄 MainLayout.tsx         # 主页面布局组件
 │   │   │   └── 📄 index.ts               # 布局组件导出
@@ -77,6 +80,7 @@ frontend/
 │   │       ├── 📄 Loading.tsx            # 加载组件
 │   │       ├── 📄 Modal.tsx              # 模态框组件
 │   │       ├── 📄 Select.tsx             # 选择器组件
+│   │       ├── 📄 SourceIcon.tsx         # 搜索源图标组件
 │   │       ├── 📄 Tabs.tsx               # 标签页组件
 │   │       ├── 📄 TextArea.tsx           # 文本域组件
 │   │       ├── 📄 Toast.tsx              # 通知组件
@@ -85,26 +89,53 @@ frontend/
 │   ├── 📁 hooks/                         # 🎣 自定义Hooks
 │   │   ├── 📄 useAuth.ts                 # 认证Hook
 │   │   ├── 📄 useFavorites.ts            # 收藏Hook
+│   │   ├── 📄 useNotification.ts         # 通知Hook
 │   │   ├── 📄 useSearch.ts               # 搜索Hook
 │   │   ├── 📄 useSearchSuggestions.ts    # 搜索建议Hook
 │   │   └── 📄 index.ts                   # Hooks导出
 │   │
 │   ├── 📁 pages/                         # 📄 页面组件
+│   │   ├── 📁 admin/                     # 管理员页面
+│   │   │   ├── 📄 ActionsTab.tsx         # 行为日志标签页
+│   │   │   ├── 📄 AdminManager.tsx       # 管理面板主页
+│   │   │   ├── 📄 AdminPanelOverview.tsx # 管理面板概览
+│   │   │   ├── 📄 AnalyticsTab.tsx       # 分析统计标签页
+│   │   │   ├── 📄 CleanupTab.tsx         # 数据清理标签页
+│   │   │   ├── 📄 ReportsTab.tsx         # 举报管理标签页
+│   │   │   ├── 📄 RolesTab.tsx           # 角色管理标签页
+│   │   │   ├── 📄 SessionsTab.tsx        # 会话管理标签页
+│   │   │   ├── 📄 TrendsTab.tsx          # 趋势分析标签页
+│   │   │   ├── 📄 UsersTab.tsx           # 用户管理标签页
+│   │   │   ├── 📄 index.ts               # 管理页面导出
+│   │   │   └── 📄 shared.tsx             # 共享组件
+│   │   │
 │   │   ├── 📁 auth/                      # 认证页面
 │   │   │   ├── 📄 ForgotPasswordPage.tsx # 忘记密码页
 │   │   │   ├── 📄 LoginPage.tsx          # 登录页
 │   │   │   ├── 📄 RegisterPage.tsx       # 注册页
 │   │   │   └── 📄 index.ts               # 认证页面导出
 │   │   │
+│   │   ├── 📁 community/                 # 社区页面
+│   │   │   ├── 📄 BrowseTab.tsx          # 浏览标签页
+│   │   │   ├── 📄 CommunityManager.tsx   # 社区管理页
+│   │   │   ├── 📄 FavoritesTab.tsx       # 收藏标签页
+│   │   │   ├── 📄 MySharesTab.tsx        # 我的分享标签页
+│   │   │   ├── 📄 NotificationsTab.tsx   # 通知标签页
+│   │   │   ├── 📄 StatsBanner.tsx        # 统计横幅组件
+│   │   │   ├── 📄 TagsTab.tsx            # 标签管理标签页
+│   │   │   ├── 📄 TrendingTab.tsx        # 热门标签页
+│   │   │   ├── 📄 index.ts               # 社区页面导出
+│   │   │   └── 📄 shared.tsx             # 共享组件
+│   │   │
 │   │   ├── 📁 dashboard/                 # 仪表板页面
 │   │   │   ├── 📄 CategoryManager.tsx    # 分类管理页
-│   │   │   ├── 📄 CommunityManager.tsx   # 社区管理页
 │   │   │   ├── 📄 DashboardPage.tsx      # 仪表板主页
 │   │   │   ├── 📄 FavoritesHistoryManager.tsx # 收藏历史管理
 │   │   │   ├── 📄 OverviewManager.tsx    # 概览页
 │   │   │   ├── 📄 SettingsManager.tsx    # 设置页
 │   │   │   ├── 📄 SourceManager.tsx      # 搜索源管理页
 │   │   │   ├── 📄 StatsManager.tsx       # 统计页
+│   │   │   ├── 📄 UserActivitiesPage.tsx # 用户活动页
 │   │   │   └── 📄 index.ts               # 仪表板页面导出
 │   │   │
 │   │   ├── 📄 HomePage.tsx               # 首页
@@ -171,14 +202,14 @@ backend/
 │   │   └── 📄 index.ts                   # 中间件导出
 │   │
 │   ├── 📁 routes/                        # 🛣️ 路由层
-│   │   ├── 📄 admin.ts                   # 管理员路由
-│   │   ├── 📄 auth.ts                    # 认证路由
-│   │   ├── 📄 community.ts               # 社区路由
-│   │   ├── 📄 config.ts                  # 配置路由
-│   │   ├── 📄 search.ts                  # 搜索路由
-│   │   ├── 📄 sources.ts                 # 搜索源路由
-│   │   ├── 📄 system.ts                  # 系统路由
-│   │   └── 📄 user.ts                    # 用户路由
+│   │   ├── 📄 admin.ts                   # 管理员路由 (仪表盘、用户管理、统计等)
+│   │   ├── 📄 auth.ts                    # 认证路由 (登录、注册、密码重置等)
+│   │   ├── 📄 community.ts               # 社区路由 (分享、评论、点赞等)
+│   │   ├── 📄 config.ts                  # 配置路由 (系统配置、分析事件等)
+│   │   ├── 📄 search.ts                  # 搜索路由 (搜索、历史、收藏、建议等)
+│   │   ├── 📄 sources.ts                 # 搜索源路由 (分类、搜索源管理)
+│   │   ├── 📄 system.ts                  # 系统路由 (公开配置、状态检查等)
+│   │   └── 📄 user.ts                    # 用户路由 (设置、活动记录等)
 │   │
 │   ├── 📁 services/                      # 🔧 业务服务层
 │   │   ├── 📄 email-verification.ts      # 📧 邮箱验证服务
@@ -195,8 +226,8 @@ backend/
 │   ├── 📁 validation/                    # ✅ 验证层
 │   │   └── 📄 index.ts                   # 请求验证
 │   │
-│   ├── 📄 constants.ts                   # 📋 常量配置
-│   └── 📄 index.ts                       # 🚀 主入口文件
+│   ├── 📄 constants.ts                   # 📋 常量配置 (CORS、分页、验证等)
+│   └── 📄 index.ts                       # 🚀 主入口文件 (路由注册)
 │
 ├── 📄 eslint.config.js                   # ESLint配置
 ├── 📄 package.json                       # 📦 项目配置文件
@@ -252,35 +283,32 @@ backend/
 ### 模块依赖关系
 
 ```
-01_user_management.sql (基础模块 - 必须首先执行)
+01_schema_core.sql (基础模块 - 必须首先执行)
         │
-        ├──► 02_search_engine.sql (搜索引擎核心)
+        ├──► 02_schema_search.sql (搜索引擎核心)
         │
-        ├──► 03_community.sql (社区功能 - 依赖用户表)
+        ├──► 03_schema_community.sql (社区功能 - 依赖用户表)
         │
-        ├──► 04_search_source.sql (搜索源管理 - 包含50+预置源)
+        ├──► 04_schema_security.sql (邮箱验证与安全机制)
         │
-        ├──► 05_email_security.sql (邮箱验证与安全机制)
+        ├──► 05_data_system.sql (系统初始化数据)
         │
-        ├──► 06_system_analytics.sql (系统配置与分析)
+        ├──► 06_data_search_sources.sql (搜索源预置数据 - 50+源)
         │
-        ├──► 07_initialization_data.sql (初始化数据)
-        │
-        └──► 08_role_management.sql (角色权限管理)
+        └──► 07_data_tags.sql (官方标签初始化数据)
 ```
 
 ### 数据表详细说明
 
 | 模块文件 | 核心数据表 | 说明 |
 |---------|-----------|------|
-| 01_user_management.sql | users, user_sessions, user_favorites, user_search_history, user_actions | 用户管理基础模块，包含会话、收藏、历史 |
-| 02_search_engine.sql | search_cache, search_analytics | 搜索缓存与分析统计 |
-| 03_community.sql | community_source_tags, community_shared_sources, community_source_reviews, community_source_likes, community_source_downloads, community_source_reports, community_user_stats | 完整社区功能：标签、分享、评论、点赞、下载、举报 |
-| 04_search_source.sql | search_major_categories, search_source_categories, search_sources, user_search_source_configs | 搜索源管理，含50+预置源和用户配置 |
-| 05_email_security.sql | email_verifications, email_change_requests, password_reset_logs, security_lockouts, user_security_events, email_send_logs, email_templates | 邮箱验证、安全锁定、审计日志 |
-| 06_system_analytics.sql | system_config, analytics_events, source_status_cache, source_health_stats | 系统配置、事件分析、源状态监控 |
-| 07_initialization_data.sql | - | 系统初始化数据 |
-| 08_role_management.sql | roles | 角色定义：super_admin, admin, user, guest |
+| 01_schema_core.sql | roles, users, user_sessions, user_favorites, user_search_history, user_actions, system_config, analytics_events | 核心模块：角色权限、用户管理、会话、收藏、历史、行为日志、系统配置、分析事件 |
+| 02_schema_search.sql | search_major_categories, search_source_categories, search_sources, user_search_source_configs, source_status_cache | 搜索引擎核心：主分类、子分类、搜索源、用户配置、状态缓存 |
+| 03_schema_community.sql | community_source_tags, community_shared_sources, community_source_reviews, community_source_likes, community_source_downloads, community_source_reports, community_user_stats | 完整社区功能：标签、分享、评论、点赞、下载、举报、用户统计 |
+| 04_schema_security.sql | email_verifications, email_change_requests, password_reset_logs, security_lockouts, user_security_events, email_send_logs, email_templates | 安全模块：邮箱验证、邮箱更改、密码重置、安全锁定、安全事件、邮件日志、邮件模板 |
+| 05_data_system.sql | - | 系统初始化数据：角色定义、系统配置、邮件模板 |
+| 06_data_search_sources.sql | - | 搜索源预置数据：4个主分类、50+搜索源 |
+| 07_data_tags.sql | - | 官方标签初始化数据 |
 
 ### 搜索源预置数据
 
@@ -323,7 +351,7 @@ backend/
 
 | 特性 | 版本1.0 | 版本2.0 |
 |-----|---------|---------|
-| 技术栈 | 原生ES6 JavaScript | React 18 + TypeScript |
+| 技术栈 | 原生ES6 JavaScript | React 18.3.1 + TypeScript |
 | 构建工具 | 无（直接运行） | Vite 5 |
 | 样式方案 | 原生CSS | Tailwind CSS |
 | 状态管理 | 自定义Store | Zustand |

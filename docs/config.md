@@ -352,14 +352,13 @@ wrangler d1 migrations apply codeseek-db
 
 ```
 database/
-├── 01_user_management.sql      # 用户管理（基础模块）
-├── 02_search_engine.sql        # 搜索引擎核心
-├── 03_community.sql            # 社区功能
-├── 04_search_source.sql        # 搜索源管理（含50+预置源）
-├── 05_email_security.sql       # 邮箱验证与安全
-├── 06_system_analytics.sql     # 系统配置与分析
-├── 07_initialization_data.sql  # 初始化数据
-└── 08_role_management.sql      # 角色权限管理
+├── 01_schema_core.sql          # 核心表结构（角色、用户、会话等）
+├── 02_schema_search.sql        # 搜索引擎核心（分类、搜索源）
+├── 03_schema_community.sql     # 社区功能（标签、分享、评论）
+├── 04_schema_security.sql      # 安全模块（验证、锁定）
+├── 05_data_system.sql          # 系统初始化数据
+├── 06_data_search_sources.sql  # 搜索源预置数据（50+源）
+└── 07_data_tags.sql            # 官方标签初始化数据
 ```
 
 ### 数据库初始化
@@ -369,17 +368,16 @@ database/
 cd backend
 
 # 开发环境
-wrangler d1 execute codeseek-db --local --file="../database/01_user_management.sql"
-wrangler d1 execute codeseek-db --local --file="../database/02_search_engine.sql"
-wrangler d1 execute codeseek-db --local --file="../database/03_community.sql"
-wrangler d1 execute codeseek-db --local --file="../database/04_search_source.sql"
-wrangler d1 execute codeseek-db --local --file="../database/05_email_security.sql"
-wrangler d1 execute codeseek-db --local --file="../database/06_system_analytics.sql"
-wrangler d1 execute codeseek-db --local --file="../database/07_initialization_data.sql"
-wrangler d1 execute codeseek-db --local --file="../database/08_role_management.sql"
+wrangler d1 execute codeseek-db --local --file="../database/01_schema_core.sql"
+wrangler d1 execute codeseek-db --local --file="../database/02_schema_search.sql"
+wrangler d1 execute codeseek-db --local --file="../database/03_schema_community.sql"
+wrangler d1 execute codeseek-db --local --file="../database/04_schema_security.sql"
+wrangler d1 execute codeseek-db --local --file="../database/05_data_system.sql"
+wrangler d1 execute codeseek-db --local --file="../database/06_data_search_sources.sql"
+wrangler d1 execute codeseek-db --local --file="../database/07_data_tags.sql"
 
 # 生产环境
-wrangler d1 execute codeseek-db --remote --file="../database/01_user_management.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/01_schema_core.sql"
 # ... 其他文件（按相同顺序执行）
 ```
 

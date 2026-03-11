@@ -235,6 +235,9 @@ npm-debug.log*
 
 # Wrangler临时文件
 .wrangler/
+
+# TypeScript缓存
+*.tsbuildinfo
 ```
 
 ### 2. 分支管理
