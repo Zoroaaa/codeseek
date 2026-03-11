@@ -41,20 +41,26 @@ export const CommunityManager: React.FC = () => {
 
   useEffect(() => {
     loadTags();
-    communityApi.getCommunityStats().then(r => { if (r.success) setCommunityStats(r.data); }).catch(() => {}).finally(() => setStatsLoading(false));
+    communityApi.getCommunityStats()
+      .then(r => { if (r.success) setCommunityStats(r.data); })
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
   }, [loadTags]);
 
   const handleImport = async (sourceId: string) => {
+    // This is a fallback, actual import now handled in BrowseTab/FavoritesTab/TrendingTab
     try {
       const res = await communityApi.downloadSharedSource(sourceId);
-      if (res.success) toast.success('导入成功！搜索源已添加到你的列表');
-      else toast.error('导入失败');
-    } catch { toast.error('导入失败，请稍后重试'); }
+      if (res.success) toast.success('操作成功');
+      else toast.error('操作失败');
+    } catch { toast.error('操作失败，请稍后重试'); }
   };
 
   return (
     <div className="space-y-6">
-      {!statsLoading && <StatsBanner stats={communityStats} />}
+      {/* 全局社区统计只在浏览页展示，其他页各自展示独有统计 */}
+      {!statsLoading && activeTab === 'browse' && <StatsBanner stats={communityStats} />}
+
       {activeTab === 'browse' && <BrowseTab tags={tags} onImport={handleImport} />}
       {activeTab === 'my-shares' && <MySharesTab tags={tags} onRefreshTags={loadTags} />}
       {activeTab === 'favorites' && <FavoritesTab tags={tags} onImport={handleImport} />}

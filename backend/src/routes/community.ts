@@ -222,6 +222,44 @@ communityRoutes.get('/sources', async (c) => {
   }
 });
 
+communityRoutes.get('/sources/my-favorites', async (c) => {
+  const userId = await getUserId(c);
+  if (!userId) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = parseInt(c.req.query('pageSize') || '20');
+
+  try {
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM community_source_likes l
+       JOIN community_shared_sources s ON l.shared_source_id = s.id
+       WHERE l.user_id = ? AND l.like_type = 'like' AND s.status = 'active'`
+    ).bind(userId).first<{ total: number }>();
+
+    const sources = await c.env.DB.prepare(
+      `SELECT s.*, u.username as author_name FROM community_source_likes l
+       JOIN community_shared_sources s ON l.shared_source_id = s.id
+       LEFT JOIN users u ON s.user_id = u.id
+       WHERE l.user_id = ? AND l.like_type = 'like' AND s.status = 'active'
+       ORDER BY l.created_at DESC
+       LIMIT ? OFFSET ?`
+    ).bind(userId, pageSize, (page - 1) * pageSize).all<CommunitySharedSource & { author_name?: string }>();
+
+    return c.json(success({
+      items: sources.results || [],
+      total: countResult?.total || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((countResult?.total || 0) / pageSize),
+    }));
+  } catch (err) {
+    console.error('Get my favorites error:', err);
+    return c.json(error('SERVER_ERROR', '获取收藏失败'), 500);
+  }
+});
+
 communityRoutes.get('/sources/my-sources', async (c) => {
   const userId = await getUserId(c);
   if (!userId) {
@@ -879,5 +917,134 @@ communityRoutes.post('/sources/:id/download', async (c) => {
   } catch (err) {
     console.error('Download count error:', err);
     return c.json(error('SERVER_ERROR', '操作失败'), 500);
+  }
+});
+
+// 获取当前用户的消息通知（点赞、评论、导入、举报处理）
+communityRoutes.get('/notifications', async (c) => {
+  const userId = await getUserId(c);
+  if (!userId) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = parseInt(c.req.query('pageSize') || '20');
+  const offset = (page - 1) * pageSize;
+
+  try {
+    // 获取用户分享的所有搜索源ID
+    const mySources = await c.env.DB.prepare(
+      'SELECT id, source_name FROM community_shared_sources WHERE user_id = ?'
+    ).bind(userId).all<{ id: string; source_name: string }>();
+
+    const mySourceIds = (mySources.results || []).map(s => s.id);
+    const sourceNameMap: Record<string, string> = {};
+    (mySources.results || []).forEach(s => { sourceNameMap[s.id] = s.source_name; });
+
+    if (mySourceIds.length === 0) {
+      return c.json(success({
+        items: [],
+        total: 0,
+        page,
+        pageSize,
+        totalPages: 0,
+      }));
+    }
+
+    const inClause = mySourceIds.map(() => '?').join(',');
+
+    // 查询点赞通知
+    const likes = await c.env.DB.prepare(
+      `SELECT l.id, l.shared_source_id, l.user_id as actor_id, u.username as actor_name, l.created_at,
+              'like' as type
+       FROM community_source_likes l
+       LEFT JOIN users u ON l.user_id = u.id
+       WHERE l.shared_source_id IN (${inClause}) AND l.user_id != ?
+       ORDER BY l.created_at DESC LIMIT 100`
+    ).bind(...mySourceIds, userId).all<any>();
+
+    // 查询评论通知
+    const reviews = await c.env.DB.prepare(
+      `SELECT r.id, r.shared_source_id, r.user_id as actor_id, u.username as actor_name, r.rating, r.comment, r.created_at,
+              'review' as type
+       FROM community_source_reviews r
+       LEFT JOIN users u ON r.user_id = u.id
+       WHERE r.shared_source_id IN (${inClause}) AND r.user_id != ?
+       ORDER BY r.created_at DESC LIMIT 100`
+    ).bind(...mySourceIds, userId).all<any>();
+
+    // 查询导入通知
+    const downloads = await c.env.DB.prepare(
+      `SELECT d.id, d.shared_source_id, d.user_id as actor_id, u.username as actor_name, d.created_at,
+              'download' as type
+       FROM community_source_downloads d
+       LEFT JOIN users u ON d.user_id = u.id
+       WHERE d.shared_source_id IN (${inClause}) AND d.user_id != ? AND d.user_id IS NOT NULL
+       ORDER BY d.created_at DESC LIMIT 100`
+    ).bind(...mySourceIds, userId).all<any>();
+
+    // 查询举报处理通知（针对本人分享源的举报被处理）
+    const reports = await c.env.DB.prepare(
+      `SELECT r.id, r.shared_source_id, r.status, r.report_reason, r.updated_at as created_at,
+              'report_resolved' as type
+       FROM community_source_reports r
+       WHERE r.shared_source_id IN (${inClause}) AND r.status != 'pending'
+       ORDER BY r.updated_at DESC LIMIT 50`
+    ).bind(...mySourceIds).all<any>();
+
+    // 合并所有通知并排序
+    const allNotifications = [
+      ...(likes.results || []).map((n: any) => ({
+        id: `like_${n.id}`,
+        type: 'like',
+        sourceId: n.shared_source_id,
+        sourceName: sourceNameMap[n.shared_source_id] || '未知搜索源',
+        actorName: n.actor_name || '匿名用户',
+        content: `点赞了你的搜索源`,
+        createdAt: n.created_at,
+      })),
+      ...(reviews.results || []).map((n: any) => ({
+        id: `review_${n.id}`,
+        type: 'review',
+        sourceId: n.shared_source_id,
+        sourceName: sourceNameMap[n.shared_source_id] || '未知搜索源',
+        actorName: n.actor_name || '匿名用户',
+        content: `评价了你的搜索源（${n.rating}星）${n.comment ? '：' + n.comment.slice(0, 50) : ''}`,
+        rating: n.rating,
+        createdAt: n.created_at,
+      })),
+      ...(downloads.results || []).map((n: any) => ({
+        id: `download_${n.id}`,
+        type: 'download',
+        sourceId: n.shared_source_id,
+        sourceName: sourceNameMap[n.shared_source_id] || '未知搜索源',
+        actorName: n.actor_name || '匿名用户',
+        content: `导入了你的搜索源`,
+        createdAt: n.created_at,
+      })),
+      ...(reports.results || []).map((n: any) => ({
+        id: `report_${n.id}`,
+        type: 'report_resolved',
+        sourceId: n.shared_source_id,
+        sourceName: sourceNameMap[n.shared_source_id] || '未知搜索源',
+        actorName: '管理员',
+        content: `对举报"${n.report_reason}"的处理结果：${n.status === 'resolved' ? '已解决' : '已驳回'}`,
+        createdAt: n.created_at,
+      })),
+    ].sort((a, b) => b.createdAt - a.createdAt);
+
+    const total = allNotifications.length;
+    const items = allNotifications.slice(offset, offset + pageSize);
+
+    return c.json(success({
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    }));
+  } catch (err) {
+    console.error('Get notifications error:', err);
+    return c.json(error('SERVER_ERROR', '获取通知失败'), 500);
   }
 });

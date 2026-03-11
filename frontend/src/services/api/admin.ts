@@ -97,8 +97,13 @@ export const adminApi = {
   },
 
   getUserDetail: async (userId: string): Promise<AdminUserDetail> => {
-    const response = await apiClient.get<{ success: boolean; data: { user: AdminUserDetail } }>(`/admin/users/${userId}`);
-    return response.data.user;
+    const response = await apiClient.get<{ success: boolean; data: { user: Omit<AdminUserDetail, 'stats' | 'recentSessions' | 'recentActions'>; stats: AdminUserDetail['stats']; recentSessions: AdminUserDetail['recentSessions']; recentActions: AdminUserDetail['recentActions'] } }>(`/admin/users/${userId}`);
+    return {
+      ...response.data.user,
+      stats: response.data.stats,
+      recentSessions: response.data.recentSessions || [],
+      recentActions: response.data.recentActions || [],
+    } as AdminUserDetail;
   },
 
   updateUserStatus: async (userId: string, isActive: boolean, reason?: string): Promise<void> => {
@@ -364,7 +369,17 @@ export const adminApi = {
     period: { days: number; startTime: number };
   }> => {
     const response = await apiClient.get<{ success: boolean; data: any }>(`/admin/analytics/stats?days=${days}`);
-    return response.data;
+    const data = response.data;
+    return {
+      totalEvents: data?.totalEvents ?? 0,
+      uniqueUsers: data?.uniqueUsers ?? 0,
+      uniqueSessions: data?.uniqueSessions ?? 0,
+      eventsByType: data?.eventsByType ?? [],
+      dailyEvents: data?.dailyEvents ?? [],
+      topReferers: data?.topReferers ?? [],
+      hourlyDistribution: data?.hourlyDistribution ?? [],
+      period: data?.period ?? { days, startTime: Date.now() - days * 86400000 },
+    };
   },
 
   getAnalyticsEvents: async (params: {

@@ -8,17 +8,29 @@ import {
   Eye,
   User,
   MessageSquare,
-  MoreVertical,
   RefreshCw,
+  Flag,
 } from 'lucide-react';
-import { Card, Button, Input, Modal, Loading, EmptyState, Dropdown, SourceIcon } from '@/components/ui';
+import { Card, Button, Input, Modal, Loading, EmptyState, SourceIcon } from '@/components/ui';
 import { communityApi } from '@/services/api';
+import { sourceApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores';
 import type { SharedSource, Tag } from '@/types';
+import type { CreateSourceRequest } from '@/types';
 import { StarRating, Pagination } from './shared';
 
-export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promise<void> }> = ({ tags, onImport }) => {
+interface ImportFormData {
+  categoryId: string;
+  name: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+  urlTemplate: string;
+  homepageUrl: string;
+}
+
+export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promise<void> }> = ({ tags }) => {
   const toast = useToast();
   const { isAuthenticated } = useAuthStore();
   const [sources, setSources] = useState<SharedSource[]>([]);
@@ -37,6 +49,20 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
   const [reportModal, setReportModal] = useState<{ open: boolean; sourceId: string }>({ open: false, sourceId: '' });
   const [reportReason, setReportReason] = useState('');
 
+  // Import modal state
+  const [importModal, setImportModal] = useState<{ open: boolean; source: SharedSource | null }>({ open: false, source: null });
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [importForm, setImportForm] = useState<ImportFormData>({
+    categoryId: '',
+    name: '',
+    subtitle: '',
+    description: '',
+    icon: '',
+    urlTemplate: '',
+    homepageUrl: '',
+  });
+  const [importLoading, setImportLoading] = useState(false);
+
   const loadSources = useCallback(async () => {
     setLoading(true);
     try {
@@ -44,24 +70,34 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
       if (search) params.search = search;
       if (selectedTag !== 'all') params.tags = [selectedTag];
       const res = await communityApi.getSharedSources(params);
-      if (res.success && res.data) { setSources(res.data.items); setTotalPages(res.data.totalPages); setTotal(res.data.total); }
+      if (res.success && res.data) {
+        setSources(res.data.items);
+        setTotalPages(res.data.totalPages);
+        setTotal(res.data.total);
+      }
     } catch { toast.error('加载失败'); } finally { setLoading(false); }
   }, [page, search, selectedTag, sortBy]);
 
   useEffect(() => { loadSources(); }, [loadSources]);
 
-  const handleLike = async (sourceId: string) => {
+  // Load categories for import form
+  useEffect(() => {
+    sourceApi.getCategories().then((res: any) => {
+      if (res.success && res.data) {
+        setCategories(res.data.map((c: any) => ({ id: c.id, name: c.name })));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleLike = async (e: React.MouseEvent, sourceId: string) => {
+    e.stopPropagation();
     if (!isAuthenticated) { toast.warning('请先登录'); return; }
     try {
       const res = await communityApi.likeSharedSource(sourceId);
       if (res.success) {
         setLikedIds(prev => {
           const next = new Set(prev);
-          if (res.data.liked) {
-            next.add(sourceId);
-          } else {
-            next.delete(sourceId);
-          }
+          if (res.data.liked) { next.add(sourceId); } else { next.delete(sourceId); }
           return next;
         });
         setSources(prev => prev.map(s => s.id === sourceId ? { ...s, likeCount: s.likeCount + (res.data.liked ? 1 : -1) } : s));
@@ -80,18 +116,76 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
     }
   };
 
+  const openImportModal = (e: React.MouseEvent, source: SharedSource) => {
+    e.stopPropagation();
+    if (!isAuthenticated) { toast.warning('请先登录'); return; }
+    setImportForm({
+      categoryId: '',
+      name: source.sourceName,
+      subtitle: source.sourceSubtitle || '',
+      description: source.description || '',
+      icon: source.sourceIcon || '',
+      urlTemplate: source.sourceUrlTemplate,
+      homepageUrl: '',
+    });
+    setImportModal({ open: true, source });
+  };
+
+  const handleImportSubmit = async () => {
+    if (!importModal.source) return;
+    if (!importForm.categoryId) { toast.error('请选择分类'); return; }
+    if (!importForm.name.trim()) { toast.error('请填写名称'); return; }
+    if (!importForm.urlTemplate.trim()) { toast.error('请填写URL模板'); return; }
+    setImportLoading(true);
+    try {
+      // Record download count on community side
+      await communityApi.downloadSharedSource(importModal.source.id);
+      // Create source in user's source manager
+      const createData: CreateSourceRequest = {
+        categoryId: importForm.categoryId,
+        name: importForm.name,
+        subtitle: importForm.subtitle || undefined,
+        description: importForm.description || undefined,
+        icon: importForm.icon || undefined,
+        urlTemplate: importForm.urlTemplate,
+        homepageUrl: importForm.homepageUrl || undefined,
+      };
+      const res = await sourceApi.createSource(createData);
+      if (res.success) {
+        toast.success('导入成功！搜索源已添加到你的搜索源列表');
+        setImportModal({ open: false, source: null });
+      } else {
+        toast.error('导入失败，请重试');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || '导入失败，请稍后重试');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   const submitReview = async () => {
     if (!detailSource || !isAuthenticated) return;
     setSubmittingReview(true);
     try {
       const res = await communityApi.createReview({ sharedSourceId: detailSource.id, rating: reviewForm.rating, comment: reviewForm.comment });
-      if (res.success) { toast.success('评价已提交'); const res2 = await communityApi.getReviews(detailSource.id); if (res2.success) setReviews(res2.data.items); setReviewForm({ rating: 5, comment: '' }); }
+      if (res.success) {
+        toast.success('评价已提交');
+        const res2 = await communityApi.getReviews(detailSource.id);
+        if (res2.success) setReviews(res2.data.items);
+        setReviewForm({ rating: 5, comment: '' });
+      }
     } catch { toast.error('提交失败'); } finally { setSubmittingReview(false); }
   };
 
   const handleReport = async () => {
-    if (!reportReason.trim()) { toast.error('请填写举报原因'); return; }
-    try { await communityApi.reportSharedSource(reportModal.sourceId, { reason: reportReason }); toast.success('举报已提交'); setReportModal({ open: false, sourceId: '' }); setReportReason(''); } catch { toast.error('提交失败'); }
+    if (!reportReason.trim()) { toast.error('请选择举报原因'); return; }
+    try {
+      await communityApi.reportSharedSource(reportModal.sourceId, { reason: reportReason });
+      toast.success('举报已提交');
+      setReportModal({ open: false, sourceId: '' });
+      setReportReason('');
+    } catch { toast.error('提交失败'); }
   };
 
   if (loading) return <div className="flex justify-center py-16"><Loading size="lg" text="加载社区内容..." /></div>;
@@ -123,7 +217,11 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sources.map(source => (
-            <Card key={source.id} className="p-5 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col">
+            <Card
+              key={source.id}
+              className="p-5 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col cursor-pointer"
+              onClick={() => openDetail(source)}
+            >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <SourceIcon icon={source.sourceIcon} name={source.sourceName} size="lg" />
@@ -133,13 +231,14 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
                     <div className="mt-1"><StarRating rating={Math.round(source.ratingScore)} /></div>
                   </div>
                 </div>
-                <Dropdown
-                  trigger={<Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button>}
-                  items={[
-                    { label: '查看详情', onClick: () => openDetail(source) },
-                    { label: '举报', onClick: () => setReportModal({ open: true, sourceId: source.id }) },
-                  ]}
-                />
+                {/* 举报按钮放右上角，替换原来的 MoreVertical 下拉 */}
+                <button
+                  onClick={e => { e.stopPropagation(); setReportModal({ open: true, sourceId: source.id }); setReportReason(''); }}
+                  className="p-1.5 rounded-lg text-surface-300 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all flex-shrink-0"
+                  title="举报"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               <p className="text-sm text-surface-600 dark:text-surface-400 line-clamp-2 mb-3 flex-1">{source.description || '暂无描述'}</p>
@@ -162,13 +261,21 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
                 <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{source.ratingCount}</span>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-surface-200 dark:border-surface-700">
+              <div className="flex items-center justify-between pt-3 border-t border-surface-200 dark:border-surface-700" onClick={e => e.stopPropagation()}>
                 <span className="text-xs text-surface-400">by {source.authorName || '匿名'}</span>
                 <div className="flex gap-2">
-                  <button onClick={() => handleLike(source.id)} className={clsx('p-1.5 rounded-lg transition-all', likedIds.has(source.id) ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-surface-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20')}>
+                  <button
+                    onClick={e => handleLike(e, source.id)}
+                    className={clsx('p-1.5 rounded-lg transition-all', likedIds.has(source.id) ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-surface-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20')}
+                  >
                     <Heart className={clsx('w-4 h-4', likedIds.has(source.id) && 'fill-current')} />
                   </button>
-                  <Button variant="primary" size="sm" onClick={() => onImport(source.id)} leftIcon={<Download className="w-3.5 h-3.5" />}>导入</Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={e => openImportModal(e, source)}
+                    leftIcon={<Download className="w-3.5 h-3.5" />}
+                  >导入</Button>
                 </div>
               </div>
             </Card>
@@ -178,6 +285,7 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
 
       <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
 
+      {/* 详情弹窗 - 点击卡片触发 */}
       <Modal isOpen={!!detailSource} onClose={() => setDetailSource(null)} title="搜索源详情" size="lg">
         {detailSource && (
           <div className="space-y-5">
@@ -196,7 +304,12 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
             <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl text-sm text-surface-700 dark:text-surface-300">{detailSource.description || '暂无描述'}</div>
 
             <div className="grid grid-cols-4 gap-3">
-              {[{ icon: Eye, label: '浏览', value: detailSource.viewCount, color: 'text-blue-500' }, { icon: Download, label: '导入', value: detailSource.downloadCount, color: 'text-green-500' }, { icon: Heart, label: '点赞', value: detailSource.likeCount, color: 'text-red-500' }, { icon: User, label: '作者', value: detailSource.authorName || '匿名', color: 'text-purple-500' }].map(item => (
+              {[
+                { icon: Eye, label: '浏览', value: detailSource.viewCount, color: 'text-blue-500' },
+                { icon: Download, label: '导入', value: detailSource.downloadCount, color: 'text-green-500' },
+                { icon: Heart, label: '点赞', value: detailSource.likeCount, color: 'text-red-500' },
+                { icon: User, label: '作者', value: detailSource.authorName || '匿名', color: 'text-purple-500' },
+              ].map(item => (
                 <div key={item.label} className="text-center p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
                   <item.icon className={clsx('w-5 h-5 mx-auto mb-1', item.color)} />
                   <p className="text-sm font-bold text-surface-900 dark:text-surface-100 truncate">{item.value}</p>
@@ -238,12 +351,100 @@ export const BrowseTab: React.FC<{ tags: Tag[]; onImport: (id: string) => Promis
 
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setDetailSource(null)}>关闭</Button>
-              <Button variant="primary" onClick={() => { onImport(detailSource.id); setDetailSource(null); }} leftIcon={<Download className="w-4 h-4" />}>导入到我的列表</Button>
+              <Button
+                variant="primary"
+                onClick={(e) => { openImportModal(e as any, detailSource); setDetailSource(null); }}
+                leftIcon={<Download className="w-4 h-4" />}
+              >导入到我的列表</Button>
             </div>
           </div>
         )}
       </Modal>
 
+      {/* 导入弹窗：预填社区信息，用户选择分类完成导入 */}
+      <Modal isOpen={importModal.open} onClose={() => setImportModal({ open: false, source: null })} title="导入搜索源" size="md">
+        {importModal.source && (
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+              将 <span className="font-semibold">「{importModal.source.sourceName}」</span> 导入到你的搜索源管理，请确认或修改以下信息：
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                分类 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={importForm.categoryId}
+                onChange={e => setImportForm(f => ({ ...f, categoryId: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+              >
+                <option value="">请选择分类</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={importForm.name}
+                onChange={e => setImportForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">副标题</label>
+              <input
+                type="text"
+                value={importForm.subtitle}
+                onChange={e => setImportForm(f => ({ ...f, subtitle: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                URL 模板 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={importForm.urlTemplate}
+                onChange={e => setImportForm(f => ({ ...f, urlTemplate: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm font-mono"
+              />
+              <p className="text-xs text-surface-400 mt-1">使用 {'{keyword}'} 作为搜索词占位符</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">主页链接</label>
+              <input
+                type="text"
+                value={importForm.homepageUrl}
+                onChange={e => setImportForm(f => ({ ...f, homepageUrl: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setImportModal({ open: false, source: null })}>取消</Button>
+              <Button
+                variant="primary"
+                onClick={handleImportSubmit}
+                disabled={importLoading}
+                leftIcon={<Download className="w-4 h-4" />}
+              >
+                {importLoading ? '导入中...' : '确认导入'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* 举报弹窗 */}
       <Modal isOpen={reportModal.open} onClose={() => setReportModal({ open: false, sourceId: '' })} title="举报搜索源">
         <div className="space-y-4">
           <div>

@@ -295,6 +295,74 @@ export const communityApi = {
     };
   },
 
+  getMyFavorites: async (page = 1, pageSize = 20): Promise<{
+    success: boolean;
+    data: PaginatedResponse<SharedSource>;
+  }> => {
+    const response = await apiClient.get<{
+      success: boolean;
+      data: {
+        items: Array<{
+          id: string;
+          user_id: string;
+          source_name: string;
+          source_subtitle: string | null;
+          source_icon: string | null;
+          source_url_template: string;
+          source_category: string;
+          description: string | null;
+          tags: string;
+          download_count: number;
+          like_count: number;
+          view_count: number;
+          rating_score: number;
+          rating_count: number;
+          status: string;
+          created_at: number;
+          updated_at: number;
+          author_name?: string;
+        }>;
+        total: number;
+        page: number;
+        pageSize: number;
+        totalPages: number;
+      };
+    }>(`/community/sources/my-favorites?page=${page}&pageSize=${pageSize}`);
+
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: {
+          items: response.data.items.map(s => ({
+            id: s.id,
+            sourceName: s.source_name,
+            sourceSubtitle: s.source_subtitle || undefined,
+            sourceIcon: s.source_icon || undefined,
+            sourceUrlTemplate: s.source_url_template,
+            sourceCategory: s.source_category,
+            description: s.description || undefined,
+            tags: JSON.parse(s.tags || '[]'),
+            authorId: s.user_id,
+            authorName: s.author_name || '',
+            viewCount: s.view_count,
+            downloadCount: s.download_count,
+            likeCount: s.like_count,
+            ratingScore: s.rating_score,
+            ratingCount: s.rating_count,
+            status: s.status as 'pending' | 'active' | 'rejected',
+            createdAt: new Date(s.created_at).toISOString(),
+            updatedAt: new Date(s.updated_at).toISOString(),
+          })),
+          total: response.data.total,
+          page: response.data.page,
+          pageSize: response.data.pageSize,
+          totalPages: response.data.totalPages,
+        },
+      };
+    }
+    return { success: false, data: { items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 } };
+  },
+
   getMySources: async (page = 1, pageSize = 20, status?: string): Promise<{ 
     success: boolean; 
     data: PaginatedResponse<SharedSource> 
