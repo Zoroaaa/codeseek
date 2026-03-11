@@ -15,7 +15,8 @@ import {
   Flag,
   TrendingUp,
   X,
-  ArrowLeft,
+  LayoutDashboard,
+  Shield,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
 
@@ -42,6 +43,8 @@ export const CommunityPanelLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
 
   const handleLogout = () => {
     logout();
@@ -162,17 +165,6 @@ export const CommunityPanelLayout: React.FC = () => {
       </nav>
 
       <div className="p-3 border-t border-slate-200/70 dark:border-slate-800">
-        <Link
-          to="/dashboard"
-          className={clsx(
-            'flex items-center gap-2 px-3 py-2 mb-2 rounded-xl text-sm font-medium',
-            'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all',
-            sidebarCollapsed && !mobile && 'justify-center'
-          )}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {(!sidebarCollapsed || mobile) && <span>返回控制台</span>}
-        </Link>
         <div className={clsx('flex items-center gap-3', (!sidebarCollapsed || mobile) ? '' : 'justify-center')}>
           <div className="user-avatar flex-shrink-0 text-sm bg-gradient-to-br from-emerald-500 to-teal-600">
             {user?.username?.charAt(0).toUpperCase()}
@@ -251,6 +243,23 @@ export const CommunityPanelLayout: React.FC = () => {
                 className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 transition-all">
                 <Search className="w-4 h-4" />
                 搜索
+              </Link>
+              <Link to="/dashboard"
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700">
+                <LayoutDashboard className="w-4 h-4" />
+                <span className="hidden lg:inline">控制台</span>
+              </Link>
+              {isAdmin && (
+                <Link to="/admin-panel"
+                  className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700">
+                  <Shield className="w-4 h-4" />
+                  <span className="hidden lg:inline">管理</span>
+                </Link>
+              )}
+              <Link to="/community"
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 transition-all">
+                <Users className="w-4 h-4" />
+                <span className="hidden lg:inline">社区</span>
               </Link>
               <button onClick={toggleTheme} className="theme-toggle-btn">
                 {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}

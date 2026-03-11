@@ -21,7 +21,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
-import { SIDEBAR_CONFIG, APP_INFO } from '@/constants';
+import { SIDEBAR_CONFIG } from '@/constants';
 
 interface NavItem {
   id: string;
@@ -87,13 +87,20 @@ export const DashboardLayout: React.FC = () => {
         'flex items-center h-16 px-4 border-b border-slate-200/70 dark:border-slate-800',
         !mobile && sidebarCollapsed ? 'justify-center' : 'justify-between'
       )}>
-        {(!sidebarCollapsed || mobile) && (
-          <Link to="/" className="flex items-center gap-2.5 group" onClick={() => mobile && setMobileMenuOpen(false)}>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md group-hover:shadow-lg transition-all">
-              <Search className="w-4 h-4 text-white" />
+        {(!sidebarCollapsed || mobile) ? (
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md">
+              <LayoutDashboard className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-base gradient-text display-font">{APP_INFO.NAME}</span>
-          </Link>
+            <div>
+              <span className="font-bold text-base gradient-text display-font">控制台</span>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Dashboard</p>
+            </div>
+          </div>
+        ) : (
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md">
+            <LayoutDashboard className="w-4 h-4 text-white" />
+          </div>
         )}
         {mobile ? (
           <button onClick={() => setMobileMenuOpen(false)}
@@ -266,11 +273,16 @@ export const DashboardLayout: React.FC = () => {
                 <Search className="w-4 h-4" />
                 搜索
               </Link>
+              <Link to="/dashboard"
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 transition-all">
+                <LayoutDashboard className="w-4 h-4" />
+                <span className="hidden lg:inline">控制台</span>
+              </Link>
               {isAdmin && (
                 <Link to="/admin-panel"
                   className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700">
                   <Shield className="w-4 h-4" />
-                  <span className="hidden lg:inline">管理看板</span>
+                  <span className="hidden lg:inline">管理</span>
                 </Link>
               )}
               <Link to="/community"
