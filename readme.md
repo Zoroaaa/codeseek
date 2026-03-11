@@ -467,29 +467,6 @@ wrangler pages deploy dist --project-name=codeseek
 | 系统 | system_config | 系统配置表 |
 | 系统 | analytics_events | 分析事件表 |
 
-### 预置搜索源
-
-项目预置了 **50+ 搜索源**，分为以下类别：
-
-**📚 番号资料站 (searchable=1)**
-- JavBus, JavDB, JavLibrary, r/JAV
-
-**🎥 在线播放平台 (searchable=1)**
-- Jable, JavMost, JavGuru, AV01, JavGG
-- MissAV, SupJAV, BestJavPorn, JAV.sb, JAVLeak
-- JAVSeen, JAVTsunami, JAV Subtitled, JAVOut, JAVCL
-- JavDoe, JAV Desu, JavyNow, JAVHDPorn.net, JAV Ass Lover, JAV Subtitle
-
-**🧲 磁力种子站 (site_type=browse)**
-- BTSOW, MagnetDL, TorrentKitty, Sukebei
-- OneJAV, Project Jav, NextJAV, JavJunkies, JAVBEE
-- iJavTorrent, Empornium, 141PPV, LoveTorrent, XXXClub, My JAV Bay
-
-**💬 社区论坛 (site_type=browse)**
-- T66Y草榴社区, 色花堂98堂, 5278.cc, SexInSex
-- SIS001, South-Plus, 52AV, JKForum, EYNY
-- 夯鸭论坛, OurSogo, Cool18, 141HongKong, HJD2048, 91论坛, Sex8.cc
-
 ## 📝 API文档
 
 ### 认证相关 API
