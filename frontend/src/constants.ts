@@ -73,81 +73,16 @@ export const PROXY_CONFIG = {
   PROXY_SERVER: 'https://omnibox.pp.ua',
   /** 默认启用状态 */
   DEFAULT_ENABLED: true,
-  /** 代理版本号（独立于应用版本） */
+  /** 代理版本号 */
   VERSION: '2.2.0',
-  /** 后端版本号（与 APP_VERSION 同步） */
+  /** 后端版本号 */
   BACKEND_VERSION: '2.0.0',
 } as const;
 
 /** 代理超时配置 */
 export const PROXY_TIMEOUTS = {
-  /** 健康检查超时 */
+  /** 健康检查超时（毫秒） */
   HEALTH_CHECK: 10000,
-  /** 请求超时 */
-  REQUEST: 30000,
-  /** 重试次数 */
-  RETRY: 3,
-  /** 重试延迟 */
-  RETRY_DELAY: 1000,
-  /** HTML 资源超时 */
-  HTML: 15000,
-  /** API 资源超时 */
-  API: 10000,
-  /** 静态资源超时 */
-  STATIC: 30000,
-  /** 媒体资源超时 */
-  MEDIA: 60000,
-} as const;
-
-/** 代理缓存配置 */
-export const PROXY_CACHE_CONFIG = {
-  /** 是否启用缓存 */
-  ENABLED: true,
-  /** 最大缓存大小（MB） */
-  MAX_SIZE: 100,
-  /** 最大缓存条目数 */
-  MAX_ENTRIES: 500,
-  /** 缓存过期时间（毫秒） */
-  TTL: {
-    HTML: 3600 * 1000,
-    CSS: 86400 * 1000,
-    JAVASCRIPT: 86400 * 1000,
-    IMAGE: 2592000 * 1000,
-    FONT: 2592000 * 1000,
-    API: 1800 * 1000,
-    MEDIA: 3600 * 1000,
-    DEFAULT: 3600 * 1000,
-  },
-} as const;
-
-/** 代理性能配置 */
-export const PROXY_PERFORMANCE_CONFIG = {
-  /** 最大并发请求数 */
-  MAX_CONCURRENT: 6,
-  /** 预加载配置 */
-  PRELOAD: {
-    ENABLED: true,
-    MAX_PRELOADS: 10,
-  },
-  /** 懒加载配置 */
-  LAZY_LOAD: {
-    ENABLED: true,
-    THRESHOLD: 100,
-  },
-} as const;
-
-/** 代理错误处理配置 */
-export const PROXY_ERROR_HANDLING = {
-  /** 最大重试次数 */
-  MAX_RETRIES: 3,
-  /** 重试延迟列表 */
-  RETRY_DELAYS: [1000, 2000, 5000],
-  /** 错误时回退到原始 URL */
-  FALLBACK_TO_ORIGINAL: true,
-  /** 记录错误日志 */
-  LOG_ERRORS: true,
-  /** 最大错误日志数 */
-  MAX_ERROR_LOGS: 200,
 } as const;
 
 /* ==================== 验证规则 ==================== */

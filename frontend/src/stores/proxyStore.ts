@@ -3,22 +3,17 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { proxyService } from '@/services/proxy/ProxyService';
 import { NotificationTemplates } from '@/utils/notificationTemplates';
 import { useUIStore } from './uiStore';
+import type { ProxyStatus } from '@/services/proxy/ProxyService';
 
 interface ProxyState {
   isEnabled: boolean;
-  status: 'disabled' | 'enabled' | 'error' | 'checking' | 'degraded' | 'smart';
+  status: ProxyStatus;
   isLoading: boolean;
   lastHealthCheck: number | null;
   isHealthy: boolean | null;
-  stats: {
-    totalRequests: number;
-    successfulRequests: number;
-    failedRequests: number;
-    cacheHits: number;
-  };
   
   setEnabled: (enabled: boolean) => void;
-  setStatus: (status: 'disabled' | 'enabled' | 'error' | 'checking' | 'degraded' | 'smart') => void;
+  setStatus: (status: ProxyStatus) => void;
   setLoading: (loading: boolean) => void;
   toggleProxy: () => Promise<void>;
   initializeProxy: () => Promise<void>;
@@ -33,12 +28,6 @@ export const useProxyStore = create<ProxyState>()(
       isLoading: false,
       lastHealthCheck: null,
       isHealthy: null,
-      stats: {
-        totalRequests: 0,
-        successfulRequests: 0,
-        failedRequests: 0,
-        cacheHits: 0,
-      },
       
       setEnabled: (isEnabled) => set({ isEnabled }),
       setStatus: (status) => set({ status }),
@@ -60,12 +49,6 @@ export const useProxyStore = create<ProxyState>()(
               status: proxyStatus.status,
               lastHealthCheck: proxyStatus.lastHealthCheck,
               isHealthy: proxyStatus.isHealthy,
-              stats: {
-                totalRequests: proxyStatus.stats.totalRequests,
-                successfulRequests: proxyStatus.stats.successfulRequests,
-                failedRequests: proxyStatus.stats.failedRequests,
-                cacheHits: proxyStatus.stats.cacheHits,
-              },
             });
             
             const template = proxyStatus.enabled 
@@ -108,12 +91,6 @@ export const useProxyStore = create<ProxyState>()(
             status: proxyStatus.status,
             lastHealthCheck: proxyStatus.lastHealthCheck,
             isHealthy: proxyStatus.isHealthy,
-            stats: {
-              totalRequests: proxyStatus.stats.totalRequests,
-              successfulRequests: proxyStatus.stats.successfulRequests,
-              failedRequests: proxyStatus.stats.failedRequests,
-              cacheHits: proxyStatus.stats.cacheHits,
-            },
           });
         } catch (error) {
           console.error('Initialize proxy failed:', error);
@@ -127,12 +104,6 @@ export const useProxyStore = create<ProxyState>()(
           status: proxyStatus.status,
           lastHealthCheck: proxyStatus.lastHealthCheck,
           isHealthy: proxyStatus.isHealthy,
-          stats: {
-            totalRequests: proxyStatus.stats.totalRequests,
-            successfulRequests: proxyStatus.stats.successfulRequests,
-            failedRequests: proxyStatus.stats.failedRequests,
-            cacheHits: proxyStatus.stats.cacheHits,
-          },
         });
       },
     }),
