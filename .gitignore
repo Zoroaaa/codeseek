@@ -45,6 +45,7 @@ coverage/
 # Old code backup
 old/
 codeseek-v1.0/
+omnibox-src/
 
 # Frontend specific
 frontend/dist/
