@@ -4,14 +4,18 @@ import { useAuthStore, useThemeStore } from '@/stores';
 import { apiClient } from '@/services/api';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { AdminPanelLayout } from '@/components/layout/AdminPanelLayout';
+import { CommunityPanelLayout } from '@/components/layout/CommunityPanelLayout';
 import { ToastContainer } from '@/components/ui/Toast';
 import { HomePage } from '@/pages/HomePage';
 import { MainSearchPage } from '@/pages/MainSearchPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { AdminManager } from '@/pages/dashboard/AdminManager';
+import { UserActivitiesPage } from '@/pages/dashboard/UserActivitiesPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { AdminPanelOverview } from '@/pages/admin/AdminPanelOverview';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -136,16 +140,40 @@ const App: React.FC = () => {
         <Route path="/register" element={<AuthRedirect><RegisterPage /></AuthRedirect>} />
         <Route path="/forgot-password" element={<AuthRedirect><ForgotPasswordPage /></AuthRedirect>} />
         <Route path="/main" element={<ProtectedRoute><MainSearchPage /></ProtectedRoute>} />
+        
         <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route index element={<DashboardPage />} />
           <Route path="stats" element={<DashboardPage />} />
           <Route path="sources" element={<DashboardPage />} />
           <Route path="categories" element={<DashboardPage />} />
-          <Route path="community" element={<DashboardPage />} />
           <Route path="favorites" element={<DashboardPage />} />
           <Route path="history" element={<DashboardPage />} />
           <Route path="settings" element={<DashboardPage />} />
+          <Route path="activities" element={<UserActivitiesPage />} />
         </Route>
+        
+        <Route path="/community" element={<ProtectedRoute><CommunityPanelLayout /></ProtectedRoute>}>
+          <Route index element={<DashboardPage />} />
+          <Route path="my-shares" element={<DashboardPage />} />
+          <Route path="my-favorites" element={<DashboardPage />} />
+          <Route path="tags" element={<DashboardPage />} />
+          <Route path="trending" element={<DashboardPage />} />
+          <Route path="reports" element={<DashboardPage />} />
+        </Route>
+        
+        <Route path="/admin-panel" element={<AdminRoute><AdminPanelLayout /></AdminRoute>}>
+          <Route index element={<AdminPanelOverview />} />
+          <Route path="users" element={<AdminManager />} />
+          <Route path="sessions" element={<AdminManager />} />
+          <Route path="actions" element={<AdminManager />} />
+          <Route path="analytics" element={<AdminManager />} />
+          <Route path="trends" element={<AdminManager />} />
+          <Route path="sources" element={<AdminManager />} />
+          <Route path="reports" element={<AdminManager />} />
+          <Route path="roles" element={<AdminManager />} />
+          <Route path="config" element={<AdminManager />} />
+        </Route>
+        
         <Route path="/admin" element={<AdminRoute><DashboardLayout /></AdminRoute>}>
           <Route index element={<AdminManager />} />
         </Route>

@@ -154,6 +154,7 @@ export const CONFIG = {
     TWO_WEEKS_IN_MS: 14 * 24 * 60 * 60 * 1000,
     DAY_IN_MS: 24 * 60 * 60 * 1000,
     HOUR_IN_MS: 60 * 60 * 1000,
+    MONTH_IN_MS: 30 * 24 * 60 * 60 * 1000,
   },
 
   /** 默认值配置 */

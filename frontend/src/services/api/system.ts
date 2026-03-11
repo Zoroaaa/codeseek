@@ -223,6 +223,46 @@ export const configApi = {
   deleteConfig: async (key: string): Promise<{ success: boolean; message: string }> => {
     return apiClient.delete(`/config/${encodeURIComponent(key)}`);
   },
+
+  batchUpdateConfig: async (configs: Array<{
+    key: string;
+    value: string;
+    description?: string;
+    configType?: string;
+    isPublic?: boolean;
+  }>): Promise<{ 
+    success: boolean; 
+    data: { 
+      results: Array<{ key: string; success: boolean }>;
+      updated: number;
+    };
+    message: string;
+  }> => {
+    return apiClient.put('/config/batch', { configs });
+  },
+
+  getConfigGroups: async (): Promise<{ 
+    success: boolean; 
+    data: Record<string, Array<{
+      key: string;
+      value: string;
+      description: string | null;
+      config_type: string;
+      is_public: number;
+      created_at: number;
+      updated_at: number;
+    }>> 
+  }> => {
+    return apiClient.get('/config/groups');
+  },
+
+  resetConfig: async (key: string): Promise<{ 
+    success: boolean; 
+    data: { key: string; value: string };
+    message: string;
+  }> => {
+    return apiClient.post(`/config/reset/${encodeURIComponent(key)}`, {});
+  },
 };
 
 export const cacheApi = {

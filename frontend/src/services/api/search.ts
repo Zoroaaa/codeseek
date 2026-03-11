@@ -263,4 +263,51 @@ export const userApi = {
   }): Promise<{ success: boolean; message: string }> => {
     return apiClient.put(`/user/source-configs/${sourceId}`, config);
   },
+
+  getActivities: async (params: {
+    limit?: number;
+    offset?: number;
+    action?: string;
+  } = {}): Promise<{
+    success: boolean;
+    data: {
+      activities: Array<{
+        id: string;
+        action: string;
+        actionLabel: string;
+        data: Record<string, unknown>;
+        ipAddress: string | null;
+        userAgent: string | null;
+        createdAt: number;
+      }>;
+      total: number;
+      limit: number;
+      offset: number;
+    };
+  }> => {
+    const queryParams = new URLSearchParams();
+    if (params.limit) queryParams.set('limit', params.limit.toString());
+    if (params.offset) queryParams.set('offset', params.offset.toString());
+    if (params.action) queryParams.set('action', params.action);
+    return apiClient.get(`/user/activities?${queryParams.toString()}`);
+  },
+
+  getActivitiesStats: async (): Promise<{
+    success: boolean;
+    data: {
+      total: number;
+      today: number;
+      week: number;
+      month: number;
+      actionsByType: Array<{ action: string; count: number }>;
+      summary: {
+        logins: number;
+        failedLogins: number;
+        searches: number;
+        favorites: number;
+      };
+    };
+  }> => {
+    return apiClient.get('/user/activities/stats');
+  },
 };

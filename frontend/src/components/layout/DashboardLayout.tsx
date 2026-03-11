@@ -18,6 +18,7 @@ import {
   BarChart2,
   Shield,
   X,
+  Activity,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
 import { SIDEBAR_CONFIG, APP_INFO } from '@/constants';
@@ -32,18 +33,17 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-const navGroups = ['个人中心', '资源管理', '社区', '设置', '管理员'];
+const navGroups = ['个人中心', '资源管理', '设置', '管理员'];
 
 const navItems: NavItem[] = [
   { id: 'overview',   label: '概览',       icon: <LayoutDashboard className="w-[18px] h-[18px]" />, path: '/dashboard',            group: '个人中心' },
   { id: 'stats',      label: '数据统计',   icon: <BarChart2 className="w-[18px] h-[18px]" />,       path: '/dashboard/stats',      group: '个人中心' },
   { id: 'favorites',  label: '我的收藏',   icon: <Heart className="w-[18px] h-[18px]" />,           path: '/dashboard/favorites',  group: '个人中心' },
   { id: 'history',    label: '搜索历史',   icon: <History className="w-[18px] h-[18px]" />,         path: '/dashboard/history',    group: '个人中心' },
+  { id: 'activities', label: '活动记录',   icon: <Activity className="w-[18px] h-[18px]" />,        path: '/dashboard/activities', group: '个人中心' },
   { id: 'sources',    label: '搜索源管理', icon: <Database className="w-[18px] h-[18px]" />,        path: '/dashboard/sources',    group: '资源管理' },
-  { id: 'community',  label: '社区管理',   icon: <Users className="w-[18px] h-[18px]" />,           path: '/dashboard/community',  group: '社区' },
   { id: 'settings',   label: '系统设置',   icon: <Settings className="w-[18px] h-[18px]" />,        path: '/dashboard/settings',   group: '设置' },
   { id: 'categories', label: '分类管理',   icon: <FolderTree className="w-[18px] h-[18px]" />,      path: '/dashboard/categories', group: '管理员', adminOnly: true },
-  { id: 'admin',      label: '管理员面板', icon: <Shield className="w-[18px] h-[18px]" />,          path: '/admin',                group: '管理员', adminOnly: true },
 ];
 
 export const DashboardLayout: React.FC = () => {
@@ -265,6 +265,18 @@ export const DashboardLayout: React.FC = () => {
                 className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 text-sm font-semibold rounded-xl text-white btn-gradient transition-all">
                 <Search className="w-4 h-4" />
                 搜索
+              </Link>
+              {isAdmin && (
+                <Link to="/admin-panel"
+                  className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700">
+                  <Shield className="w-4 h-4" />
+                  <span className="hidden lg:inline">管理看板</span>
+                </Link>
+              )}
+              <Link to="/community"
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700">
+                <Users className="w-4 h-4" />
+                <span className="hidden lg:inline">社区</span>
               </Link>
               <button onClick={toggleTheme} className="theme-toggle-btn">
                 {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}

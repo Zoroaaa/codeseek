@@ -3,10 +3,10 @@ import { useLocation } from 'react-router-dom';
 import { OverviewManager } from './OverviewManager';
 import { SourceManager } from './SourceManager';
 import { CategoryManager } from './CategoryManager';
-import { CommunityManager } from './CommunityManager';
 import { FavoritesManager, HistoryManager } from './FavoritesHistoryManager';
 import { SettingsManager } from './SettingsManager';
 import { StatsManager } from './StatsManager';
+import { UserActivitiesPage } from './UserActivitiesPage';
 
 export const DashboardPage: React.FC = () => {
   const location = useLocation();
@@ -28,10 +28,6 @@ export const DashboardPage: React.FC = () => {
     return <CategoryManager />;
   }
   
-  if (path.startsWith('/dashboard/community')) {
-    return <CommunityManager />;
-  }
-  
   if (path.startsWith('/dashboard/favorites')) {
     return <FavoritesManager />;
   }
@@ -42,6 +38,10 @@ export const DashboardPage: React.FC = () => {
   
   if (path.startsWith('/dashboard/settings')) {
     return <SettingsManager />;
+  }
+
+  if (path.startsWith('/dashboard/activities')) {
+    return <UserActivitiesPage />;
   }
 
   return <OverviewManager />;

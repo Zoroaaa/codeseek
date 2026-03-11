@@ -804,3 +804,522 @@ adminRoutes.post('/cleanup', async (c) => {
     return c.json(error('SERVER_ERROR', '清理失败'), 500);
   }
 });
+
+/**
+ * 获取所有会话列表
+ * GET /api/admin/sessions
+ */
+adminRoutes.get('/sessions', async (c) => {
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
+  const userId = c.req.query('userId');
+  const status = c.req.query('status');
+
+  try {
+    let whereClause = 'WHERE 1=1';
+    const params: (string | number)[] = [];
+
+    if (userId) {
+      whereClause += ' AND s.user_id = ?';
+      params.push(userId);
+    }
+
+    if (status === 'active') {
+      whereClause += ' AND s.expires_at > ?';
+      params.push(Date.now());
+    } else if (status === 'expired') {
+      whereClause += ' AND s.expires_at <= ?';
+      params.push(Date.now());
+    }
+
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM user_sessions s ${whereClause}`
+    ).bind(...params).first<{ total: number }>();
+
+    const sessions = await c.env.DB.prepare(`
+      SELECT s.*, u.username, u.email
+      FROM user_sessions s
+      LEFT JOIN users u ON s.user_id = u.id
+      ${whereClause}
+      ORDER BY s.last_activity DESC
+      LIMIT ? OFFSET ?
+    `).bind(...params, pageSize, (page - 1) * pageSize).all();
+
+    const now = Date.now();
+
+    return c.json(success({
+      sessions: (sessions.results || []).map((s: any) => ({
+        id: s.id,
+        userId: s.user_id,
+        username: s.username,
+        email: s.email,
+        ipAddress: s.ip_address,
+        userAgent: s.user_agent,
+        createdAt: s.created_at,
+        lastActivity: s.last_activity,
+        expiresAt: s.expires_at,
+        isActive: s.expires_at > now,
+        expiresInSeconds: Math.max(0, Math.floor((s.expires_at - now) / 1000)),
+      })),
+      total: countResult?.total || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((countResult?.total || 0) / pageSize),
+    }));
+  } catch (err) {
+    console.error('Get sessions error:', err);
+    return c.json(error('SERVER_ERROR', '获取会话列表失败'), 500);
+  }
+});
+
+/**
+ * 强制终止会话
+ * DELETE /api/admin/sessions/:id
+ */
+adminRoutes.delete('/sessions/:id', async (c) => {
+  const sessionId = c.req.param('id');
+  const adminUser = c.get('user') as JwtPayload;
+
+  try {
+    const session = await c.env.DB.prepare(`
+      SELECT s.*, u.username
+      FROM user_sessions s
+      LEFT JOIN users u ON s.user_id = u.id
+      WHERE s.id = ?
+    `).bind(sessionId).first();
+
+    if (!session) {
+      return c.json(error('NOT_FOUND', '会话不存在'), 404);
+    }
+
+    await c.env.DB.prepare('DELETE FROM user_sessions WHERE id = ?').bind(sessionId).run();
+
+    await logUserAction(c.env, adminUser.userId, 'admin_terminate_session', {
+      sessionId,
+      targetUserId: (session as any).user_id,
+      targetUsername: (session as any).username,
+    }, c);
+
+    return c.json(success(null, '会话已终止'));
+  } catch (err) {
+    console.error('Terminate session error:', err);
+    return c.json(error('SERVER_ERROR', '终止会话失败'), 500);
+  }
+});
+
+/**
+ * 获取分析事件统计
+ * GET /api/admin/analytics/stats
+ */
+adminRoutes.get('/analytics/stats', async (c) => {
+  const days = parseInt(c.req.query('days') || '7');
+
+  try {
+    const now = Date.now();
+    const startTime = now - days * CONFIG.Stats.DAY_IN_MS;
+
+    const totalEvents = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM analytics_events WHERE created_at > ?'
+    ).bind(startTime).first<{ count: number }>();
+
+    const eventsByType = await c.env.DB.prepare(`
+      SELECT event_type, COUNT(*) as count
+      FROM analytics_events
+      WHERE created_at > ?
+      GROUP BY event_type
+      ORDER BY count DESC
+    `).bind(startTime).all();
+
+    const dailyEvents = await c.env.DB.prepare(`
+      SELECT date(created_at / 1000, 'unixepoch') as date, COUNT(*) as count
+      FROM analytics_events
+      WHERE created_at > ?
+      GROUP BY date
+      ORDER BY date
+    `).bind(startTime).all();
+
+    const uniqueUsers = await c.env.DB.prepare(`
+      SELECT COUNT(DISTINCT user_id) as count
+      FROM analytics_events
+      WHERE created_at > ? AND user_id IS NOT NULL
+    `).bind(startTime).first<{ count: number }>();
+
+    const uniqueSessions = await c.env.DB.prepare(`
+      SELECT COUNT(DISTINCT session_id) as count
+      FROM analytics_events
+      WHERE created_at > ? AND session_id IS NOT NULL
+    `).bind(startTime).first<{ count: number }>();
+
+    const topReferers = await c.env.DB.prepare(`
+      SELECT referer, COUNT(*) as count
+      FROM analytics_events
+      WHERE created_at > ? AND referer IS NOT NULL
+      GROUP BY referer
+      ORDER BY count DESC
+      LIMIT 10
+    `).bind(startTime).all();
+
+    const hourlyDistribution = await c.env.DB.prepare(`
+      SELECT strftime('%H', datetime(created_at / 1000, 'unixepoch')) as hour, COUNT(*) as count
+      FROM analytics_events
+      WHERE created_at > ?
+      GROUP BY hour
+      ORDER BY hour
+    `).bind(startTime).all();
+
+    return c.json(success({
+      totalEvents: totalEvents?.count || 0,
+      uniqueUsers: uniqueUsers?.count || 0,
+      uniqueSessions: uniqueSessions?.count || 0,
+      eventsByType: eventsByType.results || [],
+      dailyEvents: dailyEvents.results || [],
+      topReferers: topReferers.results || [],
+      hourlyDistribution: hourlyDistribution.results || [],
+      period: { days, startTime },
+    }));
+  } catch (err) {
+    console.error('Get analytics stats error:', err);
+    return c.json(error('SERVER_ERROR', '获取分析统计失败'), 500);
+  }
+});
+
+/**
+ * 获取分析事件列表
+ * GET /api/admin/analytics/events
+ */
+adminRoutes.get('/analytics/events', async (c) => {
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(CONFIG.Pagination.DEFAULT_PAGE_SIZE)), CONFIG.Pagination.MAX_PAGE_SIZE);
+  const eventType = c.req.query('eventType');
+  const userId = c.req.query('userId');
+
+  try {
+    let whereClause = 'WHERE 1=1';
+    const params: (string | number)[] = [];
+
+    if (eventType) {
+      whereClause += ' AND e.event_type = ?';
+      params.push(eventType);
+    }
+
+    if (userId) {
+      whereClause += ' AND e.user_id = ?';
+      params.push(userId);
+    }
+
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM analytics_events e ${whereClause}`
+    ).bind(...params).first<{ total: number }>();
+
+    const events = await c.env.DB.prepare(`
+      SELECT e.*, u.username
+      FROM analytics_events e
+      LEFT JOIN users u ON e.user_id = u.id
+      ${whereClause}
+      ORDER BY e.created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(...params, pageSize, (page - 1) * pageSize).all();
+
+    return c.json(success({
+      events: (events.results || []).map((e: any) => ({
+        id: e.id,
+        userId: e.user_id,
+        username: e.username,
+        sessionId: e.session_id,
+        eventType: e.event_type,
+        eventData: e.event_data ? JSON.parse(e.event_data) : {},
+        ipAddress: e.ip_address,
+        userAgent: e.user_agent,
+        referer: e.referer,
+        createdAt: e.created_at,
+      })),
+      total: countResult?.total || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((countResult?.total || 0) / pageSize),
+    }));
+  } catch (err) {
+    console.error('Get analytics events error:', err);
+    return c.json(error('SERVER_ERROR', '获取分析事件失败'), 500);
+  }
+});
+
+/**
+ * 获取看板概览数据
+ * GET /api/admin/dashboard/overview
+ */
+adminRoutes.get('/dashboard/overview', async (c) => {
+  try {
+    const now = Date.now();
+    const oneDayAgo = now - CONFIG.Stats.DAY_IN_MS;
+    const oneWeekAgo = now - CONFIG.Stats.WEEK_IN_MS;
+    const oneMonthAgo = now - CONFIG.Stats.MONTH_IN_MS;
+
+    const userStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as new_today,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as new_week,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as new_month
+      FROM users
+    `).bind(oneDayAgo, oneWeekAgo, oneMonthAgo).first();
+
+    const sessionStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN expires_at > ? THEN 1 ELSE 0 END) as active,
+        COUNT(DISTINCT user_id) as unique_users
+      FROM user_sessions
+    `).bind(now).first();
+
+    const actionStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(DISTINCT user_id) as unique_users,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as today,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as week
+      FROM user_actions
+    `).bind(oneDayAgo, oneWeekAgo).first();
+
+    const analyticsStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(DISTINCT user_id) as unique_users,
+        COUNT(DISTINCT session_id) as unique_sessions,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as today,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as week
+      FROM analytics_events
+    `).bind(oneDayAgo, oneWeekAgo).first();
+
+    const sourceStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
+        SUM(usage_count) as total_usage
+      FROM search_sources
+    `).first();
+
+    const searchStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(DISTINCT user_id) as unique_users,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as today,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as week
+      FROM user_search_history
+    `).bind(oneDayAgo, oneWeekAgo).first();
+
+    const loginStats = await c.env.DB.prepare(`
+      SELECT 
+        SUM(CASE WHEN action = 'login' THEN 1 ELSE 0 END) as success,
+        SUM(CASE WHEN action = 'login_failed' THEN 1 ELSE 0 END) as failed
+      FROM user_actions
+      WHERE action IN ('login', 'login_failed') AND created_at > ?
+    `).bind(oneDayAgo).first();
+
+    const communityStats = await c.env.DB.prepare(`
+      SELECT 
+        (SELECT COUNT(*) FROM community_shared_sources) as shared_sources,
+        (SELECT COUNT(*) FROM community_source_reviews) as reviews,
+        (SELECT COUNT(*) FROM community_source_reports WHERE status = 'pending') as pending_reports
+    `).first();
+
+    const recentActions = await c.env.DB.prepare(`
+      SELECT a.action, a.data, a.created_at, u.username
+      FROM user_actions a
+      LEFT JOIN users u ON a.user_id = u.id
+      ORDER BY a.created_at DESC
+      LIMIT 20
+    `).all();
+
+    const activeUsersToday = await c.env.DB.prepare(`
+      SELECT COUNT(DISTINCT user_id) as count
+      FROM user_sessions
+      WHERE last_activity > ?
+    `).bind(oneDayAgo).first<{ count: number }>();
+
+    return c.json(success({
+      users: {
+        total: userStats?.total || 0,
+        active: userStats?.active || 0,
+        newToday: userStats?.new_today || 0,
+        newWeek: userStats?.new_week || 0,
+        newMonth: userStats?.new_month || 0,
+        activeToday: activeUsersToday?.count || 0,
+      },
+      sessions: {
+        total: sessionStats?.total || 0,
+        active: sessionStats?.active || 0,
+        uniqueUsers: sessionStats?.unique_users || 0,
+      },
+      actions: {
+        total: actionStats?.total || 0,
+        uniqueUsers: actionStats?.unique_users || 0,
+        today: actionStats?.today || 0,
+        week: actionStats?.week || 0,
+      },
+      analytics: {
+        total: analyticsStats?.total || 0,
+        uniqueUsers: analyticsStats?.unique_users || 0,
+        uniqueSessions: analyticsStats?.unique_sessions || 0,
+        today: analyticsStats?.today || 0,
+        week: analyticsStats?.week || 0,
+      },
+      sources: {
+        total: sourceStats?.total || 0,
+        active: sourceStats?.active || 0,
+        totalUsage: sourceStats?.total_usage || 0,
+      },
+      searches: {
+        total: searchStats?.total || 0,
+        uniqueUsers: searchStats?.unique_users || 0,
+        today: searchStats?.today || 0,
+        week: searchStats?.week || 0,
+      },
+      logins: {
+        successToday: loginStats?.success || 0,
+        failedToday: loginStats?.failed || 0,
+      },
+      community: {
+        sharedSources: communityStats?.shared_sources || 0,
+        reviews: communityStats?.reviews || 0,
+        pendingReports: communityStats?.pending_reports || 0,
+      },
+      recentActions: (recentActions.results || []).map((a: any) => ({
+        action: a.action,
+        data: a.data ? JSON.parse(a.data) : {},
+        createdAt: a.created_at,
+        username: a.username || '匿名',
+      })),
+    }));
+  } catch (err) {
+    console.error('Get dashboard overview error:', err);
+    return c.json(error('SERVER_ERROR', '获取看板概览失败'), 500);
+  }
+});
+
+/**
+ * 获取趋势数据
+ * GET /api/admin/dashboard/trends
+ */
+adminRoutes.get('/dashboard/trends', async (c) => {
+  const days = parseInt(c.req.query('days') || '7');
+
+  try {
+    const now = Date.now();
+    const startTime = now - days * CONFIG.Stats.DAY_IN_MS;
+
+    const userRegistrations = await c.env.DB.prepare(`
+      SELECT date(created_at / 1000, 'unixepoch') as date, COUNT(*) as count
+      FROM users
+      WHERE created_at > ?
+      GROUP BY date
+      ORDER BY date
+    `).bind(startTime).all();
+
+    const dailyLogins = await c.env.DB.prepare(`
+      SELECT 
+        date(created_at / 1000, 'unixepoch') as date,
+        COUNT(*) as total,
+        SUM(CASE WHEN action = 'login' THEN 1 ELSE 0 END) as success,
+        SUM(CASE WHEN action = 'login_failed' THEN 1 ELSE 0 END) as failed
+      FROM user_actions
+      WHERE created_at > ? AND action IN ('login', 'login_failed')
+      GROUP BY date
+      ORDER BY date
+    `).bind(startTime).all();
+
+    const dailySearches = await c.env.DB.prepare(`
+      SELECT date(created_at / 1000, 'unixepoch') as date, COUNT(*) as count
+      FROM user_search_history
+      WHERE created_at > ?
+      GROUP BY date
+      ORDER BY date
+    `).bind(startTime).all();
+
+    const dailyAnalytics = await c.env.DB.prepare(`
+      SELECT date(created_at / 1000, 'unixepoch') as date, COUNT(*) as count
+      FROM analytics_events
+      WHERE created_at > ?
+      GROUP BY date
+      ORDER BY date
+    `).bind(startTime).all();
+
+    const dailyActiveUsers = await c.env.DB.prepare(`
+      SELECT date(last_activity / 1000, 'unixepoch') as date, COUNT(DISTINCT user_id) as count
+      FROM user_sessions
+      WHERE last_activity > ?
+      GROUP BY date
+      ORDER BY date
+    `).bind(startTime).all();
+
+    return c.json(success({
+      userRegistrations: userRegistrations.results || [],
+      dailyLogins: dailyLogins.results || [],
+      dailySearches: dailySearches.results || [],
+      dailyAnalytics: dailyAnalytics.results || [],
+      dailyActiveUsers: dailyActiveUsers.results || [],
+      period: { days, startTime },
+    }));
+  } catch (err) {
+    console.error('Get trends error:', err);
+    return c.json(error('SERVER_ERROR', '获取趋势数据失败'), 500);
+  }
+});
+
+/**
+ * 获取用户行为分析
+ * GET /api/admin/dashboard/user-behavior
+ */
+adminRoutes.get('/dashboard/user-behavior', async (c) => {
+  const days = parseInt(c.req.query('days') || '7');
+
+  try {
+    const now = Date.now();
+    const startTime = now - days * CONFIG.Stats.DAY_IN_MS;
+
+    const actionsByType = await c.env.DB.prepare(`
+      SELECT action, COUNT(*) as count
+      FROM user_actions
+      WHERE created_at > ?
+      GROUP BY action
+      ORDER BY count DESC
+    `).bind(startTime).all();
+
+    const topActiveUsers = await c.env.DB.prepare(`
+      SELECT u.id, u.username, u.email, COUNT(a.id) as action_count
+      FROM users u
+      LEFT JOIN user_actions a ON u.id = a.user_id AND a.created_at > ?
+      GROUP BY u.id
+      ORDER BY action_count DESC
+      LIMIT 20
+    `).bind(startTime).all();
+
+    const hourlyActivity = await c.env.DB.prepare(`
+      SELECT strftime('%H', datetime(created_at / 1000, 'unixepoch')) as hour, COUNT(*) as count
+      FROM user_actions
+      WHERE created_at > ?
+      GROUP BY hour
+      ORDER BY hour
+    `).bind(startTime).all();
+
+    const weeklyActivity = await c.env.DB.prepare(`
+      SELECT strftime('%w', datetime(created_at / 1000, 'unixepoch')) as weekday, COUNT(*) as count
+      FROM user_actions
+      WHERE created_at > ?
+      GROUP BY weekday
+      ORDER BY weekday
+    `).bind(startTime).all();
+
+    return c.json(success({
+      actionsByType: actionsByType.results || [],
+      topActiveUsers: topActiveUsers.results || [],
+      hourlyActivity: hourlyActivity.results || [],
+      weeklyActivity: weeklyActivity.results || [],
+      period: { days, startTime },
+    }));
+  } catch (err) {
+    console.error('Get user behavior error:', err);
+    return c.json(error('SERVER_ERROR', '获取用户行为分析失败'), 500);
+  }
+});

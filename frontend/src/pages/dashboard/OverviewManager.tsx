@@ -309,7 +309,7 @@ export const OverviewManager: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/dashboard/history')}
+              onClick={() => navigate('/dashboard/activities')}
             >
               查看全部
             </Button>
@@ -387,7 +387,7 @@ export const OverviewManager: React.FC = () => {
               icon={<Globe className="w-5 h-5" />}
               title="社区分享"
               description="发现优质搜索源"
-              onClick={() => navigate('/dashboard/community')}
+              onClick={() => navigate('/community')}
               gradient="bg-gradient-to-br from-success-500 to-success-600"
             />
           </div>

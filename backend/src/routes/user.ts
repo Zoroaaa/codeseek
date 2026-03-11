@@ -577,3 +577,173 @@ userRoutes.put('/source-configs/:sourceId', async (c) => {
     return c.json(error('SERVER_ERROR', '保存配置失败'), 500);
   }
 });
+
+/**
+ * 获取个人活动记录
+ * GET /api/user/activities
+ */
+userRoutes.get('/activities', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload) {
+    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
+  }
+
+  const limit = Math.min(parseInt(c.req.query('limit') || '100'), 100);
+  const offset = parseInt(c.req.query('offset') || '0');
+  const actionType = c.req.query('action');
+
+  try {
+    let whereClause = 'WHERE user_id = ?';
+    const params: (string | number)[] = [payload.userId];
+
+    if (actionType) {
+      whereClause += ' AND action = ?';
+      params.push(actionType);
+    }
+
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM user_actions ${whereClause}`
+    ).bind(...params).first<{ total: number }>();
+
+    const activities = await c.env.DB.prepare(`
+      SELECT id, action, data, ip_address, user_agent, created_at
+      FROM user_actions
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(...params, limit, offset).all();
+
+    const actionLabels: Record<string, string> = {
+      login: '登录',
+      login_failed: '登录失败',
+      logout: '登出',
+      search: '搜索',
+      add_favorite: '添加收藏',
+      remove_favorite: '取消收藏',
+      sync_favorites: '同步收藏',
+      update_settings: '更新设置',
+      change_password: '修改密码',
+      change_email: '修改邮箱',
+      delete_account: '删除账户',
+      clear_search_history: '清空搜索历史',
+      share_source: '分享搜索源',
+      review_source: '评价搜索源',
+      report_source: '举报搜索源',
+    };
+
+    return c.json(success({
+      activities: (activities.results || []).map((a: any) => ({
+        id: a.id,
+        action: a.action,
+        actionLabel: actionLabels[a.action] || a.action,
+        data: a.data ? JSON.parse(a.data) : {},
+        ipAddress: a.ip_address,
+        userAgent: a.user_agent,
+        createdAt: a.created_at,
+      })),
+      total: countResult?.total || 0,
+      limit,
+      offset,
+    }));
+  } catch (err) {
+    console.error('Get activities error:', err);
+    return c.json(error('SERVER_ERROR', '获取活动记录失败'), 500);
+  }
+});
+
+/**
+ * 获取个人活动统计
+ * GET /api/user/activities/stats
+ */
+userRoutes.get('/activities/stats', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload) {
+    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
+  }
+
+  try {
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+    const totalActions = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM user_actions WHERE user_id = ?'
+    ).bind(payload.userId).first<{ count: number }>();
+
+    const todayActions = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM user_actions WHERE user_id = ? AND created_at > ?'
+    ).bind(payload.userId, oneDayAgo).first<{ count: number }>();
+
+    const weekActions = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM user_actions WHERE user_id = ? AND created_at > ?'
+    ).bind(payload.userId, oneWeekAgo).first<{ count: number }>();
+
+    const monthActions = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM user_actions WHERE user_id = ? AND created_at > ?'
+    ).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+
+    const actionsByType = await c.env.DB.prepare(`
+      SELECT action, COUNT(*) as count
+      FROM user_actions
+      WHERE user_id = ?
+      GROUP BY action
+      ORDER BY count DESC
+    `).bind(payload.userId).all();
+
+    const recentLogins = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM user_actions
+      WHERE user_id = ? AND action = 'login' AND created_at > ?
+    `).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+
+    const recentFailedLogins = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM user_actions
+      WHERE user_id = ? AND action = 'login_failed' AND created_at > ?
+    `).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+
+    const recentSearches = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM user_actions
+      WHERE user_id = ? AND action = 'search' AND created_at > ?
+    `).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+
+    const recentFavorites = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM user_actions
+      WHERE user_id = ? AND action IN ('add_favorite', 'remove_favorite') AND created_at > ?
+    `).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+
+    return c.json(success({
+      total: totalActions?.count || 0,
+      today: todayActions?.count || 0,
+      week: weekActions?.count || 0,
+      month: monthActions?.count || 0,
+      actionsByType: actionsByType.results || [],
+      summary: {
+        logins: recentLogins?.count || 0,
+        failedLogins: recentFailedLogins?.count || 0,
+        searches: recentSearches?.count || 0,
+        favorites: recentFavorites?.count || 0,
+      },
+    }));
+  } catch (err) {
+    console.error('Get activities stats error:', err);
+    return c.json(error('SERVER_ERROR', '获取活动统计失败'), 500);
+  }
+});

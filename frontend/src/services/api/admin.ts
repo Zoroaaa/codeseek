@@ -233,4 +233,170 @@ export const adminApi = {
     }>('/admin/cleanup', {});
     return response.data;
   },
+
+  getDashboardOverview: async (): Promise<{
+    users: {
+      total: number;
+      active: number;
+      newToday: number;
+      newWeek: number;
+      newMonth: number;
+      activeToday: number;
+    };
+    sessions: {
+      total: number;
+      active: number;
+      uniqueUsers: number;
+    };
+    actions: {
+      total: number;
+      uniqueUsers: number;
+      today: number;
+      week: number;
+    };
+    analytics: {
+      total: number;
+      uniqueUsers: number;
+      uniqueSessions: number;
+      today: number;
+      week: number;
+    };
+    sources: {
+      total: number;
+      active: number;
+      totalUsage: number;
+    };
+    searches: {
+      total: number;
+      uniqueUsers: number;
+      today: number;
+      week: number;
+    };
+    logins: {
+      successToday: number;
+      failedToday: number;
+    };
+    community: {
+      sharedSources: number;
+      reviews: number;
+      pendingReports: number;
+    };
+    recentActions: Array<{
+      action: string;
+      data: Record<string, unknown>;
+      createdAt: number;
+      username: string;
+    }>;
+  }> => {
+    const response = await apiClient.get<{ success: boolean; data: any }>('/admin/dashboard/overview');
+    return response.data;
+  },
+
+  getDashboardTrends: async (days: number = 7): Promise<{
+    userRegistrations: Array<{ date: string; count: number }>;
+    dailyLogins: Array<{ date: string; total: number; success: number; failed: number }>;
+    dailySearches: Array<{ date: string; count: number }>;
+    dailyAnalytics: Array<{ date: string; count: number }>;
+    dailyActiveUsers: Array<{ date: string; count: number }>;
+    period: { days: number; startTime: number };
+  }> => {
+    const response = await apiClient.get<{ success: boolean; data: any }>(`/admin/dashboard/trends?days=${days}`);
+    return response.data;
+  },
+
+  getUserBehavior: async (days: number = 7): Promise<{
+    actionsByType: Array<{ action: string; count: number }>;
+    topActiveUsers: Array<{ id: string; username: string; email: string; action_count: number }>;
+    hourlyActivity: Array<{ hour: string; count: number }>;
+    weeklyActivity: Array<{ weekday: string; count: number }>;
+    period: { days: number; startTime: number };
+  }> => {
+    const response = await apiClient.get<{ success: boolean; data: any }>(`/admin/dashboard/user-behavior?days=${days}`);
+    return response.data;
+  },
+
+  getSessions: async (params: {
+    page?: number;
+    pageSize?: number;
+    userId?: string;
+    status?: string;
+  } = {}): Promise<PaginatedResponse<{
+    id: string;
+    userId: string;
+    username: string;
+    email: string;
+    ipAddress: string;
+    userAgent: string;
+    createdAt: number;
+    lastActivity: number;
+    expiresAt: number;
+    isActive: boolean;
+    expiresInSeconds: number;
+  }>> => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.set('page', params.page.toString());
+    if (params.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params.userId) queryParams.set('userId', params.userId);
+    if (params.status) queryParams.set('status', params.status);
+
+    const response = await apiClient.get<{ success: boolean; data: any }>(`/admin/sessions?${queryParams.toString()}`);
+    return {
+      items: response.data.sessions,
+      total: response.data.total,
+      page: response.data.page,
+      pageSize: response.data.pageSize,
+      totalPages: response.data.totalPages,
+    };
+  },
+
+  terminateSession: async (sessionId: string): Promise<void> => {
+    await apiClient.delete(`/admin/sessions/${sessionId}`);
+  },
+
+  getAnalyticsStats: async (days: number = 7): Promise<{
+    totalEvents: number;
+    uniqueUsers: number;
+    uniqueSessions: number;
+    eventsByType: Array<{ event_type: string; count: number }>;
+    dailyEvents: Array<{ date: string; count: number }>;
+    topReferers: Array<{ referer: string; count: number }>;
+    hourlyDistribution: Array<{ hour: string; count: number }>;
+    period: { days: number; startTime: number };
+  }> => {
+    const response = await apiClient.get<{ success: boolean; data: any }>(`/admin/analytics/stats?days=${days}`);
+    return response.data;
+  },
+
+  getAnalyticsEvents: async (params: {
+    page?: number;
+    pageSize?: number;
+    eventType?: string;
+    userId?: string;
+  } = {}): Promise<PaginatedResponse<{
+    id: string;
+    userId: string;
+    username: string;
+    sessionId: string;
+    eventType: string;
+    eventData: Record<string, unknown>;
+    ipAddress: string;
+    userAgent: string;
+    referer: string;
+    createdAt: number;
+  }>> => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.set('page', params.page.toString());
+    if (params.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params.eventType) queryParams.set('eventType', params.eventType);
+    if (params.userId) queryParams.set('userId', params.userId);
+
+    const response = await apiClient.get<{ success: boolean; data: any }>(`/admin/analytics/events?${queryParams.toString()}`);
+    return {
+      items: response.data.events,
+      total: response.data.total,
+      page: response.data.page,
+      pageSize: response.data.pageSize,
+      totalPages: response.data.totalPages,
+    };
+  },
 };
