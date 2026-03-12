@@ -96,10 +96,11 @@ export const validateUsername = (username: string): boolean => {
 
 /**
  * 验证密码长度
- * 注意：使用 CONFIG 中定义的默认最小长度，适用于前端基础验证
+ * 注意：使用默认最小长度6，适用于前端基础验证
+ * 后端验证时应从 ConfigService 获取实际配置值
  */
 export const validatePassword = (password: string): boolean => {
-  return password.length >= CONFIG.VALIDATION.PASSWORD_MIN_LENGTH;
+  return password.length >= 6;
 };
 
 export const paginate = <T>(items: T[], page: number, pageSize: number) => {

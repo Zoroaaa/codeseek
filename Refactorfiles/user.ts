@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { Env, User, UserFavorite, UserSearchHistory } from '../types';
 import { success, error, generateId, verifyToken, logUserAction } from '../utils';
-import { CONFIG, DB_CONFIG_KEYS } from '../constants';
+import { DB_CONFIG_KEYS } from '../constants';
 import { ConfigService } from '../services/config';
 
 export const userRoutes = new Hono<{ Bindings: Env }>();
@@ -202,8 +202,7 @@ userRoutes.post('/favorites/sync', async (c) => {
       return c.json(error('VALIDATION_ERROR', '收藏数据格式错误'), 400);
     }
 
-    const configService = new ConfigService(c.env);
-    const maxFavorites = await configService.getInt(DB_CONFIG_KEYS.MAX_FAVORITES, 1000);
+    const maxFavorites = await (new ConfigService(c.env)).getInt(DB_CONFIG_KEYS.MAX_FAVORITES, 1000);
     if (favorites.length > maxFavorites) {
       return c.json(error('VALIDATION_ERROR', `最多只能同步${maxFavorites}个收藏`), 400);
     }
@@ -287,7 +286,7 @@ userRoutes.get('/search-history', async (c) => {
   }
 
   try {
-    const limit = parseInt(c.req.query('limit') || '100', 10);
+    const limit = parseInt(c.req.query('limit') || String(50), 10);
     const history = await c.env.DB.prepare(
       'SELECT * FROM user_search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
     ).bind(payload.userId, limit).all<UserSearchHistory>();
@@ -455,8 +454,8 @@ userRoutes.get('/search-stats', async (c) => {
     ).bind(payload.userId).all<{ query: string; created_at: number }>();
 
     const now = Date.now();
-    const oneWeekAgo = now - CONFIG.Stats.WEEK_IN_MS;
-    const twoWeeksAgo = now - CONFIG.Stats.TWO_WEEKS_IN_MS;
+    const oneWeekAgo = now - 604800000;
+    const twoWeeksAgo = now - 1209600000;
 
     const thisWeekSearches = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ? AND created_at >= ?'

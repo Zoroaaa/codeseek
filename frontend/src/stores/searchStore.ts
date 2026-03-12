@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { SEARCH_HISTORY_CONFIG } from '@/constants';
 import type { SearchHistoryItem, FavoriteItem, SearchResult, SearchSuggestion } from '@/types';
+
+const MAX_HISTORY_ITEMS = 100;
 
 interface SearchState {
   keyword: string;
@@ -65,7 +66,7 @@ export const useSearchStore = create<SearchState>()(
       setSearchHistory: (searchHistory) => set({ searchHistory }),
       
       addToHistory: (item) => set((state) => ({
-        searchHistory: [item, ...state.searchHistory].slice(0, SEARCH_HISTORY_CONFIG.MAX_HISTORY_ITEMS)
+        searchHistory: [item, ...state.searchHistory].slice(0, MAX_HISTORY_ITEMS)
       })),
       
       clearHistory: () => set({ searchHistory: [] }),

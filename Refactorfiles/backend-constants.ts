@@ -125,7 +125,6 @@ export const CONFIG = {
 // ==================================================================
 // DB Key 常量 — 防止字符串拼写错误，集中管理所有 system_config key
 // 使用方式：configService.getInt(DB_CONFIG_KEYS.MAX_FAVORITES, 1000)
-// 注意：第二个参数是硬编码后备值，仅当 DB 中无该配置时使用
 // ==================================================================
 
 export const DB_CONFIG_KEYS = {

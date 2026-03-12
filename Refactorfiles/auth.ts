@@ -144,7 +144,7 @@ authRoutes.post('/login', async (c) => {
 
 authRoutes.post('/register', async (c) => {
   const configService = new ConfigService(c.env);
-  const enableRegistration = await configService.getBoolean('enable_registration', true);
+  const enableRegistration = await configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true);
   
   if (!enableRegistration) {
     return c.json(error('FORBIDDEN', '注册功能已关闭'), 403);
@@ -407,7 +407,7 @@ authRoutes.post('/forgot-password', async (c) => {
   }
 
   const configService = new ConfigService(c.env);
-  const forgotPasswordEnabled = await configService.getBoolean('forgot_password_enabled', true);
+  const forgotPasswordEnabled = await configService.getBoolean(DB_CONFIG_KEYS.FORGOT_PASSWORD_ENABLED, true);
   
   if (!forgotPasswordEnabled) {
     return c.json(error('FORBIDDEN', '密码找回功能已关闭'), 403);
@@ -546,9 +546,7 @@ authRoutes.post('/change-password', async (c) => {
   }
 
   if (!validatePassword(newPassword)) {
-    const configService = new ConfigService(c.env);
-    const passwordMinLength = await configService.getInt(DB_CONFIG_KEYS.MIN_PASSWORD_LENGTH, 6);
-    return c.json(error('VALIDATION_ERROR', `新密码至少需要${passwordMinLength}个字符`), 400);
+    return c.json(error('VALIDATION_ERROR', `新密码至少需要${6}个字符`), 400);
   }
 
   try {
@@ -742,7 +740,7 @@ authRoutes.post('/send-registration-code', async (c) => {
 
     return c.json(success({ 
       maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail),
-      expiresIn: 900
+      expiresIn: Math.floor(900)
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send registration code error:', err);
@@ -834,8 +832,6 @@ authRoutes.post('/request-email-change', async (c) => {
     return c.json(error('VALIDATION_ERROR', '请输入当前密码'), 400);
   }
 
-  const configService = new ConfigService(c.env);
-
   try {
     const user = await c.env.DB.prepare(
       'SELECT * FROM users WHERE id = ?'
@@ -863,8 +859,7 @@ authRoutes.post('/request-email-change', async (c) => {
     }
 
     const emailService = new EmailVerificationService(c.env);
-    const changePendingExpiryMinutes = await configService.getInt(DB_CONFIG_KEYS.CHANGE_PENDING_EXPIRY_MINUTES, 30);
-    await emailService.cancelExpiredPendingRequests(user.id, changePendingExpiryMinutes);
+    await emailService.cancelExpiredPendingRequests(user.id, 15);
 
     const activeRequest = await c.env.DB.prepare(`
       SELECT id, created_at FROM email_change_requests 
@@ -873,16 +868,14 @@ authRoutes.post('/request-email-change', async (c) => {
 
     if (activeRequest) {
       const createdAt = (activeRequest as { created_at: number }).created_at;
-      const changePendingExpiryMinutes = await configService.getInt(DB_CONFIG_KEYS.CHANGE_PENDING_EXPIRY_MINUTES, 30);
       const elapsedMinutes = Math.floor((Date.now() - createdAt) / 60000);
-      const remainingMinutes = changePendingExpiryMinutes - elapsedMinutes;
+      const remainingMinutes = 15 - elapsedMinutes;
       return c.json(error('VALIDATION_ERROR', `您已有进行中的邮箱更改请求，请等待${remainingMinutes > 0 ? remainingMinutes : 1}分钟后再试或手动取消`), 400);
     }
 
     const requestId = generateId();
-    const changeRequestExpiryMs = await configService.getInt(DB_CONFIG_KEYS.CHANGE_REQUEST_EXPIRY_MS, 86400000);
-    const expiresAt = Date.now() + changeRequestExpiryMs;
-    const expiresIn = Math.floor(changeRequestExpiryMs / 1000);
+    const expiresAt = Date.now() + 1800000;
+    const expiresIn = Math.floor(1800000 / 1000);
     const newEmailHash = await hashPassword(newEmail);
 
     await c.env.DB.prepare(`
@@ -974,7 +967,7 @@ authRoutes.post('/send-email-change-code', async (c) => {
     return c.json(success({ 
       emailType,
       maskedEmail: emailVerificationUtils.maskEmail(targetEmail),
-      expiresIn: 900
+      expiresIn: Math.floor(900)
     }, '验证码已发送'));
   } catch (err) {
     console.error('Send email change code error:', err);
@@ -1174,8 +1167,6 @@ authRoutes.get('/verification-status', async (c) => {
     return c.json(error('VALIDATION_ERROR', '邮箱格式不正确'), 400);
   }
 
-  const configService = new ConfigService(c.env);
-
   try {
     const verification = await c.env.DB.prepare(`
       SELECT * FROM email_verifications 
@@ -1191,8 +1182,7 @@ authRoutes.get('/verification-status', async (c) => {
     }
 
     const remainingTime = verification.expires_at - Date.now();
-    const resendIntervalMs = await configService.getInt(DB_CONFIG_KEYS.RESEND_INTERVAL_MS, 60000);
-    const canResend = remainingTime <= resendIntervalMs;
+    const canResend = remainingTime <= 60000;
 
     return c.json(success({
       hasPendingVerification: true,
@@ -1324,7 +1314,7 @@ authRoutes.post('/smart-send-code', async (c) => {
 
     return c.json(success({
       maskedEmail: emailVerificationUtils.maskEmail(normalizedEmail),
-      expiresIn: 900
+      expiresIn: Math.floor(900)
     }, '验证码已发送'));
   } catch (err) {
     console.error('Smart send code error:', err);
