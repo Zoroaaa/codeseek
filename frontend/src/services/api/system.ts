@@ -197,33 +197,6 @@ export const analyticsApi = {
   }> => {
     return apiClient.get(`/config/analytics/stats?days=${days}`);
   },
-
-  getDailyStats: async (startDate?: string, endDate?: string): Promise<{ 
-    success: boolean; 
-    data: Array<{
-      date: string;
-      events: number;
-      users: number;
-      sessions: number;
-    }> 
-  }> => {
-    const params = new URLSearchParams();
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    const queryString = params.toString();
-    return apiClient.get(`/analytics/daily${queryString ? `?${queryString}` : ''}`);
-  },
-
-  getTopEvents: async (limit = 20): Promise<{ 
-    success: boolean; 
-    data: Array<{
-      eventType: string;
-      count: number;
-      percentage: number;
-    }> 
-  }> => {
-    return apiClient.get(`/analytics/top-events?limit=${limit}`);
-  },
 };
 
 export const configApi = {

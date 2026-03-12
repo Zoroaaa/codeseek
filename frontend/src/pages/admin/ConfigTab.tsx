@@ -80,12 +80,13 @@ export const ConfigTab: React.FC = () => {
         setGroups(response.data.groups || []);
         setGroupedConfigs(response.data.groupedConfigs || {});
       }
-    } catch (error: any) {
-      notification.error('加载失败', error.message);
+    } catch (err: any) {
+      notification.error('加载失败', err.message);
     } finally {
       setIsLoading(false);
     }
-  }, [notification]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     loadConfigs();
