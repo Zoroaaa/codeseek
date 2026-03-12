@@ -312,7 +312,7 @@ export const configService = {
     lastFetchTime = 0;
     try {
       localStorage.removeItem(CONFIG_CACHE_KEY);
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
   },

@@ -11,6 +11,7 @@ interface BadgeProps {
   size?: 'sm' | 'md';
   className?: string;
   style?: CSSProperties;
+  title?: string;
 }
 
 const variantStyles = {
@@ -35,6 +36,7 @@ export const Badge: React.FC<BadgeProps> = ({
   size = 'sm',
   className,
   style,
+  title,
 }) => {
   return (
     <span
@@ -45,6 +47,7 @@ export const Badge: React.FC<BadgeProps> = ({
         className
       )}
       style={style}
+      title={title}
     >
       {children}
     </span>
