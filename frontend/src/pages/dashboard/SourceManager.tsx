@@ -339,12 +339,21 @@ export const SourceManager: React.FC = () => {
             error: response.data.error,
           }
         }));
-        
+
         const source = sources.find(s => s.id === sourceId);
-        notification.source.testSuccess(
-          source?.name || '搜索源',
-          `响应时间: ${response.data.responseTime}ms`
-        );
+        const name = source?.name || '搜索源';
+
+        if (response.data.available) {
+          const label = response.data.status === 'restricted'
+            ? `${name} 在线（访问受限）`
+            : `${name} 在线`;
+          notification.source.testSuccess(label, `响应时间 ${response.data.responseTime}ms`);
+        } else {
+          const reason = response.data.status === 'timeout'
+            ? '请求超时'
+            : response.data.error || '无法访问';
+          notification.source.testFailed(`${name}：${reason}`);
+        }
       }
     } catch (_error) {
       const source = sources.find(s => s.id === sourceId);
@@ -353,8 +362,9 @@ export const SourceManager: React.FC = () => {
   };
 
   const handleBatchCheckStatus = async () => {
-    const searchableSources = sources.filter(s => s.searchable && s.userConfig?.isEnabled !== false);
-    if (searchableSources.length === 0) {
+    // 检查所有源（不限于已启用的），方便用户了解全部状态
+    const checkableSources = sources.filter(s => s.searchable || s.homepageUrl);
+    if (checkableSources.length === 0) {
       notification.warning('没有可检查的搜索源');
       return;
     }
@@ -362,38 +372,56 @@ export const SourceManager: React.FC = () => {
     setIsBatchChecking(true);
     setBatchCheckResults({});
 
+    let totalAvailable = 0;
+    let totalChecked = 0;
+
     try {
-      const sourceIds = searchableSources.map(s => s.id);
-      const batchSize = 10;
-      
+      const sourceIds = checkableSources.map(s => s.id);
+      // 每批 20 个并发，后端也并发处理，速度大幅提升
+      const batchSize = 20;
+
       for (let i = 0; i < sourceIds.length; i += batchSize) {
         const batch = sourceIds.slice(i, i + batchSize);
-        const response = await sourceApi.batchCheckSourceStatus(batch);
-        
-        if (response.success && response.data) {
-          const newResults: Record<string, {
-            status: string;
-            available: boolean;
-            responseTime: number;
-            error: string | null;
-          }> = {};
-          
-          response.data.results.forEach(result => {
-            newResults[result.sourceId] = {
-              status: result.status,
-              available: result.available,
-              responseTime: result.responseTime,
-              error: result.error,
-            };
-          });
-          
-          setBatchCheckResults(prev => ({ ...prev, ...newResults }));
+        try {
+          const response = await sourceApi.batchCheckSourceStatus(batch);
+
+          if (response.success && response.data) {
+            const newResults: Record<string, {
+              status: string;
+              available: boolean;
+              responseTime: number;
+              error: string | null;
+            }> = {};
+
+            response.data.results.forEach(result => {
+              newResults[result.sourceId] = {
+                status: result.status,
+                available: result.available,
+                responseTime: result.responseTime,
+                error: result.error,
+              };
+              if (result.available) totalAvailable++;
+              totalChecked++;
+            });
+
+            setBatchCheckResults(prev => ({ ...prev, ...newResults }));
+          }
+        } catch {
+          // 单批失败不中断整体流程
         }
       }
-      
-      notification.success(`检查完成`, `已完成 ${searchableSources.length} 个搜索源的健康检查`);
+
+      const unavailable = totalChecked - totalAvailable;
+      if (unavailable === 0) {
+        notification.success('检查完成', `全部 ${totalChecked} 个搜索源均可正常访问 ✓`);
+      } else {
+        notification.warning(
+          `检查完成（${totalAvailable}/${totalChecked} 可用）`,
+          `${unavailable} 个搜索源可能无法访问`
+        );
+      }
     } catch (_error) {
-      notification.error('批量检查失败', '请稍后重试');
+      notification.error('批量检查失败', '请检查网络连接后重试');
     } finally {
       setIsBatchChecking(false);
     }
@@ -775,28 +803,42 @@ export const SourceManager: React.FC = () => {
                                             系统
                                           </Badge>
                                         )}
-                                        {checkResult && (
-                                          <Badge 
-                                            variant={checkResult.available ? 'primary' : 'default'} 
-                                            className={`flex items-center gap-1 text-xs shrink-0 ${
-                                              checkResult.available 
-                                                ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400' 
-                                                : 'bg-error-100 text-error-700 dark:bg-error-900/30 dark:text-error-400'
-                                            }`}
-                                          >
-                                            {checkResult.available ? (
-                                              <>
-                                                <Zap className="w-2.5 h-2.5" />
-                                                {checkResult.responseTime}ms
-                                              </>
-                                            ) : (
-                                              <>
-                                                <XCircle className="w-2.5 h-2.5" />
-                                                {checkResult.error || '不可用'}
-                                              </>
-                                            )}
-                                          </Badge>
-                                        )}
+                                        {checkResult && (() => {
+                                          const statusColorClass = checkResult.available
+                                            ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
+                                            : checkResult.status === 'timeout'
+                                              ? 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
+                                              : checkResult.status === 'restricted'
+                                                ? 'bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400'
+                                                : 'bg-error-100 text-error-700 dark:bg-error-900/30 dark:text-error-400';
+                                          const statusLabel = checkResult.available
+                                            ? checkResult.status === 'restricted'
+                                              ? `受限 ${checkResult.responseTime}ms`
+                                              : `在线 ${checkResult.responseTime}ms`
+                                            : checkResult.status === 'timeout'
+                                              ? '超时'
+                                              : checkResult.status === 'offline'
+                                                ? '离线'
+                                                : checkResult.error || '不可用';
+                                          const titleText = checkResult.available
+                                            ? checkResult.status === 'restricted'
+                                              ? `服务器在线（访问受限），响应 ${checkResult.responseTime}ms`
+                                              : `可正常访问，响应时间 ${checkResult.responseTime}ms`
+                                            : checkResult.error || '无法访问';
+                                          return (
+                                            <Badge
+                                              variant={checkResult.available ? 'primary' : 'default'}
+                                              className={`flex items-center gap-1 text-xs shrink-0 ${statusColorClass}`}
+                                              title={titleText}
+                                            >
+                                              {checkResult.available ? (
+                                                <><Zap className="w-2.5 h-2.5" />{statusLabel}</>
+                                              ) : (
+                                                <><XCircle className="w-2.5 h-2.5" />{statusLabel}</>
+                                              )}
+                                            </Badge>
+                                          );
+                                        })()}
                                       </div>
                                       {/* Subtitle */}
                                       {(source.userConfig?.customSubtitle || source.subtitle) && (

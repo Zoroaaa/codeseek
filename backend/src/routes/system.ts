@@ -4,6 +4,126 @@ import { success, error, generateId } from '../utils';
 
 export const systemRoutes = new Hono<{ Bindings: Env }>();
 
+// ─── 健康检查核心工具函数 ────────────────────────────────────────────────────
+
+/**
+ * 检测单个 URL 是否可达。
+ * 策略：GET + 模拟浏览器 UA，将常见 4xx（401/403/405/429）视为"可达"
+ * （服务器健在但有访问限制，与宕机不同）。
+ */
+async function checkUrlReachability(url: string, timeoutMs = 10000): Promise<{
+  status: string;
+  available: boolean;
+  responseTime: number;
+  httpStatus: number | null;
+  error: string | null;
+}> {
+  const startTime = Date.now();
+
+  const headers: HeadersInit = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+  };
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      signal: controller.signal,
+      redirect: 'follow',
+    });
+
+    clearTimeout(timer);
+    const responseTime = Date.now() - startTime;
+    const httpStatus = response.status;
+
+    // 2xx/3xx 是正常在线；以下 4xx 说明服务器在线但有限制
+    const reachableSet = new Set([200, 201, 204, 206, 301, 302, 303, 304, 307, 308, 400, 401, 403, 405, 406, 429]);
+    const available = reachableSet.has(httpStatus) || (httpStatus >= 200 && httpStatus < 400);
+
+    if (available) {
+      const statusLabel = httpStatus >= 400 ? 'restricted' : 'online';
+      return { status: statusLabel, available: true, responseTime, httpStatus, error: null };
+    }
+
+    return {
+      status: 'error',
+      available: false,
+      responseTime,
+      httpStatus,
+      error: `HTTP ${httpStatus}`,
+    };
+  } catch (err) {
+    const responseTime = Date.now() - startTime;
+
+    if (err instanceof Error) {
+      if (err.name === 'AbortError' || err.message.includes('timeout')) {
+        return { status: 'timeout', available: false, responseTime, httpStatus: null, error: '请求超时' };
+      }
+      const msg = err.message.toLowerCase();
+      if (msg.includes('network') || msg.includes('failed to fetch') || msg.includes('econnrefused')) {
+        return { status: 'offline', available: false, responseTime, httpStatus: null, error: '网络不可达' };
+      }
+      return { status: 'offline', available: false, responseTime, httpStatus: null, error: err.message };
+    }
+
+    return { status: 'offline', available: false, responseTime, httpStatus: null, error: '未知错误' };
+  }
+}
+
+/** 从搜索源记录中提取最合适的检测 URL */
+function resolveCheckUrl(source: SearchSource): string {
+  if (source.homepage_url && source.homepage_url.startsWith('http')) {
+    return source.homepage_url;
+  }
+  const template = source.url_template || '';
+  if (template.includes('{keyword}')) {
+    return template.replace('{keyword}', encodeURIComponent('test'));
+  }
+  return template;
+}
+
+/** 异步写入状态缓存（失败不影响主流程） */
+async function saveStatusCache(
+  db: Env['DB'],
+  sourceId: string,
+  result: { status: string; available: boolean; responseTime: number; error: string | null },
+  ttlMs = 5 * 60 * 1000
+): Promise<void> {
+  try {
+    const cacheId = generateId();
+    const now = Date.now();
+    await db.prepare(`
+      INSERT INTO source_status_cache
+        (id, source_id, keyword, keyword_hash, status, available, content_match,
+         response_time, quality_score, check_error, expires_at, created_at, last_accessed, access_count)
+      VALUES (?, ?, 'health', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+    `).bind(
+      cacheId,
+      sourceId,
+      result.status,
+      result.available ? 1 : 0,
+      result.available ? 1 : 0,
+      result.responseTime,
+      result.available ? 100 : 0,
+      result.error,
+      now + ttlMs,
+      now,
+      now,
+    ).run();
+  } catch {
+    // 忽略缓存写入失败
+  }
+}
+
+// ─── END 工具函数 ────────────────────────────────────────────────────────────
+
 systemRoutes.get('/public-config', async (c) => {
   try {
     return c.json(success({
@@ -23,25 +143,26 @@ systemRoutes.get('/public-config', async (c) => {
   }
 });
 
+// ─── 单源健康检查 ────────────────────────────────────────────────────────────
 systemRoutes.get('/source-status-check', async (c) => {
   const sourceId = c.req.query('sourceId');
-  const keyword = c.req.query('keyword') || 'test';
 
   if (!sourceId) {
     return c.json(error('VALIDATION_ERROR', '请提供搜索源ID'), 400);
   }
 
   try {
+    // 读缓存（5 分钟内有效）
     const cached = await c.env.DB.prepare(`
-      SELECT * FROM source_status_cache 
-      WHERE source_id = ? AND keyword = ? AND created_at > ?
-    `).bind(sourceId, keyword, Date.now() - 5 * 60 * 1000).first<SourceStatusCache>();
+      SELECT * FROM source_status_cache
+      WHERE source_id = ? AND created_at > ?
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(sourceId, Date.now() - 5 * 60 * 1000).first<SourceStatusCache>();
 
     if (cached) {
       return c.json(success({
         status: cached.status,
         available: cached.available === 1,
-        contentMatch: cached.content_match === 1,
         responseTime: cached.response_time,
         qualityScore: cached.quality_score,
         error: cached.check_error,
@@ -57,104 +178,24 @@ systemRoutes.get('/source-status-check', async (c) => {
       return c.json(error('NOT_FOUND', '搜索源不存在'), 404);
     }
 
-    const checkUrl = source.homepage_url || source.url_template.replace('{keyword}', encodeURIComponent(keyword));
-    const startTime = Date.now();
-    
-    let status = 'unknown';
-    let available = false;
-    let contentMatch = false;
-    let responseTime = 0;
-    let checkError: string | null = null;
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
-      const response = await fetch(checkUrl, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          'Cache-Control': 'no-cache',
-        },
-      });
-      
-      clearTimeout(timeoutId);
-      responseTime = Date.now() - startTime;
-      
-      available = response.ok || response.status < 500;
-      
-      if (response.ok) {
-        status = 'online';
-        contentMatch = true;
-        
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('text/html')) {
-          try {
-            const text = await response.text();
-            contentMatch = text.length > 100;
-          } catch {
-            contentMatch = true;
-          }
-        }
-      } else if (response.status >= 400 && response.status < 500) {
-        status = 'restricted';
-        available = true;
-        contentMatch = false;
-        checkError = `HTTP ${response.status}`;
-      } else {
-        status = 'error';
-        checkError = `HTTP ${response.status}`;
-      }
-    } catch (fetchError) {
-      responseTime = Date.now() - startTime;
-      
-      if (fetchError instanceof Error) {
-        if (fetchError.name === 'AbortError') {
-          status = 'timeout';
-          checkError = '请求超时';
-        } else {
-          status = 'offline';
-          checkError = fetchError.message;
-        }
-      } else {
-        status = 'offline';
-        checkError = 'Unknown error';
-      }
+    const checkUrl = resolveCheckUrl(source);
+    if (!checkUrl) {
+      return c.json(error('VALIDATION_ERROR', '该搜索源没有可检测的 URL'), 400);
     }
 
-    const qualityScore = available && contentMatch ? 100 : (available ? 50 : 0);
+    const result = await checkUrlReachability(checkUrl, 10000);
 
-    const cacheId = generateId();
-    const now = Date.now();
-    await c.env.DB.prepare(`
-      INSERT INTO source_status_cache (id, source_id, keyword, keyword_hash, status, available, content_match, response_time, quality_score, check_error, expires_at, created_at, last_accessed, access_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-    `).bind(
-      cacheId,
-      sourceId,
-      keyword,
-      null,
-      status,
-      available ? 1 : 0,
-      contentMatch ? 1 : 0,
-      responseTime,
-      qualityScore,
-      checkError,
-      now + 5 * 60 * 1000,
-      now,
-      now
-    ).run();
+    // 异步写缓存，不阻塞响应
+    saveStatusCache(c.env.DB, sourceId, result).catch(() => {});
 
     return c.json(success({
-      status,
-      available,
-      contentMatch,
-      responseTime,
-      qualityScore,
-      error: checkError,
+      status: result.status,
+      available: result.available,
+      responseTime: result.responseTime,
+      qualityScore: result.available ? 100 : 0,
+      error: result.error,
       cached: false,
+      checkedUrl: checkUrl,
     }));
   } catch (err) {
     console.error('Source status check error:', err);
@@ -162,151 +203,112 @@ systemRoutes.get('/source-status-check', async (c) => {
   }
 });
 
+// ─── 批量健康检查（POST，并发执行） ─────────────────────────────────────────
 systemRoutes.post('/source-status-batch', async (c) => {
   try {
     const body = await c.req.json();
-    const { sourceIds, keyword = 'test' } = body;
+    const { sourceIds } = body;
 
     if (!sourceIds || !Array.isArray(sourceIds) || sourceIds.length === 0) {
       return c.json(error('VALIDATION_ERROR', '请提供搜索源ID列表'), 400);
     }
 
-    if (sourceIds.length > 20) {
-      return c.json(error('VALIDATION_ERROR', '单次最多检查20个搜索源'), 400);
+    if (sourceIds.length > 30) {
+      return c.json(error('VALIDATION_ERROR', '单次最多检查30个搜索源'), 400);
     }
 
-    const results: Array<{
-      sourceId: string;
-      sourceName: string;
-      status: string;
-      available: boolean;
-      responseTime: number;
-      error: string | null;
-    }> = [];
-
+    // 批量查询源信息
     const sources = await c.env.DB.prepare(
-      `SELECT id, name, url_template, homepage_url FROM search_sources WHERE id IN (${sourceIds.map(() => '?').join(',')})`
+      `SELECT id, name, url_template, homepage_url FROM search_sources
+       WHERE id IN (${sourceIds.map(() => '?').join(',')}) AND is_active = 1`
     ).bind(...sourceIds).all<{ id: string; name: string; url_template: string; homepage_url: string | null }>();
 
     const sourceMap = new Map(sources.results.map(s => [s.id, s]));
 
-    for (const sourceId of sourceIds) {
-      const source = sourceMap.get(sourceId);
-      
-      if (!source) {
-        results.push({
+    // 一次性批量查缓存
+    const TTL = 5 * 60 * 1000;
+    const cachedRows = await c.env.DB.prepare(
+      `SELECT source_id, status, available, response_time, check_error
+       FROM source_status_cache
+       WHERE source_id IN (${sourceIds.map(() => '?').join(',')}) AND created_at > ?
+       ORDER BY created_at DESC`
+    ).bind(...sourceIds, Date.now() - TTL).all<{
+      source_id: string; status: string; available: number; response_time: number; check_error: string | null;
+    }>();
+
+    const cacheMap = new Map<string, typeof cachedRows.results[0]>();
+    for (const row of (cachedRows.results || [])) {
+      if (!cacheMap.has(row.source_id)) cacheMap.set(row.source_id, row);
+    }
+
+    // 未命中缓存且存在的源 → 并发检查
+    const toCheck = sourceIds.filter(id => !cacheMap.has(id) && sourceMap.has(id));
+
+    const freshResults = await Promise.all(
+      toCheck.map(async (sourceId) => {
+        const source = sourceMap.get(sourceId)!;
+        const checkUrl = resolveCheckUrl(source as unknown as SearchSource);
+
+        if (!checkUrl) {
+          return { sourceId, sourceName: source.name, status: 'unknown', available: false, responseTime: 0, error: '无可用 URL', cached: false };
+        }
+
+        const result = await checkUrlReachability(checkUrl, 9000);
+        saveStatusCache(c.env.DB, sourceId, result).catch(() => {});
+
+        return {
           sourceId,
-          sourceName: '未知',
-          status: 'not_found',
-          available: false,
-          responseTime: 0,
-          error: '搜索源不存在',
-        });
-        continue;
+          sourceName: source.name,
+          status: result.status,
+          available: result.available,
+          responseTime: result.responseTime,
+          error: result.error,
+          cached: false,
+        };
+      })
+    );
+
+    // 合并结果
+    const results = sourceIds.map(sourceId => {
+      const source = sourceMap.get(sourceId);
+      if (!source) {
+        return { sourceId, sourceName: '未知', status: 'not_found', available: false, responseTime: 0, error: '搜索源不存在', cached: false };
       }
 
-      const cached = await c.env.DB.prepare(`
-        SELECT * FROM source_status_cache 
-        WHERE source_id = ? AND keyword = ? AND created_at > ?
-      `).bind(sourceId, keyword, Date.now() - 5 * 60 * 1000).first<SourceStatusCache>();
-
+      const cached = cacheMap.get(sourceId);
       if (cached) {
-        results.push({
+        return {
           sourceId,
           sourceName: source.name,
           status: cached.status,
           available: cached.available === 1,
           responseTime: cached.response_time,
           error: cached.check_error,
-        });
-        continue;
+          cached: true,
+        };
       }
 
-      const checkUrl = source.homepage_url || source.url_template.replace('{keyword}', encodeURIComponent(keyword));
-      const startTime = Date.now();
-      
-      let status = 'unknown';
-      let available = false;
-      let responseTime = 0;
-      let checkError: string | null = null;
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
-        const response = await fetch(checkUrl, {
-          method: 'GET',
-          signal: controller.signal,
-          headers: {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'Cache-Control': 'no-cache',
-          },
-        });
-        
-        clearTimeout(timeoutId);
-        responseTime = Date.now() - startTime;
-        
-        available = response.ok || response.status < 500;
-        status = response.ok ? 'online' : (response.status >= 400 && response.status < 500 ? 'restricted' : 'error');
-        
-        if (!response.ok) {
-          checkError = `HTTP ${response.status}`;
-        }
-      } catch (fetchError) {
-        responseTime = Date.now() - startTime;
-        
-        if (fetchError instanceof Error) {
-          if (fetchError.name === 'AbortError') {
-            status = 'timeout';
-            checkError = '请求超时';
-          } else {
-            status = 'offline';
-            checkError = fetchError.message;
-          }
-        } else {
-          status = 'offline';
-          checkError = 'Unknown error';
-        }
-      }
-
-      const qualityScore = available ? 100 : 0;
-      const cacheId = generateId();
-      const now = Date.now();
-      
-      await c.env.DB.prepare(`
-        INSERT INTO source_status_cache (id, source_id, keyword, keyword_hash, status, available, content_match, response_time, quality_score, check_error, expires_at, created_at, last_accessed, access_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-      `).bind(
-        cacheId,
-        sourceId,
-        keyword,
-        null,
-        status,
-        available ? 1 : 0,
-        available ? 1 : 0,
-        responseTime,
-        qualityScore,
-        checkError,
-        now + 5 * 60 * 1000,
-        now,
-        now
-      ).run();
-
-      results.push({
+      return freshResults.find(r => r.sourceId === sourceId) ?? {
         sourceId,
         sourceName: source.name,
-        status,
-        available,
-        responseTime,
-        error: checkError,
-      });
-    }
+        status: 'unknown',
+        available: false,
+        responseTime: 0,
+        error: '检查失败',
+        cached: false,
+      };
+    });
+
+    const availableCount = results.filter(r => r.available).length;
 
     return c.json(success({
       results,
       checkedAt: Date.now(),
-      keyword,
+      summary: {
+        total: results.length,
+        available: availableCount,
+        unavailable: results.length - availableCount,
+      },
     }));
   } catch (err) {
     console.error('Batch source status check error:', err);
@@ -324,8 +326,8 @@ systemRoutes.post('/record-action', async (c) => {
     }
 
     const actionId = generateId();
-    const ip = c.req.header('x-forwarded-for') || 
-               c.req.header('x-real-ip') || 
+    const ip = c.req.header('x-forwarded-for') ||
+               c.req.header('x-real-ip') ||
                c.req.header('CF-Connecting-IP') ||
                null;
     const userAgent = c.req.header('User-Agent') || null;
@@ -413,7 +415,7 @@ systemRoutes.get('/source-status-history/:sourceId', async (c) => {
 
   try {
     const history = await c.env.DB.prepare(`
-      SELECT * FROM source_status_cache 
+      SELECT * FROM source_status_cache
       WHERE source_id = ? AND created_at > ?
       ORDER BY created_at DESC
       LIMIT ?
@@ -429,7 +431,7 @@ systemRoutes.get('/source-status-history/:sourceId', async (c) => {
 
     const results = history.results || [];
     const availableCount = results.filter(r => r.available === 1).length;
-    const avgResponseTime = results.length > 0 
+    const avgResponseTime = results.length > 0
       ? Math.round(results.reduce((sum, r) => sum + (r.response_time || 0), 0) / results.length)
       : 0;
 
@@ -450,6 +452,7 @@ systemRoutes.get('/source-status-history/:sourceId', async (c) => {
   }
 });
 
+// ─── GET 批量查缓存（不触发新检查，仅返回已有缓存） ──────────────────────
 systemRoutes.get('/source-status-batch', async (c) => {
   const sourceIds = c.req.query('sourceIds');
 
@@ -464,108 +467,52 @@ systemRoutes.get('/source-status-batch', async (c) => {
   }
 
   if (ids.length > 50) {
-    return c.json(error('VALIDATION_ERROR', '最多同时检查50个搜索源'), 400);
+    return c.json(error('VALIDATION_ERROR', '最多同时查询50个搜索源的缓存状态'), 400);
   }
 
   try {
-    const results: Array<{
-      sourceId: string;
-      status: string;
-      available: boolean;
-      responseTime: number;
-      cached: boolean;
-      error?: string;
-    }> = [];
+    const cachedRows = await c.env.DB.prepare(
+      `SELECT source_id, status, available, response_time, check_error, created_at
+       FROM source_status_cache
+       WHERE source_id IN (${ids.map(() => '?').join(',')})
+       ORDER BY created_at DESC`
+    ).bind(...ids).all<{
+      source_id: string; status: string; available: number; response_time: number; check_error: string | null; created_at: number;
+    }>();
 
-    for (const sourceId of ids) {
-      const cached = await c.env.DB.prepare(`
-        SELECT * FROM source_status_cache 
-        WHERE source_id = ? AND created_at > ?
-        ORDER BY created_at DESC LIMIT 1
-      `).bind(sourceId, Date.now() - 5 * 60 * 1000).first<SourceStatusCache>();
+    const cacheMap = new Map<string, typeof cachedRows.results[0]>();
+    for (const row of (cachedRows.results || [])) {
+      if (!cacheMap.has(row.source_id)) cacheMap.set(row.source_id, row);
+    }
 
+    const results = ids.map(sourceId => {
+      const cached = cacheMap.get(sourceId);
       if (cached) {
-        results.push({
+        return {
           sourceId,
           status: cached.status,
           available: cached.available === 1,
           responseTime: cached.response_time,
           cached: true,
+          cacheAgeSeconds: Math.round((Date.now() - cached.created_at) / 1000),
           error: cached.check_error || undefined,
-        });
-        continue;
+        };
       }
-
-      const source = await c.env.DB.prepare(
-        'SELECT * FROM search_sources WHERE id = ?'
-      ).bind(sourceId).first<SearchSource>();
-
-      if (!source) {
-        results.push({
-          sourceId,
-          status: 'not_found',
-          available: false,
-          responseTime: 0,
-          cached: false,
-          error: '搜索源不存在',
-        });
-        continue;
-      }
-
-      const url = source.url_template.replace('{keyword}', 'test');
-      const startTime = Date.now();
-
-      let status = 'unknown';
-      let available = false;
-      let responseTime = 0;
-      let checkError = null;
-
-      try {
-        const response = await fetch(url, {
-          method: 'HEAD',
-          signal: AbortSignal.timeout(5000),
-        });
-
-        responseTime = Date.now() - startTime;
-        available = response.ok;
-        status = available ? 'online' : 'error';
-      } catch (fetchError) {
-        responseTime = Date.now() - startTime;
-        status = 'offline';
-        checkError = fetchError instanceof Error ? fetchError.message : 'Unknown error';
-      }
-
-      const cacheId = generateId();
-      await c.env.DB.prepare(`
-        INSERT INTO source_status_cache (id, source_id, keyword, status, available, content_match, response_time, quality_score, check_error, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        cacheId,
+      return {
         sourceId,
-        'test',
-        status,
-        available ? 1 : 0,
-        available ? 1 : 0,
-        responseTime,
-        available ? 100 : 0,
-        checkError,
-        Date.now()
-      ).run();
-
-      results.push({
-        sourceId,
-        status,
-        available,
-        responseTime,
+        status: 'unchecked',
+        available: false,
+        responseTime: 0,
         cached: false,
-        error: checkError || undefined,
-      });
-    }
+        cacheAgeSeconds: null,
+        error: '尚未检查',
+      };
+    });
 
     return c.json(success({ results }));
   } catch (err) {
-    console.error('Batch status check error:', err);
-    return c.json(error('SERVER_ERROR', '批量检查失败'), 500);
+    console.error('Batch status cache query error:', err);
+    return c.json(error('SERVER_ERROR', '批量查询失败'), 500);
   }
 });
 
