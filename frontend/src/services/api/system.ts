@@ -188,14 +188,14 @@ export const analyticsApi = {
     success: boolean; 
     data: { eventId: string } 
   }> => {
-    return apiClient.post('/analytics/events', data);
+    return apiClient.post('/config/analytics/events', data);
   },
 
   getStats: async (days = 7): Promise<{ 
     success: boolean; 
     data: AnalyticsStats 
   }> => {
-    return apiClient.get(`/analytics/stats?days=${days}`);
+    return apiClient.get(`/config/analytics/stats?days=${days}`);
   },
 
   getDailyStats: async (startDate?: string, endDate?: string): Promise<{ 
