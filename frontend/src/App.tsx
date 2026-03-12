@@ -8,6 +8,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AdminPanelLayout } from '@/components/layout/AdminPanelLayout';
 import { CommunityPanelLayout } from '@/components/layout/CommunityPanelLayout';
 import { ToastContainer } from '@/components/ui/Toast';
+import { useFeatureFlags } from '@/contexts/ConfigContext';
 import { HomePage } from '@/pages/HomePage';
 import { MainSearchPage } from '@/pages/MainSearchPage';
 import { DashboardPage, UserActivitiesPage } from '@/pages/dashboard';
@@ -49,6 +50,29 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
   
   if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+const CommunityRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuthStore();
+  const { communityEnabled } = useFeatureFlags();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (!communityEnabled) {
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -176,7 +200,7 @@ const App: React.FC = () => {
           <Route path="activities" element={<UserActivitiesPage />} />
         </Route>
         
-        <Route path="/community" element={<ProtectedRoute><CommunityPanelLayout /></ProtectedRoute>}>
+        <Route path="/community" element={<CommunityRoute><CommunityPanelLayout /></CommunityRoute>}>
           <Route index element={<CommunityManager />} />
           <Route path="my-shares" element={<CommunityManager />} />
           <Route path="my-favorites" element={<CommunityManager />} />

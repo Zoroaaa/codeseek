@@ -657,6 +657,19 @@ userRoutes.get('/activities/stats', async (c) => {
       WHERE user_id = ? AND action = 'login' AND created_at > ?
     `).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
 
+    const thisWeekLogins = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM user_actions
+      WHERE user_id = ? AND action = 'login' AND created_at > ?
+    `).bind(payload.userId, oneWeekAgo).first<{ count: number }>();
+
+    const lastWeekStart = now - 14 * 24 * 60 * 60 * 1000;
+    const lastWeekLogins = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM user_actions
+      WHERE user_id = ? AND action = 'login' AND created_at > ? AND created_at <= ?
+    `).bind(payload.userId, lastWeekStart, oneWeekAgo).first<{ count: number }>();
+
     const recentFailedLogins = await c.env.DB.prepare(`
       SELECT COUNT(*) as count
       FROM user_actions
@@ -683,6 +696,8 @@ userRoutes.get('/activities/stats', async (c) => {
       actionsByType: actionsByType.results || [],
       summary: {
         logins: recentLogins?.count || 0,
+        thisWeekLogins: thisWeekLogins?.count || 0,
+        lastWeekLogins: lastWeekLogins?.count || 0,
         failedLogins: recentFailedLogins?.count || 0,
         searches: recentSearches?.count || 0,
         favorites: recentFavorites?.count || 0,

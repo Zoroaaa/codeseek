@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Database,
-  Users,
   Search,
   ArrowUpRight,
   ArrowDownRight,
@@ -12,15 +11,16 @@ import {
   RefreshCw,
   Sparkles,
   Award,
-  BarChart2,
   Tag,
+  Clock,
+  LogIn,
 } from 'lucide-react';
 import { Card, Badge, Loading, Button } from '@/components/ui';
 import { systemApi, userApi, sourceApi } from '@/services/api';
 import { useAuthStore } from '@/stores';
 import { useNavigate } from 'react-router-dom';
 import { useFeatureFlags } from '@/contexts/ConfigContext';
-import type { SystemStats, FavoriteItem, SearchHistoryItem, SearchSource, UserSourceConfig } from '@/types';
+import type { FavoriteItem, SearchHistoryItem, SearchSource, UserSourceConfig } from '@/types';
 
 const getUserLevel = (total: number) => {
   if (total < 10)  return { label: '新手',   color: 'from-slate-400 to-slate-500',   icon: '🌱', next: 10,  prev: 0   };
@@ -101,7 +101,6 @@ export const OverviewManager: React.FC = () => {
   const { user } = useAuthStore();
   const { communityEnabled } = useFeatureFlags();
   
-  const [stats, setStats] = useState<SystemStats | null>(null);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [sources, setSources] = useState<Array<SearchSource & { userConfig?: UserSourceConfig | null }>>([]);
@@ -112,6 +111,10 @@ export const OverviewManager: React.FC = () => {
     searchGrowthPercent: number;
     thisWeekSearches: number;
     lastWeekSearches: number;
+  } | null>(null);
+  const [activityStats, setActivityStats] = useState<{
+    thisWeekLogins: number;
+    lastWeekLogins: number;
   } | null>(null);
   const [recentActivities, setRecentActivities] = useState<Array<{
     id: string;
@@ -125,24 +128,20 @@ export const OverviewManager: React.FC = () => {
   const loadAllData = useCallback(async () => {
     try {
       const [
-        statsResponse,
         favoritesResponse,
         historyResponse,
         sourcesResponse,
         searchStatsResponse,
-        activitiesResponse
+        activitiesResponse,
+        activityStatsResponse
       ] = await Promise.all([
-        systemApi.getStats(),
         userApi.getFavorites(),
         userApi.getSearchHistory(50),
         sourceApi.getSourcesWithUserConfig(),
         userApi.getSearchStats(),
-        systemApi.getUserActions({ userId: user?.id, limit: 10 })
+        systemApi.getUserActions({ userId: user?.id, limit: 10 }),
+        userApi.getActivitiesStats()
       ]);
-      
-      if (statsResponse.success && statsResponse.data) {
-        setStats(statsResponse.data);
-      }
       
       if (favoritesResponse.success && favoritesResponse.data) {
         setFavorites(favoritesResponse.data.favorites || []);
@@ -161,12 +160,19 @@ export const OverviewManager: React.FC = () => {
       }
       
       if (activitiesResponse.success && activitiesResponse.data) {
-        setRecentActivities(activitiesResponse.data.logs.map(log => ({
+        setRecentActivities(activitiesResponse.data.logs.map((log: { id: string; action: string; target: string; createdAt: string }) => ({
           id: log.id,
           action: log.action,
           target: log.target,
           createdAt: log.createdAt,
         })));
+      }
+
+      if (activityStatsResponse.success && activityStatsResponse.data) {
+        setActivityStats({
+          thisWeekLogins: activityStatsResponse.data.summary.thisWeekLogins,
+          lastWeekLogins: activityStatsResponse.data.summary.lastWeekLogins,
+        });
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -195,7 +201,7 @@ export const OverviewManager: React.FC = () => {
       case 'favorite':
         return <Heart className="w-4 h-4" />;
       case 'login':
-        return <Users className="w-4 h-4" />;
+        return <Activity className="w-4 h-4" />;
       default:
         return <Activity className="w-4 h-4" />;
     }
@@ -284,18 +290,18 @@ export const OverviewManager: React.FC = () => {
           onClick={() => navigate('/dashboard/favorites')}
         />
         <StatCard
+          title="本周登录"
+          value={activityStats?.thisWeekLogins ?? 0}
+          change={activityStats?.lastWeekLogins ? Math.round((((activityStats.thisWeekLogins ?? 0) - activityStats.lastWeekLogins) / Math.max(activityStats.lastWeekLogins, 1)) * 100) : undefined}
+          icon={<LogIn className="w-6 h-6" />}
+          color="success"
+        />
+        <StatCard
           title="可用搜索源"
-          value={stats?.activeSources ?? sources.length}
+          value={userStats.sourceCount}
           icon={<Database className="w-6 h-6" />}
           color="accent"
           onClick={() => navigate('/dashboard/sources')}
-        />
-        <StatCard
-          title="活跃用户"
-          value={stats?.activeUsers ?? 0}
-          change={stats?.activeUsersGrowthPercent}
-          icon={<Users className="w-6 h-6" />}
-          color="success"
         />
       </div>
 
@@ -462,64 +468,69 @@ export const OverviewManager: React.FC = () => {
         {/* 热门搜索 + 快速操作 */}
         <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
           <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-accent-600 dark:text-accent-400" />
+            <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-violet-600 dark:text-violet-400" />
             </div>
-            快速操作
+            搜索习惯
           </h3>
-          <div className="space-y-3 mb-4">
-            <QuickAction
-              icon={<Search className="w-5 h-5" />}
-              title="开始搜索"
-              description="搜索磁力资源"
-              onClick={() => navigate('/main')}
-              gradient="bg-gradient-to-br from-primary-500 to-primary-600"
-            />
-            <QuickAction
-              icon={<BarChart2 className="w-5 h-5" />}
-              title="数据统计"
-              description="查看搜索趋势与关键词分析"
-              onClick={() => navigate('/dashboard/stats')}
-              gradient="bg-gradient-to-br from-violet-500 to-purple-600"
-            />
-            <QuickAction
-              icon={<Database className="w-5 h-5" />}
-              title="管理搜索源"
-              description="添加或编辑搜索源"
-              onClick={() => navigate('/dashboard/sources')}
-              gradient="bg-gradient-to-br from-accent-500 to-accent-600"
-            />
-            {communityEnabled && (
-              <QuickAction
-                icon={<Globe className="w-5 h-5" />}
-                title="社区分享"
-                description="发现优质搜索源"
-                onClick={() => navigate('/community')}
-                gradient="bg-gradient-to-br from-success-500 to-success-600"
-              />
+          
+          <div className="space-y-4">
+            <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
+              <p className="text-xs text-surface-500 dark:text-surface-400 mb-2">本周最常搜索</p>
+              {userSearchStats?.topSources && userSearchStats.topSources.length > 0 ? (
+                <div className="space-y-2">
+                  {userSearchStats.topSources.slice(0, 3).map((item, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white text-xs flex items-center justify-center font-medium">
+                          {index + 1}
+                        </span>
+                        <span className="text-sm text-surface-700 dark:text-surface-300 truncate max-w-[150px]">{item.source}</span>
+                      </div>
+                      <span className="text-sm font-medium text-surface-900 dark:text-surface-100">{item.count}次</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-surface-400 dark:text-surface-500">暂无数据</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl text-center">
+                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+                  {new Set(searchHistory.map(h => h.query)).size}
+                </p>
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">不同关键词</p>
+              </div>
+              <div className="p-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl text-center">
+                <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+                  {userSearchStats?.thisWeekSearches ?? 0}
+                </p>
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">本周搜索</p>
+              </div>
+            </div>
+
+            {searchHistory.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Tag className="w-3.5 h-3.5 text-surface-400" />
+                  <span className="text-xs text-surface-500 dark:text-surface-400 font-medium">最近搜索</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[...new Set(searchHistory.slice(0, 10).map(h => h.query))].slice(0, 6).map(q => (
+                    <button
+                      key={q}
+                      onClick={() => navigate('/main')}
+                      className="text-xs px-2.5 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 transition-colors border border-surface-200 dark:border-surface-700 truncate max-w-[100px]"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
-
-          {/* 最近搜索词速览 */}
-          {searchHistory.length > 0 && (
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Tag className="w-3.5 h-3.5 text-surface-400" />
-                <span className="text-xs text-surface-500 dark:text-surface-400 font-medium">最近搜索</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {[...new Set(searchHistory.slice(0, 10).map(h => h.query))].slice(0, 8).map(q => (
-                  <button
-                    key={q}
-                    onClick={() => navigate('/main')}
-                    className="text-xs px-2.5 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 transition-colors border border-surface-200 dark:border-surface-700 truncate max-w-[120px]"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </Card>
       </div>
     </div>

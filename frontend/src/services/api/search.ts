@@ -259,6 +259,8 @@ export const userApi = {
       actionsByType: Array<{ action: string; count: number }>;
       summary: {
         logins: number;
+        thisWeekLogins: number;
+        lastWeekLogins: number;
         failedLogins: number;
         searches: number;
         favorites: number;
