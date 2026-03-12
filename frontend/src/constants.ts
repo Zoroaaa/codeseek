@@ -125,15 +125,3 @@ export const APP_INFO_FALLBACK = {
   VERSION: APP_VERSION,
 } as const;
 
-// ======================================================================
-// ❌ 以下配置已迁移至 DB → ConfigContext，请勿在此处重复定义：
-//
-//   VALIDATION_RULES.PASSWORD_MIN/MAX_LENGTH     → config.minPasswordLength
-//   VALIDATION_RULES.USERNAME_MIN/MAX_LENGTH     → config.minUsernameLength
-//   VALIDATION_RULES.SEARCH_KEYWORD_MIN/MAX      → config.search.maxKeywordLength
-//   SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS           → 后端 DB 控制，前端无需感知
-//   COMMUNITY_CONFIG.*                           → 后端校验，前端从 config 取
-//   SEARCH_CONFIG.MAX_KEYWORD_LENGTH             → config.search.maxKeywordLength
-//   SEARCH_HISTORY_CONFIG.MAX_HISTORY_ITEMS      → config.maxHistoryPerUser
-//   APP_INFO.NAME / DESCRIPTION                  → config.siteName / siteDescription
-// ======================================================================
