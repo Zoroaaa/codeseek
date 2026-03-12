@@ -7,7 +7,7 @@
 import { SecurityLockout, UserSecurityEvent, Env } from '../types';
 import { generateId } from '../utils';
 import { ConfigService } from '../services/config';
-import { CONFIG } from '../constants';
+import { CONFIG, DB_CONFIG_KEYS } from '../constants';
 
 const DEFAULT_SECURITY_CONFIG = {
   MAX_LOGIN_ATTEMPTS: 5,
@@ -77,11 +77,11 @@ export async function recordFailedAttempt(
   const db = env.DB;
   const now = Date.now();
   
-  const configMaxLoginAttempts = await configService.getInt('max_login_attempts', DEFAULT_SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS);
-  const configMaxVerificationAttempts = await configService.getInt('max_verification_attempts', DEFAULT_SECURITY_CONFIG.MAX_VERIFICATION_ATTEMPTS);
-  const configMaxPasswordResetAttempts = await configService.getInt('password_reset_max_attempts', DEFAULT_SECURITY_CONFIG.MAX_PASSWORD_RESET_ATTEMPTS);
-  const configLockoutDuration = await configService.getInt('lockout_duration_ms', DEFAULT_SECURITY_CONFIG.LOCKOUT_DURATION_MS);
-  const configPasswordResetLockout = await configService.getInt('password_reset_lockout_duration', DEFAULT_SECURITY_CONFIG.PASSWORD_RESET_LOCKOUT_MS);
+  const configMaxLoginAttempts = await configService.getInt(DB_CONFIG_KEYS.MAX_LOGIN_ATTEMPTS, DEFAULT_SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS);
+  const configMaxVerificationAttempts = await configService.getInt(DB_CONFIG_KEYS.MAX_VERIFICATION_ATTEMPTS, DEFAULT_SECURITY_CONFIG.MAX_VERIFICATION_ATTEMPTS);
+  const configMaxPasswordResetAttempts = await configService.getInt(DB_CONFIG_KEYS.PASSWORD_RESET_MAX_ATTEMPTS, DEFAULT_SECURITY_CONFIG.MAX_PASSWORD_RESET_ATTEMPTS);
+  const configLockoutDuration = await configService.getInt(DB_CONFIG_KEYS.LOCKOUT_DURATION_MS, DEFAULT_SECURITY_CONFIG.LOCKOUT_DURATION_MS);
+  const configPasswordResetLockout = await configService.getInt(DB_CONFIG_KEYS.PASSWORD_RESET_LOCKOUT_DURATION, DEFAULT_SECURITY_CONFIG.PASSWORD_RESET_LOCKOUT_MS);
 
   const max = maxAttempts || (
     lockoutType === 'password_reset' ? configMaxPasswordResetAttempts :
@@ -323,13 +323,12 @@ export async function detectSuspiciousActivity(
   const factors: string[] = [];
   let riskScore = 0;
   const db = env.DB;
-  const configService = new ConfigService(env);
 
   try {
-    const recentFailedLoginsThreshold = await configService.getInt('recent_failed_logins_threshold', DEFAULT_SECURITY_CONFIG.RECENT_FAILED_LOGINS_THRESHOLD);
-    const recentIpLoginsThreshold = await configService.getInt('recent_ip_logins_threshold', DEFAULT_SECURITY_CONFIG.RECENT_IP_LOGINS_THRESHOLD);
-    const recentPasswordChangesThreshold = await configService.getInt('recent_password_changes_threshold', DEFAULT_SECURITY_CONFIG.RECENT_PASSWORD_CHANGES_THRESHOLD);
-    const suspiciousActivityThreshold = await configService.getInt('high_risk_threshold', DEFAULT_SECURITY_CONFIG.SUSPICIOUS_ACTIVITY_THRESHOLD);
+    const recentFailedLoginsThreshold = DEFAULT_SECURITY_CONFIG.RECENT_FAILED_LOGINS_THRESHOLD;
+    const recentIpLoginsThreshold = DEFAULT_SECURITY_CONFIG.RECENT_IP_LOGINS_THRESHOLD;
+    const recentPasswordChangesThreshold = DEFAULT_SECURITY_CONFIG.RECENT_PASSWORD_CHANGES_THRESHOLD;
+    const suspiciousActivityThreshold = DEFAULT_SECURITY_CONFIG.SUSPICIOUS_ACTIVITY_THRESHOLD;
 
     const recentFailedLogins = await db.prepare(
     `SELECT COUNT(*) as count FROM user_security_events 

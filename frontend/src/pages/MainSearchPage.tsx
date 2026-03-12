@@ -38,6 +38,7 @@ import { Loading, SourceIcon } from '@/components/ui';
 import { convertToProxyUrl } from '@/services/proxy/ProxyService';
 import { useToast } from '@/components/ui/Toast';
 import { useNavigate, Link } from 'react-router-dom';
+import { useFeatureFlags } from '@/contexts/ConfigContext';
 import type { SearchResult, FavoriteItem, SearchHistoryItem, MajorCategory, Category, SearchSource, UserSourceConfig } from '@/types';
 
 interface SearchResultItem extends SearchResult {
@@ -66,6 +67,7 @@ export const MainSearchPage: React.FC = () => {
   const { keyword, setKeyword, setResults, isSearching, setSearching } = useSearchStore();
   const { majorCategories, setMajorCategories, categories, setCategories } = useSourceStore();
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy, initializeProxy } = useProxyStore();
+  const { communityEnabled } = useFeatureFlags();
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(true);
@@ -512,10 +514,12 @@ export const MainSearchPage: React.FC = () => {
                 <LayoutDashboard className="w-3.5 h-3.5" />
                 控制台
               </Link>
-              <Link to="/community" className="px-3.5 py-2 text-sm font-medium rounded-xl text-surface-500 dark:text-surface-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5" />
-                社区
-              </Link>
+              {communityEnabled && (
+                <Link to="/community" className="px-3.5 py-2 text-sm font-medium rounded-xl text-surface-500 dark:text-surface-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  社区
+                </Link>
+              )}
               {isAuthenticated && user && (user.role === 'admin' || user.role === 'super_admin') && (
                 <Link to="/admin-panel" className="px-3.5 py-2 text-sm font-medium rounded-xl text-surface-500 dark:text-surface-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex items-center gap-1.5">
                   <ShieldAlert className="w-3.5 h-3.5" />
@@ -548,13 +552,15 @@ export const MainSearchPage: React.FC = () => {
                 <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5" />
               </Link>
 
-              <Link 
-                to="/community" 
-                className="mobile-header-btn md:hidden"
-                title="社区"
-              >
-                <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
-              </Link>
+              {communityEnabled && (
+                <Link 
+                  to="/community" 
+                  className="mobile-header-btn md:hidden"
+                  title="社区"
+                >
+                  <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
+                </Link>
+              )}
 
               {isAuthenticated && user && (user.role === 'admin' || user.role === 'super_admin') && (
                 <Link 

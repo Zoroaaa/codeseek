@@ -220,20 +220,16 @@ export const adminApi = {
   },
 
   cleanup: async (): Promise<{
-    expiredSessions: number;
-    expiredVerifications: number;
     oldPasswordResetLogs: number;
-    oldSecurityLockouts: number;
-    oldLoginLogs: number;
+    oldActions: number;
+    oldSecurityEvents: number;
   }> => {
     const response = await apiClient.post<{
       success: boolean;
       data: {
-        expiredSessions: number;
-        expiredVerifications: number;
         oldPasswordResetLogs: number;
-        oldSecurityLockouts: number;
-        oldLoginLogs: number;
+        oldActions: number;
+        oldSecurityEvents: number;
       };
     }>('/admin/cleanup', {});
     return response.data;

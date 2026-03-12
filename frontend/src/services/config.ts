@@ -2,7 +2,10 @@ import { configApi } from '@/services/api/system';
 
 export interface PublicConfig {
   appVersion: string;
+  siteName: string;
+  siteDescription: string;
   allowRegistration: boolean;
+  communityEnabled: boolean;
 }
 
 const CONFIG_CACHE_KEY = 'app_config_cache';
@@ -14,7 +17,10 @@ let lastFetchTime = 0;
 function getDefaultConfig(): PublicConfig {
   return {
     appVersion: '2.0.0',
+    siteName: '磁力快搜',
+    siteDescription: '搜索全网资源，一步直达',
     allowRegistration: true,
+    communityEnabled: true,
   };
 }
 
@@ -23,7 +29,10 @@ function parseConfig(data: Record<string, unknown>): PublicConfig {
   
   return {
     appVersion: String(data.appVersion ?? defaults.appVersion),
+    siteName: String(data.siteName ?? defaults.siteName),
+    siteDescription: String(data.siteDescription ?? defaults.siteDescription),
     allowRegistration: data.allowRegistration === true || data.allowRegistration === 1 || data.allowRegistration === '1' || data.allowRegistration === 'true',
+    communityEnabled: data.communityEnabled === true || data.communityEnabled === 1 || data.communityEnabled === '1' || data.communityEnabled === 'true',
   };
 }
 

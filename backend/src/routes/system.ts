@@ -115,11 +115,24 @@ systemRoutes.get('/public-config', async (c) => {
   try {
     const configService = new ConfigService(c.env);
 
-    const enableRegistration = await configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true);
+    const [
+      enableRegistration,
+      communityEnabled,
+      siteName,
+      siteDescription,
+    ] = await Promise.all([
+      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true),
+      configService.getBoolean(DB_CONFIG_KEYS.COMMUNITY_ENABLED, true),
+      configService.get(DB_CONFIG_KEYS.SITE_NAME, '磁力快搜'),
+      configService.get(DB_CONFIG_KEYS.SITE_DESCRIPTION, '搜索全网资源，一步直达'),
+    ]);
 
     return c.json(success({
       appVersion: c.env.APP_VERSION || '2.0.0',
+      siteName,
+      siteDescription,
       allowRegistration: enableRegistration,
+      communityEnabled,
       minUsernameLength: R.USERNAME.MIN_LENGTH,
       maxUsernameLength: R.USERNAME.MAX_LENGTH,
       minPasswordLength: R.PASSWORD.MIN_LENGTH,

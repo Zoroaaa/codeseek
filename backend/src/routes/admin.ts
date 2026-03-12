@@ -771,8 +771,12 @@ adminRoutes.get('/logs', async (c) => {
 });
 
 /**
- * 清理过期数据
  * POST /api/admin/cleanup
+ * 手动清理过期数据（仅清理需要动态配置保留天数的表）
+ * 
+ * 说明：
+ * - user_sessions、email_verifications、security_lockouts 由触发器实时清理
+ * - password_reset_logs、user_actions、user_security_events 需要动态配置保留天数
  */
 adminRoutes.post('/cleanup', async (c) => {
   const adminUser = c.get('user') as JwtPayload;
@@ -781,40 +785,29 @@ adminRoutes.post('/cleanup', async (c) => {
     const configService = new ConfigService(c.env);
     const passwordResetRetentionDays = await configService.getInt(DB_CONFIG_KEYS.PASSWORD_RESET_LOG_RETENTION_DAYS, 30);
     const userActionsRetentionDays = await configService.getInt(DB_CONFIG_KEYS.USER_ACTIONS_RETENTION_DAYS, 90);
+    const securityEventRetentionDays = await configService.getInt(DB_CONFIG_KEYS.SECURITY_EVENT_RETENTION_DAYS, 90);
 
     const now = Date.now();
     const results = {
-      expiredSessions: 0,
-      expiredVerifications: 0,
       oldPasswordResetLogs: 0,
-      oldSecurityLockouts: 0,
       oldActions: 0,
+      oldSecurityEvents: 0,
     };
-
-    const expiredSessions = await c.env.DB.prepare(
-      'DELETE FROM user_sessions WHERE expires_at < ?'
-    ).bind(now).run();
-    results.expiredSessions = expiredSessions.meta.changes || 0;
-
-    const expiredVerifications = await c.env.DB.prepare(
-      "DELETE FROM email_verifications WHERE expires_at < ? AND status NOT IN ('used', 'expired')"
-    ).bind(now).run();
-    results.expiredVerifications = expiredVerifications.meta.changes || 0;
 
     const oldPasswordResetLogs = await c.env.DB.prepare(
       'DELETE FROM password_reset_logs WHERE created_at < ?'
     ).bind(now - passwordResetRetentionDays * CONFIG.Stats.DAY_IN_MS).run();
     results.oldPasswordResetLogs = oldPasswordResetLogs.meta.changes || 0;
 
-    const oldSecurityLockouts = await c.env.DB.prepare(
-      'DELETE FROM security_lockouts WHERE locked_until < ?'
-    ).bind(now).run();
-    results.oldSecurityLockouts = oldSecurityLockouts.meta.changes || 0;
-
     const oldActions = await c.env.DB.prepare(
       'DELETE FROM user_actions WHERE created_at < ?'
     ).bind(now - userActionsRetentionDays * CONFIG.Stats.DAY_IN_MS).run();
     results.oldActions = oldActions.meta.changes || 0;
+
+    const oldSecurityEvents = await c.env.DB.prepare(
+      'DELETE FROM user_security_events WHERE created_at < ?'
+    ).bind(now - securityEventRetentionDays * CONFIG.Stats.DAY_IN_MS).run();
+    results.oldSecurityEvents = oldSecurityEvents.meta.changes || 0;
 
     await logUserAction(c.env, adminUser.userId, 'admin_cleanup', results, c);
 

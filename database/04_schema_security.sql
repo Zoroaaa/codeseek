@@ -215,13 +215,10 @@ CREATE TRIGGER IF NOT EXISTS update_email_template_timestamp
         UPDATE email_templates SET updated_at = strftime('%s', 'now') * 1000 WHERE id = NEW.id;
     END;
 
-CREATE TRIGGER IF NOT EXISTS cleanup_expired_password_reset_logs
-    AFTER INSERT ON password_reset_logs
+CREATE TRIGGER IF NOT EXISTS cleanup_expired_security_lockouts
+    AFTER INSERT ON security_lockouts
     FOR EACH ROW
     BEGIN
-        DELETE FROM password_reset_logs 
-        WHERE created_at < strftime('%s', 'now', '-30 days') * 1000;
-        
         DELETE FROM security_lockouts 
         WHERE locked_until < strftime('%s', 'now') * 1000;
     END;

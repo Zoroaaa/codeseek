@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores';
 import { authApi, analyticsApi } from '@/services/api';
 import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
-import { useValidationRules, useAppInfo } from '@/contexts/ConfigContext';
+import { useValidationRules, useAppInfo, useFeatureFlags } from '@/contexts/ConfigContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ export const LoginPage: React.FC = () => {
   const notification = useNotification();
   const validationRules = useValidationRules();
   const appInfo = useAppInfo();
+  const { enableRegistration } = useFeatureFlags();
   
   const [formData, setFormData] = useState({
     identifier: '',
@@ -163,12 +164,18 @@ export const LoginPage: React.FC = () => {
 
           {/* Footer */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              还没有账号？{' '}
-              <Link to="/register" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition-colors">
-                立即注册
-              </Link>
-            </p>
+            {enableRegistration ? (
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                还没有账号？{' '}
+                <Link to="/register" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition-colors">
+                  立即注册
+                </Link>
+              </p>
+            ) : (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                注册功能暂未开放
+              </p>
+            )}
           </div>
         </div>
 

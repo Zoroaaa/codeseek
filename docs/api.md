@@ -38,7 +38,7 @@ interface ApiResponse<T> {
 | `DUPLICATE_ERROR` | 400 | 资源已存在 |
 | `RATE_LIMIT` | 429 | 请求频率超限 |
 | `SERVER_ERROR` | 500 | 服务器内部错误 |
-| `LOCKED_OUT` | 423 | 账户被锁定 |
+| `LOCKED` | 423 | 账户被锁定 |
 
 ---
 
@@ -54,20 +54,6 @@ interface ApiResponse<T> {
   "name": "CodeSeek API",
   "version": "2.0.0",
   "status": "running"
-}
-```
-
----
-
-### `GET /health` - 健康检查
-
-检查服务健康状态。
-
-**返回**:
-```json
-{
-  "status": "ok",
-  "timestamp": 1234567890123
 }
 ```
 
@@ -210,7 +196,8 @@ interface ApiResponse<T> {
 **请求体**:
 ```json
 {
-  "code": "string (6位验证码)"
+  "verificationCode": "string (6位验证码)",
+  "confirmText": "删除我的账户"
 }
 ```
 
@@ -237,12 +224,7 @@ interface ApiResponse<T> {
 
 向指定邮箱发送密码重置验证码。
 
-**请求体**:
-```json
-{
-  "email": "string"
-}
-```
+**认证**: 需要
 
 **返回**: 脱敏邮箱、过期时间
 
@@ -475,7 +457,7 @@ interface ApiResponse<T> {
 **认证**: 需要
 
 **查询参数**:
-- `limit` - 返回数量限制（默认50）
+- `limit` - 返回数量限制（默认100）
 
 **返回**: 搜索历史记录列表
 
@@ -1089,9 +1071,9 @@ interface ApiResponse<T> {
 - searchable - 可搜索数
 - totalCategories - 总分类数
 - totalMajorCategories - 总主分类数
-- topSources - 使用量Top 10搜索源
-- categoryCounts - 各分类搜索源数量
-- siteTypeCounts - 各站点类型数量
+- topUsedSources - 使用量Top 10搜索源
+- sourcesByCategory - 各分类搜索源数量
+- sourcesBySiteType - 各站点类型数量
 
 ---
 
@@ -1191,6 +1173,10 @@ interface ApiResponse<T> {
 - `page` - 页码（默认1）
 - `pageSize` - 每页数量（默认20）
 - `status` - 状态筛选（默认`active`）
+- `search` - 搜索关键词（可选）
+- `tags` - 标签筛选（可选，逗号分隔）
+- `sort` - 排序方式（默认`popular`）
+- `category` - 分类筛选（可选）
 
 **返回**: 分页的搜索源列表
 
@@ -1401,6 +1387,7 @@ interface ApiResponse<T> {
 
 **查询参数**:
 - `limit` - 返回数量（默认10）
+- `tag` - 标签筛选（可选）
 
 **返回**: 热门搜索源列表
 
@@ -1437,14 +1424,14 @@ interface ApiResponse<T> {
 **认证**: 需要
 
 **返回**: 
-- shareCount - 分享数量
-- pendingCount - 待审核数量
+- sharedSources - 分享数量
+- pendingSources - 待审核数量
 - totalDownloads - 总下载量
 - totalLikes - 总点赞
 - totalViews - 总浏览
 - avgRating - 平均评分
-- reviewCount - 评论数
-- createdTagCount - 创建标签数
+- reviewsGiven - 评论数
+- tagsCreated - 创建标签数
 - recentShares - 最近分享记录
 
 ---
@@ -1458,8 +1445,8 @@ interface ApiResponse<T> {
 - totalDownloads - 总下载量
 - totalUsers - 总用户数
 - totalReviews - 总评论数
-- avgRating - 平均评分
-- categoryCount - 分类数量
+- averageRating - 平均评分
+- categoriesCount - 分类数量
 - topCategories - 热门分类
 - recentActivity - 最近活动
 
@@ -1474,7 +1461,6 @@ interface ApiResponse<T> {
 **查询参数**:
 - `page` - 页码（默认1）
 - `pageSize` - 每页数量（默认20）
-- `unreadOnly` - 仅未读（可选）
 
 **返回**: 分页的通知列表
 
@@ -1505,10 +1491,14 @@ interface ApiResponse<T> {
 - `pageSize` - 每页数量（默认20，最大100）
 - `search` - 搜索关键词（用户名/邮箱）
 - `status` - 状态筛选（`active`/`inactive`）
+- `roleId` - 角色筛选（可选）
 
 **返回**: 
 - users - 用户列表（ID、用户名、邮箱、状态、登录次数等）
-- pagination - 分页信息
+- total - 总数
+- page - 页码
+- pageSize - 每页数量
+- totalPages - 总页数
 
 ---
 
@@ -1524,6 +1514,7 @@ interface ApiResponse<T> {
 - 用户详细信息
 - 统计数据（收藏数、历史数、活跃会话数）
 - 最近会话列表
+- 最近活动记录
 
 ---
 
@@ -1644,7 +1635,10 @@ interface ApiResponse<T> {
 
 **返回**: 
 - reports - 举报列表（包含搜索源名称、举报人信息）
-- pagination - 分页信息
+- total - 总数
+- page - 页码
+- pageSize - 每页数量
+- totalPages - 总页数
 
 ---
 
@@ -1677,11 +1671,12 @@ interface ApiResponse<T> {
 
 **返回**: 
 - users - 用户统计（总数、活跃、已验证、本周新增、日活）
+- roles - 角色分布
 - sources - 搜索源统计（总数、活跃、可搜索、总使用量）
 - searches - 搜索统计（总数、独立用户、独立关键词）
 - community - 社区统计（分享数、标签数、评论数、待处理举报）
-- topKeywords - Top搜索关键词（10条）
-- topSources - Top使用搜索源（10条）
+- topSearchKeywords - Top搜索关键词（10条）
+- topUsedSources - Top使用搜索源（10条）
 
 ---
 
@@ -1699,7 +1694,10 @@ interface ApiResponse<T> {
 
 **返回**: 
 - logs - 日志列表（包含用户名）
-- pagination - 分页信息
+- total - 总数
+- page - 页码
+- pageSize - 每页数量
+- totalPages - 总页数
 
 ---
 
@@ -1710,11 +1708,9 @@ interface ApiResponse<T> {
 **认证**: 需要（管理员权限）
 
 **返回**: 
-- expiredSessions - 过期会话数
-- expiredVerifications - 过期验证码数
 - oldPasswordResetLogs - 旧密码重置日志数
-- oldSecurityLockouts - 过期安全锁定数
 - oldActions - 旧行为日志数
+- oldSecurityEvents - 过期安全事件数
 
 ---
 
@@ -1728,8 +1724,14 @@ interface ApiResponse<T> {
 - `page` - 页码（默认1）
 - `pageSize` - 每页数量（默认20）
 - `userId` - 用户ID筛选
+- `status` - 状态筛选（`active`/`expired`）
 
-**返回**: 会话列表
+**返回**: 
+- sessions - 会话列表
+- total - 总数
+- page - 页码
+- pageSize - 每页数量
+- totalPages - 总页数
 
 ---
 
@@ -1760,6 +1762,8 @@ interface ApiResponse<T> {
 - uniqueSessions - 独立会话数
 - eventsByType - 按类型分组统计
 - dailyEvents - 每日事件统计
+- topReferers - 来源网站排行
+- hourlyDistribution - 小时分布
 
 ---
 
@@ -1773,6 +1777,7 @@ interface ApiResponse<T> {
 - `page` - 页码（默认1）
 - `pageSize` - 每页数量（默认50）
 - `eventType` - 事件类型筛选
+- `userId` - 用户ID筛选
 
 **返回**: 分页的事件列表
 
@@ -1786,10 +1791,14 @@ interface ApiResponse<T> {
 
 **返回**: 
 - users - 用户统计
+- sessions - 会话统计
+- actions - 行为统计
+- analytics - 分析统计
 - sources - 搜索源统计
 - searches - 搜索统计
+- logins - 登录统计
 - community - 社区统计
-- recentActivity - 最近活动
+- recentActions - 最近活动
 
 ---
 
@@ -1800,10 +1809,9 @@ interface ApiResponse<T> {
 **认证**: 需要（管理员权限）
 
 **查询参数**:
-- `days` - 统计天数（默认30）
-- `metric` - 指标类型（users/searches/sessions）
+- `days` - 统计天数（默认7）
 
-**返回**: 趋势数据
+**返回**: 趋势数据（用户注册、登录、搜索、分析事件、活跃用户）
 
 ---
 
@@ -1816,7 +1824,7 @@ interface ApiResponse<T> {
 **查询参数**:
 - `days` - 统计天数（默认7）
 
-**返回**: 用户行为分析数据
+**返回**: 用户行为分析数据（行为类型分布、活跃用户排行、小时分布、周分布）
 
 ---
 
@@ -1826,16 +1834,7 @@ interface ApiResponse<T> {
 
 获取系统公开配置信息（无需认证），返回已解析类型的配置值。
 
-**返回**: 
-```json
-{
-  "site_name": "磁力快搜",
-  "enable_registration": true,
-  "max_search_history": 1000,
-  "max_favorites": 1000,
-  ...
-}
-```
+**返回**: 系统公开配置对象
 
 ---
 
@@ -1858,18 +1857,6 @@ interface ApiResponse<T> {
 **返回**: 
 - groups - 配置分组列表
 - groupedConfigs - 分组后的配置对象
-  - basic - 基础配置
-  - user_limits - 用户限制
-  - source_check - 搜索源检查
-  - community - 社区功能
-  - email - 邮箱验证
-  - password - 密码相关
-  - security - 安全相关
-  - features - 功能开关
-  - session - 会话管理
-  - search - 搜索设置
-  - pagination - 分页设置
-  - cleanup - 数据清理
 
 ---
 
@@ -1899,15 +1886,7 @@ interface ApiResponse<T> {
 
 **认证**: 需要（管理员权限）
 
-**返回**: 
-```json
-{
-  "version": "2.0.0",
-  "exportedAt": "2024-01-01T00:00:00.000Z",
-  "exportedBy": "admin",
-  "configs": [...]
-}
-```
+**返回**: 导出的配置数据
 
 ---
 
@@ -2084,26 +2063,30 @@ interface ApiResponse<T> {
 
 ---
 
-## 系统接口 `/api/system`
+## 系统接口 `/api`
 
-### `GET /api/system/public-config` - 获取公开配置
+### `GET /api/public-config` - 获取公开配置
 
 获取系统公开配置信息（无需认证）。
 
 **返回**: 
 - appVersion - 应用版本
+- siteName - 网站名称
+- siteDescription - 网站描述
 - allowRegistration - 是否允许注册
+- communityEnabled - 是否启用社区功能
 - minUsernameLength - 用户名最小长度
 - maxUsernameLength - 用户名最大长度
 - minPasswordLength - 密码最小长度
 - maxFavoritesPerUser - 每用户最大收藏数
 - maxHistoryPerUser - 每用户最大历史数
 - maxTagsPerUser - 每用户最大标签数
-- enableActionLogging - 是否启用行为日志
+- features - 功能开关
+- search - 搜索相关配置
 
 ---
 
-### `GET /api/system/source-status-check` - 搜索源状态检查
+### `GET /api/source-status-check` - 搜索源状态检查
 
 检查指定搜索源的可用状态（带5分钟缓存）。
 
@@ -2121,7 +2104,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `POST /api/system/source-status-batch` - 批量状态检查
+### `POST /api/source-status-batch` - 批量状态检查
 
 批量检查多个搜索源的状态（并发执行，最多30个）。
 
@@ -2139,7 +2122,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/system/source-status-batch` - 批量状态检查（GET方式）
+### `GET /api/source-status-batch` - 批量状态检查（GET方式）
 
 批量查询多个搜索源的缓存状态（不触发新检查，最多50个）。
 
@@ -2150,7 +2133,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `POST /api/system/record-action` - 记录用户行为
+### `POST /api/record-action` - 记录用户行为
 
 记录用户行为日志。
 
@@ -2167,7 +2150,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/system/stats` - 获取统计信息
+### `GET /api/stats` - 获取统计信息
 
 获取系统统计数据。
 
@@ -2180,7 +2163,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/system/health` - 健康检查
+### `GET /api/health` - 健康检查
 
 检查服务健康状态。
 
@@ -2191,7 +2174,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/system/source-status-history/:sourceId` - 获取状态检查历史
+### `GET /api/source-status-history/:sourceId` - 获取状态检查历史
 
 获取指定搜索源的状态检查历史记录。
 
@@ -2208,7 +2191,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `DELETE /api/system/source-status-cache/:sourceId` - 清除状态缓存
+### `DELETE /api/source-status-cache/:sourceId` - 清除状态缓存
 
 清除指定搜索源的状态检查缓存。
 
@@ -2218,7 +2201,7 @@ interface ApiResponse<T> {
 
 ---
 
-### `GET /api/system/user-actions` - 获取行为日志
+### `GET /api/user-actions` - 获取行为日志
 
 查询用户行为日志。
 
@@ -2233,38 +2216,6 @@ interface ApiResponse<T> {
 - total - 总数
 - limit - 限制
 - offset - 偏移量
-
----
-
-## 根接口 `/api`
-
-### `GET /api` - API信息
-
-获取API基本信息。
-
-**返回**:
-```json
-{
-  "name": "CodeSeek API",
-  "version": "2.0.0",
-  "status": "running"
-}
-```
-
----
-
-### `GET /api/health` - 健康检查
-
-检查服务健康状态。
-
-**返回**:
-```json
-{
-  "status": "ok",
-  "timestamp": 1234567890123,
-  "version": "2.0.0"
-}
-```
 
 ---
 
@@ -2356,7 +2307,7 @@ async function exportSources(format: string = 'json') {
 }
 
 async function checkSourceStatus(sourceId: string) {
-  const response = await fetch(`${API_BASE}/source-status/check?sourceId=${sourceId}`);
+  const response = await fetch(`${API_BASE}/source-status-check?sourceId=${sourceId}`);
   return response.json();
 }
 
@@ -2423,8 +2374,8 @@ async function getUserActivitiesStats() {
   return response.json();
 }
 
-async function getCommunityNotifications(page: number = 1, unreadOnly: boolean = false) {
-  const response = await fetchWithAuth(`${API_BASE}/community/notifications?page=${page}&unreadOnly=${unreadOnly}`);
+async function getCommunityNotifications(page: number = 1) {
+  const response = await fetchWithAuth(`${API_BASE}/community/notifications?page=${page}`);
   return response.json();
 }
 
@@ -2460,7 +2411,7 @@ app.route('/api/search-sources', sourceRoutes);  // 搜索源路由
 app.route('/api/community', communityRoutes);    // 社区路由
 app.route('/api/admin', adminRoutes);            // 管理员路由
 app.route('/api/config', configRoutes);          // 配置路由
-app.route('/api/system', systemRoutes);          // 系统路由
+app.route('/api', systemRoutes);                // 系统路由
 ```
 
 ### 路由模块说明
@@ -2474,7 +2425,7 @@ app.route('/api/system', systemRoutes);          // 系统路由
 | communityRoutes | /api/community | routes/community.ts | 社区分享、标签、评论、举报、通知 |
 | adminRoutes | /api/admin | routes/admin.ts | 用户管理、举报处理、统计、日志、会话管理 |
 | configRoutes | /api/config | routes/config.ts | 系统配置管理、分析事件、邮件日志 |
-| systemRoutes | /api/system | routes/system.ts | 健康检查、状态检测、统计、行为记录 |
+| systemRoutes | /api | routes/system.ts | 健康检查、状态检测、统计、行为记录 |
 
 ---
 
@@ -2493,40 +2444,4 @@ app.route('/api/system', systemRoutes);          // 系统路由
 | `user_search_history` | 用户搜索历史表（id, user_id, query, source, results_count） |
 | `user_actions` | 用户行为日志表（id, user_id, action, data, ip_address, user_agent） |
 | `system_config` | 系统配置表（key, value, description, config_type, config_group, validation_rules） |
-| `config_groups` | 配置分组表（id, name, display_name, description, icon） |
-| `config_change_logs` | 配置变更日志表（id, config_key, old_value, new_value, change_type, changed_by） |
-| `analytics_events` | 分析事件表（id, user_id, session_id, event_type, event_data, referer） |
-
-### 搜索相关表 (02_schema_search.sql)
-
-| 表名 | 说明 |
-|------|------|
-| `search_major_categories` | 搜索源主分类表（id, name, description, icon, color, requires_keyword） |
-| `search_source_categories` | 搜索源分类表（id, major_category_id, name, icon, color, search_priority） |
-| `search_sources` | 搜索源表（id, category_id, name, url_template, site_type, searchable, usage_count） |
-| `user_search_source_configs` | 用户搜索源配置表（id, user_id, source_id, is_enabled, custom_priority, custom_name） |
-| `source_status_cache` | 搜索源状态缓存表（id, source_id, status, available, response_time, quality_score） |
-
-### 社区功能表 (03_schema_community.sql)
-
-| 表名 | 说明 |
-|------|------|
-| `community_source_tags` | 社区标签表（id, tag_name, tag_description, tag_color, usage_count, is_official） |
-| `community_shared_sources` | 社区共享搜索源表（id, user_id, source_name, source_url_template, download_count, like_count） |
-| `community_source_reviews` | 社区评论表（id, shared_source_id, user_id, rating, comment, is_anonymous） |
-| `community_source_likes` | 社区点赞表（id, shared_source_id, user_id, like_type） |
-| `community_source_downloads` | 社区下载记录表（id, shared_source_id, user_id, ip_address） |
-| `community_source_reports` | 社区举报表（id, shared_source_id, reporter_user_id, report_reason, status） |
-| `community_user_stats` | 社区用户统计表（id, user_id, shared_sources_count, total_downloads, reputation_score） |
-
-### 安全相关表 (04_schema_security.sql)
-
-| 表名 | 说明 |
-|------|------|
-| `email_verifications` | 邮箱验证表（id, user_id, email, verification_code, verification_type, status, expires_at） |
-| `email_change_requests` | 邮箱更改请求表（id, user_id, old_email, new_email, old_email_verified, new_email_verified） |
-| `password_reset_logs` | 密码重置日志表（id, user_id, email, request_type, request_status, verification_attempts） |
-| `security_lockouts` | 安全锁定表（id, lockout_type, identifier, attempt_count, locked_until） |
-| `user_security_events` | 用户安全事件表（id, user_id, event_type, event_status, risk_score, risk_factors） |
-| `email_send_logs` | 邮件发送日志表（id, user_id, recipient_email, email_type, send_status, provider） |
-| `email_templates` | 邮件模板表（id, template_name, template_type, subject_template, html_template） |
+| `config

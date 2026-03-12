@@ -410,7 +410,7 @@ authRoutes.post('/forgot-password', async (c) => {
 
   const configService = new ConfigService(c.env);
   
-  const verificationCodeExpiry = await configService.getInt(DB_CONFIG_KEYS.VERIFICATION_CODE_EXPIRY, R.VERIFICATION_CODE.EXPIRY_MS);
+  const verificationCodeExpiry = await configService.getInt(DB_CONFIG_KEYS.RESET_PASSWORD_CODE_EXPIRY, 30 * 60 * 1000);
   
   const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
   const maskedEmail = emailVerificationUtils.maskEmail(normalizedEmail);

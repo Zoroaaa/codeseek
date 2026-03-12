@@ -106,15 +106,19 @@ export function useAppInfo() {
   const defaults = configService.getDefaultConfig();
   
   return {
-    NAME: '磁力快搜',
-    DESCRIPTION: '搜索全网资源，一步直达',
+    NAME: config?.siteName ?? defaults.siteName,
+    DESCRIPTION: config?.siteDescription ?? defaults.siteDescription,
     VERSION: config?.appVersion ?? defaults.appVersion,
   };
 }
 
 export function useFeatureFlags() {
+  const { config } = useConfig();
+  const defaults = configService.getDefaultConfig();
+  
   return {
-    enableRegistration: true,
+    enableRegistration: config?.allowRegistration ?? defaults.allowRegistration,
+    communityEnabled: config?.communityEnabled ?? defaults.communityEnabled,
     enableSearchHistory: true,
     enableFavorites: true,
     enableAnalytics: true,
