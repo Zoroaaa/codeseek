@@ -800,7 +800,7 @@ configRoutes.put('/:key', async (c) => {
             is_sensitive = COALESCE(?, is_sensitive),
             updated_at = ?
         WHERE key = ?
-      `).bind(value, description, configType, configGroup, isPublic, isSensitive, now, key).run();
+      `).bind(value, description ?? null, configType ?? null, configGroup ?? null, isPublic === undefined || isPublic === null ? null : (isPublic ? 1 : 0), isSensitive === undefined || isSensitive === null ? null : (isSensitive ? 1 : 0), now, key).run();
 
       await logConfigChange(
         c.env, key, existing.value, value, 'update',
