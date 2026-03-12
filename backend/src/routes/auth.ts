@@ -409,12 +409,7 @@ authRoutes.post('/forgot-password', async (c) => {
   }
 
   const configService = new ConfigService(c.env);
-  const forgotPasswordEnabled = await configService.getBoolean(DB_CONFIG_KEYS.FORGOT_PASSWORD_ENABLED, true);
   
-  if (!forgotPasswordEnabled) {
-    return c.json(error('FORBIDDEN', '密码找回功能已关闭'), 403);
-  }
-
   const verificationCodeExpiry = await configService.getInt(DB_CONFIG_KEYS.VERIFICATION_CODE_EXPIRY, R.VERIFICATION_CODE.EXPIRY_MS);
   
   const normalizedEmail = emailVerificationUtils.normalizeEmail(email);

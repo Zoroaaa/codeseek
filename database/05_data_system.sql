@@ -25,9 +25,8 @@ INSERT OR IGNORE INTO config_groups (id, name, display_name, description, icon, 
     ('basic', 'basic', '基础配置', '网站基础信息配置', 'Settings', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('features', 'features', '功能开关', '功能模块开关配置', 'ToggleLeft', 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('security', 'security', '安全配置', '安全策略相关配置', 'Shield', 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('limits', 'limits', '用户限制', '用户相关限制配置', 'Users', 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('email', 'email', '邮件配置', '邮件发送相关配置', 'Mail', 5, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('cleanup', 'cleanup', '数据清理', '数据清理相关配置', 'Trash2', 6, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+    ('email', 'email', '邮件配置', '邮件发送相关配置', 'Mail', 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('cleanup', 'cleanup', '数据清理', '数据清理相关配置', 'Trash2', 5, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- ===============================================
 -- 3. 系统配置初始化数据（精简版 - 仅保留需要动态管理的配置）
@@ -45,15 +44,7 @@ INSERT OR IGNORE INTO system_config (key, value, description, config_type, confi
     -- ====================
     -- 功能开关 - 运营需要动态调整
     -- ====================
-    ('forgot_password_enabled', '1', '是否启用忘记密码功能', 'boolean', 'features', 1, 10, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('community_enabled', '1', '启用搜索源共享社区功能', 'boolean', 'features', 1, 11, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('source_check_enabled', '1', '启用搜索源状态检查', 'boolean', 'features', 1, 12, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('enable_search_history', '1', '启用搜索历史功能', 'boolean', 'features', 1, 13, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('enable_favorites', '1', '启用收藏功能', 'boolean', 'features', 1, 14, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('enable_analytics', '1', '启用统计分析功能', 'boolean', 'features', 1, 15, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('enable_dark_mode', '1', '启用深色模式切换', 'boolean', 'features', 1, 16, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('enable_proxy', '1', '启用代理服务器', 'boolean', 'features', 1, 17, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('enable_search_suggestions', '1', '启用搜索建议', 'boolean', 'features', 1, 18, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('community_enabled', '1', '启用搜索源共享社区功能', 'boolean', 'features', 1, 10, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     
     -- ====================
     -- 安全配置 - 安全策略需要动态调整
@@ -63,11 +54,6 @@ INSERT OR IGNORE INTO system_config (key, value, description, config_type, confi
     ('max_verification_attempts', '5', '最大验证尝试次数', 'integer', 'security', 1, 22, '{"min": 1, "max": 10}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('password_reset_max_attempts', '5', '密码重置最大尝试次数', 'integer', 'security', 1, 23, '{"min": 1, "max": 10}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('password_reset_lockout_duration', '3600000', '密码重置锁定持续时间（毫秒，默认1小时）', 'integer', 'security', 1, 24, '{"min": 300000, "max": 86400000}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    
-    -- ====================
-    -- 用户限制 - 运营需要动态调整
-    -- ====================
-    ('max_favorites', '1000', '最大收藏数量', 'integer', 'limits', 1, 30, '{"min": 100, "max": 5000}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     
     -- ====================
     -- 邮件配置 - 防滥用需要动态调整

@@ -291,15 +291,7 @@ export const DB_CONFIG_KEYS = {
 
   // 功能开关 — 运营需要动态调整
   ENABLE_REGISTRATION: 'enable_registration',
-  FORGOT_PASSWORD_ENABLED: 'forgot_password_enabled',
   COMMUNITY_ENABLED: 'community_enabled',
-  SOURCE_CHECK_ENABLED: 'source_check_enabled',
-  ENABLE_SEARCH_HISTORY: 'enable_search_history',
-  ENABLE_FAVORITES: 'enable_favorites',
-  ENABLE_ANALYTICS: 'enable_analytics',
-  ENABLE_DARK_MODE: 'enable_dark_mode',
-  ENABLE_PROXY: 'enable_proxy',
-  ENABLE_SEARCH_SUGGESTIONS: 'enable_search_suggestions',
 
   // 安全限制 — 安全策略需要动态调整
   MAX_LOGIN_ATTEMPTS: 'max_login_attempts',
@@ -307,9 +299,6 @@ export const DB_CONFIG_KEYS = {
   MAX_VERIFICATION_ATTEMPTS: 'max_verification_attempts',
   PASSWORD_RESET_MAX_ATTEMPTS: 'password_reset_max_attempts',
   PASSWORD_RESET_LOCKOUT_DURATION: 'password_reset_lockout_duration',
-
-  // 用户限制 — 运营需要动态调整
-  MAX_FAVORITES: 'max_favorites',
 
   // 邮件限制 — 防滥用需要动态调整
   EMAIL_RATE_LIMIT_PER_HOUR: 'email_rate_limit_per_hour',

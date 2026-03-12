@@ -109,26 +109,13 @@ async function saveStatusCache(
 
 /**
  * GET /public-config
- * 向前端暴露运行期业务配置（全部从 DB 读取）
- * Layer 1 中只有 APP_VERSION 保留在 env，其余全部来自 DB
+ * 向前端暴露运行期业务配置
  */
 systemRoutes.get('/public-config', async (c) => {
   try {
     const configService = new ConfigService(c.env);
 
-    const [
-      enableRegistration,
-      enableSearchHistory,
-      enableFavorites,
-      enableAnalytics,
-      enableProxy,
-    ] = await Promise.all([
-      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true),
-      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_SEARCH_HISTORY, true),
-      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_FAVORITES, true),
-      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_ANALYTICS, true),
-      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_PROXY, true),
-    ]);
+    const enableRegistration = await configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true);
 
     return c.json(success({
       appVersion: c.env.APP_VERSION || '2.0.0',
@@ -140,11 +127,11 @@ systemRoutes.get('/public-config', async (c) => {
       maxHistoryPerUser: R.SEARCH_HISTORY.MAX_COUNT,
       maxTagsPerUser: R.TAG.MAX_COUNT_PER_SOURCE,
       features: {
-        searchHistory: enableSearchHistory,
-        favorites: enableFavorites,
-        analytics: enableAnalytics,
+        searchHistory: true,
+        favorites: true,
+        analytics: true,
         darkMode: true,
-        proxy: enableProxy,
+        proxy: true,
         searchSuggestions: true,
       },
       search: {

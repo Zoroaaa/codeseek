@@ -161,7 +161,7 @@ export const SettingsManager: React.FC = () => {
       notification.error('请输入新邮箱');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailChangeForm.newEmail)) {
+    if (!validationRules.EMAIL_REGEX.test(emailChangeForm.newEmail)) {
       notification.error('请输入有效的邮箱地址');
       return;
     }

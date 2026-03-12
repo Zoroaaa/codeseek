@@ -45,7 +45,7 @@ export const ForgotPasswordPage: React.FC = () => {
 
   const validateEmail = () => {
     if (!email.trim()) { setError('请输入邮箱'); return false; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('请输入有效的邮箱地址'); return false; }
+    if (!validationRules.EMAIL_REGEX.test(email)) { setError('请输入有效的邮箱地址'); return false; }
     setError(''); return true;
   };
 

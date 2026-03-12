@@ -94,6 +94,12 @@ export const VALIDATION_RULES = {
   TAG: {
     MAX_COUNT_PER_SOURCE: 10,
   },
+  SEARCH_HISTORY: {
+    MAX_COUNT: 1000,
+  },
+  FAVORITES: {
+    MAX_COUNT: 1000,
+  },
   PAGINATION: {
     DEFAULT_PAGE_SIZE: 20,
     MAX_PAGE_SIZE: 100,

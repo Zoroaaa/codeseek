@@ -53,7 +53,7 @@ export const RegisterPage: React.FC = () => {
     else if (formData.username.length > validationRules.USERNAME_MAX_LENGTH) newErrors.username = `用户名最多${validationRules.USERNAME_MAX_LENGTH}个字符`;
     else if (!validationRules.USERNAME_REGEX.test(formData.username)) newErrors.username = '用户名只能包含字母、数字和下划线';
     if (!formData.email.trim()) newErrors.email = '请输入邮箱';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = '请输入有效的邮箱地址';
+    else if (!validationRules.EMAIL_REGEX.test(formData.email)) newErrors.email = '请输入有效的邮箱地址';
     if (!formData.password) newErrors.password = '请输入密码';
     else if (formData.password.length < validationRules.PASSWORD_MIN_LENGTH) newErrors.password = `密码至少${validationRules.PASSWORD_MIN_LENGTH}个字符`;
     else if (formData.password.length > validationRules.PASSWORD_MAX_LENGTH) newErrors.password = `密码最多${validationRules.PASSWORD_MAX_LENGTH}个字符`;

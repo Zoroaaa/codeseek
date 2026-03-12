@@ -84,22 +84,20 @@ export function useConfigValue<K extends keyof PublicConfig>(key: K): PublicConf
 }
 
 export function useValidationRules() {
-  const { config } = useConfig();
-  const defaults = configService.getDefaultConfig();
   const R = VALIDATION_RULES;
   
   return {
-    PASSWORD_MIN_LENGTH: config?.minPasswordLength ?? defaults.minPasswordLength,
+    PASSWORD_MIN_LENGTH: R.PASSWORD.MIN_LENGTH,
     PASSWORD_MAX_LENGTH: R.PASSWORD.MAX_LENGTH,
-    USERNAME_MIN_LENGTH: config?.minUsernameLength ?? defaults.minUsernameLength,
-    USERNAME_MAX_LENGTH: config?.maxUsernameLength ?? defaults.maxUsernameLength,
+    USERNAME_MIN_LENGTH: R.USERNAME.MIN_LENGTH,
+    USERNAME_MAX_LENGTH: R.USERNAME.MAX_LENGTH,
     EMAIL_MAX_LENGTH: R.EMAIL.MAX_LENGTH,
     SEARCH_KEYWORD_MIN_LENGTH: R.KEYWORD.MIN_LENGTH,
-    SEARCH_KEYWORD_MAX_LENGTH: config?.search.maxKeywordLength ?? defaults.search.maxKeywordLength,
+    SEARCH_KEYWORD_MAX_LENGTH: R.KEYWORD.MAX_LENGTH,
     VERIFICATION_CODE_LENGTH: R.VERIFICATION_CODE.LENGTH,
     USERNAME_REGEX: VALIDATION_REGEX.USERNAME,
     EMAIL_REGEX: VALIDATION_REGEX.EMAIL,
-    MAX_TAGS_PER_USER: config?.maxTagsPerUser ?? defaults.maxTagsPerUser,
+    MAX_TAGS_PER_USER: R.TAG.MAX_COUNT_PER_SOURCE,
   };
 }
 
@@ -115,40 +113,34 @@ export function useAppInfo() {
 }
 
 export function useFeatureFlags() {
-  const { config } = useConfig();
-  const defaults = configService.getDefaultConfig();
-  
   return {
-    enableRegistration: config?.allowRegistration ?? defaults.allowRegistration,
-    enableSearchHistory: config?.features.searchHistory ?? defaults.features.searchHistory,
-    enableFavorites: config?.features.favorites ?? defaults.features.favorites,
-    enableAnalytics: config?.features.analytics ?? defaults.features.analytics,
-    enableDarkMode: config?.features.darkMode ?? defaults.features.darkMode,
-    enableProxy: config?.features.proxy ?? defaults.features.proxy,
-    enableSearchSuggestions: config?.features.searchSuggestions ?? defaults.features.searchSuggestions,
+    enableRegistration: true,
+    enableSearchHistory: true,
+    enableFavorites: true,
+    enableAnalytics: true,
+    enableDarkMode: true,
+    enableProxy: true,
+    enableSearchSuggestions: true,
   };
 }
 
 export function useUserLimits() {
-  const { config } = useConfig();
-  const defaults = configService.getDefaultConfig();
+  const R = VALIDATION_RULES;
   
   return {
-    maxSearchHistory: config?.maxHistoryPerUser ?? defaults.maxHistoryPerUser,
-    maxFavorites: config?.maxFavoritesPerUser ?? defaults.maxFavoritesPerUser,
-    maxTagsPerUser: config?.maxTagsPerUser ?? defaults.maxTagsPerUser,
+    maxSearchHistory: R.SEARCH_HISTORY.MAX_COUNT,
+    maxFavorites: R.FAVORITES.MAX_COUNT,
+    maxTagsPerUser: R.TAG.MAX_COUNT_PER_SOURCE,
   };
 }
 
 export function useSearchConfig() {
-  const { config } = useConfig();
-  const defaults = configService.getDefaultConfig();
   const R = VALIDATION_RULES;
   
   return {
-    searchDebounceMs: config?.search.debounceMs ?? defaults.search.debounceMs,
-    enableSearchSuggestions: config?.features.searchSuggestions ?? defaults.features.searchSuggestions,
-    maxKeywordLength: config?.search.maxKeywordLength ?? defaults.search.maxKeywordLength,
+    searchDebounceMs: 300,
+    enableSearchSuggestions: true,
+    maxKeywordLength: R.KEYWORD.MAX_LENGTH,
     suggestionsMinKeywordLength: R.SUGGESTIONS.MIN_KEYWORD_LENGTH,
     suggestionsMaxLimit: R.SUGGESTIONS.MAX_LIMIT,
   };
