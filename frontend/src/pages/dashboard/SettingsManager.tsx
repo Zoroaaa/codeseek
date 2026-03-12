@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, 
-  Bell, 
   Shield, 
   Palette, 
   Mail, 
@@ -13,23 +12,17 @@ import {
   AlertTriangle,
   Trash2,
   Settings,
-  Search,
-  Monitor,
-  RotateCcw,
-  Save,
-  EyeOff as EyeClosed,
 } from 'lucide-react';
 import { Card, Button, Input, Tabs, Modal } from '@/components/ui';
 import { useAuthStore, useThemeStore } from '@/stores';
 import { userApi, authApi } from '@/services/api';
 import { useNotification } from '@/hooks';
 import { useValidationRules } from '@/contexts/ConfigContext';
-import { DEFAULT_USER_SETTINGS, type UserSettings } from '@/types/auth';
 
 export const SettingsManager: React.FC = () => {
   const navigate = useNavigate();
   const notification = useNotification();
-  const { user, updateUserSettings, logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
   const validationRules = useValidationRules();
   const [activeTab, setActiveTab] = useState('profile');
@@ -46,14 +39,8 @@ export const SettingsManager: React.FC = () => {
         username: prev.username || user.username || '',
         email: prev.email || user.email || '',
       }));
-      setUserSettings({
-        ...DEFAULT_USER_SETTINGS,
-        ...(user.settings || {}),
-      });
     }
-  }, [user?.username, user?.email, user?.settings]);
-  
-  const [userSettings, setUserSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
+  }, [user?.username, user?.email]);
   
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -166,26 +153,6 @@ export const SettingsManager: React.FC = () => {
       notification.auth.passwordChangeFailed(error.message);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleSaveUserSettings = async () => {
-    setIsLoading(true);
-    try {
-      await userApi.updateSettings(userSettings as unknown as Record<string, unknown>);
-      updateUserSettings(userSettings);
-      notification.settings.saved();
-    } catch (error: any) {
-      notification.settings.saveFailed(error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResetUserSettings = () => {
-    if (confirm('确定要重置所有个人设置为默认值吗？')) {
-      setUserSettings(DEFAULT_USER_SETTINGS);
-      notification.success('已重置', '个人设置已恢复为默认值');
     }
   };
 
@@ -646,234 +613,6 @@ export const SettingsManager: React.FC = () => {
     </Modal>
   );
 
-  const renderDisplaySettings = () => (
-    <div className="space-y-4">
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">默认搜索源数量</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">首页显示的搜索源数量</p>
-          </div>
-          <Input
-            type="number"
-            value={userSettings.display?.defaultSearchSources || 20}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              display: { ...userSettings.display, defaultSearchSources: parseInt(e.target.value) || 20 }
-            })}
-            className="w-24"
-          />
-        </div>
-      </div>
-
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">显示搜索源图标</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">在搜索源列表中显示图标</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.display?.showSourceIcons ?? true}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              display: { ...userSettings.display, showSourceIcons: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">显示搜索源描述</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">在搜索源列表中显示描述信息</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.display?.showSourceDescriptions ?? true}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              display: { ...userSettings.display, showSourceDescriptions: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">紧凑模式</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">减少界面元素间距</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.display?.compactMode ?? false}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              display: { ...userSettings.display, compactMode: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">启用动画效果</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">界面过渡动画效果</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.display?.animationsEnabled ?? true}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              display: { ...userSettings.display, animationsEnabled: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderSearchSettings = () => (
-    <div className="space-y-4">
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">自动检查搜索源</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">搜索时自动检查搜索源状态</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.search?.autoCheckSource ?? true}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              search: { ...userSettings.search, autoCheckSource: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">新标签页打开</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">点击搜索源时在新标签页打开</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.search?.openInNewTab ?? true}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              search: { ...userSettings.search, openInNewTab: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">保存搜索历史</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">自动保存搜索记录</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.search?.saveSearchHistory ?? true}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              search: { ...userSettings.search, saveSearchHistory: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">搜索防抖延迟</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">输入后延迟多久开始搜索（毫秒）</p>
-          </div>
-          <Input
-            type="number"
-            value={userSettings.search?.searchDebounce || 300}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              search: { ...userSettings.search, searchDebounce: parseInt(e.target.value) || 300 }
-            })}
-            className="w-24"
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderPrivacySettings = () => (
-    <div className="space-y-4">
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">隐藏搜索历史</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">对其他用户隐藏您的搜索历史</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.privacy?.hideSearchHistory ?? false}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              privacy: { ...userSettings.privacy, hideSearchHistory: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">隐藏收藏夹</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">对其他用户隐藏您的收藏</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.privacy?.hideFavorites ?? false}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              privacy: { ...userSettings.privacy, hideFavorites: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-
-      <div className="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-surface-900 dark:text-surface-100">分享使用数据</p>
-            <p className="text-sm text-surface-500 dark:text-surface-400">帮助我们改进产品体验</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={userSettings.privacy?.shareUsageData ?? true}
-            onChange={(e) => setUserSettings({
-              ...userSettings,
-              privacy: { ...userSettings.privacy, shareUsageData: e.target.checked }
-            })}
-            className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-          />
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -895,10 +634,6 @@ export const SettingsManager: React.FC = () => {
           { id: 'profile', label: '个人资料', icon: <User className="w-4 h-4" /> },
           { id: 'security', label: '安全设置', icon: <Shield className="w-4 h-4" /> },
           { id: 'appearance', label: '外观设置', icon: <Palette className="w-4 h-4" /> },
-          { id: 'display', label: '显示设置', icon: <Monitor className="w-4 h-4" /> },
-          { id: 'search', label: '搜索设置', icon: <Search className="w-4 h-4" /> },
-          { id: 'notifications', label: '通知设置', icon: <Bell className="w-4 h-4" /> },
-          { id: 'privacy', label: '隐私设置', icon: <EyeClosed className="w-4 h-4" /> },
         ]}
         activeTab={activeTab}
         onChange={setActiveTab}
@@ -1049,144 +784,6 @@ export const SettingsManager: React.FC = () => {
                 ))}
               </div>
             </div>
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'display' && (
-        <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-              <Monitor className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-            </div>
-            显示设置
-          </h3>
-          {renderDisplaySettings()}
-          <div className="flex gap-3 mt-6">
-            <Button variant="outline" onClick={handleResetUserSettings} leftIcon={<RotateCcw className="w-4 h-4" />}>
-              重置默认
-            </Button>
-            <Button variant="primary" onClick={handleSaveUserSettings} isLoading={isLoading} leftIcon={<Save className="w-4 h-4" />}>
-              保存设置
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'search' && (
-        <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
-              <Search className="w-4 h-4 text-accent-600 dark:text-accent-400" />
-            </div>
-            搜索设置
-          </h3>
-          {renderSearchSettings()}
-          <div className="flex gap-3 mt-6">
-            <Button variant="outline" onClick={handleResetUserSettings} leftIcon={<RotateCcw className="w-4 h-4" />}>
-              重置默认
-            </Button>
-            <Button variant="primary" onClick={handleSaveUserSettings} isLoading={isLoading} leftIcon={<Save className="w-4 h-4" />}>
-              保存设置
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'notifications' && (
-        <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-warning-100 dark:bg-warning-900/30 flex items-center justify-center">
-              <Bell className="w-4 h-4 text-warning-600 dark:text-warning-400" />
-            </div>
-            通知设置
-          </h3>
-          <div className="space-y-4">
-            <label className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
-              <div>
-                <p className="font-medium text-surface-900 dark:text-surface-100">
-                  邮件通知
-                </p>
-                <p className="text-sm text-surface-500 dark:text-surface-400">
-                  接收重要更新的邮件通知
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={userSettings.notifications?.email ?? true}
-                onChange={(e) => setUserSettings({
-                  ...userSettings,
-                  notifications: { ...userSettings.notifications, email: e.target.checked }
-                })}
-                className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-              />
-            </label>
-            <label className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
-              <div>
-                <p className="font-medium text-surface-900 dark:text-surface-100">
-                  浏览器通知
-                </p>
-                <p className="text-sm text-surface-500 dark:text-surface-400">
-                  接收浏览器推送通知
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={userSettings.notifications?.browser ?? false}
-                onChange={(e) => setUserSettings({
-                  ...userSettings,
-                  notifications: { ...userSettings.notifications, browser: e.target.checked }
-                })}
-                className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-              />
-            </label>
-            <label className="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
-              <div>
-                <p className="font-medium text-surface-900 dark:text-surface-100">
-                  安全通知
-                </p>
-                <p className="text-sm text-surface-500 dark:text-surface-400">
-                  接收账户安全相关通知
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={userSettings.notifications?.security ?? true}
-                onChange={(e) => setUserSettings({
-                  ...userSettings,
-                  notifications: { ...userSettings.notifications, security: e.target.checked }
-                })}
-                className="w-5 h-5 rounded border-surface-300 dark:border-surface-600"
-              />
-            </label>
-          </div>
-          <div className="flex gap-3 mt-6">
-            <Button variant="outline" onClick={handleResetUserSettings} leftIcon={<RotateCcw className="w-4 h-4" />}>
-              重置默认
-            </Button>
-            <Button variant="primary" onClick={handleSaveUserSettings} isLoading={isLoading} leftIcon={<Save className="w-4 h-4" />}>
-              保存设置
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'privacy' && (
-        <Card className="p-6 border-surface-200/50 dark:border-surface-700/50 shadow-lg">
-          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-surface-200 dark:bg-surface-700 flex items-center justify-center">
-              <EyeClosed className="w-4 h-4 text-surface-600 dark:text-surface-400" />
-            </div>
-            隐私设置
-          </h3>
-          {renderPrivacySettings()}
-          <div className="flex gap-3 mt-6">
-            <Button variant="outline" onClick={handleResetUserSettings} leftIcon={<RotateCcw className="w-4 h-4" />}>
-              重置默认
-            </Button>
-            <Button variant="primary" onClick={handleSaveUserSettings} isLoading={isLoading} leftIcon={<Save className="w-4 h-4" />}>
-              保存设置
-            </Button>
           </div>
         </Card>
       )}

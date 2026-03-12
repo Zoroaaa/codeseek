@@ -14,6 +14,17 @@ import {
   CheckCircle,
   XCircle,
   Info,
+  Globe,
+  Users,
+  Shield,
+  Mail,
+  Lock,
+  Zap,
+  Clock,
+  Search as SearchIcon,
+  Server,
+  Trash2,
+  FileText,
 } from 'lucide-react';
 import { Card, Button, Input, Modal } from '@/components/ui';
 import { configApi, type SystemConfigItem, type ConfigGroup, type GroupedConfigs, type ConfigChangeLog } from '@/services/api/system';
@@ -28,16 +39,18 @@ const CONFIG_TYPE_LABELS: Record<string, string> = {
 };
 
 const CONFIG_GROUP_ICONS: Record<string, React.ReactNode> = {
-  basic: <Settings className="w-4 h-4" />,
-  user_limits: <Settings className="w-4 h-4" />,
-  source_check: <Settings className="w-4 h-4" />,
-  community: <Settings className="w-4 h-4" />,
-  email: <Settings className="w-4 h-4" />,
-  password: <Settings className="w-4 h-4" />,
-  security: <Settings className="w-4 h-4" />,
-  features: <Settings className="w-4 h-4" />,
-  session: <Settings className="w-4 h-4" />,
-  search: <Settings className="w-4 h-4" />,
+  basic: <Globe className="w-4 h-4" />,
+  user_limits: <Users className="w-4 h-4" />,
+  source_check: <Server className="w-4 h-4" />,
+  community: <Users className="w-4 h-4" />,
+  email: <Mail className="w-4 h-4" />,
+  password: <Lock className="w-4 h-4" />,
+  security: <Shield className="w-4 h-4" />,
+  features: <Zap className="w-4 h-4" />,
+  session: <Clock className="w-4 h-4" />,
+  search: <SearchIcon className="w-4 h-4" />,
+  pagination: <FileText className="w-4 h-4" />,
+  cleanup: <Trash2 className="w-4 h-4" />,
 };
 
 export const ConfigTab: React.FC = () => {

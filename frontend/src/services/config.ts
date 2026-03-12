@@ -13,13 +13,18 @@ export interface PublicConfig {
   max_tags_per_user: number;
   max_batch_config_update: number;
   max_sync_favorites: number;
+  verification_code_length: number;
   source_check_enabled: boolean;
   max_concurrent_checks: number;
   default_check_timeout: number;
+  batch_check_timeout_ms: number;
   cache_duration_ms: number;
+  max_batch_check: number;
+  max_cache_age_ms: number;
   community_enabled: boolean;
   community_require_approval: boolean;
   community_max_shares_per_user: number;
+  min_rating_to_feature: number;
   max_tags_per_source: number;
   max_comment_length: number;
   max_report_reason_length: number;
@@ -30,15 +35,25 @@ export interface PublicConfig {
   source_description_max_length: number;
   email_verification_enabled: boolean;
   email_verification_required: boolean;
-  verification_code_length: number;
   verification_code_expiry: number;
+  max_verification_attempts: number;
+  email_rate_limit_per_hour: number;
+  email_rate_limit_per_day: number;
+  resend_interval_ms: number;
+  change_request_expiry_ms: number;
+  change_pending_expiry_minutes: number;
   forgot_password_enabled: boolean;
   reset_password_code_expiry: number;
-  resend_interval_ms: number;
+  password_reset_max_attempts: number;
+  password_reset_lockout_duration: number;
   security_monitoring_enabled: boolean;
   security_event_retention_days: number;
+  high_risk_threshold: number;
   max_login_attempts: number;
   lockout_duration_ms: number;
+  recent_failed_logins_threshold: number;
+  recent_ip_logins_threshold: number;
+  recent_password_changes_threshold: number;
   enable_search_history: boolean;
   enable_favorites: boolean;
   enable_analytics: boolean;
@@ -101,16 +116,21 @@ function getDefaultConfig(): PublicConfig {
     max_username_length: 20,
     min_password_length: 6,
     max_password_length: 100,
-    max_tags_per_user: 50,
+    max_tags_per_user: 100,
     max_batch_config_update: 100,
     max_sync_favorites: 1000,
+    verification_code_length: 6,
     source_check_enabled: true,
     max_concurrent_checks: 3,
     default_check_timeout: 10000,
+    batch_check_timeout_ms: 5000,
     cache_duration_ms: 300000,
+    max_batch_check: 50,
+    max_cache_age_ms: 300000,
     community_enabled: true,
     community_require_approval: false,
     community_max_shares_per_user: 50,
+    min_rating_to_feature: 4.0,
     max_tags_per_source: 10,
     max_comment_length: 1000,
     max_report_reason_length: 100,
@@ -121,15 +141,25 @@ function getDefaultConfig(): PublicConfig {
     source_description_max_length: 2000,
     email_verification_enabled: true,
     email_verification_required: false,
-    verification_code_length: 6,
     verification_code_expiry: 900000,
+    max_verification_attempts: 5,
+    email_rate_limit_per_hour: 5,
+    email_rate_limit_per_day: 20,
+    resend_interval_ms: 60000,
+    change_request_expiry_ms: 1800000,
+    change_pending_expiry_minutes: 15,
     forgot_password_enabled: true,
     reset_password_code_expiry: 1800000,
-    resend_interval_ms: 60000,
+    password_reset_max_attempts: 5,
+    password_reset_lockout_duration: 3600000,
     security_monitoring_enabled: true,
     security_event_retention_days: 90,
+    high_risk_threshold: 50,
     max_login_attempts: 5,
     lockout_duration_ms: 900000,
+    recent_failed_logins_threshold: 3,
+    recent_ip_logins_threshold: 3,
+    recent_password_changes_threshold: 2,
     enable_search_history: true,
     enable_favorites: true,
     enable_analytics: true,
@@ -176,13 +206,18 @@ function parseConfig(data: Record<string, unknown>): PublicConfig {
     max_tags_per_user: parseNumber(data.max_tags_per_user, defaults.max_tags_per_user),
     max_batch_config_update: parseNumber(data.max_batch_config_update, defaults.max_batch_config_update),
     max_sync_favorites: parseNumber(data.max_sync_favorites, defaults.max_sync_favorites),
+    verification_code_length: parseNumber(data.verification_code_length, defaults.verification_code_length),
     source_check_enabled: parseBoolean(data.source_check_enabled, defaults.source_check_enabled),
     max_concurrent_checks: parseNumber(data.max_concurrent_checks, defaults.max_concurrent_checks),
     default_check_timeout: parseNumber(data.default_check_timeout, defaults.default_check_timeout),
+    batch_check_timeout_ms: parseNumber(data.batch_check_timeout_ms, defaults.batch_check_timeout_ms),
     cache_duration_ms: parseNumber(data.cache_duration_ms, defaults.cache_duration_ms),
+    max_batch_check: parseNumber(data.max_batch_check, defaults.max_batch_check),
+    max_cache_age_ms: parseNumber(data.max_cache_age_ms, defaults.max_cache_age_ms),
     community_enabled: parseBoolean(data.community_enabled, defaults.community_enabled),
     community_require_approval: parseBoolean(data.community_require_approval, defaults.community_require_approval),
     community_max_shares_per_user: parseNumber(data.community_max_shares_per_user, defaults.community_max_shares_per_user),
+    min_rating_to_feature: parseNumber(data.min_rating_to_feature, defaults.min_rating_to_feature),
     max_tags_per_source: parseNumber(data.max_tags_per_source, defaults.max_tags_per_source),
     max_comment_length: parseNumber(data.max_comment_length, defaults.max_comment_length),
     max_report_reason_length: parseNumber(data.max_report_reason_length, defaults.max_report_reason_length),
@@ -193,15 +228,25 @@ function parseConfig(data: Record<string, unknown>): PublicConfig {
     source_description_max_length: parseNumber(data.source_description_max_length, defaults.source_description_max_length),
     email_verification_enabled: parseBoolean(data.email_verification_enabled, defaults.email_verification_enabled),
     email_verification_required: parseBoolean(data.email_verification_required, defaults.email_verification_required),
-    verification_code_length: parseNumber(data.verification_code_length, defaults.verification_code_length),
     verification_code_expiry: parseNumber(data.verification_code_expiry, defaults.verification_code_expiry),
+    max_verification_attempts: parseNumber(data.max_verification_attempts, defaults.max_verification_attempts),
+    email_rate_limit_per_hour: parseNumber(data.email_rate_limit_per_hour, defaults.email_rate_limit_per_hour),
+    email_rate_limit_per_day: parseNumber(data.email_rate_limit_per_day, defaults.email_rate_limit_per_day),
+    resend_interval_ms: parseNumber(data.resend_interval_ms, defaults.resend_interval_ms),
+    change_request_expiry_ms: parseNumber(data.change_request_expiry_ms, defaults.change_request_expiry_ms),
+    change_pending_expiry_minutes: parseNumber(data.change_pending_expiry_minutes, defaults.change_pending_expiry_minutes),
     forgot_password_enabled: parseBoolean(data.forgot_password_enabled, defaults.forgot_password_enabled),
     reset_password_code_expiry: parseNumber(data.reset_password_code_expiry, defaults.reset_password_code_expiry),
-    resend_interval_ms: parseNumber(data.resend_interval_ms, defaults.resend_interval_ms),
+    password_reset_max_attempts: parseNumber(data.password_reset_max_attempts, defaults.password_reset_max_attempts),
+    password_reset_lockout_duration: parseNumber(data.password_reset_lockout_duration, defaults.password_reset_lockout_duration),
     security_monitoring_enabled: parseBoolean(data.security_monitoring_enabled, defaults.security_monitoring_enabled),
     security_event_retention_days: parseNumber(data.security_event_retention_days, defaults.security_event_retention_days),
+    high_risk_threshold: parseNumber(data.high_risk_threshold, defaults.high_risk_threshold),
     max_login_attempts: parseNumber(data.max_login_attempts, defaults.max_login_attempts),
     lockout_duration_ms: parseNumber(data.lockout_duration_ms, defaults.lockout_duration_ms),
+    recent_failed_logins_threshold: parseNumber(data.recent_failed_logins_threshold, defaults.recent_failed_logins_threshold),
+    recent_ip_logins_threshold: parseNumber(data.recent_ip_logins_threshold, defaults.recent_ip_logins_threshold),
+    recent_password_changes_threshold: parseNumber(data.recent_password_changes_threshold, defaults.recent_password_changes_threshold),
     enable_search_history: parseBoolean(data.enable_search_history, defaults.enable_search_history),
     enable_favorites: parseBoolean(data.enable_favorites, defaults.enable_favorites),
     enable_analytics: parseBoolean(data.enable_analytics, defaults.enable_analytics),

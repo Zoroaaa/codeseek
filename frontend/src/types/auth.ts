@@ -54,75 +54,11 @@ export interface AdminUserDetail extends User {
 }
 
 export interface UserSettings {
-  theme: 'light' | 'dark' | 'system';
   language: string;
-  searchHistory: boolean;
-  autoCheckSource: boolean;
-  notifications: NotificationSettings;
-  display: DisplaySettings;
-  search: SearchSettings;
-  privacy: PrivacySettings;
-}
-
-export interface NotificationSettings {
-  email: boolean;
-  browser: boolean;
-  marketing: boolean;
-  security: boolean;
-}
-
-export interface DisplaySettings {
-  defaultSearchSources: number;
-  showSourceIcons: boolean;
-  showSourceDescriptions: boolean;
-  compactMode: boolean;
-  animationsEnabled: boolean;
-}
-
-export interface SearchSettings {
-  defaultCategory: string;
-  autoCheckSource: boolean;
-  openInNewTab: boolean;
-  saveSearchHistory: boolean;
-  searchDebounce: number;
-}
-
-export interface PrivacySettings {
-  hideSearchHistory: boolean;
-  hideFavorites: boolean;
-  shareUsageData: boolean;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
-  theme: 'system',
   language: 'zh-CN',
-  searchHistory: true,
-  autoCheckSource: true,
-  notifications: {
-    email: true,
-    browser: false,
-    marketing: false,
-    security: true,
-  },
-  display: {
-    defaultSearchSources: 20,
-    showSourceIcons: true,
-    showSourceDescriptions: true,
-    compactMode: false,
-    animationsEnabled: true,
-  },
-  search: {
-    defaultCategory: 'all',
-    autoCheckSource: true,
-    openInNewTab: true,
-    saveSearchHistory: true,
-    searchDebounce: 300,
-  },
-  privacy: {
-    hideSearchHistory: false,
-    hideFavorites: false,
-    shareUsageData: true,
-  },
 };
 
 export interface LoginRequest {
