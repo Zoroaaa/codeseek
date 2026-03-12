@@ -20,7 +20,7 @@ import {
 import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { Button } from '@/components/ui';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAppInfo } from '@/contexts/ConfigContext';
+import { useAppInfo, useFeatureFlags } from '@/contexts/ConfigContext';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +28,7 @@ export const HomePage: React.FC = () => {
   const { resolvedTheme, toggleTheme } = useThemeStore();
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy, initializeProxy } = useProxyStore();
   const appInfo = useAppInfo();
+  const { enableRegistration } = useFeatureFlags();
 
   useEffect(() => {
     initializeProxy();
@@ -149,9 +150,11 @@ export const HomePage: React.FC = () => {
                   <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="hidden sm:inline-flex ml-1">
                     登录
                   </Button>
-                  <Button variant="primary" size="sm" onClick={() => navigate('/register')} className="ml-1 sm:ml-1.5">
-                    免费注册
-                  </Button>
+                  {enableRegistration && (
+                    <Button variant="primary" size="sm" onClick={() => navigate('/register')} className="ml-1 sm:ml-1.5">
+                      免费注册
+                    </Button>
+                  )}
                 </>
               )}
             </div>
@@ -186,10 +189,10 @@ export const HomePage: React.FC = () => {
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 animate-fade-in animation-delay-300">
             <button
-              onClick={() => navigate(isAuthenticated ? '/main' : '/register')}
+              onClick={() => navigate(isAuthenticated ? '/main' : (enableRegistration ? '/register' : '/login'))}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl font-semibold text-white btn-gradient text-sm sm:text-base"
             >
-              {isAuthenticated ? '开始搜索' : '立即体验'}
+              {isAuthenticated ? '开始搜索' : (enableRegistration ? '立即体验' : '立即登录')}
               <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <button
@@ -338,22 +341,28 @@ export const HomePage: React.FC = () => {
                 准备好开始了吗？
               </h2>
               <p className="text-sm sm:text-base text-white/75 mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed">
-                免费注册，即刻开启高效磁力搜索体验
+                {enableRegistration ? '免费注册，即刻开启高效磁力搜索体验' : '立即登录，开启高效磁力搜索体验'}
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-                <button
-                  onClick={() => navigate('/register')}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl font-semibold bg-white text-blue-700 hover:bg-blue-50 transition-all duration-200 text-sm sm:text-base shadow-lg shadow-black/20"
-                >
-                  免费注册
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
+                {enableRegistration ? (
+                  <button
+                    onClick={() => navigate('/register')}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl font-semibold bg-white text-blue-700 hover:bg-blue-50 transition-all duration-200 text-sm sm:text-base shadow-lg shadow-black/20"
+                  >
+                    免费注册
+                    <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                ) : null}
                 <button
                   onClick={() => navigate('/login')}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl font-semibold border-2 border-white/30 text-white hover:bg-white/10 hover:border-white/50 transition-all duration-200 text-sm sm:text-base backdrop-blur-sm"
+                  className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl font-semibold transition-all duration-200 text-sm sm:text-base backdrop-blur-sm ${
+                    enableRegistration 
+                      ? 'border-2 border-white/30 text-white hover:bg-white/10 hover:border-white/50' 
+                      : 'bg-white text-blue-700 hover:bg-blue-50 shadow-lg shadow-black/20'
+                  }`}
                 >
-                  已有账号
+                  {enableRegistration ? '已有账号' : '立即登录'}
                 </button>
               </div>
             </div>

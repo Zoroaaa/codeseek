@@ -7,6 +7,7 @@
 import { Hono } from 'hono';
 import { Env, SystemConfig, EmailSendLog, ConfigChangeLog, ConfigGroup } from '../types';
 import { success, error, generateId, verifyToken } from '../utils';
+import { ConfigService } from '../services/config';
 
 export const configRoutes = new Hono<{ Bindings: Env }>();
 
@@ -509,6 +510,10 @@ configRoutes.post('/import', async (c) => {
       }
     }
 
+    if (results.some(r => r.success)) {
+      ConfigService.clearCache();
+    }
+
     return c.json(success({
       results,
       created: results.filter(r => r.success && r.action === 'created').length,
@@ -619,6 +624,10 @@ configRoutes.put('/batch', async (c) => {
       }
     }
 
+    if (results.some(r => r.success)) {
+      ConfigService.clearCache();
+    }
+
     return c.json(success({ results, updated: results.filter(r => r.success).length }, '配置批量更新完成'));
   } catch (err) {
     console.error('Batch update config error:', err);
@@ -665,6 +674,8 @@ configRoutes.post('/reset/:key', async (c) => {
       c.env, key, existing?.value || null, defaultValue.value, 'reset',
       payload.userId, payload.username, '重置为默认值', ipAddress, userAgent
     );
+
+    ConfigService.clearCache();
 
     return c.json(success({ key, value: defaultValue.value }, '配置已重置为默认值'));
   } catch (err) {
@@ -754,6 +765,8 @@ configRoutes.put('/:key', async (c) => {
       );
     }
 
+    ConfigService.clearCache();
+
     return c.json(success({ key, value }, '配置已更新'));
   } catch (err) {
     console.error('Update config error:', err);
@@ -794,6 +807,8 @@ configRoutes.delete('/:key', async (c) => {
     );
 
     await c.env.DB.prepare('DELETE FROM system_config WHERE key = ?').bind(key).run();
+
+    ConfigService.clearCache();
 
     return c.json(success(null, '配置已删除'));
   } catch (err) {

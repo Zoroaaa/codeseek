@@ -23,6 +23,7 @@ import {
 import { Card, Button, Input, Modal } from '@/components/ui';
 import { configApi, type SystemConfigItem, type ConfigGroup, type GroupedConfigs, type ConfigChangeLog } from '@/services/api/system';
 import { useNotification } from '@/hooks';
+import { useConfig } from '@/contexts/ConfigContext';
 
 const CONFIG_TYPE_LABELS: Record<string, string> = {
   string: '文本',
@@ -42,6 +43,7 @@ const CONFIG_GROUP_ICONS: Record<string, React.ReactNode> = {
 
 export const ConfigTab: React.FC = () => {
   const notification = useNotification();
+  const { refreshConfig } = useConfig();
   const [isLoading, setIsLoading] = useState(true);
   const [groups, setGroups] = useState<ConfigGroup[]>([]);
   const [groupedConfigs, setGroupedConfigs] = useState<Record<string, GroupedConfigs>>({});
@@ -112,6 +114,7 @@ export const ConfigTab: React.FC = () => {
         setEditValue('');
         setEditReason('');
         loadConfigs();
+        refreshConfig();
       } else {
         notification.error('更新失败', response.message || '未知错误');
       }
@@ -128,6 +131,7 @@ export const ConfigTab: React.FC = () => {
       if (response.success) {
         notification.success('重置成功', `配置 ${key} 已重置为默认值`);
         loadConfigs();
+        refreshConfig();
       } else {
         notification.error('重置失败', response.message || '未知错误');
       }
@@ -187,6 +191,7 @@ export const ConfigTab: React.FC = () => {
         setShowImportModal(false);
         setImportData('');
         loadConfigs();
+        refreshConfig();
       } else {
         notification.error('导入失败', response.message || '未知错误');
       }

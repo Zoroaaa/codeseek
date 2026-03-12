@@ -22,6 +22,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
+import { useFeatureFlags } from '@/contexts/ConfigContext';
 import { SIDEBAR_CONFIG } from '@/constants';
 
 interface NavItem {
@@ -50,6 +51,7 @@ const navItems: NavItem[] = [
 export const DashboardLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
   const { resolvedTheme, toggleTheme, sidebarCollapsed, toggleSidebar } = useThemeStore();
+  const { communityEnabled } = useFeatureFlags();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -286,11 +288,13 @@ export const DashboardLayout: React.FC = () => {
                   <span className="hidden lg:inline">管理看板</span>
                 </Link>
               )}
-              <Link to="/community"
-                className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700">
-                <Users className="w-4 h-4" />
-                <span className="hidden lg:inline">社区</span>
-              </Link>
+              {communityEnabled && (
+                <Link to="/community"
+                  className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-200 dark:border-slate-700">
+                  <Users className="w-4 h-4" />
+                  <span className="hidden lg:inline">社区</span>
+                </Link>
+              )}
 
               <Link to="/main" className="mobile-header-btn md:hidden" title="搜索">
                 <Search className="w-5 h-5" />
@@ -303,9 +307,11 @@ export const DashboardLayout: React.FC = () => {
                   <Shield className="w-5 h-5" />
                 </Link>
               )}
-              <Link to="/community" className="mobile-header-btn md:hidden" title="社区">
-                <Globe className="w-5 h-5" />
-              </Link>
+              {communityEnabled && (
+                <Link to="/community" className="mobile-header-btn md:hidden" title="社区">
+                  <Globe className="w-5 h-5" />
+                </Link>
+              )}
 
               <button onClick={toggleTheme} className="theme-toggle-btn">
                 {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}

@@ -19,6 +19,7 @@ import { Card, Badge, Loading, Button } from '@/components/ui';
 import { systemApi, userApi, sourceApi } from '@/services/api';
 import { useAuthStore } from '@/stores';
 import { useNavigate } from 'react-router-dom';
+import { useFeatureFlags } from '@/contexts/ConfigContext';
 import type { SystemStats, FavoriteItem, SearchHistoryItem, SearchSource, UserSourceConfig } from '@/types';
 
 const getUserLevel = (total: number) => {
@@ -98,6 +99,7 @@ const QuickAction: React.FC<QuickActionProps> = ({ icon, title, description, onC
 export const OverviewManager: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { communityEnabled } = useFeatureFlags();
   
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
@@ -383,13 +385,15 @@ export const OverviewManager: React.FC = () => {
               onClick={() => navigate('/dashboard/favorites')}
               gradient="bg-gradient-to-br from-error-500 to-error-600"
             />
-            <QuickAction
-              icon={<Globe className="w-5 h-5" />}
-              title="社区分享"
-              description="发现优质搜索源"
-              onClick={() => navigate('/community')}
-              gradient="bg-gradient-to-br from-success-500 to-success-600"
-            />
+            {communityEnabled && (
+              <QuickAction
+                icon={<Globe className="w-5 h-5" />}
+                title="社区分享"
+                description="发现优质搜索源"
+                onClick={() => navigate('/community')}
+                gradient="bg-gradient-to-br from-success-500 to-success-600"
+              />
+            )}
           </div>
         </Card>
       </div>
@@ -485,13 +489,15 @@ export const OverviewManager: React.FC = () => {
               onClick={() => navigate('/dashboard/sources')}
               gradient="bg-gradient-to-br from-accent-500 to-accent-600"
             />
-            <QuickAction
-              icon={<Globe className="w-5 h-5" />}
-              title="社区分享"
-              description="发现优质搜索源"
-              onClick={() => navigate('/dashboard/community')}
-              gradient="bg-gradient-to-br from-success-500 to-success-600"
-            />
+            {communityEnabled && (
+              <QuickAction
+                icon={<Globe className="w-5 h-5" />}
+                title="社区分享"
+                description="发现优质搜索源"
+                onClick={() => navigate('/community')}
+                gradient="bg-gradient-to-br from-success-500 to-success-600"
+              />
+            )}
           </div>
 
           {/* 最近搜索词速览 */}

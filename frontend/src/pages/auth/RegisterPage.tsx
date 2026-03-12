@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores';
 import { authApi } from '@/services/api';
 import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
-import { useValidationRules, useAppInfo } from '@/contexts/ConfigContext';
+import { useValidationRules, useAppInfo, useFeatureFlags } from '@/contexts/ConfigContext';
 
 type Step = 'form' | 'verify' | 'success';
 
@@ -15,6 +15,7 @@ export const RegisterPage: React.FC = () => {
   const notification = useNotification();
   const validationRules = useValidationRules();
   const appInfo = useAppInfo();
+  const { enableRegistration } = useFeatureFlags();
   
   const [currentStep, setCurrentStep] = useState<Step>('form');
   const [formData, setFormData] = useState({
@@ -352,6 +353,55 @@ export const RegisterPage: React.FC = () => {
     if (currentStep === 'verify') return '请输入邮箱验证码';
     return '';
   };
+
+  if (!enableRegistration) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50 dark:bg-slate-950 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+          <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-400/6 dark:bg-blue-500/5 rounded-full blur-[100px]" />
+          <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-violet-400/6 dark:bg-violet-500/4 rounded-full blur-[100px]" />
+          <div className="absolute inset-0 grid-dots opacity-50" />
+        </div>
+
+        <div className="w-full max-w-md relative">
+          <Link to="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 mb-8 transition-colors text-sm font-medium group">
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+            返回首页
+          </Link>
+
+          <div className="rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/50 p-7 sm:p-8 text-center"
+            style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+              <Lock className="w-6 h-6 text-slate-400" />
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">注册功能暂未开放</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">管理员尚未开放注册功能，请稍后再试</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => navigate('/')}
+                className="flex-1 py-2.5 px-4 rounded-xl font-medium text-sm border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-600 transition-all"
+              >
+                返回首页
+              </button>
+              <button
+                onClick={() => navigate('/login')}
+                className="flex-1 py-2.5 px-4 rounded-xl font-semibold text-sm text-white btn-gradient"
+              >
+                前往登录
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-center gap-2 text-slate-400 dark:text-slate-600">
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+              <Search className="w-3 h-3 text-white" />
+            </div>
+            <span className="text-xs font-medium">{appInfo.NAME}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50 dark:bg-slate-950 relative overflow-hidden">

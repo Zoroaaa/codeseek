@@ -27,12 +27,17 @@ function getDefaultConfig(): PublicConfig {
 function parseConfig(data: Record<string, unknown>): PublicConfig {
   const defaults = getDefaultConfig();
   
+  const allowReg = data.allowRegistration ?? data.enable_registration;
+  const communityEn = data.communityEnabled ?? data.community_enabled;
+  const siteNameVal = data.siteName ?? data.site_name;
+  const siteDescVal = data.siteDescription ?? data.site_description;
+  
   return {
     appVersion: String(data.appVersion ?? defaults.appVersion),
-    siteName: String(data.siteName ?? defaults.siteName),
-    siteDescription: String(data.siteDescription ?? defaults.siteDescription),
-    allowRegistration: data.allowRegistration === true || data.allowRegistration === 1 || data.allowRegistration === '1' || data.allowRegistration === 'true',
-    communityEnabled: data.communityEnabled === true || data.communityEnabled === 1 || data.communityEnabled === '1' || data.communityEnabled === 'true',
+    siteName: String(siteNameVal ?? defaults.siteName),
+    siteDescription: String(siteDescVal ?? defaults.siteDescription),
+    allowRegistration: allowReg === true || allowReg === 1 || allowReg === '1' || allowReg === 'true',
+    communityEnabled: communityEn === true || communityEn === 1 || communityEn === '1' || communityEn === 'true',
   };
 }
 
