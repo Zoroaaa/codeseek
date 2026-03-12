@@ -275,258 +275,6 @@ configRoutes.get('/groups', async (c) => {
   }
 });
 
-configRoutes.get('/:key', async (c) => {
-  const key = c.req.param('key');
-
-  try {
-    const config = await c.env.DB.prepare(
-      'SELECT * FROM system_config WHERE key = ?'
-    ).bind(key).first<SystemConfig>();
-
-    if (!config) {
-      return c.json(error('NOT_FOUND', '配置项不存在'), 404);
-    }
-
-    return c.json(success(config));
-  } catch (err) {
-    console.error('Get config error:', err);
-    return c.json(error('SERVER_ERROR', '获取配置失败'), 500);
-  }
-});
-
-configRoutes.put('/:key', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
-    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
-  }
-
-  const key = c.req.param('key');
-  const body = await c.req.json();
-  const { value, description, configType, configGroup, isPublic, isSensitive, changeReason } = body;
-
-  try {
-    const existing = await c.env.DB.prepare(
-      'SELECT * FROM system_config WHERE key = ?'
-    ).bind(key).first<SystemConfig>();
-
-    const configTypeToUse = configType || existing?.config_type || 'string';
-    const validationRules = existing?.validation_rules || DEFAULT_CONFIG_VALUES[key]?.validationRules || null;
-
-    const validation = validateConfigValue(value, configTypeToUse, validationRules);
-    if (!validation.valid) {
-      return c.json(error('VALIDATION_ERROR', validation.error || '配置值验证失败'), 400);
-    }
-
-    const now = Date.now();
-    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
-    const userAgent = c.req.header('User-Agent') || null;
-
-    if (existing) {
-      await c.env.DB.prepare(`
-        UPDATE system_config 
-        SET value = ?, description = COALESCE(?, description), 
-            config_type = COALESCE(?, config_type), 
-            config_group = COALESCE(?, config_group),
-            is_public = COALESCE(?, is_public),
-            is_sensitive = COALESCE(?, is_sensitive),
-            updated_at = ?
-        WHERE key = ?
-      `).bind(value, description, configType, configGroup, isPublic, isSensitive, now, key).run();
-
-      await logConfigChange(
-        c.env, key, existing.value, value, 'update',
-        payload.userId, payload.username, changeReason, ipAddress, userAgent
-      );
-    } else {
-      await c.env.DB.prepare(`
-        INSERT INTO system_config (key, value, description, config_type, config_group, is_public, is_sensitive, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(key, value, description || null, configTypeToUse, configGroup || 'other', isPublic ? 1 : 0, isSensitive ? 1 : 0, now, now).run();
-
-      await logConfigChange(
-        c.env, key, null, value, 'create',
-        payload.userId, payload.username, changeReason, ipAddress, userAgent
-      );
-    }
-
-    return c.json(success({ key, value }, '配置已更新'));
-  } catch (err) {
-    console.error('Update config error:', err);
-    return c.json(error('SERVER_ERROR', '更新配置失败'), 500);
-  }
-});
-
-configRoutes.delete('/:key', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || payload.role !== 'super_admin') {
-    return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
-  }
-
-  const key = c.req.param('key');
-
-  try {
-    const existing = await c.env.DB.prepare(
-      'SELECT * FROM system_config WHERE key = ?'
-    ).bind(key).first<SystemConfig>();
-
-    if (!existing) {
-      return c.json(error('NOT_FOUND', '配置项不存在'), 404);
-    }
-
-    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
-    const userAgent = c.req.header('User-Agent') || null;
-
-    await logConfigChange(
-      c.env, key, existing.value, '', 'delete',
-      payload.userId, payload.username, '删除配置', ipAddress, userAgent
-    );
-
-    await c.env.DB.prepare('DELETE FROM system_config WHERE key = ?').bind(key).run();
-
-    return c.json(success(null, '配置已删除'));
-  } catch (err) {
-    console.error('Delete config error:', err);
-    return c.json(error('SERVER_ERROR', '删除配置失败'), 500);
-  }
-});
-
-configRoutes.put('/batch', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
-    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
-  }
-
-  try {
-    const body = await c.req.json();
-    const { configs, changeReason } = body;
-
-    if (!Array.isArray(configs)) {
-      return c.json(error('VALIDATION_ERROR', '配置数据格式错误'), 400);
-    }
-
-    const now = Date.now();
-    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
-    const userAgent = c.req.header('User-Agent') || null;
-    const results: { key: string; success: boolean; error?: string }[] = [];
-
-    for (const config of configs) {
-      const { key, value } = config;
-
-      if (!key) continue;
-
-      try {
-        const existing = await c.env.DB.prepare(
-          'SELECT * FROM system_config WHERE key = ?'
-        ).bind(key).first<SystemConfig>();
-
-        const validation = validateConfigValue(
-          value, 
-          existing?.config_type || 'string', 
-          existing?.validation_rules
-        );
-
-        if (!validation.valid) {
-          results.push({ key, success: false, error: validation.error });
-          continue;
-        }
-
-        if (existing) {
-          await c.env.DB.prepare(`
-            UPDATE system_config 
-            SET value = ?, updated_at = ?
-            WHERE key = ?
-          `).bind(value, now, key).run();
-
-          await logConfigChange(
-            c.env, key, existing.value, value, 'update',
-            payload.userId, payload.username, changeReason, ipAddress, userAgent
-          );
-        } else {
-          results.push({ key, success: false, error: '配置项不存在' });
-          continue;
-        }
-
-        results.push({ key, success: true });
-      } catch (err) {
-        results.push({ key, success: false, error: String(err) });
-      }
-    }
-
-    return c.json(success({ results, updated: results.filter(r => r.success).length }, '配置批量更新完成'));
-  } catch (err) {
-    console.error('Batch update config error:', err);
-    return c.json(error('SERVER_ERROR', '批量更新配置失败'), 500);
-  }
-});
-
-configRoutes.post('/reset/:key', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || payload.role !== 'super_admin') {
-    return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
-  }
-
-  const key = c.req.param('key');
-  const defaultValue = DEFAULT_CONFIG_VALUES[key];
-
-  if (!defaultValue) {
-    return c.json(error('NOT_FOUND', '未找到该配置的默认值'), 404);
-  }
-
-  try {
-    const existing = await c.env.DB.prepare(
-      'SELECT * FROM system_config WHERE key = ?'
-    ).bind(key).first<SystemConfig>();
-
-    const now = Date.now();
-    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
-    const userAgent = c.req.header('User-Agent') || null;
-
-    await c.env.DB.prepare(`
-      UPDATE system_config 
-      SET value = ?, updated_at = ?
-      WHERE key = ?
-    `).bind(defaultValue.value, now, key).run();
-
-    await logConfigChange(
-      c.env, key, existing?.value || null, defaultValue.value, 'reset',
-      payload.userId, payload.username, '重置为默认值', ipAddress, userAgent
-    );
-
-    return c.json(success({ key, value: defaultValue.value }, '配置已重置为默认值'));
-  } catch (err) {
-    console.error('Reset config error:', err);
-    return c.json(error('SERVER_ERROR', '重置配置失败'), 500);
-  }
-});
-
 configRoutes.get('/logs', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -619,6 +367,126 @@ configRoutes.get('/export', async (c) => {
   } catch (err) {
     console.error('Export config error:', err);
     return c.json(error('SERVER_ERROR', '导出配置失败'), 500);
+  }
+});
+
+configRoutes.get('/analytics/stats', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
+  }
+
+  const days = parseInt(c.req.query('days') || '7');
+  const since = Date.now() - days * 24 * 60 * 60 * 1000;
+
+  try {
+    const totalEvents = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM analytics_events WHERE created_at > ?'
+    ).bind(since).first<{ count: number }>();
+
+    const eventsByType = await c.env.DB.prepare(`
+      SELECT event_type, COUNT(*) as count 
+      FROM analytics_events 
+      WHERE created_at > ? 
+      GROUP BY event_type 
+      ORDER BY count DESC
+    `).bind(since).all();
+
+    const dailyEvents = await c.env.DB.prepare(`
+      SELECT date(created_at / 1000, 'unixepoch') as date, COUNT(*) as count
+      FROM analytics_events
+      WHERE created_at > ?
+      GROUP BY date
+      ORDER BY date
+    `).bind(since).all();
+
+    const uniqueUsers = await c.env.DB.prepare(`
+      SELECT COUNT(DISTINCT user_id) as count 
+      FROM analytics_events 
+      WHERE created_at > ? AND user_id IS NOT NULL
+    `).bind(since).first<{ count: number }>();
+
+    const uniqueSessions = await c.env.DB.prepare(`
+      SELECT COUNT(DISTINCT session_id) as count 
+      FROM analytics_events 
+      WHERE created_at > ? AND session_id IS NOT NULL
+    `).bind(since).first<{ count: number }>();
+
+    return c.json(success({
+      totalEvents: totalEvents?.count || 0,
+      uniqueUsers: uniqueUsers?.count || 0,
+      uniqueSessions: uniqueSessions?.count || 0,
+      eventsByType: eventsByType.results || [],
+      dailyEvents: dailyEvents.results || [],
+      period: { days, since },
+    }));
+  } catch (err) {
+    console.error('Get analytics stats error:', err);
+    return c.json(error('SERVER_ERROR', '获取统计失败'), 500);
+  }
+});
+
+configRoutes.get('/email/logs', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
+  }
+
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = Math.min(parseInt(c.req.query('pageSize') || '50'), 200);
+  const emailType = c.req.query('type');
+  const status = c.req.query('status');
+
+  try {
+    let whereClause = 'WHERE 1=1';
+    const params: (string | number)[] = [];
+
+    if (emailType) {
+      whereClause += ' AND email_type = ?';
+      params.push(emailType);
+    }
+
+    if (status) {
+      whereClause += ' AND send_status = ?';
+      params.push(status);
+    }
+
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM email_send_logs ${whereClause}`
+    ).bind(...params).first<{ total: number }>();
+
+    const logs = await c.env.DB.prepare(`
+      SELECT l.*, u.username
+      FROM email_send_logs l
+      LEFT JOIN users u ON l.user_id = u.id
+      ${whereClause}
+      ORDER BY l.created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(...params, pageSize, (page - 1) * pageSize).all<EmailSendLog & { username: string | null }>();
+
+    return c.json(success({
+      logs: logs.results || [],
+      total: countResult?.total || 0,
+      page,
+      pageSize,
+    }));
+  } catch (err) {
+    console.error('Get email logs error:', err);
+    return c.json(error('SERVER_ERROR', '获取日志失败'), 500);
   }
 });
 
@@ -748,7 +616,7 @@ configRoutes.post('/analytics/events', async (c) => {
   }
 });
 
-configRoutes.get('/analytics/stats', async (c) => {
+configRoutes.put('/batch', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
@@ -761,57 +629,136 @@ configRoutes.get('/analytics/stats', async (c) => {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
-  const days = parseInt(c.req.query('days') || '7');
-  const since = Date.now() - days * 24 * 60 * 60 * 1000;
-
   try {
-    const totalEvents = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM analytics_events WHERE created_at > ?'
-    ).bind(since).first<{ count: number }>();
+    const body = await c.req.json();
+    const { configs, changeReason } = body;
 
-    const eventsByType = await c.env.DB.prepare(`
-      SELECT event_type, COUNT(*) as count 
-      FROM analytics_events 
-      WHERE created_at > ? 
-      GROUP BY event_type 
-      ORDER BY count DESC
-    `).bind(since).all();
+    if (!Array.isArray(configs)) {
+      return c.json(error('VALIDATION_ERROR', '配置数据格式错误'), 400);
+    }
 
-    const dailyEvents = await c.env.DB.prepare(`
-      SELECT date(created_at / 1000, 'unixepoch') as date, COUNT(*) as count
-      FROM analytics_events
-      WHERE created_at > ?
-      GROUP BY date
-      ORDER BY date
-    `).bind(since).all();
+    const now = Date.now();
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
+    const userAgent = c.req.header('User-Agent') || null;
+    const results: { key: string; success: boolean; error?: string }[] = [];
 
-    const uniqueUsers = await c.env.DB.prepare(`
-      SELECT COUNT(DISTINCT user_id) as count 
-      FROM analytics_events 
-      WHERE created_at > ? AND user_id IS NOT NULL
-    `).bind(since).first<{ count: number }>();
+    for (const config of configs) {
+      const { key, value } = config;
 
-    const uniqueSessions = await c.env.DB.prepare(`
-      SELECT COUNT(DISTINCT session_id) as count 
-      FROM analytics_events 
-      WHERE created_at > ? AND session_id IS NOT NULL
-    `).bind(since).first<{ count: number }>();
+      if (!key) continue;
 
-    return c.json(success({
-      totalEvents: totalEvents?.count || 0,
-      uniqueUsers: uniqueUsers?.count || 0,
-      uniqueSessions: uniqueSessions?.count || 0,
-      eventsByType: eventsByType.results || [],
-      dailyEvents: dailyEvents.results || [],
-      period: { days, since },
-    }));
+      try {
+        const existing = await c.env.DB.prepare(
+          'SELECT * FROM system_config WHERE key = ?'
+        ).bind(key).first<SystemConfig>();
+
+        const validation = validateConfigValue(
+          value, 
+          existing?.config_type || 'string', 
+          existing?.validation_rules
+        );
+
+        if (!validation.valid) {
+          results.push({ key, success: false, error: validation.error });
+          continue;
+        }
+
+        if (existing) {
+          await c.env.DB.prepare(`
+            UPDATE system_config 
+            SET value = ?, updated_at = ?
+            WHERE key = ?
+          `).bind(value, now, key).run();
+
+          await logConfigChange(
+            c.env, key, existing.value, value, 'update',
+            payload.userId, payload.username, changeReason, ipAddress, userAgent
+          );
+        } else {
+          results.push({ key, success: false, error: '配置项不存在' });
+          continue;
+        }
+
+        results.push({ key, success: true });
+      } catch (err) {
+        results.push({ key, success: false, error: String(err) });
+      }
+    }
+
+    return c.json(success({ results, updated: results.filter(r => r.success).length }, '配置批量更新完成'));
   } catch (err) {
-    console.error('Get analytics stats error:', err);
-    return c.json(error('SERVER_ERROR', '获取统计失败'), 500);
+    console.error('Batch update config error:', err);
+    return c.json(error('SERVER_ERROR', '批量更新配置失败'), 500);
   }
 });
 
-configRoutes.get('/email/logs', async (c) => {
+configRoutes.post('/reset/:key', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload || payload.role !== 'super_admin') {
+    return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
+  }
+
+  const key = c.req.param('key');
+  const defaultValue = DEFAULT_CONFIG_VALUES[key];
+
+  if (!defaultValue) {
+    return c.json(error('NOT_FOUND', '未找到该配置的默认值'), 404);
+  }
+
+  try {
+    const existing = await c.env.DB.prepare(
+      'SELECT * FROM system_config WHERE key = ?'
+    ).bind(key).first<SystemConfig>();
+
+    const now = Date.now();
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
+    const userAgent = c.req.header('User-Agent') || null;
+
+    await c.env.DB.prepare(`
+      UPDATE system_config 
+      SET value = ?, updated_at = ?
+      WHERE key = ?
+    `).bind(defaultValue.value, now, key).run();
+
+    await logConfigChange(
+      c.env, key, existing?.value || null, defaultValue.value, 'reset',
+      payload.userId, payload.username, '重置为默认值', ipAddress, userAgent
+    );
+
+    return c.json(success({ key, value: defaultValue.value }, '配置已重置为默认值'));
+  } catch (err) {
+    console.error('Reset config error:', err);
+    return c.json(error('SERVER_ERROR', '重置配置失败'), 500);
+  }
+});
+
+configRoutes.get('/:key', async (c) => {
+  const key = c.req.param('key');
+
+  try {
+    const config = await c.env.DB.prepare(
+      'SELECT * FROM system_config WHERE key = ?'
+    ).bind(key).first<SystemConfig>();
+
+    if (!config) {
+      return c.json(error('NOT_FOUND', '配置项不存在'), 404);
+    }
+
+    return c.json(success(config));
+  } catch (err) {
+    console.error('Get config error:', err);
+    return c.json(error('SERVER_ERROR', '获取配置失败'), 500);
+  }
+});
+
+configRoutes.put('/:key', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
@@ -824,46 +771,99 @@ configRoutes.get('/email/logs', async (c) => {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
-  const page = parseInt(c.req.query('page') || '1');
-  const pageSize = Math.min(parseInt(c.req.query('pageSize') || '50'), 200);
-  const emailType = c.req.query('type');
-  const status = c.req.query('status');
+  const key = c.req.param('key');
+  const body = await c.req.json();
+  const { value, description, configType, configGroup, isPublic, isSensitive, changeReason } = body;
 
   try {
-    let whereClause = 'WHERE 1=1';
-    const params: (string | number)[] = [];
+    const existing = await c.env.DB.prepare(
+      'SELECT * FROM system_config WHERE key = ?'
+    ).bind(key).first<SystemConfig>();
 
-    if (emailType) {
-      whereClause += ' AND email_type = ?';
-      params.push(emailType);
+    const configTypeToUse = configType || existing?.config_type || 'string';
+    const validationRules = existing?.validation_rules || DEFAULT_CONFIG_VALUES[key]?.validationRules || null;
+
+    const validation = validateConfigValue(value, configTypeToUse, validationRules);
+    if (!validation.valid) {
+      return c.json(error('VALIDATION_ERROR', validation.error || '配置值验证失败'), 400);
     }
 
-    if (status) {
-      whereClause += ' AND send_status = ?';
-      params.push(status);
+    const now = Date.now();
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
+    const userAgent = c.req.header('User-Agent') || null;
+
+    if (existing) {
+      await c.env.DB.prepare(`
+        UPDATE system_config 
+        SET value = ?, description = COALESCE(?, description), 
+            config_type = COALESCE(?, config_type), 
+            config_group = COALESCE(?, config_group),
+            is_public = COALESCE(?, is_public),
+            is_sensitive = COALESCE(?, is_sensitive),
+            updated_at = ?
+        WHERE key = ?
+      `).bind(value, description, configType, configGroup, isPublic, isSensitive, now, key).run();
+
+      await logConfigChange(
+        c.env, key, existing.value, value, 'update',
+        payload.userId, payload.username, changeReason, ipAddress, userAgent
+      );
+    } else {
+      await c.env.DB.prepare(`
+        INSERT INTO system_config (key, value, description, config_type, config_group, is_public, is_sensitive, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(key, value, description || null, configTypeToUse, configGroup || 'other', isPublic ? 1 : 0, isSensitive ? 1 : 0, now, now).run();
+
+      await logConfigChange(
+        c.env, key, null, value, 'create',
+        payload.userId, payload.username, changeReason, ipAddress, userAgent
+      );
     }
 
-    const countResult = await c.env.DB.prepare(
-      `SELECT COUNT(*) as total FROM email_send_logs ${whereClause}`
-    ).bind(...params).first<{ total: number }>();
-
-    const logs = await c.env.DB.prepare(`
-      SELECT l.*, u.username
-      FROM email_send_logs l
-      LEFT JOIN users u ON l.user_id = u.id
-      ${whereClause}
-      ORDER BY l.created_at DESC
-      LIMIT ? OFFSET ?
-    `).bind(...params, pageSize, (page - 1) * pageSize).all<EmailSendLog & { username: string | null }>();
-
-    return c.json(success({
-      logs: logs.results || [],
-      total: countResult?.total || 0,
-      page,
-      pageSize,
-    }));
+    return c.json(success({ key, value }, '配置已更新'));
   } catch (err) {
-    console.error('Get email logs error:', err);
-    return c.json(error('SERVER_ERROR', '获取日志失败'), 500);
+    console.error('Update config error:', err);
+    return c.json(error('SERVER_ERROR', '更新配置失败'), 500);
+  }
+});
+
+configRoutes.delete('/:key', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload || payload.role !== 'super_admin') {
+    return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
+  }
+
+  const key = c.req.param('key');
+
+  try {
+    const existing = await c.env.DB.prepare(
+      'SELECT * FROM system_config WHERE key = ?'
+    ).bind(key).first<SystemConfig>();
+
+    if (!existing) {
+      return c.json(error('NOT_FOUND', '配置项不存在'), 404);
+    }
+
+    const ipAddress = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || null;
+    const userAgent = c.req.header('User-Agent') || null;
+
+    await logConfigChange(
+      c.env, key, existing.value, '', 'delete',
+      payload.userId, payload.username, '删除配置', ipAddress, userAgent
+    );
+
+    await c.env.DB.prepare('DELETE FROM system_config WHERE key = ?').bind(key).run();
+
+    return c.json(success(null, '配置已删除'));
+  } catch (err) {
+    console.error('Delete config error:', err);
+    return c.json(error('SERVER_ERROR', '删除配置失败'), 500);
   }
 });

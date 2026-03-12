@@ -806,6 +806,214 @@ sourceRoutes.post('/', async (c) => {
   }
 });
 
+/**
+ * 更新大类
+ * PUT /api/search-sources/major-categories/:id
+ * 需要管理员权限
+ */
+sourceRoutes.put('/major-categories/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const { verifyToken } = await import('../utils');
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload) {
+    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
+  }
+
+  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
+  }
+
+  const categoryId = c.req.param('id');
+
+  try {
+    const existingCategory = await c.env.DB.prepare(
+      'SELECT * FROM search_major_categories WHERE id = ?'
+    ).bind(categoryId).first<MajorCategory>();
+
+    if (!existingCategory) {
+      return c.json(error('NOT_FOUND', '大类不存在'), 404);
+    }
+
+    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return c.json(error('FORBIDDEN', '系统大类仅管理员可修改'), 403);
+    }
+
+    const body = await c.req.json();
+    const updates: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (body.name !== undefined) {
+      const trimmedName = body.name.trim();
+      if (trimmedName.length < 1 || trimmedName.length > 30) {
+        return c.json(error('VALIDATION_ERROR', '大类名称长度必须在1-30个字符之间'), 400);
+      }
+
+      const duplicateCategory = await c.env.DB.prepare(
+        'SELECT id FROM search_major_categories WHERE LOWER(name) = LOWER(?) AND id != ?'
+      ).bind(trimmedName, categoryId).first();
+
+      if (duplicateCategory) {
+        return c.json(error('DUPLICATE_ERROR', '大类名称已存在'), 400);
+      }
+
+      updates.push('name = ?');
+      params.push(trimmedName);
+    }
+
+    if (body.description !== undefined) {
+      updates.push('description = ?');
+      params.push(body.description?.trim() || '');
+    }
+
+    if (body.icon !== undefined) {
+      updates.push('icon = ?');
+      params.push(body.icon?.trim() || '🌟');
+    }
+
+    if (body.color !== undefined && /^#[0-9a-fA-F]{6}$/.test(body.color)) {
+      updates.push('color = ?');
+      params.push(body.color);
+    }
+
+    if (body.requiresKeyword !== undefined) {
+      updates.push('requires_keyword = ?');
+      params.push(body.requiresKeyword ? 1 : 0);
+    }
+
+    if (body.displayOrder !== undefined) {
+      updates.push('display_order = ?');
+      params.push(Math.max(0, parseInt(body.displayOrder) || 0));
+    }
+
+    if (body.isActive !== undefined) {
+      updates.push('is_active = ?');
+      params.push(body.isActive ? 1 : 0);
+    }
+
+    if (updates.length === 0) {
+      return c.json(error('VALIDATION_ERROR', '没有需要更新的内容'), 400);
+    }
+
+    updates.push('updated_at = ?');
+    params.push(Date.now());
+    params.push(categoryId);
+
+    await c.env.DB.prepare(
+      `UPDATE search_major_categories SET ${updates.join(', ')} WHERE id = ?`
+    ).bind(...params).run();
+
+    return c.json(success({
+      categoryId,
+      updatedFields: Object.keys(body).filter(key => 
+        ['name', 'description', 'icon', 'color', 'requiresKeyword', 'displayOrder', 'isActive'].includes(key)
+      )
+    }, '大类更新成功'));
+  } catch (err) {
+    console.error('Update major category error:', err);
+    return c.json(error('SERVER_ERROR', '更新大类失败'), 500);
+  }
+});
+
+/**
+ * 删除大类
+ * DELETE /api/search-sources/major-categories/:id
+ * 需要管理员权限
+ */
+sourceRoutes.delete('/major-categories/:id', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const { verifyToken } = await import('../utils');
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload) {
+    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
+  }
+
+  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
+  }
+
+  const categoryId = c.req.param('id');
+
+  try {
+    const existingCategory = await c.env.DB.prepare(
+      'SELECT * FROM search_major_categories WHERE id = ?'
+    ).bind(categoryId).first<MajorCategory>();
+
+    if (!existingCategory) {
+      return c.json(error('NOT_FOUND', '大类不存在'), 404);
+    }
+
+    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return c.json(error('FORBIDDEN', '系统大类仅管理员可删除'), 403);
+    }
+
+    const categoryCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM search_source_categories WHERE major_category_id = ? AND is_active = 1'
+    ).bind(categoryId).first<{ count: number }>();
+
+    if (categoryCount && categoryCount.count > 0) {
+      return c.json(error('VALIDATION_ERROR', '该大类下还有分类，无法删除'), 400);
+    }
+
+    await c.env.DB.prepare(
+      'UPDATE search_major_categories SET is_active = 0, updated_at = ? WHERE id = ?'
+    ).bind(Date.now(), categoryId).run();
+
+    return c.json(success({ deletedId: categoryId }, '大类已删除'));
+  } catch (err) {
+    console.error('Delete major category error:', err);
+    return c.json(error('SERVER_ERROR', '删除大类失败'), 500);
+  }
+});
+
+/**
+ * 删除用户搜索源配置
+ * DELETE /api/search-sources/user-configs/:sourceId
+ * 需要认证
+ */
+sourceRoutes.delete('/user-configs/:sourceId', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json(error('AUTH_ERROR', '未授权'), 401);
+  }
+
+  const { verifyToken } = await import('../utils');
+  const token = authHeader.slice(7);
+  const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+  if (!payload) {
+    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
+  }
+
+  const sourceId = c.req.param('sourceId');
+
+  try {
+    const result = await c.env.DB.prepare(
+      'DELETE FROM user_search_source_configs WHERE user_id = ? AND source_id = ?'
+    ).bind(payload.userId, sourceId).run();
+
+    if (!result.success || result.meta.changes === 0) {
+      return c.json(error('NOT_FOUND', '配置不存在'), 404);
+    }
+
+    return c.json(success(null, '配置已删除'));
+  } catch (err) {
+    console.error('Delete user config error:', err);
+    return c.json(error('SERVER_ERROR', '删除配置失败'), 500);
+  }
+});
+
 sourceRoutes.put('/:id', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -1026,213 +1234,5 @@ sourceRoutes.post('/user-configs/batch', async (c) => {
   } catch (err) {
     console.error('Batch update user configs error:', err);
     return c.json(error('SERVER_ERROR', '批量更新失败'), 500);
-  }
-});
-
-/**
- * 更新大类
- * PUT /api/search-sources/major-categories/:id
- * 需要管理员权限
- */
-sourceRoutes.put('/major-categories/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
-  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
-    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
-  }
-
-  const categoryId = c.req.param('id');
-
-  try {
-    const existingCategory = await c.env.DB.prepare(
-      'SELECT * FROM search_major_categories WHERE id = ?'
-    ).bind(categoryId).first<MajorCategory>();
-
-    if (!existingCategory) {
-      return c.json(error('NOT_FOUND', '大类不存在'), 404);
-    }
-
-    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
-      return c.json(error('FORBIDDEN', '系统大类仅管理员可修改'), 403);
-    }
-
-    const body = await c.req.json();
-    const updates: string[] = [];
-    const params: (string | number)[] = [];
-
-    if (body.name !== undefined) {
-      const trimmedName = body.name.trim();
-      if (trimmedName.length < 1 || trimmedName.length > 30) {
-        return c.json(error('VALIDATION_ERROR', '大类名称长度必须在1-30个字符之间'), 400);
-      }
-
-      const duplicateCategory = await c.env.DB.prepare(
-        'SELECT id FROM search_major_categories WHERE LOWER(name) = LOWER(?) AND id != ?'
-      ).bind(trimmedName, categoryId).first();
-
-      if (duplicateCategory) {
-        return c.json(error('DUPLICATE_ERROR', '大类名称已存在'), 400);
-      }
-
-      updates.push('name = ?');
-      params.push(trimmedName);
-    }
-
-    if (body.description !== undefined) {
-      updates.push('description = ?');
-      params.push(body.description?.trim() || '');
-    }
-
-    if (body.icon !== undefined) {
-      updates.push('icon = ?');
-      params.push(body.icon?.trim() || '🌟');
-    }
-
-    if (body.color !== undefined && /^#[0-9a-fA-F]{6}$/.test(body.color)) {
-      updates.push('color = ?');
-      params.push(body.color);
-    }
-
-    if (body.requiresKeyword !== undefined) {
-      updates.push('requires_keyword = ?');
-      params.push(body.requiresKeyword ? 1 : 0);
-    }
-
-    if (body.displayOrder !== undefined) {
-      updates.push('display_order = ?');
-      params.push(Math.max(0, parseInt(body.displayOrder) || 0));
-    }
-
-    if (body.isActive !== undefined) {
-      updates.push('is_active = ?');
-      params.push(body.isActive ? 1 : 0);
-    }
-
-    if (updates.length === 0) {
-      return c.json(error('VALIDATION_ERROR', '没有需要更新的内容'), 400);
-    }
-
-    updates.push('updated_at = ?');
-    params.push(Date.now());
-    params.push(categoryId);
-
-    await c.env.DB.prepare(
-      `UPDATE search_major_categories SET ${updates.join(', ')} WHERE id = ?`
-    ).bind(...params).run();
-
-    return c.json(success({
-      categoryId,
-      updatedFields: Object.keys(body).filter(key => 
-        ['name', 'description', 'icon', 'color', 'requiresKeyword', 'displayOrder', 'isActive'].includes(key)
-      )
-    }, '大类更新成功'));
-  } catch (err) {
-    console.error('Update major category error:', err);
-    return c.json(error('SERVER_ERROR', '更新大类失败'), 500);
-  }
-});
-
-/**
- * 删除大类
- * DELETE /api/search-sources/major-categories/:id
- * 需要管理员权限
- */
-sourceRoutes.delete('/major-categories/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
-  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
-    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
-  }
-
-  const categoryId = c.req.param('id');
-
-  try {
-    const existingCategory = await c.env.DB.prepare(
-      'SELECT * FROM search_major_categories WHERE id = ?'
-    ).bind(categoryId).first<MajorCategory>();
-
-    if (!existingCategory) {
-      return c.json(error('NOT_FOUND', '大类不存在'), 404);
-    }
-
-    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
-      return c.json(error('FORBIDDEN', '系统大类仅管理员可删除'), 403);
-    }
-
-    const categoryCount = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM search_source_categories WHERE major_category_id = ? AND is_active = 1'
-    ).bind(categoryId).first<{ count: number }>();
-
-    if (categoryCount && categoryCount.count > 0) {
-      return c.json(error('VALIDATION_ERROR', '该大类下还有分类，无法删除'), 400);
-    }
-
-    await c.env.DB.prepare(
-      'UPDATE search_major_categories SET is_active = 0, updated_at = ? WHERE id = ?'
-    ).bind(Date.now(), categoryId).run();
-
-    return c.json(success({ deletedId: categoryId }, '大类已删除'));
-  } catch (err) {
-    console.error('Delete major category error:', err);
-    return c.json(error('SERVER_ERROR', '删除大类失败'), 500);
-  }
-});
-
-/**
- * 删除用户搜索源配置
- * DELETE /api/search-sources/user-configs/:sourceId
- * 需要认证
- */
-sourceRoutes.delete('/user-configs/:sourceId', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
-  const sourceId = c.req.param('sourceId');
-
-  try {
-    const result = await c.env.DB.prepare(
-      'DELETE FROM user_search_source_configs WHERE user_id = ? AND source_id = ?'
-    ).bind(payload.userId, sourceId).run();
-
-    if (!result.success || result.meta.changes === 0) {
-      return c.json(error('NOT_FOUND', '配置不存在'), 404);
-    }
-
-    return c.json(success(null, '配置已删除'));
-  } catch (err) {
-    console.error('Delete user config error:', err);
-    return c.json(error('SERVER_ERROR', '删除配置失败'), 500);
   }
 });
