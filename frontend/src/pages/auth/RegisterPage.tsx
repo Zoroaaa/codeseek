@@ -246,12 +246,12 @@ export const RegisterPage: React.FC = () => {
         <Input
           label="验证码"
           type="text"
-          placeholder="请输入6位验证码"
+          placeholder={`请输入${validationRules.VERIFICATION_CODE_LENGTH}位验证码`}
           value={verificationCode}
           onChange={handleCodeChange}
           fullWidth
           className="text-center text-2xl tracking-[0.5em] font-mono"
-          maxLength={7}
+          maxLength={validationRules.VERIFICATION_CODE_LENGTH}
         />
 
         {countdown > 0 ? (

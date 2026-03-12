@@ -2,7 +2,9 @@ import { Hono } from 'hono';
 import { Env, SourceStatusCache, UserAction, SearchSource } from '../types';
 import { success, error, generateId } from '../utils';
 import { ConfigService } from '../services/config';
-import { DB_CONFIG_KEYS } from '../constants';
+import { DB_CONFIG_KEYS, VALIDATION_RULES } from '../constants';
+
+const R = VALIDATION_RULES;
 
 export const systemRoutes = new Hono<{ Bindings: Env }>();
 
@@ -116,63 +118,39 @@ systemRoutes.get('/public-config', async (c) => {
 
     const [
       enableRegistration,
-      minUsernameLength,
-      maxUsernameLength,
-      minPasswordLength,
-      maxFavoritesPerUser,
-      maxHistoryPerUser,
-      maxTagsPerUser,
       enableSearchHistory,
       enableFavorites,
       enableAnalytics,
-      enableDarkMode,
       enableProxy,
-      enableSearchSuggestions,
-      searchDebounceMs,
-      maxKeywordLength,
-      suggestionsMinKeywordLength,
     ] = await Promise.all([
       configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true),
-      configService.getInt(DB_CONFIG_KEYS.MIN_USERNAME_LENGTH, 3),
-      configService.getInt(DB_CONFIG_KEYS.MAX_USERNAME_LENGTH, 20),
-      configService.getInt(DB_CONFIG_KEYS.MIN_PASSWORD_LENGTH, 6),
-      configService.getInt(DB_CONFIG_KEYS.MAX_FAVORITES, 1000),
-      configService.getInt(DB_CONFIG_KEYS.MAX_SEARCH_HISTORY, 1000),
-      configService.getInt(DB_CONFIG_KEYS.MAX_TAGS_PER_USER, 100),
       configService.getBoolean(DB_CONFIG_KEYS.ENABLE_SEARCH_HISTORY, true),
       configService.getBoolean(DB_CONFIG_KEYS.ENABLE_FAVORITES, true),
       configService.getBoolean(DB_CONFIG_KEYS.ENABLE_ANALYTICS, true),
-      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_DARK_MODE, true),
       configService.getBoolean(DB_CONFIG_KEYS.ENABLE_PROXY, true),
-      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_SEARCH_SUGGESTIONS, true),
-      configService.getInt(DB_CONFIG_KEYS.SEARCH_DEBOUNCE_MS, 300),
-      configService.getInt(DB_CONFIG_KEYS.MAX_KEYWORD_LENGTH, 200),
-      configService.getInt(DB_CONFIG_KEYS.SUGGESTIONS_MIN_KEYWORD_LENGTH, 2),
     ]);
 
     return c.json(success({
-      // 版本号来自 wrangler env（部署级）
       appVersion: c.env.APP_VERSION || '2.0.0',
-      // 业务配置全部来自 DB
       allowRegistration: enableRegistration,
-      minUsernameLength,
-      maxUsernameLength,
-      minPasswordLength,
-      maxFavoritesPerUser,
-      maxHistoryPerUser,
-      maxTagsPerUser,
+      minUsernameLength: R.USERNAME.MIN_LENGTH,
+      maxUsernameLength: R.USERNAME.MAX_LENGTH,
+      minPasswordLength: R.PASSWORD.MIN_LENGTH,
+      maxFavoritesPerUser: R.FAVORITES.MAX_COUNT,
+      maxHistoryPerUser: R.SEARCH_HISTORY.MAX_COUNT,
+      maxTagsPerUser: R.TAG.MAX_COUNT_PER_SOURCE,
       features: {
         searchHistory: enableSearchHistory,
         favorites: enableFavorites,
         analytics: enableAnalytics,
-        darkMode: enableDarkMode,
+        darkMode: true,
         proxy: enableProxy,
-        searchSuggestions: enableSearchSuggestions,
+        searchSuggestions: true,
       },
       search: {
-        debounceMs: searchDebounceMs,
-        maxKeywordLength,
-        suggestionsMinKeywordLength,
+        debounceMs: 300,
+        maxKeywordLength: R.KEYWORD.MAX_LENGTH,
+        suggestionsMinKeywordLength: R.SUGGESTIONS.MIN_KEYWORD_LENGTH,
       },
     }));
   } catch (err) {

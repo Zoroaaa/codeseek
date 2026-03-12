@@ -5,17 +5,12 @@
  *
  * 三层架构职责边界：
  *   Layer 1 wrangler.toml  → 部署级基础设施参数（域名、邮件发件人、JWT策略）
- *   Layer 2 constants.ts   → 本文件：代码枚举/正则/固定业务逻辑
+ *   Layer 2 constants.ts   → 本文件：代码枚举/正则/固定业务逻辑/验证规则
  *   Layer 3 DB system_config → 运行期业务参数，管理后台可热改
  *
  * 判断标准：
- *   放这里  → 改了需要改代码逻辑（正则、枚举、黑白名单、架构默认值）
- *   放 DB   → 管理员在后台调一下数字就能生效（限制数、超时、开关）
- *
- * ⚠️ 后备值说明：
- *   后备值不应放在本文件，应直接写在 configService.getInt(DB_CONFIG_KEYS.XXX, 1000) 的第二个参数中
- *   示例：configService.getInt(DB_CONFIG_KEYS.MAX_FAVORITES, 1000)
- *   第二个参数是硬编码后备值，仅当 DB 中无该配置时使用
+ *   放这里  → 改了需要改代码逻辑（正则、枚举、黑白名单、验证规则）
+ *   放 DB   → 管理员在后台调一下就能生效（功能开关、安全限制）
  */
 
 export const CONFIG = {
@@ -24,7 +19,6 @@ export const CONFIG = {
   // 固定枚举值 — 代码逻辑依赖，不可热改
   // ==================================================================
 
-  /** 允许的用户行为类型白名单 */
   ALLOWED_ACTIONS: [
     'search', 'login', 'logout', 'register', 'visit_site', 'copy_url',
     'favorite_add', 'favorite_remove', 'settings_update', 'export_data',
@@ -90,12 +84,27 @@ export const CONFIG = {
   // 纯计算用时间常量 — 不是业务参数，是代码里的数学常量
   // ==================================================================
 
-  Stats: {
-    HOUR_IN_MS:       60 * 60 * 1000,
-    DAY_IN_MS:    24 * 60 * 60 * 1000,
-    WEEK_IN_MS:    7 * 24 * 60 * 60 * 1000,
+  Time: {
+    SECOND: 1000,
+    MINUTE: 60 * 1000,
+    HOUR: 60 * 60 * 1000,
+    HOUR_IN_MS: 60 * 60 * 1000,
+    DAY: 24 * 60 * 60 * 1000,
+    DAY_IN_MS: 24 * 60 * 60 * 1000,
+    WEEK: 7 * 24 * 60 * 60 * 1000,
+    WEEK_IN_MS: 7 * 24 * 60 * 60 * 1000,
+    TWO_WEEKS: 14 * 24 * 60 * 60 * 1000,
     TWO_WEEKS_IN_MS: 14 * 24 * 60 * 60 * 1000,
-    MONTH_IN_MS:  30 * 24 * 60 * 60 * 1000,
+    MONTH: 30 * 24 * 60 * 60 * 1000,
+    MONTH_IN_MS: 30 * 24 * 60 * 60 * 1000,
+  },
+
+  Stats: {
+    HOUR_IN_MS: 60 * 60 * 1000,
+    DAY_IN_MS: 24 * 60 * 60 * 1000,
+    WEEK_IN_MS: 7 * 24 * 60 * 60 * 1000,
+    TWO_WEEKS_IN_MS: 14 * 24 * 60 * 60 * 1000,
+    MONTH_IN_MS: 30 * 24 * 60 * 60 * 1000,
   },
 
   // ==================================================================
@@ -127,112 +136,191 @@ export const CONFIG = {
 };
 
 // ==================================================================
-// DB Key 常量 — 防止字符串拼写错误，集中管理所有 system_config key
-// 使用方式：configService.getInt(DB_CONFIG_KEYS.MAX_FAVORITES, 1000)
-// 注意：第二个参数是硬编码后备值，仅当 DB 中无该配置时使用
+// 验证规则常量 — 统一管理所有输入验证限制
+// 改了需要重新部署，因为这些是代码级的验证逻辑
+// ==================================================================
+
+export const VALIDATION_RULES = {
+
+  // 用户相关
+  USERNAME: {
+    MIN_LENGTH: 3,
+    MAX_LENGTH: 20,
+  },
+  PASSWORD: {
+    MIN_LENGTH: 6,
+    MAX_LENGTH: 100,
+  },
+  EMAIL: {
+    MAX_LENGTH: 255,
+  },
+
+  // 搜索相关
+  KEYWORD: {
+    MIN_LENGTH: 1,
+    MAX_LENGTH: 200,
+  },
+  SEARCH_SOURCES: {
+    MAX_COUNT: 50,
+  },
+
+  // 收藏相关
+  FAVORITES: {
+    MAX_SYNC_COUNT: 1000,
+    MAX_COUNT: 1000,
+    TITLE_MAX_LENGTH: 100,
+    SUBTITLE_MAX_LENGTH: 200,
+    URL_MAX_LENGTH: 500,
+    ICON_MAX_LENGTH: 50,
+  },
+
+  // 搜索历史相关
+  SEARCH_HISTORY: {
+    MAX_COUNT: 1000,
+  },
+
+  // 分类/大类相关
+  MAJOR_CATEGORY: {
+    NAME_MAX_LENGTH: 30,
+    DESCRIPTION_MAX_LENGTH: 500,
+    ICON_MAX_LENGTH: 10,
+  },
+  CATEGORY: {
+    NAME_MAX_LENGTH: 50,
+    DESCRIPTION_MAX_LENGTH: 500,
+    ICON_MAX_LENGTH: 10,
+  },
+
+  // 搜索源相关
+  SOURCE: {
+    NAME_MAX_LENGTH: 100,
+    SUBTITLE_MAX_LENGTH: 200,
+    DESCRIPTION_MAX_LENGTH: 1000,
+    URL_MAX_LENGTH: 500,
+    ICON_MAX_LENGTH: 10,
+  },
+
+  // 用户配置相关
+  USER_CONFIG: {
+    CUSTOM_NAME_MAX_LENGTH: 100,
+    CUSTOM_SUBTITLE_MAX_LENGTH: 200,
+    CUSTOM_ICON_MAX_LENGTH: 50,
+    NOTES_MAX_LENGTH: 500,
+    BATCH_UPDATE_MAX_COUNT: 100,
+  },
+
+  // 社区相关
+  TAG: {
+    NAME_MIN_LENGTH: 2,
+    NAME_MAX_LENGTH: 20,
+    DESCRIPTION_MAX_LENGTH: 200,
+    MAX_COUNT_PER_SOURCE: 10,
+  },
+  SHARED_SOURCE: {
+    NAME_MIN_LENGTH: 2,
+    NAME_MAX_LENGTH: 100,
+    SUBTITLE_MAX_LENGTH: 200,
+    DESCRIPTION_MAX_LENGTH: 2000,
+    URL_MAX_LENGTH: 500,
+  },
+  REVIEW: {
+    COMMENT_MAX_LENGTH: 1000,
+  },
+  REPORT: {
+    REASON_MAX_LENGTH: 100,
+    DETAILS_MAX_LENGTH: 1000,
+  },
+
+  // 分页相关
+  PAGINATION: {
+    DEFAULT_PAGE_SIZE: 20,
+    MAX_PAGE_SIZE: 100,
+    MAX_LOG_PAGE_SIZE: 200,
+    DEFAULT_HISTORY_LIMIT: 50,
+    MAX_HISTORY_LIMIT: 200,
+  },
+
+  // 搜索建议相关
+  SUGGESTIONS: {
+    MIN_KEYWORD_LENGTH: 2,
+    MAX_LIMIT: 20,
+  },
+
+  // 热门搜索相关
+  TRENDING: {
+    DEFAULT_HOURS: 24,
+    MAX_HOURS: 168,
+    DEFAULT_LIMIT: 20,
+    MAX_LIMIT: 50,
+  },
+
+  // 验证码相关
+  VERIFICATION_CODE: {
+    LENGTH: 6,
+    EXPIRY_MS: 15 * 60 * 1000,
+    MAX_ATTEMPTS: 5,
+    RESEND_INTERVAL_MS: 60 * 1000,
+  },
+
+  // 邮箱更改相关
+  EMAIL_CHANGE: {
+    REQUEST_EXPIRY_MS: 30 * 60 * 1000,
+    PENDING_EXPIRY_MINUTES: 30,
+  },
+
+  // 搜索源状态检查相关
+  SOURCE_CHECK: {
+    MAX_BATCH_CHECK: 30,
+    MAX_CACHE_QUERY: 50,
+    DEFAULT_TIMEOUT_MS: 10000,
+    BATCH_TIMEOUT_MS: 5000,
+    CACHE_DURATION_MS: 5 * 60 * 1000,
+    MAX_CONCURRENT_CHECKS: 3,
+  },
+} as const;
+
+// ==================================================================
+// DB配置Key常量 — 仅保留真正需要动态管理的配置项
+// 使用方式：configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true)
 // ==================================================================
 
 export const DB_CONFIG_KEYS = {
-  // basic
-  SITE_NAME:                     'site_name',
-  SITE_DESCRIPTION:              'site_description',
-  ENABLE_REGISTRATION:           'enable_registration',
+  // 基础配置 — 网站信息
+  SITE_NAME: 'site_name',
+  SITE_DESCRIPTION: 'site_description',
 
-  // user_limits
-  MAX_FAVORITES:                 'max_favorites',
-  MAX_SEARCH_HISTORY:            'max_search_history',
-  MIN_USERNAME_LENGTH:           'min_username_length',
-  MAX_USERNAME_LENGTH:           'max_username_length',
-  MIN_PASSWORD_LENGTH:           'min_password_length',
-  MAX_PASSWORD_LENGTH:           'max_password_length',
-  MAX_TAGS_PER_USER:             'max_tags_per_user',
-  MAX_BATCH_CONFIG_UPDATE:       'max_batch_config_update',
-  MAX_SYNC_FAVORITES:            'max_sync_favorites',
+  // 功能开关 — 运营需要动态调整
+  ENABLE_REGISTRATION: 'enable_registration',
+  FORGOT_PASSWORD_ENABLED: 'forgot_password_enabled',
+  COMMUNITY_ENABLED: 'community_enabled',
+  SOURCE_CHECK_ENABLED: 'source_check_enabled',
+  ENABLE_SEARCH_HISTORY: 'enable_search_history',
+  ENABLE_FAVORITES: 'enable_favorites',
+  ENABLE_ANALYTICS: 'enable_analytics',
+  ENABLE_DARK_MODE: 'enable_dark_mode',
+  ENABLE_PROXY: 'enable_proxy',
+  ENABLE_SEARCH_SUGGESTIONS: 'enable_search_suggestions',
 
-  // source_check
-  SOURCE_CHECK_ENABLED:          'source_check_enabled',
-  MAX_CONCURRENT_CHECKS:         'max_concurrent_checks',
-  DEFAULT_CHECK_TIMEOUT:         'default_check_timeout',
-  BATCH_CHECK_TIMEOUT_MS:        'batch_check_timeout_ms',
-  CACHE_DURATION_MS:             'cache_duration_ms',
-  MAX_BATCH_CHECK:               'max_batch_check',
-  MAX_CACHE_AGE_MS:              'max_cache_age_ms',
+  // 安全限制 — 安全策略需要动态调整
+  MAX_LOGIN_ATTEMPTS: 'max_login_attempts',
+  LOCKOUT_DURATION_MS: 'lockout_duration_ms',
+  MAX_VERIFICATION_ATTEMPTS: 'max_verification_attempts',
+  PASSWORD_RESET_MAX_ATTEMPTS: 'password_reset_max_attempts',
+  PASSWORD_RESET_LOCKOUT_DURATION: 'password_reset_lockout_duration',
 
-  // community
-  COMMUNITY_ENABLED:             'community_enabled',
-  COMMUNITY_REQUIRE_APPROVAL:    'community_require_approval',
-  COMMUNITY_MAX_SHARES_PER_USER: 'community_max_shares_per_user',
-  MIN_RATING_TO_FEATURE:         'min_rating_to_feature',
-  MAX_TAGS_PER_SOURCE:           'max_tags_per_source',
-  MAX_COMMENT_LENGTH:            'max_comment_length',
-  MAX_REPORT_REASON_LENGTH:      'max_report_reason_length',
-  MAX_REPORT_DETAILS_LENGTH:     'max_report_details_length',
-  TAG_NAME_MIN_LENGTH:           'tag_name_min_length',
-  TAG_NAME_MAX_LENGTH:           'tag_name_max_length',
-  SOURCE_NAME_MAX_LENGTH:        'source_name_max_length',
-  SOURCE_DESCRIPTION_MAX_LENGTH: 'source_description_max_length',
+  // 用户限制 — 运营需要动态调整
+  MAX_FAVORITES: 'max_favorites',
 
-  // email
-  EMAIL_VERIFICATION_ENABLED:    'email_verification_enabled',
-  EMAIL_VERIFICATION_REQUIRED:   'email_verification_required',
-  VERIFICATION_CODE_EXPIRY:      'verification_code_expiry',
-  MAX_VERIFICATION_ATTEMPTS:     'max_verification_attempts',
-  EMAIL_RATE_LIMIT_PER_HOUR:     'email_rate_limit_per_hour',
-  EMAIL_RATE_LIMIT_PER_DAY:      'email_rate_limit_per_day',
-  RESEND_INTERVAL_MS:            'resend_interval_ms',
-  CHANGE_REQUEST_EXPIRY_MS:      'change_request_expiry_ms',
-  CHANGE_PENDING_EXPIRY_MINUTES: 'change_pending_expiry_minutes',
+  // 邮件限制 — 防滥用需要动态调整
+  EMAIL_RATE_LIMIT_PER_HOUR: 'email_rate_limit_per_hour',
+  EMAIL_RATE_LIMIT_PER_DAY: 'email_rate_limit_per_day',
 
-  // password
-  FORGOT_PASSWORD_ENABLED:            'forgot_password_enabled',
-  RESET_PASSWORD_CODE_EXPIRY:         'reset_password_code_expiry',
-  PASSWORD_RESET_MAX_ATTEMPTS:        'password_reset_max_attempts',
-  PASSWORD_RESET_LOCKOUT_DURATION:    'password_reset_lockout_duration',
+  // 验证码过期时间 — 安全策略需要动态调整
+  VERIFICATION_CODE_EXPIRY: 'verification_code_expiry',
+  RESET_PASSWORD_CODE_EXPIRY: 'reset_password_code_expiry',
 
-  // security
-  SECURITY_MONITORING_ENABLED:        'security_monitoring_enabled',
-  SECURITY_EVENT_RETENTION_DAYS:      'security_event_retention_days',
-  HIGH_RISK_THRESHOLD:                'high_risk_threshold',
-  MAX_LOGIN_ATTEMPTS:                 'max_login_attempts',
-  LOCKOUT_DURATION_MS:                'lockout_duration_ms',
-  RECENT_FAILED_LOGINS_THRESHOLD:     'recent_failed_logins_threshold',
-  RECENT_IP_LOGINS_THRESHOLD:         'recent_ip_logins_threshold',
-  RECENT_PASSWORD_CHANGES_THRESHOLD:  'recent_password_changes_threshold',
-
-  // features
-  ENABLE_SEARCH_HISTORY:    'enable_search_history',
-  ENABLE_FAVORITES:         'enable_favorites',
-  ENABLE_ANALYTICS:         'enable_analytics',
-  ENABLE_DARK_MODE:         'enable_dark_mode',
-  ENABLE_PROXY:             'enable_proxy',
-  ENABLE_SEARCH_SUGGESTIONS:'enable_search_suggestions',
-
-  // session
-  SESSION_TIMEOUT_MINUTES:  'session_timeout_minutes',
-  MAX_SESSIONS_PER_USER:    'max_sessions_per_user',
-  REMEMBER_ME_DAYS:         'remember_me_days',
-
-  // search
-  DEFAULT_SEARCH_SOURCES:         'default_search_sources',
-  SEARCH_DEBOUNCE_MS:             'search_debounce_ms',
-  TRENDING_SEARCHES_HOURS:        'trending_searches_hours',
-  MAX_KEYWORD_LENGTH:             'max_keyword_length',
-  MAX_SOURCES_PER_SEARCH:         'max_sources_per_search',
-  SUGGESTIONS_MIN_KEYWORD_LENGTH: 'suggestions_min_keyword_length',
-  SUGGESTIONS_MAX_LIMIT:          'suggestions_max_limit',
-  TRENDING_MAX_HOURS:             'trending_max_hours',
-  TRENDING_DEFAULT_LIMIT:         'trending_default_limit',
-  TRENDING_MAX_LIMIT:             'trending_max_limit',
-
-  // pagination
-  DEFAULT_PAGE_SIZE:       'default_page_size',
-  MAX_PAGE_SIZE:           'max_page_size',
-  MAX_LOG_PAGE_SIZE:       'max_log_page_size',
-  DEFAULT_HISTORY_LIMIT:   'default_history_limit',
-  MAX_HISTORY_LIMIT:       'max_history_limit',
-
-  // cleanup
-  PASSWORD_RESET_LOG_RETENTION_DAYS:    'password_reset_log_retention_days',
-  USER_ACTIONS_RETENTION_DAYS:          'user_actions_retention_days',
-  EMAIL_VERIFICATION_RETENTION_DAYS:    'email_verification_retention_days',
+  // 数据清理 — 运维需要动态调整
+  PASSWORD_RESET_LOG_RETENTION_DAYS: 'password_reset_log_retention_days',
+  USER_ACTIONS_RETENTION_DAYS: 'user_actions_retention_days',
+  SECURITY_EVENT_RETENTION_DAYS: 'security_event_retention_days',
 } as const;

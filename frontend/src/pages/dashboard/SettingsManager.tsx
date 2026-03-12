@@ -415,7 +415,7 @@ export const SettingsManager: React.FC = () => {
           <Input
             label="验证码"
             type="text"
-            placeholder="请输入6位验证码"
+            placeholder={`请输入${validationRules.VERIFICATION_CODE_LENGTH}位验证码`}
             value={emailChangeForm.verificationCode}
             onChange={(e) => setEmailChangeForm({ 
               ...emailChangeForm, 
@@ -423,7 +423,7 @@ export const SettingsManager: React.FC = () => {
             })}
             fullWidth
             className="text-center text-xl tracking-widest"
-            maxLength={7}
+            maxLength={validationRules.VERIFICATION_CODE_LENGTH}
           />
 
           {emailChangeCountdown > 0 ? (
@@ -564,12 +564,12 @@ export const SettingsManager: React.FC = () => {
           <Input
             label="验证码"
             type="text"
-            placeholder="请输入6位验证码"
+            placeholder={`请输入${validationRules.VERIFICATION_CODE_LENGTH}位验证码`}
             value={deleteVerificationCode}
             onChange={(e) => setDeleteVerificationCode(formatVerificationCode(e.target.value))}
             fullWidth
             className="text-center text-xl tracking-widest"
-            maxLength={7}
+            maxLength={validationRules.VERIFICATION_CODE_LENGTH}
           />
 
           {deleteCountdown > 0 ? (

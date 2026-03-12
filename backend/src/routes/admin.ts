@@ -8,15 +8,18 @@ import { Hono } from 'hono';
 import { Env, User, CommunitySourceReport, UserAction, JwtPayload, Role } from '../types';
 import { success, error, verifyToken, logUserAction } from '../utils';
 import { ConfigService } from '../services/config';
-import { CONFIG } from '../constants';
+import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '../constants';
+
+const R = VALIDATION_RULES;
 
 export const adminRoutes = new Hono<{ Bindings: Env }>();
 
-async function getPaginationConfig(configService: ConfigService) {
-  const defaultPageSize = await configService.getInt('default_page_size', 20);
-  const maxPageSize = await configService.getInt('max_page_size', 100);
-  const maxLogPageSize = await configService.getInt('max_log_page_size', 200);
-  return { defaultPageSize, maxPageSize, maxLogPageSize };
+function getPaginationConfig() {
+  return {
+    defaultPageSize: R.PAGINATION.DEFAULT_PAGE_SIZE,
+    maxPageSize: R.PAGINATION.MAX_PAGE_SIZE,
+    maxLogPageSize: R.PAGINATION.MAX_LOG_PAGE_SIZE,
+  };
 }
 
 const getAdminUser = async (c: any): Promise<JwtPayload | null> => {
@@ -83,8 +86,7 @@ adminRoutes.get('/roles', async (c) => {
  */
 adminRoutes.get('/users', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const configService = new ConfigService(c.env);
-  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const { defaultPageSize, maxPageSize } = getPaginationConfig();
   const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
   const search = c.req.query('search');
   const status = c.req.query('status');
@@ -288,8 +290,7 @@ adminRoutes.put('/users/:id/role', async (c) => {
 adminRoutes.get('/users/:id/login-logs', async (c) => {
   const userId = c.req.param('id');
   const page = parseInt(c.req.query('page') || '1');
-  const configService = new ConfigService(c.env);
-  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const { defaultPageSize, maxPageSize } = getPaginationConfig();
   const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
 
   try {
@@ -334,8 +335,7 @@ adminRoutes.get('/users/:id/login-logs', async (c) => {
  * GET /api/admin/active-users
  */
 adminRoutes.get('/active-users', async (c) => {
-  const configService = new ConfigService(c.env);
-  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const { defaultPageSize, maxPageSize } = getPaginationConfig();
   const limit = Math.min(parseInt(c.req.query('limit') || String(defaultPageSize)), maxPageSize);
   const days = parseInt(c.req.query('days') || '7');
 
@@ -519,8 +519,7 @@ adminRoutes.put('/users/:id/permissions', async (c) => {
  */
 adminRoutes.get('/reports', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const configService = new ConfigService(c.env);
-  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const { defaultPageSize, maxPageSize } = getPaginationConfig();
   const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
   const status = c.req.query('status') || 'pending';
 
@@ -722,8 +721,7 @@ adminRoutes.get('/stats', async (c) => {
  */
 adminRoutes.get('/logs', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const configService = new ConfigService(c.env);
-  const { defaultPageSize, maxLogPageSize } = await getPaginationConfig(configService);
+  const { defaultPageSize, maxLogPageSize } = getPaginationConfig();
   const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxLogPageSize);
   const userId = c.req.query('userId');
   const action = c.req.query('action');
@@ -781,8 +779,8 @@ adminRoutes.post('/cleanup', async (c) => {
 
   try {
     const configService = new ConfigService(c.env);
-    const passwordResetRetentionDays = await configService.getInt('password_reset_log_retention_days', 30);
-    const userActionsRetentionDays = await configService.getInt('user_actions_retention_days', 90);
+    const passwordResetRetentionDays = await configService.getInt(DB_CONFIG_KEYS.PASSWORD_RESET_LOG_RETENTION_DAYS, 30);
+    const userActionsRetentionDays = await configService.getInt(DB_CONFIG_KEYS.USER_ACTIONS_RETENTION_DAYS, 90);
 
     const now = Date.now();
     const results = {
@@ -833,8 +831,7 @@ adminRoutes.post('/cleanup', async (c) => {
  */
 adminRoutes.get('/sessions', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const configService = new ConfigService(c.env);
-  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const { defaultPageSize, maxPageSize } = getPaginationConfig();
   const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
   const userId = c.req.query('userId');
   const status = c.req.query('status');
@@ -1013,8 +1010,7 @@ adminRoutes.get('/analytics/stats', async (c) => {
  */
 adminRoutes.get('/analytics/events', async (c) => {
   const page = parseInt(c.req.query('page') || '1');
-  const configService = new ConfigService(c.env);
-  const { defaultPageSize, maxPageSize } = await getPaginationConfig(configService);
+  const { defaultPageSize, maxPageSize } = getPaginationConfig();
   const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxPageSize);
   const eventType = c.req.query('eventType');
   const userId = c.req.query('userId');

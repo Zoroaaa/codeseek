@@ -3,8 +3,10 @@ import { Env, User, EmailVerification, EmailChangeRequest } from '../types';
 import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP, checkLockout, clearLockout, recordSecurityEvent } from '../utils';
 import { recordFailedAttempt } from '../utils/security';
 import { EmailVerificationService, emailVerificationUtils } from '../services/email-verification';
-import { CONFIG, DB_CONFIG_KEYS } from '../constants';
+import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '../constants';
 import { ConfigService } from '../services/config';
+
+const R = VALIDATION_RULES;
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
@@ -144,7 +146,7 @@ authRoutes.post('/login', async (c) => {
 
 authRoutes.post('/register', async (c) => {
   const configService = new ConfigService(c.env);
-  const enableRegistration = await configService.getBoolean('enable_registration', true);
+  const enableRegistration = await configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true);
   
   if (!enableRegistration) {
     return c.json(error('FORBIDDEN', '注册功能已关闭'), 403);
@@ -157,9 +159,9 @@ authRoutes.post('/register', async (c) => {
     return c.json(error('VALIDATION_ERROR', '请填写所有必填项'), 400);
   }
 
-  const usernameMinLength = await configService.getInt(DB_CONFIG_KEYS.MIN_USERNAME_LENGTH, 3);
-  const usernameMaxLength = await configService.getInt(DB_CONFIG_KEYS.MAX_USERNAME_LENGTH, 20);
-  const passwordMinLength = await configService.getInt(DB_CONFIG_KEYS.MIN_PASSWORD_LENGTH, 6);
+  const usernameMinLength = R.USERNAME.MIN_LENGTH;
+  const usernameMaxLength = R.USERNAME.MAX_LENGTH;
+  const passwordMinLength = R.PASSWORD.MIN_LENGTH;
 
   if (!validateUsername(username)) {
     return c.json(error('VALIDATION_ERROR', `用户名需要${usernameMinLength}-${usernameMaxLength}个字符，只能包含字母、数字和下划线`), 400);
@@ -407,13 +409,13 @@ authRoutes.post('/forgot-password', async (c) => {
   }
 
   const configService = new ConfigService(c.env);
-  const forgotPasswordEnabled = await configService.getBoolean('forgot_password_enabled', true);
+  const forgotPasswordEnabled = await configService.getBoolean(DB_CONFIG_KEYS.FORGOT_PASSWORD_ENABLED, true);
   
   if (!forgotPasswordEnabled) {
     return c.json(error('FORBIDDEN', '密码找回功能已关闭'), 403);
   }
 
-  const verificationCodeExpiry = await configService.getInt(DB_CONFIG_KEYS.VERIFICATION_CODE_EXPIRY, 900000);
+  const verificationCodeExpiry = await configService.getInt(DB_CONFIG_KEYS.VERIFICATION_CODE_EXPIRY, R.VERIFICATION_CODE.EXPIRY_MS);
   
   const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
   const maskedEmail = emailVerificationUtils.maskEmail(normalizedEmail);
@@ -546,9 +548,7 @@ authRoutes.post('/change-password', async (c) => {
   }
 
   if (!validatePassword(newPassword)) {
-    const configService = new ConfigService(c.env);
-    const passwordMinLength = await configService.getInt(DB_CONFIG_KEYS.MIN_PASSWORD_LENGTH, 6);
-    return c.json(error('VALIDATION_ERROR', `新密码至少需要${passwordMinLength}个字符`), 400);
+    return c.json(error('VALIDATION_ERROR', `新密码至少需要${R.PASSWORD.MIN_LENGTH}个字符`), 400);
   }
 
   try {
@@ -834,8 +834,6 @@ authRoutes.post('/request-email-change', async (c) => {
     return c.json(error('VALIDATION_ERROR', '请输入当前密码'), 400);
   }
 
-  const configService = new ConfigService(c.env);
-
   try {
     const user = await c.env.DB.prepare(
       'SELECT * FROM users WHERE id = ?'
@@ -863,7 +861,7 @@ authRoutes.post('/request-email-change', async (c) => {
     }
 
     const emailService = new EmailVerificationService(c.env);
-    const changePendingExpiryMinutes = await configService.getInt(DB_CONFIG_KEYS.CHANGE_PENDING_EXPIRY_MINUTES, 30);
+    const changePendingExpiryMinutes = R.EMAIL_CHANGE.PENDING_EXPIRY_MINUTES;
     await emailService.cancelExpiredPendingRequests(user.id, changePendingExpiryMinutes);
 
     const activeRequest = await c.env.DB.prepare(`
@@ -873,14 +871,13 @@ authRoutes.post('/request-email-change', async (c) => {
 
     if (activeRequest) {
       const createdAt = (activeRequest as { created_at: number }).created_at;
-      const changePendingExpiryMinutes = await configService.getInt(DB_CONFIG_KEYS.CHANGE_PENDING_EXPIRY_MINUTES, 30);
       const elapsedMinutes = Math.floor((Date.now() - createdAt) / 60000);
       const remainingMinutes = changePendingExpiryMinutes - elapsedMinutes;
       return c.json(error('VALIDATION_ERROR', `您已有进行中的邮箱更改请求，请等待${remainingMinutes > 0 ? remainingMinutes : 1}分钟后再试或手动取消`), 400);
     }
 
     const requestId = generateId();
-    const changeRequestExpiryMs = await configService.getInt(DB_CONFIG_KEYS.CHANGE_REQUEST_EXPIRY_MS, 86400000);
+    const changeRequestExpiryMs = R.EMAIL_CHANGE.REQUEST_EXPIRY_MS;
     const expiresAt = Date.now() + changeRequestExpiryMs;
     const expiresIn = Math.floor(changeRequestExpiryMs / 1000);
     const newEmailHash = await hashPassword(newEmail);
@@ -1174,8 +1171,6 @@ authRoutes.get('/verification-status', async (c) => {
     return c.json(error('VALIDATION_ERROR', '邮箱格式不正确'), 400);
   }
 
-  const configService = new ConfigService(c.env);
-
   try {
     const verification = await c.env.DB.prepare(`
       SELECT * FROM email_verifications 
@@ -1191,7 +1186,7 @@ authRoutes.get('/verification-status', async (c) => {
     }
 
     const remainingTime = verification.expires_at - Date.now();
-    const resendIntervalMs = await configService.getInt(DB_CONFIG_KEYS.RESEND_INTERVAL_MS, 60000);
+    const resendIntervalMs = R.VERIFICATION_CODE.RESEND_INTERVAL_MS;
     const canResend = remainingTime <= resendIntervalMs;
 
     return c.json(success({

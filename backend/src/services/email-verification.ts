@@ -1,7 +1,9 @@
 import { Env } from '../types';
 import { generateId, hashPassword } from '../utils';
-import { CONFIG, DB_CONFIG_KEYS } from '../constants';
+import { CONFIG, DB_CONFIG_KEYS, VALIDATION_RULES } from '../constants';
 import { ConfigService } from './config';
+
+const R = VALIDATION_RULES;
 
 export type VerificationType =
   | 'registration'
@@ -657,8 +659,7 @@ export class EmailVerificationService {
   ): Promise<{ id: string; expiresAt: number }> {
     const requestId = generateId();
     const newEmailHash = await hashPassword(newEmail);
-    const configService = new ConfigService(this.env);
-    const expiryTime = Date.now() + await configService.getInt(DB_CONFIG_KEYS.CHANGE_REQUEST_EXPIRY_MS, 86400000);
+    const expiryTime = Date.now() + R.EMAIL_CHANGE.REQUEST_EXPIRY_MS;
 
     await this.env.DB.prepare(
       `INSERT INTO email_change_requests (

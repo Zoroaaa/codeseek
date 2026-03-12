@@ -9,14 +9,6 @@
  * 判断标准：
  *   放这里  → 改了需要改代码（UI尺寸、动画时长、API地址、正则格式）
  *   放 ConfigContext → 从后端 /api/system/public-config 拉取的业务参数
- *
- * 注意：原来硬编码在这里的业务数字（用户名长度、最大收藏数、社区限制等）
- *       已全部移至 DB → ConfigContext，请勿在此处重复定义。
- *
- * ⚠️ 后备值说明：
- *   后备值不应放在本文件，应直接写在 configService.getXxx() 的第二个参数中
- *   或在 ConfigContext 的 hooks 中作为 ?? 后面的后备值
- *   示例：config?.max_favorites ?? defaults.max_favorites
  */
 
 /* ==================== API 配置 ==================== */
@@ -67,15 +59,62 @@ export const PROXY_TIMEOUTS = {
 
 /**
  * 表单格式正则 — 代码逻辑依赖，不可热改
- * 注意：长度限制（min/maxLength）来自 ConfigContext，不在此处定义
+ * 注意：这些正则必须与后端 constants.ts 中的定义保持一致
  */
 export const VALIDATION_REGEX = {
   USERNAME: /^[a-zA-Z0-9_]+$/,
   EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
 } as const;
 
+/* ==================== 验证规则常量 ==================== */
+
+/**
+ * 验证规则 — 与后端 VALIDATION_RULES 保持一致
+ * 这些值改了需要前后端同步修改代码重新部署
+ */
+export const VALIDATION_RULES = {
+  USERNAME: {
+    MIN_LENGTH: 3,
+    MAX_LENGTH: 20,
+  },
+  PASSWORD: {
+    MIN_LENGTH: 6,
+    MAX_LENGTH: 100,
+  },
+  EMAIL: {
+    MAX_LENGTH: 255,
+  },
+  KEYWORD: {
+    MIN_LENGTH: 1,
+    MAX_LENGTH: 200,
+  },
+  VERIFICATION_CODE: {
+    LENGTH: 6,
+  },
+  TAG: {
+    MAX_COUNT_PER_SOURCE: 10,
+  },
+  PAGINATION: {
+    DEFAULT_PAGE_SIZE: 20,
+    MAX_PAGE_SIZE: 100,
+    MAX_LOG_PAGE_SIZE: 200,
+    DEFAULT_HISTORY_LIMIT: 50,
+    MAX_HISTORY_LIMIT: 200,
+  },
+  SUGGESTIONS: {
+    MIN_KEYWORD_LENGTH: 2,
+    MAX_LIMIT: 20,
+  },
+  TRENDING: {
+    DEFAULT_HOURS: 24,
+    MAX_HOURS: 168,
+    DEFAULT_LIMIT: 20,
+    MAX_LIMIT: 50,
+  },
+} as const;
+
 /** 验证码固定位数（格式规则，非业务参数）*/
-export const VERIFICATION_CODE_LENGTH = 6;
+export const VERIFICATION_CODE_LENGTH = VALIDATION_RULES.VERIFICATION_CODE.LENGTH;
 
 /** 本地搜索历史最大条数（前端 localStorage 限制，非后端 DB 限制）*/
 export const MAX_LOCAL_SEARCH_HISTORY = 100;

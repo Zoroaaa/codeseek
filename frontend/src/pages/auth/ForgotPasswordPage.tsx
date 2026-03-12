@@ -159,8 +159,8 @@ export const ForgotPasswordPage: React.FC = () => {
         </p>
       </div>
 
-      <Input label="验证码" type="text" placeholder="请输入6位验证码" value={verificationCode}
-        onChange={handleCodeChange} fullWidth className="text-center text-2xl tracking-[0.5em] font-mono" maxLength={7} />
+      <Input label="验证码" type="text" placeholder={`请输入${validationRules.VERIFICATION_CODE_LENGTH}位验证码`} value={verificationCode}
+        onChange={handleCodeChange} fullWidth className="text-center text-2xl tracking-[0.5em] font-mono" maxLength={validationRules.VERIFICATION_CODE_LENGTH} />
 
       <p className="text-center text-sm text-slate-500 dark:text-slate-400">
         {countdown > 0
@@ -168,7 +168,7 @@ export const ForgotPasswordPage: React.FC = () => {
           : '未收到验证码？可以重新发送'}
       </p>
 
-      <Input label="新密码" type={showPassword ? 'text' : 'password'} placeholder="请输入新密码（至少6位）"
+      <Input label="新密码" type={showPassword ? 'text' : 'password'} placeholder={`请输入新密码（至少${validationRules.PASSWORD_MIN_LENGTH}位）`}
         value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
         leftIcon={<Lock className="w-5 h-5" />}
         rightIcon={<button type="button" onClick={() => setShowPassword(!showPassword)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">

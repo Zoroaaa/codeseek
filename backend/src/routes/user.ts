@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
 import { Env, User, UserFavorite, UserSearchHistory } from '../types';
 import { success, error, generateId, verifyToken, logUserAction } from '../utils';
-import { CONFIG, DB_CONFIG_KEYS } from '../constants';
-import { ConfigService } from '../services/config';
+import { CONFIG, VALIDATION_RULES } from '../constants';
+
+const R = VALIDATION_RULES;
 
 export const userRoutes = new Hono<{ Bindings: Env }>();
 
@@ -135,8 +136,7 @@ userRoutes.post('/favorites', async (c) => {
       }, '已收藏该链接'));
     }
 
-    const configService = new ConfigService(c.env);
-    const maxFavorites = await configService.getInt(DB_CONFIG_KEYS.MAX_FAVORITES, 1000);
+    const maxFavorites = R.FAVORITES.MAX_COUNT;
     
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_favorites WHERE user_id = ?'
@@ -202,8 +202,7 @@ userRoutes.post('/favorites/sync', async (c) => {
       return c.json(error('VALIDATION_ERROR', '收藏数据格式错误'), 400);
     }
 
-    const configService = new ConfigService(c.env);
-    const maxFavorites = await configService.getInt(DB_CONFIG_KEYS.MAX_FAVORITES, 1000);
+    const maxFavorites = R.FAVORITES.MAX_SYNC_COUNT;
     if (favorites.length > maxFavorites) {
       return c.json(error('VALIDATION_ERROR', `最多只能同步${maxFavorites}个收藏`), 400);
     }
@@ -322,8 +321,7 @@ userRoutes.post('/search-history', async (c) => {
       return c.json(error('VALIDATION_ERROR', '搜索关键词是必填项'), 400);
     }
 
-    const configService = new ConfigService(c.env);
-    const maxHistory = await configService.getInt(DB_CONFIG_KEYS.MAX_SEARCH_HISTORY, 1000);
+    const maxHistory = R.SEARCH_HISTORY.MAX_COUNT;
     
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?'
