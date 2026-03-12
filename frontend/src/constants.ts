@@ -72,56 +72,10 @@ export const VALIDATION_REGEX = {
 /** 验证码固定位数（格式规则，非业务参数）*/
 export const VERIFICATION_CODE_LENGTH = 6;
 
-/* ==================== 时间常量 ==================== */
-
-/** 纯数学常量，供其他地方计算用 */
-export const TIME_CONSTANTS = {
-  SECOND: 1000,
-  MINUTE: 60 * 1000,
-  HOUR:   60 * 60 * 1000,
-  DAY:    24 * 60 * 60 * 1000,
-} as const;
-
-/* ==================== 统计默认天数 ==================== */
-
-/** 图表默认时间范围 — UI 展示默认值，不是业务限制 */
-export const STATS_DEFAULT_DAYS = {
-  LOGIN_STATS: 7,
-  ANALYTICS:   7,
-  TRENDING_HOURS: 24,
-} as const;
-
-/* ==================== 响应式断点 ==================== */
-
-/** CSS 断点（像素）— 布局固定值 */
-export const BREAKPOINTS = {
-  MOBILE:  768,
-  TABLET:  1024,
-  DESKTOP: 1280,
-} as const;
-
-/* ==================== 动画 ==================== */
-
-/** 动画时长（毫秒）— 纯 UI 常量 */
-export const ANIMATION_DURATION = {
-  FAST:    150,
-  DEFAULT: 300,
-  SLOW:    500,
-} as const;
+/** 本地搜索历史最大条数（前端 localStorage 限制，非后端 DB 限制）*/
+export const MAX_LOCAL_SEARCH_HISTORY = 100;
 
 /* ==================== 应用信息 ==================== */
 
 /** 构建时版本号，来自打包配置 */
 export const APP_VERSION = '2.0.0' as const;
-
-/**
- * 应用展示信息后备值
- * 真实值通过 ConfigContext 从后端 DB 获取（site_name / site_description）
- * 仅在 ConfigContext 尚未加载时作为骨架屏占位使用
- */
-export const APP_INFO_FALLBACK = {
-  NAME: '磁力快搜',
-  DESCRIPTION: '搜索全网资源，一步直达',
-  VERSION: APP_VERSION,
-} as const;
-

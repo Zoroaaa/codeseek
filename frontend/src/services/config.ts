@@ -13,7 +13,6 @@ export interface PublicConfig {
   max_tags_per_user: number;
   max_batch_config_update: number;
   max_sync_favorites: number;
-  verification_code_length: number;
   source_check_enabled: boolean;
   max_concurrent_checks: number;
   default_check_timeout: number;
@@ -119,7 +118,6 @@ function getDefaultConfig(): PublicConfig {
     max_tags_per_user: 100,
     max_batch_config_update: 100,
     max_sync_favorites: 1000,
-    verification_code_length: 6,
     source_check_enabled: true,
     max_concurrent_checks: 3,
     default_check_timeout: 10000,
@@ -206,7 +204,6 @@ function parseConfig(data: Record<string, unknown>): PublicConfig {
     max_tags_per_user: parseNumber(data.max_tags_per_user, defaults.max_tags_per_user),
     max_batch_config_update: parseNumber(data.max_batch_config_update, defaults.max_batch_config_update),
     max_sync_favorites: parseNumber(data.max_sync_favorites, defaults.max_sync_favorites),
-    verification_code_length: parseNumber(data.verification_code_length, defaults.verification_code_length),
     source_check_enabled: parseBoolean(data.source_check_enabled, defaults.source_check_enabled),
     max_concurrent_checks: parseNumber(data.max_concurrent_checks, defaults.max_concurrent_checks),
     default_check_timeout: parseNumber(data.default_check_timeout, defaults.default_check_timeout),

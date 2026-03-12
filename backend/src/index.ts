@@ -39,7 +39,7 @@ app.use('*', cors({
 app.get('/', (c) => {
   return c.json({
     name: 'CodeSeek API',
-    version: c.env.APP_VERSION || CONFIG.Defaults.APP_VERSION,
+    version: c.env.APP_VERSION || '2.0.0',
     status: 'running',
   });
 });

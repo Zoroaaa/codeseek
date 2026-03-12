@@ -37,7 +37,7 @@ export const CONFIG = {
   // ==================================================================
 
   VALIDATION: {
-    USERNAME_REGEX: /^[a-zA-Z0-9_]{3,20}$/,
+    USERNAME_REGEX: /^[a-zA-Z0-9_]+$/,
     EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     VERIFICATION_CODE_REGEX: /^\d{6}$/,
   },
@@ -98,7 +98,6 @@ export const CONFIG = {
   // ==================================================================
 
   Defaults: {
-    APP_VERSION: '2.0.0',
     SEARCH_PRIORITY: 5,
     DISPLAY_ORDER: 999,
     DEFAULT_ICON: '🔍',
@@ -171,7 +170,6 @@ export const DB_CONFIG_KEYS = {
   // email
   EMAIL_VERIFICATION_ENABLED:    'email_verification_enabled',
   EMAIL_VERIFICATION_REQUIRED:   'email_verification_required',
-  VERIFICATION_CODE_LENGTH:      'verification_code_length',
   VERIFICATION_CODE_EXPIRY:      'verification_code_expiry',
   MAX_VERIFICATION_ATTEMPTS:     'max_verification_attempts',
   EMAIL_RATE_LIMIT_PER_HOUR:     'email_rate_limit_per_hour',

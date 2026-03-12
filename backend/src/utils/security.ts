@@ -7,11 +7,7 @@
 import { SecurityLockout, UserSecurityEvent, Env } from '../types';
 import { generateId } from '../utils';
 import { ConfigService } from '../services/config';
-
-const TIME_CONSTANTS = {
-  DAY_IN_MS: 24 * 60 * 60 * 1000,
-  WEEK_IN_MS: 7 * 24 * 60 * 60 * 1000,
-};
+import { CONFIG } from '../constants';
 
 const DEFAULT_SECURITY_CONFIG = {
   MAX_LOGIN_ATTEMPTS: 5,
@@ -338,7 +334,7 @@ export async function detectSuspiciousActivity(
     const recentFailedLogins = await db.prepare(
     `SELECT COUNT(*) as count FROM user_security_events 
      WHERE user_id = ? AND event_type = 'login' AND event_status = 'failed' AND created_at > ?`
-  ).bind(userId, Date.now() - TIME_CONSTANTS.DAY_IN_MS).first<{ count: number }>();
+  ).bind(userId, Date.now() - CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
 
   if (recentFailedLogins && recentFailedLogins.count >= recentFailedLoginsThreshold) {
     factors.push('多次登录失败');
@@ -348,12 +344,12 @@ export async function detectSuspiciousActivity(
   const recentIpLogins = await db.prepare(
     `SELECT COUNT(DISTINCT ip_address) as count FROM user_security_events 
      WHERE user_id = ? AND event_type = 'login' AND event_status = 'success' AND created_at > ? AND ip_address IS NOT NULL`
-  ).bind(userId, Date.now() - TIME_CONSTANTS.WEEK_IN_MS).first<{ count: number }>();
+  ).bind(userId, Date.now() - CONFIG.Stats.WEEK_IN_MS).first<{ count: number }>();
 
   const knownIpLogin = await db.prepare(
     `SELECT COUNT(*) as count FROM user_security_events 
      WHERE user_id = ? AND event_type = 'login' AND event_status = 'success' AND ip_address = ? AND created_at > ?`
-  ).bind(userId, ipAddress, Date.now() - 30 * TIME_CONSTANTS.DAY_IN_MS).first<{ count: number }>();
+  ).bind(userId, ipAddress, Date.now() - CONFIG.Stats.MONTH_IN_MS).first<{ count: number }>();
 
   if (recentIpLogins && recentIpLogins.count >= recentIpLoginsThreshold && (!knownIpLogin || knownIpLogin.count === 0)) {
     factors.push('新IP地址登录');
@@ -363,7 +359,7 @@ export async function detectSuspiciousActivity(
   const recentPasswordChanges = await db.prepare(
     `SELECT COUNT(*) as count FROM user_security_events 
      WHERE user_id = ? AND event_type = 'password_change' AND created_at > ?`
-  ).bind(userId, Date.now() - TIME_CONSTANTS.DAY_IN_MS).first<{ count: number }>();
+  ).bind(userId, Date.now() - CONFIG.Stats.DAY_IN_MS).first<{ count: number }>();
 
   if (recentPasswordChanges && recentPasswordChanges.count >= recentPasswordChangesThreshold) {
     factors.push('频繁修改密码');

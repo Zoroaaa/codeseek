@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { configService, PublicConfig } from '@/services/config';
+import { VALIDATION_REGEX, VERIFICATION_CODE_LENGTH } from '@/constants';
 
 interface ConfigContextType {
   config: PublicConfig | null;
@@ -94,8 +95,9 @@ export function useValidationRules() {
     EMAIL_MAX_LENGTH: 255,
     SEARCH_KEYWORD_MIN_LENGTH: 2,
     SEARCH_KEYWORD_MAX_LENGTH: config?.max_keyword_length ?? defaults.max_keyword_length,
-    VERIFICATION_CODE_LENGTH: config?.verification_code_length ?? defaults.verification_code_length,
-    USERNAME_REGEX: /^[a-zA-Z0-9_]+$/,
+    VERIFICATION_CODE_LENGTH: VERIFICATION_CODE_LENGTH,
+    USERNAME_REGEX: VALIDATION_REGEX.USERNAME,
+    EMAIL_REGEX: VALIDATION_REGEX.EMAIL,
     MAX_TAGS_PER_USER: config?.max_tags_per_user ?? defaults.max_tags_per_user,
     MAX_BATCH_CONFIG_UPDATE: config?.max_batch_config_update ?? defaults.max_batch_config_update,
     MAX_SYNC_FAVORITES: config?.max_sync_favorites ?? defaults.max_sync_favorites,
@@ -192,7 +194,7 @@ export function useEmailConfig() {
   const defaults = configService.getDefaultConfig();
   
   return {
-    verificationCodeLength: config?.verification_code_length ?? defaults.verification_code_length,
+    verificationCodeLength: VERIFICATION_CODE_LENGTH,
     verificationCodeExpiry: config?.verification_code_expiry ?? defaults.verification_code_expiry,
     resendIntervalMs: config?.resend_interval_ms ?? defaults.resend_interval_ms,
     emailVerificationEnabled: config?.email_verification_enabled ?? defaults.email_verification_enabled,

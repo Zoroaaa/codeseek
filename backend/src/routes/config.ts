@@ -49,8 +49,6 @@ const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string
   'max_verification_attempts': { value: '5', description: '最大验证尝试次数', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 1, "max": 10}' },
   'email_rate_limit_per_hour': { value: '5', description: '每小时最大发送邮件数', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 1, "max": 20}' },
   'email_rate_limit_per_day': { value: '20', description: '每天最大发送邮件数', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 1, "max": 100}' },
-  'default_from_email': { value: 'noreply@codeseek.pp.ua', description: '默认发件人邮箱', configType: 'string', configGroup: 'email', isPublic: 0, isSensitive: 1 },
-  'default_from_name': { value: '磁力快搜', description: '默认发件人姓名', configType: 'string', configGroup: 'email', isPublic: 0, isSensitive: 0 },
   'resend_interval_ms': { value: '60000', description: '邮件重发间隔（毫秒，默认1分钟）', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 30000, "max": 300000}' },
   'change_request_expiry_ms': { value: '1800000', description: '邮箱更改请求过期时间（毫秒，默认30分钟）', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 600000, "max": 7200000}' },
   'change_pending_expiry_minutes': { value: '15', description: '邮箱更改待确认过期时间（分钟）', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 5, "max": 60}' },

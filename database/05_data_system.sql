@@ -81,13 +81,10 @@ INSERT OR IGNORE INTO system_config (key, value, description, config_type, confi
     -- 邮箱验证配置
     ('email_verification_enabled', '1', '是否启用邮箱验证功能', 'boolean', 'email', 1, 50, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('email_verification_required', '0', '注册时是否强制邮箱验证', 'boolean', 'email', 1, 51, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('verification_code_length', '6', '验证码长度', 'integer', 'email', 1, 52, '{"min": 4, "max": 8}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('verification_code_expiry', '900000', '验证码过期时间（毫秒，默认15分钟）', 'integer', 'email', 1, 53, '{"min": 60000, "max": 3600000}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('max_verification_attempts', '5', '最大验证尝试次数', 'integer', 'email', 1, 54, '{"min": 1, "max": 10}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('email_rate_limit_per_hour', '5', '每小时最大发送邮件数', 'integer', 'email', 0, 55, '{"min": 1, "max": 20}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('email_rate_limit_per_day', '20', '每天最大发送邮件数', 'integer', 'email', 0, 56, '{"min": 1, "max": 100}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('default_from_email', 'noreply@codeseek.pp.ua', '默认发件人邮箱', 'string', 'email', 0, 57, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('default_from_name', '磁力快搜', '默认发件人姓名', 'string', 'email', 0, 58, NULL, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('resend_interval_ms', '60000', '邮件重发间隔（毫秒，默认1分钟）', 'integer', 'email', 1, 59, '{"min": 30000, "max": 300000}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('change_request_expiry_ms', '1800000', '邮箱更改请求过期时间（毫秒，默认30分钟）', 'integer', 'email', 0, 60, '{"min": 600000, "max": 7200000}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('change_pending_expiry_minutes', '15', '邮箱更改待确认过期时间（分钟）', 'integer', 'email', 0, 61, '{"min": 5, "max": 60}', strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
