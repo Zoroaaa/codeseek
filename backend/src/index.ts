@@ -54,7 +54,7 @@ app.route('/api/search', searchRoutes);
 app.route('/api/search-sources', sourceRoutes);
 app.route('/api/community', communityRoutes);
 app.route('/api/admin', adminRoutes);
-app.route('/api', configRoutes);
+app.route('/api/config', configRoutes);
 app.route('/api', systemRoutes);
 
 app.get('/api/config', async (c) => {

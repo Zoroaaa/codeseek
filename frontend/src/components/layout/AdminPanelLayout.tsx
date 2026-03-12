@@ -19,6 +19,7 @@ import {
   TrendingUp,
   X,
   Globe,
+  Trash2,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
 
@@ -40,6 +41,7 @@ const navItems: NavItem[] = [
   { id: 'reports', label: '举报处理', icon: <AlertTriangle className="w-[18px] h-[18px]" />, path: '/admin-panel/reports' },
   { id: 'roles', label: '角色管理', icon: <Shield className="w-[18px] h-[18px]" />, path: '/admin-panel/roles' },
   { id: 'config', label: '系统配置', icon: <Settings className="w-[18px] h-[18px]" />, path: '/admin-panel/config' },
+  { id: 'cleanup', label: '数据清理', icon: <Trash2 className="w-[18px] h-[18px]" />, path: '/admin-panel/cleanup' },
 ];
 
 export const AdminPanelLayout: React.FC = () => {

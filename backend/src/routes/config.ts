@@ -23,7 +23,7 @@ const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string
   'max_tags_per_user': { value: '100', description: '每个用户最大标签数量', configType: 'integer', configGroup: 'user_limits', isPublic: 1, isSensitive: 0, validationRules: '{"min": 10, "max": 200}' },
   'max_batch_config_update': { value: '100', description: '批量配置更新最大数量', configType: 'integer', configGroup: 'user_limits', isPublic: 0, isSensitive: 0, validationRules: '{"min": 10, "max": 500}' },
   'max_sync_favorites': { value: '1000', description: '同步收藏最大数量', configType: 'integer', configGroup: 'user_limits', isPublic: 0, isSensitive: 0, validationRules: '{"min": 100, "max": 5000}' },
-  'verification_code_length': { value: '6', description: '验证码长度', configType: 'integer', configGroup: 'user_limits', isPublic: 0, isSensitive: 0, validationRules: '{"min": 4, "max": 8}' },
+  'verification_code_length': { value: '6', description: '验证码长度', configType: 'integer', configGroup: 'email', isPublic: 1, isSensitive: 0, validationRules: '{"min": 4, "max": 8}' },
   'source_check_enabled': { value: '1', description: '启用搜索源状态检查', configType: 'boolean', configGroup: 'source_check', isPublic: 1, isSensitive: 0 },
   'max_concurrent_checks': { value: '3', description: '最大并发检查数', configType: 'integer', configGroup: 'source_check', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1, "max": 10}' },
   'default_check_timeout': { value: '10000', description: '默认检查超时时间（毫秒）', configType: 'integer', configGroup: 'source_check', isPublic: 1, isSensitive: 0, validationRules: '{"min": 1000, "max": 60000}' },
