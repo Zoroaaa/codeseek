@@ -704,6 +704,41 @@ npm install
 
 ---
 
+## 🔧 v2.0 最新更新 (2025-03)
+
+### 新增功能
+
+#### 前端新增
+- ✅ 新增 `contexts/ConfigContext.tsx` 配置上下文
+- ✅ 新增 `pages/admin/ConfigTab.tsx` 系统配置管理页面
+- ✅ 新增 `services/config.ts` 配置服务
+- ✅ 新增 `types/notification.ts` 通知类型定义
+- ✅ 新增 `utils/notificationTemplates.ts` 通知模板工具
+- ✅ 新增 `docs/notification.md` 通知系统文档
+
+#### 后端新增
+- ✅ 新增 `services/config.ts` 配置服务
+- ✅ 新增系统配置管理API
+- ✅ 新增邮箱验证码限流机制
+- ✅ 新增搜索源状态检查缓存
+
+### 配置优化
+- ✅ `wrangler.toml` 配置项大幅扩展，支持更多运行时配置
+- ✅ 新增 `compatibility_flags = ["nodejs_compat"]` Node.js兼容性
+- ✅ 新增 `observability` 监控配置
+- ✅ 新增邮件发送频率限制配置
+- ✅ 新增JWT有效期配置
+- ✅ 新增搜索源状态检查配置
+
+### 安全增强
+- ✅ 邮箱验证码发送频率限制（每小时5次，每天20次）
+- ✅ 验证码尝试次数限制（最多3次）
+- ✅ 临时邮箱域名黑名单
+- ✅ 可信邮箱域名白名单
+- ✅ 安全事件监控阈值配置
+
+---
+
 ## 🙏 致谢
 
 感谢所有参与版本2.0开发和测试的贡献者！

@@ -170,24 +170,56 @@ const apiClient = {
 ```toml
 name = "codeseek-backend"
 main = "src/index.ts"
-compatibility_date = "2024-09-09"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+preview_urls = false  
 
 [vars]
-ENVIRONMENT = "production"
+# 应用版本信息
 APP_VERSION = "2.0.0"
 
+# 用户注册相关配置
+ALLOW_REGISTRATION = "true"                    # 是否允许新用户注册
+MAX_FAVORITES_PER_USER = "1000"                # 每个用户最大收藏数量限制
+MAX_HISTORY_PER_USER = "1000"                  # 每个用户最大搜索历史记录数量限制
+MAX_TAGS_PER_USER = "50"                       # 每个用户最大可创建标签数量限制
+COMMUNITY_MAX_SHARES_PER_USER = "50"           # 社区中每个用户最大分享搜索源数量限制
+
+# 系统行为日志配置
+ENABLE_ACTION_LOGGING = "true"                 # 是否启用用户行为日志记录
+
+# 邮箱验证功能配置
+EMAIL_VERIFICATION_ENABLED = "true"            # 是否启用邮箱验证系统
+EMAIL_VERIFICATION_REQUIRED = "false"          # 注册时是否强制要求邮箱验证
+VERIFICATION_CODE_LENGTH = "6"                 # 验证码位数（6位数字）
+VERIFICATION_CODE_EXPIRY = "900000"            # 验证码过期时间（毫秒，15分钟=900000）
+MAX_VERIFICATION_ATTEMPTS = "3"                # 单个验证码最大尝试次数
+EMAIL_RATE_LIMIT_PER_HOUR = "5"               # 同一邮箱/IP每小时最大发送次数
+EMAIL_RATE_LIMIT_PER_DAY = "20"               # 同一邮箱/IP每天最大发送次数
+DEFAULT_FROM_EMAIL = "noreply@yourdomain.com" # 系统发送邮件的发件人邮箱地址
+DEFAULT_FROM_NAME = "磁力快搜"                  # 系统发送邮件的发件人显示名称
+SITE_URL = "https://yourdomain.com"           # 网站域名（用于邮件中的链接和引用）
+
+# JWT令牌配置
+JWT_EXPIRY_DAYS = "30"                         # JWT令牌有效期（天）
+
+# 社区功能配置
+COMMUNITY_REQUIRE_APPROVAL = "false"           # 社区分享的搜索源是否需要管理员审核
+
+# 搜索源状态检查配置
+ENABLE_SOURCE_STATUS_CHECK = "true"            # 是否启用搜索源状态自动检查功能
+SOURCE_STATUS_CHECK_TIMEOUT = "10000"          # 单个搜索源状态检查超时时间（毫秒，10秒）
+SOURCE_STATUS_CACHE_DURATION = "300000"        # 状态检查结果缓存时间（毫秒，5分钟=300000）
+
+# 数据库配置
 [[d1_databases]]
-binding = "DB"
-database_name = "codeseek-db"
-database_id = "your-database-id"
+binding = "DB"                                  # 在代码中使用的数据库实例名称
+database_name = "codeseek"                     # Cloudflare D1 数据库名称
+database_id = "your-database-id-here"          # 数据库唯一标识符（替换为实际ID）
 
-[env.development]
-name = "codeseek-backend-dev"
-vars = { ENVIRONMENT = "development" }
-
-[env.production]
-name = "codeseek-backend"
-vars = { ENVIRONMENT = "production" }
+# 监控和可观测性配置
+[observability]
+enabled = true                                 # 启用 Cloudflare 的监控和日志功能
 ```
 
 ### Hono应用配置 (src/index.ts)
@@ -216,43 +248,112 @@ export default app
 ### 常量配置 (src/constants.ts)
 
 ```typescript
-export const APP_CONFIG = {
-  APP_NAME: 'CodeSeek',
-  APP_VERSION: '2.0.0',
-  
-  JWT_EXPIRES_IN: '7d',
-  JWT_REFRESH_EXPIRES_IN: '30d',
-  
-  VERIFICATION_CODE_EXPIRY: 10 * 60 * 1000,
-  VERIFICATION_RESEND_INTERVAL: 60 * 1000,
-  
-  MAX_LOGIN_ATTEMPTS: 5,
-  LOCKOUT_DURATION: 15 * 60 * 1000,
-}
+export const CONFIG = {
+  /** 允许的用户行为类型 - [固定值] */
+  ALLOWED_ACTIONS: [
+    'search', 'login', 'logout', 'register', 'visit_site', 'copy_url',
+    'favorite_add', 'favorite_remove', 'settings_update', 'export_data',
+    'sync_data', 'page_view', 'session_start', 'session_end',
+    'custom_source_add', 'custom_source_edit', 'custom_source_delete',
+    'tag_created', 'tag_updated', 'tag_deleted',
+    'major_category_create', 'major_category_update', 'major_category_delete',
+    'source_category_create', 'source_category_update', 'source_category_delete',
+    'search_source_create', 'search_source_update', 'search_source_delete',
+    'user_source_config_update', 'search_sources_export'
+  ] as const,
 
-export const LIMITS = {
-  MAX_TAGS_PER_USER: 50,
-  MAX_SHARES_PER_USER: 50,
+  /** 验证相关配置 - [后备值] */
+  VALIDATION: {
+    USERNAME_MIN_LENGTH: 3,
+    USERNAME_MAX_LENGTH: 20,
+    PASSWORD_MIN_LENGTH: 6,
+    PASSWORD_MAX_LENGTH: 100,
+    USERNAME_REGEX: /^[a-zA-Z0-9_]{3,20}$/,
+    EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    VERIFICATION_CODE_REGEX: /^\d{6}$/,
+    MAX_BATCH_CONFIG_UPDATE: 100,
+    MAX_SYNC_FAVORITES: 1000,
+  },
+
+  /** 安全相关配置 - [后备值] */
+  SECURITY: {
+    MAX_LOGIN_ATTEMPTS: 5,
+    MAX_VERIFICATION_ATTEMPTS: 5,
+    MAX_PASSWORD_RESET_ATTEMPTS: 5,
+    LOCKOUT_DURATION_MS: 15 * 60 * 1000,
+    PASSWORD_RESET_LOCKOUT_MS: 60 * 60 * 1000,
+    SUSPICIOUS_ACTIVITY_THRESHOLD: 50,
+    RECENT_FAILED_LOGINS_THRESHOLD: 3,
+    RECENT_IP_LOGINS_THRESHOLD: 3,
+    RECENT_PASSWORD_CHANGES_THRESHOLD: 2,
+  },
+
+  /** 邮件相关配置 - [后备值] */
+  Email: {
+    VERIFICATION_CODE_EXPIRY_MS: 900000,
+    VERIFICATION_CODE_LENGTH: 6,
+    HOURLY_LIMIT: 5,
+    DAILY_LIMIT: 20,
+    RESEND_INTERVAL_MS: 60000,
+    CHANGE_REQUEST_EXPIRY_MS: 1800000,
+    CHANGE_PENDING_EXPIRY_MINUTES: 15,
+    DEFAULT_FROM_EMAIL: 'noreply@codeseek.pp.ua',
+    DEFAULT_FROM_NAME: '磁力快搜',
+  },
+
+  /** CORS跨域配置 - [固定值] */
+  CORS: {
+    MAX_AGE: 86400,
+    ALLOW_METHODS: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    ALLOW_HEADERS: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    EXPOSE_HEADERS: ['Content-Length', 'X-Request-Id'],
+    ALLOWED_ORIGINS: [
+      'https://codeseek.pp.ua',
+      'https://www.codeseek.pp.ua',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+    ],
+  },
+
+  /** 搜索源状态检查配置 - [后备值] */
+  SourceStatus: {
+    CHECK_TIMEOUT_MS: 10000,
+    BATCH_CHECK_TIMEOUT_MS: 5000,
+    CACHE_DURATION_MS: 300000,
+    MAX_BATCH_CHECK: 50,
+    MAX_CACHE_AGE_MS: 300000,
+  },
+
+  /** 分页配置 - [后备值] */
+  Pagination: {
+    DEFAULT_PAGE_SIZE: 20,
+    MAX_PAGE_SIZE: 100,
+    MAX_LOG_PAGE_SIZE: 200,
+    DEFAULT_HISTORY_LIMIT: 50,
+    MAX_HISTORY_LIMIT: 200,
+    MAX_BATCH_CONFIG_UPDATE: 100,
+    MAX_SOURCES_CHECK: 50,
+  },
+
+  /** 默认值配置 - [固定值] */
+  Defaults: {
+    APP_VERSION: '2.0.0',
+    SEARCH_PRIORITY: 5,
+    DISPLAY_ORDER: 999,
+    DEFAULT_ICON: '🔍',
+    DEFAULT_CATEGORY_ICON: '📁',
+    DEFAULT_MAJOR_CATEGORY_ICON: '🌟',
+    DEFAULT_COLOR: '#3b82f6',
+    DEFAULT_MAJOR_CATEGORY_COLOR: '#6b7280',
+    DEFAULT_SITE_TYPE: 'search',
+    SITE_URL: 'https://codeseek.pp.ua',
+  },
+
+  /** 用户数据限制配置 - [后备值] */
   MAX_FAVORITES_PER_USER: 1000,
-  MAX_HISTORY_PER_USER: 1000,
-  
-  USERNAME_MIN_LENGTH: 3,
-  USERNAME_MAX_LENGTH: 20,
-  PASSWORD_MIN_LENGTH: 6,
-  PASSWORD_MAX_LENGTH: 100,
+  MAX_HISTORY_PER_USER: 500,
+  MAX_TAGS_PER_USER: 100,
 }
-
-export const ALLOWED_ACTIONS = [
-  'search', 'login', 'logout', 'register', 'visit_site', 'copy_url',
-  'favorite_add', 'favorite_remove', 'settings_update', 'export_data',
-  'sync_data', 'page_view', 'session_start', 'session_end',
-  'custom_source_add', 'custom_source_edit', 'custom_source_delete',
-  'tag_created', 'tag_updated', 'tag_deleted',
-  'major_category_create', 'major_category_update', 'major_category_delete',
-  'source_category_create', 'source_category_update', 'source_category_delete',
-  'search_source_create', 'search_source_update', 'search_source_delete',
-  'user_source_config_update', 'search_sources_export'
-] as const
 ```
 
 ---

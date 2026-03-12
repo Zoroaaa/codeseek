@@ -98,7 +98,8 @@ frontend/src/
 │   │   ├── AdminPanelLayout.tsx    # 管理面板布局
 │   │   ├── CommunityPanelLayout.tsx # 社区面板布局
 │   │   ├── DashboardLayout.tsx     # 仪表板布局
-│   │   └── MainLayout.tsx          # 主页面布局
+│   │   ├── MainLayout.tsx          # 主页面布局
+│   │   └── index.ts                # 布局组件导出
 │   └── ui/              # UI基础组件
 │       ├── Badge.tsx              # 徽章组件
 │       ├── Button.tsx             # 按钮组件
@@ -113,20 +114,26 @@ frontend/src/
 │       ├── SourceIcon.tsx         # 搜索源图标组件
 │       ├── Tabs.tsx               # 标签页组件
 │       ├── TextArea.tsx           # 文本域组件
-│       └── Toast.tsx              # 通知组件
+│       ├── Toast.tsx              # 通知组件
+│       └── index.ts               # UI组件导出
+│
+├── contexts/            # 🔄 React Context
+│   └── ConfigContext.tsx          # 配置上下文
 │
 ├── hooks/               # 🎣 自定义Hooks
 │   ├── useAuth.ts       # 认证Hook
 │   ├── useFavorites.ts  # 收藏Hook
 │   ├── useNotification.ts # 通知Hook
 │   ├── useSearch.ts     # 搜索Hook
-│   └── useSearchSuggestions.ts  # 搜索建议Hook
+│   ├── useSearchSuggestions.ts  # 搜索建议Hook
+│   └── index.ts         # Hooks导出
 │
 ├── pages/               # 📄 页面组件
 │   ├── auth/            # 认证页面
 │   │   ├── ForgotPasswordPage.tsx # 忘记密码页
 │   │   ├── LoginPage.tsx          # 登录页
-│   │   └── RegisterPage.tsx       # 注册页
+│   │   ├── RegisterPage.tsx       # 注册页
+│   │   └── index.ts               # 认证页面导出
 │   ├── dashboard/       # 仪表板页面
 │   │   ├── CategoryManager.tsx    # 分类管理
 │   │   ├── DashboardPage.tsx      # 仪表板主页
@@ -135,18 +142,22 @@ frontend/src/
 │   │   ├── SettingsManager.tsx    # 设置页
 │   │   ├── SourceManager.tsx      # 搜索源管理
 │   │   ├── StatsManager.tsx       # 统计页
-│   │   └── UserActivitiesPage.tsx # 用户活动页
+│   │   ├── UserActivitiesPage.tsx # 用户活动页
+│   │   └── index.ts               # 仪表板页面导出
 │   ├── admin/           # 管理面板页面
 │   │   ├── ActionsTab.tsx         # 行为日志
 │   │   ├── AdminManager.tsx       # 管理主页
 │   │   ├── AdminPanelOverview.tsx # 管理概览
 │   │   ├── AnalyticsTab.tsx       # 分析统计
 │   │   ├── CleanupTab.tsx         # 数据清理
+│   │   ├── ConfigTab.tsx          # 系统配置
 │   │   ├── ReportsTab.tsx         # 举报管理
 │   │   ├── RolesTab.tsx           # 角色管理
 │   │   ├── SessionsTab.tsx        # 会话管理
 │   │   ├── TrendsTab.tsx          # 趋势分析
-│   │   └── UsersTab.tsx           # 用户管理
+│   │   ├── UsersTab.tsx           # 用户管理
+│   │   ├── index.ts               # 管理页面导出
+│   │   └── shared.tsx             # 共享组件
 │   ├── community/       # 社区页面
 │   │   ├── BrowseTab.tsx          # 浏览页
 │   │   ├── CommunityManager.tsx   # 社区主页
@@ -155,7 +166,9 @@ frontend/src/
 │   │   ├── NotificationsTab.tsx   # 通知页
 │   │   ├── StatsBanner.tsx        # 统计横幅
 │   │   ├── TagsTab.tsx            # 标签管理
-│   │   └── TrendingTab.tsx        # 热门页
+│   │   ├── TrendingTab.tsx        # 热门页
+│   │   ├── index.ts               # 社区页面导出
+│   │   └── shared.tsx             # 共享组件
 │   ├── HomePage.tsx     # 首页
 │   └── MainSearchPage.tsx # 主搜索页
 │
@@ -167,10 +180,12 @@ frontend/src/
 │   │   ├── community.ts # 社区API
 │   │   ├── search.ts    # 搜索API
 │   │   ├── source.ts    # 搜索源API
-│   │   └── system.ts    # 系统API
-│   └── proxy/           # 代理服务
-│       ├── ProxyService.ts    # 代理服务
-│       └── proxy-config.ts    # 代理配置
+│   │   ├── system.ts    # 系统API
+│   │   └── index.ts     # API服务导出
+│   ├── proxy/           # 代理服务
+│   │   ├── ProxyService.ts    # 代理服务
+│   │   └── proxy-config.ts    # 代理配置
+│   └── config.ts        # 配置服务
 │
 ├── stores/              # 📦 状态管理 (Zustand)
 │   ├── authStore.ts     # 认证状态
@@ -179,7 +194,8 @@ frontend/src/
 │   ├── searchStore.ts   # 搜索状态
 │   ├── sourceStore.ts   # 搜索源状态
 │   ├── themeStore.ts    # 主题状态
-│   └── uiStore.ts       # UI状态
+│   ├── uiStore.ts       # UI状态
+│   └── index.ts         # Store导出
 │
 ├── types/               # 📝 TypeScript类型定义
 │   ├── auth.ts          # 认证类型
@@ -187,7 +203,8 @@ frontend/src/
 │   ├── community.ts     # 社区类型
 │   ├── notification.ts  # 通知类型
 │   ├── search.ts        # 搜索类型
-│   └── source.ts        # 搜索源类型
+│   ├── source.ts        # 搜索源类型
+│   └── index.ts         # 类型导出
 │
 ├── utils/               # 🛠️ 工具函数
 │   └── notificationTemplates.ts # 通知模板
@@ -217,6 +234,7 @@ backend/src/
 │
 ├── services/            # 🔧 业务服务层
 │   ├── index.ts         # 服务入口
+│   ├── config.ts        # 配置服务
 │   ├── email-verification.ts  # 邮箱验证服务
 │   └── search-sources-service.ts # 搜索源服务
 │

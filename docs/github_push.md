@@ -10,6 +10,7 @@
 - [日常推送](#日常推送)
 - [常见问题](#常见问题)
 - [最佳实践](#最佳实践)
+- [GitHub Actions自动部署](#github-actions自动部署)
 
 ---
 
@@ -112,6 +113,8 @@ git commit -m "feat(search): 添加搜索建议功能"
 git commit -m "fix(auth): 修复登录Token过期问题"
 git commit -m "docs: 更新API文档"
 git commit -m "refactor(frontend): 重构组件结构"
+git commit -m "feat(config): 新增系统配置管理页面"
+git commit -m "security: 增强邮箱验证码限流机制"
 ```
 
 ---

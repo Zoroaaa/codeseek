@@ -59,6 +59,9 @@ frontend/
 │   ├── 📄 _headers                       # Cloudflare Headers配置
 │   └── 📄 _redirects                     # Cloudflare重定向配置
 │
+├── 📁 docs/                              # 📚 前端文档
+│   └── 📄 notification.md                # 通知系统文档
+│
 ├── 📁 src/                               # 📦 源码目录
 │   │
 │   ├── 📁 components/                    # 🧩 组件层
@@ -86,6 +89,9 @@ frontend/
 │   │       ├── 📄 Toast.tsx              # 通知组件
 │   │       └── 📄 index.ts               # UI组件导出
 │   │
+│   ├── 📁 contexts/                      # 🔄 React Context
+│   │   └── 📄 ConfigContext.tsx          # 配置上下文
+│   │
 │   ├── 📁 hooks/                         # 🎣 自定义Hooks
 │   │   ├── 📄 useAuth.ts                 # 认证Hook
 │   │   ├── 📄 useFavorites.ts            # 收藏Hook
@@ -101,6 +107,7 @@ frontend/
 │   │   │   ├── 📄 AdminPanelOverview.tsx # 管理面板概览
 │   │   │   ├── 📄 AnalyticsTab.tsx       # 分析统计标签页
 │   │   │   ├── 📄 CleanupTab.tsx         # 数据清理标签页
+│   │   │   ├── 📄 ConfigTab.tsx          # 系统配置标签页
 │   │   │   ├── 📄 ReportsTab.tsx         # 举报管理标签页
 │   │   │   ├── 📄 RolesTab.tsx           # 角色管理标签页
 │   │   │   ├── 📄 SessionsTab.tsx        # 会话管理标签页
@@ -143,6 +150,7 @@ frontend/
 │   │
 │   ├── 📁 services/                      # 🔧 服务层
 │   │   ├── 📁 api/                       # API服务
+│   │   │   ├── 📄 admin.ts               # 管理员API
 │   │   │   ├── 📄 auth.ts                # 认证API
 │   │   │   ├── 📄 client.ts              # API客户端
 │   │   │   ├── 📄 community.ts           # 社区API
@@ -151,9 +159,11 @@ frontend/
 │   │   │   ├── 📄 source.ts              # 搜索源API
 │   │   │   └── 📄 system.ts              # 系统API
 │   │   │
-│   │   └── 📁 proxy/                     # 代理服务
-│   │       ├── 📄 ProxyService.ts        # 代理服务实现
-│   │       └── 📄 proxy-config.ts        # 代理配置
+│   │   ├── 📁 proxy/                     # 代理服务
+│   │   │   ├── 📄 ProxyService.ts        # 代理服务实现
+│   │   │   └── 📄 proxy-config.ts        # 代理配置
+│   │   │
+│   │   └── 📄 config.ts                  # 配置服务
 │   │
 │   ├── 📁 stores/                        # 📦 状态管理 (Zustand)
 │   │   ├── 📄 authStore.ts               # 认证状态
@@ -170,8 +180,12 @@ frontend/
 │   │   ├── 📄 common.ts                  # 通用类型
 │   │   ├── 📄 community.ts               # 社区类型
 │   │   ├── 📄 index.ts                   # 类型导出
+│   │   ├── 📄 notification.ts            # 通知类型
 │   │   ├── 📄 search.ts                  # 搜索类型
 │   │   └── 📄 source.ts                  # 搜索源类型
+│   │
+│   ├── 📁 utils/                         # 🛠️ 工具函数
+│   │   └── 📄 notificationTemplates.ts   # 通知模板
 │   │
 │   ├── 📄 App.tsx                        # 应用入口组件
 │   ├── 📄 index.css                      # 全局样式 (Tailwind)
@@ -212,6 +226,7 @@ backend/
 │   │   └── 📄 user.ts                    # 用户路由 (设置、活动记录等)
 │   │
 │   ├── 📁 services/                      # 🔧 业务服务层
+│   │   ├── 📄 config.ts                  # 配置服务
 │   │   ├── 📄 email-verification.ts      # 📧 邮箱验证服务
 │   │   ├── 📄 index.ts                   # 服务导出
 │   │   └── 📄 search-sources-service.ts  # 🔍 搜索源服务

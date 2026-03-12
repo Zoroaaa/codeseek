@@ -127,16 +127,52 @@ wrangler d1 create codeseek-db
 ```toml
 name = "codeseek-backend"
 main = "src/index.ts"
-compatibility_date = "2024-09-09"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+preview_urls = false  
 
 [vars]
-ENVIRONMENT = "production"
+# 应用版本信息
 APP_VERSION = "2.0.0"
 
+# 用户注册相关配置
+ALLOW_REGISTRATION = "true"
+MAX_FAVORITES_PER_USER = "1000"
+MAX_HISTORY_PER_USER = "1000"
+MAX_TAGS_PER_USER = "50"
+
+# 系统行为日志配置
+ENABLE_ACTION_LOGGING = "true"
+
+# 邮箱验证功能配置
+EMAIL_VERIFICATION_ENABLED = "true"
+EMAIL_VERIFICATION_REQUIRED = "false"
+VERIFICATION_CODE_LENGTH = "6"
+VERIFICATION_CODE_EXPIRY = "900000"
+MAX_VERIFICATION_ATTEMPTS = "3"
+EMAIL_RATE_LIMIT_PER_HOUR = "5"
+EMAIL_RATE_LIMIT_PER_DAY = "20"
+DEFAULT_FROM_EMAIL = "noreply@yourdomain.com"
+DEFAULT_FROM_NAME = "磁力快搜"
+SITE_URL = "https://yourdomain.com"
+
+# JWT令牌配置
+JWT_EXPIRY_DAYS = "30"
+
+# 搜索源状态检查配置
+ENABLE_SOURCE_STATUS_CHECK = "true"
+SOURCE_STATUS_CHECK_TIMEOUT = "10000"
+SOURCE_STATUS_CACHE_DURATION = "300000"
+
+# 数据库配置
 [[d1_databases]]
 binding = "DB"
-database_name = "codeseek-db"
+database_name = "codeseek"
 database_id = "your-database-id-here"  # 替换为实际ID
+
+# 监控和可观测性配置
+[observability]
+enabled = true
 ```
 
 ### 3. 初始化生产数据库
@@ -314,11 +350,35 @@ wrangler d1 execute codeseek-db --file backup.sql
 
 | 变量名 | 必需 | 说明 | 示例值 |
 |--------|------|------|--------|
-| `JWT_SECRET` | ✅ | JWT签名密钥 | `your-32-char-secret-key-here` |
+| `JWT_SECRET` | ✅ | JWT签名密钥（至少32字符） | `your-32-char-secret-key-here` |
 | `RESEND_API_KEY` | ❌ | Resend邮件服务密钥 | `re_xxxxxxxxxxxx` |
-| `DEFAULT_FROM_EMAIL` | ❌ | 默认发件邮箱 | `noreply@yourdomain.com` |
-| `DEFAULT_FROM_NAME` | ❌ | 默认发件人名称 | `磁力快搜` |
-| `SITE_URL` | ❌ | 网站URL | `https://codeseek.pp.ua` |
+
+### 后端配置变量 (wrangler.toml)
+
+以下变量在 `wrangler.toml` 的 `[vars]` 部分配置：
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `APP_VERSION` | `2.0.0` | 应用版本号 |
+| `ALLOW_REGISTRATION` | `true` | 是否允许新用户注册 |
+| `MAX_FAVORITES_PER_USER` | `1000` | 每用户最大收藏数 |
+| `MAX_HISTORY_PER_USER` | `1000` | 每用户最大历史记录数 |
+| `MAX_TAGS_PER_USER` | `50` | 每用户最大标签数 |
+| `ENABLE_ACTION_LOGGING` | `true` | 是否启用行为日志 |
+| `EMAIL_VERIFICATION_ENABLED` | `true` | 是否启用邮箱验证 |
+| `EMAIL_VERIFICATION_REQUIRED` | `false` | 注册是否需要邮箱验证 |
+| `VERIFICATION_CODE_LENGTH` | `6` | 验证码长度 |
+| `VERIFICATION_CODE_EXPIRY` | `900000` | 验证码过期时间(毫秒) |
+| `MAX_VERIFICATION_ATTEMPTS` | `3` | 验证码最大尝试次数 |
+| `EMAIL_RATE_LIMIT_PER_HOUR` | `5` | 每小时邮件发送限制 |
+| `EMAIL_RATE_LIMIT_PER_DAY` | `20` | 每天邮件发送限制 |
+| `DEFAULT_FROM_EMAIL` | `noreply@yourdomain.com` | 默认发件邮箱 |
+| `DEFAULT_FROM_NAME` | `磁力快搜` | 默认发件人名称 |
+| `SITE_URL` | `https://yourdomain.com` | 网站URL |
+| `JWT_EXPIRY_DAYS` | `30` | JWT有效期(天) |
+| `ENABLE_SOURCE_STATUS_CHECK` | `true` | 是否启用搜索源状态检查 |
+| `SOURCE_STATUS_CHECK_TIMEOUT` | `10000` | 状态检查超时(毫秒) |
+| `SOURCE_STATUS_CACHE_DURATION` | `300000` | 状态缓存时间(毫秒) |
 
 ### 前端环境变量
 
