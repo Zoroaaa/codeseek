@@ -113,6 +113,7 @@ export interface SendVerificationCodeRequest {
 
 export interface VerificationStatusResponse {
   hasPendingCode: boolean;
+  hasPendingVerification: boolean;
   canResend: boolean;
   remainingTime: number;
 }

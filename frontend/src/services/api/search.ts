@@ -7,47 +7,12 @@ import type {
   SearchRequest,
   SearchResponse,
   AddFavoriteRequest,
-  SyncFavoritesRequest,
   SaveSearchHistoryRequest,
 } from '@/types';
 
 export const searchApi = {
   search: async (data: SearchRequest): Promise<SearchResponse> => {
     return apiClient.post<SearchResponse>('/search', data);
-  },
-
-  getHistory: async (limit = 50): Promise<{ 
-    success: boolean; 
-    data: SearchHistoryItem[] 
-  }> => {
-    return apiClient.get(`/search/history?limit=${limit}`);
-  },
-
-  clearHistory: async (): Promise<{ success: boolean; message: string }> => {
-    return apiClient.delete('/search/history');
-  },
-
-  deleteHistoryItem: async (id: string): Promise<{ success: boolean; message: string }> => {
-    return apiClient.delete(`/search/history/${id}`);
-  },
-
-  getFavorites: async (): Promise<{ 
-    success: boolean; 
-    data: FavoriteItem[] 
-  }> => {
-    return apiClient.get('/search/favorites');
-  },
-
-  addFavorite: async (data: AddFavoriteRequest): Promise<{ 
-    success: boolean; 
-    data: FavoriteItem; 
-    message: string 
-  }> => {
-    return apiClient.post('/search/favorites', data);
-  },
-
-  removeFavorite: async (id: string): Promise<{ success: boolean; message: string }> => {
-    return apiClient.delete(`/search/favorites/${id}`);
   },
 
   getSuggestions: async (keyword: string, limit = 10): Promise<{ 
@@ -127,14 +92,6 @@ export const userApi = {
 
   removeFavorite: async (id: string): Promise<{ success: boolean; message: string }> => {
     return apiClient.delete(`/user/favorites/${id}`);
-  },
-
-  syncFavorites: async (data: SyncFavoritesRequest): Promise<{ 
-    success: boolean; 
-    data: { count: number }; 
-    message: string 
-  }> => {
-    return apiClient.post('/user/favorites/sync', data);
   },
 
   getSearchHistory: async (limit = 50): Promise<{ 

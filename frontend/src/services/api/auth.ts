@@ -159,11 +159,14 @@ export const authApi = {
   getUserVerificationStatus: async (): Promise<{ 
     success: boolean; 
     data?: { 
-      pendingVerifications: Array<{ type: string; email: string; expiresIn: number }>;
+      pendingVerifications: Array<{ verification_type: string; email: string; expires_at: number }>;
       emailChangeRequest?: {
-        requestId: string;
-        newEmail: string;
+        id: string;
+        user_id: string;
+        old_email: string;
+        new_email: string;
         status: string;
+        expires_at: number;
       } | null;
     };
     message?: string;
@@ -171,11 +174,14 @@ export const authApi = {
     return apiClient.get<{ 
       success: boolean; 
       data?: { 
-        pendingVerifications: Array<{ type: string; email: string; expiresIn: number }>;
+        pendingVerifications: Array<{ verification_type: string; email: string; expires_at: number }>;
         emailChangeRequest?: {
-          requestId: string;
-          newEmail: string;
+          id: string;
+          user_id: string;
+          old_email: string;
+          new_email: string;
           status: string;
+          expires_at: number;
         } | null;
       };
       message?: string;

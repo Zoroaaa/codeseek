@@ -181,64 +181,6 @@ userRoutes.post('/favorites', async (c) => {
   }
 });
 
-userRoutes.post('/favorites/sync', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
-  try {
-    const body = await c.req.json();
-    const { favorites } = body;
-
-    if (!Array.isArray(favorites)) {
-      return c.json(error('VALIDATION_ERROR', '收藏数据格式错误'), 400);
-    }
-
-    const maxFavorites = R.FAVORITES.MAX_SYNC_COUNT;
-    if (favorites.length > maxFavorites) {
-      return c.json(error('VALIDATION_ERROR', `最多只能同步${maxFavorites}个收藏`), 400);
-    }
-
-    await c.env.DB.prepare('DELETE FROM user_favorites WHERE user_id = ?').bind(payload.userId).run();
-
-    const now = Date.now();
-    for (const fav of favorites) {
-      if (!fav.title || !fav.url) continue;
-
-      const favoriteId = fav.id || generateId();
-      await c.env.DB.prepare(`
-        INSERT INTO user_favorites (id, user_id, title, subtitle, url, icon, keyword, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        favoriteId,
-        payload.userId,
-        fav.title,
-        fav.subtitle || null,
-        fav.url,
-        fav.icon || null,
-        fav.keyword || null,
-        fav.createdAt || now,
-        now
-      ).run();
-    }
-
-    await logUserAction(c.env, payload.userId, 'sync_favorites', { count: favorites.length }, c);
-
-    return c.json(success({ count: favorites.length }, '同步成功'));
-  } catch (err) {
-    console.error('Sync favorites error:', err);
-    return c.json(error('SERVER_ERROR', '同步失败'), 500);
-  }
-});
-
 userRoutes.delete('/favorites/:id', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

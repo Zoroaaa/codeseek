@@ -512,7 +512,6 @@ GET    /api/user/settings              # 获取用户设置
 PUT    /api/user/settings              # 更新用户设置
 GET    /api/user/favorites             # 获取收藏列表
 POST   /api/user/favorites             # 添加收藏
-POST   /api/user/favorites/sync        # 同步收藏数据
 DELETE /api/user/favorites/:id         # 删除收藏
 GET    /api/user/search-history        # 获取搜索历史
 POST   /api/user/search-history        # 保存搜索记录
@@ -527,12 +526,6 @@ PUT    /api/user/source-configs/:sourceId # 更新搜索源配置
 
 ```http
 POST   /api/search                     # 执行搜索
-GET    /api/search/history             # 获取搜索历史
-DELETE /api/search/history             # 清空搜索历史
-DELETE /api/search/history/:id         # 删除单条历史
-GET    /api/search/favorites           # 获取收藏列表
-POST   /api/search/favorites           # 添加收藏
-DELETE /api/search/favorites/:id       # 删除收藏
 GET    /api/search/suggestions         # 获取搜索建议
 GET    /api/search/trending            # 获取热门搜索
 ```

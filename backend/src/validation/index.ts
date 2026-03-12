@@ -84,18 +84,6 @@ export const schemas = {
       keyword: z.string().max(R.KEYWORD.MAX_LENGTH, `关键词最多${R.KEYWORD.MAX_LENGTH}个字符`).optional(),
     }),
 
-    syncFavorites: z.object({
-      favorites: z.array(z.object({
-        id: z.string().optional(),
-        title: z.string().min(1),
-        url: z.string().url(),
-        subtitle: z.string().optional().nullable(),
-        icon: z.string().optional().nullable(),
-        keyword: z.string().optional().nullable(),
-        createdAt: z.number().optional(),
-      })).max(R.FAVORITES.MAX_SYNC_COUNT, `最多同步${R.FAVORITES.MAX_SYNC_COUNT}个收藏`),
-    }),
-
     addSearchHistory: z.object({
       query: z.string()
         .min(R.KEYWORD.MIN_LENGTH, '搜索关键词不能为空')

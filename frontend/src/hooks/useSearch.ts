@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchStore, useAuthStore } from '@/stores';
-import { searchApi } from '@/services/api';
+import { searchApi, userApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { useValidationRules, useUserLimits, usePaginationConfig } from '@/contexts/ConfigContext';
 import type { SearchResult, SearchHistoryItem } from '@/types';
@@ -168,9 +168,9 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
     if (!isAuthenticated) return;
 
     try {
-      const response = await searchApi.getHistory(maxHistoryItems);
+      const response = await userApi.getSearchHistory(maxHistoryItems);
       if (response.success && response.data) {
-        setSearchHistory(response.data.slice(0, maxHistoryItems));
+        setSearchHistory(response.data.history.slice(0, maxHistoryItems));
       }
     } catch (err) {
       console.error('Failed to load search history:', err);
@@ -179,7 +179,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
 
   const deleteHistoryItem = useCallback(async (id: string) => {
     try {
-      await searchApi.deleteHistoryItem(id);
+      await userApi.deleteSearchHistoryItem(id);
       removeFromHistory(id);
     } catch (_err) {
       toast.error('删除失败', '无法删除搜索历史');
@@ -188,7 +188,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
 
   const clearAllHistory = useCallback(async () => {
     try {
-      await searchApi.clearHistory();
+      await userApi.clearSearchHistory();
       clearHistory();
       toast.success('已清空', '搜索历史已清空');
     } catch (_err) {

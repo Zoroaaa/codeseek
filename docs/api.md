@@ -314,13 +314,13 @@ interface ApiResponse<T> {
 
 ### `GET /api/auth/verification-status` - 检查验证状态
 
-检查指定邮箱的验证码状态。
+检查指定邮箱的验证码状态（无需认证）。用于前端页面恢复逻辑：用户发送验证码后意外关闭或刷新页面，重新打开时调用此接口，若仍有未过期的验证码则直接展示验证码输入页面。
 
 **查询参数**:
 - `email` - 邮箱地址
-- `type` - 验证类型（registration/password_reset/email_change_old/email_change_new/account_delete）
+- `type` - 验证类型（registration/forgot_password/password_reset/email_change_old/email_change_new/account_delete）
 
-**返回**: 是否有待验证的验证码、是否可重发、剩余时间
+**返回**: `hasPendingVerification`（是否有待验证的验证码）、`canResend`（是否可重发）、`remainingTime`（剩余毫秒数）、`expiresAt`
 
 ---
 
@@ -408,33 +408,6 @@ interface ApiResponse<T> {
 ```
 
 **返回**: 新创建的收藏信息
-
----
-
-### `POST /api/user/favorites/sync` - 同步收藏数据
-
-批量同步收藏数据（覆盖式同步）。
-
-**认证**: 需要
-
-**请求体**:
-```json
-{
-  "favorites": [
-    {
-      "id": "string?",
-      "title": "string",
-      "subtitle": "string?",
-      "url": "string",
-      "icon": "string?",
-      "keyword": "string?",
-      "createdAt": "number?"
-    }
-  ]
-}
-```
-
-**返回**: 同步结果（包含同步数量）
 
 ---
 
@@ -615,84 +588,6 @@ interface ApiResponse<T> {
 - page - 页码
 - pageSize - 每页数量
 - hasMore - 是否有更多
-
----
-
-### `GET /api/search/history` - 获取搜索历史
-
-获取当前用户的搜索历史记录。
-
-**认证**: 需要
-
-**查询参数**:
-- `limit` - 返回数量限制（默认50，最大200）
-
-**返回**: 搜索历史记录列表（包含搜索源名称和图标）
-
----
-
-### `DELETE /api/search/history` - 清空搜索历史
-
-清空当前用户的所有搜索历史。
-
-**认证**: 需要
-
-**返回**: 操作结果
-
----
-
-### `DELETE /api/search/history/:id` - 删除单条搜索历史
-
-删除指定的搜索历史记录。
-
-**认证**: 需要
-
-**URL参数**: `id` - 历史记录ID
-
-**返回**: 操作结果
-
----
-
-### `GET /api/search/favorites` - 获取收藏列表
-
-获取当前用户的收藏列表。
-
-**认证**: 需要
-
-**返回**: 收藏列表
-
----
-
-### `POST /api/search/favorites` - 添加收藏
-
-添加一个新的收藏。
-
-**认证**: 需要
-
-**请求体**:
-```json
-{
-  "title": "string (必填)",
-  "subtitle": "string?",
-  "url": "string (必填，有效URL)",
-  "icon": "string?",
-  "keyword": "string?"
-}
-```
-
-**返回**: 新创建的收藏信息
-
----
-
-### `DELETE /api/search/favorites/:id` - 删除收藏
-
-删除指定的收藏项。
-
-**认证**: 需要
-
-**URL参数**: `id` - 收藏项ID
-
-**返回**: 操作结果
 
 ---
 

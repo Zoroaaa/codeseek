@@ -104,13 +104,18 @@ export const FavoritesManager: React.FC = () => {
         return;
       }
       
-      const response = await userApi.syncFavorites({ favorites: data });
-      if (response.success) {
-        toast.success(`成功导入 ${response.data.count} 个收藏`);
-        setImportModal(false);
-        setImportData('');
-        loadFavorites();
+      let successCount = 0;
+      for (const item of data) {
+        if (!item.title || !item.url) continue;
+        try {
+          const res = await userApi.addFavorite({ title: item.title, url: item.url, subtitle: item.subtitle, icon: item.icon, keyword: item.keyword });
+          if (res.success) successCount++;
+        } catch (_e) { /* skip duplicates/errors */ }
       }
+      toast.success(`成功导入 ${successCount} 个收藏`);
+      setImportModal(false);
+      setImportData('');
+      loadFavorites();
     } catch (_error) {
       toast.error('导入失败', '请检查数据格式');
     }

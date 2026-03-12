@@ -67,18 +67,6 @@ export interface AddFavoriteRequest {
   magnetLink?: string;
 }
 
-export interface SyncFavoritesRequest {
-  favorites: Array<{
-    id?: string;
-    title: string;
-    subtitle?: string;
-    url: string;
-    icon?: string;
-    keyword?: string;
-    createdAt?: number;
-  }>;
-}
-
 export interface SaveSearchHistoryRequest {
   query: string;
   source?: string;

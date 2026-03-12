@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useSearchStore, useAuthStore } from '@/stores';
 import { userApi } from '@/services/api';
 import { useNotification } from './useNotification';
-import type { FavoriteItem, AddFavoriteRequest, SyncFavoritesRequest } from '@/types';
+import type { FavoriteItem, AddFavoriteRequest } from '@/types';
 
 interface UseFavoritesReturn {
   favorites: FavoriteItem[];
@@ -10,7 +10,6 @@ interface UseFavoritesReturn {
   loadFavorites: () => Promise<void>;
   addFavorite: (data: AddFavoriteRequest) => Promise<boolean>;
   removeFavorite: (id: string) => Promise<boolean>;
-  syncFavorites: (favorites: SyncFavoritesRequest) => Promise<boolean>;
   isFavorited: (url: string) => boolean;
   getFavoriteByUrl: (url: string) => FavoriteItem | undefined;
 }
@@ -77,27 +76,6 @@ export function useFavorites(): UseFavoritesReturn {
     }
   }, [removeFromFavorites, notification]);
 
-  const syncFavorites = useCallback(async (data: SyncFavoritesRequest): Promise<boolean> => {
-    if (!isAuthenticated) {
-      notification.common.loginRequired();
-      return false;
-    }
-
-    try {
-      const response = await userApi.syncFavorites(data);
-      if (response.success) {
-        notification.favorite.syncSuccess(response.data?.count || 0);
-        return true;
-      }
-      notification.favorite.syncFailed(response.message);
-      return false;
-    } catch (error) {
-      console.error('Failed to sync favorites:', error);
-      notification.favorite.syncFailed();
-      return false;
-    }
-  }, [isAuthenticated, notification]);
-
   const isFavorited = useCallback((url: string): boolean => {
     return favorites.some(f => f.url === url);
   }, [favorites]);
@@ -118,7 +96,6 @@ export function useFavorites(): UseFavoritesReturn {
     loadFavorites,
     addFavorite,
     removeFavorite,
-    syncFavorites,
     isFavorited,
     getFavoriteByUrl,
   };

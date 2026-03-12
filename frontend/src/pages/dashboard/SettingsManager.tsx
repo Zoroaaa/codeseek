@@ -67,6 +67,55 @@ export const SettingsManager: React.FC = () => {
   const [deleteCountdown, setDeleteCountdown] = useState(0);
   const [deleteMaskedEmail, setDeleteMaskedEmail] = useState('');
 
+  const maskEmail = (email: string): string => {
+    if (!email) return '';
+    const [localPart, domain] = email.split('@');
+    if (localPart.length <= 2) {
+      return `${localPart[0]}***@${domain}`;
+    }
+    const masked = localPart[0] + '*'.repeat(localPart.length - 2) + localPart[localPart.length - 1];
+    return `${masked}@${domain}`;
+  };
+
+  // 页面加载时检查是否有待处理的验证（修改邮箱 / 删除账号），若有则直接恢复到验证码输入步骤
+  useEffect(() => {
+    if (!user?.email) return;
+    authApi.getUserVerificationStatus().then((res) => {
+      if (!res.success || !res.data) return;
+
+      const pending = res.data.pendingVerifications || [];
+      const emailChangeReq = res.data.emailChangeRequest;
+
+      // 修改邮箱：有进行中的请求且有待验证的 new email 验证码
+      const emailChangeVerif = pending.find((v: { verification_type: string }) => v.verification_type === 'email_change_new');
+      if (emailChangeReq && emailChangeVerif) {
+        setEmailChangeRequestId(emailChangeReq.id);
+        setEmailChangeMaskedEmail(maskEmail(emailChangeReq.new_email));
+        authApi.checkVerificationStatus(emailChangeReq.new_email, 'email_change_new').then((sv) => {
+          if (sv.success && sv.data?.hasPendingVerification && sv.data.remainingTime && sv.data.remainingTime > 0) {
+            setEmailChangeCountdown(Math.floor(sv.data.remainingTime / 1000));
+          }
+        });
+        setEmailChangeStep('verify');
+        setEmailChangeModal(true);
+        return;
+      }
+
+      // 删除账号：有待验证的 account_delete 验证码
+      const deleteVerif = pending.find((v: { verification_type: string }) => v.verification_type === 'account_delete');
+      if (deleteVerif && user.email) {
+        authApi.checkVerificationStatus(user.email, 'account_delete').then((sv) => {
+          if (sv.success && sv.data?.hasPendingVerification && sv.data.remainingTime && sv.data.remainingTime > 0) {
+            setDeleteMaskedEmail(maskEmail(user.email!));
+            setDeleteCountdown(Math.floor(sv.data.remainingTime / 1000));
+            setDeleteAccountStep('verify');
+            setDeleteAccountModal(true);
+          }
+        });
+      }
+    }).catch(() => { /* 静默忽略 */ });
+  }, [user?.email]);
+
   useEffect(() => {
     if (emailChangeCountdown > 0) {
       const timer = setTimeout(() => setEmailChangeCountdown(emailChangeCountdown - 1), 1000);
@@ -80,16 +129,6 @@ export const SettingsManager: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [deleteCountdown]);
-
-  const maskEmail = (email: string): string => {
-    if (!email) return '';
-    const [localPart, domain] = email.split('@');
-    if (localPart.length <= 2) {
-      return `${localPart[0]}***@${domain}`;
-    }
-    const masked = localPart[0] + '*'.repeat(localPart.length - 2) + localPart[localPart.length - 1];
-    return `${masked}@${domain}`;
-  };
 
   const formatCountdown = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
