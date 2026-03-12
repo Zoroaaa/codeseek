@@ -12,6 +12,11 @@
  *
  * 注意：原来硬编码在这里的业务数字（用户名长度、最大收藏数、社区限制等）
  *       已全部移至 DB → ConfigContext，请勿在此处重复定义。
+ *
+ * ⚠️ 后备值说明：
+ *   后备值不应放在本文件，应直接写在 configService.getXxx() 的第二个参数中
+ *   或在 ConfigContext 的 hooks 中作为 ?? 后面的后备值
+ *   示例：config?.max_favorites ?? defaults.max_favorites
  */
 
 /* ==================== API 配置 ==================== */

@@ -11,6 +11,11 @@
  * 判断标准：
  *   放这里  → 改了需要改代码逻辑（正则、枚举、黑白名单、架构默认值）
  *   放 DB   → 管理员在后台调一下数字就能生效（限制数、超时、开关）
+ *
+ * ⚠️ 后备值说明：
+ *   后备值不应放在本文件，应直接写在 configService.getInt(DB_CONFIG_KEYS.XXX, 1000) 的第二个参数中
+ *   示例：configService.getInt(DB_CONFIG_KEYS.MAX_FAVORITES, 1000)
+ *   第二个参数是硬编码后备值，仅当 DB 中无该配置时使用
  */
 
 export const CONFIG = {

@@ -6,6 +6,10 @@
  *   Layer 1 wrangler.toml  → 部署级基础设施参数
  *   Layer 2 constants.ts   → 代码枚举/正则/固定业务逻辑
  *   Layer 3 DB system_config → 运行期业务参数（本服务负责读取）
+ * 
+ * 后备值说明：
+ *   后备值直接写在方法调用的第二个参数中，如 configService.getInt(DB_CONFIG_KEYS.XXX, 1000)
+ *   仅当 DB 中无该配置时使用后备值
  */
 import { Env } from '../types';
 
