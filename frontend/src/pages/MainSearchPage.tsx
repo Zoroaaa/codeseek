@@ -484,19 +484,19 @@ export const MainSearchPage: React.FC = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
 
-        <div className="mb-5 sm:mb-6 lg:mb-8 animate-fade-in">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-surface-900 dark:text-surface-100">
+        <div className="mb-4 sm:mb-6 animate-fade-in">
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-surface-900 dark:text-surface-100">
             嗨，<span className="bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
               {isAuthenticated ? user?.username : '访客'}
             </span> 👋
           </h1>
-          <p className="text-sm sm:text-base text-surface-500 dark:text-surface-400 mt-1">搜索全网资源，一步直达</p>
+          <p className="text-xs sm:text-sm text-surface-500 dark:text-surface-400 mt-0.5">搜索全网资源，一步直达</p>
         </div>
 
-        <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-xl shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 p-4 sm:p-5 lg:p-6 mb-5 sm:mb-6 lg:mb-8 backdrop-blur-sm animate-slide-up">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+        <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-xl shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 p-3 sm:p-5 mb-4 sm:mb-6 backdrop-blur-sm animate-slide-up">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
             <div className="search-input-wrapper">
               <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none">
                 <Search className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -528,7 +528,7 @@ export const MainSearchPage: React.FC = () => {
                 <Filter className="w-3.5 h-3.5 text-surface-400" />
                 <span className="text-xs text-surface-400 font-medium hidden sm:inline">分类</span>
               </div>
-              <div className="flex items-center gap-2 flex-nowrap">
+              <div className="flex items-center gap-1.5 flex-nowrap">
                 <button
                   onClick={() => setSelectedCategory(null)}
                   className={`category-filter-btn ${selectedCategory === null ? 'active' : ''}`}
@@ -563,9 +563,9 @@ export const MainSearchPage: React.FC = () => {
           onToggleFavorite={handleToggleFavorite}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 lg:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
-          <div className="lg:col-span-8 xl:col-span-9 space-y-4 sm:space-y-5">
+          <div className="lg:col-span-2 space-y-3 sm:space-y-4">
 
             <JavRankingsPanel onCodeClick={handleCodeClick} />
 
@@ -610,14 +610,12 @@ export const MainSearchPage: React.FC = () => {
             />
           </div>
 
-          <div className="lg:col-span-4 xl:col-span-3 hidden lg:block">
-            <div className="sticky top-20">
-              <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} />
-            </div>
+          <div className="hidden lg:block">
+            <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} />
           </div>
         </div>
 
-        <div className="lg:hidden mt-4 sm:mt-5">
+        <div className="lg:hidden mt-3 sm:mt-4">
           <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} />
         </div>
       </div>

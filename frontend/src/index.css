@@ -158,7 +158,7 @@
   }
 
   .result-card {
-    @apply relative rounded-xl border;
+    @apply relative rounded-2xl border;
     background: rgba(255,255,255,0.92);
     border-color: rgba(226,232,240,0.7);
     box-shadow: var(--shadow-card);
@@ -278,12 +278,10 @@
   .dark .input-modern:focus { background: rgba(15,23,42,0.9); }
 
   /* Search */
-  .search-input-wrapper { 
-    @apply relative flex-1 min-w-0; 
-  }
+  .search-input-wrapper { @apply relative flex-1; }
   .search-input {
-    @apply w-full rounded-2xl border px-4 py-3 pl-11;
-    @apply text-slate-900 dark:text-slate-100 text-sm;
+    @apply w-full rounded-2xl border px-5 py-3.5 pl-12;
+    @apply text-slate-900 dark:text-slate-100 text-base;
     @apply placeholder:text-slate-400 dark:placeholder:text-slate-500;
     background: rgba(255,255,255,0.92);
     border-color: rgba(226,232,240,0.8);
@@ -291,7 +289,6 @@
     transition: all 0.25s var(--ease-smooth);
     font-family: 'DM Sans', sans-serif;
     letter-spacing: -0.01em;
-    min-height: 48px;
   }
   .search-input:focus {
     @apply outline-none;
@@ -305,13 +302,11 @@
   }
 
   .search-btn {
-    @apply px-5 py-3 rounded-2xl font-semibold text-white shrink-0;
+    @apply px-6 py-3 rounded-2xl font-semibold text-white;
     background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
     box-shadow: 0 4px 16px rgba(79,158,255,0.28);
     transition: all 0.2s var(--ease-smooth);
     letter-spacing: -0.01em;
-    min-height: 48px;
-    min-width: 88px;
   }
   .search-btn:hover {
     background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
@@ -329,7 +324,7 @@
   .category-filter-wrapper::-webkit-scrollbar { display: none; }
 
   .category-filter-btn {
-    @apply px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 shrink-0;
+    @apply px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-200 shrink-0;
     @apply text-slate-600 dark:text-slate-400;
     @apply bg-slate-100 dark:bg-slate-800/60;
     @apply hover:bg-slate-200 dark:hover:bg-slate-700;
@@ -550,88 +545,22 @@
 }
 
 /* ============================================================
-   Responsive - PC端(≥1024px) / Pad端(768-1023px) / 移动端(<768px)
+   Responsive
    ============================================================ */
-
-/* 移动端 (< 640px) */
-@media (max-width: 639px) {
+@media (max-width: 640px) {
   .mobile-stack { flex-direction: column; }
   .mobile-full-width { width: 100%; }
   .mobile-hide { display: none; }
   .mobile-text-sm { font-size: 0.875rem; }
   .mobile-p-3 { padding: 0.75rem; }
   .mobile-gap-2 { gap: 0.5rem; }
-  .search-input { 
-    border-radius: 12px; 
-    padding: 0.75rem 1rem 0.75rem 2.5rem; 
-    font-size: 0.875rem;
-    min-height: 44px;
-  }
-  .search-btn { 
-    border-radius: 12px; 
-    padding: 0.625rem 1rem; 
-    font-size: 0.875rem; 
-    min-height: 44px;
-    min-width: 72px;
-  }
-  .result-card { border-radius: 10px; }
+  .search-input { border-radius: 14px; padding: 0.75rem 1rem 0.75rem 2.75rem; }
+  .search-btn { border-radius: 14px; padding: 0.625rem 1rem; font-size: 0.875rem; }
 }
 
-/* Pad端 (640px - 1023px) */
-@media (min-width: 640px) and (max-width: 1023px) {
+@media (min-width: 641px) and (max-width: 1024px) {
   .tablet-flex-row { flex-direction: row; }
   .tablet-gap-4 { gap: 1rem; }
-  .search-input { 
-    padding: 0.875rem 1.25rem 0.875rem 2.75rem; 
-    font-size: 0.9375rem;
-    min-height: 50px;
-  }
-  .search-btn { 
-    padding: 0.875rem 1.5rem; 
-    font-size: 0.9375rem;
-    min-height: 50px;
-    min-width: 96px;
-  }
-  .category-filter-btn {
-    padding: 0.375rem 0.875rem;
-    font-size: 0.8125rem;
-  }
-  .result-card { border-radius: 12px; }
-}
-
-/* PC端 (≥ 1024px) */
-@media (min-width: 1024px) {
-  .search-input { 
-    padding: 0.875rem 1.5rem 0.875rem 3rem; 
-    font-size: 1rem;
-    min-height: 52px;
-  }
-  .search-btn { 
-    padding: 0.875rem 2rem; 
-    font-size: 1rem;
-    min-height: 52px;
-    min-width: 100px;
-  }
-  .category-filter-btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-  }
-  .result-card { border-radius: 14px; }
-}
-
-/* 大屏PC端 (≥ 1280px) */
-@media (min-width: 1280px) {
-  .search-input { 
-    padding: 1rem 1.75rem 1rem 3.25rem; 
-    font-size: 1rem;
-    min-height: 56px;
-  }
-  .search-btn { 
-    padding: 1rem 2.25rem; 
-    font-size: 1rem;
-    min-height: 56px;
-    min-width: 110px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

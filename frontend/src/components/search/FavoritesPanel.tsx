@@ -19,13 +19,13 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
 }) => (
   <div className="collapsible-section animate-fade-in" style={{ animationDelay: '150ms' }}>
     <button onClick={onToggle} className="collapsible-header">
-      <div className="flex items-center gap-2.5 sm:gap-3">
-        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
-          <Heart className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-rose-600 dark:text-rose-400" />
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+          <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600 dark:text-rose-400" />
         </div>
-        <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base lg:text-lg">我的收藏</span>
+        <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base">我的收藏</span>
         {favorites.length > 0 && (
-          <span className="px-2.5 py-1 text-xs font-semibold bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-full">
+          <span className="px-2 py-0.5 text-xs font-semibold bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-full">
             {favorites.length}
           </span>
         )}
@@ -34,13 +34,13 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
         {show && favorites.length > 0 && (
           <button
             onClick={(e) => { e.stopPropagation(); onExport(); }}
-            className="p-1.5 sm:p-2 rounded-xl text-surface-400 hover:text-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all"
+            className="p-1 sm:p-1.5 rounded-lg text-surface-400 hover:text-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all"
             title="导出收藏"
           >
-            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <Download className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </button>
         )}
-        {show ? <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-surface-400" /> : <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-surface-400" />}
+        {show ? <ChevronDown className="w-4 h-4 text-surface-400" /> : <ChevronRight className="w-4 h-4 text-surface-400" />}
       </div>
     </button>
     {show && (
@@ -48,12 +48,12 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
         {isLoading ? (
           <div className="p-6 sm:p-8 flex justify-center"><Loading /></div>
         ) : favorites.length > 0 ? (
-          <div className="p-3 sm:p-4 lg:p-5 max-h-56 sm:max-h-72 lg:max-h-80 overflow-y-auto scrollbar-thin">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5">
+          <div className="p-3 sm:p-4 max-h-52 sm:max-h-64 overflow-y-auto scrollbar-thin">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 sm:gap-2">
               {favorites.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between p-2.5 sm:p-3 lg:p-3.5 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-all border border-surface-100 dark:border-surface-800"
+                  className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-all border border-surface-100 dark:border-surface-800"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-xs sm:text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
@@ -70,15 +70,15 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                   <div className="flex items-center gap-0.5 sm:gap-1 ml-2 shrink-0">
                     <button
                       onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')}
-                      className="p-1.5 sm:p-2 rounded-xl text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
+                      className="p-1 sm:p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
                     >
-                      <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <ExternalLink className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </button>
                     <button
                       onClick={() => onRemove(item.id)}
-                      className="p-1.5 sm:p-2 rounded-xl text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-all"
+                      className="p-1 sm:p-1.5 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-all"
                     >
-                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -86,8 +86,8 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
             </div>
           </div>
         ) : (
-          <div className="px-4 sm:px-5 lg:px-6 py-6 sm:py-8 text-center">
-            <Heart className="w-7 h-7 sm:w-9 sm:h-9 text-surface-300 dark:text-surface-600 mx-auto mb-2" />
+          <div className="px-4 sm:px-5 py-6 sm:py-8 text-center">
+            <Heart className="w-6 h-6 sm:w-8 sm:h-8 text-surface-300 dark:text-surface-600 mx-auto mb-2" />
             <p className="text-xs sm:text-sm text-surface-400">暂无收藏内容</p>
           </div>
         )}
