@@ -7,18 +7,22 @@ export interface JavItem {
   source: string;
 }
 
-export interface GenreRanking {
-  genre: string;
-  key: string;
+export interface GroupRanking {
+  name: string;   // 类别名 或 女优名
+  key: string;    // slug
   items: JavItem[];
 }
 
+// 向后兼容旧命名
+export type GenreRanking = GroupRanking;
+
 export interface JavRankings {
-  popular: JavItem[];      // 近期热门
-  newRelease: JavItem[];   // 最新发行
-  censored: JavItem[];     // 有码精选
-  uncensored: JavItem[];   // 无码精选
-  genres: GenreRanking[];  // 类别榜（动态）
+  censored: JavItem[];        // 有码精选
+  uncensored: JavItem[];      // 无码精选
+  hd: JavItem[];              // 高清
+  subtitle: JavItem[];        // 字幕
+  genres: GroupRanking[];     // 随机10类别
+  actresses: GroupRanking[];  // 随机10女优
   suggestions: string[];
   fetchedAt: number;
   sources: string[];

@@ -1,17 +1,15 @@
 /**
- * JAV 榜单路由
- * 数据源：仅 JavBus
- * 维度：近期热门 / 最新发行 / 有码精选 / 无码精选 / 类别榜（动态抓取）
- * 缓存：前端 localStorage 缓存 10 分钟
+ * JAV 榜单路由 — 仅 JavBus
+ * 4 个维度：有码精选 / 无码精选 / 随机类别(10) / 随机女优(10)
  */
 import { Hono } from 'hono';
 import { Env } from '../types';
 
 export const javRoutes = new Hono<{ Bindings: Env }>();
 
-// =====================================================================
-// 类型定义
-// =====================================================================
+// ─────────────────────────────────────────────
+// 类型
+// ─────────────────────────────────────────────
 
 interface JavItem {
   code: string;
@@ -22,66 +20,60 @@ interface JavItem {
   source: string;
 }
 
-interface GenreRanking {
-  genre: string;  // 类别中文名，如 "巨乳"
-  key: string;    // 类别 slug，如 "rq"（即 javbus genre 路径末段）
+interface GroupRanking {
+  name: string;   // 类别名 或 女优名
+  key: string;    // slug（genre/xx 或 star/xx 的末段）
   items: JavItem[];
 }
 
 interface RankingsResponse {
-  popular: JavItem[];      // 近期热门（有码热门第2页，与首页新作区分）
-  newRelease: JavItem[];   // 最新发行（有码首页）
-  censored: JavItem[];     // 有码精选（有码热度排序）
-  uncensored: JavItem[];   // 无码精选（无码首页）
-  genres: GenreRanking[];  // 类别榜（动态抓取 /genre 页）
+  censored: JavItem[];          // 有码精选（前3页随机20）
+  uncensored: JavItem[];        // 无码精选（前3页随机20）
+  hd: JavItem[];                // 高清（/genre/hd 前3页随机20）
+  subtitle: JavItem[];          // 字幕（/genre/sub 前3页随机20）
+  genres: GroupRanking[];       // 随机10类别
+  actresses: GroupRanking[];    // 随机10女优
   suggestions: string[];
   fetchedAt: number;
   sources: string[];
 }
 
-// =====================================================================
-// 请求头
-// =====================================================================
+// ─────────────────────────────────────────────
+// 请求工具
+// ─────────────────────────────────────────────
 
-const BASE_HEADERS = {
+const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xhtml+xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'Accept-Language': 'zh-CN,zh;q=0.9,ja;q=0.8,en;q=0.7',
   'Accept-Encoding': 'gzip, deflate, br',
   'Cache-Control': 'no-cache',
-};
-
-const JAVBUS_HEADERS = {
-  ...BASE_HEADERS,
   'Referer': 'https://www.javbus.com/',
 };
 
-const TIMEOUT = 10000;
-
-async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+async function get(url: string, timeoutMs = 10000): Promise<string> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: ctrl.signal });
+    const r = await fetch(url, { headers: HEADERS, signal: ctrl.signal });
+    if (!r.ok) return '';
+    return await r.text();
+  } catch {
+    return '';
   } finally {
-    clearTimeout(timer);
+    clearTimeout(t);
   }
 }
 
-// =====================================================================
-// 工具
-// =====================================================================
-
-function stripTags(html: string): string {
-  return html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-}
+// ─────────────────────────────────────────────
+// 工具函数
+// ─────────────────────────────────────────────
 
 function normalizeCode(raw: string): string {
   const s = raw.trim().toUpperCase().replace(/\s/g, '');
   if (/^[A-Z]+-\d+$/.test(s)) return s;
   const m = s.match(/^([A-Z]+)(\d+)$/);
-  if (m) return `${m[1]}-${m[2]}`;
-  return s;
+  return m ? `${m[1]}-${m[2]}` : s;
 }
 
 function isValidCode(code: string): boolean {
@@ -90,242 +82,273 @@ function isValidCode(code: string): boolean {
 
 function dedup(items: JavItem[]): JavItem[] {
   const seen = new Set<string>();
-  return items.filter(item => {
-    if (seen.has(item.code)) return false;
-    seen.add(item.code);
-    return true;
-  });
+  return items.filter(i => { if (seen.has(i.code)) return false; seen.add(i.code); return true; });
 }
 
-// =====================================================================
-// JavBus 通用网格解析
-// =====================================================================
+/** Fisher-Yates 随机洗牌 */
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
-function parseJavBusGrid(html: string, source: string): JavItem[] {
+/** 从数组随机取 n 个 */
+function sample<T>(arr: T[], n: number): T[] {
+  return shuffle(arr).slice(0, n);
+}
+
+// ─────────────────────────────────────────────
+// JavBus 网格解析（通用）
+// ─────────────────────────────────────────────
+
+function parseGrid(html: string, source: string): JavItem[] {
+  if (!html) return [];
   const items: JavItem[] = [];
-  // 截取 waterfall 区域，提高匹配精度
-  const section = (() => {
-    const si = html.indexOf('id="waterfall"');
-    const ei = html.indexOf('</div>', si + 500);
-    return si !== -1 ? html.slice(si, ei + 10000) : html;
-  })();
+  // 截取 waterfall 区域
+  const wi = html.indexOf('id="waterfall"');
+  const section = wi !== -1 ? html.slice(wi, wi + 60000) : html;
 
-  const movieBoxRe = /<a[^>]+class="movie-box"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  const re = /<a[^>]+class="movie-box"[^>]*href="[^"]+"[^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
+  while ((m = re.exec(section)) !== null && items.length < 30) {
+    const block = m[1];
+    const imgM = block.match(/<img[^>]+src="([^"]+)"/i);
+    const cover = imgM ? imgM[1] : undefined;
 
-  while ((m = movieBoxRe.exec(section)) !== null && items.length < 24) {
-    const block = m[2];
-
-    // 封面
-    const imgMatch = block.match(/<img[^>]+src="([^"]+)"/i);
-    const cover = imgMatch ? imgMatch[1] : undefined;
-
-    // 番号（多种选择器兼容）
-    const codeMatch =
+    const codeM =
       block.match(/<span[^>]*class="[^"]*id[^"]*"[^>]*>([^<]+)<\/span>/i) ||
       block.match(/<date[^>]*>([A-Za-z0-9]+-\d+)<\/date>/i) ||
       block.match(/>([A-Z]{2,8}-\d{2,6})</);
-    if (!codeMatch) continue;
-    const code = normalizeCode(codeMatch[1].trim());
+    if (!codeM) continue;
+    const code = normalizeCode(codeM[1].trim());
     if (!isValidCode(code)) continue;
 
-    // 标题
-    const titleMatch = block.match(/title="([^"]+)"/i);
-    const title = titleMatch ? titleMatch[1].trim() : code;
+    const titleM = block.match(/title="([^"]+)"/i);
+    const title = titleM ? titleM[1].trim() : code;
 
-    // 日期
-    const dateMatch = block.match(/<date[^>]*>(\d{4}-\d{2}-\d{2})<\/date>/i);
-    const date = dateMatch ? stripTags(dateMatch[0]) : undefined;
+    const dateM = block.match(/<date[^>]*>(\d{4}-\d{2}-\d{2})<\/date>/i);
+    const date = dateM ? dateM[1] : undefined;
 
     items.push({ code, title, cover, date, source });
   }
   return items;
 }
 
-// =====================================================================
-// 抓取函数
-// =====================================================================
+// ─────────────────────────────────────────────
+// 有码精选：前3页合并 → dedup → shuffle → 取20
+// ─────────────────────────────────────────────
 
-// 最新发行（有码首页）
-async function fetchCensoredNew(): Promise<JavItem[]> {
-  try {
-    const r = await fetchWithTimeout('https://www.javbus.com/', { headers: JAVBUS_HEADERS });
-    if (!r.ok) return [];
-    return parseJavBusGrid(await r.text(), 'javbus');
-  } catch { return []; }
+async function fetchCensored(): Promise<JavItem[]> {
+  const pages = ['https://www.javbus.com/', 'https://www.javbus.com/page/2', 'https://www.javbus.com/page/3'];
+  const results = await Promise.allSettled(pages.map(u => get(u)));
+  const all = results.flatMap((r, i) =>
+    r.status === 'fulfilled' ? parseGrid(r.value, `javbus-p${i + 1}`) : []
+  );
+  return sample(dedup(all), 20);
 }
 
-// 近期热门（有码第2页，内容不同于首页）
-async function fetchCensoredPopular(): Promise<JavItem[]> {
-  try {
-    const r = await fetchWithTimeout('https://www.javbus.com/page/2', { headers: JAVBUS_HEADERS });
-    if (!r.ok) return [];
-    return parseJavBusGrid(await r.text(), 'javbus');
-  } catch { return []; }
+// ─────────────────────────────────────────────
+// 无码精选：前3页合并 → dedup → shuffle → 取20
+// ─────────────────────────────────────────────
+
+async function fetchUncensored(): Promise<JavItem[]> {
+  const pages = [
+    'https://www.javbus.com/uncensored/',
+    'https://www.javbus.com/uncensored/page/2',
+    'https://www.javbus.com/uncensored/page/3',
+  ];
+  const results = await Promise.allSettled(pages.map(u => get(u)));
+  const all = results.flatMap((r, i) =>
+    r.status === 'fulfilled' ? parseGrid(r.value, `javbus-u${i + 1}`) : []
+  );
+  return sample(dedup(all), 20);
 }
 
-// 有码精选（有码按月排序/第3页，避免与热门重复）
-async function fetchCensoredPick(): Promise<JavItem[]> {
-  try {
-    // 尝试评分类聚合页，fallback 到 page/3
-    const r = await fetchWithTimeout('https://www.javbus.com/page/3', { headers: JAVBUS_HEADERS });
-    if (!r.ok) return [];
-    return parseJavBusGrid(await r.text(), 'javbus');
-  } catch { return []; }
+// ─────────────────────────────────────────────
+// 高清：/genre/hd 前3页合并 → dedup → shuffle → 取20
+// ─────────────────────────────────────────────
+
+async function fetchHD(): Promise<JavItem[]> {
+  const pages = [
+    'https://www.javbus.com/genre/hd',
+    'https://www.javbus.com/genre/hd/2',
+    'https://www.javbus.com/genre/hd/3',
+  ];
+  const results = await Promise.allSettled(pages.map(u => get(u)));
+  const all = results.flatMap((r, i) =>
+    r.status === 'fulfilled' ? parseGrid(r.value, `javbus-hd${i + 1}`) : []
+  );
+  return sample(dedup(all), 20);
 }
 
-// 无码首页（热门）
-async function fetchUncensoredPopular(): Promise<JavItem[]> {
-  try {
-    const r = await fetchWithTimeout('https://www.javbus.com/uncensored/', { headers: JAVBUS_HEADERS });
-    if (!r.ok) return [];
-    return parseJavBusGrid(await r.text(), 'javbus-u');
-  } catch { return []; }
+// ─────────────────────────────────────────────
+// 字幕：/genre/sub 前3页合并 → dedup → shuffle → 取20
+// ─────────────────────────────────────────────
+
+async function fetchSubtitle(): Promise<JavItem[]> {
+  const pages = [
+    'https://www.javbus.com/genre/sub',
+    'https://www.javbus.com/genre/sub/2',
+    'https://www.javbus.com/genre/sub/3',
+  ];
+  const results = await Promise.allSettled(pages.map(u => get(u)));
+  const all = results.flatMap((r, i) =>
+    r.status === 'fulfilled' ? parseGrid(r.value, `javbus-sub${i + 1}`) : []
+  );
+  return sample(dedup(all), 20);
 }
 
-// 无码第2页（补充数量）
-async function fetchUncensoredPage2(): Promise<JavItem[]> {
-  try {
-    const r = await fetchWithTimeout('https://www.javbus.com/uncensored/page/2', { headers: JAVBUS_HEADERS });
-    if (!r.ok) return [];
-    return parseJavBusGrid(await r.text(), 'javbus-u');
-  } catch { return []; }
+// ─────────────────────────────────────────────
+// 随机类别：抓 /genre 页 → 解析所有类别 → 随机取10 → 各抓首页
+// ─────────────────────────────────────────────
+
+interface Entry { key: string; name: string; }
+
+async function fetchGenreList(): Promise<Entry[]> {
+  const html = await get('https://www.javbus.com/genre');
+  if (!html) return [];
+  const entries: Entry[] = [];
+  const re = /href="https?:\/\/www\.javbus\.com\/genre\/([a-z0-9]+)"[^>]*>([^<]+)</gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const key = m[1].trim();
+    const name = m[2].trim();
+    if (/^\d+$/.test(key) || name.length < 1) continue;
+    entries.push({ key, name });
+  }
+  return entries;
 }
 
-// =====================================================================
-// 类别动态抓取
-// 策略：GET /genre 解析所有类别链接 + 中文名，随机选取 8 个并发抓榜单
-// =====================================================================
-
-interface GenreEntry { key: string; genre: string; }
-
-async function fetchGenreList(): Promise<GenreEntry[]> {
-  try {
-    const r = await fetchWithTimeout('https://www.javbus.com/genre', { headers: JAVBUS_HEADERS });
-    if (!r.ok) return [];
-    const html = await r.text();
-
-    // /genre 页结构：<a href="https://www.javbus.com/genre/rq">巨乳</a>
-    const entries: GenreEntry[] = [];
-    const linkRe = /<a[^>]+href="https?:\/\/www\.javbus\.com\/genre\/([a-z0-9]+)"[^>]*>([^<]+)<\/a>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = linkRe.exec(html)) !== null) {
-      const key = m[1].trim();
-      const genre = m[2].trim();
-      // 过滤掉纯数字（分页链接）和太短的（1字符）
-      if (/^\d+$/.test(key) || genre.length < 1) continue;
-      entries.push({ key, genre });
-    }
-    return entries;
-  } catch { return []; }
-}
-
-// 默认兜底类别（/genre 抓失败时使用）
-const FALLBACK_GENRES: GenreEntry[] = [
-  { key: 'rq', genre: '巨乳' },
-  { key: 'we', genre: '护士' },
-  { key: 'dp', genre: '女学生' },
-  { key: '2e', genre: '角色扮演' },
-  { key: 'do', genre: 'OL' },
-  { key: 'sm', genre: '近亲' },
-  { key: 'e', genre: '中出' },
-  { key: 'q', genre: '美少女' },
+// 兜底类别列表（/genre 页无法访问时使用）
+const FALLBACK_GENRES: Entry[] = [
+  { key: 'rq', name: '巨乳' }, { key: 'we', name: '护士' }, { key: 'dp', name: '女学生' },
+  { key: '2e', name: '角色扮演' }, { key: 'do', name: 'OL' }, { key: 'sm', name: '近亲' },
+  { key: 'e',  name: '中出' },   { key: 'q',  name: '美少女' }, { key: '28', name: '高清' },
+  { key: '2f', name: '4K' },     { key: 'zs', name: '女同' },   { key: 'zr', name: '素人' },
 ];
 
-async function fetchGenreItems(key: string): Promise<JavItem[]> {
-  try {
-    const r = await fetchWithTimeout(`https://www.javbus.com/genre/${key}`, { headers: JAVBUS_HEADERS });
-    if (!r.ok) return [];
-    return parseJavBusGrid(await r.text(), `javbus-g-${key}`);
-  } catch { return []; }
-}
+async function fetchRandomGenres(): Promise<GroupRanking[]> {
+  const list = await fetchGenreList();
+  const pool = list.length >= 10 ? list : FALLBACK_GENRES;
+  const picked = sample(pool, 10);
 
-async function buildGenreRankings(genreList: GenreEntry[]): Promise<GenreRanking[]> {
-  // 取前 10 个类别并发抓（避免超时）
-  const targets = genreList.slice(0, 10);
-  const results = await Promise.allSettled(targets.map(g => fetchGenreItems(g.key)));
+  const results = await Promise.allSettled(
+    picked.map(g => get(`https://www.javbus.com/genre/${g.key}`))
+  );
 
-  return targets
+  return picked
     .map((g, i) => ({
-      genre: g.genre,
+      name: g.name,
       key: g.key,
-      items: (results[i].status === 'fulfilled' ? results[i].value : []).slice(0, 12),
+      items: results[i].status === 'fulfilled'
+        ? sample(parseGrid(results[i].value, `javbus-g-${g.key}`), 12)
+        : [],
     }))
     .filter(g => g.items.length > 0);
 }
 
-// =====================================================================
-// 主路由：GET /api/jav/rankings
-// =====================================================================
+// ─────────────────────────────────────────────
+// 随机女优：抓 /actresses → 解析女优列表 → 随机取10 → 各抓 /star/xx 首页
+// ─────────────────────────────────────────────
+
+async function fetchActressList(): Promise<Entry[]> {
+  const html = await get('https://www.javbus.com/actresses');
+  if (!html) return [];
+  const entries: Entry[] = [];
+  // <a href="https://www.javbus.com/star/okq">苍井空</a> 或带 avatar 的结构
+  const re = /href="https?:\/\/www\.javbus\.com\/star\/([a-z0-9]+)"[^>]*>\s*(?:<img[^>]*>)?\s*<span[^>]*>([^<]+)<\/span>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const key = m[1].trim();
+    const name = m[2].trim();
+    if (!key || name.length < 1) continue;
+    entries.push({ key, name });
+  }
+
+  // fallback: 更宽松的匹配（纯文本链接）
+  if (entries.length < 5) {
+    const re2 = /href="https?:\/\/www\.javbus\.com\/star\/([a-z0-9]+)"[^>]*>([^<]{1,20})<\/a>/gi;
+    while ((m = re2.exec(html)) !== null) {
+      const key = m[1].trim();
+      const name = m[2].trim();
+      if (!key || name.length < 1 || entries.find(e => e.key === key)) continue;
+      entries.push({ key, name });
+    }
+  }
+
+  return entries;
+}
+
+// 兜底女优列表
+const FALLBACK_ACTRESSES: Entry[] = [
+  { key: '2xi', name: '三上悠亜' }, { key: 'okq', name: '苍井空' },
+  { key: '2pv', name: '深田咏美' }, { key: 'jmd', name: '明日花绮罗' },
+  { key: 'pix', name: '波多野结衣' }, { key: 'lhm', name: '天使もえ' },
+  { key: 'qhd', name: '桃乃木香奈' }, { key: 'zld', name: '椎名空' },
+  { key: 'nns', name: '上原亚衣' }, { key: 'rki', name: '水野朝阳' },
+  { key: 'sqt', name: '小仓由菜' }, { key: 'hgp', name: '铃村あいり' },
+];
+
+async function fetchRandomActresses(): Promise<GroupRanking[]> {
+  const list = await fetchActressList();
+  const pool = list.length >= 10 ? list : FALLBACK_ACTRESSES;
+  const picked = sample(pool, 10);
+
+  const results = await Promise.allSettled(
+    picked.map(a => get(`https://www.javbus.com/star/${a.key}`))
+  );
+
+  return picked
+    .map((a, i) => ({
+      name: a.name,
+      key: a.key,
+      items: results[i].status === 'fulfilled'
+        ? sample(parseGrid(results[i].value, `javbus-star-${a.key}`), 12)
+        : [],
+    }))
+    .filter(a => a.items.length > 0);
+}
+
+// ─────────────────────────────────────────────
+// 主路由
+// ─────────────────────────────────────────────
 
 javRoutes.get('/rankings', async (c) => {
   try {
-    // 并发：先抓基础4个榜 + genre列表（genre抓取在列表返回后再并发）
-    const [
-      r_newRelease,
-      r_popular,
-      r_censoredPick,
-      r_uncensored1,
-      r_uncensored2,
-      r_genreList,
-    ] = await Promise.allSettled([
-      fetchCensoredNew(),
-      fetchCensoredPopular(),
-      fetchCensoredPick(),
-      fetchUncensoredPopular(),
-      fetchUncensoredPage2(),
-      fetchGenreList(),
+    // 六路并发：有码、无码、高清、字幕、类别列表+抓取、女优列表+抓取
+    const [r_censored, r_uncensored, r_hd, r_subtitle, r_genres, r_actresses] = await Promise.allSettled([
+      fetchCensored(),
+      fetchUncensored(),
+      fetchHD(),
+      fetchSubtitle(),
+      fetchRandomGenres(),
+      fetchRandomActresses(),
     ]);
 
-    const get = <T>(r: PromiseSettledResult<T>, fb: T): T =>
+    const g = <T>(r: PromiseSettledResult<T>, fb: T): T =>
       r.status === 'fulfilled' ? r.value : fb;
 
-    // 最新发行：首页新作
-    const newRelease = dedup(get(r_newRelease, [])).slice(0, 24);
+    const censored   = g(r_censored, []);
+    const uncensored = g(r_uncensored, []);
+    const hd         = g(r_hd, []);
+    const subtitle   = g(r_subtitle, []);
+    const genres     = g(r_genres, []);
+    const actresses  = g(r_actresses, []);
 
-    // 近期热门：第2页（时效上略早于首页，内容不同）
-    const popular = dedup(get(r_popular, [])).slice(0, 24);
-
-    // 有码精选：第3页（与前两个不重叠）
-    const censoredRaw = dedup([
-      ...get(r_censoredPick, []),
-      // 补充：从前两个去重后补位
-      ...get(r_newRelease, []),
-    ]);
-    // 去掉已在 popular 里的
-    const popularCodes = new Set(popular.map(i => i.code));
-    const censored = censoredRaw.filter(i => !popularCodes.has(i.code)).slice(0, 24);
-
-    // 无码精选
-    const uncensored = dedup([
-      ...get(r_uncensored1, []),
-      ...get(r_uncensored2, []),
-    ]).slice(0, 24);
-
-    // 类别榜
-    const genreListRaw = get(r_genreList, []);
-    const genreList = genreListRaw.length > 0 ? genreListRaw : FALLBACK_GENRES;
-    const genres = await buildGenreRankings(genreList);
-
-    // 搜索建议
-    const suggestions = dedup([...popular, ...uncensored])
-      .map(i => i.code)
-      .filter(isValidCode)
-      .slice(0, 30);
+    const suggestions = dedup([...censored, ...uncensored, ...hd])
+      .map(i => i.code).filter(isValidCode).slice(0, 30);
 
     const sources: string[] = [];
-    if (newRelease.length > 0 || popular.length > 0) sources.push('JavBus');
+    if (censored.length > 0)   sources.push('JavBus');
     if (uncensored.length > 0) sources.push('JavBus(无码)');
+    if (hd.length > 0)         sources.push('JavBus(高清)');
 
     const response: RankingsResponse = {
-      popular,
-      newRelease,
-      censored,
-      uncensored,
-      genres,
-      suggestions,
-      fetchedAt: Date.now(),
-      sources,
+      censored, uncensored, hd, subtitle, genres, actresses, suggestions,
+      fetchedAt: Date.now(), sources,
     };
 
     return c.json({ success: true, data: response });
@@ -335,13 +358,13 @@ javRoutes.get('/rankings', async (c) => {
   }
 });
 
-// GET /api/jav/suggestions?keyword=xxx
+// suggestions 接口（轻量）
 javRoutes.get('/suggestions', async (c) => {
   const keyword = (c.req.query('keyword') || '').toUpperCase().trim();
   if (!keyword) return c.json({ success: true, data: [] });
   try {
-    const items = await fetchCensoredNew();
-    const matched = items
+    const html = await get('https://www.javbus.com/');
+    const matched = parseGrid(html, 'javbus')
       .map(i => i.code)
       .filter(code => code.startsWith(keyword) || code.includes(keyword))
       .slice(0, 10);
