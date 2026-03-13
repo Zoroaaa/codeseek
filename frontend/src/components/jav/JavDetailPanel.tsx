@@ -5,7 +5,7 @@ import {
   AlertCircle, Search, ChevronDown, ChevronUp, X,
   Shield,
 } from 'lucide-react';
-import type { JavDetail, MagnetItem } from '@/types/jav';
+import type { JavDetail, MagnetItem } from '@/types';
 
 interface JavDetailPanelProps {
   detail: JavDetail | null;

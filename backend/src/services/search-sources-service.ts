@@ -1,5 +1,5 @@
-import { Env } from '../types';
-import { generateId } from '../utils';
+import { Env } from '@/types';
+import { generateId } from '@/utils';
 
 export interface MajorCategory {
   id: string;

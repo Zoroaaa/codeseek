@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, RefreshCw, Trash2, CheckCircle } from 'lucide-react';
-import { adminApi } from '@/services/api/admin';
+import { adminApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 

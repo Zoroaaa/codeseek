@@ -1,5 +1,5 @@
 import { Context } from 'hono';
-import { Env, JwtPayload } from '../types';
+import { Env, JwtPayload } from '@/types';
 import * as jose from 'jose';
 
 export const success = <T>(data: T, message?: string) => ({
@@ -76,7 +76,7 @@ export const getClientIP = (c: Context<{ Bindings: Env }>): string => {
          'unknown';
 };
 
-import { CONFIG } from '../constants';
+import { CONFIG } from '@/constants';
 
 /**
  * 验证邮箱格式

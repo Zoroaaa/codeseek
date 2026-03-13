@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { Zap, Users, Server, Search, Globe } from 'lucide-react';
-import { adminApi } from '@/services/api/admin';
+import { adminApi } from '@/services/api';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { Pagination, TableWrapper } from './shared';

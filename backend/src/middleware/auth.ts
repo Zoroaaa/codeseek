@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono';
-import { Env, JwtPayload, Role } from '../types';
-import { verifyToken, error } from '../utils';
+import { Env, JwtPayload, Role } from '@/types';
+import { verifyToken, error } from '@/utils';
 
 declare module 'hono' {
   interface ContextVariableMap {

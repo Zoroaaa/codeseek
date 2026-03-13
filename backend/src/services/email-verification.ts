@@ -1,6 +1,6 @@
-import { Env } from '../types';
-import { generateId, hashPassword } from '../utils';
-import { CONFIG, DB_CONFIG_KEYS, VALIDATION_RULES } from '../constants';
+import { Env } from '@/types';
+import { generateId, hashPassword } from '@/utils';
+import { CONFIG, DB_CONFIG_KEYS, VALIDATION_RULES } from '@/constants';
 import { ConfigService } from './config';
 
 const R = VALIDATION_RULES;

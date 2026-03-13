@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useUIStore } from '@/stores';
-import type { ToastOptions, ToastType, ToastPosition } from '@/types/notification';
-import { NotificationTemplates } from '@/utils/notificationTemplates';
+import type { ToastOptions, ToastType, ToastPosition } from '@/types';
+import { NotificationTemplates } from '@/utils';
 
 type ShowToastOptions = Omit<ToastOptions, 'type' | 'title'>;
 

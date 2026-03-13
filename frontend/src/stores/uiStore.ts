@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Toast, ToastOptions, ToastPosition, ToastConfig } from '@/types/notification';
-import { DEFAULT_TOAST_CONFIG } from '@/types/notification';
+import type { Toast, ToastOptions, ToastPosition, ToastConfig } from '@/types';
+import { DEFAULT_TOAST_CONFIG } from '@/types';
 
 interface UIState {
   toasts: Toast[];

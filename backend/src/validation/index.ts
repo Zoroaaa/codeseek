@@ -7,8 +7,8 @@
  */
 import { z } from 'zod';
 import type { Context } from 'hono';
-import type { Env } from '../types';
-import { VALIDATION_RULES, CONFIG } from '../constants';
+import type { Env } from '@/types';
+import { VALIDATION_RULES, CONFIG } from '@/constants';
 
 const R = VALIDATION_RULES;
 

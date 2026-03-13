@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '@/services/api/client';
-import type { JavRankings } from '@/types/jav';
-import { JAV_CACHE_KEY, JAV_CACHE_TTL } from '@/types/jav';
+import { apiClient } from '@/services/api';
+import type { JavRankings } from '@/types';
+import { JAV_CACHE_KEY, JAV_CACHE_TTL } from '@/types';
 
 interface CacheEntry {
   data: JavRankings;

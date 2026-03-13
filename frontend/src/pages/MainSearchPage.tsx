@@ -16,7 +16,7 @@ import { useSearchStore, useSourceStore, useAuthStore, useThemeStore, useProxySt
 import { searchApi, sourceApi, userApi, analyticsApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { useNavigate, Link } from 'react-router-dom';
-import { useFeatureFlags } from '@/contexts/ConfigContext';
+import { useFeatureFlags } from '@/contexts';
 import type {
   SearchResult,
   FavoriteItem,
@@ -27,14 +27,9 @@ import type {
   UserSourceConfig,
 } from '@/types';
 
-import { SearchResultsPanel } from '@/components/search/SearchResultsPanel';
-import { JavDetailPanel } from '@/components/jav/JavDetailPanel';
-import { useJavDetail } from '@/hooks/useJavDetail';
-import { SearchHistoryPanel } from '@/components/search/SearchHistoryPanel';
-import { FavoritesPanel } from '@/components/search/FavoritesPanel';
-import { SourcesPanel } from '@/components/search/SourcesPanel';
-import { QuickActionsPanel } from '@/components/search/QuickActionsPanel';
-import { JavRankingsPanel } from '@/components/jav/JavRankingsPanel';
+import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesPanel, QuickActionsPanel } from '@/components/search';
+import { JavDetailPanel, JavRankingsPanel } from '@/components/jav';
+import { useJavDetail } from '@/hooks';
 
 interface SearchResultItem extends SearchResult {
   subtitle?: string;

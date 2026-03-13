@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { Role, AdminUser, AdminUserDetail, UserLoginLog } from '@/types/auth';
+import type { Role, AdminUser, AdminUserDetail, UserLoginLog } from '@/types';
 
 interface PaginatedResponse<T> {
   items: T[];

@@ -6,17 +6,9 @@
  */
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { Env } from './types';
-import { authRoutes } from './routes/auth';
-import { userRoutes } from './routes/user';
-import { sourceRoutes } from './routes/sources';
-import { communityRoutes } from './routes/community';
-import { systemRoutes } from './routes/system';
-import { searchRoutes } from './routes/search';
-import { adminRoutes } from './routes/admin';
-import { configRoutes } from './routes/config';
-import { javRoutes } from './routes/jav';
-import { CONFIG } from './constants';
+import { Env } from '@/types';
+import { authRoutes, userRoutes, sourceRoutes, communityRoutes, systemRoutes, searchRoutes, adminRoutes, configRoutes, javRoutes } from '@/routes';
+import { CONFIG } from '@/constants';
 
 const app = new Hono<{ Bindings: Env }>();
 

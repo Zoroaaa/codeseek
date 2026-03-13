@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchStore } from '@/stores';
 import { searchApi } from '@/services/api';
-import { useValidationRules, useSearchConfig } from '@/contexts/ConfigContext';
+import { useValidationRules, useSearchConfig } from '@/contexts';
 
 interface UseSearchSuggestionsOptions {
   debounceMs?: number;

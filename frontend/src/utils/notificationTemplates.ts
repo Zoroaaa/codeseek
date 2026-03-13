@@ -1,4 +1,4 @@
-import type { ToastType } from '@/types/notification';
+import type { ToastType } from '@/types';
 
 export interface NotificationTemplate {
   type: ToastType;

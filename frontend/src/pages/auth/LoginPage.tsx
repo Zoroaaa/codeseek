@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores';
 import { authApi, analyticsApi } from '@/services/api';
 import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
-import { useValidationRules, useAppInfo, useFeatureFlags } from '@/contexts/ConfigContext';
+import { useValidationRules, useAppInfo, useFeatureFlags } from '@/contexts';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { clsx } from 'clsx';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 import { useUIStore } from '@/stores';
-import type { ToastType, ToastPosition, Toast } from '@/types/notification';
+import type { ToastType, ToastPosition, Toast } from '@/types';
 
 const ToastIcon: Record<ToastType, React.ReactNode> = {
   success: <CheckCircle className="w-5 h-5 text-success-500" />,

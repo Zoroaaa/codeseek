@@ -22,7 +22,7 @@ import {
 import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { Button, Modal } from '@/components/ui';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAppInfo, useFeatureFlags } from '@/contexts/ConfigContext';
+import { useAppInfo, useFeatureFlags } from '@/contexts';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();

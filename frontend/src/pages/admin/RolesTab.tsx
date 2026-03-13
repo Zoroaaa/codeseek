@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield } from 'lucide-react';
-import { adminApi } from '@/services/api/admin';
-import type { Role } from '@/types/auth';
+import { adminApi } from '@/services/api';
+import type { Role } from '@/types';
 
 export const RolesTab: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([]);

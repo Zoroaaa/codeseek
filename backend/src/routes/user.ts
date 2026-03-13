@@ -5,10 +5,10 @@
  * 日期：2024
  */
 import { Hono } from 'hono';
-import { Env, User, UserFavorite, UserSearchHistory } from '../types';
-import { success, error, generateId, logUserAction } from '../utils';
-import { authMiddleware } from '../middleware';
-import { CONFIG, VALIDATION_RULES } from '../constants';
+import { Env, User, UserFavorite, UserSearchHistory } from '@/types';
+import { success, error, generateId, logUserAction } from '@/utils';
+import { authMiddleware } from '@/middleware';
+import { CONFIG, VALIDATION_RULES } from '@/constants';
 
 const R = VALIDATION_RULES;
 

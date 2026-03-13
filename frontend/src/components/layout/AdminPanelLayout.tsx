@@ -22,7 +22,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
-import { useFeatureFlags } from '@/contexts/ConfigContext';
+import { useFeatureFlags } from '@/contexts';
 
 interface NavItem {
   id: string;

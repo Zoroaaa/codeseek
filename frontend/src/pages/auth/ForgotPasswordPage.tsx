@@ -8,7 +8,7 @@ import { ArrowLeft, Mail, Send, Lock, ShieldCheck, CheckCircle, Eye, EyeOff, Sea
 import { authApi } from '@/services/api';
 import { Input } from '@/components/ui';
 import { useNotification } from '@/hooks';
-import { useValidationRules } from '@/contexts/ConfigContext';
+import { useValidationRules } from '@/contexts';
 
 type Step = 'email' | 'verify' | 'success';
 

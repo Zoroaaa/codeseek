@@ -13,7 +13,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { SourceIcon } from '@/components/ui';
-import { convertToProxyUrl } from '@/services/proxy/ProxyService';
+import { convertToProxyUrl } from '@/services/proxy';
 import type { SearchSource, UserSourceConfig, MajorCategory, Category } from '@/types';
 
 interface SourceWithUserConfig extends SearchSource {

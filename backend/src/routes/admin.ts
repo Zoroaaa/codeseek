@@ -5,10 +5,10 @@
  * 日期：2024
  */
 import { Hono } from 'hono';
-import { Env, User, CommunitySourceReport, UserAction, JwtPayload, Role } from '../types';
-import { success, error, verifyToken, logUserAction } from '../utils';
-import { ConfigService } from '../services/config';
-import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '../constants';
+import { Env, User, CommunitySourceReport, UserAction, JwtPayload, Role } from '@/types';
+import { success, error, verifyToken, logUserAction } from '@/utils';
+import { ConfigService } from '@/services';
+import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
 
 const R = VALIDATION_RULES;
 

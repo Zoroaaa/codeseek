@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { proxyService } from '@/services/proxy/ProxyService';
-import { NotificationTemplates } from '@/utils/notificationTemplates';
+import { proxyService } from '@/services/proxy';
+import { NotificationTemplates } from '@/utils';
 import { useUIStore } from './uiStore';
-import type { ProxyStatus } from '@/services/proxy/ProxyService';
+import type { ProxyStatus } from '@/services/proxy';
 
 interface ProxyState {
   isEnabled: boolean;

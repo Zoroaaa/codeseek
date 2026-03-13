@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useSearchStore, useAuthStore } from '@/stores';
 import { searchApi, userApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
-import { useValidationRules, useUserLimits, usePaginationConfig } from '@/contexts/ConfigContext';
+import { useValidationRules, useUserLimits, usePaginationConfig } from '@/contexts';
 import type { SearchResult, SearchHistoryItem } from '@/types';
 
 interface UseSearchOptions {

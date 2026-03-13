@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import { Search, RefreshCw, Clock, MapPin, Terminal } from 'lucide-react';
-import { adminApi } from '@/services/api/admin';
+import { adminApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';

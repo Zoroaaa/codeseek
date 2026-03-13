@@ -5,3 +5,4 @@ export { sourceApi } from './source';
 export { communityApi } from './community';
 export { adminApi } from './admin';
 export { systemApi, analyticsApi, configApi } from './system';
+export type { SystemConfigItem, ConfigGroup, GroupedConfigs, ConfigChangeLog } from './system';

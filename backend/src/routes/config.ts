@@ -5,10 +5,10 @@
  * 日期：2024
  */
 import { Hono } from 'hono';
-import { Env, SystemConfig, EmailSendLog, ConfigChangeLog, ConfigGroup, JwtPayload } from '../types';
-import { success, error, generateId } from '../utils';
-import { authMiddleware } from '../middleware';
-import { ConfigService } from '../services/config';
+import { Env, SystemConfig, EmailSendLog, ConfigChangeLog, ConfigGroup, JwtPayload } from '@/types';
+import { success, error, generateId } from '@/utils';
+import { authMiddleware } from '@/middleware';
+import { ConfigService } from '@/services';
 
 export const configRoutes = new Hono<{ Bindings: Env }>();
 

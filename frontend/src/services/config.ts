@@ -1,4 +1,4 @@
-import { configApi } from '@/services/api/system';
+import { configApi } from '@/services/api';
 
 export interface PublicConfig {
   appVersion: string;

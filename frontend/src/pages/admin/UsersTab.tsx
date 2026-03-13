@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import { Search, RefreshCw, Ban, CheckCircle, Eye, Shield, LogIn, Activity, Server, Database, Award, MapPin } from 'lucide-react';
-import { adminApi } from '@/services/api/admin';
-import type { AdminUser, AdminUserDetail, Role } from '@/types/auth';
+import { adminApi } from '@/services/api';
+import type { AdminUser, AdminUserDetail, Role } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';

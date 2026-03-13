@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Shield, FileText } from 'lucide-react';
-import { useAppInfo } from '@/contexts/ConfigContext';
+import { useAppInfo } from '@/contexts';
 
 export const TermsPage: React.FC = () => {
   const appInfo = useAppInfo();

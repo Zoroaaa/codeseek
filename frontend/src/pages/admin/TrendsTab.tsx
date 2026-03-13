@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
-import { adminApi } from '@/services/api/admin';
+import { adminApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { actionLabels } from './shared';
 

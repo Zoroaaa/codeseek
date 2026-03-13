@@ -3,7 +3,7 @@
  * 4 个维度：有码精选 / 无码精选 / 随机类别(10) / 随机女优(10)
  */
 import { Hono } from 'hono';
-import { Env } from '../types';
+import { Env } from '@/types';
 
 export const javRoutes = new Hono<{ Bindings: Env }>();
 

@@ -4,8 +4,8 @@ import {
   RefreshCw, Loader2, AlertCircle, Clock,
   ChevronDown, ChevronRight, Search, TrendingUp,
 } from 'lucide-react';
-import { useJavRankings } from '@/hooks/useJavRankings';
-import type { JavItem, GroupRanking } from '@/types/jav';
+import { useJavRankings } from '@/hooks';
+import type { JavItem, GroupRanking } from '@/types';
 
 interface JavRankingsPanelProps {
   onCodeClick: (code: string) => void;

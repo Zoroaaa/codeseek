@@ -1,10 +1,10 @@
 import React from 'react';
 import { Heart, Download, Trash2, ExternalLink, Tag, ChevronDown, ChevronRight } from 'lucide-react';
 import { Loading } from '@/components/ui';
-import { convertToProxyUrl } from '@/services/proxy/ProxyService';
+import { convertToProxyUrl } from '@/services/proxy';
 import type { FavoriteItem } from '@/types';
-import { JAV_PANEL_HEIGHT, JAV_HEADER_HEIGHT } from '@/components/jav/JavRankingsPanel';
-import { HIST_PANEL_HEIGHT, HIST_HEADER_HEIGHT } from '@/components/search/SearchHistoryPanel';
+import { JAV_PANEL_HEIGHT, JAV_HEADER_HEIGHT } from '@/components/jav';
+import { HIST_PANEL_HEIGHT, HIST_HEADER_HEIGHT } from '@/components/search';
 
 // ─── 收藏面板高度由左侧两个面板决定 ────────────────────────────────
 // gap-3(12px) 或 gap-4(16px)，取 sm:gap-4 = 16px

@@ -1,10 +1,9 @@
 import { Hono } from 'hono';
-import { Env, User, EmailVerification, EmailChangeRequest } from '../types';
-import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP, checkLockout, clearLockout, recordSecurityEvent } from '../utils';
-import { recordFailedAttempt } from '../utils/security';
-import { EmailVerificationService, emailVerificationUtils } from '../services/email-verification';
-import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '../constants';
-import { ConfigService } from '../services/config';
+import { Env, User, EmailVerification, EmailChangeRequest } from '@/types';
+import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP, checkLockout, clearLockout, recordSecurityEvent } from '@/utils';
+import { recordFailedAttempt } from '@/utils/security';
+import { EmailVerificationService, emailVerificationUtils, ConfigService } from '@/services';
+import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
 
 const R = VALIDATION_RULES;
 

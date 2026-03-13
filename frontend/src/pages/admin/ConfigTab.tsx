@@ -21,9 +21,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Card, Button, Input, Modal } from '@/components/ui';
-import { configApi, type SystemConfigItem, type ConfigGroup, type GroupedConfigs, type ConfigChangeLog } from '@/services/api/system';
+import { configApi, type SystemConfigItem, type ConfigGroup, type GroupedConfigs, type ConfigChangeLog } from '@/services/api';
 import { useNotification } from '@/hooks';
-import { useConfig } from '@/contexts/ConfigContext';
+import { useConfig } from '@/contexts';
 
 const CONFIG_TYPE_LABELS: Record<string, string> = {
   string: '文本',

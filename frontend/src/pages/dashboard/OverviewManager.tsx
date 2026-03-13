@@ -19,7 +19,7 @@ import { Card, Badge, Loading, Button } from '@/components/ui';
 import { systemApi, userApi, sourceApi } from '@/services/api';
 import { useAuthStore } from '@/stores';
 import { useNavigate } from 'react-router-dom';
-import { useFeatureFlags } from '@/contexts/ConfigContext';
+import { useFeatureFlags } from '@/contexts';
 import type { FavoriteItem, SearchHistoryItem, SearchSource, UserSourceConfig } from '@/types';
 
 const getUserLevel = (total: number) => {

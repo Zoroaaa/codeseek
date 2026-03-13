@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { apiClient } from '@/services/api/client';
-import type { JavDetail } from '@/types/jav';
+import { apiClient } from '@/services/api';
+import type { JavDetail } from '@/types';
 
 type Status = 'idle' | 'loading' | 'success' | 'error' | 'not_found';
 

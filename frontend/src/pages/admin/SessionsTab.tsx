@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import { RefreshCw, MapPin, Monitor, XCircle } from 'lucide-react';
-import { adminApi } from '@/services/api/admin';
+import { adminApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { Pagination, TableWrapper } from './shared';

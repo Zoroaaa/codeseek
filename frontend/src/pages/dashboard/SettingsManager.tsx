@@ -17,7 +17,7 @@ import { Card, Button, Input, Tabs, Modal } from '@/components/ui';
 import { useAuthStore, useThemeStore } from '@/stores';
 import { userApi, authApi } from '@/services/api';
 import { useNotification } from '@/hooks';
-import { useValidationRules } from '@/contexts/ConfigContext';
+import { useValidationRules } from '@/contexts';
 
 export const SettingsManager: React.FC = () => {
   const navigate = useNavigate();

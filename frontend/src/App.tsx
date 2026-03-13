@@ -8,7 +8,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AdminPanelLayout } from '@/components/layout/AdminPanelLayout';
 import { CommunityPanelLayout } from '@/components/layout/CommunityPanelLayout';
 import { ToastContainer } from '@/components/ui/Toast';
-import { useFeatureFlags } from '@/contexts/ConfigContext';
+import { useFeatureFlags } from '@/contexts';
 import { HomePage } from '@/pages/HomePage';
 import { MainSearchPage } from '@/pages/MainSearchPage';
 import { TermsPage } from '@/pages/TermsPage';

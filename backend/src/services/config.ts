@@ -11,7 +11,7 @@
  *   后备值直接写在方法调用的第二个参数中，如 configService.getInt(DB_CONFIG_KEYS.XXX, 1000)
  *   仅当 DB 中无该配置时使用后备值
  */
-import { Env } from '../types';
+import { Env } from '@/types';
 
 interface ConfigCache {
   data: Record<string, string>;

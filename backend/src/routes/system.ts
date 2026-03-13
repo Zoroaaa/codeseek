@@ -5,11 +5,11 @@
  * 日期：2024
  */
 import { Hono } from 'hono';
-import { Env, SourceStatusCache, UserAction, SearchSource } from '../types';
-import { success, error, generateId } from '../utils';
-import { authMiddleware } from '../middleware';
-import { ConfigService } from '../services/config';
-import { DB_CONFIG_KEYS } from '../constants';
+import { Env, SourceStatusCache, UserAction, SearchSource } from '@/types';
+import { success, error, generateId } from '@/utils';
+import { authMiddleware } from '@/middleware';
+import { ConfigService } from '@/services';
+import { DB_CONFIG_KEYS } from '@/constants';
 
 export const systemRoutes = new Hono<{ Bindings: Env }>();
 

@@ -22,7 +22,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
-import { useFeatureFlags } from '@/contexts/ConfigContext';
+import { useFeatureFlags } from '@/contexts';
 import { SIDEBAR_CONFIG } from '@/constants';
 
 interface NavItem {

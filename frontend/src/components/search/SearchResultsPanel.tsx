@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingUp, List, Grid, X, Heart, ExternalLink, ShieldCheck } from 'lucide-react';
 import { SourceIcon } from '@/components/ui';
-import { convertToProxyUrl } from '@/services/proxy/ProxyService';
+import { convertToProxyUrl } from '@/services/proxy';
 import type { SearchResult, FavoriteItem, Category, MajorCategory } from '@/types';
 
 interface SearchResultItem extends SearchResult {

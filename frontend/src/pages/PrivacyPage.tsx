@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Shield, Lock } from 'lucide-react';
-import { useAppInfo } from '@/contexts/ConfigContext';
+import { useAppInfo } from '@/contexts';
 
 export const PrivacyPage: React.FC = () => {
   const appInfo = useAppInfo();

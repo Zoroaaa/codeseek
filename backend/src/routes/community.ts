@@ -5,9 +5,9 @@
  * 日期：2024
  */
 import { Hono } from 'hono';
-import { Env, CommunitySourceTag, CommunitySharedSource, CommunitySourceReview } from '../types';
-import { success, error, generateId } from '../utils';
-import { authMiddleware } from '../middleware';
+import { Env, CommunitySourceTag, CommunitySharedSource, CommunitySourceReview } from '@/types';
+import { success, error, generateId } from '@/utils';
+import { authMiddleware } from '@/middleware';
 
 export const communityRoutes = new Hono<{ Bindings: Env }>();
 

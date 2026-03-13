@@ -4,10 +4,10 @@
  * 作者：CodeSeek Team
  * 日期：2024
  */
-import { SecurityLockout, UserSecurityEvent, Env } from '../types';
-import { generateId } from '../utils';
-import { ConfigService } from '../services/config';
-import { CONFIG, DB_CONFIG_KEYS } from '../constants';
+import { SecurityLockout, UserSecurityEvent, Env } from '@/types';
+import { generateId } from '@/utils';
+import { ConfigService } from '@/services';
+import { CONFIG, DB_CONFIG_KEYS } from '@/constants';
 
 const DEFAULT_SECURITY_CONFIG = {
   MAX_LOGIN_ATTEMPTS: 5,
