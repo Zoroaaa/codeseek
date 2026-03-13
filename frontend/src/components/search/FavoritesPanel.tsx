@@ -48,7 +48,7 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
         {isLoading ? (
           <div className="p-6 sm:p-8 flex justify-center"><Loading /></div>
         ) : favorites.length > 0 ? (
-          <div className="p-3 sm:p-4 max-h-52 sm:max-h-64 overflow-y-auto scrollbar-thin">
+          <div className="p-3 sm:p-4 overflow-y-auto scrollbar-thin">
             <div className="space-y-1.5 sm:space-y-2">
               {favorites.map((item) => (
                 <div
