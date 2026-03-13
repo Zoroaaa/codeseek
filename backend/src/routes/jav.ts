@@ -4,11 +4,8 @@
  */
 import { Hono } from 'hono';
 import { Env } from '../types';
-import { authMiddleware } from '../middleware';
 
 export const javRoutes = new Hono<{ Bindings: Env }>();
-
-javRoutes.use('*', authMiddleware);
 
 // ─────────────────────────────────────────────
 // 类型
@@ -374,5 +371,160 @@ javRoutes.get('/suggestions', async (c) => {
     return c.json({ success: true, data: matched });
   } catch {
     return c.json({ success: true, data: [] });
+  }
+});
+
+// =====================================================================
+// 详情页 + 磁力链接提取
+// =====================================================================
+
+interface MagnetItem {
+  name: string;
+  size: string;
+  date: string;
+  magnet: string;      // magnet:?xt= 完整链接
+  isHD: boolean;
+}
+
+interface JavDetail {
+  code: string;
+  title: string;
+  cover?: string;
+  releaseDate?: string;
+  duration?: string;
+  director?: string;
+  maker?: string;
+  publisher?: string;
+  series?: string;
+  tags: string[];
+  actresses: string[];
+  magnets: MagnetItem[];
+  detailUrl: string;
+}
+
+/** 从详情页 HTML 提取 gid / uc（磁力 Ajax 必需参数） */
+function extractGidUc(html: string): { gid: string; uc: string } | null {
+  // JavBus 页面内嵌：var gid = 12345; var uc = 0;
+  const gidM = html.match(/var\s+gid\s*=\s*(\d+)/);
+  const ucM  = html.match(/var\s+uc\s*=\s*(\d+)/);
+  if (gidM && ucM) return { gid: gidM[1], uc: ucM[1] };
+  return null;
+}
+
+/** 解析磁力 Ajax 响应 HTML */
+function parseMagnets(html: string): MagnetItem[] {
+  if (!html) return [];
+  const items: MagnetItem[] = [];
+  // 每条磁力是一个 <tr>
+  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let row: RegExpExecArray | null;
+  while ((row = rowRe.exec(html)) !== null) {
+    const rowHtml = row[1];
+    // 磁力链接
+    const magnetM = rowHtml.match(/href="(magnet:\?xt=[^"]+)"/i);
+    if (!magnetM) continue;
+    const magnet = magnetM[1];
+    // 名称（第一个 <td> 的文本）
+    const nameM = rowHtml.match(/<td[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/i);
+    const name = nameM ? nameM[1].trim() : '';
+    // 文件大小
+    const cells: string[] = [];
+    const cellRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    let cell: RegExpExecArray | null;
+    while ((cell = cellRe.exec(rowHtml)) !== null) {
+      cells.push(cell[1].replace(/<[^>]+>/g, '').trim());
+    }
+    const size = cells[1] ?? '';
+    const date = cells[2] ?? '';
+    const isHD = /hd|1080|720/i.test(name) || rowHtml.includes('btn-primary');
+    items.push({ name: name || '未知', size, date, magnet, isHD });
+  }
+  return items;
+}
+
+/** 解析详情页主体信息 */
+function parseDetail(html: string, code: string, detailUrl: string): Omit<JavDetail, 'magnets'> {
+  // 标题
+  const titleM = html.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i) ||
+                 html.match(/<title>([^<]+)<\/title>/i);
+  const rawTitle = titleM ? titleM[1].replace(/<[^>]+>/g, '').trim() : code;
+  const title = rawTitle.replace(/\s*-\s*JavBus\s*$/i, '').trim();
+
+  // 封面
+  const coverM = html.match(/bigImage[^>]*href="([^"]+)"/i) ||
+                 html.match(/<img[^>]+class="[^"]*cover[^"]*"[^>]+src="([^"]+)"/i);
+  const cover = coverM ? coverM[1] : undefined;
+
+  // 信息提取辅助
+  const infoField = (label: string): string | undefined => {
+    const re = new RegExp(label + '[^:：]*[:：]\\s*<[^>]+>([^<]+)<', 'i');
+    const m = html.match(re);
+    if (m) return m[1].trim();
+    // 纯文本行
+    const re2 = new RegExp(label + '[^:：]*[:：]\\s*([^<\\n]+)', 'i');
+    const m2 = html.match(re2);
+    return m2 ? m2[1].trim() : undefined;
+  };
+
+  const releaseDate = infoField('發行日期') ?? infoField('发行日期') ?? infoField('Release Date');
+  const duration    = infoField('長度') ?? infoField('长度') ?? infoField('Length');
+  const director    = infoField('導演') ?? infoField('导演') ?? infoField('Director');
+  const maker       = infoField('製作商') ?? infoField('制作商') ?? infoField('Studio');
+  const publisher   = infoField('發行商') ?? infoField('发行商') ?? infoField('Label');
+  const series      = infoField('系列') ?? infoField('Series');
+
+  // 类别标签
+  const tags: string[] = [];
+  const tagSection = html.match(/class="genre"[\s\S]{0,5000}/i)?.[0] ?? '';
+  const tagRe = /<a[^>]+href="[^"]*\/genre\/[^"]*"[^>]*>([^<]+)<\/a>/gi;
+  let tagM: RegExpExecArray | null;
+  while ((tagM = tagRe.exec(tagSection)) !== null) {
+    const t = tagM[1].trim();
+    if (t) tags.push(t);
+  }
+
+  // 演员
+  const actresses: string[] = [];
+  const starRe = /<a[^>]+href="[^"]*\/star\/[^"]*"[^>]*>([^<]+)<\/a>/gi;
+  let starM: RegExpExecArray | null;
+  while ((starM = starRe.exec(html)) !== null) {
+    const name = starM[1].trim();
+    if (name && name.length < 30) actresses.push(name);
+  }
+
+  return { code, title, cover, releaseDate, duration, director, maker, publisher, series, tags, actresses, detailUrl };
+}
+
+javRoutes.get('/detail', async (c) => {
+  const code = (c.req.query('code') ?? '').trim().toUpperCase();
+  if (!code || !/^[A-Z]+-\d+$/.test(code) && !/^[A-Z0-9]+-?\d+$/.test(code)) {
+    return c.json({ success: false, error: { code: 'INVALID_CODE', message: '无效的番号格式' } }, 400);
+  }
+
+  const detailUrl = `https://www.javbus.com/${code}`;
+
+  try {
+    // Step 1：抓详情页
+    const html = await get(detailUrl, 15000);
+    if (!html || html.length < 500) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: '未找到该番号' } }, 404);
+    }
+
+    // Step 2：提取基本信息
+    const detail = parseDetail(html, code, detailUrl);
+
+    // Step 3：提取 gid/uc 并请求磁力 Ajax
+    let magnets: MagnetItem[] = [];
+    const gidUc = extractGidUc(html);
+    if (gidUc) {
+      const magnetUrl = `https://www.javbus.com/ajax/uncledatoolsbyajax.php?lang=zh&gid=${gidUc.gid}&uc=${gidUc.uc}&floor=${Date.now()}`;
+      const magnetHtml = await get(magnetUrl, 12000);
+      magnets = parseMagnets(magnetHtml);
+    }
+
+    return c.json({ success: true, data: { ...detail, magnets } });
+  } catch (err) {
+    console.error('JAV detail error:', err);
+    return c.json({ success: false, error: { code: 'FETCH_ERROR', message: '获取详情失败' } }, 500);
   }
 });

@@ -30,3 +30,29 @@ export interface JavRankings {
 
 export const JAV_CACHE_KEY = 'jav_rankings_cache';
 export const JAV_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+// ── 详情 & 磁力 ──────────────────────────────────────────────────────
+
+export interface MagnetItem {
+  name: string;
+  size: string;
+  date: string;
+  magnet: string;
+  isHD: boolean;
+}
+
+export interface JavDetail {
+  code: string;
+  title: string;
+  cover?: string;
+  releaseDate?: string;
+  duration?: string;
+  director?: string;
+  maker?: string;
+  publisher?: string;
+  series?: string;
+  tags: string[];
+  actresses: string[];
+  magnets: MagnetItem[];
+  detailUrl: string;
+}

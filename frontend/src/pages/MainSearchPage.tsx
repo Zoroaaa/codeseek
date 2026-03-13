@@ -28,6 +28,8 @@ import type {
 } from '@/types';
 
 import { SearchResultsPanel } from '@/components/search/SearchResultsPanel';
+import { JavDetailPanel } from '@/components/jav/JavDetailPanel';
+import { useJavDetail } from '@/hooks/useJavDetail';
 import { SearchHistoryPanel } from '@/components/search/SearchHistoryPanel';
 import { FavoritesPanel } from '@/components/search/FavoritesPanel';
 import { SourcesPanel } from '@/components/search/SourcesPanel';
@@ -104,6 +106,9 @@ export const MainSearchPage: React.FC = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // JAV 磁力提取
+  const { detail: javDetail, status: javDetailStatus, fetch: fetchJavDetail, reset: resetJavDetail } = useJavDetail();
   const [allSources, setAllSources] = useState<SourceWithUserConfig[]>([]);
   const [expandedMajorCategories, setExpandedMajorCategories] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -231,6 +236,13 @@ export const MainSearchPage: React.FC = () => {
           toast.info('未找到结果', '尝试更换关键词搜索');
         } else {
           loadHistory();
+        }
+        // 若输入符合番号格式，自动触发磁力提取
+        const trimmed = keyword.trim().toUpperCase();
+        if (/^[A-Z]{2,8}-?\d{2,6}$/.test(trimmed)) {
+          fetchJavDetail(trimmed);
+        } else {
+          resetJavDetail();
         }
       }
     } catch {
@@ -562,8 +574,14 @@ export const MainSearchPage: React.FC = () => {
           categories={categories}
           majorCategories={majorCategories}
           onViewModeChange={setViewMode}
-          onClose={() => setSearchResults([])}
+          onClose={() => { setSearchResults([]); resetJavDetail(); }}
           onToggleFavorite={handleToggleFavorite}
+        />
+
+        <JavDetailPanel
+          detail={javDetail}
+          status={javDetailStatus}
+          onClose={resetJavDetail}
         />
 
         {/* 主内容区：左侧JAV+历史 / 右侧收藏，右列高度精确跟随左列 */}
