@@ -17,7 +17,16 @@ interface FavoritesPanelProps {
 export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
   favorites, isLoading, show, isProxyEnabled, onToggle, onRemove, onExport,
 }) => (
-  <div className="collapsible-section flex-1 flex flex-col animate-fade-in min-h-0" style={{ animationDelay: '150ms' }}>
+  /*
+   * 桌面端：父容器已由 ResizeObserver 精确设定 height = 左列高度。
+   * 本组件需要：
+   *   - 根元素 h-full flex flex-col → 撑满父高度
+   *   - header shrink-0 → 不被压缩
+   *   - content flex-1 min-h-0 overflow-y-auto → 剩余空间滚动
+   */
+  <div className="collapsible-section h-full flex flex-col animate-fade-in" style={{ animationDelay: '150ms' }}>
+
+    {/* Header */}
     <button onClick={onToggle} className="collapsible-header shrink-0">
       <div className="flex items-center gap-2 sm:gap-3">
         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
@@ -40,15 +49,21 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
             <Download className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </button>
         )}
-        {show ? <ChevronDown className="w-4 h-4 text-surface-400" /> : <ChevronRight className="w-4 h-4 text-surface-400" />}
+        {show
+          ? <ChevronDown className="w-4 h-4 text-surface-400" />
+          : <ChevronRight className="w-4 h-4 text-surface-400" />}
       </div>
     </button>
+
+    {/* Content：flex-1 + min-h-0 让它占满剩余高度，overflow-y-auto 触发内部滚动 */}
     {show && (
-      <div className="collapsible-content flex-1 flex flex-col overflow-hidden min-h-0">
+      <div className="collapsible-content flex-1 min-h-0 flex flex-col overflow-hidden">
         {isLoading ? (
-          <div className="p-6 sm:p-8 flex justify-center"><Loading /></div>
+          <div className="flex-1 flex items-center justify-center">
+            <Loading />
+          </div>
         ) : favorites.length > 0 ? (
-          <div className="p-3 sm:p-4 flex-1 overflow-y-auto scrollbar-thin min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-3 sm:p-4">
             <div className="space-y-1.5 sm:space-y-2">
               {favorites.map((item) => (
                 <div
@@ -57,7 +72,9 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-xs sm:text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
-                    {item.subtitle && <p className="text-[10px] sm:text-xs text-surface-400 truncate mt-0.5">{item.subtitle}</p>}
+                    {item.subtitle && (
+                      <p className="text-[10px] sm:text-xs text-surface-400 truncate mt-0.5">{item.subtitle}</p>
+                    )}
                     {item.keyword && (
                       <div className="flex items-center gap-1 mt-1">
                         <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary-400 flex-shrink-0" />
@@ -86,8 +103,8 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
             </div>
           </div>
         ) : (
-          <div className="px-4 sm:px-5 py-6 sm:py-8 text-center flex-1 flex flex-col items-center justify-center">
-            <Heart className="w-6 h-6 sm:w-8 sm:h-8 text-surface-300 dark:text-surface-600 mx-auto mb-2" />
+          <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+            <Heart className="w-6 h-6 sm:w-8 sm:h-8 text-surface-300 dark:text-surface-600 mb-2" />
             <p className="text-xs sm:text-sm text-surface-400">暂无收藏内容</p>
           </div>
         )}

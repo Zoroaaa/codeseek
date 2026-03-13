@@ -14,12 +14,11 @@ export interface GenreRanking {
 }
 
 export interface JavRankings {
-  popular: JavItem[];
-  newRelease: JavItem[];
-  mostWanted: JavItem[];
-  topRated: JavItem[];
-  uncensored: JavItem[];
-  genres: GenreRanking[];
+  popular: JavItem[];      // 近期热门
+  newRelease: JavItem[];   // 最新发行
+  censored: JavItem[];     // 有码精选
+  uncensored: JavItem[];   // 无码精选
+  genres: GenreRanking[];  // 类别榜（动态）
   suggestions: string[];
   fetchedAt: number;
   sources: string[];
