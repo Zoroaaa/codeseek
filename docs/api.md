@@ -45,7 +45,7 @@ interface ApiResponse<T> {
 | 路由模块 | 认证方式 | 说明 |
 |---------|---------|------|
 | `/api/auth` | 无全局中间件 | 部分接口需要认证（单独验证） |
-| `/api/user` | 无全局中间件 | 所有接口需要认证（单独验证） |
+| `/api/user` | 全局 authMiddleware | 所有接口需要认证 |
 | `/api/search` | 全局 authMiddleware | 所有接口需要认证 |
 | `/api/search-sources` | 全局 authMiddleware | 所有接口需要认证，部分需要管理员权限 |
 | `/api/community` | 全局 authMiddleware | 所有接口需要认证 |
@@ -382,7 +382,7 @@ interface ApiResponse<T> {
 
 ## 用户数据接口 `/api/user`
 
-**认证方式**: 无全局中间件，各接口单独使用verifyToken验证
+**认证方式**: 全局 authMiddleware，所有接口需要认证
 
 ### `GET /api/user/settings` - 获取用户设置
 
@@ -2430,13 +2430,13 @@ app.route('/api', systemRoutes);                // 系统路由
 | 模块 | 路由前缀 | 文件 | 认证方式 | 功能 |
 |------|---------|------|---------|------|
 | authRoutes | /api/auth | routes/auth.ts | 无全局中间件 | 用户认证、登录注册、邮箱验证、密码管理 |
-| userRoutes | /api/user | routes/user.ts | 无全局中间件 | 用户设置、收藏、搜索历史、活动记录 |
+| userRoutes | /api/user | routes/user.ts | 全局authMiddleware | 用户设置、收藏、搜索历史、活动记录 |
 | searchRoutes | /api/search | routes/search.ts | 全局authMiddleware | 搜索执行、建议、热门 |
 | sourceRoutes | /api/search-sources | routes/sources.ts | 全局authMiddleware | 搜索源CRUD、分类管理、用户配置 |
 | communityRoutes | /api/community | routes/community.ts | 全局authMiddleware | 社区分享、标签、评论、举报、通知 |
 | adminRoutes | /api/admin | routes/admin.ts | 全局管理员中间件 | 用户管理、举报处理、统计、日志、会话管理 |
 | configRoutes | /api/config | routes/config.ts | 全局authMiddleware | 系统配置管理、分析事件、邮件日志 |
-| systemRoutes | /api | routes/system.ts | 全局authMiddleware | 健康检查、状态检测、统计、行为记录 |
+| systemRoutes | /api | routes/system.ts | 全局authMiddleware（/public-config、/health公开） | 健康检查、状态检测、统计、行为记录 |
 
 ---
 

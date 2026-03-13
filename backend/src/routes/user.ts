@@ -1,36 +1,35 @@
+/**
+ * 用户路由模块
+ * 功能：用户设置、收藏、搜索历史、活动记录
+ * 作者：CodeSeek Team
+ * 日期：2024
+ */
 import { Hono } from 'hono';
 import { Env, User, UserFavorite, UserSearchHistory } from '../types';
-import { success, error, generateId, verifyToken, logUserAction } from '../utils';
+import { success, error, generateId, logUserAction } from '../utils';
+import { authMiddleware } from '../middleware';
 import { CONFIG, VALIDATION_RULES } from '../constants';
 
 const R = VALIDATION_RULES;
 
 export const userRoutes = new Hono<{ Bindings: Env }>();
 
+userRoutes.use('*', authMiddleware);
+
 userRoutes.get('/settings', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
-    const user = await c.env.DB.prepare(
+    const userRow = await c.env.DB.prepare(
       'SELECT settings FROM users WHERE id = ?'
-    ).bind(payload.userId).first<User>();
+    ).bind(user.userId).first<User>();
 
-    if (!user) {
+    if (!userRow) {
       return c.json(error('AUTH_ERROR', '用户不存在'), 404);
     }
 
     return c.json(success({
-      settings: JSON.parse(user.settings || '{}'),
+      settings: JSON.parse(userRow.settings || '{}'),
     }));
   } catch (err) {
     console.error('Get settings error:', err);
@@ -39,17 +38,7 @@ userRoutes.get('/settings', async (c) => {
 });
 
 userRoutes.put('/settings', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const body = await c.req.json();
@@ -61,9 +50,9 @@ userRoutes.put('/settings', async (c) => {
 
     await c.env.DB.prepare(
       'UPDATE users SET settings = ?, updated_at = ? WHERE id = ?'
-    ).bind(JSON.stringify(settings), Date.now(), payload.userId).run();
+    ).bind(JSON.stringify(settings), Date.now(), user.userId).run();
 
-    await logUserAction(c.env, payload.userId, 'update_settings', { settings }, c);
+    await logUserAction(c.env, user.userId, 'update_settings', { settings }, c);
 
     return c.json(success({ settings }, '设置已保存'));
   } catch (err) {
@@ -73,22 +62,12 @@ userRoutes.put('/settings', async (c) => {
 });
 
 userRoutes.get('/favorites', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const favorites = await c.env.DB.prepare(
       'SELECT * FROM user_favorites WHERE user_id = ? ORDER BY created_at DESC'
-    ).bind(payload.userId).all<UserFavorite>();
+    ).bind(user.userId).all<UserFavorite>();
 
     return c.json(success({
       favorites: favorites.results || [],
@@ -100,17 +79,7 @@ userRoutes.get('/favorites', async (c) => {
 });
 
 userRoutes.post('/favorites', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const body = await c.req.json();
@@ -122,7 +91,7 @@ userRoutes.post('/favorites', async (c) => {
 
     const existing = await c.env.DB.prepare(
       'SELECT id, title, subtitle, url, icon, keyword, created_at FROM user_favorites WHERE user_id = ? AND url = ?'
-    ).bind(payload.userId, url).first<UserFavorite>();
+    ).bind(user.userId, url).first<UserFavorite>();
 
     if (existing) {
       return c.json(success({
@@ -140,7 +109,7 @@ userRoutes.post('/favorites', async (c) => {
     
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_favorites WHERE user_id = ?'
-    ).bind(payload.userId).first<{ count: number }>();
+    ).bind(user.userId).first<{ count: number }>();
 
     if (count && count.count >= maxFavorites) {
       return c.json(error('VALIDATION_ERROR', `最多只能收藏${maxFavorites}个搜索源`), 400);
@@ -154,7 +123,7 @@ userRoutes.post('/favorites', async (c) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       favoriteId,
-      payload.userId,
+      user.userId,
       title,
       subtitle || null,
       url,
@@ -164,7 +133,7 @@ userRoutes.post('/favorites', async (c) => {
       now
     ).run();
 
-    await logUserAction(c.env, payload.userId, 'add_favorite', { title, url }, c);
+    await logUserAction(c.env, user.userId, 'add_favorite', { title, url }, c);
 
     return c.json(success({
       id: favoriteId,
@@ -182,30 +151,19 @@ userRoutes.post('/favorites', async (c) => {
 });
 
 userRoutes.delete('/favorites/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
+  const user = c.get('user');
   const favoriteId = c.req.param('id');
 
   try {
     const result = await c.env.DB.prepare(
       'DELETE FROM user_favorites WHERE id = ? AND user_id = ?'
-    ).bind(favoriteId, payload.userId).run();
+    ).bind(favoriteId, user.userId).run();
 
     if (!result.success) {
       return c.json(error('NOT_FOUND', '收藏不存在'), 404);
     }
 
-    await logUserAction(c.env, payload.userId, 'remove_favorite', { favoriteId }, c);
+    await logUserAction(c.env, user.userId, 'remove_favorite', { favoriteId }, c);
 
     return c.json(success(null, '已取消收藏'));
   } catch (err) {
@@ -215,23 +173,13 @@ userRoutes.delete('/favorites/:id', async (c) => {
 });
 
 userRoutes.get('/search-history', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const limit = parseInt(c.req.query('limit') || '100', 10);
     const history = await c.env.DB.prepare(
       'SELECT * FROM user_search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
-    ).bind(payload.userId, limit).all<UserSearchHistory>();
+    ).bind(user.userId, limit).all<UserSearchHistory>();
 
     return c.json(success({
       history: history.results || [],
@@ -243,17 +191,7 @@ userRoutes.get('/search-history', async (c) => {
 });
 
 userRoutes.post('/search-history', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const body = await c.req.json();
@@ -267,12 +205,12 @@ userRoutes.post('/search-history', async (c) => {
     
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?'
-    ).bind(payload.userId).first<{ count: number }>();
+    ).bind(user.userId).first<{ count: number }>();
 
     if (count && count.count >= maxHistory) {
       const oldest = await c.env.DB.prepare(
         'SELECT id FROM user_search_history WHERE user_id = ? ORDER BY created_at ASC LIMIT 1'
-      ).bind(payload.userId).first<{ id: string }>();
+      ).bind(user.userId).first<{ id: string }>();
 
       if (oldest) {
         await c.env.DB.prepare('DELETE FROM user_search_history WHERE id = ?').bind(oldest.id).run();
@@ -287,7 +225,7 @@ userRoutes.post('/search-history', async (c) => {
       VALUES (?, ?, ?, ?, ?, ?)
     `).bind(
       historyId,
-      payload.userId,
+      user.userId,
       query,
       source || '',
       resultsCount || 0,
@@ -308,22 +246,12 @@ userRoutes.post('/search-history', async (c) => {
 });
 
 userRoutes.delete('/search-history', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
-    await c.env.DB.prepare('DELETE FROM user_search_history WHERE user_id = ?').bind(payload.userId).run();
+    await c.env.DB.prepare('DELETE FROM user_search_history WHERE user_id = ?').bind(user.userId).run();
 
-    await logUserAction(c.env, payload.userId, 'clear_search_history', {}, c);
+    await logUserAction(c.env, user.userId, 'clear_search_history', {}, c);
 
     return c.json(success(null, '搜索历史已清空'));
   } catch (err) {
@@ -333,24 +261,13 @@ userRoutes.delete('/search-history', async (c) => {
 });
 
 userRoutes.delete('/search-history/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
+  const user = c.get('user');
   const historyId = c.req.param('id');
 
   try {
     const result = await c.env.DB.prepare(
       'DELETE FROM user_search_history WHERE id = ? AND user_id = ?'
-    ).bind(historyId, payload.userId).run();
+    ).bind(historyId, user.userId).run();
 
     if (!result.success || result.meta.changes === 0) {
       return c.json(error('NOT_FOUND', '搜索历史记录不存在'), 404);
@@ -364,22 +281,12 @@ userRoutes.delete('/search-history/:id', async (c) => {
 });
 
 userRoutes.get('/search-stats', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const totalSearches = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?'
-    ).bind(payload.userId).first<{ count: number }>();
+    ).bind(user.userId).first<{ count: number }>();
 
     const topSources = await c.env.DB.prepare(`
       SELECT source, COUNT(*) as count 
@@ -388,11 +295,11 @@ userRoutes.get('/search-stats', async (c) => {
       GROUP BY source 
       ORDER BY count DESC 
       LIMIT 5
-    `).bind(payload.userId).all<{ source: string; count: number }>();
+    `).bind(user.userId).all<{ source: string; count: number }>();
 
     const recentSearches = await c.env.DB.prepare(
       'SELECT query, created_at FROM user_search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 10'
-    ).bind(payload.userId).all<{ query: string; created_at: number }>();
+    ).bind(user.userId).all<{ query: string; created_at: number }>();
 
     const now = Date.now();
     const oneWeekAgo = now - CONFIG.Stats.WEEK_IN_MS;
@@ -400,11 +307,11 @@ userRoutes.get('/search-stats', async (c) => {
 
     const thisWeekSearches = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ? AND created_at >= ?'
-    ).bind(payload.userId, oneWeekAgo).first<{ count: number }>();
+    ).bind(user.userId, oneWeekAgo).first<{ count: number }>();
 
     const lastWeekSearches = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ? AND created_at >= ? AND created_at < ?'
-    ).bind(payload.userId, twoWeeksAgo, oneWeekAgo).first<{ count: number }>();
+    ).bind(user.userId, twoWeeksAgo, oneWeekAgo).first<{ count: number }>();
 
     const thisWeek = thisWeekSearches?.count || 0;
     const lastWeek = lastWeekSearches?.count || 0;
@@ -430,22 +337,12 @@ userRoutes.get('/search-stats', async (c) => {
 });
 
 userRoutes.get('/source-configs', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const configs = await c.env.DB.prepare(
       'SELECT * FROM user_search_source_configs WHERE user_id = ?'
-    ).bind(payload.userId).all();
+    ).bind(user.userId).all();
 
     return c.json(success({
       configs: configs.results || [],
@@ -457,18 +354,7 @@ userRoutes.get('/source-configs', async (c) => {
 });
 
 userRoutes.put('/source-configs/:sourceId', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
+  const user = c.get('user');
   const sourceId = c.req.param('sourceId');
 
   try {
@@ -477,7 +363,7 @@ userRoutes.put('/source-configs/:sourceId', async (c) => {
 
     const existing = await c.env.DB.prepare(
       'SELECT id FROM user_search_source_configs WHERE user_id = ? AND source_id = ?'
-    ).bind(payload.userId, sourceId).first();
+    ).bind(user.userId, sourceId).first();
 
     const now = Date.now();
 
@@ -494,7 +380,7 @@ userRoutes.put('/source-configs/:sourceId', async (c) => {
         customIcon || null,
         notes || null,
         now,
-        payload.userId,
+        user.userId,
         sourceId
       ).run();
     } else {
@@ -504,7 +390,7 @@ userRoutes.put('/source-configs/:sourceId', async (c) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         configId,
-        payload.userId,
+        user.userId,
         sourceId,
         isEnabled !== undefined ? (isEnabled ? 1 : 0) : 1,
         customPriority || null,
@@ -524,30 +410,15 @@ userRoutes.put('/source-configs/:sourceId', async (c) => {
   }
 });
 
-/**
- * 获取个人活动记录
- * GET /api/user/activities
- */
 userRoutes.get('/activities', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
+  const user = c.get('user');
   const limit = Math.min(parseInt(c.req.query('limit') || '100'), 100);
   const offset = parseInt(c.req.query('offset') || '0');
   const actionType = c.req.query('action');
 
   try {
     let whereClause = 'WHERE user_id = ?';
-    const params: (string | number)[] = [payload.userId];
+    const params: (string | number)[] = [user.userId];
 
     if (actionType) {
       whereClause += ' AND action = ?';
@@ -604,22 +475,8 @@ userRoutes.get('/activities', async (c) => {
   }
 });
 
-/**
- * 获取个人活动统计
- * GET /api/user/activities/stats
- */
 userRoutes.get('/activities/stats', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const now = Date.now();
@@ -629,19 +486,19 @@ userRoutes.get('/activities/stats', async (c) => {
 
     const totalActions = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_actions WHERE user_id = ?'
-    ).bind(payload.userId).first<{ count: number }>();
+    ).bind(user.userId).first<{ count: number }>();
 
     const todayActions = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_actions WHERE user_id = ? AND created_at > ?'
-    ).bind(payload.userId, oneDayAgo).first<{ count: number }>();
+    ).bind(user.userId, oneDayAgo).first<{ count: number }>();
 
     const weekActions = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_actions WHERE user_id = ? AND created_at > ?'
-    ).bind(payload.userId, oneWeekAgo).first<{ count: number }>();
+    ).bind(user.userId, oneWeekAgo).first<{ count: number }>();
 
     const monthActions = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_actions WHERE user_id = ? AND created_at > ?'
-    ).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+    ).bind(user.userId, oneMonthAgo).first<{ count: number }>();
 
     const actionsByType = await c.env.DB.prepare(`
       SELECT action, COUNT(*) as count
@@ -649,44 +506,44 @@ userRoutes.get('/activities/stats', async (c) => {
       WHERE user_id = ?
       GROUP BY action
       ORDER BY count DESC
-    `).bind(payload.userId).all();
+    `).bind(user.userId).all();
 
     const recentLogins = await c.env.DB.prepare(`
       SELECT COUNT(*) as count
       FROM user_actions
       WHERE user_id = ? AND action = 'login' AND created_at > ?
-    `).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+    `).bind(user.userId, oneMonthAgo).first<{ count: number }>();
 
     const thisWeekLogins = await c.env.DB.prepare(`
       SELECT COUNT(*) as count
       FROM user_actions
       WHERE user_id = ? AND action = 'login' AND created_at > ?
-    `).bind(payload.userId, oneWeekAgo).first<{ count: number }>();
+    `).bind(user.userId, oneWeekAgo).first<{ count: number }>();
 
     const lastWeekStart = now - 14 * 24 * 60 * 60 * 1000;
     const lastWeekLogins = await c.env.DB.prepare(`
       SELECT COUNT(*) as count
       FROM user_actions
       WHERE user_id = ? AND action = 'login' AND created_at > ? AND created_at <= ?
-    `).bind(payload.userId, lastWeekStart, oneWeekAgo).first<{ count: number }>();
+    `).bind(user.userId, lastWeekStart, oneWeekAgo).first<{ count: number }>();
 
     const recentFailedLogins = await c.env.DB.prepare(`
       SELECT COUNT(*) as count
       FROM user_actions
       WHERE user_id = ? AND action = 'login_failed' AND created_at > ?
-    `).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+    `).bind(user.userId, oneMonthAgo).first<{ count: number }>();
 
     const recentSearches = await c.env.DB.prepare(`
       SELECT COUNT(*) as count
       FROM user_actions
       WHERE user_id = ? AND action = 'search' AND created_at > ?
-    `).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+    `).bind(user.userId, oneMonthAgo).first<{ count: number }>();
 
     const recentFavorites = await c.env.DB.prepare(`
       SELECT COUNT(*) as count
       FROM user_actions
       WHERE user_id = ? AND action IN ('add_favorite', 'remove_favorite') AND created_at > ?
-    `).bind(payload.userId, oneMonthAgo).first<{ count: number }>();
+    `).bind(user.userId, oneMonthAgo).first<{ count: number }>();
 
     return c.json(success({
       total: totalActions?.count || 0,
