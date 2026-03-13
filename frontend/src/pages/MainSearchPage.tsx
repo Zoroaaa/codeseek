@@ -571,49 +571,53 @@ export const MainSearchPage: React.FC = () => {
             <JavRankingsPanel onCodeClick={handleCodeClick} />
 
             {isAuthenticated && (
-              <>
-                <SearchHistoryPanel
-                  history={searchHistory}
-                  isLoading={isLoadingHistory}
-                  show={showHistory}
-                  onToggle={() => setShowHistory(!showHistory)}
-                  onItemClick={(query) => setKeyword(query)}
-                  onClear={handleClearHistory}
-                />
-                <FavoritesPanel
-                  favorites={favorites}
-                  isLoading={isLoadingFavorites}
-                  show={showFavorites}
-                  isProxyEnabled={isProxyEnabled}
-                  onToggle={() => setShowFavorites(!showFavorites)}
-                  onRemove={handleRemoveFavorite}
-                  onExport={handleExportFavorites}
-                />
-              </>
+              <SearchHistoryPanel
+                history={searchHistory}
+                isLoading={isLoadingHistory}
+                show={showHistory}
+                onToggle={() => setShowHistory(!showHistory)}
+                onItemClick={(query) => setKeyword(query)}
+                onClear={handleClearHistory}
+              />
             )}
 
-            <SourcesPanel
-              show={showSources}
-              allSources={allSources}
-              majorCategoriesWithCategories={getMajorCategoriesWithCategories()}
-              expandedMajorCategories={expandedMajorCategories}
-              expandedCategories={expandedCategories}
-              batchCheckResults={batchCheckResults}
-              isBatchChecking={isBatchChecking}
-              isProxyEnabled={isProxyEnabled}
-              onToggle={() => setShowSources(!showSources)}
-              onToggleMajorCategory={toggleMajorCategory}
-              onToggleCategory={toggleCategory}
-              onBatchCheck={handleBatchCheckSources}
-              onCheckSingle={handleCheckSingleSource}
-              getSiteTypeBadge={getSiteTypeBadge}
-              getSiteTypeLabel={getSiteTypeLabel}
-            />
           </div>
 
-          <div className="hidden lg:block">
+          <div className="hidden lg:block space-y-3 sm:space-y-4">
             <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} />
+            {isAuthenticated && (
+              <FavoritesPanel
+                favorites={favorites}
+                isLoading={isLoadingFavorites}
+                show={showFavorites}
+                isProxyEnabled={isProxyEnabled}
+                onToggle={() => setShowFavorites(!showFavorites)}
+                onRemove={handleRemoveFavorite}
+                onExport={handleExportFavorites}
+              />
+            )}
           </div>
+
+        </div>
+
+        <div className="mt-3 sm:mt-4">
+          <SourcesPanel
+            show={showSources}
+            allSources={allSources}
+            majorCategoriesWithCategories={getMajorCategoriesWithCategories()}
+            expandedMajorCategories={expandedMajorCategories}
+            expandedCategories={expandedCategories}
+            batchCheckResults={batchCheckResults}
+            isBatchChecking={isBatchChecking}
+            isProxyEnabled={isProxyEnabled}
+            onToggle={() => setShowSources(!showSources)}
+            onToggleMajorCategory={toggleMajorCategory}
+            onToggleCategory={toggleCategory}
+            onBatchCheck={handleBatchCheckSources}
+            onCheckSingle={handleCheckSingleSource}
+            getSiteTypeBadge={getSiteTypeBadge}
+            getSiteTypeLabel={getSiteTypeLabel}
+          />
         </div>
 
         <div className="lg:hidden mt-3 sm:mt-4">
