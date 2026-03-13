@@ -8,7 +8,7 @@ import { authMiddleware } from '@/middleware';
 
 export const javRoutes = new Hono<{ Bindings: Env }>();
 
-javRoutes.use('/torrent/*', authMiddleware);
+javRoutes.use('*', authMiddleware);
 
 // ─────────────────────────────────────────────
 // 类型
