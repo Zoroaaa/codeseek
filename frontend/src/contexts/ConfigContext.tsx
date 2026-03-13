@@ -119,12 +119,6 @@ export function useFeatureFlags() {
   return {
     enableRegistration: config?.allowRegistration ?? defaults.allowRegistration,
     communityEnabled: config?.communityEnabled ?? defaults.communityEnabled,
-    enableSearchHistory: true,
-    enableFavorites: true,
-    enableAnalytics: true,
-    enableDarkMode: true,
-    enableProxy: true,
-    enableSearchSuggestions: true,
   };
 }
 
@@ -143,9 +137,6 @@ export function useSearchConfig() {
   
   return {
     searchDebounceMs: 300,
-    enableSearchSuggestions: true,
-    maxKeywordLength: R.KEYWORD.MAX_LENGTH,
-    suggestionsMinKeywordLength: R.SUGGESTIONS.MIN_KEYWORD_LENGTH,
     suggestionsMaxLimit: R.SUGGESTIONS.MAX_LIMIT,
   };
 }

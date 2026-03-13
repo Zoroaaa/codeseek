@@ -9,9 +9,7 @@ import { Env, SourceStatusCache, UserAction, SearchSource } from '../types';
 import { success, error, generateId } from '../utils';
 import { authMiddleware } from '../middleware';
 import { ConfigService } from '../services/config';
-import { DB_CONFIG_KEYS, VALIDATION_RULES } from '../constants';
-
-const R = VALIDATION_RULES;
+import { DB_CONFIG_KEYS } from '../constants';
 
 export const systemRoutes = new Hono<{ Bindings: Env }>();
 
@@ -37,25 +35,6 @@ systemRoutes.get('/public-config', async (c) => {
       siteDescription,
       allowRegistration: enableRegistration,
       communityEnabled,
-      minUsernameLength: R.USERNAME.MIN_LENGTH,
-      maxUsernameLength: R.USERNAME.MAX_LENGTH,
-      minPasswordLength: R.PASSWORD.MIN_LENGTH,
-      maxFavoritesPerUser: R.FAVORITES.MAX_COUNT,
-      maxHistoryPerUser: R.SEARCH_HISTORY.MAX_COUNT,
-      maxTagsPerUser: R.TAG.MAX_COUNT_PER_SOURCE,
-      features: {
-        searchHistory: true,
-        favorites: true,
-        analytics: true,
-        darkMode: true,
-        proxy: true,
-        searchSuggestions: true,
-      },
-      search: {
-        debounceMs: 300,
-        maxKeywordLength: R.KEYWORD.MAX_LENGTH,
-        suggestionsMinKeywordLength: R.SUGGESTIONS.MIN_KEYWORD_LENGTH,
-      },
     }));
   } catch (err) {
     console.error('Get public config error:', err);
