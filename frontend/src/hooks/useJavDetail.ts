@@ -18,7 +18,7 @@ export function useJavDetail() {
     setLastCode(normalized);
     setDetail(null);
     try {
-      const res = await apiClient.get(`/api/jav/detail?code=${encodeURIComponent(normalized)}`) as {
+      const res = await apiClient.get(`/jav/detail?code=${encodeURIComponent(normalized)}`) as {
         success: boolean;
         data?: JavDetail;
         error?: { code: string; message: string };
