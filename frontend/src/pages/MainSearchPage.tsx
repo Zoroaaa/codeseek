@@ -403,14 +403,16 @@ export const MainSearchPage: React.FC = () => {
       <header className="mobile-header">
         <div className="max-w-7xl mx-auto">
           <div className="mobile-header-inner">
-            <Link to="/main" className="flex items-center gap-2 group">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/20 group-hover:shadow-primary-500/40 transition-all">
-                <Search className="w-4 h-4 sm:w-5 sm:h-5 text-white" strokeWidth={2.5} />
-              </div>
+            <a href={window.location.pathname} className="flex items-center gap-2 group cursor-pointer" title="刷新页面">
+              <img
+                src="/logo.png"
+                alt="磁力快搜"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl shadow-lg shadow-primary-500/20 group-hover:shadow-primary-500/40 transition-all object-cover"
+              />
               <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent hidden xs:block tracking-tight">
                 磁力快搜
               </span>
-            </Link>
+            </a>
 
             <nav className="hidden md:flex items-center gap-1">
               <Link to="/main" className="px-3.5 py-2 text-sm font-semibold rounded-xl text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 transition-all flex items-center gap-1.5">
