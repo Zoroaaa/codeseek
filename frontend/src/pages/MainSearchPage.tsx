@@ -564,10 +564,10 @@ export const MainSearchPage: React.FC = () => {
           onToggleFavorite={handleToggleFavorite}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        {/* 主内容区：左侧JAV+历史 / 右侧收藏，桌面端等高 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 lg:items-stretch">
 
           <div className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
-
             <JavRankingsPanel onCodeClick={handleCodeClick} />
 
             {isAuthenticated && (
@@ -580,26 +580,41 @@ export const MainSearchPage: React.FC = () => {
                 onClear={handleClearHistory}
               />
             )}
-
           </div>
 
-          <div className="hidden lg:block">
-            {isAuthenticated && (
-              <div className="h-full flex flex-col">
-                <FavoritesPanel
-                  favorites={favorites}
-                  isLoading={isLoadingFavorites}
-                  show={showFavorites}
-                  isProxyEnabled={isProxyEnabled}
-                  onToggle={() => setShowFavorites(!showFavorites)}
-                  onRemove={handleRemoveFavorite}
-                  onExport={handleExportFavorites}
-                />
-              </div>
-            )}
-          </div>
+          {/* 右侧收藏：桌面端撑满高度，内部滚动 */}
+          {isAuthenticated ? (
+            <div className="hidden lg:flex flex-col">
+              <FavoritesPanel
+                favorites={favorites}
+                isLoading={isLoadingFavorites}
+                show={showFavorites}
+                isProxyEnabled={isProxyEnabled}
+                onToggle={() => setShowFavorites(!showFavorites)}
+                onRemove={handleRemoveFavorite}
+                onExport={handleExportFavorites}
+              />
+            </div>
+          ) : (
+            <div className="hidden lg:block" />
+          )}
 
         </div>
+
+        {/* 移动端：我的收藏 */}
+        {isAuthenticated && (
+          <div className="lg:hidden mt-3 sm:mt-4">
+            <FavoritesPanel
+              favorites={favorites}
+              isLoading={isLoadingFavorites}
+              show={showFavorites}
+              isProxyEnabled={isProxyEnabled}
+              onToggle={() => setShowFavorites(!showFavorites)}
+              onRemove={handleRemoveFavorite}
+              onExport={handleExportFavorites}
+            />
+          </div>
+        )}
 
         <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
           <SourcesPanel
@@ -621,10 +636,6 @@ export const MainSearchPage: React.FC = () => {
           />
 
           <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} layout="horizontal" />
-        </div>
-
-        <div className="lg:hidden mt-3 sm:mt-4">
-          <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} />
         </div>
       </div>
     </div>

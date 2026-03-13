@@ -7,10 +7,19 @@ export interface JavItem {
   source: string;
 }
 
+export interface GenreRanking {
+  genre: string;
+  key: string;
+  items: JavItem[];
+}
+
 export interface JavRankings {
   popular: JavItem[];
   newRelease: JavItem[];
   mostWanted: JavItem[];
+  topRated: JavItem[];
+  uncensored: JavItem[];
+  genres: GenreRanking[];
   suggestions: string[];
   fetchedAt: number;
   sources: string[];

@@ -17,7 +17,7 @@ interface FavoritesPanelProps {
 export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
   favorites, isLoading, show, isProxyEnabled, onToggle, onRemove, onExport,
 }) => (
-  <div className="collapsible-section h-full flex flex-col animate-fade-in" style={{ animationDelay: '150ms' }}>
+  <div className="collapsible-section flex-1 flex flex-col animate-fade-in min-h-0" style={{ animationDelay: '150ms' }}>
     <button onClick={onToggle} className="collapsible-header shrink-0">
       <div className="flex items-center gap-2 sm:gap-3">
         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
@@ -44,11 +44,11 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
       </div>
     </button>
     {show && (
-      <div className="collapsible-content flex-1 flex flex-col overflow-hidden">
+      <div className="collapsible-content flex-1 flex flex-col overflow-hidden min-h-0">
         {isLoading ? (
           <div className="p-6 sm:p-8 flex justify-center"><Loading /></div>
         ) : favorites.length > 0 ? (
-          <div className="p-3 sm:p-4 flex-1 overflow-y-auto scrollbar-thin">
+          <div className="p-3 sm:p-4 flex-1 overflow-y-auto scrollbar-thin min-h-0">
             <div className="space-y-1.5 sm:space-y-2">
               {favorites.map((item) => (
                 <div

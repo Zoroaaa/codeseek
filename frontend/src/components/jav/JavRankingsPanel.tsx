@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { TrendingUp, Sparkles, Star, RefreshCw, Loader2, AlertCircle, Clock, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import {
+  TrendingUp, Sparkles, Star, RefreshCw, Loader2, AlertCircle,
+  Clock, ChevronDown, ChevronRight, Search, Award, Eye, Tag,
+} from 'lucide-react';
 import { useJavRankings } from '@/hooks/useJavRankings';
-import type { JavItem } from '@/types/jav';
+import type { JavItem, GenreRanking } from '@/types/jav';
 
 interface JavRankingsPanelProps {
   onCodeClick: (code: string) => void;
 }
 
-// 格式化缓存时间
 function formatAge(ms: number | null): string {
   if (ms === null) return '';
   const sec = Math.floor(ms / 1000);
@@ -17,7 +19,6 @@ function formatAge(ms: number | null): string {
   return `${Math.floor(min / 60)}小时前`;
 }
 
-// 番号 Badge 颜色
 function getCodeColor(index: number): string {
   const colors = [
     'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border-rose-200 dark:border-rose-800',
@@ -33,9 +34,10 @@ interface TabListProps {
   items: JavItem[];
   onCodeClick: (code: string) => void;
   emptyText: string;
+  cols?: 3 | 4;
 }
 
-const TabList: React.FC<TabListProps> = ({ items, onCodeClick, emptyText }) => {
+const TabList: React.FC<TabListProps> = ({ items, onCodeClick, emptyText, cols = 4 }) => {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-surface-400">
@@ -44,9 +46,11 @@ const TabList: React.FC<TabListProps> = ({ items, onCodeClick, emptyText }) => {
       </div>
     );
   }
-
+  const gridClass = cols === 3
+    ? 'grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2'
+    : 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2';
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2">
+    <div className={gridClass}>
       {items.slice(0, 24).map((item, i) => (
         <button
           key={`${item.code}-${i}`}
@@ -62,59 +66,107 @@ const TabList: React.FC<TabListProps> = ({ items, onCodeClick, emptyText }) => {
   );
 };
 
-type TabId = 'popular' | 'newRelease' | 'mostWanted';
+interface GenreTabsProps {
+  genres: GenreRanking[];
+  onCodeClick: (code: string) => void;
+}
 
-interface Tab {
-  id: TabId;
+const GenreTabs: React.FC<GenreTabsProps> = ({ genres, onCodeClick }) => {
+  const [activeGenre, setActiveGenre] = useState<string>(genres[0]?.key ?? '');
+
+  if (genres.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-surface-400">
+        <Tag className="w-8 h-8 mb-2 opacity-40" />
+        <p className="text-xs">类别数据加载中...</p>
+      </div>
+    );
+  }
+
+  const current = genres.find(g => g.key === activeGenre) ?? genres[0];
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1 mb-3">
+        {genres.map(g => (
+          <button
+            key={g.key}
+            onClick={() => setActiveGenre(g.key)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+              activeGenre === g.key
+                ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                : 'text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+            }`}
+          >
+            {g.genre}
+            <span className="ml-1 opacity-60 text-[10px]">{g.items.length}</span>
+          </button>
+        ))}
+      </div>
+      <TabList items={current.items} onCodeClick={onCodeClick} emptyText="该类别暂无数据" cols={3} />
+    </div>
+  );
+};
+
+type MainTabId = 'popular' | 'newRelease' | 'mostWanted' | 'topRated' | 'uncensored' | 'genres';
+
+interface MainTab {
+  id: MainTabId;
   label: string;
+  shortLabel: string;
   icon: React.ElementType;
   color: string;
   bgColor: string;
 }
 
-const TABS: Tab[] = [
-  { id: 'popular', label: '近期热门', icon: TrendingUp, color: 'text-rose-600 dark:text-rose-400', bgColor: 'bg-rose-100 dark:bg-rose-900/30' },
-  { id: 'newRelease', label: '最新发行', icon: Sparkles, color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-100 dark:bg-blue-900/30' },
-  { id: 'mostWanted', label: '最受期待', icon: Star, color: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-100 dark:bg-amber-900/30' },
+const MAIN_TABS: MainTab[] = [
+  { id: 'popular',    label: '近期热门', shortLabel: '热门', icon: TrendingUp, color: 'text-rose-600 dark:text-rose-400',    bgColor: 'bg-rose-100 dark:bg-rose-900/30' },
+  { id: 'newRelease', label: '最新发行', shortLabel: '新作', icon: Sparkles,   color: 'text-blue-600 dark:text-blue-400',    bgColor: 'bg-blue-100 dark:bg-blue-900/30' },
+  { id: 'mostWanted', label: '最多收藏', shortLabel: '收藏', icon: Star,        color: 'text-amber-600 dark:text-amber-400',  bgColor: 'bg-amber-100 dark:bg-amber-900/30' },
+  { id: 'topRated',   label: '高分佳作', shortLabel: '高分', icon: Award,       color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30' },
+  { id: 'uncensored', label: '无码精选', shortLabel: '无码', icon: Eye,         color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-100 dark:bg-purple-900/30' },
+  { id: 'genres',     label: '按类别',   shortLabel: '类别', icon: Tag,         color: 'text-violet-600 dark:text-violet-400', bgColor: 'bg-violet-100 dark:bg-violet-900/30' },
 ];
 
 export const JavRankingsPanel: React.FC<JavRankingsPanelProps> = ({ onCodeClick }) => {
   const { data, isLoading, error, fromCache, cacheAge, refresh } = useJavRankings();
-  const [activeTab, setActiveTab] = useState<TabId>('popular');
+  const [activeTab, setActiveTab] = useState<MainTabId>('popular');
   const [expanded, setExpanded] = useState(true);
 
-  const activeTabConfig = TABS.find(t => t.id === activeTab)!;
-  const activeItems = data ? data[activeTab] : [];
+  const activeTabConfig = MAIN_TABS.find(t => t.id === activeTab)!;
+
+  const activeCount = (() => {
+    if (!data) return 0;
+    if (activeTab === 'genres') return data.genres.reduce((s, g) => s + g.items.length, 0);
+    return (data[activeTab] as JavItem[])?.length ?? 0;
+  })();
 
   return (
     <div className="collapsible-section animate-fade-in" style={{ animationDelay: '80ms' }}>
-      {/* Header */}
       <button onClick={() => setExpanded(!expanded)} className="collapsible-header">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg ${activeTabConfig.bgColor} flex items-center justify-center`}>
             <TrendingUp className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTabConfig.color}`} />
           </div>
           <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base">JAV 榜单</span>
-          {data && (
+          {data && activeCount > 0 && (
             <span className="px-2 py-0.5 text-xs font-semibold bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-full">
-              {activeItems.length}
+              {activeCount}
             </span>
           )}
           {data?.sources && data.sources.length > 0 && (
             <span className="hidden sm:flex items-center gap-1 text-[10px] text-surface-400 dark:text-surface-500">
-              来源: {data.sources.join(' · ')}
+              {data.sources.join(' · ')}
             </span>
           )}
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* 缓存状态 */}
           {fromCache && cacheAge !== null && (
             <span className="hidden sm:flex items-center gap-1 text-[10px] text-surface-400 dark:text-surface-500 shrink-0">
               <Clock className="w-3 h-3" />
               {formatAge(cacheAge)}
             </span>
           )}
-          {/* 刷新按钮 */}
           <button
             onClick={(e) => { e.stopPropagation(); refresh(); }}
             disabled={isLoading}
@@ -123,31 +175,33 @@ export const JavRankingsPanel: React.FC<JavRankingsPanelProps> = ({ onCodeClick 
           >
             <RefreshCw className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
-          {expanded ? <ChevronDown className="w-4 h-4 text-surface-400" /> : <ChevronRight className="w-4 h-4 text-surface-400" />}
+          {expanded
+            ? <ChevronDown className="w-4 h-4 text-surface-400" />
+            : <ChevronRight className="w-4 h-4 text-surface-400" />}
         </div>
       </button>
 
       {expanded && (
         <div className="collapsible-content">
-          {/* Tab 切换 */}
+          {/* 主 Tab 切换 */}
           <div className="px-3 sm:px-4 pt-3 pb-2 border-b border-surface-100 dark:border-surface-800">
-            <div className="flex gap-1">
-              {TABS.map(tab => {
+            <div className="flex gap-1 flex-wrap">
+              {MAIN_TABS.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       isActive
                         ? `${tab.bgColor} ${tab.color}`
                         : 'text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
                     }`}
                   >
-                    <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                    <span className="hidden xs:inline">{tab.label}</span>
-                    <span className="xs:hidden">{tab.label.slice(0, 2)}</span>
+                    <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="sm:hidden">{tab.shortLabel}</span>
                   </button>
                 );
               })}
@@ -165,24 +219,23 @@ export const JavRankingsPanel: React.FC<JavRankingsPanelProps> = ({ onCodeClick 
               <div className="flex flex-col items-center justify-center py-6 gap-2 text-surface-400">
                 <AlertCircle className="w-6 h-6 text-error-400" />
                 <p className="text-xs text-error-500">{error}</p>
-                <button
-                  onClick={refresh}
-                  className="text-xs text-primary-500 hover:text-primary-600 underline"
-                >
+                <button onClick={refresh} className="text-xs text-primary-500 hover:text-primary-600 underline">
                   点击重试
                 </button>
               </div>
+            ) : activeTab === 'genres' ? (
+              <GenreTabs genres={data?.genres ?? []} onCodeClick={onCodeClick} />
             ) : (
               <TabList
-                items={activeItems}
+                items={(data?.[activeTab] as JavItem[]) ?? []}
                 onCodeClick={onCodeClick}
                 emptyText="暂无数据，点击右上角刷新按钮重试"
               />
             )}
           </div>
 
-          {/* 搜索建议提示 */}
-          {data && data.suggestions.length > 0 && !isLoading && !error && (
+          {/* 底部提示 */}
+          {data && !isLoading && !error && (
             <div className="px-3 sm:px-4 py-2.5 border-t border-surface-50 dark:border-surface-800/60">
               <p className="text-[10px] text-surface-400 dark:text-surface-500">
                 💡 点击番号可快速填入搜索框

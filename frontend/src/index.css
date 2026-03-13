@@ -248,11 +248,14 @@
 
   /* --- Collapsible --- */
   .collapsible-section {
-    @apply rounded-2xl overflow-hidden;
+    @apply rounded-2xl;
     background: white;
     border: 1px solid rgba(226,232,240,0.7);
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     transition: all 0.3s var(--ease-smooth);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
   .dark .collapsible-section {
     background: rgba(15,23,42,0.7);

@@ -22,12 +22,21 @@ interface JavItem {
 }
 
 interface RankingsResponse {
-  popular: JavItem[];      // 近期热门
+  popular: JavItem[];      // 近期热门（有码热门）
   newRelease: JavItem[];   // 最新发行
-  mostWanted: JavItem[];   // 最受期待 / 最多收藏
+  mostWanted: JavItem[];   // 最受期待 / 最多收藏（评分榜）
+  uncensored: JavItem[];   // 无码精选
+  topRated: JavItem[];     // 高分佳作（JavLibrary 评分榜）
+  genres: GenreRanking[];  // 类别榜
   suggestions: string[];   // 搜索建议词（番号列表）
   fetchedAt: number;
   sources: string[];       // 实际成功的来源
+}
+
+interface GenreRanking {
+  genre: string;   // 类别名称，如 "巨乳"
+  key: string;     // 类别 key，如 "busty"
+  items: JavItem[];
 }
 
 // =====================================================================
@@ -351,6 +360,88 @@ function dedup(items: JavItem[]): JavItem[] {
 }
 
 // =====================================================================
+// Source 5: JavBus 无码 (uncensored) — /uncensored/
+// =====================================================================
+
+async function fetchJavBusUncensored(): Promise<JavItem[]> {
+  try {
+    const resp = await fetchWithTimeout('https://www.javbus.com/uncensored/star/2xi', {
+      headers: { ...BROWSER_HEADERS, 'Referer': 'https://www.javbus.com/uncensored/' },
+    });
+    if (!resp.ok) {
+      // fallback: 无码首页
+      const r2 = await fetchWithTimeout('https://www.javbus.com/uncensored/', {
+        headers: { ...BROWSER_HEADERS },
+      });
+      if (!r2.ok) return [];
+      return parseJavBusGrid(await r2.text(), 'javbus-u');
+    }
+    return parseJavBusGrid(await resp.text(), 'javbus-u');
+  } catch {
+    return [];
+  }
+}
+
+async function fetchJavBusUncensoredNew(): Promise<JavItem[]> {
+  try {
+    const resp = await fetchWithTimeout('https://www.javbus.com/uncensored/', {
+      headers: { ...BROWSER_HEADERS, 'Referer': 'https://www.javbus.com/' },
+    });
+    if (!resp.ok) return [];
+    return parseJavBusGrid(await resp.text(), 'javbus-u');
+  } catch {
+    return [];
+  }
+}
+
+// =====================================================================
+// Source 6: JavLibrary 评分榜 /vl_bestrated.php
+// =====================================================================
+
+async function fetchJavLibraryTopRated(): Promise<JavItem[]> {
+  return fetchJavLibrary('/vl_bestrated.php?&mode=&page=&v=&venus=');
+}
+
+// =====================================================================
+// Source 7: JavBus 类别榜
+// 抓取指定类别标签页，每类取前 12 条
+// =====================================================================
+
+// JavBus 类别 genre 对应路径
+const GENRE_PATHS: Array<{ key: string; genre: string; path: string }> = [
+  { key: 'busty',     genre: '巨乳',   path: '/genre/rq' },
+  { key: 'nurse',     genre: '护士',   path: '/genre/we' },
+  { key: 'student',   genre: '女学生', path: '/genre/dp' },
+  { key: 'incest',    genre: '近亲',   path: '/genre/sm' },
+  { key: 'cosplay',   genre: '角色扮演', path: '/genre/2e' },
+  { key: 'office',    genre: 'OL',     path: '/genre/do' },
+];
+
+async function fetchJavBusGenre(path: string, source: string): Promise<JavItem[]> {
+  try {
+    const resp = await fetchWithTimeout(`https://www.javbus.com${path}`, {
+      headers: { ...BROWSER_HEADERS, 'Referer': 'https://www.javbus.com/' },
+    });
+    if (!resp.ok) return [];
+    return parseJavBusGrid(await resp.text(), source);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchAllGenres(): Promise<Array<{ genre: string; key: string; items: JavItem[] }>> {
+  // 并发但限制 6 个，避免超时
+  const results = await Promise.allSettled(
+    GENRE_PATHS.map(g => fetchJavBusGenre(g.path, `javbus-${g.key}`))
+  );
+  return GENRE_PATHS.map((g, i) => ({
+    genre: g.genre,
+    key: g.key,
+    items: (results[i].status === 'fulfilled' ? results[i].value : []).slice(0, 12),
+  })).filter(g => g.items.length > 0);
+}
+
+// =====================================================================
 // 主路由：GET /api/jav/rankings
 // =====================================================================
 
@@ -359,21 +450,32 @@ javRoutes.get('/rankings', async (c) => {
   void force; // 缓存由前端 localStorage 控制，Worker 不做服务端缓存
 
   try {
-    // 并发抓取所有源
-    const [javbusNew, javbusTrend, javlibWanted, javlibNew, dmmNew, dmmRanking, mgsRanking] =
-      await Promise.allSettled([
-        fetchJavBusNew(),
-        fetchJavBusTrending(),
-        fetchJavLibrary('/vl_mostwanted.php'),
-        fetchJavLibrary('/vl_newrelease.php'),
-        fetchDMMNew(),
-        fetchDMMRanking(),
-        fetchMGSRanking(),
-      ]);
+    // 并发抓取所有源（含新增维度）
+    const [
+      javbusNew, javbusTrend,
+      javlibWanted, javlibNew, javlibTopRated,
+      dmmNew, dmmRanking,
+      mgsRanking,
+      javbusUncensored, javbusUncensoredNew,
+      genreResults,
+    ] = await Promise.allSettled([
+      fetchJavBusNew(),
+      fetchJavBusTrending(),
+      fetchJavLibrary('/vl_mostwanted.php'),
+      fetchJavLibrary('/vl_newrelease.php'),
+      fetchJavLibraryTopRated(),
+      fetchDMMNew(),
+      fetchDMMRanking(),
+      fetchMGSRanking(),
+      fetchJavBusUncensored(),
+      fetchJavBusUncensoredNew(),
+      fetchAllGenres(),
+    ]);
 
     const get = <T>(r: PromiseSettledResult<T>, fallback: T): T =>
       r.status === 'fulfilled' ? r.value : fallback;
 
+    // 近期热门：有码热门（JavBus 热门 + JavLibrary 最多收藏 + DMM 销售榜 + MGS）
     const popular = dedup([
       ...get(javbusTrend, []),
       ...get(javlibWanted, []),
@@ -381,20 +483,36 @@ javRoutes.get('/rankings', async (c) => {
       ...get(mgsRanking, []),
     ]).slice(0, 24);
 
+    // 最新发行：按时间维度，来源互补去重
     const newRelease = dedup([
       ...get(javbusNew, []),
       ...get(javlibNew, []),
       ...get(dmmNew, []),
     ]).slice(0, 24);
 
+    // 最受期待：专用 JavLibrary mostwanted + DMM 热卖，与 popular 来源不同权重
     const mostWanted = dedup([
       ...get(javlibWanted, []),
       ...get(dmmRanking, []),
-      ...get(javbusTrend, []),
     ]).slice(0, 24);
 
-    // 搜索建议：从热门中提取番号
-    const suggestions = dedup([...popular, ...mostWanted])
+    // 高分佳作：JavLibrary 评分榜为主，补充 DMM 榜
+    const topRated = dedup([
+      ...get(javlibTopRated, []),
+      ...get(dmmRanking, []),
+    ]).slice(0, 24);
+
+    // 无码精选：无码热门 + 无码新作
+    const uncensored = dedup([
+      ...get(javbusUncensored, []),
+      ...get(javbusUncensoredNew, []),
+    ]).slice(0, 24);
+
+    // 类别榜
+    const genres = get(genreResults, []);
+
+    // 搜索建议：从热门 + 高分 + 无码中提取番号
+    const suggestions = dedup([...popular, ...topRated, ...uncensored])
       .map(i => i.code)
       .filter(isValidCode)
       .slice(0, 30);
@@ -405,11 +523,15 @@ javRoutes.get('/rankings', async (c) => {
     if (get(javlibWanted, []).length > 0 || get(javlibNew, []).length > 0) sources.push('JavLibrary');
     if (get(dmmNew, []).length > 0 || get(dmmRanking, []).length > 0) sources.push('DMM');
     if (get(mgsRanking, []).length > 0) sources.push('MGStage');
+    if (get(javbusUncensored, []).length > 0) sources.push('JavBus(无码)');
 
     const response: RankingsResponse = {
       popular,
       newRelease,
       mostWanted,
+      topRated,
+      uncensored,
+      genres,
       suggestions,
       fetchedAt: Date.now(),
       sources,
