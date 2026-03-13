@@ -4,8 +4,11 @@
  */
 import { Hono } from 'hono';
 import { Env } from '@/types';
+import { authMiddleware } from '@/middleware';
 
 export const javRoutes = new Hono<{ Bindings: Env }>();
+
+javRoutes.use('/torrent/*', authMiddleware);
 
 // ─────────────────────────────────────────────
 // 类型
@@ -528,3 +531,70 @@ javRoutes.get('/detail', async (c) => {
     return c.json({ success: false, error: { code: 'FETCH_ERROR', message: '获取详情失败' } }, 500);
   }
 });
+
+// =====================================================================
+// 真实种子文件代理下载
+// GET /api/jav/torrent/:hash
+// 从 itorrents.org 获取真实 .torrent 文件并代理返回
+// =====================================================================
+
+javRoutes.get('/torrent/:hash', async (c) => {
+  const raw = c.req.param('hash').trim();
+  // 支持 40位hex 或 32位base32
+  const isHex = /^[a-fA-F0-9]{40}$/.test(raw);
+  const isBase32 = /^[a-zA-Z2-7]{32}$/.test(raw);
+  if (!isHex && !isBase32) {
+    return c.json({ success: false, error: { code: 'INVALID_HASH', message: '无效的 info hash' } }, 400);
+  }
+
+  // 统一转为大写hex
+  const hash = isHex ? raw.toUpperCase() : base32ToHexPublic(raw).toUpperCase();
+
+  // itorrents.org 是目前最稳定的公共种子缓存服务
+  const sources = [
+    `https://itorrents.org/torrent/${hash}.torrent`,
+    `https://torrage.info/torrent.php?h=${hash}`,
+  ];
+
+  for (const url of sources) {
+    try {
+      const resp = await fetch(url, {
+        headers: { 'User-Agent': HEADERS['User-Agent'] },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!resp.ok) continue;
+      const ct = resp.headers.get('content-type') ?? '';
+      // 确认拿到的是种子，不是HTML错误页
+      if (!ct.includes('bittorrent') && !ct.includes('octet-stream')) continue;
+
+      const data = await resp.arrayBuffer();
+      return new Response(data, {
+        headers: {
+          'Content-Type': 'application/x-bittorrent',
+          'Content-Disposition': `attachment; filename="${hash}.torrent"`,
+          'Cache-Control': 'public, max-age=86400',
+        },
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return c.json({ success: false, error: { code: 'NOT_FOUND', message: '未找到该种子文件，请改用磁力链接' } }, 404);
+});
+
+// base32→hex（供路由内部使用）
+function base32ToHexPublic(base32: string): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const char of base32.toUpperCase()) {
+    const val = alphabet.indexOf(char);
+    if (val === -1) continue;
+    bits += val.toString(2).padStart(5, '0');
+  }
+  let hex = '';
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    hex += parseInt(bits.slice(i, i + 8), 2).toString(16).padStart(2, '0');
+  }
+  return hex;
+}

@@ -2,7 +2,7 @@
 // magnet.ts  —  磁力链接工具集
 // ─────────────────────────────────────────────────────────────────
 
-
+import { apiClient } from '@/services/api/client';
 
 export interface ParsedMagnet {
   infoHash: string;    // 40位小写hex
@@ -75,7 +75,12 @@ export async function downloadTorrentFile(
   const backendUrl = `${apiBase}/jav/torrent/${hash}`;
 
   try {
-    const resp = await fetch(backendUrl, { credentials: 'include' });
+    const token = apiClient.getToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const resp = await fetch(backendUrl, { credentials: 'include', headers });
     if (resp.ok) {
       const blob = await resp.blob();
       triggerDownload(blob, name + '.torrent');
