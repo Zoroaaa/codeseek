@@ -238,9 +238,9 @@ export const RegisterPage: React.FC = () => {
         />
         <span className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
           我已阅读并同意{' '}
-          <a href="#" className="text-blue-600 dark:text-blue-400 hover:underline">服务条款</a>
+          <Link to="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">服务条款</Link>
           {' '}和{' '}
-          <a href="#" className="text-blue-600 dark:text-blue-400 hover:underline">隐私政策</a>
+          <Link to="/privacy" className="text-blue-600 dark:text-blue-400 hover:underline">隐私政策</Link>
         </span>
       </label>
 

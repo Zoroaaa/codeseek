@@ -407,6 +407,12 @@
     @apply dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800;
     @apply active:scale-95;
   }
+  .help-btn {
+    @apply p-2 rounded-xl transition-all duration-200;
+    @apply text-slate-500 hover:text-slate-700 hover:bg-slate-100/80;
+    @apply dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800;
+    @apply active:scale-95;
+  }
 
   /* --- Misc --- */
   .section-title {

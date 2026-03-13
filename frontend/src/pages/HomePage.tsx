@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Search,
   Sparkles,
@@ -17,9 +17,10 @@ import {
   Settings,
   ArrowRight,
   Github,
+  HelpCircle,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
-import { Button } from '@/components/ui';
+import { Button, Modal } from '@/components/ui';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppInfo, useFeatureFlags } from '@/contexts/ConfigContext';
 
@@ -30,6 +31,7 @@ export const HomePage: React.FC = () => {
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy, initializeProxy } = useProxyStore();
   const appInfo = useAppInfo();
   const { enableRegistration } = useFeatureFlags();
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   useEffect(() => {
     initializeProxy();
@@ -116,6 +118,15 @@ export const HomePage: React.FC = () => {
 
             {/* Actions */}
             <div className="flex items-center gap-1 sm:gap-1.5">
+              {/* Help button */}
+              <button
+                onClick={() => setIsHelpModalOpen(true)}
+                className="help-btn"
+                title="使用说明"
+              >
+                <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
               {/* Proxy toggle */}
               <button
                 onClick={toggleProxy}
@@ -381,6 +392,29 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Help Modal */}
+      <Modal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+        title="使用说明"
+      >
+        <div className="text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed">
+          <p className="mb-4">
+            CodeSeek是一个高效的磁力搜索工具，帮助您快速找到所需资源。
+          </p>
+          <p className="mb-4">
+            使用步骤：
+          </p>
+          <ol className="list-decimal pl-5 mb-4 space-y-2">
+            <li>注册或登录账号</li>
+            <li>在搜索框输入关键词，例如：SONE-520 MIMK-186</li>
+            <li>选择合适的搜索源</li>
+            <li>点击搜索按钮开始查找</li>
+            <li>收藏和管理找到的资源</li>
+          </ol>
+        </div>
+      </Modal>
 
     </div>
   );

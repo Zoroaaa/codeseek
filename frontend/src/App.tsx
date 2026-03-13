@@ -11,6 +11,8 @@ import { ToastContainer } from '@/components/ui/Toast';
 import { useFeatureFlags } from '@/contexts/ConfigContext';
 import { HomePage } from '@/pages/HomePage';
 import { MainSearchPage } from '@/pages/MainSearchPage';
+import { TermsPage } from '@/pages/TermsPage';
+import { PrivacyPage } from '@/pages/PrivacyPage';
 import { DashboardPage, UserActivitiesPage } from '@/pages/dashboard';
 import { AdminManager, AdminPanelOverview } from '@/pages/admin';
 import { CommunityManager } from '@/pages/community';
@@ -183,6 +185,8 @@ const App: React.FC = () => {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<AuthRedirect><HomePage /></AuthRedirect>} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
         </Route>
         <Route path="/login" element={<AuthRedirect><LoginPage /></AuthRedirect>} />
         <Route path="/register" element={<AuthRedirect><RegisterPage /></AuthRedirect>} />
