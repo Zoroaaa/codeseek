@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Shield, FileText, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Shield, FileText } from 'lucide-react';
 import { useAppInfo } from '@/contexts/ConfigContext';
 
 export const TermsPage: React.FC = () => {

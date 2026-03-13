@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Shield, Lock, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Shield, Lock } from 'lucide-react';
 import { useAppInfo } from '@/contexts/ConfigContext';
 
 export const PrivacyPage: React.FC = () => {
