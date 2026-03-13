@@ -583,17 +583,19 @@ export const MainSearchPage: React.FC = () => {
 
           </div>
 
-          <div className="hidden lg:flex flex-col min-h-0">
+          <div className="hidden lg:block overflow-hidden">
             {isAuthenticated && (
-              <FavoritesPanel
-                favorites={favorites}
-                isLoading={isLoadingFavorites}
-                show={showFavorites}
-                isProxyEnabled={isProxyEnabled}
-                onToggle={() => setShowFavorites(!showFavorites)}
-                onRemove={handleRemoveFavorite}
-                onExport={handleExportFavorites}
-              />
+              <div className="h-full flex flex-col overflow-hidden">
+                <FavoritesPanel
+                  favorites={favorites}
+                  isLoading={isLoadingFavorites}
+                  show={showFavorites}
+                  isProxyEnabled={isProxyEnabled}
+                  onToggle={() => setShowFavorites(!showFavorites)}
+                  onRemove={handleRemoveFavorite}
+                  onExport={handleExportFavorites}
+                />
+              </div>
             )}
           </div>
 
