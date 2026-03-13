@@ -389,7 +389,7 @@ export const MainSearchPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-surface-50 via-white to-primary-50/20 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950/20">
+    <div className="min-h-screen page-bg">
 
       <header className="mobile-header">
         <div className="max-w-7xl mx-auto">
@@ -487,16 +487,17 @@ export const MainSearchPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
 
         <div className="mb-4 sm:mb-6 animate-fade-in">
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-surface-900 dark:text-surface-100">
+          <h1 className="text-lg sm:text-xl lg:text-2xl text-heading">
             嗨，<span className="bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
               {isAuthenticated ? user?.username : '访客'}
             </span> 👋
           </h1>
-          <p className="text-xs sm:text-sm text-surface-500 dark:text-surface-400 mt-0.5">搜索全网资源，一步直达</p>
+          <p className="text-xs sm:text-sm text-caption mt-0.5">搜索全网资源，一步直达</p>
         </div>
 
-        <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-xl shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 p-3 sm:p-5 mb-4 sm:mb-6 backdrop-blur-sm animate-slide-up">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+        <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-xl shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 p-3 sm:p-5 mb-4 sm:mb-6 backdrop-blur-sm animate-slide-up relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-accent-500 to-cyan-500"></div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 relative z-10">
             <div className="search-input-wrapper">
               <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none">
                 <Search className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -513,7 +514,7 @@ export const MainSearchPage: React.FC = () => {
             <button
               onClick={handleSearch}
               disabled={isSearching}
-              className="search-btn flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="search-btn flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover-lift"
             >
               {isSearching
                 ? <Loader2 className="w-4 h-4 animate-spin" />
