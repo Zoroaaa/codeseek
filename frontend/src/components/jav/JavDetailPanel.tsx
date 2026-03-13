@@ -3,7 +3,7 @@ import {
   Magnet, Film, Calendar, Clock, User, Building2,
   Tag, Star, ExternalLink, Copy, Check, Loader2,
   AlertCircle, Search, ChevronDown, ChevronUp, X,
-  Download, Shield,
+  Shield,
 } from 'lucide-react';
 import type { JavDetail, MagnetItem } from '@/types/jav';
 
