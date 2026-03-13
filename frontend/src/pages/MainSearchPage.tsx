@@ -566,7 +566,7 @@ export const MainSearchPage: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
-          <div className="lg:col-span-2 space-y-3 sm:space-y-4">
+          <div className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
 
             <JavRankingsPanel onCodeClick={handleCodeClick} />
 
