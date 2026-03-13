@@ -44,6 +44,7 @@ coverage/
 
 # Old code backup
 codeseek-v1.0/
+.trae/
 
 # Frontend specific
 frontend/dist/
