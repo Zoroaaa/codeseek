@@ -15,6 +15,7 @@ import { systemRoutes } from './routes/system';
 import { searchRoutes } from './routes/search';
 import { adminRoutes } from './routes/admin';
 import { configRoutes } from './routes/config';
+import { javRoutes } from './routes/jav';
 import { CONFIG } from './constants';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -51,6 +52,7 @@ app.route('/api/search-sources', sourceRoutes);
 app.route('/api/community', communityRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/config', configRoutes);
+app.route('/api/jav', javRoutes);
 app.route('/api', systemRoutes);
 
 app.notFound((c) => {
