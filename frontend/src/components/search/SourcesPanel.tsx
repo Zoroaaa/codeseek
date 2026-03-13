@@ -186,7 +186,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
                         {isCategoryExpanded && (
                           <div className="px-3 sm:px-4 pb-2 sm:pb-3 pl-10 sm:pl-16">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 sm:gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2">
                               {category.sources.map((source) => {
                                 const isEnabled = source.userConfig?.isEnabled !== false;
                                 const sourceName = source.userConfig?.customName || source.name;

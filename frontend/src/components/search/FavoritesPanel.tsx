@@ -49,7 +49,7 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
           <div className="p-6 sm:p-8 flex justify-center"><Loading /></div>
         ) : favorites.length > 0 ? (
           <div className="p-3 sm:p-4 max-h-52 sm:max-h-64 overflow-y-auto scrollbar-thin">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 sm:gap-2">
+            <div className="space-y-1.5 sm:space-y-2">
               {favorites.map((item) => (
                 <div
                   key={item.id}
