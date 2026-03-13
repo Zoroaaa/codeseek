@@ -3,7 +3,6 @@ export type { NotificationTemplate, NotificationCategory, NotificationAction } f
 
 export {
   parseMagnet,
-  generateTorrentFile,
   downloadTorrentFile,
   openMagnetClient,
   copyToClipboard,

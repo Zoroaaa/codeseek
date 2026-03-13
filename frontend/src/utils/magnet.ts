@@ -1,31 +1,40 @@
-interface ParsedMagnet {
-  infoHash: string;
+// ─────────────────────────────────────────────────────────────────
+// magnet.ts  —  磁力链接工具集
+// ─────────────────────────────────────────────────────────────────
+
+
+
+export interface ParsedMagnet {
+  infoHash: string;    // 40位小写hex
   name: string;
-  trackers: string[];
   dn: string;
+  trackers: string[];
 }
 
+// ── 解析 ─────────────────────────────────────────────────────────
+
 export function parseMagnet(magnetUri: string): ParsedMagnet | null {
-  if (!magnetUri.startsWith('magnet:')) return null;
+  if (!magnetUri || !magnetUri.startsWith('magnet:')) return null;
+  try {
+    const url = new URL(magnetUri);
+    const params = new URLSearchParams(url.search.slice(1));
 
-  const url = new URL(magnetUri);
-  const params = new URLSearchParams(url.search.slice(1));
+    const xt = params.get('xt') ?? '';
+    const m = xt.match(/urn:btih:([a-fA-F0-9]{40}|[a-zA-Z2-7]{32})/i);
+    if (!m) return null;
 
-  const xt = params.get('xt') || '';
-  const infoHashMatch = xt.match(/urn:btih:([a-fA-F0-9]{40}|[a-zA-Z2-7]{32})/);
-  if (!infoHashMatch) return null;
+    let infoHash = m[1];
+    if (infoHash.length === 32) infoHash = base32ToHex(infoHash);
 
-  let infoHash = infoHashMatch[1];
-  if (infoHash.length === 32) {
-    infoHash = base32ToHex(infoHash);
+    return {
+      infoHash: infoHash.toLowerCase(),
+      name: params.get('dn') ?? '',
+      dn: params.get('dn') ?? '',
+      trackers: params.getAll('tr'),
+    };
+  } catch {
+    return null;
   }
-
-  return {
-    infoHash: infoHash.toLowerCase(),
-    name: params.get('dn') || '',
-    dn: params.get('dn') || '',
-    trackers: params.getAll('tr'),
-  };
 }
 
 function base32ToHex(base32: string): string {
@@ -43,129 +52,107 @@ function base32ToHex(base32: string): string {
   return hex;
 }
 
-export async function generateTorrentFile(
+// ── 下载种子文件 ─────────────────────────────────────────────────
+// 优先走后端代理获取真实 .torrent（含 pieces，BT 客户端可正确识别）
+// 后端 404 时降级为直接下载 itorrents.org（前端同源限制可能失败，仅兜底）
+
+export async function downloadTorrentFile(
   magnetUri: string,
-  options: { announce?: string; comment?: string } = {}
-): Promise<Blob | null> {
+  filename?: string,
+): Promise<void> {
   const parsed = parseMagnet(magnetUri);
-  if (!parsed) return null;
+  if (!parsed) return;
 
-  const trackers = options.announce
-    ? [options.announce, ...parsed.trackers]
-    : parsed.trackers;
+  const hash = parsed.infoHash.toUpperCase();
+  const name = (filename || parsed.name || hash).replace(/[/\\?%*:|"<>]/g, '_');
 
-  const torrent: Record<string, unknown> = {
-    info: {
-      name: parsed.name || parsed.infoHash.toUpperCase(),
-      'piece length': 16384,
-      pieces: '',
-    },
-  };
+  // 1. 优先：后端代理
+  // 动态获取API地址（与 services/api/client.ts 逻辑保持一致）
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const apiBase = (hostname === 'localhost' || hostname === '127.0.0.1')
+    ? '/api'
+    : 'https://backend.codeseek.pp.ua/api';
+  const backendUrl = `${apiBase}/jav/torrent/${hash}`;
 
-  if (trackers.length > 0) {
-    if (trackers.length === 1) {
-      torrent.announce = trackers[0];
-    } else {
-      torrent['announce-list'] = trackers.map((t) => [t]);
+  try {
+    const resp = await fetch(backendUrl, { credentials: 'include' });
+    if (resp.ok) {
+      const blob = await resp.blob();
+      triggerDownload(blob, name + '.torrent');
+      return;
+    }
+  } catch {
+    // 后端失败，继续走 fallback
+  }
+
+  // 2. Fallback：itorrents.org 直链（跨域，部分浏览器会被 CORS 拦）
+  const directUrl = `https://itorrents.org/torrent/${hash}.torrent`;
+  const a = document.createElement('a');
+  a.href = directUrl;
+  a.download = name + '.torrent';
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// ── 复制到剪贴板 ─────────────────────────────────────────────────
+
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // 兜底：execCommand（已废弃但兼容旧浏览器）
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
     }
   }
-
-  if (options.comment) {
-    torrent.comment = options.comment;
-  }
-
-  torrent['creation date'] = Math.floor(Date.now() / 1000);
-  torrent['created by'] = 'CodeSeek v2.0';
-
-  const encoded = bencodeEncode(torrent);
-  const buffer = new ArrayBuffer(encoded.length);
-  new Uint8Array(buffer).set(encoded);
-  return new Blob([buffer], { type: 'application/x-bittorrent' });
 }
 
-function bencodeEncode(data: unknown): Uint8Array {
-  const encoder = new TextEncoder();
-  const chunks: Uint8Array[] = [];
-
-  function encode(val: unknown): void {
-    if (typeof val === 'string') {
-      const bytes = encoder.encode(val);
-      chunks.push(encoder.encode(bytes.length + ':'));
-      chunks.push(bytes);
-    } else if (typeof val === 'number') {
-      chunks.push(encoder.encode('i' + val + 'e'));
-    } else if (Array.isArray(val)) {
-      chunks.push(encoder.encode('l'));
-      for (const item of val) encode(item);
-      chunks.push(encoder.encode('e'));
-    } else if (val instanceof Uint8Array) {
-      chunks.push(encoder.encode(val.length + ':'));
-      chunks.push(val);
-    } else if (typeof val === 'object' && val !== null) {
-      chunks.push(encoder.encode('d'));
-      const keys = Object.keys(val).sort();
-      for (const key of keys) {
-        encode(key);
-        encode((val as Record<string, unknown>)[key]);
-      }
-      chunks.push(encoder.encode('e'));
-    }
-  }
-
-  encode(data);
-
-  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return result;
-}
-
-export function downloadTorrentFile(magnetUri: string, filename?: string): boolean {
-  const parsed = parseMagnet(magnetUri);
-  if (!parsed) return false;
-
-  generateTorrentFile(magnetUri).then((blob) => {
-    if (!blob) return;
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (filename || parsed.name || parsed.infoHash) + '.torrent';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  });
-
-  return true;
-}
+// ── 唤起本地 BT 客户端 ───────────────────────────────────────────
 
 export function openMagnetClient(magnetUri: string): void {
   window.location.href = magnetUri;
 }
 
-export function copyToClipboard(text: string): Promise<boolean> {
-  return navigator.clipboard
-    .writeText(text)
-    .then(() => true)
-    .catch(() => false);
-}
+// ── 在线播放外链 ─────────────────────────────────────────────────
 
+/** webtor.io — 流媒体播放，需海外可访问 */
 export function getWebtorUrl(magnetUri: string): string {
-  const parsed = parseMagnet(magnetUri);
-  if (!parsed) return '';
-
-  return `https://webtor.io/show#${encodeURIComponent(magnetUri)}`;
+  if (!magnetUri?.startsWith('magnet:')) return '';
+  return `https://webtor.io/#/show?magnet=${encodeURIComponent(magnetUri)}`;
 }
 
+/** btorrent.xyz — WebTorrent 在线播放备用 */
 export function getBtorrentUrl(magnetUri: string): string {
+  if (!magnetUri?.startsWith('magnet:')) return '';
   return `https://btorrent.xyz/#${encodeURIComponent(magnetUri)}`;
 }
 
+/** 磁力短哈希（用于显示，不用于下载） */
 export function getMagnetShortHash(magnetUri: string): string {
   const parsed = parseMagnet(magnetUri);
   return parsed ? parsed.infoHash.substring(0, 8).toUpperCase() : 'UNKNOWN';

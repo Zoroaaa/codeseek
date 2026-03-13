@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Magnet, Film, Calendar, Clock, User, Building2,
   Tag, Star, ExternalLink, Copy, Check, Loader2,
   AlertCircle, Search, ChevronDown, ChevronUp, X,
-  Shield, Play, FileDown, Link2,
+  Shield, Play, FileDown, Link2, Tv,
 } from 'lucide-react';
 import type { JavDetail, MagnetItem } from '@/types';
-import { downloadTorrentFile, getWebtorUrl } from '@/utils/magnet';
+import {
+  downloadTorrentFile,
+  getWebtorUrl,
+  getBtorrentUrl,
+  copyToClipboard,
+} from '@/utils/magnet';
 import { WebTorrentPlayer } from './WebTorrentPlayer';
 
 interface JavDetailPanelProps {
@@ -15,19 +20,21 @@ interface JavDetailPanelProps {
   onClose: () => void;
 }
 
-// ── 工具 ───────────────────────────────────────────────────────────
+// ── 复制按钮（带反馈） ─────────────────────────────────────────────
 
 function CopyBtn({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
-    await navigator.clipboard.writeText(text).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
   return (
     <button
       onClick={copy}
-      title={label ?? '复制'}
+      title={label ?? '复制磁力链接'}
       className="p-1 rounded text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
     >
       {copied
@@ -36,6 +43,42 @@ function CopyBtn({ text, label }: { text: string; label?: string }) {
     </button>
   );
 }
+
+// ── 下载种子按钮（带 loading） ─────────────────────────────────────
+
+function DownloadBtn({ magnet, name }: { magnet: string; name: string }) {
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleClick = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await downloadTorrentFile(magnet, name);
+      setDone(true);
+      setTimeout(() => setDone(false), 2000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      title="下载种子文件"
+      className="p-1 rounded text-surface-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all disabled:opacity-60"
+    >
+      {loading
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+        : done
+        ? <Check className="w-3.5 h-3.5 text-emerald-500" />
+        : <FileDown className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
+// ── InfoRow ────────────────────────────────────────────────────────
 
 function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: string }) {
   if (!value) return null;
@@ -53,7 +96,24 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
 const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
   const [showAll, setShowAll] = useState(false);
   const [playingMagnet, setPlayingMagnet] = useState<string | null>(null);
+  // 在线播放菜单展开状态
+  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
+
   const displayed = showAll ? magnets : magnets.slice(0, 5);
+
+  const toggleMenu = useCallback((magnet: string) => {
+    setOpenMenuFor(prev => prev === magnet ? null : magnet);
+  }, []);
+
+  const startInlinePlay = useCallback((magnet: string) => {
+    setPlayingMagnet(prev => prev === magnet ? null : magnet);
+    setOpenMenuFor(null);
+  }, []);
+
+  const openExternal = useCallback((url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setOpenMenuFor(null);
+  }, []);
 
   if (magnets.length === 0) {
     return (
@@ -66,7 +126,8 @@ const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
 
   return (
     <div className="space-y-1.5">
-      <div className="grid grid-cols-[1fr_80px_88px_100px] gap-2 px-2 py-1 text-[10px] font-semibold text-surface-400 uppercase tracking-wide border-b border-surface-100 dark:border-surface-800">
+      {/* 表头 */}
+      <div className="grid grid-cols-[1fr_80px_88px_116px] gap-2 px-2 py-1 text-[10px] font-semibold text-surface-400 uppercase tracking-wide border-b border-surface-100 dark:border-surface-800">
         <span>磁力名称</span>
         <span className="text-right">大小</span>
         <span className="text-right">分享日期</span>
@@ -74,8 +135,9 @@ const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
       </div>
 
       {displayed.map((m, i) => (
-        <div key={i}>
-          <div className="grid grid-cols-[1fr_80px_88px_100px] gap-2 items-center px-2 py-2 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-all group">
+        <div key={i} className="relative">
+          <div className="grid grid-cols-[1fr_80px_88px_116px] gap-2 items-center px-2 py-2 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-all group">
+            {/* 名称（点击唤起 BT 客户端） */}
             <div className="flex items-center gap-1.5 min-w-0">
               {m.isHD && (
                 <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300 rounded">HD</span>
@@ -88,36 +150,83 @@ const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
                 {m.name}
               </a>
             </div>
+
             <span className="text-xs text-right text-surface-600 dark:text-surface-400 tabular-nums">{m.size}</span>
             <span className="text-xs text-right text-surface-400 tabular-nums">{m.date}</span>
-            <div className="flex justify-end gap-0.5">
-              <button
-                onClick={() => setPlayingMagnet(playingMagnet === m.magnet ? null : m.magnet)}
-                title="在线播放"
-                className="p-1 rounded text-surface-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-              >
-                <Play className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => downloadTorrentFile(m.magnet, m.name)}
-                title="下载种子文件"
-                className="p-1 rounded text-surface-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"
-              >
-                <FileDown className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => window.open(getWebtorUrl(m.magnet), '_blank')}
-                title="WebTor在线播放"
-                className="p-1 rounded text-surface-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
-              >
-                <Link2 className="w-3.5 h-3.5" />
-              </button>
-              <CopyBtn text={m.magnet} label="复制磁力链接" />
+
+            {/* 操作区 */}
+            <div className="flex justify-end items-center gap-0.5">
+              {/* 在线播放（下拉菜单） */}
+              <div className="relative">
+                <button
+                  onClick={() => toggleMenu(m.magnet)}
+                  title="在线播放"
+                  className={`p-1 rounded transition-all ${
+                    openMenuFor === m.magnet || playingMagnet === m.magnet
+                      ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                      : 'text-surface-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                  }`}
+                >
+                  <Play className="w-3.5 h-3.5" />
+                </button>
+
+                {/* 播放方式菜单 */}
+                {openMenuFor === m.magnet && (
+                  <div className="absolute right-0 top-7 z-20 w-44 bg-white dark:bg-surface-800 rounded-xl shadow-xl border border-surface-200 dark:border-surface-700 overflow-hidden">
+                    <div className="px-3 py-2 text-[10px] font-semibold text-surface-400 uppercase border-b border-surface-100 dark:border-surface-700">
+                      选择播放方式
+                    </div>
+                    <button
+                      onClick={() => startInlinePlay(m.magnet)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
+                    >
+                      <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                        <Play className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-medium">内嵌播放</div>
+                        <div className="text-[10px] text-surface-400">P2P · 无需跳转</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => openExternal(getWebtorUrl(m.magnet))}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
+                    >
+                      <div className="w-6 h-6 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
+                        <Tv className="w-3 h-3 text-violet-600 dark:text-violet-400" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-medium">WebTor</div>
+                        <div className="text-[10px] text-surface-400">外链 · 稳定流畅</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => openExternal(getBtorrentUrl(m.magnet))}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors border-t border-surface-100 dark:border-surface-700"
+                    >
+                      <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                        <Link2 className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-medium">BTorrent</div>
+                        <div className="text-[10px] text-surface-400">外链 · 备用</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 下载种子（真实 .torrent） */}
+              <DownloadBtn magnet={m.magnet} name={m.name} />
+
+              {/* 复制磁力链接 */}
+              <CopyBtn text={m.magnet} />
             </div>
           </div>
-          
+
+          {/* 内嵌播放器 */}
           {playingMagnet === m.magnet && (
-            <div className="mt-2 px-2">
+            <div className="mt-2 px-2 pb-2">
               <WebTorrentPlayer
                 magnetUri={m.magnet}
                 onClose={() => setPlayingMagnet(null)}
@@ -149,7 +258,7 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
   return (
     <div className="bg-white dark:bg-surface-900/90 rounded-2xl shadow-xl shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 mb-4 sm:mb-6 overflow-hidden animate-fade-in">
 
-      {/* ── 顶部标题栏 ── */}
+      {/* 顶部标题栏 */}
       <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-surface-100 dark:border-surface-800">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
@@ -175,7 +284,7 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
         </button>
       </div>
 
-      {/* ── 加载中 ── */}
+      {/* 加载中 */}
       {status === 'loading' && (
         <div className="flex flex-col items-center justify-center py-12 gap-3 text-surface-400">
           <Loader2 className="w-8 h-8 animate-spin text-rose-400" />
@@ -184,7 +293,7 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
         </div>
       )}
 
-      {/* ── 未找到 ── */}
+      {/* 未找到 */}
       {status === 'not_found' && (
         <div className="flex flex-col items-center justify-center py-12 gap-3 text-surface-400">
           <Search className="w-8 h-8 opacity-40" />
@@ -193,7 +302,7 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
         </div>
       )}
 
-      {/* ── 出错 ── */}
+      {/* 出错 */}
       {status === 'error' && (
         <div className="flex flex-col items-center justify-center py-12 gap-3">
           <AlertCircle className="w-8 h-8 text-error-400" />
@@ -201,13 +310,12 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
         </div>
       )}
 
-      {/* ── 成功 ── */}
+      {/* 成功 */}
       {status === 'success' && detail && (
         <div className="p-4 sm:p-5 space-y-4 sm:space-y-5">
 
-          {/* 上半部分：封面 + 基本信息 */}
+          {/* 封面 + 基本信息 */}
           <div className="flex gap-4 sm:gap-5">
-            {/* 封面 */}
             {detail.cover && (
               <a href={detail.detailUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
                 <img
@@ -218,24 +326,18 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
                 />
               </a>
             )}
-
-            {/* 信息 */}
             <div className="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
-              {/* 标题 */}
               <h3 className="text-sm sm:text-base font-semibold text-surface-900 dark:text-surface-100 leading-snug line-clamp-3">
                 {detail.title}
               </h3>
-
               <div className="space-y-1">
-                <InfoRow icon={Calendar} label="发行日期" value={detail.releaseDate} />
-                <InfoRow icon={Clock}    label="时长"     value={detail.duration} />
-                <InfoRow icon={User}     label="导演"     value={detail.director} />
-                <InfoRow icon={Building2} label="制作商"  value={detail.maker} />
-                <InfoRow icon={Building2} label="发行商"  value={detail.publisher} />
-                <InfoRow icon={Film}     label="系列"     value={detail.series} />
+                <InfoRow icon={Calendar}  label="发行日期" value={detail.releaseDate} />
+                <InfoRow icon={Clock}     label="时长"     value={detail.duration} />
+                <InfoRow icon={User}      label="导演"     value={detail.director} />
+                <InfoRow icon={Building2} label="制作商"   value={detail.maker} />
+                <InfoRow icon={Building2} label="发行商"   value={detail.publisher} />
+                <InfoRow icon={Film}      label="系列"     value={detail.series} />
               </div>
-
-              {/* JavBus 链接 */}
               <a
                 href={detail.detailUrl}
                 target="_blank"
@@ -294,7 +396,7 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
               {detail.magnets.length > 0 && (
                 <div className="flex items-center gap-1 text-[10px] text-surface-400">
                   <Shield className="w-3 h-3" />
-                  点击名称唤起下载 | Play在线播放 | 种子文件下载
+                  点击名称唤起客户端 · Play选择播放方式
                 </div>
               )}
             </div>
