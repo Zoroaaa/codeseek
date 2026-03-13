@@ -401,6 +401,12 @@
   .proxy-toggle-btn.enabled { @apply text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20; }
   .proxy-toggle-btn.disabled { @apply text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-200 dark:hover:bg-slate-800; }
   .proxy-toggle-btn.error { @apply text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20; }
+  .github-link-btn {
+    @apply p-2 rounded-xl transition-all duration-200;
+    @apply text-slate-500 hover:text-slate-700 hover:bg-slate-100/80;
+    @apply dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800;
+    @apply active:scale-95;
+  }
 
   /* --- Misc --- */
   .section-title {

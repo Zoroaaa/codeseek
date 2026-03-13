@@ -16,6 +16,7 @@ import {
   Loader2,
   Settings,
   ArrowRight,
+  Github,
 } from 'lucide-react';
 import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { Button } from '@/components/ui';
@@ -133,6 +134,17 @@ export const HomePage: React.FC = () => {
                 )}
               </button>
 
+              {/* GitHub link */}
+              <a
+                href="https://github.com/Zoroaaa/codeseek"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="github-link-btn"
+                title="访问GitHub仓库"
+              >
+                <Github className="w-4 h-4 sm:w-5 sm:h-5" />
+              </a>
+
               {/* Theme toggle */}
               <button onClick={toggleTheme} className="theme-toggle-btn">
                 {resolvedTheme === 'dark'
@@ -206,7 +218,7 @@ export const HomePage: React.FC = () => {
           {/* Decorative stats row */}
           <div className="mt-14 sm:mt-16 grid grid-cols-3 gap-4 sm:gap-8 max-w-lg mx-auto animate-fade-in animation-delay-400">
             {[
-              { num: '20+', label: '搜索源' },
+              { num: '50+', label: '搜索源' },
               { num: '99%', label: '可用性' },
               { num: '极速', label: '响应时间' },
             ].map((stat) => (
