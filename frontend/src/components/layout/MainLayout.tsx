@@ -25,17 +25,23 @@ export const MainLayout: React.FC = () => {
 
             {/* Logo + Nav */}
             <div className="flex items-center gap-8">
-              <Link to="/" className="flex items-center gap-2.5 group">
+              <a
+                href={window.location.pathname}
+                className="flex items-center gap-2.5 group cursor-pointer"
+                title="刷新页面"
+              >
                 <div className="relative w-10 h-10">
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 opacity-0 group-hover:opacity-20 blur-lg transition-all" />
-                  <div className="relative w-full h-full rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md">
-                    <Search className="w-5 h-5 text-white" />
-                  </div>
+                  <img
+                    src="/logo.png"
+                    alt="磁力快搜"
+                    className="relative w-full h-full rounded-xl shadow-md object-cover"
+                  />
                 </div>
                 <span className="text-xl font-bold gradient-text display-font hidden sm:block">
                   磁力快搜
                 </span>
-              </Link>
+              </a>
 
               <nav className="hidden md:flex items-center gap-1">
                 {isAuthenticated ? (
