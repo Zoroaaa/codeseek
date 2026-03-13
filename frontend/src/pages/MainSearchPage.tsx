@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search,
   Moon,
@@ -96,9 +96,7 @@ export const MainSearchPage: React.FC = () => {
     typeof window !== 'undefined' && window.innerWidth >= 768 ? 'grid' : 'list'
   );
 
-  // 左列 ref：用于同步右侧收藏高度
-  const leftColRef = useRef<HTMLDivElement>(null);
-  const [leftColHeight, setLeftColHeight] = useState<number>(0);
+
 
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
@@ -123,19 +121,6 @@ export const MainSearchPage: React.FC = () => {
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // 监听左列高度变化，同步到右侧收藏
-  useEffect(() => {
-    const el = leftColRef.current;
-    if (!el) return;
-    const obs = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        setLeftColHeight(entry.contentRect.height);
-      }
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
   }, []);
 
   useEffect(() => {
@@ -584,8 +569,7 @@ export const MainSearchPage: React.FC = () => {
         {/* 主内容区：左侧JAV+历史 / 右侧收藏，右列高度精确跟随左列 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
-          {/* 左列：挂 ref，ResizeObserver 实时同步高度给右列 */}
-          <div ref={leftColRef} className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
+          <div className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
             <JavRankingsPanel onCodeClick={handleCodeClick} />
 
             {isAuthenticated && (
@@ -600,12 +584,9 @@ export const MainSearchPage: React.FC = () => {
             )}
           </div>
 
-          {/* 右列：高度 = 左列高度，超出内部滚动 */}
+          {/* 右列：高度由 FavoritesPanel 内部常量决定，自动与左列对齐 */}
           {isAuthenticated && (
-            <div
-              className="hidden lg:flex flex-col overflow-hidden"
-              style={leftColHeight > 0 ? { height: leftColHeight } : {}}
-            >
+            <div className="hidden lg:block self-start">
               <FavoritesPanel
                 favorites={favorites}
                 isLoading={isLoadingFavorites}
