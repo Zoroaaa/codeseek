@@ -583,9 +583,9 @@ export const MainSearchPage: React.FC = () => {
 
           </div>
 
-          <div className="hidden lg:block overflow-hidden">
+          <div className="hidden lg:block">
             {isAuthenticated && (
-              <div className="h-full flex flex-col overflow-hidden">
+              <div className="h-full flex flex-col">
                 <FavoritesPanel
                   favorites={favorites}
                   isLoading={isLoadingFavorites}
