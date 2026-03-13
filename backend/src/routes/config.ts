@@ -5,11 +5,14 @@
  * 日期：2024
  */
 import { Hono } from 'hono';
-import { Env, SystemConfig, EmailSendLog, ConfigChangeLog, ConfigGroup } from '../types';
-import { success, error, generateId, verifyToken } from '../utils';
+import { Env, SystemConfig, EmailSendLog, ConfigChangeLog, ConfigGroup, JwtPayload } from '../types';
+import { success, error, generateId } from '../utils';
+import { authMiddleware } from '../middleware';
 import { ConfigService } from '../services/config';
 
 export const configRoutes = new Hono<{ Bindings: Env }>();
+
+configRoutes.use('*', authMiddleware);
 
 const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string; configType: string; configGroup: string; isPublic: number; isSensitive: number; validationRules?: string }> = {
   'site_name': { value: '磁力快搜', description: '网站名称', configType: 'string', configGroup: 'basic', isPublic: 1, isSensitive: 0 },
@@ -28,6 +31,14 @@ const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string
   'password_reset_log_retention_days': { value: '30', description: '密码重置日志保留天数', configType: 'integer', configGroup: 'cleanup', isPublic: 0, isSensitive: 0, validationRules: '{"min": 7, "max": 90}' },
   'user_actions_retention_days': { value: '90', description: '用户行为日志保留天数', configType: 'integer', configGroup: 'cleanup', isPublic: 0, isSensitive: 0, validationRules: '{"min": 30, "max": 365}' },
   'security_event_retention_days': { value: '90', description: '安全事件保留天数', configType: 'integer', configGroup: 'cleanup', isPublic: 0, isSensitive: 0, validationRules: '{"min": 30, "max": 365}' },
+};
+
+const checkAdminRole = (user: JwtPayload): boolean => {
+  return user.role === 'admin' || user.role === 'super_admin';
+};
+
+const checkSuperAdminRole = (user: JwtPayload): boolean => {
+  return user.role === 'super_admin';
 };
 
 async function logConfigChange(
@@ -141,15 +152,9 @@ configRoutes.get('/public', async (c) => {
 });
 
 configRoutes.get('/all', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -166,15 +171,9 @@ configRoutes.get('/all', async (c) => {
 });
 
 configRoutes.get('/groups', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -211,15 +210,9 @@ configRoutes.get('/groups', async (c) => {
 });
 
 configRoutes.get('/logs', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -266,15 +259,9 @@ configRoutes.get('/logs', async (c) => {
 });
 
 configRoutes.get('/export', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -286,7 +273,7 @@ configRoutes.get('/export', async (c) => {
     const exportData = {
       version: '2.0.0',
       exportedAt: new Date().toISOString(),
-      exportedBy: payload.username,
+      exportedBy: user.username,
       configs: (configs.results || []).map(c => ({
         key: c.key,
         value: c.is_sensitive ? '******' : c.value,
@@ -306,15 +293,9 @@ configRoutes.get('/export', async (c) => {
 });
 
 configRoutes.get('/analytics/stats', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -369,15 +350,9 @@ configRoutes.get('/analytics/stats', async (c) => {
 });
 
 configRoutes.get('/email/logs', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -426,15 +401,9 @@ configRoutes.get('/email/logs', async (c) => {
 });
 
 configRoutes.post('/import', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || payload.role !== 'super_admin') {
+  const user = c.get('user');
+  
+  if (!checkSuperAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
   }
 
@@ -488,7 +457,7 @@ configRoutes.post('/import', async (c) => {
 
           await logConfigChange(
             c.env, key, existing.value, value, 'update',
-            payload.userId, payload.username, '导入配置', ipAddress, userAgent
+            user.userId, user.username, '导入配置', ipAddress, userAgent
           );
 
           results.push({ key, success: true, action: 'updated' });
@@ -500,7 +469,7 @@ configRoutes.post('/import', async (c) => {
 
           await logConfigChange(
             c.env, key, null, value, 'create',
-            payload.userId, payload.username, '导入配置', ipAddress, userAgent
+            user.userId, user.username, '导入配置', ipAddress, userAgent
           );
 
           results.push({ key, success: true, action: 'created' });
@@ -527,9 +496,11 @@ configRoutes.post('/import', async (c) => {
 });
 
 configRoutes.post('/analytics/events', async (c) => {
+  const user = c.get('user');
+
   try {
     const body = await c.req.json();
-    const { userId, sessionId, eventType, eventData, referer } = body;
+    const { sessionId, eventType, eventData, referer } = body;
 
     const id = generateId();
     await c.env.DB.prepare(`
@@ -538,7 +509,7 @@ configRoutes.post('/analytics/events', async (c) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
-      userId || null,
+      user.userId,
       sessionId || null,
       eventType,
       JSON.stringify(eventData || {}),
@@ -556,15 +527,9 @@ configRoutes.post('/analytics/events', async (c) => {
 });
 
 configRoutes.put('/batch', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -611,7 +576,7 @@ configRoutes.put('/batch', async (c) => {
 
           await logConfigChange(
             c.env, key, existing.value, value, 'update',
-            payload.userId, payload.username, changeReason, ipAddress, userAgent
+            user.userId, user.username, changeReason, ipAddress, userAgent
           );
         } else {
           results.push({ key, success: false, error: '配置项不存在' });
@@ -636,15 +601,9 @@ configRoutes.put('/batch', async (c) => {
 });
 
 configRoutes.post('/reset/:key', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || payload.role !== 'super_admin') {
+  const user = c.get('user');
+  
+  if (!checkSuperAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
   }
 
@@ -672,7 +631,7 @@ configRoutes.post('/reset/:key', async (c) => {
 
     await logConfigChange(
       c.env, key, existing?.value || null, defaultValue.value, 'reset',
-      payload.userId, payload.username, '重置为默认值', ipAddress, userAgent
+      user.userId, user.username, '重置为默认值', ipAddress, userAgent
     );
 
     ConfigService.clearCache();
@@ -704,15 +663,9 @@ configRoutes.get('/:key', async (c) => {
 });
 
 configRoutes.put('/:key', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -751,7 +704,7 @@ configRoutes.put('/:key', async (c) => {
 
       await logConfigChange(
         c.env, key, existing.value, value, 'update',
-        payload.userId, payload.username, changeReason, ipAddress, userAgent
+        user.userId, user.username, changeReason, ipAddress, userAgent
       );
     } else {
       await c.env.DB.prepare(`
@@ -761,7 +714,7 @@ configRoutes.put('/:key', async (c) => {
 
       await logConfigChange(
         c.env, key, null, value, 'create',
-        payload.userId, payload.username, changeReason, ipAddress, userAgent
+        user.userId, user.username, changeReason, ipAddress, userAgent
       );
     }
 
@@ -775,15 +728,9 @@ configRoutes.put('/:key', async (c) => {
 });
 
 configRoutes.delete('/:key', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload || payload.role !== 'super_admin') {
+  const user = c.get('user');
+  
+  if (!checkSuperAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要超级管理员权限'), 403);
   }
 
@@ -803,7 +750,7 @@ configRoutes.delete('/:key', async (c) => {
 
     await logConfigChange(
       c.env, key, existing.value, '', 'delete',
-      payload.userId, payload.username, '删除配置', ipAddress, userAgent
+      user.userId, user.username, '删除配置', ipAddress, userAgent
     );
 
     await c.env.DB.prepare('DELETE FROM system_config WHERE key = ?').bind(key).run();

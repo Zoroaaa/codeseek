@@ -1,18 +1,17 @@
+/**
+ * 社区模块路由
+ * 功能：搜索源分享、标签管理、评论、点赞、举报等
+ * 作者：CodeSeek Team
+ * 日期：2024
+ */
 import { Hono } from 'hono';
 import { Env, CommunitySourceTag, CommunitySharedSource, CommunitySourceReview } from '../types';
-import { success, error, generateId, verifyToken } from '../utils';
+import { success, error, generateId } from '../utils';
+import { authMiddleware } from '../middleware';
 
 export const communityRoutes = new Hono<{ Bindings: Env }>();
 
-const getUserId = async (c: any): Promise<string | null> => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-  return payload?.userId || null;
-};
+communityRoutes.use('*', authMiddleware);
 
 communityRoutes.get('/tags', async (c) => {
   try {
@@ -28,11 +27,7 @@ communityRoutes.get('/tags', async (c) => {
 });
 
 communityRoutes.post('/tags', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const body = await c.req.json();
   const { name, description, color } = body;
 
@@ -55,7 +50,7 @@ communityRoutes.post('/tags', async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO community_source_tags (id, tag_name, tag_description, tag_color, usage_count, is_official, tag_active, created_by, created_at, updated_at)
        VALUES (?, ?, ?, ?, 0, 0, 1, ?, ?, ?)`
-    ).bind(id, name, description || null, color || '#3b82f6', userId, now, now).run();
+    ).bind(id, name, description || null, color || '#3b82f6', user.userId, now, now).run();
 
     return c.json(success({
       id,
@@ -64,7 +59,7 @@ communityRoutes.post('/tags', async (c) => {
       tagColor: color || '#3b82f6',
       usageCount: 0,
       createdAt: now,
-      createdBy: userId,
+      createdBy: user.userId,
     }, '创建成功'));
   } catch (err) {
     console.error('Create tag error:', err);
@@ -73,11 +68,7 @@ communityRoutes.post('/tags', async (c) => {
 });
 
 communityRoutes.put('/tags/:id', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const tagId = c.req.param('id');
   const body = await c.req.json();
   const { name, description, color, isActive } = body;
@@ -91,7 +82,7 @@ communityRoutes.put('/tags/:id', async (c) => {
       return c.json(error('NOT_FOUND', '标签不存在'), 404);
     }
 
-    if (existingTag.created_by !== userId && !existingTag.is_official) {
+    if (existingTag.created_by !== user.userId && !existingTag.is_official) {
       return c.json(error('FORBIDDEN', '无权修改此标签'), 403);
     }
 
@@ -156,11 +147,7 @@ communityRoutes.put('/tags/:id', async (c) => {
 });
 
 communityRoutes.delete('/tags/:id', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const tagId = c.req.param('id');
 
   try {
@@ -172,7 +159,7 @@ communityRoutes.delete('/tags/:id', async (c) => {
       return c.json(error('NOT_FOUND', '标签不存在'), 404);
     }
 
-    if (existingTag.created_by !== userId) {
+    if (existingTag.created_by !== user.userId) {
       return c.json(error('FORBIDDEN', '无权删除此标签'), 403);
     }
 
@@ -194,6 +181,7 @@ communityRoutes.delete('/tags/:id', async (c) => {
 });
 
 communityRoutes.get('/sources', async (c) => {
+  const user = c.get('user');
   const page = parseInt(c.req.query('page') || '1');
   const pageSize = parseInt(c.req.query('pageSize') || '20');
   const status = c.req.query('status') || 'active';
@@ -201,7 +189,6 @@ communityRoutes.get('/sources', async (c) => {
   const tags = c.req.query('tags');
   const sort = c.req.query('sort') || 'popular';
   const category = c.req.query('category');
-  const userId = await getUserId(c);
 
   try {
     const whereClauses: string[] = ['s.status = ?'];
@@ -255,13 +242,13 @@ communityRoutes.get('/sources', async (c) => {
     ).bind(...params, pageSize, (page - 1) * pageSize).all<CommunitySharedSource & { author_name?: string }>();
 
     const likedSourceIds: Set<string> = new Set();
-    if (userId && sources.results && sources.results.length > 0) {
+    if (sources.results && sources.results.length > 0) {
       const sourceIds = sources.results.map(s => s.id);
       const inClause = sourceIds.map(() => '?').join(',');
       const likes = await c.env.DB.prepare(
         `SELECT shared_source_id FROM community_source_likes 
          WHERE user_id = ? AND like_type = 'like' AND shared_source_id IN (${inClause})`
-      ).bind(userId, ...sourceIds).all<{ shared_source_id: string }>();
+      ).bind(user.userId, ...sourceIds).all<{ shared_source_id: string }>();
       
       (likes.results || []).forEach(l => likedSourceIds.add(l.shared_source_id));
     }
@@ -285,11 +272,7 @@ communityRoutes.get('/sources', async (c) => {
 });
 
 communityRoutes.get('/sources/my-favorites', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const page = parseInt(c.req.query('page') || '1');
   const pageSize = parseInt(c.req.query('pageSize') || '20');
 
@@ -298,7 +281,7 @@ communityRoutes.get('/sources/my-favorites', async (c) => {
       `SELECT COUNT(*) as total FROM community_source_likes l
        JOIN community_shared_sources s ON l.shared_source_id = s.id
        WHERE l.user_id = ? AND l.like_type = 'like' AND s.status = 'active'`
-    ).bind(userId).first<{ total: number }>();
+    ).bind(user.userId).first<{ total: number }>();
 
     const sources = await c.env.DB.prepare(
       `SELECT s.*, u.username as author_name FROM community_source_likes l
@@ -307,7 +290,7 @@ communityRoutes.get('/sources/my-favorites', async (c) => {
        WHERE l.user_id = ? AND l.like_type = 'like' AND s.status = 'active'
        ORDER BY l.created_at DESC
        LIMIT ? OFFSET ?`
-    ).bind(userId, pageSize, (page - 1) * pageSize).all<CommunitySharedSource & { author_name?: string }>();
+    ).bind(user.userId, pageSize, (page - 1) * pageSize).all<CommunitySharedSource & { author_name?: string }>();
 
     return c.json(success({
       items: sources.results || [],
@@ -323,18 +306,14 @@ communityRoutes.get('/sources/my-favorites', async (c) => {
 });
 
 communityRoutes.get('/sources/my-sources', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const page = parseInt(c.req.query('page') || '1');
   const pageSize = parseInt(c.req.query('pageSize') || '20');
   const status = c.req.query('status');
 
   try {
     let query = 'SELECT * FROM community_shared_sources WHERE user_id = ?';
-    const params: (string | number)[] = [userId];
+    const params: (string | number)[] = [user.userId];
 
     if (status) {
       query += ' AND status = ?';
@@ -446,43 +425,40 @@ communityRoutes.get('/sources/search', async (c) => {
 });
 
 communityRoutes.get('/sources/user-stats', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const sharedCount = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM community_shared_sources WHERE user_id = ? AND status = ?'
-    ).bind(userId, 'active').first<{ count: number }>();
+    ).bind(user.userId, 'active').first<{ count: number }>();
 
     const pendingCount = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM community_shared_sources WHERE user_id = ? AND status = ?'
-    ).bind(userId, 'pending').first<{ count: number }>();
+    ).bind(user.userId, 'pending').first<{ count: number }>();
 
     const totalDownloads = await c.env.DB.prepare(
       `SELECT COALESCE(SUM(download_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
-    ).bind(userId).first<{ total: number }>();
+    ).bind(user.userId).first<{ total: number }>();
 
     const totalLikes = await c.env.DB.prepare(
       `SELECT COALESCE(SUM(like_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
-    ).bind(userId).first<{ total: number }>();
+    ).bind(user.userId).first<{ total: number }>();
 
     const totalViews = await c.env.DB.prepare(
       `SELECT COALESCE(SUM(view_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
-    ).bind(userId).first<{ total: number }>();
+    ).bind(user.userId).first<{ total: number }>();
 
     const avgRating = await c.env.DB.prepare(
       `SELECT AVG(rating_score) as avg FROM community_shared_sources WHERE user_id = ? AND rating_count > 0`
-    ).bind(userId).first<{ avg: number }>();
+    ).bind(user.userId).first<{ avg: number }>();
 
     const reviewsGiven = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM community_source_reviews WHERE user_id = ?'
-    ).bind(userId).first<{ count: number }>();
+    ).bind(user.userId).first<{ count: number }>();
 
     const tagsCreated = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM community_source_tags WHERE created_by = ?'
-    ).bind(userId).first<{ count: number }>();
+    ).bind(user.userId).first<{ count: number }>();
 
     const recentShares = await c.env.DB.prepare(
       `SELECT id, source_name, status, download_count, like_count, view_count, rating_score, created_at 
@@ -490,7 +466,7 @@ communityRoutes.get('/sources/user-stats', async (c) => {
        WHERE user_id = ? 
        ORDER BY created_at DESC 
        LIMIT 10`
-    ).bind(userId).all();
+    ).bind(user.userId).all();
 
     return c.json(success({
       general: {
@@ -597,11 +573,7 @@ communityRoutes.get('/sources/:id', async (c) => {
 });
 
 communityRoutes.post('/sources', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const body = await c.req.json();
   const { sourceName, sourceSubtitle, sourceIcon, sourceUrlTemplate, sourceCategory, description, tags } = body;
 
@@ -616,7 +588,7 @@ communityRoutes.post('/sources', async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO community_shared_sources (id, user_id, source_name, source_subtitle, source_icon, source_url_template, source_category, description, tags, download_count, like_count, view_count, rating_score, rating_count, is_verified, is_featured, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 'active', ?, ?)`
-    ).bind(id, userId, sourceName, sourceSubtitle || null, sourceIcon || '🔍', sourceUrlTemplate, sourceCategory, description || '', JSON.stringify(tags || []), now, now).run();
+    ).bind(id, user.userId, sourceName, sourceSubtitle || null, sourceIcon || '🔍', sourceUrlTemplate, sourceCategory, description || '', JSON.stringify(tags || []), now, now).run();
 
     return c.json(success({
       id,
@@ -627,7 +599,7 @@ communityRoutes.post('/sources', async (c) => {
       sourceCategory,
       description: description || '',
       tags: tags || [],
-      userId,
+      userId: user.userId,
       status: 'active',
       viewCount: 0,
       downloadCount: 0,
@@ -644,11 +616,7 @@ communityRoutes.post('/sources', async (c) => {
 });
 
 communityRoutes.delete('/sources/:id', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const id = c.req.param('id');
 
   try {
@@ -660,7 +628,7 @@ communityRoutes.delete('/sources/:id', async (c) => {
       return c.json(error('NOT_FOUND', '分享源不存在'), 404);
     }
 
-    if (source.user_id !== userId) {
+    if (source.user_id !== user.userId) {
       return c.json(error('FORBIDDEN', '无权删除'), 403);
     }
 
@@ -673,17 +641,13 @@ communityRoutes.delete('/sources/:id', async (c) => {
 });
 
 communityRoutes.put('/sources/:id', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const sourceId = c.req.param('id');
 
   try {
     const existingSource = await c.env.DB.prepare(
       'SELECT * FROM community_shared_sources WHERE id = ? AND user_id = ?'
-    ).bind(sourceId, userId).first<CommunitySharedSource>();
+    ).bind(sourceId, user.userId).first<CommunitySharedSource>();
 
     if (!existingSource) {
       return c.json(error('NOT_FOUND', '搜索源不存在或您无权编辑'), 404);
@@ -717,7 +681,7 @@ communityRoutes.put('/sources/:id', async (c) => {
       sourceCategory || existingSource.source_category,
       now,
       sourceId,
-      userId
+      user.userId
     ).run();
 
     return c.json(success({
@@ -733,17 +697,13 @@ communityRoutes.put('/sources/:id', async (c) => {
 });
 
 communityRoutes.post('/sources/:id/like', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const id = c.req.param('id');
 
   try {
     const existing = await c.env.DB.prepare(
       'SELECT id FROM community_source_likes WHERE shared_source_id = ? AND user_id = ? AND like_type = ?'
-    ).bind(id, userId, 'like').first();
+    ).bind(id, user.userId, 'like').first();
 
     if (existing) {
       await c.env.DB.prepare('DELETE FROM community_source_likes WHERE id = ?').bind(existing.id).run();
@@ -755,7 +715,7 @@ communityRoutes.post('/sources/:id/like', async (c) => {
       const likeId = generateId();
       await c.env.DB.prepare(
         'INSERT INTO community_source_likes (id, shared_source_id, user_id, like_type, created_at) VALUES (?, ?, ?, ?, ?)'
-      ).bind(likeId, id, userId, 'like', Date.now()).run();
+      ).bind(likeId, id, user.userId, 'like', Date.now()).run();
       await c.env.DB.prepare(
         'UPDATE community_shared_sources SET like_count = like_count + 1 WHERE id = ?'
       ).bind(id).run();
@@ -787,11 +747,7 @@ communityRoutes.get('/sources/:id/reviews', async (c) => {
 });
 
 communityRoutes.post('/reviews', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const body = await c.req.json();
   const { sharedSourceId, rating, comment } = body;
 
@@ -802,7 +758,7 @@ communityRoutes.post('/reviews', async (c) => {
   try {
     const existing = await c.env.DB.prepare(
       'SELECT id FROM community_source_reviews WHERE shared_source_id = ? AND user_id = ?'
-    ).bind(sharedSourceId, userId).first();
+    ).bind(sharedSourceId, user.userId).first();
 
     if (existing) {
       return c.json(error('DUPLICATE_ERROR', '您已评价过该资源'), 400);
@@ -814,12 +770,12 @@ communityRoutes.post('/reviews', async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO community_source_reviews (id, shared_source_id, user_id, rating, comment, is_anonymous, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
-    ).bind(id, sharedSourceId, userId, rating, comment || '', now, now).run();
+    ).bind(id, sharedSourceId, user.userId, rating, comment || '', now, now).run();
 
     return c.json(success({
       id,
       sharedSourceId,
-      userId,
+      userId: user.userId,
       rating,
       comment: comment || '',
       createdAt: now,
@@ -832,11 +788,7 @@ communityRoutes.post('/reviews', async (c) => {
 });
 
 communityRoutes.delete('/reviews/:id', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const id = c.req.param('id');
 
   try {
@@ -848,7 +800,7 @@ communityRoutes.delete('/reviews/:id', async (c) => {
       return c.json(error('NOT_FOUND', '评论不存在'), 404);
     }
 
-    if (review.user_id !== userId) {
+    if (review.user_id !== user.userId) {
       return c.json(error('FORBIDDEN', '无权删除'), 403);
     }
 
@@ -861,17 +813,8 @@ communityRoutes.delete('/reviews/:id', async (c) => {
   }
 });
 
-/**
- * 更新评论
- * PUT /api/community/reviews/:id
- * 需要认证，只能修改自己的评论
- */
 communityRoutes.put('/reviews/:id', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
   const { rating, comment } = body;
@@ -893,7 +836,7 @@ communityRoutes.put('/reviews/:id', async (c) => {
       return c.json(error('NOT_FOUND', '评论不存在'), 404);
     }
 
-    if (review.user_id !== userId) {
+    if (review.user_id !== user.userId) {
       return c.json(error('FORBIDDEN', '无权修改'), 403);
     }
 
@@ -930,11 +873,7 @@ communityRoutes.put('/reviews/:id', async (c) => {
 });
 
 communityRoutes.post('/sources/:id/report', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
   const { reason, details } = body;
@@ -958,7 +897,7 @@ communityRoutes.post('/sources/:id/report', async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO community_source_reports (id, shared_source_id, reporter_user_id, report_reason, report_details, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`
-    ).bind(reportId, id, userId, reason, details || null, now, now).run();
+    ).bind(reportId, id, user.userId, reason, details || null, now, now).run();
 
     return c.json(success({ reportId }, '举报已提交'));
   } catch (err) {
@@ -968,8 +907,8 @@ communityRoutes.post('/sources/:id/report', async (c) => {
 });
 
 communityRoutes.post('/sources/:id/download', async (c) => {
+  const user = c.get('user');
   const id = c.req.param('id');
-  const userId = await getUserId(c);
 
   try {
     const downloadId = generateId();
@@ -983,7 +922,7 @@ communityRoutes.post('/sources/:id/download', async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO community_source_downloads (id, shared_source_id, user_id, ip_address, user_agent, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`
-    ).bind(downloadId, id, userId, ip, userAgent, now).run();
+    ).bind(downloadId, id, user.userId, ip, userAgent, now).run();
 
     return c.json(success(null, '下载计数已更新'));
   } catch (err) {
@@ -992,22 +931,16 @@ communityRoutes.post('/sources/:id/download', async (c) => {
   }
 });
 
-// 获取当前用户的消息通知（点赞、评论、导入、举报处理）
 communityRoutes.get('/notifications', async (c) => {
-  const userId = await getUserId(c);
-  if (!userId) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
+  const user = c.get('user');
   const page = parseInt(c.req.query('page') || '1');
   const pageSize = parseInt(c.req.query('pageSize') || '20');
   const offset = (page - 1) * pageSize;
 
   try {
-    // 获取用户分享的所有搜索源ID
     const mySources = await c.env.DB.prepare(
       'SELECT id, source_name FROM community_shared_sources WHERE user_id = ?'
-    ).bind(userId).all<{ id: string; source_name: string }>();
+    ).bind(user.userId).all<{ id: string; source_name: string }>();
 
     const mySourceIds = (mySources.results || []).map(s => s.id);
     const sourceNameMap: Record<string, string> = {};
@@ -1025,7 +958,6 @@ communityRoutes.get('/notifications', async (c) => {
 
     const inClause = mySourceIds.map(() => '?').join(',');
 
-    // 查询点赞通知
     const likes = await c.env.DB.prepare(
       `SELECT l.id, l.shared_source_id, l.user_id as actor_id, u.username as actor_name, l.created_at,
               'like' as type
@@ -1033,9 +965,8 @@ communityRoutes.get('/notifications', async (c) => {
        LEFT JOIN users u ON l.user_id = u.id
        WHERE l.shared_source_id IN (${inClause}) AND l.user_id != ?
        ORDER BY l.created_at DESC LIMIT 100`
-    ).bind(...mySourceIds, userId).all<any>();
+    ).bind(...mySourceIds, user.userId).all<any>();
 
-    // 查询评论通知
     const reviews = await c.env.DB.prepare(
       `SELECT r.id, r.shared_source_id, r.user_id as actor_id, u.username as actor_name, r.rating, r.comment, r.created_at,
               'review' as type
@@ -1043,9 +974,8 @@ communityRoutes.get('/notifications', async (c) => {
        LEFT JOIN users u ON r.user_id = u.id
        WHERE r.shared_source_id IN (${inClause}) AND r.user_id != ?
        ORDER BY r.created_at DESC LIMIT 100`
-    ).bind(...mySourceIds, userId).all<any>();
+    ).bind(...mySourceIds, user.userId).all<any>();
 
-    // 查询导入通知
     const downloads = await c.env.DB.prepare(
       `SELECT d.id, d.shared_source_id, d.user_id as actor_id, u.username as actor_name, d.created_at,
               'download' as type
@@ -1053,9 +983,8 @@ communityRoutes.get('/notifications', async (c) => {
        LEFT JOIN users u ON d.user_id = u.id
        WHERE d.shared_source_id IN (${inClause}) AND d.user_id != ? AND d.user_id IS NOT NULL
        ORDER BY d.created_at DESC LIMIT 100`
-    ).bind(...mySourceIds, userId).all<any>();
+    ).bind(...mySourceIds, user.userId).all<any>();
 
-    // 查询举报处理通知（针对本人分享源的举报被处理）
     const reports = await c.env.DB.prepare(
       `SELECT r.id, r.shared_source_id, r.status, r.report_reason, r.updated_at as created_at,
               'report_resolved' as type
@@ -1064,7 +993,6 @@ communityRoutes.get('/notifications', async (c) => {
        ORDER BY r.updated_at DESC LIMIT 50`
     ).bind(...mySourceIds).all<any>();
 
-    // 合并所有通知并排序
     const allNotifications = [
       ...(likes.results || []).map((n: any) => ({
         id: `like_${n.id}`,

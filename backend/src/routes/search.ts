@@ -7,19 +7,21 @@
 import { Hono } from 'hono';
 import { Env, SearchSource } from '../types';
 import { success, error, generateId } from '../utils';
-import { optionalAuthMiddleware } from '../middleware';
+import { authMiddleware } from '../middleware';
 import { VALIDATION_RULES } from '../constants';
 
 const R = VALIDATION_RULES;
 
 export const searchRoutes = new Hono<{ Bindings: Env }>();
 
+searchRoutes.use('*', authMiddleware);
+
 /**
  * 执行搜索
  * POST /api/search
- * 支持可选认证，记录搜索历史
+ * 需要认证，记录搜索历史
  */
-searchRoutes.post('/', optionalAuthMiddleware, async (c) => {
+searchRoutes.post('/', async (c) => {
   const userPayload = c.get('user');
   const body = await c.req.json();
   const { keyword, page = 1, pageSize = 20, majorCategoryId, categoryId } = body;

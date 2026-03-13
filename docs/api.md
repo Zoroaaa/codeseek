@@ -40,6 +40,19 @@ interface ApiResponse<T> {
 | `SERVER_ERROR` | 500 | 服务器内部错误 |
 | `LOCKED` | 423 | 账户被锁定 |
 
+## 认证要求汇总
+
+| 路由模块 | 认证方式 | 说明 |
+|---------|---------|------|
+| `/api/auth` | 无全局中间件 | 部分接口需要认证（单独验证） |
+| `/api/user` | 无全局中间件 | 所有接口需要认证（单独验证） |
+| `/api/search` | 全局 authMiddleware | 所有接口需要认证 |
+| `/api/search-sources` | 全局 authMiddleware | 所有接口需要认证，部分需要管理员权限 |
+| `/api/community` | 全局 authMiddleware | 所有接口需要认证 |
+| `/api/config` | 全局 authMiddleware | 所有接口需要认证，部分需要管理员权限 |
+| `/api/admin` | 全局管理员中间件 | 所有接口需要管理员权限 |
+| `/api` (system) | 全局 authMiddleware | 大部分接口需要认证，`/public-config` 和 `/health` 为公开接口 |
+
 ---
 
 ## 根接口
@@ -61,9 +74,13 @@ interface ApiResponse<T> {
 
 ## 认证接口 `/api/auth`
 
+**认证方式**: 无全局中间件，各接口单独处理认证
+
 ### `POST /api/auth/register` - 用户注册
 
 注册新用户账号。
+
+**认证**: 公开
 
 **请求体**:
 ```json
@@ -82,6 +99,8 @@ interface ApiResponse<T> {
 ### `POST /api/auth/login` - 用户登录
 
 使用用户名或邮箱登录。
+
+**认证**: 公开
 
 **请求体**:
 ```json
@@ -141,6 +160,8 @@ interface ApiResponse<T> {
 
 发送密码重置验证码到邮箱。
 
+**认证**: 公开
+
 **请求体**:
 ```json
 {
@@ -155,6 +176,8 @@ interface ApiResponse<T> {
 ### `POST /api/auth/reset-password` - 重置密码
 
 使用验证码重置密码。
+
+**认证**: 公开
 
 **请求体**:
 ```json
@@ -208,6 +231,8 @@ interface ApiResponse<T> {
 ### `POST /api/auth/send-registration-code` - 发送注册验证码
 
 向指定邮箱发送注册验证码。
+
+**认证**: 公开
 
 **请求体**:
 ```json
@@ -316,6 +341,8 @@ interface ApiResponse<T> {
 
 检查指定邮箱的验证码状态（无需认证）。用于前端页面恢复逻辑：用户发送验证码后意外关闭或刷新页面，重新打开时调用此接口，若仍有未过期的验证码则直接展示验证码输入页面。
 
+**认证**: 公开
+
 **查询参数**:
 - `email` - 邮箱地址
 - `type` - 验证类型（registration/forgot_password/password_reset/email_change_old/email_change_new/account_delete）
@@ -338,6 +365,8 @@ interface ApiResponse<T> {
 
 根据验证类型智能发送验证码，自动处理重发间隔。
 
+**认证**: 部分需要（password_reset/email_change_old/email_change_new/account_delete需要认证）
+
 **请求体**:
 ```json
 {
@@ -352,6 +381,8 @@ interface ApiResponse<T> {
 ---
 
 ## 用户数据接口 `/api/user`
+
+**认证方式**: 无全局中间件，各接口单独使用verifyToken验证
 
 ### `GET /api/user/settings` - 获取用户设置
 
@@ -564,11 +595,13 @@ interface ApiResponse<T> {
 
 ## 搜索接口 `/api/search`
 
+**认证方式**: 全局 authMiddleware，所有接口需要认证
+
 ### `POST /api/search` - 执行搜索
 
 执行搜索并返回搜索源列表，自动记录搜索历史。
 
-**认证**: 可选（认证后记录历史）
+**认证**: 需要
 
 **请求体**:
 ```json
@@ -595,6 +628,8 @@ interface ApiResponse<T> {
 
 根据关键词获取搜索建议。
 
+**认证**: 需要
+
 **查询参数**:
 - `keyword` - 搜索关键词（至少2个字符）
 - `limit` - 返回数量（默认10，最大20）
@@ -607,6 +642,8 @@ interface ApiResponse<T> {
 
 获取热门搜索关键词。
 
+**认证**: 需要
+
 **查询参数**:
 - `limit` - 返回数量（默认20，最大50）
 - `hours` - 时间范围（默认24小时，最大168小时/7天）
@@ -617,9 +654,13 @@ interface ApiResponse<T> {
 
 ## 搜索源管理接口 `/api/search-sources`
 
+**认证方式**: 全局 authMiddleware，所有接口需要认证，部分需要管理员权限
+
 ### `GET /api/search-sources/major-categories` - 获取主分类列表
 
 获取所有激活的主分类。
+
+**认证**: 需要
 
 **返回**: 主分类列表（按显示顺序排序）
 
@@ -628,6 +669,8 @@ interface ApiResponse<T> {
 ### `GET /api/search-sources/major-categories/:id` - 获取单个主分类
 
 获取指定主分类的详细信息。
+
+**认证**: 需要
 
 **URL参数**: `id` - 主分类ID
 
@@ -697,6 +740,8 @@ interface ApiResponse<T> {
 
 获取所有激活的分类。
 
+**认证**: 需要
+
 **查询参数**:
 - `majorCategoryId` - 主分类ID（可选，用于筛选）
 
@@ -707,6 +752,8 @@ interface ApiResponse<T> {
 ### `GET /api/search-sources/categories/:id` - 获取单个分类
 
 获取指定分类的详细信息。
+
+**认证**: 需要
 
 **URL参数**: `id` - 分类ID
 
@@ -742,7 +789,7 @@ interface ApiResponse<T> {
 
 更新指定分类的信息。
 
-**认证**: 需要（登录用户即可，系统分类需要管理员权限）
+**认证**: 需要（系统分类需要管理员权限）
 
 **URL参数**: `id` - 分类ID
 
@@ -767,7 +814,7 @@ interface ApiResponse<T> {
 
 删除指定分类（分类下不能有搜索源）。
 
-**认证**: 需要（登录用户即可，系统分类需要管理员权限）
+**认证**: 需要（系统分类需要管理员权限）
 
 **URL参数**: `id` - 分类ID
 
@@ -778,6 +825,8 @@ interface ApiResponse<T> {
 ### `GET /api/search-sources/` - 获取搜索源列表
 
 获取所有激活的搜索源。
+
+**认证**: 需要
 
 **查询参数**:
 - `categoryId` - 分类ID（可选）
@@ -792,6 +841,8 @@ interface ApiResponse<T> {
 
 获取指定搜索源的详细信息。
 
+**认证**: 需要
+
 **URL参数**: `id` - 搜索源ID
 
 **返回**: 搜索源详情
@@ -802,7 +853,7 @@ interface ApiResponse<T> {
 
 创建新的搜索源。
 
-**认证**: 需要（登录用户即可）
+**认证**: 需要
 
 **请求体**:
 ```json
@@ -829,7 +880,7 @@ interface ApiResponse<T> {
 
 更新指定搜索源的信息。
 
-**认证**: 需要（登录用户即可，系统搜索源需要管理员权限）
+**认证**: 需要（系统搜索源需要管理员权限）
 
 **URL参数**: `id` - 搜索源ID
 
@@ -858,7 +909,7 @@ interface ApiResponse<T> {
 
 删除指定搜索源。
 
-**认证**: 需要（登录用户即可，系统搜索源需要管理员权限）
+**认证**: 需要（系统搜索源需要管理员权限）
 
 **URL参数**: `id` - 搜索源ID
 
@@ -870,6 +921,8 @@ interface ApiResponse<T> {
 
 增加指定搜索源的使用计数。
 
+**认证**: 需要
+
 **URL参数**: `id` - 搜索源ID
 
 **返回**: 操作结果
@@ -879,6 +932,8 @@ interface ApiResponse<T> {
 ### `GET /api/search-sources/user-configs/:userId` - 获取用户配置
 
 获取指定用户的搜索源配置。
+
+**认证**: 需要
 
 **URL参数**: `userId` - 用户ID
 
@@ -901,6 +956,8 @@ interface ApiResponse<T> {
 ### `GET /api/search-sources/with-user-config/:userId` - 获取带用户配置的搜索源
 
 获取所有搜索源并附带用户的个性化配置。
+
+**认证**: 需要
 
 **URL参数**: `userId` - 用户ID
 
@@ -939,6 +996,8 @@ interface ApiResponse<T> {
 
 获取使用量最高的搜索源。
 
+**认证**: 需要
+
 **查询参数**:
 - `limit` - 返回数量（默认20）
 
@@ -949,6 +1008,8 @@ interface ApiResponse<T> {
 ### `GET /api/search-sources/search` - 搜索搜索源
 
 根据关键词搜索搜索源。
+
+**认证**: 需要
 
 **查询参数**:
 - `keyword` - 搜索关键词（必填）
@@ -961,9 +1022,11 @@ interface ApiResponse<T> {
 
 获取搜索源的整体统计数据。
 
+**认证**: 需要
+
 **返回**: 
-- total - 总搜索源数
-- searchable - 可搜索数
+- totalSources - 总搜索源数
+- searchableSources - 可搜索数
 - totalCategories - 总分类数
 - totalMajorCategories - 总主分类数
 - topUsedSources - 使用量Top 10搜索源
@@ -975,6 +1038,8 @@ interface ApiResponse<T> {
 ### `GET /api/search-sources/export` - 导出搜索源
 
 导出搜索源数据。
+
+**认证**: 需要
 
 **查询参数**:
 - `format` - 导出格式（`json`/`csv`/`opml`，默认`json`）
@@ -991,6 +1056,8 @@ interface ApiResponse<T> {
 
 导出用户的搜索源配置。
 
+**认证**: 需要
+
 **URL参数**: `userId` - 用户ID
 
 **返回**: 用户配置列表
@@ -999,9 +1066,13 @@ interface ApiResponse<T> {
 
 ## 社区接口 `/api/community`
 
+**认证方式**: 全局 authMiddleware，所有接口需要认证
+
 ### `GET /api/community/tags` - 获取标签列表
 
 获取所有激活的标签。
+
+**认证**: 需要
 
 **返回**: 标签列表（按使用量和名称排序）
 
@@ -1064,6 +1135,8 @@ interface ApiResponse<T> {
 
 获取社区分享的搜索源列表。
 
+**认证**: 需要
+
 **查询参数**:
 - `page` - 页码（默认1）
 - `pageSize` - 每页数量（默认20）
@@ -1080,6 +1153,8 @@ interface ApiResponse<T> {
 ### `GET /api/community/sources/:id` - 获取搜索源详情
 
 获取指定社区搜索源的详细信息。
+
+**认证**: 需要
 
 **URL参数**: `id` - 搜索源ID
 
@@ -1162,6 +1237,8 @@ interface ApiResponse<T> {
 
 获取指定搜索源的评论列表。
 
+**认证**: 需要
+
 **URL参数**: `id` - 搜索源ID
 
 **返回**: 评论列表（包含用户名）
@@ -1243,7 +1320,7 @@ interface ApiResponse<T> {
 
 记录搜索源的下载行为。
 
-**认证**: 可选
+**认证**: 需要
 
 **URL参数**: `id` - 搜索源ID
 
@@ -1256,6 +1333,10 @@ interface ApiResponse<T> {
 获取当前用户在社区收藏的搜索源列表。
 
 **认证**: 需要
+
+**查询参数**:
+- `page` - 页码（默认1）
+- `pageSize` - 每页数量（默认20）
 
 **返回**: 收藏的搜索源列表
 
@@ -1280,6 +1361,8 @@ interface ApiResponse<T> {
 
 获取社区热门搜索源。
 
+**认证**: 需要
+
 **查询参数**:
 - `limit` - 返回数量（默认10）
 - `tag` - 标签筛选（可选）
@@ -1292,6 +1375,8 @@ interface ApiResponse<T> {
 
 获取社区最新分享的搜索源。
 
+**认证**: 需要
+
 **查询参数**:
 - `limit` - 返回数量（默认10）
 
@@ -1302,6 +1387,8 @@ interface ApiResponse<T> {
 ### `GET /api/community/sources/search` - 搜索社区资源
 
 在社区中搜索搜索源。
+
+**认证**: 需要
 
 **查询参数**:
 - `keyword` - 搜索关键词（必填）
@@ -1319,14 +1406,14 @@ interface ApiResponse<T> {
 **认证**: 需要
 
 **返回**: 
-- sharedSources - 分享数量
-- pendingSources - 待审核数量
-- totalDownloads - 总下载量
-- totalLikes - 总点赞
-- totalViews - 总浏览
-- avgRating - 平均评分
-- reviewsGiven - 评论数
-- tagsCreated - 创建标签数
+- general.sharedSources - 分享数量
+- general.pendingSources - 待审核数量
+- general.totalDownloads - 总下载量
+- general.totalLikes - 总点赞
+- general.totalViews - 总浏览
+- general.avgRating - 平均评分
+- general.reviewsGiven - 评论数
+- general.tagsCreated - 创建标签数
 - recentShares - 最近分享记录
 
 ---
@@ -1334,6 +1421,8 @@ interface ApiResponse<T> {
 ### `GET /api/community/sources/stats` - 获取社区统计
 
 获取社区整体统计数据。
+
+**认证**: 需要
 
 **返回**: 
 - totalSources - 总搜索源数
@@ -1363,7 +1452,7 @@ interface ApiResponse<T> {
 
 ## 管理员接口 `/api/admin`
 
-所有管理员接口需要管理员或超级管理员权限。
+**认证方式**: 全局管理员中间件，所有接口需要管理员或超级管理员权限
 
 ### `GET /api/admin/roles` - 获取角色列表
 
@@ -1725,9 +1814,13 @@ interface ApiResponse<T> {
 
 ## 系统配置接口 `/api/config`
 
+**认证方式**: 全局 authMiddleware，所有接口需要认证，部分需要管理员权限
+
 ### `GET /api/config/public` - 获取公开配置
 
-获取系统公开配置信息（无需认证），返回已解析类型的配置值。
+获取系统公开配置信息，返回已解析类型的配置值。
+
+**认证**: 需要
 
 **返回**: 系统公开配置对象
 
@@ -1821,6 +1914,8 @@ interface ApiResponse<T> {
 
 获取指定配置项详情。
 
+**认证**: 需要
+
 **URL参数**: `key` - 配置键名
 
 **返回**: 配置详情对象
@@ -1905,10 +2000,11 @@ interface ApiResponse<T> {
 
 记录用户行为分析事件。
 
+**认证**: 需要
+
 **请求体**:
 ```json
 {
-  "userId": "string?",
   "sessionId": "string?",
   "eventType": "string (必填)",
   "eventData": "object?",
@@ -1960,9 +2056,13 @@ interface ApiResponse<T> {
 
 ## 系统接口 `/api`
 
+**认证方式**: 全局 authMiddleware，但 `/public-config` 和 `/health` 定义在中间件之前，为公开接口
+
 ### `GET /api/public-config` - 获取公开配置
 
-获取系统公开配置信息（无需认证）。
+获取系统公开配置信息。
+
+**认证**: 公开
 
 **返回**: 
 - appVersion - 应用版本
@@ -1985,6 +2085,8 @@ interface ApiResponse<T> {
 
 检查指定搜索源的可用状态（带5分钟缓存）。
 
+**认证**: 需要
+
 **查询参数**:
 - `sourceId` - 搜索源ID（必填）
 
@@ -2002,6 +2104,8 @@ interface ApiResponse<T> {
 ### `POST /api/source-status-batch` - 批量状态检查
 
 批量检查多个搜索源的状态（并发执行，最多30个）。
+
+**认证**: 需要
 
 **请求体**:
 ```json
@@ -2021,6 +2125,8 @@ interface ApiResponse<T> {
 
 批量查询多个搜索源的缓存状态（不触发新检查，最多50个）。
 
+**认证**: 需要
+
 **查询参数**:
 - `sourceIds` - 搜索源ID列表（逗号分隔）
 
@@ -2032,10 +2138,11 @@ interface ApiResponse<T> {
 
 记录用户行为日志。
 
+**认证**: 需要
+
 **请求体**:
 ```json
 {
-  "userId": "string?",
   "action": "string (必填)",
   "data": "object?"
 }
@@ -2048,6 +2155,8 @@ interface ApiResponse<T> {
 ### `GET /api/stats` - 获取统计信息
 
 获取系统统计数据。
+
+**认证**: 需要
 
 **返回**: 
 - users - 活跃用户数
@@ -2062,6 +2171,8 @@ interface ApiResponse<T> {
 
 检查服务健康状态。
 
+**认证**: 公开
+
 **返回**: 
 - status - 状态（ok）
 - timestamp - 时间戳
@@ -2072,6 +2183,8 @@ interface ApiResponse<T> {
 ### `GET /api/source-status-history/:sourceId` - 获取状态检查历史
 
 获取指定搜索源的状态检查历史记录。
+
+**认证**: 需要
 
 **URL参数**: `sourceId` - 搜索源ID
 
@@ -2090,6 +2203,8 @@ interface ApiResponse<T> {
 
 清除指定搜索源的状态检查缓存。
 
+**认证**: 需要
+
 **URL参数**: `sourceId` - 搜索源ID
 
 **返回**: 操作结果
@@ -2100,8 +2215,9 @@ interface ApiResponse<T> {
 
 查询用户行为日志。
 
+**认证**: 需要
+
 **查询参数**:
-- `userId` - 用户ID（可选）
 - `action` - 行为类型（可选）
 - `limit` - 返回数量（默认100）
 - `offset` - 偏移量（默认0）
@@ -2145,7 +2261,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
 }
 
 async function search(keyword: string, majorCategoryId?: string, categoryId?: string) {
-  const response = await fetch(`${API_BASE}/search`, {
+  const response = await fetchWithAuth(`${API_BASE}/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ keyword, majorCategoryId, categoryId })
@@ -2171,7 +2287,7 @@ async function getSearchSources(categoryId?: string) {
   const url = categoryId 
     ? `${API_BASE}/search-sources/?categoryId=${categoryId}`
     : `${API_BASE}/search-sources/`;
-  const response = await fetch(url);
+  const response = await fetchWithAuth(url);
   return response.json();
 }
 
@@ -2194,7 +2310,7 @@ async function batchUpdateConfigs(configs: object[]) {
 }
 
 async function exportSources(format: string = 'json') {
-  const response = await fetch(`${API_BASE}/search-sources/export?format=${format}`);
+  const response = await fetchWithAuth(`${API_BASE}/search-sources/export?format=${format}`);
   if (format === 'json') {
     return response.json();
   }
@@ -2202,7 +2318,7 @@ async function exportSources(format: string = 'json') {
 }
 
 async function checkSourceStatus(sourceId: string) {
-  const response = await fetch(`${API_BASE}/source-status-check?sourceId=${sourceId}`);
+  const response = await fetchWithAuth(`${API_BASE}/source-status-check?sourceId=${sourceId}`);
   return response.json();
 }
 
@@ -2216,12 +2332,12 @@ async function sendVerificationCode(email: string, type: string) {
 }
 
 async function getTrendingSearches(hours: number = 24) {
-  const response = await fetch(`${API_BASE}/search/trending?hours=${hours}`);
+  const response = await fetchWithAuth(`${API_BASE}/search/trending?hours=${hours}`);
   return response.json();
 }
 
 async function getSearchSuggestions(keyword: string) {
-  const response = await fetch(`${API_BASE}/search/suggestions?keyword=${encodeURIComponent(keyword)}`);
+  const response = await fetchWithAuth(`${API_BASE}/search/suggestions?keyword=${encodeURIComponent(keyword)}`);
   return response.json();
 }
 
@@ -2311,16 +2427,16 @@ app.route('/api', systemRoutes);                // 系统路由
 
 ### 路由模块说明
 
-| 模块 | 路由前缀 | 文件 | 功能 |
-|------|---------|------|------|
-| authRoutes | /api/auth | routes/auth.ts | 用户认证、登录注册、邮箱验证、密码管理 |
-| userRoutes | /api/user | routes/user.ts | 用户设置、收藏、搜索历史、活动记录 |
-| searchRoutes | /api/search | routes/search.ts | 搜索执行、历史管理、收藏、建议、热门 |
-| sourceRoutes | /api/search-sources | routes/sources.ts | 搜索源CRUD、分类管理、用户配置 |
-| communityRoutes | /api/community | routes/community.ts | 社区分享、标签、评论、举报、通知 |
-| adminRoutes | /api/admin | routes/admin.ts | 用户管理、举报处理、统计、日志、会话管理 |
-| configRoutes | /api/config | routes/config.ts | 系统配置管理、分析事件、邮件日志 |
-| systemRoutes | /api | routes/system.ts | 健康检查、状态检测、统计、行为记录 |
+| 模块 | 路由前缀 | 文件 | 认证方式 | 功能 |
+|------|---------|------|---------|------|
+| authRoutes | /api/auth | routes/auth.ts | 无全局中间件 | 用户认证、登录注册、邮箱验证、密码管理 |
+| userRoutes | /api/user | routes/user.ts | 无全局中间件 | 用户设置、收藏、搜索历史、活动记录 |
+| searchRoutes | /api/search | routes/search.ts | 全局authMiddleware | 搜索执行、建议、热门 |
+| sourceRoutes | /api/search-sources | routes/sources.ts | 全局authMiddleware | 搜索源CRUD、分类管理、用户配置 |
+| communityRoutes | /api/community | routes/community.ts | 全局authMiddleware | 社区分享、标签、评论、举报、通知 |
+| adminRoutes | /api/admin | routes/admin.ts | 全局管理员中间件 | 用户管理、举报处理、统计、日志、会话管理 |
+| configRoutes | /api/config | routes/config.ts | 全局authMiddleware | 系统配置管理、分析事件、邮件日志 |
+| systemRoutes | /api | routes/system.ts | 全局authMiddleware | 健康检查、状态检测、统计、行为记录 |
 
 ---
 
@@ -2338,5 +2454,55 @@ app.route('/api', systemRoutes);                // 系统路由
 | `user_favorites` | 用户收藏表（id, user_id, title, subtitle, url, icon, keyword） |
 | `user_search_history` | 用户搜索历史表（id, user_id, query, source, results_count） |
 | `user_actions` | 用户行为日志表（id, user_id, action, data, ip_address, user_agent） |
-| `system_config` | 系统配置表（key, value, description, config_type, config_group, validation_rules） |
-| `config
+| `system_config` | 系统配置表（key, value, description, config_type, config_group, is_public, is_sensitive） |
+| `config_groups` | 配置分组表（name, display_name, description, display_order） |
+| `config_change_logs` | 配置变更日志表（config_key, old_value, new_value, change_type, changed_by） |
+| `analytics_events` | 分析事件表（user_id, session_id, event_type, event_data, ip_address, user_agent, referer） |
+| `email_send_logs` | 邮件发送日志表（user_id, email_type, recipient_email, send_status, error_message） |
+
+### 搜索源表 (02_schema_sources.sql)
+
+| 表名 | 说明 |
+|------|------|
+| `search_major_categories` | 搜索源大类表（id, name, description, icon, color, requires_keyword, is_system, is_active, display_order） |
+| `search_source_categories` | 搜索源分类表（id, major_category_id, name, description, icon, color, default_searchable, default_site_type, search_priority, is_system, is_active, display_order） |
+| `search_sources` | 搜索源表（id, category_id, name, subtitle, description, icon, url_template, homepage_url, site_type, searchable, requires_keyword, search_priority, is_system, is_active, display_order, usage_count, created_by） |
+| `user_search_source_configs` | 用户搜索源配置表（id, user_id, source_id, is_enabled, custom_priority, custom_name, custom_subtitle, custom_icon, notes） |
+| `source_status_cache` | 搜索源状态缓存表（id, source_id, keyword, keyword_hash, status, available, content_match, response_time, quality_score, check_error, expires_at） |
+
+### 社区表 (03_schema_community.sql)
+
+| 表名 | 说明 |
+|------|------|
+| `community_source_tags` | 社区标签表（id, tag_name, tag_description, tag_color, usage_count, is_official, tag_active, created_by） |
+| `community_shared_sources` | 社区分享搜索源表（id, user_id, source_name, source_subtitle, source_icon, source_url_template, source_category, description, tags, download_count, like_count, view_count, rating_score, rating_count, is_verified, is_featured, status） |
+| `community_source_likes` | 社区点赞表（id, shared_source_id, user_id, like_type, created_at） |
+| `community_source_reviews` | 社区评论表（id, shared_source_id, user_id, rating, comment, is_anonymous） |
+| `community_source_reports` | 社区举报表（id, shared_source_id, reporter_user_id, report_reason, report_details, status, admin_user_id, admin_action, admin_notes, resolved_at） |
+| `community_source_downloads` | 社区下载记录表（id, shared_source_id, user_id, ip_address, user_agent） |
+
+### 安全表 (04_schema_security.sql)
+
+| 表名 | 说明 |
+|------|------|
+| `email_verifications` | 邮箱验证表（id, email, verification_code, verification_type, user_id, expires_at, verified_at, verification_data） |
+| `email_change_requests` | 邮箱更改请求表（id, user_id, old_email, new_email, new_email_hash, old_email_verified, new_email_verified, status, expires_at） |
+| `password_reset_logs` | 密码重置日志表（id, user_id, email, ip_address, user_agent, success, failure_reason） |
+| `user_security_events` | 用户安全事件表（id, user_id, event_type, event_status, event_data, ip_address, user_agent） |
+| `security_lockouts` | 安全锁定表（id, lockout_type, identifier, locked_until, lockout_reason, unlock_count） |
+
+---
+
+## API统计
+
+| 路由模块 | API数量 | 认证要求 |
+|---------|--------|---------|
+| authRoutes | 20 | 部分需要认证 |
+| userRoutes | 13 | 全部需要认证 |
+| searchRoutes | 3 | 全部需要认证 |
+| sourceRoutes | 25 | 全部需要认证，部分需要管理员权限 |
+| communityRoutes | 24 | 全部需要认证 |
+| adminRoutes | 21 | 全部需要管理员权限 |
+| configRoutes | 14 | 全部需要认证，部分需要管理员权限 |
+| systemRoutes | 10 | 全部需要认证 |
+| **总计** | **130** | - |

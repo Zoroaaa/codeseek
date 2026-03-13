@@ -1,11 +1,24 @@
+/**
+ * 搜索源管理路由
+ * 功能：搜索源、分类、大类管理
+ * 作者：CodeSeek Team
+ * 日期：2024
+ */
 import { Hono } from 'hono';
-import { Env, SearchSource, SearchSourceCategory, MajorCategory, UserSearchSourceConfig } from '../types';
+import { Env, SearchSource, SearchSourceCategory, MajorCategory, UserSearchSourceConfig, JwtPayload } from '../types';
 import { success, error, generateId } from '../utils';
+import { authMiddleware } from '../middleware';
 import { VALIDATION_RULES } from '../constants';
 
 const R = VALIDATION_RULES;
 
 export const sourceRoutes = new Hono<{ Bindings: Env }>();
+
+sourceRoutes.use('*', authMiddleware);
+
+const checkAdminRole = (user: JwtPayload): boolean => {
+  return user.role === 'admin' || user.role === 'super_admin';
+};
 
 sourceRoutes.get('/major-categories', async (c) => {
   try {
@@ -424,20 +437,9 @@ sourceRoutes.post('/:id/increment-usage', async (c) => {
 });
 
 sourceRoutes.post('/major-categories', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
-  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -496,20 +498,9 @@ sourceRoutes.post('/major-categories', async (c) => {
 });
 
 sourceRoutes.post('/categories', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
-  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -584,19 +575,7 @@ sourceRoutes.post('/categories', async (c) => {
 });
 
 sourceRoutes.put('/categories/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
+  const user = c.get('user');
   const categoryId = c.req.param('id');
 
   try {
@@ -608,7 +587,7 @@ sourceRoutes.put('/categories/:id', async (c) => {
       return c.json(error('NOT_FOUND', '分类不存在'), 404);
     }
 
-    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+    if (existingCategory.is_system && !checkAdminRole(user)) {
       return c.json(error('FORBIDDEN', '系统分类仅管理员可修改'), 403);
     }
 
@@ -658,19 +637,7 @@ sourceRoutes.put('/categories/:id', async (c) => {
 });
 
 sourceRoutes.delete('/categories/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
+  const user = c.get('user');
   const categoryId = c.req.param('id');
 
   try {
@@ -682,7 +649,7 @@ sourceRoutes.delete('/categories/:id', async (c) => {
       return c.json(error('NOT_FOUND', '分类不存在'), 404);
     }
 
-    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+    if (existingCategory.is_system && !checkAdminRole(user)) {
       return c.json(error('FORBIDDEN', '系统分类仅管理员可删除'), 403);
     }
 
@@ -706,18 +673,7 @@ sourceRoutes.delete('/categories/:id', async (c) => {
 });
 
 sourceRoutes.post('/', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const body = await c.req.json();
@@ -781,7 +737,7 @@ sourceRoutes.post('/', async (c) => {
       searchable !== false ? 1 : 0,
       requiresKeyword !== false ? 1 : 0,
       Math.min(Math.max(parseInt(searchPriority) || 5, 1), 10),
-      payload.userId,
+      user.userId,
       now,
       now
     ).run();
@@ -806,26 +762,10 @@ sourceRoutes.post('/', async (c) => {
   }
 });
 
-/**
- * 更新大类
- * PUT /api/search-sources/major-categories/:id
- * 需要管理员权限
- */
 sourceRoutes.put('/major-categories/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
-  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -840,7 +780,7 @@ sourceRoutes.put('/major-categories/:id', async (c) => {
       return c.json(error('NOT_FOUND', '大类不存在'), 404);
     }
 
-    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+    if (existingCategory.is_system && !checkAdminRole(user)) {
       return c.json(error('FORBIDDEN', '系统大类仅管理员可修改'), 403);
     }
 
@@ -920,26 +860,10 @@ sourceRoutes.put('/major-categories/:id', async (c) => {
   }
 });
 
-/**
- * 删除大类
- * DELETE /api/search-sources/major-categories/:id
- * 需要管理员权限
- */
 sourceRoutes.delete('/major-categories/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
-  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+  const user = c.get('user');
+  
+  if (!checkAdminRole(user)) {
     return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
   }
 
@@ -954,7 +878,7 @@ sourceRoutes.delete('/major-categories/:id', async (c) => {
       return c.json(error('NOT_FOUND', '大类不存在'), 404);
     }
 
-    if (existingCategory.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+    if (existingCategory.is_system && !checkAdminRole(user)) {
       return c.json(error('FORBIDDEN', '系统大类仅管理员可删除'), 403);
     }
 
@@ -977,31 +901,14 @@ sourceRoutes.delete('/major-categories/:id', async (c) => {
   }
 });
 
-/**
- * 删除用户搜索源配置
- * DELETE /api/search-sources/user-configs/:sourceId
- * 需要认证
- */
 sourceRoutes.delete('/user-configs/:sourceId', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
+  const user = c.get('user');
   const sourceId = c.req.param('sourceId');
 
   try {
     const result = await c.env.DB.prepare(
       'DELETE FROM user_search_source_configs WHERE user_id = ? AND source_id = ?'
-    ).bind(payload.userId, sourceId).run();
+    ).bind(user.userId, sourceId).run();
 
     if (!result.success || result.meta.changes === 0) {
       return c.json(error('NOT_FOUND', '配置不存在'), 404);
@@ -1015,19 +922,7 @@ sourceRoutes.delete('/user-configs/:sourceId', async (c) => {
 });
 
 sourceRoutes.put('/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
+  const user = c.get('user');
   const sourceId = c.req.param('id');
 
   try {
@@ -1039,7 +934,7 @@ sourceRoutes.put('/:id', async (c) => {
       return c.json(error('NOT_FOUND', '搜索源不存在'), 404);
     }
 
-    if (existingSource.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+    if (existingSource.is_system && !checkAdminRole(user)) {
       return c.json(error('FORBIDDEN', '系统搜索源仅管理员可修改'), 403);
     }
 
@@ -1103,19 +998,7 @@ sourceRoutes.put('/:id', async (c) => {
 });
 
 sourceRoutes.delete('/:id', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
+  const user = c.get('user');
   const sourceId = c.req.param('id');
 
   try {
@@ -1127,7 +1010,7 @@ sourceRoutes.delete('/:id', async (c) => {
       return c.json(error('NOT_FOUND', '搜索源不存在'), 404);
     }
 
-    if (existingSource.is_system && payload.role !== 'admin' && payload.role !== 'super_admin') {
+    if (existingSource.is_system && !checkAdminRole(user)) {
       return c.json(error('FORBIDDEN', '系统搜索源仅管理员可删除'), 403);
     }
 
@@ -1147,18 +1030,7 @@ sourceRoutes.delete('/:id', async (c) => {
 });
 
 sourceRoutes.post('/user-configs/batch', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const { verifyToken } = await import('../utils');
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const user = c.get('user');
 
   try {
     const body = await c.req.json();
@@ -1182,7 +1054,7 @@ sourceRoutes.post('/user-configs/batch', async (c) => {
 
       const existingConfig = await c.env.DB.prepare(
         'SELECT id FROM user_search_source_configs WHERE user_id = ? AND source_id = ?'
-      ).bind(payload.userId, config.sourceId).first();
+      ).bind(user.userId, config.sourceId).first();
 
       if (existingConfig) {
         await c.env.DB.prepare(`
@@ -1209,7 +1081,7 @@ sourceRoutes.post('/user-configs/batch', async (c) => {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           configId,
-          payload.userId,
+          user.userId,
           config.sourceId,
           config.isEnabled !== false ? 1 : 0,
           config.customPriority ? Math.min(Math.max(parseInt(config.customPriority), 1), 10) : null,

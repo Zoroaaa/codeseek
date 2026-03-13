@@ -279,7 +279,7 @@ export const RegisterPage: React.FC = () => {
           onChange={handleCodeChange}
           fullWidth
           className="text-center text-2xl tracking-[0.5em] font-mono"
-          maxLength={validationRules.VERIFICATION_CODE_LENGTH}
+          maxLength={validationRules.VERIFICATION_CODE_LENGTH + 1}
         />
 
         {countdown > 0 ? (

@@ -462,7 +462,7 @@ export const SettingsManager: React.FC = () => {
             })}
             fullWidth
             className="text-center text-xl tracking-widest"
-            maxLength={validationRules.VERIFICATION_CODE_LENGTH}
+            maxLength={validationRules.VERIFICATION_CODE_LENGTH + 1}
           />
 
           {emailChangeCountdown > 0 ? (
@@ -608,7 +608,7 @@ export const SettingsManager: React.FC = () => {
             onChange={(e) => setDeleteVerificationCode(formatVerificationCode(e.target.value))}
             fullWidth
             className="text-center text-xl tracking-widest"
-            maxLength={validationRules.VERIFICATION_CODE_LENGTH}
+            maxLength={validationRules.VERIFICATION_CODE_LENGTH + 1}
           />
 
           {deleteCountdown > 0 ? (

@@ -1,6 +1,13 @@
+/**
+ * 系统路由模块
+ * 功能：健康检查、状态缓存、用户行为记录、系统统计
+ * 作者：CodeSeek Team
+ * 日期：2024
+ */
 import { Hono } from 'hono';
 import { Env, SourceStatusCache, UserAction, SearchSource } from '../types';
 import { success, error, generateId } from '../utils';
+import { authMiddleware } from '../middleware';
 import { ConfigService } from '../services/config';
 import { DB_CONFIG_KEYS, VALIDATION_RULES } from '../constants';
 
@@ -8,7 +15,63 @@ const R = VALIDATION_RULES;
 
 export const systemRoutes = new Hono<{ Bindings: Env }>();
 
-// ─── 健康检查核心工具函数 ────────────────────────────────────────────────────
+systemRoutes.get('/public-config', async (c) => {
+  try {
+    const configService = new ConfigService(c.env);
+
+    const [
+      enableRegistration,
+      communityEnabled,
+      siteName,
+      siteDescription,
+    ] = await Promise.all([
+      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true),
+      configService.getBoolean(DB_CONFIG_KEYS.COMMUNITY_ENABLED, true),
+      configService.get(DB_CONFIG_KEYS.SITE_NAME, '磁力快搜'),
+      configService.get(DB_CONFIG_KEYS.SITE_DESCRIPTION, '搜索全网资源，一步直达'),
+    ]);
+
+    return c.json(success({
+      appVersion: c.env.APP_VERSION || '2.0.0',
+      siteName,
+      siteDescription,
+      allowRegistration: enableRegistration,
+      communityEnabled,
+      minUsernameLength: R.USERNAME.MIN_LENGTH,
+      maxUsernameLength: R.USERNAME.MAX_LENGTH,
+      minPasswordLength: R.PASSWORD.MIN_LENGTH,
+      maxFavoritesPerUser: R.FAVORITES.MAX_COUNT,
+      maxHistoryPerUser: R.SEARCH_HISTORY.MAX_COUNT,
+      maxTagsPerUser: R.TAG.MAX_COUNT_PER_SOURCE,
+      features: {
+        searchHistory: true,
+        favorites: true,
+        analytics: true,
+        darkMode: true,
+        proxy: true,
+        searchSuggestions: true,
+      },
+      search: {
+        debounceMs: 300,
+        maxKeywordLength: R.KEYWORD.MAX_LENGTH,
+        suggestionsMinKeywordLength: R.SUGGESTIONS.MIN_KEYWORD_LENGTH,
+      },
+    }));
+  } catch (err) {
+    console.error('Get public config error:', err);
+    return c.json(error('SERVER_ERROR', '获取配置失败'), 500);
+  }
+});
+
+systemRoutes.get('/health', async (c) => {
+  return c.json(success({
+    status: 'ok',
+    timestamp: Date.now(),
+    version: c.env.APP_VERSION || '2.0.0',
+  }));
+});
+
+systemRoutes.use('*', authMiddleware);
 
 async function checkUrlReachability(url: string, timeoutMs = 10000): Promise<{
   status: string;
@@ -105,61 +168,6 @@ async function saveStatusCache(
   }
 }
 
-// ─── END 工具函数 ────────────────────────────────────────────────────────────
-
-/**
- * GET /public-config
- * 向前端暴露运行期业务配置
- */
-systemRoutes.get('/public-config', async (c) => {
-  try {
-    const configService = new ConfigService(c.env);
-
-    const [
-      enableRegistration,
-      communityEnabled,
-      siteName,
-      siteDescription,
-    ] = await Promise.all([
-      configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true),
-      configService.getBoolean(DB_CONFIG_KEYS.COMMUNITY_ENABLED, true),
-      configService.get(DB_CONFIG_KEYS.SITE_NAME, '磁力快搜'),
-      configService.get(DB_CONFIG_KEYS.SITE_DESCRIPTION, '搜索全网资源，一步直达'),
-    ]);
-
-    return c.json(success({
-      appVersion: c.env.APP_VERSION || '2.0.0',
-      siteName,
-      siteDescription,
-      allowRegistration: enableRegistration,
-      communityEnabled,
-      minUsernameLength: R.USERNAME.MIN_LENGTH,
-      maxUsernameLength: R.USERNAME.MAX_LENGTH,
-      minPasswordLength: R.PASSWORD.MIN_LENGTH,
-      maxFavoritesPerUser: R.FAVORITES.MAX_COUNT,
-      maxHistoryPerUser: R.SEARCH_HISTORY.MAX_COUNT,
-      maxTagsPerUser: R.TAG.MAX_COUNT_PER_SOURCE,
-      features: {
-        searchHistory: true,
-        favorites: true,
-        analytics: true,
-        darkMode: true,
-        proxy: true,
-        searchSuggestions: true,
-      },
-      search: {
-        debounceMs: 300,
-        maxKeywordLength: R.KEYWORD.MAX_LENGTH,
-        suggestionsMinKeywordLength: R.SUGGESTIONS.MIN_KEYWORD_LENGTH,
-      },
-    }));
-  } catch (err) {
-    console.error('Get public config error:', err);
-    return c.json(error('SERVER_ERROR', '获取配置失败'), 500);
-  }
-});
-
-// ─── 单源健康检查 ────────────────────────────────────────────────────────────
 systemRoutes.get('/source-status-check', async (c) => {
   const sourceId = c.req.query('sourceId');
 
@@ -209,7 +217,6 @@ systemRoutes.get('/source-status-check', async (c) => {
   }
 });
 
-// ─── 批量健康检查（POST，并发执行） ─────────────────────────────────────────
 systemRoutes.post('/source-status-batch', async (c) => {
   try {
     const body = await c.req.json();
@@ -290,9 +297,11 @@ systemRoutes.post('/source-status-batch', async (c) => {
 });
 
 systemRoutes.post('/record-action', async (c) => {
+  const user = c.get('user');
+
   try {
     const body = await c.req.json();
-    const { userId, action, data } = body;
+    const { action, data } = body;
 
     if (!action) {
       return c.json(error('VALIDATION_ERROR', '请提供行为类型'), 400);
@@ -305,7 +314,7 @@ systemRoutes.post('/record-action', async (c) => {
     await c.env.DB.prepare(`
       INSERT INTO user_actions (id, user_id, action, data, ip_address, user_agent, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(actionId, userId || null, action, JSON.stringify(data || {}), ip, userAgent, Date.now()).run();
+    `).bind(actionId, user.userId, action, JSON.stringify(data || {}), ip, userAgent, Date.now()).run();
 
     return c.json(success({ id: actionId }, '行为已记录'));
   } catch (err) {
@@ -341,14 +350,6 @@ systemRoutes.get('/stats', async (c) => {
     console.error('Get stats error:', err);
     return c.json(error('SERVER_ERROR', '获取统计失败'), 500);
   }
-});
-
-systemRoutes.get('/health', async (c) => {
-  return c.json(success({
-    status: 'ok',
-    timestamp: Date.now(),
-    version: c.env.APP_VERSION || '2.0.0',
-  }));
 });
 
 systemRoutes.get('/source-status-history/:sourceId', async (c) => {
@@ -443,15 +444,14 @@ systemRoutes.delete('/source-status-cache/:sourceId', async (c) => {
 });
 
 systemRoutes.get('/user-actions', async (c) => {
-  const userId = c.req.query('userId');
+  const user = c.get('user');
   const action = c.req.query('action');
   const limit = parseInt(c.req.query('limit') || '100', 10);
   const offset = parseInt(c.req.query('offset') || '0', 10);
 
-  let query = 'SELECT * FROM user_actions WHERE 1=1';
-  const params: (string | number)[] = [];
+  let query = 'SELECT * FROM user_actions WHERE user_id = ?';
+  const params: (string | number)[] = [user.userId];
 
-  if (userId) { query += ' AND user_id = ?'; params.push(userId); }
   if (action) { query += ' AND action = ?'; params.push(action); }
 
   query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
@@ -460,9 +460,8 @@ systemRoutes.get('/user-actions', async (c) => {
   try {
     const actions = await c.env.DB.prepare(query).bind(...params).all<UserAction>();
 
-    let countQuery = 'SELECT COUNT(*) as count FROM user_actions WHERE 1=1';
-    const countParams: string[] = [];
-    if (userId) { countQuery += ' AND user_id = ?'; countParams.push(userId); }
+    let countQuery = 'SELECT COUNT(*) as count FROM user_actions WHERE user_id = ?';
+    const countParams: string[] = [user.userId];
     if (action) { countQuery += ' AND action = ?'; countParams.push(action); }
 
     const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first<{ count: number }>();

@@ -187,7 +187,7 @@ export const ForgotPasswordPage: React.FC = () => {
       </div>
 
       <Input label="验证码" type="text" placeholder={`请输入${validationRules.VERIFICATION_CODE_LENGTH}位验证码`} value={verificationCode}
-        onChange={handleCodeChange} fullWidth className="text-center text-2xl tracking-[0.5em] font-mono" maxLength={validationRules.VERIFICATION_CODE_LENGTH} />
+        onChange={handleCodeChange} fullWidth className="text-center text-2xl tracking-[0.5em] font-mono" maxLength={validationRules.VERIFICATION_CODE_LENGTH + 1} />
 
       <p className="text-center text-sm text-slate-500 dark:text-slate-400">
         {countdown > 0
