@@ -583,24 +583,25 @@ export const MainSearchPage: React.FC = () => {
 
           </div>
 
-          <div className="hidden lg:block space-y-3 sm:space-y-4">
-            <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} />
+          <div className="hidden lg:block">
             {isAuthenticated && (
-              <FavoritesPanel
-                favorites={favorites}
-                isLoading={isLoadingFavorites}
-                show={showFavorites}
-                isProxyEnabled={isProxyEnabled}
-                onToggle={() => setShowFavorites(!showFavorites)}
-                onRemove={handleRemoveFavorite}
-                onExport={handleExportFavorites}
-              />
+              <div className="h-full flex flex-col">
+                <FavoritesPanel
+                  favorites={favorites}
+                  isLoading={isLoadingFavorites}
+                  show={showFavorites}
+                  isProxyEnabled={isProxyEnabled}
+                  onToggle={() => setShowFavorites(!showFavorites)}
+                  onRemove={handleRemoveFavorite}
+                  onExport={handleExportFavorites}
+                />
+              </div>
             )}
           </div>
 
         </div>
 
-        <div className="mt-3 sm:mt-4">
+        <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
           <SourcesPanel
             show={showSources}
             allSources={allSources}
@@ -618,6 +619,8 @@ export const MainSearchPage: React.FC = () => {
             getSiteTypeBadge={getSiteTypeBadge}
             getSiteTypeLabel={getSiteTypeLabel}
           />
+
+          <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} layout="horizontal" />
         </div>
 
         <div className="lg:hidden mt-3 sm:mt-4">
