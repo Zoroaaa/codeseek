@@ -583,18 +583,20 @@ export const MainSearchPage: React.FC = () => {
 
           </div>
 
-          <div className="hidden lg:block space-y-3 sm:space-y-4">
+          <div className="hidden lg:flex lg:flex-col gap-3 sm:gap-4">
             <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} />
             {isAuthenticated && (
-              <FavoritesPanel
-                favorites={favorites}
-                isLoading={isLoadingFavorites}
-                show={showFavorites}
-                isProxyEnabled={isProxyEnabled}
-                onToggle={() => setShowFavorites(!showFavorites)}
-                onRemove={handleRemoveFavorite}
-                onExport={handleExportFavorites}
-              />
+              <div className="flex-1 flex flex-col">
+                <FavoritesPanel
+                  favorites={favorites}
+                  isLoading={isLoadingFavorites}
+                  show={showFavorites}
+                  isProxyEnabled={isProxyEnabled}
+                  onToggle={() => setShowFavorites(!showFavorites)}
+                  onRemove={handleRemoveFavorite}
+                  onExport={handleExportFavorites}
+                />
+              </div>
             )}
           </div>
 
