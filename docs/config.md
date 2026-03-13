@@ -1,5 +1,7 @@
 # CodeSeek 配置说明文档 (v2.0.0)
 
+> 📖 [返回项目主页](../readme.md) | [API接口文档](api.md) | [架构设计文档](backend-frontend-tree.md) | [部署指南文档](deploy.md) | [更新日志](changelogv.2.0.md)
+
 本文档详细说明CodeSeek项目的配置系统，包括前端配置、后端配置和环境变量设置。
 
 ---

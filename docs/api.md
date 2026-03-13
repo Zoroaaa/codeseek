@@ -1,6 +1,28 @@
 # CodeSeek API 文档 (v2.0.0)
 
+> 📖 [返回项目主页](../readme.md) | [架构设计文档](backend-frontend-tree.md) | [配置说明文档](config.md) | [部署指南文档](deploy.md)
+
 本文档详细说明CodeSeek项目的所有API接口，100%基于实际后端代码。
+
+---
+
+## 目录
+
+- [基础信息](#基础信息)
+- [根接口](#根接口)
+- [认证接口](#认证接口-apiauth)
+- [用户数据接口](#用户数据接口-apiuser)
+- [搜索接口](#搜索接口-apisearch)
+- [搜索源管理接口](#搜索源管理接口-apisearch-sources)
+- [社区接口](#社区接口-apicommunity)
+- [管理员接口](#管理员接口-apiadmin)
+- [系统配置接口](#系统配置接口-apiconfig)
+- [系统接口](#系统接口-api)
+- [JAV榜单接口](#jav榜单接口-apijav)
+- [API调用示例](#api调用示例)
+- [路由注册汇总](#路由注册汇总)
+- [数据库表结构参考](#数据库表结构参考)
+- [API统计](#api统计)
 
 ---
 
@@ -2237,6 +2259,88 @@ interface ApiResponse<T> {
 
 ---
 
+## JAV榜单接口 `/api/jav`
+
+**认证方式**: 全局 authMiddleware，所有接口需要认证
+
+### `GET /api/jav/rankings` - 获取JAV榜单
+
+获取JavBus榜单数据，包含有码精选、无码精选、高清、字幕、随机类别、随机女优等多个维度的榜单。
+
+**认证**: 需要
+
+**返回**: 
+- censored - 有码精选（前3页随机20条）
+- uncensored - 无码精选（前3页随机20条）
+- hd - 高清榜单（前3页随机20条）
+- subtitle - 字幕榜单（前3页随机20条）
+- genres - 随机10个类别榜单（每个类别12条）
+- actresses - 随机10个女优榜单（每个女优12条）
+- suggestions - 推荐番号列表（30条）
+- fetchedAt - 获取时间戳
+- sources - 数据来源列表
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "censored": [
+      {
+        "code": "SSIS-123",
+        "title": "作品标题",
+        "cover": "https://...",
+        "date": "2024-01-01",
+        "source": "javbus-p1"
+      }
+    ],
+    "uncensored": [...],
+    "hd": [...],
+    "subtitle": [...],
+    "genres": [
+      {
+        "name": "巨乳",
+        "key": "rq",
+        "items": [...]
+      }
+    ],
+    "actresses": [
+      {
+        "name": "三上悠亜",
+        "key": "2xi",
+        "items": [...]
+      }
+    ],
+    "suggestions": ["SSIS-123", "SSIS-456", ...],
+    "fetchedAt": 1704067200000,
+    "sources": ["JavBus", "JavBus(无码)", "JavBus(高清)"]
+  }
+}
+```
+
+---
+
+### `GET /api/jav/suggestions` - 获取番号建议
+
+根据关键词获取匹配的番号建议列表。
+
+**认证**: 需要
+
+**查询参数**:
+- `keyword` - 搜索关键词（番号前缀或包含的字符）
+
+**返回**: 匹配的番号列表（最多10条）
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": ["SSIS-123", "SSIS-456", "SSIS-789"]
+}
+```
+
+---
+
 ## API调用示例
 
 ```typescript
@@ -2429,6 +2533,7 @@ app.route('/api/search-sources', sourceRoutes);  // 搜索源路由
 app.route('/api/community', communityRoutes);    // 社区路由
 app.route('/api/admin', adminRoutes);            // 管理员路由
 app.route('/api/config', configRoutes);          // 配置路由
+app.route('/api/jav', javRoutes);                // JAV榜单路由
 app.route('/api', systemRoutes);                // 系统路由
 ```
 
@@ -2443,13 +2548,14 @@ app.route('/api', systemRoutes);                // 系统路由
 | communityRoutes | /api/community | routes/community.ts | 全局authMiddleware | 社区分享、标签、评论、举报、通知 |
 | adminRoutes | /api/admin | routes/admin.ts | 全局管理员中间件 | 用户管理、举报处理、统计、日志、会话管理 |
 | configRoutes | /api/config | routes/config.ts | 全局authMiddleware | 系统配置管理、分析事件、邮件日志 |
+| javRoutes | /api/jav | routes/jav.ts | 全局authMiddleware | JAV榜单、番号建议 |
 | systemRoutes | /api | routes/system.ts | 全局authMiddleware（/public-config、/health公开） | 健康检查、状态检测、统计、行为记录 |
 
 ---
 
 ## 数据库表结构参考
 
-项目使用Cloudflare D1 (SQLite)，数据库Schema分为4个文件：
+项目使用Cloudflare D1 (SQLite)，数据库Schema分为7个文件：
 
 ### 核心表 (01_schema_core.sql)
 
@@ -2467,7 +2573,7 @@ app.route('/api', systemRoutes);                // 系统路由
 | `analytics_events` | 分析事件表（user_id, session_id, event_type, event_data, ip_address, user_agent, referer） |
 | `email_send_logs` | 邮件发送日志表（user_id, email_type, recipient_email, send_status, error_message） |
 
-### 搜索源表 (02_schema_sources.sql)
+### 搜索源表 (02_schema_search.sql)
 
 | 表名 | 说明 |
 |------|------|
@@ -2512,4 +2618,5 @@ app.route('/api', systemRoutes);                // 系统路由
 | adminRoutes | 21 | 全部需要管理员权限 |
 | configRoutes | 14 | 全部需要认证，部分需要管理员权限 |
 | systemRoutes | 10 | 大部分需要认证 |
-| **总计** | **130** | - |
+| javRoutes | 2 | 全部需要认证 |
+| **总计** | **132** | - |

@@ -18,12 +18,10 @@
 ## 📑 目录
 
 - [快速访问](#-快速访问)
+- [项目文档](#-项目文档)
 - [项目特色](#-项目特色)
-- [技术架构](#️-技术架构)
+- [技术栈概览](#️-技术栈概览)
 - [快速开始](#-快速开始)
-- [核心功能](#-核心功能)
-- [数据库设计](#-数据库设计)
-- [API文档](#-api文档)
 - [性能优化](#-性能优化)
 - [安全特性](#-安全特性)
 - [许可证](#-许可证)
@@ -43,27 +41,184 @@
 
 </div>
 
+## 📚 项目文档
+
+本项目采用模块化文档管理，各专项文档独立维护，确保内容完整、准确、专业。
+
+### 核心文档
+
+| 文档 | 说明 | 链接 |
+|------|------|------|
+| **API 接口文档** | 完整的 RESTful API 接口说明，包含 130+ 接口定义、请求/响应格式、认证方式等 | [docs/api.md](docs/api.md) |
+| **架构设计文档** | 前后端目录结构、技术栈版本、部署架构、数据库模块化设计详解 | [docs/backend-frontend-tree.md](docs/backend-frontend-tree.md) |
+| **配置说明文档** | 前端配置、后端配置、环境变量、代理服务、数据库配置、角色权限配置 | [docs/config.md](docs/config.md) |
+| **部署指南文档** | 环境要求、本地开发、后端部署、前端部署、数据库配置、常见问题解答 | [docs/deploy.md](docs/deploy.md) |
+| **版本变更日志** | v1.0 到 v2.0 的完整变更记录，包含技术栈升级、架构重构、迁移指南 | [docs/changelogv.2.0.md](docs/changelogv.2.0.md) |
+| **GitHub 推送指南** | Git 操作流程、提交规范、分支管理、GitHub Actions 自动部署配置 | [docs/github_push.md](docs/github_push.md) |
+
+### 前端专项文档
+
+| 文档 | 说明 | 链接 |
+|------|------|------|
+| **通知组件文档** | Toast 通知组件的使用方法、API 文档、配置选项和最佳实践 | [frontend/docs/notification.md](frontend/docs/notification.md) |
+
 ## ✨ 项目特色
 
-### 核心优势
-- ⚛️ **React 18 + TypeScript**: 现代化前端技术栈，类型安全，开发体验优秀
-- ☁️ **Cloudflare全栈**: 完全基于Cloudflare生态构建，利用全球CDN边缘计算优势
-- 🌐 **多源聚合**: 同时整合多个磁力搜索引擎，提供最全面的搜索结果
-- 🎨 **Tailwind CSS**: 原子化CSS框架，响应式界面设计，支持亮色/暗色主题
-- 🔐 **企业级安全**: JWT认证、邮箱验证、数据加密、安全锁定等多层安全防护
+### 🎯 核心优势
 
-### 技术特性
-- 📱 **完美响应式**: 从手机到4K显示器的无缝适配体验
-- 💾 **智能缓存**: 多层级缓存策略，大幅提升搜索速度
-- 🔌 **智能代理**: 内置完整代理服务，突破访问限制
-- 🔧 **高度可定制**: 支持自定义搜索源、分类管理、配置导入导出
-- 📊 **数据分析**: 内置搜索源监控、性能分析和使用统计
-- 👥 **社区驱动**: 支持搜索源分享、标签管理、评论评分等社区功能
-- 🛡️ **角色权限**: 完整的RBAC权限系统，支持超级管理员、管理员、普通用户、访客四种角色
+#### 1. 现代化技术架构
+- ⚛️ **React 18 + TypeScript 5.5**: 采用最新的React并发特性，配合TypeScript实现完整的类型安全，大幅减少运行时错误
+- ⚡ **Vite 5.4 极速构建**: 毫秒级热更新，开发体验丝滑流畅，生产构建优化到极致
+- 🎨 **Tailwind CSS 3.4**: 原子化CSS方案，样式开发效率提升300%，支持亮色/暗色主题无缝切换
+- 📦 **Zustand 状态管理**: 轻量级状态管理方案，自动持久化存储，告别Redux的繁琐
 
-## 🏗️ 技术架构
+#### 2. 云原生边缘计算
+- ☁️ **Cloudflare 全栈部署**: 前端Pages + 后端Workers + 数据库D1，完全Serverless架构
+- 🌍 **全球CDN加速**: 利用Cloudflare全球300+边缘节点，用户就近访问，响应速度提升80%
+- 💰 **零运维成本**: 无需购买服务器，免费额度即可支撑中小型应用，真正实现"部署即忘"
+- 📈 **自动弹性伸缩**: 流量高峰自动扩容，无需担心服务器宕机或资源浪费
 
-### 技术栈概览
+#### 3. 多源聚合搜索引擎
+- 🌐 **50+ 预置搜索源**: 内置磁力搜索、网盘搜索、影视搜索、学术搜索等多种类型
+- 🔍 **智能聚合搜索**: 一键搜索多个源，结果统一格式化、智能排序，告别逐个网站查找
+- 📊 **搜索源状态监控**: 实时检测搜索源可用性，自动跳过失效源，保证搜索成功率
+- ⚙️ **高度可定制**: 用户可自由启用/禁用搜索源、调整优先级、添加自定义搜索源
+
+#### 4. 企业级安全防护
+- 🔐 **JWT无状态认证**: 基于jose库实现的Token认证，支持自动刷新，安全可靠
+- 📧 **完整邮箱验证**: 注册验证、密码重置、邮箱更改、账户删除，全流程邮箱确认
+- 🛡️ **多层安全机制**: 登录失败锁定、验证码频率限制、临时邮箱黑名单、安全事件日志
+- 🔑 **RBAC权限系统**: 四级角色权限（超级管理员/管理员/用户/访客），细粒度权限控制
+
+### 🚀 技术亮点
+
+#### 前端技术栈
+```
+React 18.3.1          → 并发渲染、Suspense、自动批处理
+TypeScript 5.5.3      → 完整类型推断、泛型约束、类型守卫
+Vite 5.4.1            → ESM原生支持、按需编译、极速HMR
+Tailwind CSS 3.4.11   → JIT编译、暗色模式、响应式设计
+Zustand 4.5.5         → 极简API、中间件支持、持久化存储
+React Router 6.26.2   → 数据路由、懒加载、嵌套布局
+Lucide React 0.441.0  → 1000+ 精美图标、Tree-shaking优化
+date-fns 3.6.0        → 轻量级日期处理、国际化支持
+```
+
+#### 后端技术栈
+```
+Hono 4.6.0            → 超轻量Web框架、多运行时支持
+TypeScript 5.5.3      → 类型安全、接口定义、泛型约束
+Cloudflare Workers    → 边缘计算、V8隔离环境、零冷启动
+Cloudflare D1         → SQLite兼容、全球分布、自动备份
+JWT (jose 5.9.0)      → 标准化认证、多种算法支持
+Resend                → 现代邮件服务、高送达率、实时追踪
+```
+
+### 📱 用户体验
+
+#### 完美响应式设计
+- 📱 **移动端优先**: 从320px到4K显示器，完美适配所有设备尺寸
+- 🎯 **触摸优化**: 手势操作、滑动菜单、长按交互，移动端体验媲美原生APP
+- ⚡ **性能优先**: 首屏加载<1s，交互响应<100ms，Lighthouse评分90+
+
+#### 智能交互体验
+- 🔔 **Toast通知系统**: 统一的消息提示，支持成功/错误/警告/信息四种类型
+- 💾 **自动数据同步**: 跨设备同步搜索历史、收藏夹、个人设置
+- 🎨 **主题定制**: 亮色/暗色/跟随系统，一键切换，状态持久化
+- ⌨️ **快捷键支持**: 常用操作支持键盘快捷键，提升操作效率
+
+## 🎯 核心功能
+
+### 1. 🔍 智能搜索系统
+
+#### 多源聚合搜索
+- **一键聚合**: 输入关键词，同时搜索多个搜索引擎，结果统一展示
+- **智能排序**: 根据搜索源优先级、使用频率、可用状态智能排序结果
+- **分类筛选**: 支持按主分类（磁力/网盘/影视等）和子分类筛选搜索源
+- **历史记录**: 自动保存搜索历史，支持快速重搜和历史统计
+
+#### 搜索建议与热门
+- **智能提示**: 输入关键词时自动提示相关搜索建议
+- **热门搜索**: 实时展示热门搜索关键词，发现热门资源
+- **搜索统计**: 个人搜索统计，了解自己的搜索习惯
+
+#### 搜索源管理
+- **启用/禁用**: 自由控制哪些搜索源参与搜索
+- **优先级调整**: 自定义搜索源的显示顺序
+- **状态监控**: 实时查看搜索源可用性状态
+- **自定义添加**: 支持添加自定义搜索源（URL模板）
+
+### 2. 👤 用户系统
+
+#### 认证与安全
+- **多种登录方式**: 支持用户名或邮箱登录
+- **JWT Token认证**: 无状态认证，支持Token自动刷新
+- **登录保护**: 连续失败5次自动锁定15分钟
+- **会话管理**: 查看活跃会话，支持强制登出
+
+#### 邮箱验证流程
+- **注册验证**: 可选/强制邮箱验证注册
+- **密码重置**: 通过邮箱验证码安全重置密码
+- **邮箱更改**: 双邮箱验证确认，安全更改绑定邮箱
+- **账户删除**: 邮箱验证确认后才能删除账户
+
+#### 个人数据管理
+- **收藏夹**: 收藏常用搜索结果，支持分类管理
+- **搜索历史**: 自动记录搜索历史，支持清空和删除
+- **数据同步**: 跨设备同步收藏、历史、设置
+- **数据导出**: 支持导出个人数据（JSON格式）
+
+### 3. 👥 社区功能
+
+#### 搜索源分享
+- **分享搜索源**: 将自己发现的好用搜索源分享给社区
+- **标签管理**: 为搜索源添加标签，方便分类查找
+- **审核机制**: 管理员审核后才能上架，保证质量
+
+#### 互动功能
+- **评论评分**: 对搜索源发表评价，帮助他人选择
+- **点赞收藏**: 为优质搜索源点赞，收藏到个人列表
+- **举报机制**: 发现违规内容可举报，管理员处理
+
+#### 贡献统计
+- **个人贡献**: 查看自己分享的搜索源数量、下载量、评分
+- **社区排行**: 热门分享、活跃贡献者排行
+
+### 4. 🛠️ 管理员功能
+
+#### 用户管理
+- **用户列表**: 分页查询、搜索筛选、状态查看
+- **角色权限**: 四级角色（超级管理员/管理员/用户/访客）
+- **状态控制**: 启用/禁用用户账户
+- **登录日志**: 查看用户登录记录和IP信息
+
+#### 内容管理
+- **搜索源管理**: 增删改查系统搜索源和分类
+- **社区审核**: 审核用户分享的搜索源
+- **举报处理**: 处理用户举报内容
+
+#### 系统监控
+- **仪表盘**: 一览系统运行状态、用户活跃度
+- **趋势分析**: 用户增长、搜索趋势、活跃度变化
+- **行为日志**: 用户操作行为记录和分析
+- **配置管理**: 动态修改系统配置，无需重新部署
+
+### 5. 📊 JAV榜单功能
+
+#### 多维度榜单
+- **有码精选**: JavBus首页前3页随机20条
+- **无码精选**: 无码专区前3页随机20条
+- **高清榜单**: 高清分类前3页随机20条
+- **字幕榜单**: 字幕分类前3页随机20条
+- **随机类别**: 随机10个类别，每个类别12条
+- **随机女优**: 随机10个女优，每个女优12条
+
+#### 智能推荐
+- **番号建议**: 输入关键词自动匹配番号
+- **数据来源**: 支持多数据源聚合展示
+- **登录可见**: 需要用户登录认证后才能访问
+
+## 🏗️ 技术栈概览
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -73,8 +228,6 @@
 │  • Tailwind CSS 3.4.11 样式框架                         │
 │  • Zustand 4.5.5 状态管理                                │
 │  • React Router 6.26.2 路由管理                         │
-│  • Lucide React 0.441.0 图标库                          │
-│  • date-fns 3.6.0 日期处理                              │
 │  • 部署：Cloudflare Pages                               │
 └─────────────────────────────────────────────────────────┘
                             ↓
@@ -89,171 +242,7 @@
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 前端架构设计
-
-```
-frontend/src/
-├── components/           # 🧩 组件层
-│   ├── layout/          # 布局组件
-│   │   ├── AdminPanelLayout.tsx    # 管理面板布局
-│   │   ├── CommunityPanelLayout.tsx # 社区面板布局
-│   │   ├── DashboardLayout.tsx     # 仪表板布局
-│   │   ├── MainLayout.tsx          # 主页面布局
-│   │   └── index.ts                # 布局组件导出
-│   └── ui/              # UI基础组件
-│       ├── Badge.tsx              # 徽章组件
-│       ├── Button.tsx             # 按钮组件
-│       ├── Card.tsx               # 卡片组件
-│       ├── Checkbox.tsx           # 复选框组件
-│       ├── Dropdown.tsx           # 下拉菜单组件
-│       ├── EmptyState.tsx         # 空状态组件
-│       ├── Input.tsx              # 输入框组件
-│       ├── Loading.tsx            # 加载组件
-│       ├── Modal.tsx              # 模态框组件
-│       ├── Select.tsx             # 选择器组件
-│       ├── SourceIcon.tsx         # 搜索源图标组件
-│       ├── Tabs.tsx               # 标签页组件
-│       ├── TextArea.tsx           # 文本域组件
-│       ├── Toast.tsx              # 通知组件
-│       └── index.ts               # UI组件导出
-│
-├── contexts/            # 🔄 React Context
-│   └── ConfigContext.tsx          # 配置上下文
-│
-├── hooks/               # 🎣 自定义Hooks
-│   ├── useAuth.ts       # 认证Hook
-│   ├── useFavorites.ts  # 收藏Hook
-│   ├── useNotification.ts # 通知Hook
-│   ├── useSearch.ts     # 搜索Hook
-│   ├── useSearchSuggestions.ts  # 搜索建议Hook
-│   └── index.ts         # Hooks导出
-│
-├── pages/               # 📄 页面组件
-│   ├── auth/            # 认证页面
-│   │   ├── ForgotPasswordPage.tsx # 忘记密码页
-│   │   ├── LoginPage.tsx          # 登录页
-│   │   ├── RegisterPage.tsx       # 注册页
-│   │   └── index.ts               # 认证页面导出
-│   ├── dashboard/       # 仪表板页面
-│   │   ├── CategoryManager.tsx    # 分类管理
-│   │   ├── DashboardPage.tsx      # 仪表板主页
-│   │   ├── FavoritesHistoryManager.tsx # 收藏历史
-│   │   ├── OverviewManager.tsx    # 概览页
-│   │   ├── SettingsManager.tsx    # 设置页
-│   │   ├── SourceManager.tsx      # 搜索源管理
-│   │   ├── StatsManager.tsx       # 统计页
-│   │   ├── UserActivitiesPage.tsx # 用户活动页
-│   │   └── index.ts               # 仪表板页面导出
-│   ├── admin/           # 管理面板页面
-│   │   ├── ActionsTab.tsx         # 行为日志
-│   │   ├── AdminManager.tsx       # 管理主页
-│   │   ├── AdminPanelOverview.tsx # 管理概览
-│   │   ├── AnalyticsTab.tsx       # 分析统计
-│   │   ├── CleanupTab.tsx         # 数据清理
-│   │   ├── ConfigTab.tsx          # 系统配置
-│   │   ├── ReportsTab.tsx         # 举报管理
-│   │   ├── RolesTab.tsx           # 角色管理
-│   │   ├── SessionsTab.tsx        # 会话管理
-│   │   ├── TrendsTab.tsx          # 趋势分析
-│   │   ├── UsersTab.tsx           # 用户管理
-│   │   ├── index.ts               # 管理页面导出
-│   │   └── shared.tsx             # 共享组件
-│   ├── community/       # 社区页面
-│   │   ├── BrowseTab.tsx          # 浏览页
-│   │   ├── CommunityManager.tsx   # 社区主页
-│   │   ├── FavoritesTab.tsx       # 收藏页
-│   │   ├── MySharesTab.tsx        # 我的分享
-│   │   ├── NotificationsTab.tsx   # 通知页
-│   │   ├── StatsBanner.tsx        # 统计横幅
-│   │   ├── TagsTab.tsx            # 标签管理
-│   │   ├── TrendingTab.tsx        # 热门页
-│   │   ├── index.ts               # 社区页面导出
-│   │   └── shared.tsx             # 共享组件
-│   ├── HomePage.tsx     # 首页
-│   └── MainSearchPage.tsx # 主搜索页
-│
-├── services/            # 🔧 服务层
-│   ├── api/             # API服务
-│   │   ├── admin.ts     # 管理员API
-│   │   ├── auth.ts      # 认证API
-│   │   ├── client.ts    # API客户端
-│   │   ├── community.ts # 社区API
-│   │   ├── search.ts    # 搜索API
-│   │   ├── source.ts    # 搜索源API
-│   │   ├── system.ts    # 系统API
-│   │   └── index.ts     # API服务导出
-│   ├── proxy/           # 代理服务
-│   │   ├── ProxyService.ts    # 代理服务
-│   │   └── proxy-config.ts    # 代理配置
-│   └── config.ts        # 配置服务
-│
-├── stores/              # 📦 状态管理 (Zustand)
-│   ├── authStore.ts     # 认证状态
-│   ├── communityStore.ts # 社区状态
-│   ├── proxyStore.ts    # 代理状态
-│   ├── searchStore.ts   # 搜索状态
-│   ├── sourceStore.ts   # 搜索源状态
-│   ├── themeStore.ts    # 主题状态
-│   ├── uiStore.ts       # UI状态
-│   └── index.ts         # Store导出
-│
-├── types/               # 📝 TypeScript类型定义
-│   ├── auth.ts          # 认证类型
-│   ├── common.ts        # 通用类型
-│   ├── community.ts     # 社区类型
-│   ├── notification.ts  # 通知类型
-│   ├── search.ts        # 搜索类型
-│   ├── source.ts        # 搜索源类型
-│   └── index.ts         # 类型导出
-│
-├── utils/               # 🛠️ 工具函数
-│   └── notificationTemplates.ts # 通知模板
-│
-├── App.tsx              # 应用入口组件
-├── constants.ts         # 常量配置
-├── main.tsx             # 主入口文件
-└── index.css            # 全局样式
-```
-
-### 后端架构设计
-
-```
-backend/src/
-├── index.ts             # 🚀 主入口文件
-├── constants.ts         # 📋 常量配置
-│
-├── routes/              # 🛣️ 路由层
-│   ├── admin.ts         # 管理员路由（用户管理、统计、举报处理、角色管理）
-│   ├── auth.ts          # 认证路由（登录、注册、密码重置、邮箱验证）
-│   ├── community.ts     # 社区路由（标签、分享、评论、点赞）
-│   ├── config.ts        # 配置路由（系统配置管理）
-│   ├── search.ts        # 搜索路由（搜索执行、历史、建议）
-│   ├── sources.ts       # 搜索源路由（分类、搜索源、用户配置）
-│   ├── system.ts        # 系统路由（健康检查、状态监控）
-│   └── user.ts          # 用户路由（设置、收藏、历史）
-│
-├── services/            # 🔧 业务服务层
-│   ├── index.ts         # 服务入口
-│   ├── config.ts        # 配置服务
-│   ├── email-verification.ts  # 邮箱验证服务
-│   └── search-sources-service.ts # 搜索源服务
-│
-├── middleware/          # 🔐 中间件层
-│   ├── index.ts         # 中间件入口
-│   └── auth.ts          # 认证中间件
-│
-├── validation/          # ✅ 验证层
-│   └── index.ts         # 请求验证
-│
-├── utils/               # 🛠️ 工具函数
-│   ├── index.ts         # 工具入口
-│   └── security.ts      # 安全工具（密码哈希、锁定机制）
-│
-└── types/               # 📝 TypeScript类型定义
-    └── index.ts         # 类型定义（User, Role, SearchSource等）
-```
-
-👉 [查看完整架构说明](docs/backend-frontend-tree.md)
+👉 [查看完整架构设计](docs/backend-frontend-tree.md)
 
 ## 🚀 快速开始
 
@@ -263,474 +252,51 @@ backend/src/
 - **Cloudflare账户**: 用于部署Workers和D1数据库
 - **Wrangler CLI**: Cloudflare开发工具 (>= 3.78.0)
 
-### 部署指南
-
-#### 1. 后端部署 (Cloudflare Workers + D1)
+### 快速部署
 
 ```bash
 # 克隆项目
 git clone https://github.com/Zoroaaa/codeseek.git
-cd codeseek/backend
+cd codeseek
 
-# 安装依赖
-npm install
+# 后端部署
+cd backend && npm install && npm run deploy
 
-# 登录Cloudflare
-wrangler login
-
-# 创建D1数据库
-wrangler d1 create codeseek-db
-
-# 配置 wrangler.toml（添加必要的环境变量和数据库ID）
-# - JWT_SECRET: JWT签名密钥
-# - RESEND_API_KEY: 邮件服务API密钥
-# - DB: D1数据库绑定
-
-# 初始化数据库（按顺序执行SQL文件）
-wrangler d1 execute codeseek-db --remote --file="../database/01_schema_core.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/02_schema_search.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/03_schema_community.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/04_schema_security.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/05_data_system.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/06_data_search_sources.sql"
-wrangler d1 execute codeseek-db --remote --file="../database/07_data_tags.sql"
-
-# 本地开发
-npm run dev
-
-# 部署到生产环境
-npm run deploy
+# 前端部署
+cd frontend && npm install && npm run build && wrangler pages deploy dist
 ```
 
-#### 2. 前端部署 (Cloudflare Pages)
-
-```bash
-cd frontend
-
-# 安装依赖
-npm install
-
-# 本地开发
-npm run dev
-
-# 构建生产版本
-npm run build
-
-# 部署到 Cloudflare Pages
-wrangler pages deploy dist --project-name=codeseek
-```
-
-👉 [查看详细部署文档](docs/deploy.md)  
+👉 [查看详细部署指南](docs/deploy.md)  
 👉 [查看配置说明](docs/config.md)
-
-## 🎯 核心功能
-
-### 1. 智能搜索系统
-
-**多源聚合搜索**
-- 同时从多个磁力搜索站点获取结果
-- 统一结果格式化和排序
-- 支持自定义搜索源优先级
-- 实时监控搜索源可用性
-
-**搜索增强功能**
-- 搜索历史记录和智能提示
-- 基于热门关键词的搜索建议
-- 搜索结果去重和优化排序
-- 支持按文件大小、时间等条件筛选
-
-**缓存策略**
-- 多层级缓存机制 (内存缓存 + KV缓存)
-- 智能缓存失效策略
-- 显著提升搜索响应速度
-
-**搜索源管理**
-- 用户可自由启用/禁用搜索源
-- 支持搜索源优先级排序
-- 实时检查搜索源状态
-- 搜索源配置导入导出
-
-### 2. 用户系统
-
-**安全认证**
-- 基于 JWT 的无状态认证
-- Token 自动刷新机制
-- 安全的密码加密存储 (bcrypt)
-- 支持忘记密码功能
-- 登录失败锁定机制
-
-**邮箱验证**
-- 注册时邮箱验证
-- 修改邮箱验证
-- 重置密码验证
-- 删除账户验证
-- 基于 Resend 的邮件服务
-
-**个人设置**
-- 主题偏好设置（亮色/暗色模式）
-- 搜索偏好配置
-- 隐私设置
-- 通知设置
-
-**数据同步**
-- 跨设备数据同步
-- 搜索历史同步
-- 收藏内容同步
-- 设置同步
-
-**收藏管理**
-- 添加/删除收藏
-- 收藏分类
-- 收藏搜索和筛选
-- 批量操作
-
-**历史记录**
-- 自动保存搜索历史
-- 历史记录搜索
-- 按时间筛选
-- 清除历史记录
-
-### 3. 社区功能
-
-**标签管理**
-- 创建和编辑标签
-- 标签分类
-- 标签热度统计
-- 标签搜索
-
-**搜索源分享**
-- 发布自定义搜索源
-- 搜索源评分和评论
-- 搜索源下载和使用
-- 热门搜索源推荐
-
-**用户互动**
-- 点赞和收藏
-- 评论和反馈
-- 举报不当内容
-- 用户贡献统计
-
-**社区统计**
-- 热门搜索关键词
-- 活跃用户排行
-- 搜索源使用统计
-- 社区成长数据
-
-### 4. 管理员功能
-
-**用户管理**
-- 用户列表查看和搜索
-- 用户状态管理（启用/禁用）
-- 用户角色分配
-- 用户权限管理
-- 登录日志查看
-
-**系统监控**
-- 系统统计概览
-- 用户活跃度分析
-- 登录趋势分析
-- 搜索趋势分析
-- 行为日志查询
-
-**内容管理**
-- 举报处理
-- 搜索源审核
-- 标签管理
-- 数据清理
-
-**角色权限**
-- 四种系统角色：超级管理员、管理员、普通用户、访客
-- 灵活的权限配置
-- 基于角色的访问控制 (RBAC)
-
-## 📊 数据库设计
-
-使用 Cloudflare D1 (SQLite) 作为数据持久化方案，采用模块化SQL文件管理：
-
-### 数据库模块结构
-
-| 文件 | 说明 | 核心表 |
-|------|------|--------|
-| `01_schema_core.sql` | 核心表结构 | roles, users, user_sessions, user_favorites, user_search_history, user_actions, system_config, analytics_events |
-| `02_schema_search.sql` | 搜索相关表 | search_major_categories, search_source_categories, search_sources, user_search_source_configs, source_status_cache |
-| `03_schema_community.sql` | 社区功能表 | community_source_tags, community_shared_sources, community_source_reviews, community_source_likes, community_source_downloads, community_source_reports, community_user_stats |
-| `04_schema_security.sql` | 安全相关表 | email_verifications, email_change_requests, password_reset_logs, security_lockouts, user_security_events, email_send_logs, email_templates |
-| `05_data_system.sql` | 系统初始化数据 | 角色数据、系统配置、邮件模板 |
-| `06_data_search_sources.sql` | 搜索源数据 | 大类、分类、50+预置搜索源 |
-| `07_data_tags.sql` | 标签数据 | 官方标签初始化 |
-
-### 核心数据表说明
-
-| 模块 | 表名 | 说明 |
-|------|------|------|
-| 用户管理 | users | 用户基础信息、权限、设置 |
-| 用户管理 | user_sessions | JWT会话管理 |
-| 用户管理 | user_favorites | 用户收藏记录 |
-| 用户管理 | user_search_history | 搜索历史记录 |
-| 用户管理 | user_actions | 行为日志表 |
-| 角色管理 | roles | 角色定义（super_admin, admin, user, guest） |
-| 搜索源 | search_sources | 搜索源配置（50+预置源） |
-| 搜索源 | search_source_categories | 搜索源分类 |
-| 搜索源 | search_major_categories | 主分类（搜索源/浏览站点） |
-| 搜索源 | user_search_source_configs | 用户搜索源配置 |
-| 社区 | community_shared_sources | 社区分享的搜索源 |
-| 社区 | community_source_tags | 社区标签管理 |
-| 社区 | community_source_reviews | 评论表 |
-| 社区 | community_source_likes | 点赞表 |
-| 社区 | community_source_reports | 举报表 |
-| 社区 | community_user_stats | 用户统计表 |
-| 安全 | email_verifications | 邮箱验证码管理 |
-| 安全 | security_lockouts | 安全锁定机制 |
-| 安全 | user_security_events | 安全事件日志 |
-| 系统 | system_config | 系统配置表 |
-| 系统 | analytics_events | 分析事件表 |
-
-## 📝 API文档
-
-### 认证相关 API
-
-```http
-POST   /api/auth/register              # 用户注册
-POST   /api/auth/login                 # 用户登录
-POST   /api/auth/verify-token          # 验证Token
-POST   /api/auth/refresh               # 刷新Token
-POST   /api/auth/logout                # 用户登出
-GET    /api/auth/me                    # 获取当前用户信息
-PUT    /api/auth/change-password       # 修改密码
-POST   /api/auth/forgot-password       # 忘记密码
-POST   /api/auth/reset-password        # 重置密码
-DELETE /api/auth/account               # 删除账户
-POST   /api/auth/send-registration-code # 发送注册验证码
-POST   /api/auth/smart-send-code       # 智能发送验证码
-GET    /api/auth/verification-status   # 检查验证状态
-```
-
-### 用户数据 API
-
-```http
-GET    /api/user/settings              # 获取用户设置
-PUT    /api/user/settings              # 更新用户设置
-GET    /api/user/favorites             # 获取收藏列表
-POST   /api/user/favorites             # 添加收藏
-DELETE /api/user/favorites/:id         # 删除收藏
-GET    /api/user/search-history        # 获取搜索历史
-POST   /api/user/search-history        # 保存搜索记录
-DELETE /api/user/search-history        # 清空搜索历史
-DELETE /api/user/search-history/:id    # 删除单条历史
-GET    /api/user/search-stats          # 获取搜索统计
-GET    /api/user/source-configs        # 获取用户搜索源配置
-PUT    /api/user/source-configs/:sourceId # 更新搜索源配置
-```
-
-### 搜索接口
-
-```http
-POST   /api/search                     # 执行搜索
-GET    /api/search/suggestions         # 获取搜索建议
-GET    /api/search/trending            # 获取热门搜索
-```
-
-### 搜索源管理 API
-
-```http
-GET    /api/search-sources/major-categories        # 获取主分类列表
-POST   /api/search-sources/major-categories        # 创建主分类
-GET    /api/search-sources/major-categories/:id    # 获取单个主分类
-PUT    /api/search-sources/major-categories/:id    # 更新主分类
-DELETE /api/search-sources/major-categories/:id    # 删除主分类
-GET    /api/search-sources/categories              # 获取分类列表
-POST   /api/search-sources/categories              # 创建分类
-GET    /api/search-sources/categories/:id          # 获取单个分类
-PUT    /api/search-sources/categories/:id          # 更新分类
-DELETE /api/search-sources/categories/:id          # 删除分类
-GET    /api/search-sources/                        # 获取搜索源列表
-POST   /api/search-sources/                        # 创建搜索源
-GET    /api/search-sources/:id                     # 获取单个搜索源
-PUT    /api/search-sources/:id                     # 更新搜索源
-DELETE /api/search-sources/:id                     # 删除搜索源
-POST   /api/search-sources/:id/increment-usage     # 增加使用次数
-GET    /api/search-sources/user-configs/:userId    # 获取用户配置
-DELETE /api/search-sources/user-configs/:sourceId  # 删除用户配置
-GET    /api/search-sources/with-user-config/:userId # 获取带用户配置的搜索源
-POST   /api/search-sources/user-configs/batch      # 批量更新用户配置
-GET    /api/search-sources/popular                 # 获取热门搜索源
-GET    /api/search-sources/search                  # 搜索搜索源
-GET    /api/search-sources/stats                   # 获取搜索源统计
-GET    /api/search-sources/export                  # 导出搜索源
-GET    /api/search-sources/export-user-configs/:userId # 导出用户配置
-```
-
-### 社区接口
-
-```http
-GET    /api/community/tags             # 获取标签列表
-POST   /api/community/tags             # 创建标签
-PUT    /api/community/tags/:id         # 更新标签
-DELETE /api/community/tags/:id         # 删除标签
-GET    /api/community/sources          # 获取社区搜索源列表
-GET    /api/community/sources/:id      # 获取搜索源详情
-POST   /api/community/sources          # 提交搜索源
-PUT    /api/community/sources/:id      # 更新搜索源
-DELETE /api/community/sources/:id      # 删除搜索源
-POST   /api/community/sources/:id/like # 点赞/取消点赞
-GET    /api/community/sources/:id/reviews # 获取评论列表
-POST   /api/community/reviews          # 创建评论
-PUT    /api/community/reviews/:id      # 更新评论
-DELETE /api/community/reviews/:id      # 删除评论
-POST   /api/community/sources/:id/report # 举报搜索源
-POST   /api/community/sources/:id/download # 记录下载
-GET    /api/community/sources/my-sources # 获取我的分享
-GET    /api/community/sources/popular  # 获取热门分享
-GET    /api/community/sources/recent   # 获取最新分享
-GET    /api/community/sources/search   # 搜索社区资源
-GET    /api/community/sources/user-stats # 获取用户统计
-GET    /api/community/sources/stats    # 获取社区统计
-```
-
-### 管理员接口
-
-```http
-GET    /api/admin/roles                # 获取角色列表
-GET    /api/admin/users                # 获取用户列表
-GET    /api/admin/users/:id            # 获取用户详情
-PUT    /api/admin/users/:id/status     # 更新用户状态
-PUT    /api/admin/users/:id/permissions # 更新用户权限
-PUT    /api/admin/users/:id/role       # 更新用户角色
-GET    /api/admin/users/:id/login-logs # 获取用户登录日志
-GET    /api/admin/active-users         # 获取活跃用户排行
-GET    /api/admin/login-stats          # 获取登录统计
-GET    /api/admin/reports              # 获取举报列表
-PUT    /api/admin/reports/:id          # 处理举报
-GET    /api/admin/stats                # 获取系统统计
-GET    /api/admin/logs                 # 获取行为日志
-POST   /api/admin/cleanup              # 清理过期数据
-GET    /api/admin/sessions             # 获取会话列表
-DELETE /api/admin/sessions/:id         # 终止会话
-GET    /api/admin/analytics/stats      # 获取分析统计
-GET    /api/admin/analytics/events     # 获取分析事件
-GET    /api/admin/dashboard/overview   # 获取看板概览
-GET    /api/admin/dashboard/trends     # 获取趋势数据
-GET    /api/admin/dashboard/user-behavior # 获取用户行为分析
-```
-
-### 系统接口
-
-```http
-GET    /                               # API信息
-GET    /health                         # 健康检查
-GET    /api/public-config              # 获取公开配置
-GET    /api/config                     # 获取系统配置
-GET    /api/stats                      # 获取统计信息
-GET    /api/source-status/check        # 搜索源状态检查
-GET    /api/source-status-history/:sourceId # 获取状态检查历史
-GET    /api/source-status-batch        # 批量状态检查
-DELETE /api/source-status-cache/:sourceId # 清除状态缓存
-POST   /api/actions/record             # 记录用户行为
-```
 
 👉 [查看完整API文档](docs/api.md)
 
 ## 📊 性能优化
 
 ### 前端性能优化
-
-**架构优化**
-- ✅ React 18 并发特性
-- ✅ Vite 快速构建和HMR
-- ✅ 代码分割，路由级别懒加载
-- ✅ Tree-shaking 支持
-
-**缓存策略**
-- ✅ Zustand 持久化状态
-- ✅ API 响应缓存，减少网络请求
-- ✅ 静态资源强缓存
-- ✅ 智能缓存失效机制
-
-**渲染优化**
+- ✅ React 18 并发特性 + Vite 快速构建
+- ✅ 代码分割，路由级别懒加载，Tree-shaking
+- ✅ Zustand 持久化状态 + API 响应缓存
 - ✅ React.memo 和 useMemo 优化重渲染
-- ✅ 虚拟滚动处理大量搜索结果
-- ✅ 防抖节流优化用户输入
-- ✅ 图片懒加载
-
-**资源优化**
-- ✅ Tailwind CSS 按需生成
-- ✅ 字体子集化
-- ✅ SVG 图标优化
-- ✅ 响应式图片
 
 ### 后端性能优化
-
-**边缘计算**
-- ✅ 利用 Cloudflare 全球边缘节点
-- ✅ 就近处理请求
-- ✅ 减少网络延迟
-- ✅ 自动负载均衡
-
-**数据库优化**
-- ✅ 索引优化
-- ✅ 查询优化
-- ✅ 参数化查询防止SQL注入
-- ✅ 自动清理过期数据触发器
-
-**API 优化**
-- ✅ 响应压缩 (gzip/brotli)
-- ✅ 批量操作支持
-- ✅ 分页查询
-- ✅ 字段筛选
-
-**并发控制**
-- ✅ 请求限流
-- ✅ 并发请求控制
-- ✅ 优先级队列
-- ✅ 降级策略
+- ✅ Cloudflare 全球边缘节点就近处理
+- ✅ 数据库索引优化 + 参数化查询
+- ✅ 响应压缩 (gzip/brotli) + 批量操作支持
+- ✅ 请求限流 + 并发控制 + 降级策略
 
 ## 🔒 安全特性
 
 ### 前端安全
-
-**输入安全**
-- ✅ XSS 防护：严格的输入输出过滤
-- ✅ CSRF 保护：Token 验证机制
-- ✅ 内容安全策略 (CSP)
-- ✅ 子资源完整性 (SRI)
-
-**数据安全**
-- ✅ 敏感数据加密存储
-- ✅ 安全的 Cookie 设置
-- ✅ HTTPS 强制
-- ✅ 安全的第三方资源加载
-
-**API 安全**
-- ✅ JWT Token 认证
-- ✅ Token 自动刷新
-- ✅ 请求签名验证
-- ✅ 速率限制
+- ✅ XSS 防护 + CSRF 保护
+- ✅ 内容安全策略 (CSP) + 子资源完整性 (SRI)
+- ✅ JWT Token 认证 + 请求签名验证
 
 ### 后端安全
-
-**认证与授权**
-- ✅ JWT Token 认证 (jose库)
-- ✅ 基于角色的访问控制 (RBAC)
-- ✅ 会话管理
-- ✅ 登录失败锁定机制
-
-**数据安全**
-- ✅ SQL 注入防护
-- ✅ 参数化查询
-- ✅ 密码加密存储 (bcrypt)
-- ✅ 敏感数据脱敏
-
-**API 安全**
-- ✅ CORS 配置
-- ✅ 速率限制
-- ✅ 请求验证
-- ✅ IP 记录
-
-**监控与审计**
-- ✅ 安全事件日志
-- ✅ 异常行为检测
-- ✅ 审计日志
-- ✅ 安全告警
+- ✅ JWT Token 认证 (jose库) + RBAC 权限控制
+- ✅ SQL 注入防护 + 密码加密存储 (bcrypt)
+- ✅ 登录失败锁定机制 + 安全事件日志
+- ✅ CORS 配置 + 速率限制 + IP 记录
 
 ## 📄 许可证
 
@@ -756,9 +322,6 @@ POST   /api/actions/record             # 记录用户行为
 
 ### 技术平台
 - **[Cloudflare](https://www.cloudflare.com/)** - 提供优秀的边缘计算平台
-  - Workers - 无服务器计算平台
-  - D1 - SQLite数据库服务
-  - Pages - 静态网站托管
 - **[GitHub](https://github.com/)** - 代码托管和协作平台
 - **[Resend](https://resend.com/)** - 邮件发送服务
 

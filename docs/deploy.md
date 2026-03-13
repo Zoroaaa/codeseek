@@ -1,5 +1,7 @@
 # CodeSeek 部署指南 (v2.0.0)
 
+> 📖 [返回项目主页](../readme.md) | [API接口文档](api.md) | [架构设计文档](backend-frontend-tree.md) | [配置说明文档](config.md) | [更新日志](changelogv.2.0.md)
+
 本文档详细说明如何将CodeSeek项目部署到Cloudflare平台。
 
 ---

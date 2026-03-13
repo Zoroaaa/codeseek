@@ -4,8 +4,11 @@
  */
 import { Hono } from 'hono';
 import { Env } from '../types';
+import { authMiddleware } from '../middleware';
 
 export const javRoutes = new Hono<{ Bindings: Env }>();
+
+javRoutes.use('*', authMiddleware);
 
 // ─────────────────────────────────────────────
 // 类型
