@@ -502,9 +502,12 @@ export const sourceApi = {
         error: string | null;
       }>;
       summary: {
-        uptime: number;
+        totalChecks: number;
+        availableCount: number;
+        unavailableCount: number;
+        availabilityRate: number;
         avgResponseTime: number;
-        lastChecked: string;
+        lastChecked: string | null;
       };
     } 
   }> => {

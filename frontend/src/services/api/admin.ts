@@ -410,4 +410,64 @@ export const adminApi = {
       totalPages: response.data.totalPages,
     };
   },
+
+  getReports: async (params: {
+    page?: number;
+    pageSize?: number;
+    status?: string;
+  } = {}): Promise<PaginatedResponse<{
+    id: string;
+    shared_source_id: string;
+    source_name: string;
+    source_url_template: string;
+    reporter_user_id: string;
+    reporter_username: string;
+    report_reason: string;
+    report_details: string | null;
+    status: string;
+    created_at: number;
+  }>> => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.set('page', params.page.toString());
+    if (params.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params.status) queryParams.set('status', params.status);
+
+    const response = await apiClient.get<{
+      success: boolean;
+      data: {
+        reports: Array<{
+          id: string;
+          shared_source_id: string;
+          source_name: string;
+          source_url_template: string;
+          reporter_user_id: string;
+          reporter_username: string;
+          report_reason: string;
+          report_details: string | null;
+          status: string;
+          created_at: number;
+        }>;
+        total: number;
+        page: number;
+        pageSize: number;
+        totalPages: number;
+      };
+    }>(`/admin/reports?${queryParams.toString()}`);
+
+    return {
+      items: response.data.reports,
+      total: response.data.total,
+      page: response.data.page,
+      pageSize: response.data.pageSize,
+      totalPages: response.data.totalPages,
+    };
+  },
+
+  handleReport: async (reportId: string, data: {
+    status: 'resolved' | 'dismissed';
+    action?: string;
+    notes?: string;
+  }): Promise<void> => {
+    await apiClient.put(`/admin/reports/${reportId}`, data);
+  },
 };

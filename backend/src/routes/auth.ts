@@ -745,66 +745,6 @@ authRoutes.post('/send-registration-code', async (c) => {
   }
 });
 
-authRoutes.post('/send-password-reset-code', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
-
-  try {
-    const user = await c.env.DB.prepare(
-      'SELECT * FROM users WHERE id = ?'
-    ).bind(payload.userId).first<User>();
-
-    if (!user) {
-      return c.json(error('AUTH_ERROR', '用户不存在'), 404);
-    }
-
-    const emailService = new EmailVerificationService(c.env);
-    const ipAddress = getClientIP(c);
-
-    try {
-      await emailService.checkEmailRateLimit(user.email, ipAddress);
-    } catch (rateLimitError) {
-      return c.json(error('RATE_LIMIT', (rateLimitError as Error).message), 429);
-    }
-
-    const verification = await emailService.createEmailVerification(
-      user.email, 
-      'password_reset', 
-      user.id, 
-      { ipAddress }
-    );
-
-    try {
-      await emailService.sendVerificationEmail(
-        user.email,
-        verification.code,
-        'password_reset',
-        { username: user.username }
-      );
-    } catch (sendError) {
-      console.error('发送密码重置验证码失败:', sendError);
-      return c.json(error('SERVER_ERROR', '验证码发送失败，请稍后重试'), 500);
-    }
-
-    return c.json(success({ 
-      maskedEmail: emailVerificationUtils.maskEmail(user.email),
-      expiresIn: 900 
-    }, '验证码已发送'));
-  } catch (err) {
-    console.error('Send password reset code error:', err);
-    return c.json(error('SERVER_ERROR', '发送验证码失败'), 500);
-  }
-});
-
 authRoutes.post('/request-email-change', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

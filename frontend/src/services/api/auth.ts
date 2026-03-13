@@ -98,18 +98,6 @@ export const authApi = {
     }>('/auth/send-registration-code', { email });
   },
 
-  sendPasswordResetCode: async (email: string): Promise<{ 
-    success: boolean; 
-    data?: { maskedEmail: string; expiresIn: number };
-    message?: string;
-  }> => {
-    return apiClient.post<{ 
-      success: boolean; 
-      data?: { maskedEmail: string; expiresIn: number };
-      message?: string;
-    }>('/auth/send-password-reset-code', { email });
-  },
-
   sendAccountDeleteCode: async (): Promise<{ 
     success: boolean; 
     data?: { maskedEmail: string; expiresIn: number };

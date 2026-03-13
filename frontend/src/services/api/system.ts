@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { SystemStats, SystemConfig, RecordActionRequest, AnalyticsEvent, AnalyticsStats } from '@/types';
+import type { SystemStats, RecordActionRequest, AnalyticsEvent, AnalyticsStats } from '@/types';
 
 export interface SystemConfigItem {
   key: string;
@@ -92,14 +92,6 @@ export const systemApi = {
         activeUsersGrowthPercent: 0,
       }
     };
-  },
-
-  getConfig: async (): Promise<{ success: boolean; data: SystemConfig }> => {
-    return apiClient.get('/config');
-  },
-
-  getPublicConfig: async (): Promise<{ success: boolean; data: SystemConfig }> => {
-    return apiClient.get('/config/public');
   },
 
   recordAction: async (data: RecordActionRequest): Promise<{ 

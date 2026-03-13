@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import { RefreshCw } from 'lucide-react';
-import { apiClient } from '@/services/api/client';
+import { adminApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -15,7 +15,7 @@ export const ReportsTab: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [handleModal, setHandleModal] = useState<{ open: boolean; reportId: string }>({ open: false, reportId: '' });
-  const [handleForm, setHandleForm] = useState({ status: 'resolved', action: '', notes: '' });
+  const [handleForm, setHandleForm] = useState<{ status: 'resolved' | 'dismissed'; action: string; notes: string }>({ status: 'resolved', action: '', notes: '' });
 
   const formatDate = (timestamp: number | null | undefined) => {
     if (!timestamp) return '-';
@@ -25,8 +25,9 @@ export const ReportsTab: React.FC = () => {
   const loadReports = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get<any>(`/admin/reports?page=${page}&pageSize=20&status=${statusFilter}`);
-      if (response.data) { setReports(response.data.reports || []); setTotalPages(response.data.totalPages || 1); }
+      const response = await adminApi.getReports({ page, pageSize: 20, status: statusFilter });
+      setReports(response.items);
+      setTotalPages(response.totalPages);
     } catch { toast.error('加载举报列表失败'); } finally { setLoading(false); }
   }, [page, statusFilter]);
 
@@ -34,7 +35,7 @@ export const ReportsTab: React.FC = () => {
 
   const handleReport = async () => {
     try {
-      await apiClient.put(`/admin/reports/${handleModal.reportId}`, handleForm);
+      await adminApi.handleReport(handleModal.reportId, handleForm);
       toast.success('举报已处理'); setHandleModal({ open: false, reportId: '' }); loadReports();
     } catch { toast.error('操作失败'); }
   };

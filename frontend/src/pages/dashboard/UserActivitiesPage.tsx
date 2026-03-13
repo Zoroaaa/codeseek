@@ -10,7 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { apiClient } from '@/services/api';
+import { userApi } from '@/services/api';
 import { Card } from '@/components/ui/Card';
 import { Loading } from '@/components/ui/Loading';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -33,17 +33,10 @@ interface ActivityStats {
   actionsByType: Array<{ action: string; count: number }>;
   summary: {
     logins: number;
+    thisWeekLogins: number;
+    lastWeekLogins: number;
     failedLogins: number;
-    searches: number;
-    favorites: number;
   };
-}
-
-interface ActivitiesResponse {
-  activities: Activity[];
-  total: number;
-  limit: number;
-  offset: number;
 }
 
 const actionColors: Record<string, { bg: string; text: string; icon: string }> = {
@@ -86,8 +79,8 @@ export const UserActivitiesPage: React.FC = () => {
     try {
       setLoading(true);
       const [activitiesRes, statsRes] = await Promise.all([
-        apiClient.get<{ success: boolean; data: ActivitiesResponse }>(`/user/activities?limit=${limit}&offset=${offset}${actionFilter ? `&action=${actionFilter}` : ''}`),
-        apiClient.get<{ success: boolean; data: ActivityStats }>('/user/activities/stats'),
+        userApi.getActivities({ limit, offset, action: actionFilter || undefined }),
+        userApi.getActivitiesStats(),
       ]);
 
       if (activitiesRes.success && activitiesRes.data) {
@@ -177,12 +170,12 @@ export const UserActivitiesPage: React.FC = () => {
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">本月登录</p>
           </Card>
           <Card className="p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.summary.searches}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">本月搜索</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.summary.thisWeekLogins}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">本周登录</p>
           </Card>
           <Card className="p-4 text-center">
-            <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">{stats.summary.favorites}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">本月收藏</p>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.summary.failedLogins}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">登录失败</p>
           </Card>
         </div>
       )}

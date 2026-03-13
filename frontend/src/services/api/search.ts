@@ -193,23 +193,6 @@ export const userApi = {
     };
   },
 
-  getSourceConfigs: async (): Promise<{ 
-    success: boolean; 
-    data: { configs: Array<{
-      id: string;
-      userId: string;
-      sourceId: string;
-      isEnabled: boolean;
-      customPriority: number | null;
-      customName: string | null;
-      customSubtitle: string | null;
-      customIcon: string | null;
-      notes: string | null;
-    }> } 
-  }> => {
-    return apiClient.get('/user/source-configs');
-  },
-
   updateSourceConfig: async (sourceId: string, config: {
     isEnabled?: boolean;
     customPriority?: number;

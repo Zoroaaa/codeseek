@@ -146,6 +146,35 @@ communityRoutes.put('/tags/:id', async (c) => {
   }
 });
 
+communityRoutes.get('/tags/:id', async (c) => {
+  const tagId = c.req.param('id');
+
+  try {
+    const tag = await c.env.DB.prepare(
+      'SELECT * FROM community_source_tags WHERE id = ?'
+    ).bind(tagId).first<CommunitySourceTag>();
+
+    if (!tag) {
+      return c.json(error('NOT_FOUND', '标签不存在'), 404);
+    }
+
+    return c.json(success({
+      id: tag.id,
+      name: tag.tag_name,
+      description: tag.tag_description,
+      color: tag.tag_color,
+      usageCount: tag.usage_count,
+      isOfficial: tag.is_official === 1,
+      isActive: tag.tag_active === 1,
+      createdAt: tag.created_at,
+      createdBy: tag.created_by,
+    }));
+  } catch (err) {
+    console.error('Get tag error:', err);
+    return c.json(error('SERVER_ERROR', '获取标签失败'), 500);
+  }
+});
+
 communityRoutes.delete('/tags/:id', async (c) => {
   const user = c.get('user');
   const tagId = c.req.param('id');
@@ -385,42 +414,6 @@ communityRoutes.get('/sources/recent', async (c) => {
   } catch (err) {
     console.error('Get recent sources error:', err);
     return c.json(error('SERVER_ERROR', '获取失败'), 500);
-  }
-});
-
-communityRoutes.get('/sources/search', async (c) => {
-  const keyword = c.req.query('keyword');
-  const page = parseInt(c.req.query('page') || '1');
-  const pageSize = parseInt(c.req.query('pageSize') || '20');
-
-  if (!keyword) {
-    return c.json(error('VALIDATION_ERROR', '请提供搜索关键词'), 400);
-  }
-
-  try {
-    const searchPattern = `%${keyword}%`;
-    const countResult = await c.env.DB.prepare(
-      `SELECT COUNT(*) as total FROM community_shared_sources 
-       WHERE status = 'active' AND (source_name LIKE ? OR description LIKE ?)`
-    ).bind(searchPattern, searchPattern).first<{ total: number }>();
-
-    const sources = await c.env.DB.prepare(
-      `SELECT * FROM community_shared_sources 
-       WHERE status = 'active' AND (source_name LIKE ? OR description LIKE ?)
-       ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`
-    ).bind(searchPattern, searchPattern, pageSize, (page - 1) * pageSize).all<CommunitySharedSource>();
-
-    return c.json(success({
-      items: sources.results || [],
-      total: countResult?.total || 0,
-      page,
-      pageSize,
-      totalPages: Math.ceil((countResult?.total || 0) / pageSize),
-    }));
-  } catch (err) {
-    console.error('Search sources error:', err);
-    return c.json(error('SERVER_ERROR', '搜索失败'), 500);
   }
 });
 
@@ -693,6 +686,46 @@ communityRoutes.put('/sources/:id', async (c) => {
   } catch (err) {
     console.error('Update shared source error:', err);
     return c.json(error('SERVER_ERROR', '更新搜索源失败'), 500);
+  }
+});
+
+communityRoutes.put('/sources/:id/status', async (c) => {
+  const user = c.get('user');
+  const sourceId = c.req.param('id');
+  const body = await c.req.json();
+  const { status, reason } = body;
+
+  if (!['active', 'rejected'].includes(status)) {
+    return c.json(error('VALIDATION_ERROR', '无效的状态'), 400);
+  }
+
+  if (user.role !== 'admin' && user.role !== 'super_admin') {
+    return c.json(error('FORBIDDEN', '需要管理员权限'), 403);
+  }
+
+  try {
+    const source = await c.env.DB.prepare(
+      'SELECT * FROM community_shared_sources WHERE id = ?'
+    ).bind(sourceId).first<CommunitySharedSource>();
+
+    if (!source) {
+      return c.json(error('NOT_FOUND', '搜索源不存在'), 404);
+    }
+
+    const now = Date.now();
+
+    await c.env.DB.prepare(
+      'UPDATE community_shared_sources SET status = ?, updated_at = ? WHERE id = ?'
+    ).bind(status, now, sourceId).run();
+
+    return c.json(success({
+      sourceId,
+      status,
+      reason: reason || null,
+    }, status === 'active' ? '已通过审核' : '已拒绝'));
+  } catch (err) {
+    console.error('Update source status error:', err);
+    return c.json(error('SERVER_ERROR', '更新状态失败'), 500);
   }
 });
 

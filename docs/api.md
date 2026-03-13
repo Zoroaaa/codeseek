@@ -245,16 +245,6 @@ interface ApiResponse<T> {
 
 ---
 
-### `POST /api/auth/send-password-reset-code` - 发送密码重置验证码
-
-向指定邮箱发送密码重置验证码。
-
-**认证**: 需要
-
-**返回**: 脱敏邮箱、过期时间
-
----
-
 ### `POST /api/auth/request-email-change` - 申请更改邮箱
 
 创建邮箱更改请求。
@@ -1078,6 +1068,18 @@ interface ApiResponse<T> {
 
 ---
 
+### `GET /api/community/tags/:id` - 获取单个标签
+
+获取指定标签的详细信息。
+
+**认证**: 需要
+
+**URL参数**: `id` - 标签ID
+
+**返回**: 标签详情
+
+---
+
 ### `POST /api/community/tags` - 创建标签
 
 创建一个新标签。
@@ -1216,6 +1218,26 @@ interface ApiResponse<T> {
 **认证**: 需要
 
 **URL参数**: `id` - 搜索源ID
+
+**返回**: 操作结果
+
+---
+
+### `PUT /api/community/sources/:id/status` - 审核搜索源状态
+
+审核社区分享的搜索源（管理员功能）。
+
+**认证**: 需要（管理员权限）
+
+**URL参数**: `id` - 搜索源ID
+
+**请求体**:
+```json
+{
+  "status": "active | rejected",
+  "reason": "string? (拒绝原因)"
+}
+```
 
 **返回**: 操作结果
 
@@ -1381,21 +1403,6 @@ interface ApiResponse<T> {
 - `limit` - 返回数量（默认10）
 
 **返回**: 最新搜索源列表
-
----
-
-### `GET /api/community/sources/search` - 搜索社区资源
-
-在社区中搜索搜索源。
-
-**认证**: 需要
-
-**查询参数**:
-- `keyword` - 搜索关键词（必填）
-- `page` - 页码（默认1）
-- `pageSize` - 每页数量（默认20）
-
-**返回**: 分页的搜索结果
 
 ---
 
@@ -2497,12 +2504,12 @@ app.route('/api', systemRoutes);                // 系统路由
 
 | 路由模块 | API数量 | 认证要求 |
 |---------|--------|---------|
-| authRoutes | 20 | 部分需要认证 |
+| authRoutes | 19 | 部分需要认证 |
 | userRoutes | 13 | 全部需要认证 |
 | searchRoutes | 3 | 全部需要认证 |
 | sourceRoutes | 25 | 全部需要认证，部分需要管理员权限 |
-| communityRoutes | 24 | 全部需要认证 |
+| communityRoutes | 25 | 全部需要认证，部分需要管理员权限 |
 | adminRoutes | 21 | 全部需要管理员权限 |
 | configRoutes | 14 | 全部需要认证，部分需要管理员权限 |
-| systemRoutes | 10 | 全部需要认证 |
+| systemRoutes | 10 | 大部分需要认证 |
 | **总计** | **130** | - |

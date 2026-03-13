@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import { RefreshCw, Bell, Heart, MessageSquare, Download, AlertTriangle, Inbox } from 'lucide-react';
-import { apiClient } from '@/services/api/client';
+import { communityApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Loading } from '@/components/ui/Loading';
 import { useToast } from '@/components/ui/Toast';
@@ -52,8 +52,8 @@ export const NotificationsTab: React.FC = () => {
     if (!isAuthenticated) { setLoading(false); return; }
     setLoading(true);
     try {
-      const response = await apiClient.get<any>(`/community/notifications?page=${page}&pageSize=20`);
-      if (response.data) {
+      const response = await communityApi.getNotifications(page, 20);
+      if (response.success && response.data) {
         setNotifications(response.data.items || []);
         setTotalPages(response.data.totalPages || 1);
         setTotal(response.data.total || 0);

@@ -374,9 +374,25 @@ systemRoutes.get('/source-status-history/:sourceId', async (c) => {
     const availableCount = results.filter(r => r.available === 1).length;
     const avgResponseTime = results.length > 0 ? Math.round(results.reduce((sum, r) => sum + (r.response_time || 0), 0) / results.length) : 0;
 
+    const formattedHistory = results.map(r => ({
+      status: r.status,
+      available: r.available === 1,
+      responseTime: r.response_time,
+      checkedAt: new Date(r.created_at).toISOString(),
+      error: r.check_error,
+    }));
+
     return c.json(success({
-      source, history: results,
-      summary: { totalChecks: results.length, availableCount, unavailableCount: results.length - availableCount, availabilityRate: results.length > 0 ? Math.round((availableCount / results.length) * 100) : 0, avgResponseTime },
+      source,
+      history: formattedHistory,
+      summary: {
+        totalChecks: results.length,
+        availableCount,
+        unavailableCount: results.length - availableCount,
+        availabilityRate: results.length > 0 ? Math.round((availableCount / results.length) * 100) : 0,
+        avgResponseTime,
+        lastChecked: results.length > 0 ? new Date(results[0].created_at).toISOString() : null,
+      },
     }));
   } catch (err) {
     console.error('Get source status history error:', err);

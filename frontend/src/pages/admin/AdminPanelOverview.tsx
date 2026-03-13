@@ -18,7 +18,7 @@ import {
   XCircle,
   RefreshCw,
 } from 'lucide-react';
-import { apiClient } from '@/services/api';
+import { adminApi } from '@/services/api';
 import { Card } from '@/components/ui/Card';
 import { Loading } from '@/components/ui/Loading';
 
@@ -172,9 +172,9 @@ export const AdminPanelOverview: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiClient.get<{ success: boolean; data: DashboardOverview }>('/admin/dashboard/overview');
-      if (response.success && response.data) {
-        setData(response.data);
+      const response = await adminApi.getDashboardOverview();
+      if (response) {
+        setData(response);
       } else {
         setError('获取数据失败');
       }
