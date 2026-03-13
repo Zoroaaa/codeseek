@@ -3,9 +3,11 @@ import {
   Magnet, Film, Calendar, Clock, User, Building2,
   Tag, Star, ExternalLink, Copy, Check, Loader2,
   AlertCircle, Search, ChevronDown, ChevronUp, X,
-  Shield,
+  Shield, Play, FileDown, Link2,
 } from 'lucide-react';
 import type { JavDetail, MagnetItem } from '@/types';
+import { downloadTorrentFile, getWebtorUrl } from '@/utils/magnet';
+import { WebTorrentPlayer } from './WebTorrentPlayer';
 
 interface JavDetailPanelProps {
   detail: JavDetail | null;
@@ -50,6 +52,7 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
 
 const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
   const [showAll, setShowAll] = useState(false);
+  const [playingMagnet, setPlayingMagnet] = useState<string | null>(null);
   const displayed = showAll ? magnets : magnets.slice(0, 5);
 
   if (magnets.length === 0) {
@@ -63,40 +66,64 @@ const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
 
   return (
     <div className="space-y-1.5">
-      {/* 表头 */}
-      <div className="grid grid-cols-[1fr_80px_88px_44px] gap-2 px-2 py-1 text-[10px] font-semibold text-surface-400 uppercase tracking-wide border-b border-surface-100 dark:border-surface-800">
+      <div className="grid grid-cols-[1fr_80px_88px_100px] gap-2 px-2 py-1 text-[10px] font-semibold text-surface-400 uppercase tracking-wide border-b border-surface-100 dark:border-surface-800">
         <span>磁力名称</span>
         <span className="text-right">大小</span>
         <span className="text-right">分享日期</span>
-        <span></span>
+        <span className="text-right">操作</span>
       </div>
 
       {displayed.map((m, i) => (
-        <div
-          key={i}
-          className="grid grid-cols-[1fr_80px_88px_44px] gap-2 items-center px-2 py-2 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-all group"
-        >
-          {/* 名称 */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            {m.isHD && (
-              <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300 rounded">HD</span>
-            )}
-            <a
-              href={m.magnet}
-              className="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate"
-              title={m.name}
-            >
-              {m.name}
-            </a>
+        <div key={i}>
+          <div className="grid grid-cols-[1fr_80px_88px_100px] gap-2 items-center px-2 py-2 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-all group">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {m.isHD && (
+                <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300 rounded">HD</span>
+              )}
+              <a
+                href={m.magnet}
+                className="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate"
+                title={m.name}
+              >
+                {m.name}
+              </a>
+            </div>
+            <span className="text-xs text-right text-surface-600 dark:text-surface-400 tabular-nums">{m.size}</span>
+            <span className="text-xs text-right text-surface-400 tabular-nums">{m.date}</span>
+            <div className="flex justify-end gap-0.5">
+              <button
+                onClick={() => setPlayingMagnet(playingMagnet === m.magnet ? null : m.magnet)}
+                title="在线播放"
+                className="p-1 rounded text-surface-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+              >
+                <Play className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => downloadTorrentFile(m.magnet, m.name)}
+                title="下载种子文件"
+                className="p-1 rounded text-surface-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"
+              >
+                <FileDown className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => window.open(getWebtorUrl(m.magnet), '_blank')}
+                title="WebTor在线播放"
+                className="p-1 rounded text-surface-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+              </button>
+              <CopyBtn text={m.magnet} label="复制磁力链接" />
+            </div>
           </div>
-          {/* 大小 */}
-          <span className="text-xs text-right text-surface-600 dark:text-surface-400 tabular-nums">{m.size}</span>
-          {/* 日期 */}
-          <span className="text-xs text-right text-surface-400 tabular-nums">{m.date}</span>
-          {/* 操作 */}
-          <div className="flex justify-end">
-            <CopyBtn text={m.magnet} label="复制磁力链接" />
-          </div>
+          
+          {playingMagnet === m.magnet && (
+            <div className="mt-2 px-2">
+              <WebTorrentPlayer
+                magnetUri={m.magnet}
+                onClose={() => setPlayingMagnet(null)}
+              />
+            </div>
+          )}
         </div>
       ))}
 
@@ -267,7 +294,7 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
               {detail.magnets.length > 0 && (
                 <div className="flex items-center gap-1 text-[10px] text-surface-400">
                   <Shield className="w-3 h-3" />
-                  点击名称直接唤起下载
+                  点击名称唤起下载 | Play在线播放 | 种子文件下载
                 </div>
               )}
             </div>
