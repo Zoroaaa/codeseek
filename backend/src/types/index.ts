@@ -19,6 +19,7 @@ export interface Env {
   APP_VERSION?: string;
   APP_ENV?: string;
   SITE_URL?: string;
+  FRONTEND_URL?: string;
   BACKEND_URL?: string;
   DEFAULT_FROM_EMAIL?: string;
   DEFAULT_FROM_NAME?: string;

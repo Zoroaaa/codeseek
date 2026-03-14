@@ -22,6 +22,9 @@ APP_ENV = "production"
 # 网站域名 — 与 DNS/CORS/邮件发件域强绑定，改了必须重新部署
 SITE_URL = "https://tempemail.pp.ua"
 
+# 前端域名 — OAuth 回调后跳转目标
+FRONTEND_URL = "https://codeseek.pp.ua"
+
 # 后端 API 域名 — 用于 OAuth callback URI 构造
 BACKEND_URL = "https://backend.codeseek.pp.ua"
 

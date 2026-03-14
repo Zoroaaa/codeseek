@@ -92,11 +92,8 @@ githubOAuthRoutes.get('/github', async (c) => {
   }
 
   const state = generateState();
-  const siteUrl = c.env.SITE_URL || 'http://localhost:5173';
-  // redirect_uri 必须与 GitHub App 里填的 Callback URL 完全一致
-  // 后端自己处理回调，所以用后端域名
-  const backendUrl = c.env.BACKEND_URL || siteUrl;
-  const redirectUri = `${backendUrl.replace(/\/$/, '')}/api/auth/github/callback`;
+  const backendUrl = (c.env.BACKEND_URL || 'https://backend.codeseek.pp.ua').replace(/\/$/, '');
+  const redirectUri = `${backendUrl}/api/auth/github/callback`;
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -122,10 +119,9 @@ githubOAuthRoutes.get('/github', async (c) => {
 githubOAuthRoutes.get('/github/callback', async (c) => {
   const clientId = c.env.GITHUB_CLIENT_ID;
   const clientSecret = c.env.GITHUB_CLIENT_SECRET;
-  const siteUrl = c.env.SITE_URL || 'http://localhost:5173';
-  const frontendBase = siteUrl.replace(/\/$/, '');
-  const backendUrl = c.env.BACKEND_URL || siteUrl;
-  const redirectUri = `${backendUrl.replace(/\/$/, '')}/api/auth/github/callback`;
+  const frontendBase = (c.env.FRONTEND_URL || 'https://codeseek.pp.ua').replace(/\/$/, '');
+  const backendUrl = (c.env.BACKEND_URL || 'https://backend.codeseek.pp.ua').replace(/\/$/, '');
+  const redirectUri = `${backendUrl}/api/auth/github/callback`;
 
   if (!clientId || !clientSecret) {
     return c.redirect(`${frontendBase}/login?error=github_not_configured`, 302);
