@@ -66,7 +66,7 @@ async function logConfigChange(
       userId, username, reason, ipAddress, userAgent, Date.now()
     ).run();
   } catch (err) {
-    console.error('Log config change error:', err);
+    console.error('Log config change error:', String(err), JSON.stringify(err));
   }
 }
 
