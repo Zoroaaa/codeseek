@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { Env, User, EmailVerification, EmailChangeRequest } from '@/types';
 import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP, checkLockout, clearLockout, recordSecurityEvent } from '@/utils';
-import { recordFailedAttempt } from '@/utils/security';
+import { recordFailedAttempt, recordPasswordResetLog, updatePasswordResetLog } from '@/utils/security';
 import { EmailVerificationService, emailVerificationUtils, ConfigService } from '@/services';
 import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
 
@@ -429,6 +429,16 @@ authRoutes.post('/forgot-password', async (c) => {
 
     const emailService = new EmailVerificationService(c.env);
     const ipAddress = getClientIP(c);
+    const userAgent = c.req.header('User-Agent') || '';
+
+    const resetLogId = await recordPasswordResetLog(c.env.DB, {
+      userId: user.id,
+      email: normalizedEmail,
+      requestType: 'forgot_password',
+      requestStatus: 'initiated',
+      ipAddress,
+      userAgent,
+    });
 
     try {
       await emailService.checkEmailRateLimit(normalizedEmail, ipAddress);
@@ -447,10 +457,18 @@ authRoutes.post('/forgot-password', async (c) => {
         { username: user.username }
       );
 
+      await updatePasswordResetLog(c.env.DB, resetLogId, {
+        requestStatus: 'code_sent',
+        verificationCodeSent: true,
+        codeSentAt: Date.now(),
+      });
+
       await logUserAction(c.env, user.id, 'forgot_password', { email: normalizedEmail }, c);
     } catch (sendError) {
       console.error('发送密码重置邮件失败:', sendError);
-      // 邮件发送失败时返回错误，而不是静默成功
+      await updatePasswordResetLog(c.env.DB, resetLogId, {
+        requestStatus: 'failed',
+      });
       return c.json(error('SERVER_ERROR', '验证码发送失败，请稍后重试'), 500);
     }
 
@@ -483,6 +501,8 @@ authRoutes.post('/reset-password', async (c) => {
   }
 
   const normalizedEmail = emailVerificationUtils.normalizeEmail(email);
+  const ipAddress = getClientIP(c);
+  const userAgent = c.req.header('User-Agent') || '';
 
   try {
     const user = await c.env.DB.prepare(
@@ -493,11 +513,27 @@ authRoutes.post('/reset-password', async (c) => {
       return c.json(error('VALIDATION_ERROR', '用户不存在或已被禁用'), 400);
     }
 
+    const resetLogId = await recordPasswordResetLog(c.env.DB, {
+      userId: user.id,
+      email: normalizedEmail,
+      requestType: 'forgot_password',
+      requestStatus: 'initiated',
+      ipAddress,
+      userAgent,
+    });
+
     const emailService = new EmailVerificationService(c.env);
 
     try {
       await emailService.verifyCode(normalizedEmail, actualCode, 'forgot_password', user.id);
+      await updatePasswordResetLog(c.env.DB, resetLogId, {
+        requestStatus: 'code_verified',
+        verifiedAt: Date.now(),
+      });
     } catch (verifyError) {
+      await updatePasswordResetLog(c.env.DB, resetLogId, {
+        requestStatus: 'failed',
+      });
       return c.json(error('VALIDATION_ERROR', (verifyError as Error).message || '验证码无效或已过期'), 400);
     }
 
@@ -511,6 +547,11 @@ authRoutes.post('/reset-password', async (c) => {
     await c.env.DB.prepare(
       'DELETE FROM user_sessions WHERE user_id = ?'
     ).bind(user.id).run();
+
+    await updatePasswordResetLog(c.env.DB, resetLogId, {
+      requestStatus: 'completed',
+      completedAt: now,
+    });
 
     await logUserAction(c.env, user.id, 'reset_password', { email: normalizedEmail }, c);
 
