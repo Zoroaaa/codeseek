@@ -521,7 +521,7 @@ authRoutes.post('/reset-password', async (c) => {
   }
 });
 
-authRoutes.post('/change-password', async (c) => {
+authRoutes.put('/change-password', async (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json(error('AUTH_ERROR', '未授权'), 401);
