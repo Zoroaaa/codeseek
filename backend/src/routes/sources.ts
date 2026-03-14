@@ -106,13 +106,15 @@ sourceRoutes.get('/categories/:id', async (c) => {
 });
 
 sourceRoutes.get('/', async (c) => {
+  const user = c.get('user');
+  
   try {
     const categoryId = c.req.query('categoryId');
     const searchable = c.req.query('searchable');
     const siteType = c.req.query('siteType');
     
-    let query = 'SELECT * FROM search_sources WHERE is_active = 1';
-    const params: (string | number)[] = [];
+    let query = 'SELECT * FROM search_sources WHERE is_active = 1 AND (is_system = 1 OR created_by = ?)';
+    const params: (string | number)[] = [user.userId];
     
     if (categoryId) {
       query += ' AND category_id = ?';
@@ -131,9 +133,7 @@ sourceRoutes.get('/', async (c) => {
     
     query += ' ORDER BY search_priority DESC, display_order ASC';
     
-    const sources = params.length > 0
-      ? await c.env.DB.prepare(query).bind(...params).all<SearchSource>()
-      : await c.env.DB.prepare(query).all<SearchSource>();
+    const sources = await c.env.DB.prepare(query).bind(...params).all<SearchSource>();
 
     return c.json(success({
       sources: sources.results || [],
@@ -145,15 +145,17 @@ sourceRoutes.get('/', async (c) => {
 });
 
 sourceRoutes.get('/popular', async (c) => {
+  const user = c.get('user');
+  
   try {
     const limit = parseInt(c.req.query('limit') || String(R.PAGINATION.DEFAULT_PAGE_SIZE), 10);
     
     const sources = await c.env.DB.prepare(`
       SELECT * FROM search_sources 
-      WHERE is_active = 1 AND searchable = 1 
+      WHERE is_active = 1 AND searchable = 1 AND (is_system = 1 OR created_by = ?)
       ORDER BY usage_count DESC, search_priority DESC 
       LIMIT ?
-    `).bind(limit).all<SearchSource>();
+    `).bind(user.userId, limit).all<SearchSource>();
 
     return c.json(success({
       sources: sources.results || [],
@@ -165,6 +167,7 @@ sourceRoutes.get('/popular', async (c) => {
 });
 
 sourceRoutes.get('/search', async (c) => {
+  const user = c.get('user');
   const keyword = c.req.query('keyword');
 
   if (!keyword) {
@@ -174,11 +177,11 @@ sourceRoutes.get('/search', async (c) => {
   try {
     const sources = await c.env.DB.prepare(`
       SELECT * FROM search_sources 
-      WHERE is_active = 1 AND searchable = 1 
+      WHERE is_active = 1 AND searchable = 1 AND (is_system = 1 OR created_by = ?)
       AND (name LIKE ? OR description LIKE ? OR subtitle LIKE ?)
       ORDER BY search_priority DESC, usage_count DESC
       LIMIT 20
-    `).bind(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`).all<SearchSource>();
+    `).bind(user.userId, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`).all<SearchSource>();
 
     return c.json(success({
       sources: sources.results || [],
@@ -190,14 +193,16 @@ sourceRoutes.get('/search', async (c) => {
 });
 
 sourceRoutes.get('/stats', async (c) => {
+  const user = c.get('user');
+  
   try {
     const totalSources = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM search_sources WHERE is_active = 1'
-    ).first<{ count: number }>();
+      'SELECT COUNT(*) as count FROM search_sources WHERE is_active = 1 AND (is_system = 1 OR created_by = ?)'
+    ).bind(user.userId).first<{ count: number }>();
 
     const searchableSources = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM search_sources WHERE is_active = 1 AND searchable = 1'
-    ).first<{ count: number }>();
+      'SELECT COUNT(*) as count FROM search_sources WHERE is_active = 1 AND searchable = 1 AND (is_system = 1 OR created_by = ?)'
+    ).bind(user.userId).first<{ count: number }>();
 
     const totalCategories = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM search_source_categories WHERE is_active = 1'
@@ -210,26 +215,26 @@ sourceRoutes.get('/stats', async (c) => {
     const topUsedSources = await c.env.DB.prepare(`
       SELECT id, name, usage_count 
       FROM search_sources 
-      WHERE is_active = 1 
+      WHERE is_active = 1 AND (is_system = 1 OR created_by = ?)
       ORDER BY usage_count DESC 
       LIMIT 10
-    `).all<{ id: string; name: string; usage_count: number }>();
+    `).bind(user.userId).all<{ id: string; name: string; usage_count: number }>();
 
     const sourcesByCategory = await c.env.DB.prepare(`
       SELECT c.name as category_name, COUNT(s.id) as source_count
       FROM search_source_categories c
-      LEFT JOIN search_sources s ON c.id = s.category_id AND s.is_active = 1
+      LEFT JOIN search_sources s ON c.id = s.category_id AND s.is_active = 1 AND (s.is_system = 1 OR s.created_by = ?)
       WHERE c.is_active = 1
       GROUP BY c.id
       ORDER BY source_count DESC
-    `).all<{ category_name: string; source_count: number }>();
+    `).bind(user.userId).all<{ category_name: string; source_count: number }>();
 
     const sourcesBySiteType = await c.env.DB.prepare(`
       SELECT site_type, COUNT(*) as count
       FROM search_sources
-      WHERE is_active = 1
+      WHERE is_active = 1 AND (is_system = 1 OR created_by = ?)
       GROUP BY site_type
-    `).all<{ site_type: string; count: number }>();
+    `).bind(user.userId).all<{ site_type: string; count: number }>();
 
     return c.json(success({
       totalSources: totalSources?.count || 0,
@@ -247,6 +252,8 @@ sourceRoutes.get('/stats', async (c) => {
 });
 
 sourceRoutes.get('/export', async (c) => {
+  const user = c.get('user');
+  
   try {
     const format = c.req.query('format') || 'json';
     const categoryId = c.req.query('categoryId');
@@ -256,9 +263,9 @@ sourceRoutes.get('/export', async (c) => {
       FROM search_sources s
       LEFT JOIN search_source_categories c ON s.category_id = c.id
       LEFT JOIN search_major_categories mc ON c.major_category_id = mc.id
-      WHERE s.is_active = 1
+      WHERE s.is_active = 1 AND (s.is_system = 1 OR s.created_by = ?)
     `;
-    const params: string[] = [];
+    const params: string[] = [user.userId];
 
     if (categoryId) {
       query += ' AND s.category_id = ?';
@@ -267,9 +274,7 @@ sourceRoutes.get('/export', async (c) => {
 
     query += ' ORDER BY s.search_priority DESC, s.display_order ASC';
 
-    const sources = params.length > 0
-      ? await c.env.DB.prepare(query).bind(...params).all<SearchSource & { category_name: string; major_category_name: string }>()
-      : await c.env.DB.prepare(query).all<SearchSource & { category_name: string; major_category_name: string }>();
+    const sources = await c.env.DB.prepare(query).bind(...params).all<SearchSource & { category_name: string; major_category_name: string }>();
 
     const sourcesList = sources.results || [];
 
@@ -351,8 +356,8 @@ sourceRoutes.get('/with-user-config/:userId', async (c) => {
 
   try {
     const sources = await c.env.DB.prepare(
-      'SELECT * FROM search_sources WHERE is_active = 1 ORDER BY search_priority DESC, display_order ASC'
-    ).all<SearchSource>();
+      'SELECT * FROM search_sources WHERE is_active = 1 AND (is_system = 1 OR created_by = ?) ORDER BY search_priority DESC, display_order ASC'
+    ).bind(userId).all<SearchSource>();
 
     const userConfigs = await c.env.DB.prepare(
       'SELECT * FROM user_search_source_configs WHERE user_id = ?'

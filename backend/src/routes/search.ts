@@ -67,32 +67,33 @@ searchRoutes.post('/', async (c) => {
         INNER JOIN search_source_categories c ON s.category_id = c.id
         INNER JOIN search_major_categories mc ON c.major_category_id = mc.id
         WHERE s.is_active = 1 AND s.searchable = 1 AND s.category_id = ? AND mc.requires_keyword = 1
+        AND (s.is_system = 1 OR s.created_by = ?)
         ORDER BY c.search_priority ASC, s.search_priority ASC, s.display_order ASC
       `;
-      params = [categoryId];
+      params = [categoryId, userPayload?.userId || ''];
     } else if (majorCategoryId) {
       query = `
         SELECT s.* FROM search_sources s
         INNER JOIN search_source_categories c ON s.category_id = c.id
         INNER JOIN search_major_categories mc ON c.major_category_id = mc.id
         WHERE s.is_active = 1 AND s.searchable = 1 AND c.major_category_id = ? AND mc.requires_keyword = 1
+        AND (s.is_system = 1 OR s.created_by = ?)
         ORDER BY c.search_priority ASC, s.search_priority ASC, s.display_order ASC
       `;
-      params = [majorCategoryId];
+      params = [majorCategoryId, userPayload?.userId || ''];
     } else {
       query = `
         SELECT s.* FROM search_sources s
         INNER JOIN search_source_categories c ON s.category_id = c.id
         INNER JOIN search_major_categories mc ON c.major_category_id = mc.id
         WHERE s.is_active = 1 AND s.searchable = 1 AND mc.requires_keyword = 1
+        AND (s.is_system = 1 OR s.created_by = ?)
         ORDER BY c.search_priority ASC, s.search_priority ASC, s.display_order ASC
       `;
-      params = [];
+      params = [userPayload?.userId || ''];
     }
 
-    const sources = params.length > 0
-      ? await c.env.DB.prepare(query).bind(...params).all<SearchSource>()
-      : await c.env.DB.prepare(query).all<SearchSource>();
+    const sources = await c.env.DB.prepare(query).bind(...params).all<SearchSource>();
 
     const filteredSources = userEnabledSources
       ? (sources.results || []).filter(s => userEnabledSources.has(s.id))
