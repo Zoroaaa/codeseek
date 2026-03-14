@@ -62,8 +62,17 @@ async function logConfigChange(
         ip_address, user_agent, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      logId, configKey, oldValue, newValue, changeType,
-      userId, username, reason, ipAddress, userAgent, Date.now()
+      logId,
+      configKey,
+      oldValue ?? null,
+      newValue,
+      changeType,
+      userId ?? null,
+      username ?? null,
+      reason ?? null,
+      ipAddress ?? null,
+      userAgent ?? null,
+      Date.now()
     ).run();
   } catch (err) {
     console.error('Log config change error:', String(err), JSON.stringify(err));
@@ -576,7 +585,7 @@ configRoutes.put('/batch', async (c) => {
 
           await logConfigChange(
             c.env, key, existing.value, value, 'update',
-            user.userId, user.username, changeReason, ipAddress, userAgent
+            user.userId, user.username, changeReason ?? null, ipAddress, userAgent
           );
         } else {
           results.push({ key, success: false, error: '配置项不存在' });
@@ -704,7 +713,7 @@ configRoutes.put('/:key', async (c) => {
 
       await logConfigChange(
         c.env, key, existing.value, value, 'update',
-        user.userId, user.username, changeReason, ipAddress, userAgent
+        user.userId, user.username, changeReason ?? null, ipAddress, userAgent
       );
     } else {
       await c.env.DB.prepare(`
@@ -714,7 +723,7 @@ configRoutes.put('/:key', async (c) => {
 
       await logConfigChange(
         c.env, key, null, value, 'create',
-        user.userId, user.username, changeReason, ipAddress, userAgent
+        user.userId, user.username, changeReason ?? null, ipAddress, userAgent
       );
     }
 
