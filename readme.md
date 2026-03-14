@@ -49,7 +49,7 @@
 
 | 文档 | 说明 | 链接 |
 |------|------|------|
-| **API 接口文档** | 完整的 RESTful API 接口说明，包含 130+ 接口定义、请求/响应格式、认证方式等 | [docs/api.md](docs/api.md) |
+| **API 接口文档** | 完整的 RESTful API 接口说明，包含 130+ 接口定义、请求/响应格式、认证方式等 | [docs/api/index.md](docs/api/index.md) |
 | **架构设计文档** | 前后端目录结构、技术栈版本、部署架构、数据库模块化设计详解 | [docs/backend-frontend-tree.md](docs/backend-frontend-tree.md) |
 | **配置说明文档** | 前端配置、后端配置、环境变量、代理服务、数据库配置、角色权限配置 | [docs/config.md](docs/config.md) |
 | **部署指南文档** | 环境要求、本地开发、后端部署、前端部署、数据库配置、常见问题解答 | [docs/deploy.md](docs/deploy.md) |
@@ -269,7 +269,7 @@ cd frontend && npm install && npm run build && wrangler pages deploy dist
 👉 [查看详细部署指南](docs/deploy.md)  
 👉 [查看配置说明](docs/config.md)
 
-👉 [查看完整API文档](docs/api.md)
+👉 [查看完整API文档](docs/api/index.md)
 
 ## 📊 性能优化
 

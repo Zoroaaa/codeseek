@@ -7,7 +7,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { Env } from '@/types';
-import { authRoutes, userRoutes, sourceRoutes, communityRoutes, systemRoutes, searchRoutes, adminRoutes, configRoutes, javRoutes } from '@/routes';
+import { authRoutes, githubOAuthRoutes, userRoutes, sourceRoutes, communityRoutes, systemRoutes, searchRoutes, adminRoutes, configRoutes, javRoutes } from '@/routes';
 import { CONFIG } from '@/constants';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -38,6 +38,7 @@ app.get('/', (c) => {
 });
 
 app.route('/api/auth', authRoutes);
+app.route('/api/auth', githubOAuthRoutes);
 app.route('/api/user', userRoutes);
 app.route('/api/search', searchRoutes);
 app.route('/api/search-sources', sourceRoutes);

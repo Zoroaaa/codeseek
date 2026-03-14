@@ -1,6 +1,6 @@
 # 通知组件 (Notification/Toast) 使用文档
 
-> 📖 [返回项目主页](../../readme.md) | [API接口文档](../docs/api.md) | [架构设计文档](../docs/backend-frontend-tree.md)
+> 📖 [返回项目主页](../../readme.md) | [API接口文档](../docs/api/index.md) | [架构设计文档](../docs/backend-frontend-tree.md)
 
 ## 目录
 

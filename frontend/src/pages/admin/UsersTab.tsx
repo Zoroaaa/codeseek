@@ -44,7 +44,7 @@ export const UsersTab: React.FC = () => {
   }, [page, search, statusFilter, roleFilter]);
 
   const loadStats = useCallback(async () => {
-    try { setStats(await adminApi.getUsersStats()); } catch {}
+    try { setStats(await adminApi.getUsersStats()); } catch { toast.error('加载统计数据失败'); }
   }, []);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);

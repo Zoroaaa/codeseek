@@ -1,6 +1,6 @@
 # 磁力快搜 - 项目架构树 (v2.0.0)
 
-> 📖 [返回项目主页](../readme.md) | [API接口文档](api.md) | [配置说明文档](config.md) | [部署指南文档](deploy.md)
+> 📖 [返回项目主页](../readme.md) | [API接口文档](api/index.md) | [配置说明文档](config.md) | [部署指南文档](deploy.md)
 
 ---
 

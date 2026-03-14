@@ -17,6 +17,17 @@ import type {
 } from '@/types';
 
 export const authApi = {
+  /**
+   * 发起 GitHub OAuth 授权
+   * 直接跳转到后端 /auth/github，后端重定向到 GitHub
+   */
+  loginWithGitHub: (): void => {
+    const base = import.meta.env.DEV
+      ? '/api'
+      : 'https://backend.codeseek.pp.ua/api';
+    window.location.href = `${base}/auth/github`;
+  },
+
   login: async (data: LoginRequest): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', data);
     if (response.success && response.data?.token) {

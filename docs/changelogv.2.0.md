@@ -1,6 +1,6 @@
 # CodeSeek 版本 2.0 变更日志
 
-> 📖 [返回项目主页](../readme.md) | [API接口文档](api.md) | [架构设计文档](backend-frontend-tree.md) | [配置说明文档](config.md) | [部署指南文档](deploy.md)
+> 📖 [返回项目主页](../readme.md) | [API接口文档](api/index.md) | [架构设计文档](backend-frontend-tree.md) | [配置说明文档](config.md) | [部署指南文档](deploy.md)
 
 本文档详细记录CodeSeek从版本1.0升级到版本2.0的所有变更内容。
 

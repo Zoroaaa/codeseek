@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, Lock, User, ArrowLeft, Search } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, ArrowLeft, Search, Github } from 'lucide-react';
 import { useAuthStore } from '@/stores';
 import { authApi, analyticsApi } from '@/services/api';
 import { Input } from '@/components/ui';
@@ -21,6 +21,7 @@ export const LoginPage: React.FC = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGithubLoading, setIsGithubLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validateForm = () => {
@@ -67,6 +68,12 @@ export const LoginPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGitHubLogin = () => {
+    setIsGithubLoading(true);
+    // loginWithGitHub 是同步跳转，setIsGithubLoading 只为在跳转前显示 loading 状态
+    authApi.loginWithGitHub();
   };
 
   return (
@@ -161,6 +168,31 @@ export const LoginPage: React.FC = () => {
               {isLoading ? '登录中...' : '登录'}
             </button>
           </form>
+
+          {/* OAuth 分割线 */}
+          <div className="mt-5 flex items-center gap-3">
+            <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+            <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">或通过以下方式登录</span>
+            <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+          </div>
+
+          {/* GitHub 登录按钮 */}
+          <button
+            type="button"
+            onClick={handleGitHubLogin}
+            disabled={isGithubLoading || isLoading}
+            className="mt-4 w-full flex items-center justify-center gap-2.5 py-3 px-6 rounded-xl font-semibold text-sm
+              bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700
+              text-white border border-slate-700 dark:border-slate-600
+              transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+          >
+            {isGithubLoading
+              ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <Github className="w-4 h-4" />
+            }
+            {isGithubLoading ? '跳转中...' : '使用 GitHub 一键登录'}
+          </button>
 
           {/* Footer */}
           <div className="mt-6 text-center">

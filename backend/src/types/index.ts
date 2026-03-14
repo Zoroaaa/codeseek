@@ -24,6 +24,10 @@ export interface Env {
   JWT_EXPIRY_DAYS?: string;
   ENABLE_ACTION_LOGGING?: string;
 
+  // GitHub OAuth（通过 `wrangler secret put` 注入）
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+
 }
 
 export interface User {
@@ -41,6 +45,8 @@ export interface User {
   email_verified: number;
   last_password_change?: number | null;
   role_id?: string;
+  github_id?: string | null;
+  github_username?: string | null;
 }
 
 export interface Role {

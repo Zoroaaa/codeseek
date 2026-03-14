@@ -42,7 +42,7 @@ export const ActionsTab: React.FC = () => {
   }, [page, userSearch, actionFilter]);
 
   const loadStats = useCallback(async () => {
-    try { setStats(await adminApi.getLogsStats()); } catch {}
+    try { setStats(await adminApi.getLogsStats()); } catch { toast.error('加载统计数据失败'); }
   }, []);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);

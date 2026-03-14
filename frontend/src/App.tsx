@@ -16,7 +16,7 @@ import { PrivacyPage } from '@/pages/PrivacyPage';
 import { DashboardPage, UserActivitiesPage } from '@/pages/dashboard';
 import { AdminManager, AdminPanelOverview } from '@/pages/admin';
 import { CommunityManager } from '@/pages/community';
-import { LoginPage, RegisterPage, ForgotPasswordPage } from '@/pages/auth';
+import { LoginPage, RegisterPage, ForgotPasswordPage, GitHubCallbackPage } from '@/pages/auth';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -191,6 +191,8 @@ const App: React.FC = () => {
         <Route path="/login" element={<AuthRedirect><LoginPage /></AuthRedirect>} />
         <Route path="/register" element={<AuthRedirect><RegisterPage /></AuthRedirect>} />
         <Route path="/forgot-password" element={<AuthRedirect><ForgotPasswordPage /></AuthRedirect>} />
+        {/* GitHub OAuth 回调 — 不加 AuthRedirect，否则已登录状态无法完成回调 */}
+        <Route path="/auth/callback" element={<GitHubCallbackPage />} />
         <Route path="/main" element={<ProtectedRoute><MainSearchPage /></ProtectedRoute>} />
         
         <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>

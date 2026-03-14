@@ -34,7 +34,7 @@ export const SessionsTab: React.FC = () => {
   }, [page, statusFilter]);
 
   const loadStats = useCallback(async () => {
-    try { setStats(await adminApi.getSessionsStats()); } catch {}
+    try { setStats(await adminApi.getSessionsStats()); } catch { toast.error('加载统计数据失败'); }
   }, []);
 
   useEffect(() => { loadSessions(); }, [loadSessions]);
