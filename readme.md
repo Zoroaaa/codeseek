@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="frontend/images/logo.png" alt="CodeSeek Logo" width="120" height="120">
+<img src="frontend/public/logo.png" alt="CodeSeek Logo" width="120" height="120">
 
 # 磁力快搜 - CodeSeek
 

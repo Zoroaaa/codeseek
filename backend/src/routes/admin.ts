@@ -81,6 +81,60 @@ adminRoutes.get('/roles', async (c) => {
 });
 
 /**
+ * 获取用户统计概览
+ * GET /api/admin/users/stats
+ */
+adminRoutes.get('/users/stats', async (c) => {
+  try {
+    const now = Date.now();
+    const oneDayAgo = now - CONFIG.Stats.DAY_IN_MS;
+    const oneWeekAgo = now - CONFIG.Stats.WEEK_IN_MS;
+    const oneMonthAgo = now - CONFIG.Stats.MONTH_IN_MS;
+
+    const userStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) as inactive,
+        SUM(CASE WHEN email_verified = 1 THEN 1 ELSE 0 END) as verified,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as new_today,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as new_week,
+        SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) as new_month
+      FROM users
+    `).bind(oneDayAgo, oneWeekAgo, oneMonthAgo).first();
+
+    const activeUsersToday = await c.env.DB.prepare(`
+      SELECT COUNT(DISTINCT user_id) as count
+      FROM user_sessions
+      WHERE last_activity > ?
+    `).bind(oneDayAgo).first<{ count: number }>();
+
+    const roleDistribution = await c.env.DB.prepare(`
+      SELECT r.display_name, COUNT(u.id) as count
+      FROM roles r
+      LEFT JOIN users u ON r.id = u.role_id
+      GROUP BY r.id
+      ORDER BY count DESC
+    `).all<{ display_name: string; count: number }>();
+
+    return c.json(success({
+      total: userStats?.total || 0,
+      active: userStats?.active || 0,
+      inactive: userStats?.inactive || 0,
+      verified: userStats?.verified || 0,
+      newToday: userStats?.new_today || 0,
+      newWeek: userStats?.new_week || 0,
+      newMonth: userStats?.new_month || 0,
+      activeToday: activeUsersToday?.count || 0,
+      roleDistribution: roleDistribution.results || [],
+    }));
+  } catch (err) {
+    console.error('Get users stats error:', err);
+    return c.json(error('SERVER_ERROR', '获取用户统计失败'), 500);
+  }
+});
+
+/**
  * 获取用户列表
  * GET /api/admin/users
  */
@@ -716,6 +770,66 @@ adminRoutes.get('/stats', async (c) => {
 });
 
 /**
+ * 获取行为日志统计概览
+ * GET /api/admin/logs/stats
+ */
+adminRoutes.get('/logs/stats', async (c) => {
+  try {
+    const now = Date.now();
+    const oneDayAgo = now - CONFIG.Stats.DAY_IN_MS;
+    const oneWeekAgo = now - CONFIG.Stats.WEEK_IN_MS;
+
+    const totalStats = await c.env.DB.prepare(`
+      SELECT COUNT(*) as total FROM user_actions
+    `).first<{ total: number }>();
+
+    const todayStats = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM user_actions WHERE created_at > ?
+    `).bind(oneDayAgo).first<{ count: number }>();
+
+    const weekStats = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM user_actions WHERE created_at > ?
+    `).bind(oneWeekAgo).first<{ count: number }>();
+
+    const uniqueUsersToday = await c.env.DB.prepare(`
+      SELECT COUNT(DISTINCT user_id) as count FROM user_actions WHERE created_at > ? AND user_id IS NOT NULL
+    `).bind(oneDayAgo).first<{ count: number }>();
+
+    const actionsByType = await c.env.DB.prepare(`
+      SELECT action, COUNT(*) as count
+      FROM user_actions
+      WHERE created_at > ?
+      GROUP BY action
+      ORDER BY count DESC
+      LIMIT 10
+    `).bind(oneWeekAgo).all<{ action: string; count: number }>();
+
+    const loginStats = await c.env.DB.prepare(`
+      SELECT 
+        SUM(CASE WHEN action = 'login' THEN 1 ELSE 0 END) as success,
+        SUM(CASE WHEN action = 'login_failed' THEN 1 ELSE 0 END) as failed
+      FROM user_actions
+      WHERE action IN ('login', 'login_failed') AND created_at > ?
+    `).bind(oneDayAgo).first<{ success: number; failed: number }>();
+
+    return c.json(success({
+      total: totalStats?.total || 0,
+      today: todayStats?.count || 0,
+      week: weekStats?.count || 0,
+      uniqueUsersToday: uniqueUsersToday?.count || 0,
+      actionsByType: actionsByType.results || [],
+      loginToday: {
+        success: loginStats?.success || 0,
+        failed: loginStats?.failed || 0,
+      },
+    }));
+  } catch (err) {
+    console.error('Get logs stats error:', err);
+    return c.json(error('SERVER_ERROR', '获取行为日志统计失败'), 500);
+  }
+});
+
+/**
  * 获取行为日志
  * GET /api/admin/logs
  */
@@ -724,28 +838,36 @@ adminRoutes.get('/logs', async (c) => {
   const { defaultPageSize, maxLogPageSize } = getPaginationConfig();
   const pageSize = Math.min(parseInt(c.req.query('pageSize') || String(defaultPageSize)), maxLogPageSize);
   const userId = c.req.query('userId');
+  const username = c.req.query('username');
   const action = c.req.query('action');
 
   try {
-    let whereClause = 'WHERE 1=1';
+    const conditions: string[] = [];
     const params: (string | number)[] = [];
 
     if (userId) {
-      whereClause += ' AND user_id = ?';
+      conditions.push('a.user_id = ?');
       params.push(userId);
+    }
+
+    if (username) {
+      conditions.push('u.username LIKE ?');
+      params.push(`%${username}%`);
     }
 
     if (action) {
       const actions = action.split(',').map(a => a.trim()).filter(Boolean);
       if (actions.length > 0) {
         const placeholders = actions.map(() => '?').join(', ');
-        whereClause += ` AND action IN (${placeholders})`;
+        conditions.push(`a.action IN (${placeholders})`);
         params.push(...actions);
       }
     }
 
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
     const countResult = await c.env.DB.prepare(
-      `SELECT COUNT(*) as total FROM user_actions ${whereClause}`
+      `SELECT COUNT(*) as total FROM user_actions a LEFT JOIN users u ON a.user_id = u.id ${whereClause}`
     ).bind(...params).first<{ total: number }>();
 
     const logs = await c.env.DB.prepare(`
@@ -815,6 +937,68 @@ adminRoutes.post('/cleanup', async (c) => {
   } catch (err) {
     console.error('Cleanup error:', err);
     return c.json(error('SERVER_ERROR', '清理失败'), 500);
+  }
+});
+
+/**
+ * 获取会话统计概览
+ * GET /api/admin/sessions/stats
+ */
+adminRoutes.get('/sessions/stats', async (c) => {
+  try {
+    const now = Date.now();
+    const oneDayAgo = now - CONFIG.Stats.DAY_IN_MS;
+    const oneHourAgo = now - CONFIG.Stats.HOUR_IN_MS;
+
+    const totalStats = await c.env.DB.prepare(`
+      SELECT COUNT(*) as total FROM user_sessions
+    `).first<{ total: number }>();
+
+    const activeStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as active,
+        COUNT(DISTINCT user_id) as unique_users
+      FROM user_sessions
+      WHERE expires_at > ?
+    `).bind(now).first<{ active: number; unique_users: number }>();
+
+    const recentActive = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM user_sessions
+      WHERE last_activity > ? AND expires_at > ?
+    `).bind(oneHourAgo, now).first<{ count: number }>();
+
+    const todaySessions = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM user_sessions
+      WHERE created_at > ?
+    `).bind(oneDayAgo).first<{ count: number }>();
+
+    const topDevices = await c.env.DB.prepare(`
+      SELECT 
+        CASE 
+          WHEN user_agent LIKE '%Mobile%' THEN 'Mobile'
+          WHEN user_agent LIKE '%Tablet%' THEN 'Tablet'
+          ELSE 'Desktop'
+        END as device_type,
+        COUNT(*) as count
+      FROM user_sessions
+      WHERE expires_at > ?
+      GROUP BY device_type
+      ORDER BY count DESC
+    `).bind(now).all<{ device_type: string; count: number }>();
+
+    return c.json(success({
+      total: totalStats?.total || 0,
+      active: activeStats?.active || 0,
+      uniqueUsers: activeStats?.unique_users || 0,
+      recentlyActive: recentActive?.count || 0,
+      todaySessions: todaySessions?.count || 0,
+      deviceDistribution: topDevices.results || [],
+    }));
+  } catch (err) {
+    console.error('Get sessions stats error:', err);
+    return c.json(error('SERVER_ERROR', '获取会话统计失败'), 500);
   }
 });
 

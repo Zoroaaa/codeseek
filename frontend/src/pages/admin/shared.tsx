@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui';
 
 export const formatDate = (timestamp: number | null | undefined) => {
@@ -56,5 +56,49 @@ export const Pagination: React.FC<{ page: number; totalPages: number; onPageChan
 export const TableWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="bg-white dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 overflow-hidden">
     <div className="overflow-x-auto">{children}</div>
+  </div>
+);
+
+interface StatCardProps {
+  icon: LucideIcon;
+  label: string;
+  value: number | string;
+  subLabel?: string;
+  color: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'teal' | 'pink';
+}
+
+const colorClasses: Record<string, { bg: string; iconBg: string }> = {
+  blue: { bg: 'bg-blue-50 dark:bg-blue-900/20', iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600' },
+  green: { bg: 'bg-green-50 dark:bg-green-900/20', iconBg: 'bg-gradient-to-br from-green-500 to-green-600' },
+  purple: { bg: 'bg-purple-50 dark:bg-purple-900/20', iconBg: 'bg-gradient-to-br from-purple-500 to-purple-600' },
+  orange: { bg: 'bg-orange-50 dark:bg-orange-900/20', iconBg: 'bg-gradient-to-br from-orange-500 to-orange-600' },
+  red: { bg: 'bg-red-50 dark:bg-red-900/20', iconBg: 'bg-gradient-to-br from-red-500 to-red-600' },
+  teal: { bg: 'bg-teal-50 dark:bg-teal-900/20', iconBg: 'bg-gradient-to-br from-teal-500 to-teal-600' },
+  pink: { bg: 'bg-pink-50 dark:bg-pink-900/20', iconBg: 'bg-gradient-to-br from-pink-500 to-pink-600' },
+};
+
+export const StatCard: React.FC<StatCardProps> = ({ icon: Icon, label, value, subLabel, color }) => {
+  const colors = colorClasses[color] || colorClasses.blue;
+  return (
+    <div className={`${colors.bg} rounded-xl p-4 border border-surface-200 dark:border-surface-700`}>
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-lg ${colors.iconBg} flex items-center justify-center shrink-0`}>
+          <Icon className="w-5 h-5 text-white" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm text-surface-500 dark:text-surface-400 truncate">{label}</div>
+          <div className="text-xl font-bold text-surface-900 dark:text-surface-100">
+            {typeof value === 'number' ? value.toLocaleString() : value}
+          </div>
+          {subLabel && <div className="text-xs text-surface-400">{subLabel}</div>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const StatsGrid: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+    {children}
   </div>
 );

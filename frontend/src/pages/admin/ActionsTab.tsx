@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
-import { Search, RefreshCw, Clock, MapPin, Terminal } from 'lucide-react';
+import { Search, RefreshCw, Clock, MapPin, Terminal, Activity, Zap, Users, LogIn, AlertTriangle, TrendingUp } from 'lucide-react';
 import { adminApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
-import { Pagination, TableWrapper, actionLabels, actionColors } from './shared';
+import { Pagination, TableWrapper, actionLabels, actionColors, StatCard, StatsGrid } from './shared';
 
 export const ActionsTab: React.FC = () => {
   const toast = useToast();
@@ -17,20 +17,36 @@ export const ActionsTab: React.FC = () => {
   const [actionFilter, setActionFilter] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [stats, setStats] = useState<{
+    total: number;
+    today: number;
+    week: number;
+    uniqueUsersToday: number;
+    actionsByType: Array<{ action: string; count: number }>;
+    loginToday: { success: number; failed: number };
+  } | null>(null);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await adminApi.getLogs({ page, pageSize: 20, action: actionFilter || undefined });
+      const result = await adminApi.getLogs({
+        page,
+        pageSize: 20,
+        username: userSearch || undefined,
+        action: actionFilter || undefined,
+      });
       setLogs(result.items);
       setTotalPages(result.totalPages);
       setTotal(result.total);
     } catch { toast.error('加载日志失败'); } finally { setLoading(false); }
-  }, [page, actionFilter]);
+  }, [page, userSearch, actionFilter]);
+
+  const loadStats = useCallback(async () => {
+    try { setStats(await adminApi.getLogsStats()); } catch {}
+  }, []);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
-
-  const filteredLogs = userSearch ? logs.filter(l => l.username?.toLowerCase().includes(userSearch.toLowerCase())) : logs;
+  useEffect(() => { loadStats(); }, [loadStats]);
 
   const parseData = (data: string | null): string => {
     if (!data) return '-';
@@ -50,16 +66,27 @@ export const ActionsTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {stats && (
+        <StatsGrid>
+          <StatCard icon={Activity} label="总记录" value={stats.total} color="blue" />
+          <StatCard icon={Zap} label="今日行为" value={stats.today} subLabel={`本周 ${stats.week}`} color="orange" />
+          <StatCard icon={Users} label="今日活跃用户" value={stats.uniqueUsersToday} color="green" />
+          <StatCard icon={LogIn} label="今日登录成功" value={stats.loginToday.success} color="teal" />
+          <StatCard icon={AlertTriangle} label="今日登录失败" value={stats.loginToday.failed} color="red" />
+          <StatCard icon={TrendingUp} label="最常见操作" value={stats.actionsByType[0] ? actionLabels[stats.actionsByType[0].action] || stats.actionsByType[0].action : '-'} color="purple" />
+        </StatsGrid>
+      )}
+
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="w-44"><Input placeholder="筛选用户名..." value={userSearch} onChange={e => setUserSearch(e.target.value)} leftIcon={<Search className="w-4 h-4" />} /></div>
+          <div className="w-44"><Input placeholder="筛选用户名..." value={userSearch} onChange={e => { setUserSearch(e.target.value); setPage(1); }} leftIcon={<Search className="w-4 h-4" />} /></div>
           <select value={actionFilter} onChange={e => { setActionFilter(e.target.value); setPage(1); }} className="px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm">
             <option value="">全部操作</option>
             {Object.entries(actionLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <span className="text-sm text-surface-500">共 {total} 条</span>
         </div>
-        <Button variant="outline" size="sm" onClick={loadLogs}><RefreshCw className="w-4 h-4 mr-2" />刷新</Button>
+        <Button variant="outline" size="sm" onClick={() => { loadLogs(); loadStats(); }}><RefreshCw className="w-4 h-4 mr-2" />刷新</Button>
       </div>
       <TableWrapper>
         <table className="w-full text-sm">
@@ -68,8 +95,8 @@ export const ActionsTab: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-surface-100 dark:divide-surface-700">
             {loading ? <tr><td colSpan={5} className="px-4 py-8 text-center text-surface-500">加载中...</td></tr>
-              : filteredLogs.length === 0 ? <tr><td colSpan={5} className="px-4 py-8 text-center text-surface-500">暂无数据</td></tr>
-              : filteredLogs.map(log => (
+              : logs.length === 0 ? <tr><td colSpan={5} className="px-4 py-8 text-center text-surface-500">暂无数据</td></tr>
+              : logs.map(log => (
                 <React.Fragment key={log.id}>
                   <tr className="hover:bg-surface-50 dark:hover:bg-surface-700/50">
                     <td className="px-4 py-3 text-surface-500 whitespace-nowrap">

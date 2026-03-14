@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
-import { Search, RefreshCw, Ban, CheckCircle, Eye, Shield, LogIn, Activity, Server, Database, Award, MapPin } from 'lucide-react';
+import { Search, RefreshCw, Ban, CheckCircle, Eye, Shield, LogIn, Activity, Server, Database, Award, MapPin, Users, UserCheck, UserX, Mail, TrendingUp } from 'lucide-react';
 import { adminApi } from '@/services/api';
 import type { AdminUser, AdminUserDetail, Role } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
-import { Pagination, TableWrapper } from './shared';
+import { Pagination, TableWrapper, StatCard, StatsGrid } from './shared';
 
 export const UsersTab: React.FC = () => {
   const toast = useToast();
@@ -22,6 +22,17 @@ export const UsersTab: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<AdminUserDetail | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [permissionsModal, setPermissionsModal] = useState<{ open: boolean; userId: string; current: string[] }>({ open: false, userId: '', current: [] });
+  const [stats, setStats] = useState<{
+    total: number;
+    active: number;
+    inactive: number;
+    verified: number;
+    newToday: number;
+    newWeek: number;
+    newMonth: number;
+    activeToday: number;
+    roleDistribution: Array<{ display_name: string; count: number }>;
+  } | null>(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -32,7 +43,12 @@ export const UsersTab: React.FC = () => {
     } catch { toast.error('加载失败'); } finally { setLoading(false); }
   }, [page, search, statusFilter, roleFilter]);
 
+  const loadStats = useCallback(async () => {
+    try { setStats(await adminApi.getUsersStats()); } catch {}
+  }, []);
+
   useEffect(() => { loadUsers(); }, [loadUsers]);
+  useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { adminApi.getRoles().then(setRoles).catch(() => {}); }, []);
 
   const handleViewDetail = async (userId: string) => {
@@ -48,6 +64,7 @@ export const UsersTab: React.FC = () => {
       await adminApi.updateUserStatus(userId, !currentStatus);
       toast.success(!currentStatus ? '用户已启用' : '用户已禁用');
       loadUsers();
+      loadStats();
     } catch { toast.error('操作失败'); }
   };
 
@@ -61,6 +78,17 @@ export const UsersTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {stats && (
+        <StatsGrid>
+          <StatCard icon={Users} label="总用户" value={stats.total} color="blue" />
+          <StatCard icon={UserCheck} label="已激活" value={stats.active} subLabel={`占比 ${stats.total > 0 ? Math.round(stats.active / stats.total * 100) : 0}%`} color="green" />
+          <StatCard icon={UserX} label="已禁用" value={stats.inactive} color="red" />
+          <StatCard icon={Mail} label="已验证" value={stats.verified} color="purple" />
+          <StatCard icon={TrendingUp} label="今日新增" value={stats.newToday} subLabel={`本周 ${stats.newWeek}`} color="orange" />
+          <StatCard icon={Activity} label="今日活跃" value={stats.activeToday} color="teal" />
+        </StatsGrid>
+      )}
+
       <div className="flex gap-3 flex-wrap">
         <div className="flex-1 min-w-[200px]">
           <Input placeholder="搜索用户名或邮箱..." value={search} onChange={e => setSearch(e.target.value)} leftIcon={<Search className="w-4 h-4" />} />
@@ -72,7 +100,7 @@ export const UsersTab: React.FC = () => {
           <option value="">全部角色</option>
           {roles.map(r => <option key={r.id} value={r.id}>{r.displayName}</option>)}
         </select>
-        <Button variant="outline" size="sm" onClick={loadUsers}><RefreshCw className="w-4 h-4" /></Button>
+        <Button variant="outline" size="sm" onClick={() => { loadUsers(); loadStats(); }}><RefreshCw className="w-4 h-4" /></Button>
       </div>
       <TableWrapper>
         <table className="w-full text-sm">

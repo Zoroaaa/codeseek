@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
-import { RefreshCw, MapPin, Monitor, XCircle } from 'lucide-react';
+import { RefreshCw, MapPin, Monitor, XCircle, Users, Wifi, Clock, Smartphone, MonitorSmartphone, Zap } from 'lucide-react';
 import { adminApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
-import { Pagination, TableWrapper } from './shared';
+import { Pagination, TableWrapper, StatCard, StatsGrid } from './shared';
 
 export const SessionsTab: React.FC = () => {
   const toast = useToast();
@@ -14,6 +14,14 @@ export const SessionsTab: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState('active');
   const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState<{
+    total: number;
+    active: number;
+    uniqueUsers: number;
+    recentlyActive: number;
+    todaySessions: number;
+    deviceDistribution: Array<{ device_type: string; count: number }>;
+  } | null>(null);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -25,11 +33,16 @@ export const SessionsTab: React.FC = () => {
     } catch { toast.error('加载会话失败'); } finally { setLoading(false); }
   }, [page, statusFilter]);
 
+  const loadStats = useCallback(async () => {
+    try { setStats(await adminApi.getSessionsStats()); } catch {}
+  }, []);
+
   useEffect(() => { loadSessions(); }, [loadSessions]);
+  useEffect(() => { loadStats(); }, [loadStats]);
 
   const handleTerminate = async (sessionId: string) => {
     if (!confirm('确定要强制终止此会话吗？')) return;
-    try { await adminApi.terminateSession(sessionId); toast.success('会话已终止'); loadSessions(); } catch { toast.error('操作失败'); }
+    try { await adminApi.terminateSession(sessionId); toast.success('会话已终止'); loadSessions(); loadStats(); } catch { toast.error('操作失败'); }
   };
 
   const formatExpiry = (seconds: number) => {
@@ -49,8 +62,29 @@ export const SessionsTab: React.FC = () => {
     return `${d}天前`;
   };
 
+  const getDeviceIcon = (deviceType: string) => {
+    switch (deviceType) {
+      case 'Mobile': return Smartphone;
+      case 'Tablet': return MonitorSmartphone;
+      default: return Monitor;
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {stats && (
+        <StatsGrid>
+          <StatCard icon={Wifi} label="活跃会话" value={stats.active} color="green" />
+          <StatCard icon={Users} label="在线用户" value={stats.uniqueUsers} color="blue" />
+          <StatCard icon={Zap} label="1小时内活跃" value={stats.recentlyActive} color="orange" />
+          <StatCard icon={Clock} label="今日新会话" value={stats.todaySessions} color="purple" />
+          <StatCard icon={Monitor} label="总会话记录" value={stats.total} color="teal" />
+          {stats.deviceDistribution[0] && (
+            <StatCard icon={getDeviceIcon(stats.deviceDistribution[0].device_type)} label="主要设备" value={stats.deviceDistribution[0].device_type} subLabel={`${stats.deviceDistribution[0].count} 个`} color="pink" />
+          )}
+        </StatsGrid>
+      )}
+
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} className="px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm">
@@ -58,7 +92,7 @@ export const SessionsTab: React.FC = () => {
           </select>
           <span className="text-sm text-surface-500">共 {total} 条记录</span>
         </div>
-        <Button variant="outline" size="sm" onClick={loadSessions}><RefreshCw className="w-4 h-4 mr-2" />刷新</Button>
+        <Button variant="outline" size="sm" onClick={() => { loadSessions(); loadStats(); }}><RefreshCw className="w-4 h-4 mr-2" />刷新</Button>
       </div>
       <TableWrapper>
         <table className="w-full text-sm">

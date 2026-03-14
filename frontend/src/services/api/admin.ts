@@ -62,6 +62,21 @@ export const adminApi = {
     return response.data.roles;
   },
 
+  getUsersStats: async (): Promise<{
+    total: number;
+    active: number;
+    inactive: number;
+    verified: number;
+    newToday: number;
+    newWeek: number;
+    newMonth: number;
+    activeToday: number;
+    roleDistribution: Array<{ display_name: string; count: number }>;
+  }> => {
+    const response = await apiClient.get<{ success: boolean; data: any }>('/admin/users/stats');
+    return response.data;
+  },
+
   getUsers: async (params: {
     page?: number;
     pageSize?: number;
@@ -169,10 +184,23 @@ export const adminApi = {
     return response.data;
   },
 
+  getLogsStats: async (): Promise<{
+    total: number;
+    today: number;
+    week: number;
+    uniqueUsersToday: number;
+    actionsByType: Array<{ action: string; count: number }>;
+    loginToday: { success: number; failed: number };
+  }> => {
+    const response = await apiClient.get<{ success: boolean; data: any }>('/admin/logs/stats');
+    return response.data;
+  },
+
   getLogs: async (params: {
     page?: number;
     pageSize?: number;
     userId?: string;
+    username?: string;
     action?: string;
   } = {}): Promise<PaginatedResponse<{
     id: string;
@@ -188,6 +216,7 @@ export const adminApi = {
     if (params.page) queryParams.set('page', params.page.toString());
     if (params.pageSize) queryParams.set('pageSize', params.pageSize.toString());
     if (params.userId) queryParams.set('userId', params.userId);
+    if (params.username) queryParams.set('username', params.username);
     if (params.action) queryParams.set('action', params.action);
 
     const response = await apiClient.get<{
@@ -313,6 +342,18 @@ export const adminApi = {
     period: { days: number; startTime: number };
   }> => {
     const response = await apiClient.get<{ success: boolean; data: any }>(`/admin/dashboard/user-behavior?days=${days}`);
+    return response.data;
+  },
+
+  getSessionsStats: async (): Promise<{
+    total: number;
+    active: number;
+    uniqueUsers: number;
+    recentlyActive: number;
+    todaySessions: number;
+    deviceDistribution: Array<{ device_type: string; count: number }>;
+  }> => {
+    const response = await apiClient.get<{ success: boolean; data: any }>('/admin/sessions/stats');
     return response.data;
   },
 
