@@ -32,28 +32,6 @@ export const RegisterPage: React.FC = () => {
   const [countdown, setCountdown] = useState(0);
   const [maskedEmail, setMaskedEmail] = useState('');
 
-  // 页面加载时检查是否有待验证的注册码（用户发码后关闭/刷新页面的恢复逻辑）
-  useEffect(() => {
-    const savedEmail = sessionStorage.getItem('register_pending_email');
-    const savedMasked = sessionStorage.getItem('register_pending_masked');
-    if (savedEmail && savedMasked) {
-      authApi.checkVerificationStatus(savedEmail, 'registration').then((res) => {
-        if (res.success && res.data?.hasPendingVerification && res.data.remainingTime && res.data.remainingTime > 0) {
-          setFormData(prev => ({ ...prev, email: savedEmail }));
-          setMaskedEmail(savedMasked);
-          setCountdown(Math.floor(res.data!.remainingTime! / 1000));
-          setCurrentStep('verify');
-        } else {
-          sessionStorage.removeItem('register_pending_email');
-          sessionStorage.removeItem('register_pending_masked');
-        }
-      }).catch(() => {
-        sessionStorage.removeItem('register_pending_email');
-        sessionStorage.removeItem('register_pending_masked');
-      });
-    }
-  }, []);
-
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -95,8 +73,6 @@ export const RegisterPage: React.FC = () => {
         const masked = response.data.maskedEmail || maskEmail(formData.email);
         setMaskedEmail(masked);
         setCountdown(response.data.expiresIn || 300);
-        sessionStorage.setItem('register_pending_email', formData.email);
-        sessionStorage.setItem('register_pending_masked', masked);
         setCurrentStep('verify');
         notification.auth.emailCodeSent();
       } else {
@@ -153,8 +129,6 @@ export const RegisterPage: React.FC = () => {
       if (response.success && response.data) {
         setUser(response.data.user);
         setToken(response.data.token);
-        sessionStorage.removeItem('register_pending_email');
-        sessionStorage.removeItem('register_pending_masked');
         setCurrentStep('success');
         notification.auth.registerSuccess();
         setTimeout(() => navigate('/dashboard'), 2000);
@@ -294,11 +268,7 @@ export const RegisterPage: React.FC = () => {
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => {
-              sessionStorage.removeItem('register_pending_email');
-              sessionStorage.removeItem('register_pending_masked');
-              setCurrentStep('form');
-            }}
+            onClick={() => setCurrentStep('form')}
             className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl font-medium text-sm border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200"
           >
             返回修改

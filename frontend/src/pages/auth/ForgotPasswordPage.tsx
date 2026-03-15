@@ -28,28 +28,6 @@ export const ForgotPasswordPage: React.FC = () => {
   const [countdown, setCountdown] = useState(0);
   const [maskedEmail, setMaskedEmail] = useState('');
 
-  // 页面加载时检查是否有待验证的忘记密码码
-  useEffect(() => {
-    const savedEmail = sessionStorage.getItem('forgot_pending_email');
-    const savedMasked = sessionStorage.getItem('forgot_pending_masked');
-    if (savedEmail && savedMasked) {
-      authApi.checkVerificationStatus(savedEmail, 'forgot_password').then((res) => {
-        if (res.success && res.data?.hasPendingVerification && res.data.remainingTime && res.data.remainingTime > 0) {
-          setEmail(savedEmail);
-          setMaskedEmail(savedMasked);
-          setCountdown(Math.floor(res.data!.remainingTime! / 1000));
-          setCurrentStep('verify');
-        } else {
-          sessionStorage.removeItem('forgot_pending_email');
-          sessionStorage.removeItem('forgot_pending_masked');
-        }
-      }).catch(() => {
-        sessionStorage.removeItem('forgot_pending_email');
-        sessionStorage.removeItem('forgot_pending_masked');
-      });
-    }
-  }, []);
-
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -81,8 +59,6 @@ export const ForgotPasswordPage: React.FC = () => {
         const masked = response.data.maskedEmail || maskEmail(email);
         setMaskedEmail(masked);
         setCountdown(60);
-        sessionStorage.setItem('forgot_pending_email', email);
-        sessionStorage.setItem('forgot_pending_masked', masked);
         setCurrentStep('verify');
         notification.auth.emailCodeSent();
       } else {
@@ -136,8 +112,6 @@ export const ForgotPasswordPage: React.FC = () => {
     try {
       const response = await authApi.resetPassword({ email, verificationCode: cleanCode, newPassword });
       if (response.success) {
-        sessionStorage.removeItem('forgot_pending_email');
-        sessionStorage.removeItem('forgot_pending_masked');
         setCurrentStep('success');
         notification.auth.passwordResetSuccess();
       } else {
@@ -207,11 +181,7 @@ export const ForgotPasswordPage: React.FC = () => {
         leftIcon={<Lock className="w-5 h-5" />} fullWidth />
 
       <div className="grid grid-cols-2 gap-3">
-        <button type="button" onClick={() => {
-          sessionStorage.removeItem('forgot_pending_email');
-          sessionStorage.removeItem('forgot_pending_masked');
-          setCurrentStep('email');
-        }}
+        <button type="button" onClick={() => setCurrentStep('email')}
           className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl font-medium text-sm border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200">
           返回
         </button>

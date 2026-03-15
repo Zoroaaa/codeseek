@@ -23,6 +23,7 @@ import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import { Button, Modal } from '@/components/ui';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppInfo, useFeatureFlags } from '@/contexts';
+import { FeedbackButton } from '@/components/feedback';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -415,6 +416,9 @@ export const HomePage: React.FC = () => {
           </ol>
         </div>
       </Modal>
+
+      {/* 反馈建议按钮 */}
+      <FeedbackButton />
 
     </div>
   );
