@@ -47,8 +47,8 @@ app.route('/api/community', communityRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/config', configRoutes);
 app.route('/api/jav', javRoutes);
-app.route('/api', systemRoutes);
 app.route('/api/feedback', feedbackRoutes);
+app.route('/api', systemRoutes);
 
 app.notFound((c) => {
   return c.json({ success: false, error: { code: 'NOT_FOUND', message: '接口不存在' } }, 404);
