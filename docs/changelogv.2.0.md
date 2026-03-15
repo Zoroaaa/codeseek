@@ -732,12 +732,35 @@ npm install
 - ✅ 新增 `types/notification.ts` 通知类型定义
 - ✅ 新增 `utils/notificationTemplates.ts` 通知模板工具
 - ✅ 新增 `docs/notification.md` 通知系统文档
+- ✅ 新增 `components/feedback/FeedbackButton.tsx` 反馈浮动按钮组件
+- ✅ 新增 `components/feedback/FeedbackModal.tsx` 反馈提交弹窗组件
+- ✅ 新增 `services/api/feedback.ts` 反馈 API 客户端
 
 #### 后端新增
 - ✅ 新增 `services/config.ts` 配置服务
 - ✅ 新增系统配置管理API
 - ✅ 新增邮箱验证码限流机制
 - ✅ 新增搜索源状态检查缓存
+- ✅ 新增 `routes/github-oauth.ts` GitHub OAuth 第三方登录
+- ✅ 新增 `routes/feedback.ts` 用户反馈系统
+- ✅ 新增 `database/09_schema_feedback.sql` 用户反馈表结构
+
+#### GitHub OAuth 模块
+- ✅ 支持使用 GitHub 账号一键登录
+- ✅ 自动创建新用户或关联已有账号
+- ✅ CSRF 防护（state 参数 + HttpOnly Cookie）
+- ✅ 记录安全事件日志
+- ✅ 支持 GitHub 邮箱权限获取
+
+#### 用户反馈模块
+- ✅ 支持三种反馈类型：问题反馈、优化建议、其他
+- ✅ 未登录用户也可提交反馈（需填写联系邮箱）
+- ✅ 自动收集页面URL、浏览器信息
+- ✅ 管理员反馈管理面板
+- ✅ 反馈状态流转（待处理→处理中→已解决/已关闭）
+- ✅ 优先级设置（低/普通/高/紧急）
+- ✅ 处理完成后发送邮件通知用户
+- ✅ 反馈统计面板
 
 ### 配置优化
 - ✅ `wrangler.toml` 配置项大幅扩展，支持更多运行时配置
@@ -746,6 +769,8 @@ npm install
 - ✅ 新增邮件发送频率限制配置
 - ✅ 新增JWT有效期配置
 - ✅ 新增搜索源状态检查配置
+- ✅ 新增 `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` GitHub OAuth 配置
+- ✅ 新增 `BACKEND_URL` / `FRONTEND_URL` OAuth 回调地址配置
 
 ### 安全增强
 - ✅ 邮箱验证码发送频率限制（每小时5次，每天20次）
@@ -753,6 +778,13 @@ npm install
 - ✅ 临时邮箱域名黑名单
 - ✅ 可信邮箱域名白名单
 - ✅ 安全事件监控阈值配置
+- ✅ GitHub OAuth CSRF 防护（state 参数 + HttpOnly Cookie）
+- ✅ OAuth state 有效期限制（10分钟）
+
+### API 统计更新
+- ✅ 新增 GitHub OAuth 接口（2个）
+- ✅ 新增用户反馈接口（6个）
+- ✅ API 总数从 134 个增加到 142 个
 
 ---
 

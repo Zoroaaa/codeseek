@@ -11,6 +11,8 @@
 - [前端配置](#前端配置)
 - [后端配置](#后端配置)
 - [环境变量](#环境变量)
+- [GitHub OAuth 配置](#github-oauth-配置)
+- [反馈系统配置](#反馈系统配置)
 - [代理服务配置](#代理服务配置)
 - [数据库配置](#数据库配置)
 - [角色权限配置](#角色权限配置)
@@ -397,6 +399,145 @@ wrangler secret put RESEND_API_KEY
 
 ---
 
+## GitHub OAuth 配置
+
+GitHub OAuth 模块支持使用 GitHub 账号第三方登录。
+
+### 创建 GitHub OAuth App
+
+1. 访问 [GitHub Developer Settings](https://github.com/settings/developers)
+2. 点击 "New OAuth App"
+3. 填写应用信息：
+   - **Application name**: 应用名称（如：磁力快搜）
+   - **Homepage URL**: 前端首页地址（如：`https://codeseek.pp.ua`）
+   - **Authorization callback URL**: 后端回调地址（如：`https://backend.codeseek.pp.ua/api/auth/github/callback`）
+4. 创建后获取 Client ID 和 Client Secret
+
+### 环境变量配置
+
+| 变量名 | 类型 | 说明 | 配置方式 |
+|--------|------|------|----------|
+| `GITHUB_CLIENT_ID` | Secret | GitHub OAuth App Client ID | `wrangler secret put GITHUB_CLIENT_ID` |
+| `GITHUB_CLIENT_SECRET` | Secret | GitHub OAuth App Client Secret | `wrangler secret put GITHUB_CLIENT_SECRET` |
+| `BACKEND_URL` | Var | 后端域名，用于构造回调 URL | wrangler.toml |
+| `FRONTEND_URL` | Var | 前端域名，授权后跳转目标 | wrangler.toml |
+
+### wrangler.toml 配置示例
+
+```toml
+[vars]
+BACKEND_URL = "https://backend.codeseek.pp.ua"
+FRONTEND_URL = "https://codeseek.pp.ua"
+```
+
+### 设置密钥
+
+```bash
+# 设置 GitHub OAuth Client ID
+wrangler secret put GITHUB_CLIENT_ID
+# 输入你的 Client ID
+
+# 设置 GitHub OAuth Client Secret
+wrangler secret put GITHUB_CLIENT_SECRET
+# 输入你的 Client Secret
+```
+
+### OAuth 流程说明
+
+1. 用户点击 "GitHub 登录" 按钮
+2. 前端调用 `GET /api/auth/github` 发起授权
+3. 后端生成 state 参数并重定向到 GitHub
+4. 用户在 GitHub 授权页面确认
+5. GitHub 回调到 `/api/auth/github/callback`
+6. 后端验证 state，换取 access_token
+7. 获取 GitHub 用户信息，创建/关联账号
+8. 生成 JWT Token，重定向到前端
+
+### 安全机制
+
+- **CSRF 防护**: 使用随机 state 参数，存储在 HttpOnly Cookie 中
+- **Cookie 安全**: 设置 `HttpOnly`、`Secure`、`SameSite=Lax`
+- **有效期限制**: State 有效期 10 分钟
+- **日志记录**: 记录登录安全事件
+
+---
+
+## 反馈系统配置
+
+反馈系统模块支持用户提交问题反馈和建议，管理员可处理反馈并发送邮件通知。
+
+### 环境变量配置
+
+| 变量名 | 类型 | 说明 | 配置方式 |
+|--------|------|------|----------|
+| `RESEND_API_KEY` | Secret | Resend 邮件服务 API 密钥 | `wrangler secret put RESEND_API_KEY` |
+| `DEFAULT_FROM_EMAIL` | Var | 发件人邮箱 | wrangler.toml |
+| `DEFAULT_FROM_NAME` | Var | 发件人名称 | wrangler.toml |
+| `SITE_URL` | Var | 网站域名（邮件中链接） | wrangler.toml |
+
+### wrangler.toml 配置示例
+
+```toml
+[vars]
+DEFAULT_FROM_EMAIL = "noreply@tempemail.pp.ua"
+DEFAULT_FROM_NAME = "磁力快搜"
+SITE_URL = "https://codeseek.pp.ua"
+```
+
+### 数据库表结构
+
+反馈系统使用 `user_feedback` 表，需执行数据库迁移：
+
+```bash
+# 执行反馈表迁移
+wrangler d1 execute codeseek-db --remote --file="../database/09_schema_feedback.sql"
+```
+
+### 反馈类型
+
+| 类型 | 说明 |
+|------|------|
+| `bug` | 问题反馈 - 报告系统缺陷或错误 |
+| `suggestion` | 优化建议 - 提出功能改进建议 |
+| `other` | 其他 - 其他类型的反馈 |
+
+### 反馈状态流转
+
+```
+pending (待处理) → processing (处理中) → resolved (已解决) / closed (已关闭)
+```
+
+### 邮件通知
+
+当管理员处理反馈时，可选择发送邮件通知用户。邮件内容包括：
+- 反馈类型和标题
+- 处理状态
+- 管理员回复内容
+- 网站链接
+
+### 前端组件
+
+反馈系统提供两个前端组件：
+
+1. **FeedbackButton** - 固定在页面右下角的浮动按钮
+2. **FeedbackModal** - 反馈提交弹窗
+
+使用示例：
+```tsx
+import { FeedbackButton } from '@/components/feedback';
+
+function App() {
+  return (
+    <div>
+      {/* 页面内容 */}
+      <FeedbackButton />
+    </div>
+  );
+}
+```
+
+---
+
 ## 代理服务配置
 
 > **注意**: 代理服务已独立为 [OmniBox](https://github.com/Zoroaaa/OmniBox) 项目，以下为历史参考。
@@ -461,7 +602,8 @@ database/
 ├── 04_schema_security.sql      # 安全模块（验证、锁定）
 ├── 05_data_system.sql          # 系统初始化数据
 ├── 06_data_search_sources.sql  # 搜索源预置数据（50+源）
-└── 07_data_tags.sql            # 官方标签初始化数据
+├── 07_data_tags.sql            # 官方标签初始化数据
+└── 09_schema_feedback.sql      # 用户反馈表结构
 ```
 
 ### 数据库初始化
@@ -478,6 +620,7 @@ wrangler d1 execute codeseek-db --local --file="../database/04_schema_security.s
 wrangler d1 execute codeseek-db --local --file="../database/05_data_system.sql"
 wrangler d1 execute codeseek-db --local --file="../database/06_data_search_sources.sql"
 wrangler d1 execute codeseek-db --local --file="../database/07_data_tags.sql"
+wrangler d1 execute codeseek-db --local --file="../database/09_schema_feedback.sql"
 
 # 生产环境
 wrangler d1 execute codeseek-db --remote --file="../database/01_schema_core.sql"

@@ -10,6 +10,8 @@
 
 - [用户登录](#用户登录)
 - [用户注册](#用户注册)
+- [GitHub OAuth 登录](#github-oauth-登录)
+- [GitHub OAuth 回调](#github-oauth-回调)
 - [用户登出](#用户登出)
 - [获取当前用户信息](#获取当前用户信息)
 - [Token验证](#token验证)
@@ -150,6 +152,98 @@
 | `FORBIDDEN` | 403 | 注册功能已关闭 |
 | `VALIDATION_ERROR` | 400 | 参数验证失败 |
 | `VALIDATION_ERROR` | 400 | 用户名或邮箱已被注册 |
+
+---
+
+## GitHub OAuth 登录
+
+### `GET /api/auth/github`
+
+发起 GitHub OAuth 授权流程，重定向到 GitHub 授权页面。
+
+**认证**: 公开
+
+**流程说明**:
+1. 生成防 CSRF 的 state 参数
+2. 构造 GitHub 授权 URL
+3. 将 state 存入 HttpOnly Cookie（有效期 10 分钟）
+4. 重定向到 GitHub 授权页面
+
+**重定向 URL**:
+```
+https://github.com/login/oauth/authorize?client_id=xxx&redirect_uri=xxx&scope=user:email&state=xxx
+```
+
+**参数说明**:
+| 参数 | 来源 | 说明 |
+|------|------|------|
+| client_id | 环境变量 `GITHUB_CLIENT_ID` | GitHub OAuth App 的 Client ID |
+| redirect_uri | 环境变量 `BACKEND_URL` + `/api/auth/github/callback` | 授权回调地址 |
+| scope | 固定值 | `user:email`，获取用户邮箱权限 |
+| state | 随机生成 | 防 CSRF 攻击的随机字符串 |
+
+**错误情况**:
+如果 GitHub OAuth 未配置，会重定向到前端并携带错误参数：
+```
+{FRONTEND_URL}/auth/callback?error=github_not_configured
+```
+
+---
+
+## GitHub OAuth 回调
+
+### `GET /api/auth/github/callback`
+
+处理 GitHub OAuth 授权回调，完成登录或注册。
+
+**认证**: 公开
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| code | string | 是 | GitHub 授权码 |
+| state | string | 是 | 防 CSRF 的 state 参数 |
+
+**处理流程**:
+1. **CSRF 校验** - 验证 Cookie 中的 state 与回调参数匹配
+2. **Code 换 Token** - 调用 GitHub API 获取 access_token
+3. **获取用户信息** - 调用 GitHub `/user` 和 `/user/emails` 接口
+4. **查找/创建用户**:
+   - 优先通过 `github_id` 查找已有用户
+   - 其次通过 `email` 关联已有账号（并绑定 github_id）
+   - 都不存在则自动注册新用户
+5. **生成 JWT** - 创建会话并返回 token
+6. **重定向到前端** - 携带 token 和用户信息
+
+**成功响应**:
+重定向到前端回调页面：
+```
+{FRONTEND_URL}/auth/callback?token=xxx&user=xxx
+```
+
+**错误响应**:
+重定向到前端并携带错误参数：
+```
+{FRONTEND_URL}/auth/callback?error=xxx
+```
+
+**错误码说明**:
+| 错误码 | 说明 |
+|--------|------|
+| `github_not_configured` | GitHub OAuth 未配置 |
+| `github_cancelled` | 用户取消授权 |
+| `github_invalid_params` | 参数缺失 |
+| `github_state_mismatch` | CSRF 校验失败 |
+| `github_token_failed` | Token 获取失败 |
+| `github_db_error` | 数据库错误 |
+| `account_disabled` | 账号已禁用 |
+| `github_server_error` | 服务器错误 |
+
+**安全机制**:
+- 使用 state 参数防止 CSRF 攻击
+- Cookie 设置 HttpOnly、Secure、SameSite=Lax
+- State 有效期 10 分钟
+- 记录安全事件日志
 
 ---
 

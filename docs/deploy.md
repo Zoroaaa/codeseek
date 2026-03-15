@@ -83,6 +83,7 @@ wrangler d1 execute codeseek-db --local --file="../database/04_schema_security.s
 wrangler d1 execute codeseek-db --local --file="../database/05_data_system.sql"
 wrangler d1 execute codeseek-db --local --file="../database/06_data_search_sources.sql"
 wrangler d1 execute codeseek-db --local --file="../database/07_data_tags.sql"
+wrangler d1 execute codeseek-db --local --file="../database/09_schema_feedback.sql"
 
 # 启动开发服务器
 npm run dev
@@ -188,6 +189,7 @@ wrangler d1 execute codeseek-db --remote --file="../database/04_schema_security.
 wrangler d1 execute codeseek-db --remote --file="../database/05_data_system.sql"
 wrangler d1 execute codeseek-db --remote --file="../database/06_data_search_sources.sql"
 wrangler d1 execute codeseek-db --remote --file="../database/07_data_tags.sql"
+wrangler d1 execute codeseek-db --remote --file="../database/09_schema_feedback.sql"
 ```
 
 ### 4. 设置环境变量
@@ -198,6 +200,10 @@ wrangler secret put JWT_SECRET
 
 # 设置邮件服务API密钥（可选）
 wrangler secret put RESEND_API_KEY
+
+# 设置GitHub OAuth（可选）
+wrangler secret put GITHUB_CLIENT_ID
+wrangler secret put GITHUB_CLIENT_SECRET
 
 # 设置其他配置
 wrangler secret put DEFAULT_FROM_EMAIL
@@ -322,6 +328,8 @@ wrangler pages deploy dist --project-name=codeseek
 │  06_data_search_sources.sql  # 搜索源预置数据（50+）    │
 ├─────────────────────────────────────────────────────────┤
 │  07_data_tags.sql            # 官方标签数据             │
+├─────────────────────────────────────────────────────────┤
+│  09_schema_feedback.sql      # 用户反馈表               │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -354,6 +362,8 @@ wrangler d1 execute codeseek-db --file backup.sql
 |--------|------|------|--------|
 | `JWT_SECRET` | ✅ | JWT签名密钥（至少32字符） | `your-32-char-secret-key-here` |
 | `RESEND_API_KEY` | ❌ | Resend邮件服务密钥 | `re_xxxxxxxxxxxx` |
+| `GITHUB_CLIENT_ID` | ❌ | GitHub OAuth App Client ID | `Iv1.xxxxxxxx` |
+| `GITHUB_CLIENT_SECRET` | ❌ | GitHub OAuth App Client Secret | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
 
 ### 后端配置变量 (wrangler.toml)
 
@@ -498,7 +508,7 @@ wrangler d1 execute codeseek-db --remote --file="../database/01_schema_core.sql"
 - [ ] Node.js >= 20.0.0 已安装
 - [ ] Wrangler CLI 已安装并登录
 - [ ] D1数据库已创建
-- [ ] 数据库表已初始化（7个SQL文件按顺序执行）
+- [ ] 数据库表已初始化（8个SQL文件按顺序执行）
 - [ ] JWT_SECRET 已设置
 - [ ] 后端Worker已部署
 - [ ] 后端API健康检查通过
@@ -506,6 +516,8 @@ wrangler d1 execute codeseek-db --remote --file="../database/01_schema_core.sql"
 - [ ] 前端已部署到Pages
 - [ ] CORS配置正确
 - [ ] 自定义域名已配置（可选）
+- [ ] GitHub OAuth 已配置（可选）
+- [ ] 邮件服务已配置（可选）
 
 ---
 
