@@ -30,6 +30,7 @@ import type {
 import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesPanel, QuickActionsPanel } from '@/components/search';
 import { JavDetailPanel, JavRankingsPanel } from '@/components/jav';
 import { useJavDetail } from '@/hooks';
+import { FeedbackButton } from '@/components/feedback';
 
 interface SearchResultItem extends SearchResult {
   subtitle?: string;
@@ -653,6 +654,9 @@ export const MainSearchPage: React.FC = () => {
           <QuickActionsPanel isAdmin={isAdmin} communityEnabled={communityEnabled} layout="horizontal" />
         </div>
       </div>
+
+      {/* 悬浮反馈按钮 */}
+      <FeedbackButton />
     </div>
   );
 };

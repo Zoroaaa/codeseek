@@ -8,4 +8,6 @@ export { TrendsTab } from './TrendsTab';
 export { ReportsTab } from './ReportsTab';
 export { RolesTab } from './RolesTab';
 export { CleanupTab } from './CleanupTab';
+export { FeedbackTab } from './FeedbackTab';
 export { Pagination, TableWrapper, formatDate, formatRelativeTime, actionLabels, actionColors } from './shared';
+

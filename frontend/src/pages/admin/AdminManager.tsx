@@ -9,8 +9,9 @@ import { ReportsTab } from './ReportsTab';
 import { RolesTab } from './RolesTab';
 import { CleanupTab } from './CleanupTab';
 import { ConfigTab } from './ConfigTab';
+import { FeedbackTab } from './FeedbackTab';
 
-type TabType = 'users' | 'sessions' | 'actions' | 'analytics' | 'trends' | 'reports' | 'roles' | 'config' | 'cleanup';
+type TabType = 'users' | 'sessions' | 'actions' | 'analytics' | 'trends' | 'reports' | 'roles' | 'config' | 'cleanup' | 'feedback';
 
 export const AdminManager: React.FC = () => {
   const location = useLocation();
@@ -25,6 +26,7 @@ export const AdminManager: React.FC = () => {
     if (p.includes('/roles')) return 'roles';
     if (p.includes('/config')) return 'config';
     if (p.includes('/cleanup')) return 'cleanup';
+    if (p.includes('/feedback')) return 'feedback';
     return 'users';
   };
 
@@ -42,6 +44,7 @@ export const AdminManager: React.FC = () => {
       {activeTab === 'roles' && <RolesTab />}
       {activeTab === 'config' && <ConfigTab />}
       {activeTab === 'cleanup' && <CleanupTab />}
+      {activeTab === 'feedback' && <FeedbackTab />}
     </div>
   );
 };

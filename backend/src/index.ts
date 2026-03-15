@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { Env } from '@/types';
 import { authRoutes, githubOAuthRoutes, userRoutes, sourceRoutes, communityRoutes, systemRoutes, searchRoutes, adminRoutes, configRoutes, javRoutes } from '@/routes';
+import { feedbackRoutes } from '@/routes/feedback';
 import { CONFIG } from '@/constants';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -47,6 +48,7 @@ app.route('/api/admin', adminRoutes);
 app.route('/api/config', configRoutes);
 app.route('/api/jav', javRoutes);
 app.route('/api', systemRoutes);
+app.route('/api/feedback', feedbackRoutes);
 
 app.notFound((c) => {
   return c.json({ success: false, error: { code: 'NOT_FOUND', message: '接口不存在' } }, 404);

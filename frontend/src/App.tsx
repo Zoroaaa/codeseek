@@ -226,6 +226,7 @@ const App: React.FC = () => {
           <Route path="roles" element={<AdminManager />} />
           <Route path="config" element={<AdminManager />} />
           <Route path="cleanup" element={<AdminManager />} />
+          <Route path="feedback" element={<AdminManager />} />
         </Route>
         
         <Route path="/admin" element={<AdminRoute><DashboardLayout /></AdminRoute>}>
