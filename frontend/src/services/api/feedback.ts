@@ -1,4 +1,15 @@
 import { apiClient } from './client';
+import { API_BASE_URL } from '@/constants';
+
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return API_BASE_URL.LOCAL;
+    }
+  }
+  return API_BASE_URL.PRODUCTION;
+};
 
 export interface FeedbackSubmit {
   type: 'bug' | 'suggestion' | 'other';
@@ -56,13 +67,25 @@ interface PaginatedResult<T> {
 }
 
 export const feedbackApi = {
-  /** 提交反馈（登录/未登录均可） */
+  /** 提交反馈（登录/未登录均可，使用原生 fetch 绕开 apiClient 的 token 注入和 401 拦截） */
   submit: async (data: FeedbackSubmit): Promise<{ id: string }> => {
-    const res = await apiClient.post<{ success: boolean; data: { id: string } }>(
-      '/feedback',
-      data
-    );
-    if (!res.success) throw new Error('提交失败');
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error('提交失败，请稍后重试');
+    }
+
+    const res = await response.json();
+    if (!res.success) {
+      throw new Error(res.message || res.error?.message || '提交失败');
+    }
     return res.data;
   },
 
