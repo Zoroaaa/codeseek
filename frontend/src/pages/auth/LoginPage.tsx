@@ -150,9 +150,9 @@ export const LoginPage: React.FC = () => {
             />
 
             <div className="flex items-center justify-between text-xs sm:text-sm">
-              <label className="flex items-center gap-2 text-slate-600 dark:text-slate-400 cursor-pointer select-none">
-                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-500 focus:ring-blue-500" />
-                记住我
+              <label className="flex items-center gap-2 text-slate-600 dark:text-slate-400 cursor-pointer select-none py-2 -my-2">
+                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-500 focus:ring-blue-500 flex-shrink-0" />
+                <span>记住我</span>
               </label>
               <Link to="/forgot-password" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors font-medium">
                 忘记密码？

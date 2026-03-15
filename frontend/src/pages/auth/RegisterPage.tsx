@@ -229,12 +229,12 @@ export const RegisterPage: React.FC = () => {
         fullWidth
       />
 
-      <label className="flex items-start gap-3 cursor-pointer select-none">
+      <label className="flex items-start gap-3 cursor-pointer select-none py-1">
         <input
           type="checkbox"
           checked={agreed}
           onChange={(e) => setAgreed(e.target.checked)}
-          className="mt-1 rounded border-slate-300 dark:border-slate-600 text-blue-500 focus:ring-blue-500"
+          className="mt-0.5 rounded border-slate-300 dark:border-slate-600 text-blue-500 focus:ring-blue-500 w-4 h-4 flex-shrink-0"
         />
         <span className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
           我已阅读并同意{' '}

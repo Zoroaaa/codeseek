@@ -117,7 +117,7 @@ export const HomePage: React.FC = () => {
             </Link>
 
             {/* Actions */}
-            <div className="flex items-center gap-1 sm:gap-1.5">
+            <div className="flex items-center gap-0.5 sm:gap-1.5">
               {/* Help button */}
               <button
                 onClick={() => setIsHelpModalOpen(true)}
@@ -170,12 +170,12 @@ export const HomePage: React.FC = () => {
                 </Button>
               ) : (
                 <>
-                  <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="hidden sm:inline-flex ml-1">
+                  <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="ml-0.5 sm:ml-1 px-2 sm:px-3">
                     登录
                   </Button>
                   {enableRegistration && (
-                    <Button variant="primary" size="sm" onClick={() => navigate('/register')} className="ml-1 sm:ml-1.5">
-                      免费注册
+                    <Button variant="primary" size="sm" onClick={() => navigate('/register')} className="ml-0.5 sm:ml-1.5 px-2 sm:px-3">
+                      注册
                     </Button>
                   )}
                 </>

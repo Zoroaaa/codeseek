@@ -708,10 +708,18 @@
 
 /* --- Mobile Touch Optimization --- */
 @media (max-width: 640px) {
-  /* Increase touch target size */
-  button, a, input, select, textarea {
+  /* Increase touch target size - exclude checkbox/radio to prevent oversized inputs */
+  button, a, input:not([type="checkbox"]):not([type="radio"]), select, textarea {
     min-height: 44px;
     min-width: 44px;
+  }
+  
+  /* Checkbox and radio should have normal size but with proper touch target */
+  input[type="checkbox"], input[type="radio"] {
+    min-width: auto;
+    min-height: auto;
+    width: 1rem;
+    height: 1rem;
   }
   
   /* Optimize tap feedback */
