@@ -487,12 +487,16 @@ function parseDetail(html: string, code: string, detailUrl: string): Omit<JavDet
   }
 
   // 演员
+  const actressSet = new Set<string>();
   const actresses: string[] = [];
   const starRe = /<a[^>]+href="[^"]*\/star\/[^"]*"[^>]*>([^<]+)<\/a>/gi;
   let starM: RegExpExecArray | null;
   while ((starM = starRe.exec(html)) !== null) {
     const name = starM[1].trim();
-    if (name && name.length < 30) actresses.push(name);
+    if (name && name.length < 30 && !actressSet.has(name)) {
+      actressSet.add(name);
+      actresses.push(name);
+    }
   }
 
   return { code, title, cover, releaseDate, duration, director, maker, publisher, series, tags, actresses, detailUrl };

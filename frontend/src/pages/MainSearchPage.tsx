@@ -563,6 +563,12 @@ export const MainSearchPage: React.FC = () => {
           )}
         </div>
 
+        <JavDetailPanel
+          detail={javDetail}
+          status={javDetailStatus}
+          onClose={resetJavDetail}
+        />
+
         <SearchResultsPanel
           results={searchResults}
           viewMode={viewMode}
@@ -574,12 +580,6 @@ export const MainSearchPage: React.FC = () => {
           onViewModeChange={setViewMode}
           onClose={() => { setSearchResults([]); resetJavDetail(); }}
           onToggleFavorite={handleToggleFavorite}
-        />
-
-        <JavDetailPanel
-          detail={javDetail}
-          status={javDetailStatus}
-          onClose={resetJavDetail}
         />
 
         {/* 主内容区：左侧JAV+历史 / 右侧收藏，右列高度精确跟随左列 */}
