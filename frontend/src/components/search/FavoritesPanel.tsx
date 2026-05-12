@@ -18,7 +18,10 @@ const resolveUrl = (relativePath: string, referenceUrl: string): string => {
 };
 
 const getProxyImageUrl = (url: string): string => {
-  return `/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
+  const baseUrl = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? ''
+    : 'https://backend.codeseek.pp.ua';
+  return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
 };
 
 // ─── 收藏面板高度由左侧两个面板决定 ────────────────────────────────
