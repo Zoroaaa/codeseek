@@ -134,47 +134,49 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
               {favorites.map((item) => (
                 <div
                   key={item.id}
-                  className="flex gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-all border border-surface-100 dark:border-surface-800"
+                  className="flex flex-col gap-2 p-2.5 sm:p-3 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800/40 transition-all border border-surface-100 dark:border-surface-800"
                 >
-                  {item.cover ? (
-                    <img
-                      src={getProxyImageUrl(resolveUrl(item.cover, item.url))}
-                      alt={item.title}
-                      className="w-16 h-22 sm:w-20 sm:h-28 object-cover rounded-md flex-shrink-0"
-                      loading="lazy"
-                    />
-                  ) : item.icon ? (
-                    <img src={item.icon} alt="" className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-contain flex-shrink-0" loading="lazy" />
-                  ) : null}
-                  <div className="flex-1 min-w-0 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {item.status && (
-                          <button
-                            onClick={() => !updatingStatus && handleStatusChange(item.id, item.status!)}
-                            disabled={updatingStatus === item.id}
-                            className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 transition-all ${
-                              updatingStatus === item.id 
-                                ? 'opacity-50 cursor-not-allowed' 
-                                : 'hover:opacity-80 cursor-pointer'
-                            } ${getStatusColor(item.status)}`}
-                            title={updatingStatus === item.id ? '更新中...' : `点击切换到${getStatusText(item.status === 'want' ? 'watched' : 'want')}`}
-                          >
-                            {item.status === 'want' ? <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <EyeOff className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
-                            {getStatusText(item.status)}
-                          </button>
+                  <div className="flex gap-3">
+                    {item.cover ? (
+                      <img
+                        src={getProxyImageUrl(resolveUrl(item.cover, item.url))}
+                        alt={item.title}
+                        className="w-32 h-20 sm:w-40 sm:h-24 object-cover rounded-md flex-shrink-0"
+                        loading="lazy"
+                      />
+                    ) : item.icon ? (
+                      <img src={item.icon} alt="" className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-contain flex-shrink-0" loading="lazy" />
+                    ) : null}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {item.status && (
+                            <button
+                              onClick={() => !updatingStatus && handleStatusChange(item.id, item.status!)}
+                              disabled={updatingStatus === item.id}
+                              className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 transition-all ${
+                                updatingStatus === item.id 
+                                  ? 'opacity-50 cursor-not-allowed' 
+                                  : 'hover:opacity-80 cursor-pointer'
+                              } ${getStatusColor(item.status)}`}
+                              title={updatingStatus === item.id ? '更新中...' : `点击切换到${getStatusText(item.status === 'want' ? 'watched' : 'want')}`}
+                            >
+                              {item.status === 'want' ? <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <EyeOff className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
+                              {getStatusText(item.status)}
+                            </button>
+                          )}
+                          {item.code && (
+                            <span className="text-[10px] sm:text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded-md">
+                              {item.code}
+                            </span>
+                          )}
+                          <p className="text-xs sm:text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
+                        </div>
+                        {item.subtitle && (
+                          <p className="text-[10px] sm:text-xs text-surface-400 truncate mt-0.5">{item.subtitle}</p>
                         )}
-                        {item.code && (
-                          <span className="text-[10px] sm:text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded-md">
-                            {item.code}
-                          </span>
-                        )}
-                        <p className="text-xs sm:text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
                       </div>
-                      {item.subtitle && (
-                        <p className="text-[10px] sm:text-xs text-surface-400 truncate mt-0.5">{item.subtitle}</p>
-                      )}
-                      <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-1">
+                      <div className="flex items-center gap-x-2 sm:gap-x-3 mt-1">
                         {item.actors && (
                           <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400">
                             <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />
@@ -200,39 +202,43 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                           </span>
                         )}
                       </div>
+                    </div>
+                    <div className="flex flex-col items-center gap-0.5 sm:gap-1 shrink-0">
+                      <button
+                        onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')}
+                        className="p-1 sm:p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
+                      >
+                        <ExternalLink className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onRemove(item.id)}
+                        className="p-1 sm:p-1.5 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-all"
+                      >
+                        <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  {(item.tags || (item.keyword && !item.code)) && (
+                    <div className="flex items-center gap-2 flex-wrap">
                       {item.tags && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {item.tags.split(',').slice(0, 5).map((tag, i) => (
+                        <div className="flex flex-wrap gap-1">
+                          {item.tags.split(',').slice(0, 6).map((tag, i) => (
                             <span key={i} className="text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
-                              {tag.trim()}
-                            </span>
+                                {tag.trim()}
+                              </span>
                           ))}
                         </div>
                       )}
                       {item.keyword && !item.code && (
-                        <div className="flex items-center gap-1 mt-1">
+                        <div className="flex items-center gap-1">
                           <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary-400 flex-shrink-0" />
-                          <span className="text-[10px] sm:text-xs text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded truncate max-w-[100px] sm:max-w-[120px]">
+                          <span className="text-[10px] sm:text-xs text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded truncate max-w-[120px] sm:max-w-[150px]">
                             {item.keyword}
                           </span>
                         </div>
                       )}
                     </div>
-                  </div>
-                  <div className="flex flex-col items-center gap-0.5 sm:gap-1 ml-1 shrink-0">
-                    <button
-                      onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')}
-                      className="p-1 sm:p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
-                    >
-                      <ExternalLink className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onRemove(item.id)}
-                      className="p-1 sm:p-1.5 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-all"
-                    >
-                      <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                    </button>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
