@@ -17,6 +17,10 @@ const resolveUrl = (relativePath: string, referenceUrl: string): string => {
   }
 };
 
+const getProxyImageUrl = (url: string): string => {
+  return `/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
+};
+
 // ─── 收藏面板高度由左侧两个面板决定 ────────────────────────────────
 // gap-3(12px) 或 gap-4(16px)，取 sm:gap-4 = 16px
 const GAP = 16;
@@ -131,7 +135,7 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                 >
                   {item.cover ? (
                     <img
-                      src={convertToProxyUrl(resolveUrl(item.cover, item.url))}
+                      src={getProxyImageUrl(resolveUrl(item.cover, item.url))}
                       alt={item.title}
                       className="w-16 h-22 sm:w-20 sm:h-28 object-cover rounded-md flex-shrink-0"
                       loading="lazy"

@@ -602,3 +602,54 @@ function base32ToHexPublic(base32: string): string {
   }
   return hex;
 }
+
+// 图片代理
+// GET /api/jav/proxy-image?url=<encoded_url>
+// 代理获取外部图片，解决跨域和被墙问题
+// =====================================================================
+
+javRoutes.get('/proxy-image', async (c) => {
+  const rawUrl = c.req.query('url');
+  if (!rawUrl) {
+    return c.json({ success: false, error: { code: 'MISSING_URL', message: '缺少url参数' } }, 400);
+  }
+
+  let targetUrl: string;
+  try {
+    targetUrl = decodeURIComponent(rawUrl);
+  } catch {
+    return c.json({ success: false, error: { code: 'INVALID_URL', message: '无效的URL编码' } }, 400);
+  }
+
+  if (!targetUrl.startsWith('http')) {
+    return c.json({ success: false, error: { code: 'INVALID_URL', message: '只支持http/https协议' } }, 400);
+  }
+
+  try {
+    const resp = await fetch(targetUrl, {
+      headers: {
+        'User-Agent': HEADERS['User-Agent'],
+        'Referer': 'https://www.javbus.com/',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!resp.ok) {
+      return c.json({ success: false, error: { code: 'FETCH_FAILED', message: `图片获取失败: ${resp.status}` } }, 502);
+    }
+
+    const contentType = resp.headers.get('content-type') || 'image/jpeg';
+    const data = await resp.arrayBuffer();
+
+    return new Response(data, {
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (err) {
+    console.error('Proxy image error:', err);
+    return c.json({ success: false, error: { code: 'TIMEOUT', message: '图片请求超时或失败' } }, 504);
+  }
+});
