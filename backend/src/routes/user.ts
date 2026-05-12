@@ -69,8 +69,27 @@ userRoutes.get('/favorites', async (c) => {
       'SELECT * FROM user_favorites WHERE user_id = ? ORDER BY created_at DESC'
     ).bind(user.userId).all<UserFavorite>();
 
+    const mapped = (favorites.results || []).map((f: UserFavorite) => ({
+      id: f.id,
+      userId: f.user_id,
+      title: f.title,
+      subtitle: f.subtitle,
+      url: f.url,
+      icon: f.icon,
+      keyword: f.keyword,
+      code: f.code,
+      cover: f.cover,
+      actors: f.actors,
+      duration: f.duration,
+      tags: f.tags,
+      releaseDate: f.release_date,
+      publisher: f.publisher,
+      magnetLink: f.magnet_link,
+      createdAt: f.created_at,
+    }));
+
     return c.json(success({
-      favorites: favorites.results || [],
+      favorites: mapped,
     }));
   } catch (err) {
     console.error('Get favorites error:', err);
@@ -83,24 +102,33 @@ userRoutes.post('/favorites', async (c) => {
 
   try {
     const body = await c.req.json();
-    const { title, subtitle, url, icon, keyword } = body;
+    const { title, subtitle, url, icon, keyword, code, cover, actors, duration, tags, releaseDate, publisher, magnetLink } = body;
 
     if (!title || !url) {
       return c.json(error('VALIDATION_ERROR', '标题和URL是必填项'), 400);
     }
 
     const existing = await c.env.DB.prepare(
-      'SELECT id, title, subtitle, url, icon, keyword, created_at FROM user_favorites WHERE user_id = ? AND url = ?'
+      'SELECT * FROM user_favorites WHERE user_id = ? AND url = ?'
     ).bind(user.userId, url).first<UserFavorite>();
 
     if (existing) {
       return c.json(success({
         id: existing.id,
+        userId: existing.user_id,
         title: existing.title,
         subtitle: existing.subtitle,
         url: existing.url,
         icon: existing.icon,
         keyword: existing.keyword,
+        code: existing.code,
+        cover: existing.cover,
+        actors: existing.actors,
+        duration: existing.duration,
+        tags: existing.tags,
+        releaseDate: existing.release_date,
+        publisher: existing.publisher,
+        magnetLink: existing.magnet_link,
         createdAt: existing.created_at,
       }, '已收藏该链接'));
     }
@@ -119,8 +147,8 @@ userRoutes.post('/favorites', async (c) => {
     const now = Date.now();
 
     await c.env.DB.prepare(`
-      INSERT INTO user_favorites (id, user_id, title, subtitle, url, icon, keyword, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO user_favorites (id, user_id, title, subtitle, url, icon, keyword, code, cover, actors, duration, tags, release_date, publisher, magnet_link, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       favoriteId,
       user.userId,
@@ -129,6 +157,14 @@ userRoutes.post('/favorites', async (c) => {
       url,
       icon || null,
       keyword || null,
+      code || null,
+      cover || null,
+      actors || null,
+      duration || null,
+      tags || null,
+      releaseDate || null,
+      publisher || null,
+      magnetLink || null,
       now,
       now
     ).run();
@@ -137,11 +173,20 @@ userRoutes.post('/favorites', async (c) => {
 
     return c.json(success({
       id: favoriteId,
+      userId: user.userId,
       title,
       subtitle: subtitle || null,
       url,
       icon: icon || null,
       keyword: keyword || null,
+      code: code || null,
+      cover: cover || null,
+      actors: actors || null,
+      duration: duration || null,
+      tags: tags || null,
+      releaseDate: releaseDate || null,
+      publisher: publisher || null,
+      magnetLink: magnetLink || null,
       createdAt: now,
     }, '收藏成功'));
   } catch (err) {

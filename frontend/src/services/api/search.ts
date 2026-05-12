@@ -52,14 +52,21 @@ export const userApi = {
   }> => {
     const response = await apiClient.get<{ success: boolean; data: { favorites: Array<{
       id: string;
-      user_id: string;
+      userId: string;
       title: string;
       subtitle: string | null;
       url: string;
       icon: string | null;
       keyword: string | null;
-      created_at: number;
-      updated_at: number;
+      code: string | null;
+      cover: string | null;
+      actors: string | null;
+      duration: string | null;
+      tags: string | null;
+      releaseDate: string | null;
+      publisher: string | null;
+      magnetLink: string | null;
+      createdAt: number;
     }> } }>('/user/favorites');
     
     if (response.success && response.data) {
@@ -68,13 +75,21 @@ export const userApi = {
         data: {
           favorites: response.data.favorites.map(f => ({
             id: f.id,
-            userId: f.user_id,
+            userId: f.userId,
             title: f.title,
             subtitle: f.subtitle || undefined,
             url: f.url,
             icon: f.icon || undefined,
             keyword: f.keyword || undefined,
-            createdAt: f.created_at,
+            code: f.code || undefined,
+            cover: f.cover || undefined,
+            actors: f.actors || undefined,
+            duration: f.duration || undefined,
+            tags: f.tags || undefined,
+            releaseDate: f.releaseDate || undefined,
+            publisher: f.publisher || undefined,
+            magnetLink: f.magnetLink || undefined,
+            createdAt: f.createdAt,
           }))
         }
       };

@@ -25,6 +25,7 @@ import type {
   Category,
   SearchSource,
   UserSourceConfig,
+  JavDetail,
 } from '@/types';
 
 import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesPanel, QuickActionsPanel } from '@/components/search';
@@ -36,6 +37,7 @@ interface SearchResultItem extends SearchResult {
   subtitle?: string;
   siteType?: string;
   category?: string;
+  description?: string;
 }
 
 interface SourceWithUserConfig extends SearchSource {
@@ -214,7 +216,7 @@ export const MainSearchPage: React.FC = () => {
         categoryId: selectedCategory || undefined,
       }) as unknown as {
         success: boolean;
-        data: { keyword: string; results: Array<{ id: string; name: string; subtitle?: string; icon?: string; url: string; siteType: string; category: string }> };
+        data: { keyword: string; results: Array<{ id: string; name: string; subtitle?: string; icon?: string; url: string; siteType: string; category: string; description?: string }> };
       };
       if (response.success && response.data) {
         const mappedResults: SearchResultItem[] = response.data.results.map(r => ({
@@ -225,6 +227,7 @@ export const MainSearchPage: React.FC = () => {
           subtitle: r.subtitle,
           siteType: r.siteType,
           category: r.category,
+          description: r.description,
         }));
         setResults(mappedResults as unknown as SearchResult[]);
         setSearchResults(mappedResults);
@@ -270,6 +273,63 @@ export const MainSearchPage: React.FC = () => {
           url: result.url || '',
           subtitle: result.subtitle,
           keyword: keyword.trim() || undefined,
+        });
+        if (response.success && response.data) setFavorites(prev => [response.data, ...prev]);
+        toast.success('已添加到收藏');
+      } catch { toast.error('收藏失败', '请稍后重试'); }
+    }
+  };
+
+  const handleFavoriteJavItem = async (item: { code: string; title: string; cover?: string; date?: string; actress?: string }) => {
+    if (!isAuthenticated) { toast.warning('请先登录'); navigate('/login'); return; }
+    const detailUrl = `https://javdb.com/search?q=${item.code}&f=all`;
+    const existingFavoriteId = getFavoriteId(detailUrl);
+    if (existingFavoriteId) {
+      try {
+        await userApi.removeFavorite(existingFavoriteId);
+        setFavorites(prev => prev.filter(f => f.id !== existingFavoriteId));
+        toast.success('已取消收藏');
+      } catch { toast.error('取消收藏失败', '请稍后重试'); }
+    } else {
+      try {
+        const response = await userApi.addFavorite({
+          title: item.title,
+          url: detailUrl,
+          code: item.code,
+          cover: item.cover,
+          actors: item.actress,
+          releaseDate: item.date,
+          keyword: item.code,
+        });
+        if (response.success && response.data) setFavorites(prev => [response.data, ...prev]);
+        toast.success('已添加到收藏');
+      } catch { toast.error('收藏失败', '请稍后重试'); }
+    }
+  };
+
+  const handleFavoriteJavDetail = async (detail: JavDetail) => {
+    if (!isAuthenticated) { toast.warning('请先登录'); navigate('/login'); return; }
+    const detailUrl = detail.detailUrl || `https://javdb.com/search?q=${detail.code}&f=all`;
+    const existingFavoriteId = getFavoriteId(detailUrl);
+    if (existingFavoriteId) {
+      try {
+        await userApi.removeFavorite(existingFavoriteId);
+        setFavorites(prev => prev.filter(f => f.id !== existingFavoriteId));
+        toast.success('已取消收藏');
+      } catch { toast.error('取消收藏失败', '请稍后重试'); }
+    } else {
+      try {
+        const response = await userApi.addFavorite({
+          title: detail.title,
+          url: detailUrl,
+          code: detail.code,
+          cover: detail.cover,
+          actors: detail.actresses?.join(', '),
+          duration: detail.duration,
+          tags: detail.tags?.join(', '),
+          releaseDate: detail.releaseDate,
+          publisher: detail.publisher || detail.maker,
+          keyword: detail.code,
         });
         if (response.success && response.data) setFavorites(prev => [response.data, ...prev]);
         toast.success('已添加到收藏');
@@ -389,6 +449,12 @@ export const MainSearchPage: React.FC = () => {
   };
 
   const isAdmin = isAuthenticated && user != null && (user.role === 'admin' || user.role === 'super_admin');
+
+  const favoritedCodes = React.useMemo(() => {
+    const codes = new Set<string>();
+    favorites.forEach(f => { if (f.code) codes.add(f.code); });
+    return codes;
+  }, [favorites]);
   const searchableCategories = categories.filter(cat => {
     const mc = majorCategories.find(mc => mc.id === cat.majorCategoryId);
     return mc?.requiresKeyword === true;
@@ -567,6 +633,8 @@ export const MainSearchPage: React.FC = () => {
           detail={javDetail}
           status={javDetailStatus}
           onClose={resetJavDetail}
+          onFavorite={handleFavoriteJavDetail}
+          isFavorited={javDetail ? favoritedCodes.has(javDetail.code) : false}
         />
 
         <SearchResultsPanel
@@ -586,7 +654,7 @@ export const MainSearchPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
           <div className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
-            <JavRankingsPanel onCodeClick={handleCodeClick} />
+            <JavRankingsPanel onCodeClick={handleCodeClick} onFavorite={handleFavoriteJavItem} favoritedCodes={favoritedCodes} />
 
             {isAuthenticated && (
               <SearchHistoryPanel

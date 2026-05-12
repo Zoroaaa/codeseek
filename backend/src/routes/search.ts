@@ -107,6 +107,7 @@ searchRoutes.post('/', async (c) => {
       url: source.url_template.replace('{keyword}', encodeURIComponent(trimmedKeyword)),
       siteType: source.site_type,
       category: source.category_id,
+      description: source.description,
     }));
 
     if (historyId && userPayload) {

@@ -16,6 +16,14 @@ export interface FavoriteItem {
   icon?: string;
   keyword?: string;
   createdAt: number;
+  code?: string;
+  cover?: string;
+  actors?: string;
+  duration?: string;
+  tags?: string;
+  releaseDate?: string;
+  publisher?: string;
+  magnetLink?: string;
 }
 
 export interface SearchResult {
@@ -23,6 +31,7 @@ export interface SearchResult {
   sourceName: string;
   sourceIcon?: string;
   url: string;
+  description?: string;
 }
 
 export interface SearchRequest {
@@ -65,6 +74,13 @@ export interface AddFavoriteRequest {
   icon?: string;
   keyword?: string;
   magnetLink?: string;
+  code?: string;
+  cover?: string;
+  actors?: string;
+  duration?: string;
+  tags?: string;
+  releaseDate?: string;
+  publisher?: string;
 }
 
 export interface SaveSearchHistoryRequest {

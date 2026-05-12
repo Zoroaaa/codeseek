@@ -82,6 +82,14 @@ export interface UserFavorite {
   url: string;
   icon: string | null;
   keyword: string | null;
+  code: string | null;
+  cover: string | null;
+  actors: string | null;
+  duration: string | null;
+  tags: string | null;
+  release_date: string | null;
+  publisher: string | null;
+  magnet_link: string | null;
   created_at: number;
   updated_at: number;
 }

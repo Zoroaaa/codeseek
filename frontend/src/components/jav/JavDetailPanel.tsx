@@ -3,7 +3,7 @@ import {
   Magnet, Film, Calendar, Clock, User, Building2,
   Tag, Star, ExternalLink, Copy, Check, Loader2,
   AlertCircle, Search, ChevronDown, ChevronUp, X,
-  Shield, Play, FileDown, Link2, Tv,
+  Shield, Play, FileDown, Link2, Tv, Heart,
 } from 'lucide-react';
 import type { JavDetail, MagnetItem } from '@/types';
 import {
@@ -18,6 +18,8 @@ interface JavDetailPanelProps {
   detail: JavDetail | null;
   status: 'idle' | 'loading' | 'success' | 'error' | 'not_found';
   onClose: () => void;
+  onFavorite?: (detail: JavDetail) => void;
+  isFavorited?: boolean;
 }
 
 // ── 复制按钮（带反馈） ─────────────────────────────────────────────
@@ -252,7 +254,7 @@ const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
 
 // ── 主组件 ─────────────────────────────────────────────────────────
 
-export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, onClose }) => {
+export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, onClose, onFavorite, isFavorited }) => {
   if (status === 'idle') return null;
 
   return (
@@ -276,12 +278,23 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
             </span>
           )}
         </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg text-surface-400 hover:text-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {onFavorite && detail && status === 'success' && (
+            <button
+              onClick={() => onFavorite(detail)}
+              className={`p-1.5 rounded-lg transition-all ${isFavorited ? 'text-rose-500 bg-rose-50 dark:bg-rose-900/20' : 'text-surface-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20'}`}
+              title={isFavorited ? '取消收藏' : '收藏'}
+            >
+              <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-surface-400 hover:text-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* 加载中 */}
