@@ -8,12 +8,12 @@ import { HIST_PANEL_HEIGHT, HIST_HEADER_HEIGHT } from '@/components/search/Searc
 import { userApi } from '@/services/api/search';
 import { useToast } from '@/components/ui/Toast';
 
-const getBaseUrl = (url: string): string => {
+const resolveUrl = (relativePath: string, referenceUrl: string): string => {
   try {
-    const parsed = new URL(url);
-    return `${parsed.protocol}//${parsed.host}`;
+    const base = new URL(referenceUrl);
+    return new URL(relativePath, base).href;
   } catch {
-    return '';
+    return relativePath;
   }
 };
 
@@ -131,7 +131,7 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                 >
                   {item.cover ? (
                     <img
-                      src={isProxyEnabled ? convertToProxyUrl(item.cover, undefined, getBaseUrl(item.url)) : (item.cover.startsWith('/') ? getBaseUrl(item.url) + item.cover : getBaseUrl(item.url) + '/' + item.cover)}
+                      src={convertToProxyUrl(resolveUrl(item.cover, item.url))}
                       alt={item.title}
                       className="w-16 h-22 sm:w-20 sm:h-28 object-cover rounded-md flex-shrink-0"
                       loading="lazy"
