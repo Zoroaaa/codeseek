@@ -13,6 +13,23 @@ import {
   copyToClipboard,
 } from '@/utils/magnet';
 import { WebTorrentPlayer } from './WebTorrentPlayer';
+import { ProxyImage } from '@/components/ui';
+
+const resolveUrl = (relativePath: string, referenceUrl: string): string => {
+  try {
+    const base = new URL(referenceUrl);
+    return new URL(relativePath, base).href;
+  } catch {
+    return relativePath;
+  }
+};
+
+const getProxyImageUrl = (url: string): string => {
+  const baseUrl = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? ''
+    : 'https://backend.codeseek.pp.ua';
+  return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
+};
 
 interface JavDetailPanelProps {
   detail: JavDetail | null;
@@ -280,13 +297,20 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
         </div>
         <div className="flex items-center gap-1">
           {onFavorite && detail && status === 'success' && (
-            <button
-              onClick={() => onFavorite(detail)}
-              className={`p-1.5 rounded-lg transition-all ${isFavorited ? 'text-rose-500 bg-rose-50 dark:bg-rose-900/20' : 'text-surface-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20'}`}
-              title={isFavorited ? '取消收藏' : '收藏'}
-            >
-              <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
-            </button>
+            <>
+              <button
+                onClick={() => onFavorite(detail)}
+                className={`p-1.5 rounded-lg transition-all ${isFavorited ? 'text-rose-500 bg-rose-50 dark:bg-rose-900/20' : 'text-surface-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20'}`}
+                title={isFavorited ? '取消收藏' : '收藏'}
+              >
+                <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
+              </button>
+              {!isFavorited && (
+                <span className="text-xs font-medium text-rose-500 dark:text-rose-400 animate-pulse">
+                  喜欢就收藏吧~
+                </span>
+              )}
+            </>
           )}
           <button
             onClick={onClose}
@@ -330,14 +354,11 @@ export const JavDetailPanel: React.FC<JavDetailPanelProps> = ({ detail, status, 
           {/* 封面 + 基本信息 */}
           <div className="flex gap-4 sm:gap-5">
             {detail.cover && (
-              <a href={detail.detailUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                <img
-                  src={detail.cover}
-                  alt={detail.code}
-                  className="w-28 sm:w-36 rounded-lg object-cover shadow-md hover:shadow-lg transition-shadow"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              </a>
+              <ProxyImage
+                src={getProxyImageUrl(resolveUrl(detail.cover, detail.detailUrl))}
+                alt={detail.code}
+                className="w-40 sm:w-52 rounded-lg object-cover shadow-md hover:shadow-lg transition-shadow shrink-0"
+              />
             )}
             <div className="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
               <h3 className="text-sm sm:text-base font-semibold text-surface-900 dark:text-surface-100 leading-snug line-clamp-3">

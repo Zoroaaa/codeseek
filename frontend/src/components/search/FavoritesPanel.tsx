@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Heart, Download, Trash2, ExternalLink, Tag, ChevronDown, ChevronRight, Clock, Building2, Calendar, User, Eye, EyeOff } from 'lucide-react';
-import { Loading } from '@/components/ui';
+import { Loading, ProxyImage } from '@/components/ui';
 import { convertToProxyUrl } from '@/services/proxy';
 import type { FavoriteItem } from '@/types';
 import { JAV_PANEL_HEIGHT, JAV_HEADER_HEIGHT } from '@/components/jav/JavRankingsPanel';
@@ -138,11 +138,10 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                 >
                   <div className="flex gap-3">
                     {item.cover ? (
-                      <img
+                      <ProxyImage
                         src={getProxyImageUrl(resolveUrl(item.cover, item.url))}
                         alt={item.title}
                         className="w-36 h-24 sm:w-44 sm:h-28 object-cover rounded-md flex-shrink-0"
-                        loading="lazy"
                       />
                     ) : item.icon ? (
                       <img src={item.icon} alt="" className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-contain flex-shrink-0" loading="lazy" />
