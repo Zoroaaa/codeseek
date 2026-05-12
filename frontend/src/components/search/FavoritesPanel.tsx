@@ -141,104 +141,102 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                       <img
                         src={getProxyImageUrl(resolveUrl(item.cover, item.url))}
                         alt={item.title}
-                        className="w-32 h-20 sm:w-40 sm:h-24 object-cover rounded-md flex-shrink-0"
+                        className="w-36 h-24 sm:w-44 sm:h-28 object-cover rounded-md flex-shrink-0"
                         loading="lazy"
                       />
                     ) : item.icon ? (
                       <img src={item.icon} alt="" className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-contain flex-shrink-0" loading="lazy" />
                     ) : null}
-                    <div className="flex-1 min-w-0 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {item.status && (
-                            <button
-                              onClick={() => !updatingStatus && handleStatusChange(item.id, item.status!)}
-                              disabled={updatingStatus === item.id}
-                              className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 transition-all ${
-                                updatingStatus === item.id 
-                                  ? 'opacity-50 cursor-not-allowed' 
-                                  : 'hover:opacity-80 cursor-pointer'
-                              } ${getStatusColor(item.status)}`}
-                              title={updatingStatus === item.id ? '更新中...' : `点击切换到${getStatusText(item.status === 'want' ? 'watched' : 'want')}`}
-                            >
-                              {item.status === 'want' ? <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <EyeOff className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
-                              {getStatusText(item.status)}
-                            </button>
-                          )}
-                          {item.code && (
-                            <span className="text-[10px] sm:text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded-md">
-                              {item.code}
-                            </span>
-                          )}
-                          <p className="text-xs sm:text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
-                        </div>
-                        {item.subtitle && (
-                          <p className="text-[10px] sm:text-xs text-surface-400 truncate mt-0.5">{item.subtitle}</p>
+                    <div className="flex-1 min-w-0 flex items-center justify-between gap-2 py-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {item.status && (
+                          <button
+                            onClick={() => !updatingStatus && handleStatusChange(item.id, item.status!)}
+                            disabled={updatingStatus === item.id}
+                            className={`text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 transition-all ${
+                              updatingStatus === item.id 
+                                ? 'opacity-50 cursor-not-allowed' 
+                                : 'hover:opacity-80 cursor-pointer'
+                            } ${getStatusColor(item.status)}`}
+                            title={updatingStatus === item.id ? '更新中...' : `点击切换到${getStatusText(item.status === 'want' ? 'watched' : 'want')}`}
+                          >
+                            {item.status === 'want' ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                            {getStatusText(item.status)}
+                          </button>
                         )}
-                      </div>
-                      <div className="flex items-center gap-x-2 sm:gap-x-3 mt-1">
-                        {item.actors && (
-                          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400">
-                            <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />
-                            {item.actors}
-                          </span>
-                        )}
-                        {item.duration && (
-                          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-amber-600 dark:text-amber-400">
-                            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />
-                            {item.duration}分钟
-                          </span>
-                        )}
-                        {item.releaseDate && (
-                          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-blue-600 dark:text-blue-400">
-                            <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />
-                            {item.releaseDate}
-                          </span>
-                        )}
-                        {item.publisher && (
-                          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-purple-600 dark:text-purple-400">
-                            <Building2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />
-                            {item.publisher}
+                        {item.code && (
+                          <span className="text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded">
+                            {item.code}
                           </span>
                         )}
                       </div>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5 sm:gap-1 shrink-0">
-                      <button
-                        onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')}
-                        className="p-1 sm:p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
-                      >
-                        <ExternalLink className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => onRemove(item.id)}
-                        className="p-1 sm:p-1.5 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-all"
-                      >
-                        <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')}
+                          className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onRemove(item.id)}
+                          className="p-1.5 rounded-lg text-surface-400 hover:text-error-500 hover:bg-error-50 dark:hover:bg-error-900/20 transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  {(item.tags || (item.keyword && !item.code)) && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {item.tags && (
-                        <div className="flex flex-wrap gap-1">
-                          {item.tags.split(',').slice(0, 6).map((tag, i) => (
-                            <span key={i} className="text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
-                                {tag.trim()}
-                              </span>
-                          ))}
-                        </div>
+                  <div className="space-y-1 pl-0">
+                    <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
+                    {item.subtitle && (
+                      <p className="text-xs text-surface-500 truncate">{item.subtitle}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                      {item.actors && (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                          <User className="w-3 h-3" />
+                          {item.actors}
+                        </span>
                       )}
-                      {item.keyword && !item.code && (
-                        <div className="flex items-center gap-1">
-                          <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary-400 flex-shrink-0" />
-                          <span className="text-[10px] sm:text-xs text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded truncate max-w-[120px] sm:max-w-[150px]">
-                            {item.keyword}
-                          </span>
-                        </div>
+                      {item.duration && (
+                        <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                          <Clock className="w-3 h-3" />
+                          {item.duration}分钟
+                        </span>
+                      )}
+                      {item.releaseDate && (
+                        <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                          <Calendar className="w-3 h-3" />
+                          {item.releaseDate}
+                        </span>
+                      )}
+                      {item.publisher && (
+                        <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400">
+                          <Building2 className="w-3 h-3" />
+                          {item.publisher}
+                        </span>
                       )}
                     </div>
-                  )}
+                    {(item.tags || (item.keyword && !item.code)) && (
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        {item.tags && (
+                          <>
+                            {item.tags.split(',').slice(0, 6).map((tag, i) => (
+                              <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
+                                  {tag.trim()}
+                              </span>
+                            ))}
+                          </>
+                        )}
+                        {item.keyword && !item.code && (
+                          <span className="inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded truncate max-w-[150px]">
+                            <Tag className="w-3 h-3" />
+                            {item.keyword}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
