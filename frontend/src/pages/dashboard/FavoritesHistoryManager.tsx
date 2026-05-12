@@ -13,6 +13,8 @@ import {
   Calendar,
   Tag,
   BarChart2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, EmptyState, Dropdown } from '@/components/ui';
 import { userApi } from '@/services/api';
@@ -58,6 +60,23 @@ export const FavoritesManager: React.FC = () => {
       toast.success('已移除收藏');
     } catch (_error) {
       toast.error('移除失败', '请稍后重试');
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'want' ? 'watched' : 'want';
+    try {
+      const result = await userApi.updateFavoriteStatus(id, newStatus);
+      if (result.success) {
+        setFavorites(prev => prev.map(f => 
+          f.id === id ? { ...f, status: newStatus } : f
+        ));
+        toast.success('状态更新成功');
+      } else {
+        toast.error(result.message || '状态更新失败');
+      }
+    } catch (_error) {
+      toast.error('状态更新失败');
     }
   };
 
@@ -266,9 +285,24 @@ export const FavoritesManager: React.FC = () => {
                   className="mt-1 rounded border-surface-300 dark:border-surface-600"
                 />
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-surface-900 dark:text-surface-100 truncate">
-                    {favorite.title}
-                  </h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    {favorite.status && (
+                      <button
+                        onClick={() => handleUpdateStatus(favorite.id, favorite.status!)}
+                        className={`text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 transition-all hover:opacity-80 ${
+                          favorite.status === 'want'
+                            ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30'
+                            : 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30'
+                        }`}
+                      >
+                        {favorite.status === 'want' ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                        {favorite.status === 'want' ? '想' : '看过'}
+                      </button>
+                    )}
+                    <h3 className="font-medium text-surface-900 dark:text-surface-100 truncate">
+                      {favorite.title}
+                    </h3>
+                  </div>
                   {favorite.subtitle && (
                     <p className="text-sm text-surface-500 dark:text-surface-400 truncate mt-1">
                       {favorite.subtitle}

@@ -24,6 +24,7 @@ export interface FavoriteItem {
   releaseDate?: string;
   publisher?: string;
   magnetLink?: string;
+  status?: string;
 }
 
 export interface SearchResult {
@@ -81,6 +82,7 @@ export interface AddFavoriteRequest {
   tags?: string;
   releaseDate?: string;
   publisher?: string;
+  status?: string;
 }
 
 export interface SaveSearchHistoryRequest {

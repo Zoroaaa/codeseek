@@ -679,6 +679,7 @@ export const MainSearchPage: React.FC = () => {
                 onToggle={() => setShowFavorites(!showFavorites)}
                 onRemove={handleRemoveFavorite}
                 onExport={handleExportFavorites}
+                onUpdate={loadFavorites}
               />
             </div>
           )}
@@ -696,6 +697,7 @@ export const MainSearchPage: React.FC = () => {
               onToggle={() => setShowFavorites(!showFavorites)}
               onRemove={handleRemoveFavorite}
               onExport={handleExportFavorites}
+              onUpdate={loadFavorites}
             />
           </div>
         )}

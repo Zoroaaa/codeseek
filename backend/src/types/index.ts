@@ -90,6 +90,7 @@ export interface UserFavorite {
   release_date: string | null;
   publisher: string | null;
   magnet_link: string | null;
+  status: string;
   created_at: number;
   updated_at: number;
 }

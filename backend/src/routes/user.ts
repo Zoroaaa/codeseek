@@ -85,6 +85,7 @@ userRoutes.get('/favorites', async (c) => {
       releaseDate: f.release_date,
       publisher: f.publisher,
       magnetLink: f.magnet_link,
+      status: f.status,
       createdAt: f.created_at,
     }));
 
@@ -102,7 +103,7 @@ userRoutes.post('/favorites', async (c) => {
 
   try {
     const body = await c.req.json();
-    const { title, subtitle, url, icon, keyword, code, cover, actors, duration, tags, releaseDate, publisher, magnetLink } = body;
+    const { title, subtitle, url, icon, keyword, code, cover, actors, duration, tags, releaseDate, publisher, magnetLink, status } = body;
 
     if (!title || !url) {
       return c.json(error('VALIDATION_ERROR', '标题和URL是必填项'), 400);
@@ -114,23 +115,24 @@ userRoutes.post('/favorites', async (c) => {
 
     if (existing) {
       return c.json(success({
-        id: existing.id,
-        userId: existing.user_id,
-        title: existing.title,
-        subtitle: existing.subtitle,
-        url: existing.url,
-        icon: existing.icon,
-        keyword: existing.keyword,
-        code: existing.code,
-        cover: existing.cover,
-        actors: existing.actors,
-        duration: existing.duration,
-        tags: existing.tags,
-        releaseDate: existing.release_date,
-        publisher: existing.publisher,
-        magnetLink: existing.magnet_link,
-        createdAt: existing.created_at,
-      }, '已收藏该链接'));
+      id: existing.id,
+      userId: existing.user_id,
+      title: existing.title,
+      subtitle: existing.subtitle,
+      url: existing.url,
+      icon: existing.icon,
+      keyword: existing.keyword,
+      code: existing.code,
+      cover: existing.cover,
+      actors: existing.actors,
+      duration: existing.duration,
+      tags: existing.tags,
+      releaseDate: existing.release_date,
+      publisher: existing.publisher,
+      magnetLink: existing.magnet_link,
+      status: existing.status,
+      createdAt: existing.created_at,
+    }, '已收藏该链接'));
     }
 
     const maxFavorites = R.FAVORITES.MAX_COUNT;
@@ -147,8 +149,8 @@ userRoutes.post('/favorites', async (c) => {
     const now = Date.now();
 
     await c.env.DB.prepare(`
-      INSERT INTO user_favorites (id, user_id, title, subtitle, url, icon, keyword, code, cover, actors, duration, tags, release_date, publisher, magnet_link, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO user_favorites (id, user_id, title, subtitle, url, icon, keyword, code, cover, actors, duration, tags, release_date, publisher, magnet_link, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       favoriteId,
       user.userId,
@@ -165,6 +167,7 @@ userRoutes.post('/favorites', async (c) => {
       releaseDate || null,
       publisher || null,
       magnetLink || null,
+      status || 'want',
       now,
       now
     ).run();
@@ -187,6 +190,7 @@ userRoutes.post('/favorites', async (c) => {
       releaseDate: releaseDate || null,
       publisher: publisher || null,
       magnetLink: magnetLink || null,
+      status: status || 'want',
       createdAt: now,
     }, '收藏成功'));
   } catch (err) {
@@ -214,6 +218,43 @@ userRoutes.delete('/favorites/:id', async (c) => {
   } catch (err) {
     console.error('Remove favorite error:', err);
     return c.json(error('SERVER_ERROR', '取消收藏失败'), 500);
+  }
+});
+
+userRoutes.patch('/favorites/:id/status', async (c) => {
+  const user = c.get('user');
+  const favoriteId = c.req.param('id');
+
+  try {
+    const body = await c.req.json();
+    const { status } = body;
+
+    if (!status || (status !== 'want' && status !== 'watched')) {
+      return c.json(error('VALIDATION_ERROR', '状态必须是 want 或 watched'), 400);
+    }
+
+    const existing = await c.env.DB.prepare(
+      'SELECT * FROM user_favorites WHERE id = ? AND user_id = ?'
+    ).bind(favoriteId, user.userId).first<UserFavorite>();
+
+    if (!existing) {
+      return c.json(error('NOT_FOUND', '收藏不存在'), 404);
+    }
+
+    const now = Date.now();
+    await c.env.DB.prepare(
+      'UPDATE user_favorites SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?'
+    ).bind(status, now, favoriteId, user.userId).run();
+
+    await logUserAction(c.env, user.userId, 'update_favorite_status', { favoriteId, status }, c);
+
+    return c.json(success({
+      id: favoriteId,
+      status,
+    }, '状态更新成功'));
+  } catch (err) {
+    console.error('Update favorite status error:', err);
+    return c.json(error('SERVER_ERROR', '更新状态失败'), 500);
   }
 });
 

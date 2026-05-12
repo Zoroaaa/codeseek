@@ -1,10 +1,21 @@
-import React from 'react';
-import { Heart, Download, Trash2, ExternalLink, Tag, ChevronDown, ChevronRight, Clock, Building2, Calendar, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Heart, Download, Trash2, ExternalLink, Tag, ChevronDown, ChevronRight, Clock, Building2, Calendar, User, Eye, EyeOff } from 'lucide-react';
 import { Loading } from '@/components/ui';
 import { convertToProxyUrl } from '@/services/proxy';
 import type { FavoriteItem } from '@/types';
 import { JAV_PANEL_HEIGHT, JAV_HEADER_HEIGHT } from '@/components/jav/JavRankingsPanel';
 import { HIST_PANEL_HEIGHT, HIST_HEADER_HEIGHT } from '@/components/search/SearchHistoryPanel';
+import { userApi } from '@/services/api/search';
+import { useToast } from '@/components/ui/Toast';
+
+const getBaseUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return '';
+  }
+};
 
 // ─── 收藏面板高度由左侧两个面板决定 ────────────────────────────────
 // gap-3(12px) 或 gap-4(16px)，取 sm:gap-4 = 16px
@@ -27,13 +38,45 @@ interface FavoritesPanelProps {
   onToggle: () => void;
   onRemove: (id: string) => void;
   onExport: () => void;
+  onUpdate: () => void;
 }
 
 export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
-  favorites, isLoading, show, isProxyEnabled, onToggle, onRemove, onExport,
+  favorites, isLoading: isLoading, show, isProxyEnabled, onToggle, onRemove, onExport, onUpdate,
 }) => {
+  const toast = useToast();
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+
   const totalHeight = show ? FAV_EXPANDED_HEIGHT : FAV_COLLAPSED_HEIGHT;
   const contentHeight = totalHeight - FAV_HEADER_HEIGHT;
+
+  const handleStatusChange = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'want' ? 'watched' : 'want';
+    setUpdatingStatus(id);
+    try {
+      const result = await userApi.updateFavoriteStatus(id, newStatus);
+      if (result.success) {
+        toast.success('状态更新成功');
+        onUpdate();
+      } else {
+        toast.error(result.message || '状态更新失败');
+      }
+    } catch (error) {
+      toast.error('状态更新失败');
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    return status === 'want' ? '想看' : '已看过';
+  };
+
+  const getStatusColor = (status: string) => {
+    return status === 'want' 
+      ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30' 
+      : 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30';
+  };
 
   return (
     <div
@@ -88,7 +131,7 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                 >
                   {item.cover ? (
                     <img
-                      src={item.cover}
+                      src={isProxyEnabled ? convertToProxyUrl(item.cover, undefined, getBaseUrl(item.url)) : (item.cover.startsWith('/') ? getBaseUrl(item.url) + item.cover : getBaseUrl(item.url) + '/' + item.cover)}
                       alt={item.title}
                       className="w-16 h-22 sm:w-20 sm:h-28 object-cover rounded-md flex-shrink-0"
                       loading="lazy"
@@ -99,6 +142,21 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
+                        {item.status && (
+                          <button
+                            onClick={() => !updatingStatus && handleStatusChange(item.id, item.status!)}
+                            disabled={updatingStatus === item.id}
+                            className={`text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 transition-all ${
+                              updatingStatus === item.id 
+                                ? 'opacity-50 cursor-not-allowed' 
+                                : 'hover:opacity-80 cursor-pointer'
+                            } ${getStatusColor(item.status)}`}
+                            title={updatingStatus === item.id ? '更新中...' : `点击切换到${getStatusText(item.status === 'want' ? 'watched' : 'want')}`}
+                          >
+                            {item.status === 'want' ? <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <EyeOff className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
+                            {getStatusText(item.status)}
+                          </button>
+                        )}
                         {item.code && (
                           <span className="text-[10px] sm:text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded-md">
                             {item.code}

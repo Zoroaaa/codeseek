@@ -46,7 +46,7 @@ export function getProxyStatusUrl(): string {
   return `${proxyConfig.proxyServer}${proxyConfig.api.status}`;
 }
 
-export function convertToProxyUrl(originalUrl: string, proxyServer?: string): string {
+export function convertToProxyUrl(originalUrl: string, proxyServer?: string, baseUrl?: string): string {
   const server = proxyServer || proxyConfig.proxyServer;
   if (!originalUrl || typeof originalUrl !== 'string') {
     return originalUrl;
@@ -56,8 +56,10 @@ export function convertToProxyUrl(originalUrl: string, proxyServer?: string): st
     new URL(originalUrl);
     return `${server}/${originalUrl}`;
   } catch {
-    return originalUrl;
-  }
+      if (!baseUrl) return originalUrl;
+      const fullUrl = originalUrl.startsWith('/') ? `${baseUrl}${originalUrl}` : `${baseUrl}/${originalUrl}`;
+      return `${server}/${fullUrl}`;
+    }
 }
 
 export function getOriginalUrl(proxyUrl: string, proxyServer?: string): string {

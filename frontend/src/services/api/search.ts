@@ -66,6 +66,7 @@ export const userApi = {
       releaseDate: string | null;
       publisher: string | null;
       magnetLink: string | null;
+      status: string | null;
       createdAt: number;
     }> } }>('/user/favorites');
     
@@ -89,6 +90,7 @@ export const userApi = {
             releaseDate: f.releaseDate || undefined,
             publisher: f.publisher || undefined,
             magnetLink: f.magnetLink || undefined,
+            status: f.status || undefined,
             createdAt: f.createdAt,
           }))
         }
@@ -107,6 +109,14 @@ export const userApi = {
 
   removeFavorite: async (id: string): Promise<{ success: boolean; message: string }> => {
     return apiClient.delete(`/user/favorites/${id}`);
+  },
+
+  updateFavoriteStatus: async (id: string, status: string): Promise<{ 
+    success: boolean; 
+    data: { id: string; status: string }; 
+    message: string 
+  }> => {
+    return apiClient.patch(`/user/favorites/${id}/status`, { status });
   },
 
   getSearchHistory: async (limit = 50): Promise<{ 
