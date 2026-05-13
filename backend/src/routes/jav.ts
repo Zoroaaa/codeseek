@@ -65,33 +65,59 @@ javRoutes.get('/proxy-image', async (c) => {
     return c.json({ success: false, error: { code: 'FORBIDDEN_HOST', message: `不允许的域名: ${parsed.hostname}` } }, 403);
   }
 
-  try {
-    const resp = await fetch(targetUrl, {
-      headers: {
-        'User-Agent': HEADERS['User-Agent'],
-        'Referer': 'https://www.javbus.com/',
-      },
-      signal: AbortSignal.timeout(15000),
-    });
+  const imageFetchHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Referer': 'https://www.javbus.com/',
+    'Sec-Fetch-Dest': 'image',
+    'Sec-Fetch-Mode': 'no-cors',
+    'Sec-Fetch-Site': 'same-origin',
+    'Cache-Control': 'no-cache',
+  };
 
-    if (!resp.ok) {
-      return c.json({ success: false, error: { code: 'FETCH_FAILED', message: `图片获取失败: ${resp.status}` } }, 502);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const resp = await fetch(targetUrl, {
+        headers: imageFetchHeaders,
+        signal: AbortSignal.timeout(10000),
+        redirect: 'follow',
+      });
+
+      if (resp.status === 403 && attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+
+      if (!resp.ok) {
+        console.error('Image fetch failed:', targetUrl, resp.status);
+        return c.json({ success: false, error: { code: 'FETCH_FAILED', message: `图片获取失败: ${resp.status}` } }, 502);
+      }
+
+      const contentType = resp.headers.get('content-type') || 'image/jpeg';
+      const data = await resp.arrayBuffer();
+
+      return new Response(data, {
+        headers: {
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=86400',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+        },
+      });
+    } catch (err) {
+      if (attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+      console.error('Proxy image error:', targetUrl, err);
+      return c.json({ success: false, error: { code: 'TIMEOUT', message: '图片请求超时或失败' } }, 504);
     }
-
-    const contentType = resp.headers.get('content-type') || 'image/jpeg';
-    const data = await resp.arrayBuffer();
-
-    return new Response(data, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
-  } catch (err) {
-    console.error('Proxy image error:', err);
-    return c.json({ success: false, error: { code: 'TIMEOUT', message: '图片请求超时或失败' } }, 504);
   }
+
+  return c.json({ success: false, error: { code: 'FETCH_FAILED', message: '图片获取失败' } }, 502);
 });
 
 javRoutes.use('*', authMiddleware);

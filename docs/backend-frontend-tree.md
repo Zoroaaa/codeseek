@@ -1,6 +1,6 @@
-# 磁力快搜 - 项目架构树 (v3.0.0)
+# 磁力快搜 - 项目架构树 (v3.1.0)
 
-> 📖 [返回项目主页](../readme.md) | [API接口文档](api/index.md) | [配置说明文档](config.md) | [部署指南文档](deploy.md) | [v2.0 变更日志](changelogv.2.0.md) | [v3.0 变更日志](changelogv3.0.md)
+> 📖 [返回项目主页](../readme.md) | [API接口文档](api/index.md) | [配置说明文档](config.md) | [部署指南文档](deploy.md) | [v3.0 变更日志](changelogv3.0.md) | [v3.1.0 变更日志](changelogv3.1.0.md)
 
 ---
 
@@ -30,7 +30,7 @@
 - **日期处理**: date-fns 3.6.0
 - **工具库**: clsx 2.1.1 (类名合并)
 - **部署**: Cloudflare Pages
-- **版本**: v3.0.0
+- **版本**: v3.1.0
 
 ### 后端技术栈
 - **运行时**: Cloudflare Workers
@@ -38,12 +38,13 @@
 - **语言**: TypeScript 5.5.3
 - **数据库**: Cloudflare D1 (SQLite)
 - **认证**: JWT (jose 5.9.0)
-- **数据验证**: Zod 4.4.3 (新增)
-- **密码安全**: PBKDF2-SHA256 (100,000次迭代，v3.0升级)
+- **数据验证**: Zod 4.4.3
+- **密码安全**: PBKDF2-SHA256 (100,000次迭代)
+- **Token 存储**: AES-GCM 加密 (v3.1.0)
 - **邮件服务**: Resend
 - **API**: RESTful 风格
 - **开发工具**: Wrangler 3.78.0
-- **版本**: v3.0.0
+- **版本**: v3.1.0
 
 ### 代理服务
 - **架构**: Cloudflare Workers边缘计算
@@ -56,11 +57,14 @@
 
 ```
 codeseek/
+├── 📁 packages/                   # 共享包 (npm workspaces)
+│   └── 📁 shared/                 # @codeseek/shared - 类型、工具、验证规则
 ├── 📁 backend/                    # 后端代码 (Cloudflare Workers + Hono)
 ├── 📁 frontend/                   # 前端代码 (React + TypeScript)
 ├── 📁 database/                   # 数据库迁移文件 (Cloudflare D1)
 ├── 📁 codeseek-1.0/              # 版本1.0存档（历史参考）
 ├── 📁 docs/                       # 项目文档目录
+├── 📄 package.json                # npm workspaces 根配置
 ├── 📄 readme.md                   # 项目说明文档
 └── 📄 LICENSE                     # MIT许可证
 ```
@@ -205,7 +209,10 @@ frontend/
 │   │   └── 📄 source.ts                  # 搜索源类型
 │   │
 │   ├── 📁 utils/                         # 🛠️ 工具函数
-│   │   └── 📄 notificationTemplates.ts   # 通知模板
+│   │   ├── 📄 notificationTemplates.ts   # 通知模板
+│   │   ├── 📄 magnet.ts                  # 磁力链接工具
+│   │   ├── 📄 tokenStorage.ts            # Token 加密存储 (v3.1.0)
+│   │   └── 📄 index.ts                   # 工具函数导出
 │   │
 │   ├── 📄 App.tsx                        # 应用入口组件
 │   ├── 📄 index.css                      # 全局样式 (Tailwind)
@@ -221,7 +228,7 @@ frontend/
 
 ---
 
-## 后端架构 (部署在Cloudflare Workers v2.0)
+## 后端架构 (部署在Cloudflare Workers v3.1)
 
 ```
 backend/
@@ -330,7 +337,13 @@ backend/
         │
         ├──► 06_data_search_sources.sql (搜索源预置数据 - 50+源)
         │
-        └──► 07_data_tags.sql (官方标签初始化数据)
+        ├──► 07_data_tags.sql (官方标签初始化数据)
+        │
+        ├──► 10_schema_favorites_extend.sql (v3.0: 收藏表扩展)
+        │
+        ├──► 11_schema_search_history_extend.sql (v3.0: 历史表扩展)
+        │
+        └──► 12_index_performance.sql (v3.1: 查询性能索引)
 ```
 
 ### 数据表详细说明
@@ -344,6 +357,9 @@ backend/
 | 05_data_system.sql | - | 系统初始化数据：角色定义、系统配置、邮件模板 |
 | 06_data_search_sources.sql | - | 搜索源预置数据：4个主分类、50+搜索源 |
 | 07_data_tags.sql | - | 官方标签初始化数据 |
+| 10_schema_favorites_extend.sql | - | v3.0: 收藏表新增9个JAV元数据字段 |
+| 11_schema_search_history_extend.sql | - | v3.0: 搜索历史表新增9个元数据字段 |
+| 12_index_performance.sql | - | v3.1: 25个高频查询索引 |
 
 ### 搜索源预置数据
 
@@ -374,9 +390,10 @@ backend/
 
 | 组件 | 版本 | 说明 |
 |-----|------|------|
-| 前端应用 | v2.0.0 | React 18 + TypeScript |
-| 后端服务 | v2.0.0 | Hono + TypeScript |
-| 数据库 | v2.0.0 | Cloudflare D1 |
+| 前端应用 | v3.1.0 | React 18 + TypeScript |
+| 后端服务 | v3.1.0 | Hono + TypeScript |
+| 数据库 | v3.1.0 | Cloudflare D1 |
+| 共享包 | v3.1.0 | @codeseek/shared |
 
 ---
 
@@ -535,5 +552,51 @@ CREATE INDEX idx_favorites_code ON user_favorites(code);
 - **数据库脚本**: 3 个（Schema + 迁移）
 
 ---
+
+## 🔄 v3.1.0 版本变更 (2026-05-13)
+
+### 📦 Monorepo 共享包改造
+
+- 创建 `packages/shared` (`@codeseek/shared`)
+- 前端类型文件改为从共享包重新导出：`auth.ts`, `search.ts`, `source.ts`, `common.ts`
+- 后端 `VALIDATION_RULES` 从共享包导入
+- npm workspaces 统一管理，前后端分别独立构建/部署
+
+### 🔒 安全加固
+
+- Token 存储从明文升级为 **AES-GCM 加密** (Web Crypto API)
+- 新增 `frontend/src/utils/tokenStorage.ts` — 加解密工具
+- `authStore` 新增 `persistToken()` / `restoreToken()` 方法
+- `OAuth` 回调（GitHub）同步加密 Token
+- 关闭生产环境 source map (`vite.config.ts`)
+
+### 🚦 CI/CD 门禁
+
+- `backend-deploy.yml` 部署前强制运行 `typecheck` + `lint`
+- 类型错误和代码规范问题被拦截在 CI，不再推送到生产
+
+### ⚡ 性能优化
+
+- 新增 `12_index_performance.sql` — 25 个高频查询索引
+- 覆盖：登录、会话验证、收藏、搜索历史、邮箱验证、安全锁定、社区查询
+- 构建脚本优化：`tsc -b && vite build` → `tsc --noEmit && vite build`
+
+### 🧹 代码质量
+
+- 新增 `camelizeKeys` 工具函数（递归 snake_case → camelCase）
+- 前端 `utils/index.ts` 从共享包重新导出工具函数
+- 前端 API 服务 (`search.ts`) 应用 `camelizeKeys` 替代 15 行手动映射
+- 修复 `AdminUser.permissions` / `AdminUserDetail.permissions` 类型 (`string` → `string[]`)
+- 删除冗余文件：`frontend/src/utils/camelize.ts`, `shared/validations.ts`
+
+### 📄 文件变更
+
+- 新增 15 个文件（共享包 + tokenStorage + 数据库索引）
+- 修改 17 个文件（前端 12 + 后端 3 + CI 1 + 构建配置 1）
+- 删除 2 个文件（被迁移至共享包的冗余代码）
+
+---
+
+👉 [查看完整的 v3.1.0 变更日志 →](changelogv3.1.0.md)
 
 👉 [查看完整的 v3.0 变更日志 →](changelogv3.0.md)
