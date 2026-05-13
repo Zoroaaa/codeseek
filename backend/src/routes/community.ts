@@ -7,6 +7,7 @@
 import { Hono } from 'hono';
 import { Env, CommunitySourceTag, CommunitySharedSource, CommunitySourceReview } from '@/types';
 import { success, error, generateId } from '@/utils';
+import { z } from 'zod';
 import { authMiddleware } from '@/middleware';
 
 export const communityRoutes = new Hono<{ Bindings: Env }>();
@@ -1024,46 +1025,70 @@ communityRoutes.get('/notifications', async (c) => {
        FROM community_source_reports r
        WHERE r.shared_source_id IN (${inClause}) AND r.status != 'pending'
        ORDER BY r.updated_at DESC LIMIT 50`
-    ).bind(...mySourceIds).all<any>();
+    ).bind(...mySourceIds).all();
+
+    const notificationSchema = z.object({
+      id: z.string(),
+      shared_source_id: z.string(),
+      actor_name: z.string().optional(),
+      created_at: z.number(),
+      rating: z.number().optional(),
+      comment: z.string().optional(),
+      report_reason: z.string().optional(),
+      status: z.string().optional(),
+      type: z.string(),
+    });
 
     const allNotifications = [
-      ...(likes.results || []).map((n: any) => ({
-        id: `like_${n.id}`,
-        type: 'like',
-        sourceId: n.shared_source_id,
-        sourceName: sourceNameMap[n.shared_source_id] || '未知搜索源',
-        actorName: n.actor_name || '匿名用户',
-        content: `点赞了你的搜索源`,
-        createdAt: n.created_at,
-      })),
-      ...(reviews.results || []).map((n: any) => ({
-        id: `review_${n.id}`,
-        type: 'review',
-        sourceId: n.shared_source_id,
-        sourceName: sourceNameMap[n.shared_source_id] || '未知搜索源',
-        actorName: n.actor_name || '匿名用户',
-        content: `评价了你的搜索源（${n.rating}星）${n.comment ? '：' + n.comment.slice(0, 50) : ''}`,
-        rating: n.rating,
-        createdAt: n.created_at,
-      })),
-      ...(downloads.results || []).map((n: any) => ({
-        id: `download_${n.id}`,
-        type: 'download',
-        sourceId: n.shared_source_id,
-        sourceName: sourceNameMap[n.shared_source_id] || '未知搜索源',
-        actorName: n.actor_name || '匿名用户',
-        content: `导入了你的搜索源`,
-        createdAt: n.created_at,
-      })),
-      ...(reports.results || []).map((n: any) => ({
-        id: `report_${n.id}`,
-        type: 'report_resolved',
-        sourceId: n.shared_source_id,
-        sourceName: sourceNameMap[n.shared_source_id] || '未知搜索源',
-        actorName: '管理员',
-        content: `对举报"${n.report_reason}"的处理结果：${n.status === 'resolved' ? '已解决' : '已驳回'}`,
-        createdAt: n.created_at,
-      })),
+      ...(likes.results || []).map((n) => {
+        const notif = notificationSchema.parse(n);
+        return {
+          id: `like_${notif.id}`,
+          type: 'like',
+          sourceId: notif.shared_source_id,
+          sourceName: sourceNameMap[notif.shared_source_id] || '未知搜索源',
+          actorName: notif.actor_name || '匿名用户',
+          content: `点赞了你的搜索源`,
+          createdAt: notif.created_at,
+        };
+      }),
+      ...(reviews.results || []).map((n) => {
+        const notif = notificationSchema.parse(n);
+        return {
+          id: `review_${notif.id}`,
+          type: 'review',
+          sourceId: notif.shared_source_id,
+          sourceName: sourceNameMap[notif.shared_source_id] || '未知搜索源',
+          actorName: notif.actor_name || '匿名用户',
+          content: `评价了你的搜索源（${notif.rating}星）${notif.comment ? '：' + notif.comment.slice(0, 50) : ''}`,
+          rating: notif.rating,
+          createdAt: notif.created_at,
+        };
+      }),
+      ...(downloads.results || []).map((n) => {
+        const notif = notificationSchema.parse(n);
+        return {
+          id: `download_${notif.id}`,
+          type: 'download',
+          sourceId: notif.shared_source_id,
+          sourceName: sourceNameMap[notif.shared_source_id] || '未知搜索源',
+          actorName: notif.actor_name || '匿名用户',
+          content: `导入了你的搜索源`,
+          createdAt: notif.created_at,
+        };
+      }),
+      ...(reports.results || []).map((n) => {
+        const notif = notificationSchema.parse(n);
+        return {
+          id: `report_${notif.id}`,
+          type: 'report_resolved',
+          sourceId: notif.shared_source_id,
+          sourceName: sourceNameMap[notif.shared_source_id] || '未知搜索源',
+          actorName: '管理员',
+          content: `对举报"${notif.report_reason}"的处理结果：${notif.status === 'resolved' ? '已解决' : '已驳回'}`,
+          createdAt: notif.created_at,
+        };
+      }),
     ].sort((a, b) => b.createdAt - a.createdAt);
 
     const total = allNotifications.length;

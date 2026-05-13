@@ -106,10 +106,6 @@ class ApiClient {
         }
 
         if (response.status === 401) {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('auth-storage');
-            window.location.href = '/login';
-          }
           const authError = new Error('认证失败，请重新登录');
           (authError as unknown as Record<string, unknown>).code = 'AUTH_FAILED';
           throw authError;

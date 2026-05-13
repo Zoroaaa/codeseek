@@ -4,15 +4,17 @@
  * 作者：CodeSeek Team
  */
 import { Hono } from 'hono';
+import { Context, Next } from 'hono';
 import { Env, JwtPayload } from '@/types';
 import { success, error, verifyToken, generateId, logUserAction } from '@/utils';
+import { feedbackSchema } from '@/utils/validators';
 
 export const feedbackRoutes = new Hono<{ Bindings: Env }>();
 
 // -----------------------------------------------------------------------
 // 可选鉴权中间件（有 token 就解析，没有也放行）
 // -----------------------------------------------------------------------
-const optionalAuth = async (c: any, next: () => Promise<void>) => {
+const optionalAuth = async (c: Context<{ Bindings: Env }>, next: Next) => {
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
@@ -44,7 +46,7 @@ const STATUS_LABELS: Record<string, string> = {
 // -----------------------------------------------------------------------
 feedbackRoutes.post('/', async (c) => {
   const user = c.get('user') as JwtPayload | undefined;
-  let body: any;
+  let body: { type?: string; title?: string; content?: string; priority?: string; email?: string; contactEmail?: string; screenshots?: string };
   try { body = await c.req.json(); } catch {
     return c.json(error('VALIDATION_ERROR', '请求体格式错误'), 400);
   }
@@ -150,7 +152,7 @@ feedbackRoutes.get('/my', async (c) => {
 // -----------------------------------------------------------------------
 // 管理员专用路由 — 需要 admin 权限
 // -----------------------------------------------------------------------
-const getAdminUser = async (c: any): Promise<JwtPayload | null> => {
+const getAdminUser = async (c: Context<{ Bindings: Env }>): Promise<JwtPayload | null> => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return null;
   const token = authHeader.slice(7);
@@ -270,7 +272,7 @@ feedbackRoutes.put('/admin/:id', async (c) => {
   if (!adminUser) return c.json(error('AUTH_ERROR', '需要管理员权限'), 403);
 
   const feedbackId = c.req.param('id');
-  let body: any;
+  let body: { status?: string; priority?: string; adminReply?: string; adminNotes?: string; sendEmail?: boolean };
   try { body = await c.req.json(); } catch {
     return c.json(error('VALIDATION_ERROR', '请求体格式错误'), 400);
   }
@@ -292,9 +294,10 @@ feedbackRoutes.put('/admin/:id', async (c) => {
       FROM user_feedback f
       LEFT JOIN users u ON f.user_id = u.id
       WHERE f.id = ?
-    `).bind(feedbackId).first() as any;
+    `).bind(feedbackId).first();
 
     if (!item) return c.json(error('NOT_FOUND', '反馈不存在'), 404);
+    const feedback = feedbackSchema.parse(item);
 
     const now = Date.now();
     const newStatus = status || item.status;
@@ -361,7 +364,7 @@ feedbackRoutes.put('/admin/:id', async (c) => {
 // -----------------------------------------------------------------------
 async function sendFeedbackReplyEmail(
   env: Env,
-  feedback: any,
+  feedback: z.infer<typeof feedbackSchema>,
   adminReply: string,
   newStatus: string
 ): Promise<{ sent: boolean; error?: string }> {
@@ -457,7 +460,7 @@ async function sendFeedbackReplyEmail(
   });
 
   if (!response.ok) {
-    const errData = await response.json().catch(() => ({})) as any;
+    const errData = await response.json().catch(() => ({})) as { message?: string };
     return { sent: false, error: errData.message || '邮件发送失败' };
   }
 

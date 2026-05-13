@@ -4,11 +4,12 @@
  * 作者：CodeSeek Team
  * 日期：2024
  */
-import { Hono } from 'hono';
+import { Hono, Context } from 'hono';
 import { Env, User, CommunitySourceReport, UserAction, JwtPayload, Role } from '@/types';
 import { success, error, verifyToken, logUserAction } from '@/utils';
 import { ConfigService } from '@/services';
 import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
+import { adminSessionSchema, adminEventSchema, adminActionSchema } from '@/utils/validators';
 
 const R = VALIDATION_RULES;
 
@@ -22,7 +23,7 @@ function getPaginationConfig() {
   };
 }
 
-const getAdminUser = async (c: any): Promise<JwtPayload | null> => {
+const getAdminUser = async (c: Context<{ Bindings: Env }>): Promise<JwtPayload | null> => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
@@ -243,7 +244,10 @@ adminRoutes.get('/users/:id', async (c) => {
        ORDER BY created_at DESC LIMIT 20`
     ).bind(userId).all();
 
-    const loginCount = recentActions.results?.filter((a: any) => a.action === 'login').length || 0;
+    const loginCount = recentActions.results?.filter((a) => {
+      const action = adminActionSchema.parse(a);
+      return action.action === 'login';
+    }).length || 0;
     const searchCount = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?'
     ).bind(userId).first<{ count: number }>();
@@ -1046,19 +1050,22 @@ adminRoutes.get('/sessions', async (c) => {
     const now = Date.now();
 
     return c.json(success({
-      sessions: (sessions.results || []).map((s: any) => ({
-        id: s.id,
-        userId: s.user_id,
-        username: s.username,
-        email: s.email,
-        ipAddress: s.ip_address,
-        userAgent: s.user_agent,
-        createdAt: s.created_at,
-        lastActivity: s.last_activity,
-        expiresAt: s.expires_at,
-        isActive: s.expires_at > now,
-        expiresInSeconds: Math.max(0, Math.floor((s.expires_at - now) / 1000)),
-      })),
+      sessions: (sessions.results || []).map((s) => {
+        const session = adminSessionSchema.parse(s);
+        return {
+          id: session.id,
+          userId: session.user_id,
+          username: s.username,
+          email: s.email,
+          ipAddress: session.ip_address,
+          userAgent: session.user_agent,
+          createdAt: session.created_at,
+          lastActivity: session.last_activity,
+          expiresAt: session.expires_at,
+          isActive: session.expires_at > now,
+          expiresInSeconds: Math.max(0, Math.floor((session.expires_at - now) / 1000)),
+        };
+      }),
       total: countResult?.total || 0,
       page,
       pageSize,

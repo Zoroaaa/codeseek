@@ -7,7 +7,8 @@
 import { Hono } from 'hono';
 import { Env, User, UserFavorite, UserSearchHistory } from '@/types';
 import { success, error, generateId, logUserAction } from '@/utils';
-import { authMiddleware } from '@/middleware';
+import { authMiddleware } from '@/middleware/auth';
+import { userActivitySchema } from '@/utils/validators';
 import { CONFIG, VALIDATION_RULES } from '@/constants';
 
 const R = VALIDATION_RULES;
@@ -609,15 +610,18 @@ userRoutes.get('/activities', async (c) => {
     };
 
     return c.json(success({
-      activities: (activities.results || []).map((a: any) => ({
-        id: a.id,
-        action: a.action,
-        actionLabel: actionLabels[a.action] || a.action,
-        data: a.data ? JSON.parse(a.data) : {},
-        ipAddress: a.ip_address,
-        userAgent: a.user_agent,
-        createdAt: a.created_at,
-      })),
+      activities: (activities.results || []).map((a) => {
+        const activity = userActivitySchema.parse(a);
+        return {
+          id: activity.id,
+          action: activity.action,
+          actionLabel: actionLabels[activity.action] || activity.action,
+          data: activity.data ? JSON.parse(activity.data) : {},
+          ipAddress: activity.ip_address,
+          userAgent: activity.user_agent,
+          createdAt: activity.created_at,
+        };
+      }),
       total: countResult?.total || 0,
       limit,
       offset,
