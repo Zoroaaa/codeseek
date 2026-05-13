@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { Env, User, EmailVerification, EmailChangeRequest } from '@/types';
-import { success, error, generateId, hashPassword, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP, checkLockout, clearLockout, recordSecurityEvent } from '@/utils';
+import { success, error, generateId, hashPassword, hashToken, verifyPassword, generateToken, verifyToken, validateEmail, validateUsername, validatePassword, logUserAction, getClientIP, checkLockout, clearLockout, recordSecurityEvent } from '@/utils';
 import { recordFailedAttempt, recordPasswordResetLog, updatePasswordResetLog } from '@/utils/security';
 import { EmailVerificationService, emailVerificationUtils, ConfigService } from '@/services';
 import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
@@ -106,7 +106,7 @@ authRoutes.post('/login', async (c) => {
     const expiryDays = parseInt(c.env.JWT_EXPIRY_DAYS || '30', 10);
     const token = await generateToken(user.id, user.username, c.env.JWT_SECRET, expiryDays, userRole);
 
-    const tokenHash = await hashPassword(token);
+    const tokenHash = await hashToken(token);
     const sessionId = generateId();
     const expiresAt = now + expiryDays * 24 * 60 * 60 * 1000;
     
@@ -223,7 +223,7 @@ authRoutes.post('/register', async (c) => {
     const expiryDays = parseInt(c.env.JWT_EXPIRY_DAYS || '30', 10);
     const token = await generateToken(userId, username, c.env.JWT_SECRET, expiryDays);
 
-    const tokenHash = await hashPassword(token);
+    const tokenHash = await hashToken(token);
     const sessionId = generateId();
     const expiresAt = now + expiryDays * 24 * 60 * 60 * 1000;
 
@@ -287,7 +287,7 @@ authRoutes.post('/logout', authMiddleware, async (c) => {
   const token = c.get('authToken');
 
   try {
-    const tokenHash = await hashPassword(token);
+    const tokenHash = await hashToken(token);
     await c.env.DB.prepare(
       'DELETE FROM user_sessions WHERE user_id = ? AND token_hash = ?'
     ).bind(payload.userId, tokenHash).run();
@@ -317,7 +317,7 @@ authRoutes.get('/me', authMiddleware, async (c) => {
       return c.json(error('AUTH_ERROR', '用户不存在'), 404);
     }
 
-    const tokenHash = await hashPassword(token);
+    const tokenHash = await hashToken(token);
     const session = await c.env.DB.prepare(
       'SELECT * FROM user_sessions WHERE user_id = ? AND token_hash = ? AND expires_at > ?'
     ).bind(user.id, tokenHash, Date.now()).first();
@@ -355,7 +355,7 @@ authRoutes.post('/verify-token', authMiddleware, async (c) => {
   const token = c.get('authToken');
 
   try {
-    const tokenHash = await hashPassword(token);
+    const tokenHash = await hashToken(token);
     const session = await c.env.DB.prepare(
       'SELECT * FROM user_sessions WHERE user_id = ? AND token_hash = ? AND expires_at > ?'
     ).bind(payload.userId, tokenHash, Date.now()).first();
@@ -527,7 +527,7 @@ authRoutes.post('/reset-password', async (c) => {
 
     const passwordHash = await hashPassword(newPassword);
     const now = Date.now();
-    const currentTokenHash = await hashPassword(c.get('authToken'));
+    const currentTokenHash = await hashToken(c.get('authToken'));
 
     await c.env.DB.batch([
       c.env.DB.prepare(`
@@ -662,7 +662,7 @@ authRoutes.post('/refresh', authMiddleware, async (c) => {
   const oldToken = c.get('authToken');
 
   try {
-    const oldTokenHash = await hashPassword(oldToken);
+    const oldTokenHash = await hashToken(oldToken);
     const session = await c.env.DB.prepare(
       'SELECT * FROM user_sessions WHERE user_id = ? AND token_hash = ? AND expires_at > ?'
     ).bind(payload.userId, oldTokenHash, Date.now()).first();
@@ -673,7 +673,7 @@ authRoutes.post('/refresh', authMiddleware, async (c) => {
 
     const expiryDays = parseInt(c.env.JWT_EXPIRY_DAYS || '30', 10);
     const newToken = await generateToken(payload.userId, payload.username, c.env.JWT_SECRET, expiryDays);
-    const newTokenHash = await hashPassword(newToken);
+    const newTokenHash = await hashToken(newToken);
     const expiresAt = Date.now() + expiryDays * 24 * 60 * 60 * 1000;
 
     await c.env.DB.prepare(`
