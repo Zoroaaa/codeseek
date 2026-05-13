@@ -24,7 +24,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
-      isLoading: false, // token 同步恢复，无需异步等待
+      isLoading: true, // 初始状态为加载中，等待初始化完成
 
       setUser: (user) => {
         set({ 
