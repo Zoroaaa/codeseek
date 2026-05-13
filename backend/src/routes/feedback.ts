@@ -297,7 +297,11 @@ feedbackRoutes.put('/admin/:id', async (c) => {
     `).bind(feedbackId).first();
 
     if (!item) return c.json(error('NOT_FOUND', '反馈不存在'), 404);
-    feedbackSchema.parse(item);
+    const validationResult = feedbackSchema.safeParse(item);
+    if (!validationResult.success) {
+      console.error('Feedback validation error:', validationResult.error, item);
+      return c.json(error('VALIDATION_ERROR', '反馈数据格式错误'), 500);
+    }
 
     const now = Date.now();
     const newStatus = (status || (item as Record<string, unknown>).status) as string;
@@ -329,7 +333,8 @@ feedbackRoutes.put('/admin/:id', async (c) => {
     let emailResult: { sent: boolean; error?: string } = { sent: false };
     if (sendEmail && adminReply && (item as Record<string, unknown>).contact_email) {
       try {
-        const parsedFeedback = feedbackSchema.parse(item);
+        const parsedFeedbackResult = feedbackSchema.safeParse(item);
+        const parsedFeedback = parsedFeedbackResult.success ? parsedFeedbackResult.data : item;
         emailResult = await sendFeedbackReplyEmail(c.env, parsedFeedback, adminReply as string, newStatus);
         if (emailResult.sent) {
           await c.env.DB.prepare(

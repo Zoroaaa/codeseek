@@ -1041,7 +1041,8 @@ communityRoutes.get('/notifications', async (c) => {
 
     const allNotifications = [
       ...(likes.results || []).map((n) => {
-        const notif = notificationSchema.parse(n);
+        const result = notificationSchema.safeParse(n);
+        const notif = result.success ? result.data : n;
         return {
           id: `like_${notif.id}`,
           type: 'like',
@@ -1053,7 +1054,8 @@ communityRoutes.get('/notifications', async (c) => {
         };
       }),
       ...(reviews.results || []).map((n) => {
-        const notif = notificationSchema.parse(n);
+        const result = notificationSchema.safeParse(n);
+        const notif = result.success ? result.data : n;
         return {
           id: `review_${notif.id}`,
           type: 'review',
@@ -1066,7 +1068,8 @@ communityRoutes.get('/notifications', async (c) => {
         };
       }),
       ...(downloads.results || []).map((n) => {
-        const notif = notificationSchema.parse(n);
+        const result = notificationSchema.safeParse(n);
+        const notif = result.success ? result.data : n;
         return {
           id: `download_${notif.id}`,
           type: 'download',
@@ -1078,7 +1081,8 @@ communityRoutes.get('/notifications', async (c) => {
         };
       }),
       ...(reports.results || []).map((n) => {
-        const notif = notificationSchema.parse(n);
+        const result = notificationSchema.safeParse(n);
+        const notif = result.success ? result.data : n;
         return {
           id: `report_${notif.id}`,
           type: 'report_resolved',

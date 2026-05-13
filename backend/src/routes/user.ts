@@ -30,7 +30,7 @@ userRoutes.get('/settings', async (c) => {
     }
 
     return c.json(success({
-      settings: JSON.parse(userRow.settings || '{}'),
+      settings: (() => { try { return JSON.parse(userRow.settings || '{}'); } catch { return {}; } })(),
     }));
   } catch (err) {
     console.error('Get settings error:', err);
@@ -611,12 +611,13 @@ userRoutes.get('/activities', async (c) => {
 
     return c.json(success({
       activities: (activities.results || []).map((a) => {
-        const activity = userActivitySchema.parse(a);
+        const result = userActivitySchema.safeParse(a);
+        const activity = result.success ? result.data : a as { id: string; action: string; data?: string; ip_address?: string; user_agent?: string; created_at: number };
         return {
           id: activity.id,
           action: activity.action,
           actionLabel: actionLabels[activity.action] || activity.action,
-          data: activity.data ? JSON.parse(activity.data) : {},
+          data: activity.data ? (() => { try { return JSON.parse(activity.data); } catch { return {}; } })() : {},
           ipAddress: activity.ip_address,
           userAgent: activity.user_agent,
           createdAt: activity.created_at,

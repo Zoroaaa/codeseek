@@ -139,8 +139,8 @@ authRoutes.post('/login', async (c) => {
         id: user.id,
         username: user.username,
         email: user.email,
-        permissions: JSON.parse(user.permissions || '[]'),
-        settings: JSON.parse(user.settings || '{}'),
+        permissions: (() => { try { return JSON.parse(user.permissions || '[]'); } catch { return []; } })(),
+        settings: (() => { try { return JSON.parse(user.settings || '{}'); } catch { return {}; } })(),
         isActive: user.is_active === 1,
         emailVerified: user.email_verified === 1,
         createdAt: user.created_at,
@@ -334,8 +334,8 @@ authRoutes.get('/me', authMiddleware, async (c) => {
       id: user.id,
       username: user.username,
       email: user.email,
-      permissions: JSON.parse(user.permissions || '[]'),
-      settings: JSON.parse(user.settings || '{}'),
+      permissions: (() => { try { return JSON.parse(user.permissions || '[]'); } catch { return []; } })(),
+      settings: (() => { try { return JSON.parse(user.settings || '{}'); } catch { return {}; } })(),
       isActive: user.is_active === 1,
       emailVerified: user.email_verified === 1,
       createdAt: user.created_at,
@@ -527,20 +527,15 @@ authRoutes.post('/reset-password', async (c) => {
 
     const passwordHash = await hashPassword(newPassword);
     const now = Date.now();
-    const currentTokenHash = await hashToken(c.get('authToken'));
 
     await c.env.DB.batch([
       c.env.DB.prepare(`
         UPDATE users SET password_hash = ?, last_password_change = ?, updated_at = ? WHERE id = ?
       `).bind(passwordHash, now, now, user.id),
       c.env.DB.prepare(`
-        DELETE FROM user_sessions WHERE user_id = ? AND token_hash != ?
-      `).bind(user.id, currentTokenHash),
+        DELETE FROM user_sessions WHERE user_id = ?
+      `).bind(user.id),
     ]);
-
-    await c.env.DB.prepare(
-      'DELETE FROM user_sessions WHERE user_id = ?'
-    ).bind(user.id).run();
 
     await updatePasswordResetLog(c.env.DB, resetLogId, {
       requestStatus: 'completed',
