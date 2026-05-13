@@ -48,6 +48,8 @@ app.use('*', secureHeaders({
   xContentTypeOptions: 'nosniff',
   referrerPolicy: 'strict-origin-when-cross-origin',
   strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
 }));
 
 app.get('/', (c) => {
