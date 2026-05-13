@@ -134,7 +134,7 @@ export const parseBody = async <T>(c: Context<{ Bindings: Env }>): Promise<T> =>
   return c.req.json<T>();
 };
 
-export const getClientIP = (c: Context<{ Bindings: Env }>): string => {
+export const getClientIP = (c: Context): string => {
   return c.req.header('x-forwarded-for') || 
          c.req.header('x-real-ip') || 
          c.req.header('CF-Connecting-IP') ||
@@ -188,7 +188,7 @@ export const logUserAction = async (
   userId: string | null, 
   action: string, 
   data: Record<string, unknown>,
-  c: Context<{ Bindings: Env; Variables?: Record<string, unknown> }>
+  c: Context
 ): Promise<void> => {
   if (env.ENABLE_ACTION_LOGGING !== 'true') return;
   

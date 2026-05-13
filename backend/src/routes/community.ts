@@ -422,37 +422,25 @@ communityRoutes.get('/sources/user-stats', async (c) => {
   const user = c.get('user');
 
   try {
-    const sharedCount = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_shared_sources WHERE user_id = ? AND status = ?'
-    ).bind(user.userId, 'active').first<{ count: number }>();
+    const stats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) as active_count,
+        SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending_count,
+        COALESCE(SUM(download_count), 0) as total_downloads,
+        COALESCE(SUM(like_count), 0) as total_likes,
+        COALESCE(SUM(view_count), 0) as total_views,
+        AVG(CASE WHEN rating_count > 0 THEN rating_score END) as avg_rating
+      FROM community_shared_sources WHERE user_id = ?
+    `).bind(user.userId).first();
 
-    const pendingCount = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_shared_sources WHERE user_id = ? AND status = ?'
-    ).bind(user.userId, 'pending').first<{ count: number }>();
+    const [reviewsResult, tagsResult] = await c.env.DB.batch([
+      c.env.DB.prepare('SELECT COUNT(*) as c FROM community_source_reviews WHERE user_id = ?').bind(user.userId),
+      c.env.DB.prepare('SELECT COUNT(*) as c FROM community_source_tags WHERE created_by = ?').bind(user.userId),
+    ]) as unknown as [{ results: Array<{ c: number }> }, { results: Array<{ c: number }> }];
 
-    const totalDownloads = await c.env.DB.prepare(
-      `SELECT COALESCE(SUM(download_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
-    ).bind(user.userId).first<{ total: number }>();
-
-    const totalLikes = await c.env.DB.prepare(
-      `SELECT COALESCE(SUM(like_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
-    ).bind(user.userId).first<{ total: number }>();
-
-    const totalViews = await c.env.DB.prepare(
-      `SELECT COALESCE(SUM(view_count), 0) as total FROM community_shared_sources WHERE user_id = ?`
-    ).bind(user.userId).first<{ total: number }>();
-
-    const avgRating = await c.env.DB.prepare(
-      `SELECT AVG(rating_score) as avg FROM community_shared_sources WHERE user_id = ? AND rating_count > 0`
-    ).bind(user.userId).first<{ avg: number }>();
-
-    const reviewsGiven = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_source_reviews WHERE user_id = ?'
-    ).bind(user.userId).first<{ count: number }>();
-
-    const tagsCreated = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM community_source_tags WHERE created_by = ?'
-    ).bind(user.userId).first<{ count: number }>();
+    const reviewsGiven = reviewsResult.results[0]?.c || 0;
+    const tagsCreated = tagsResult.results[0]?.c || 0;
 
     const recentShares = await c.env.DB.prepare(
       `SELECT id, source_name, status, download_count, like_count, view_count, rating_score, created_at 
@@ -464,14 +452,14 @@ communityRoutes.get('/sources/user-stats', async (c) => {
 
     return c.json(success({
       general: {
-        sharedSources: sharedCount?.count || 0,
-        pendingSources: pendingCount?.count || 0,
-        totalDownloads: totalDownloads?.total || 0,
-        totalLikes: totalLikes?.total || 0,
-        totalViews: totalViews?.total || 0,
-        avgRating: avgRating?.avg || 0,
-        reviewsGiven: reviewsGiven?.count || 0,
-        tagsCreated: tagsCreated?.count || 0,
+        sharedSources: stats?.total || 0,
+        pendingSources: stats?.pending_count || 0,
+        totalDownloads: stats?.total_downloads || 0,
+        totalLikes: stats?.total_likes || 0,
+        totalViews: stats?.total_views || 0,
+        avgRating: stats?.avg_rating || 0,
+        reviewsGiven,
+        tagsCreated,
       },
       recentShares: recentShares.results || []
     }));
@@ -483,6 +471,19 @@ communityRoutes.get('/sources/user-stats', async (c) => {
 
 communityRoutes.get('/sources/stats', async (c) => {
   try {
+    const cacheKey = new Request('https://internal/community-stats');
+    const cache = caches.default;
+    
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+      return new Response(cached.body, {
+        headers: {
+          ...Object.fromEntries(cached.headers),
+          'X-Cache': 'HIT',
+        },
+      });
+    }
+
     const totalSources = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM community_shared_sources WHERE status = ?'
     ).bind('active').first<{ count: number }>();
@@ -537,6 +538,26 @@ communityRoutes.get('/sources/stats', async (c) => {
         createdAt: new Date(item.createdAt).toISOString()
       }))
     }));
+
+    const response = c.json(success({
+      totalSources: totalSources?.count || 0,
+      totalDownloads: totalDownloads?.total || 0,
+      totalUsers: totalUsers?.count || 0,
+      totalReviews: totalReviews?.count || 0,
+      averageRating: avgRating?.avg || 0,
+      categoriesCount: categoriesCount?.count || 0,
+      topCategories: topCategories.results || [],
+      recentActivity: (recentActivity.results || []).map(item => ({
+        ...item,
+        createdAt: new Date(item.createdAt).toISOString()
+      }))
+    }));
+
+    c.executionCtx.waitUntil(
+      cache.put(cacheKey, response.clone())
+    );
+
+    return response;
   } catch (err) {
     console.error('Get community stats error:', err);
     return c.json(error('SERVER_ERROR', '获取社区统计失败'), 500);
@@ -1047,7 +1068,7 @@ communityRoutes.get('/notifications', async (c) => {
           id: `like_${notif.id}`,
           type: 'like',
           sourceId: notif.shared_source_id,
-          sourceName: sourceNameMap[notif.shared_source_id] || '未知搜索源',
+          sourceName: sourceNameMap[String(notif.shared_source_id)] || '未知搜索源',
           actorName: notif.actor_name || '匿名用户',
           content: `点赞了你的搜索源`,
           createdAt: notif.created_at,
@@ -1060,7 +1081,7 @@ communityRoutes.get('/notifications', async (c) => {
           id: `review_${notif.id}`,
           type: 'review',
           sourceId: notif.shared_source_id,
-          sourceName: sourceNameMap[notif.shared_source_id] || '未知搜索源',
+          sourceName: sourceNameMap[String(notif.shared_source_id)] || '未知搜索源',
           actorName: notif.actor_name || '匿名用户',
           content: `评价了你的搜索源（${notif.rating}星）${notif.comment ? '：' + notif.comment.slice(0, 50) : ''}`,
           rating: notif.rating,
@@ -1074,7 +1095,7 @@ communityRoutes.get('/notifications', async (c) => {
           id: `download_${notif.id}`,
           type: 'download',
           sourceId: notif.shared_source_id,
-          sourceName: sourceNameMap[notif.shared_source_id] || '未知搜索源',
+          sourceName: sourceNameMap[String(notif.shared_source_id)] || '未知搜索源',
           actorName: notif.actor_name || '匿名用户',
           content: `导入了你的搜索源`,
           createdAt: notif.created_at,
@@ -1087,7 +1108,7 @@ communityRoutes.get('/notifications', async (c) => {
           id: `report_${notif.id}`,
           type: 'report_resolved',
           sourceId: notif.shared_source_id,
-          sourceName: sourceNameMap[notif.shared_source_id] || '未知搜索源',
+          sourceName: sourceNameMap[String(notif.shared_source_id)] || '未知搜索源',
           actorName: '管理员',
           content: `对举报"${notif.report_reason}"的处理结果：${notif.status === 'resolved' ? '已解决' : '已驳回'}`,
           createdAt: notif.created_at,

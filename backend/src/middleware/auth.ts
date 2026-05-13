@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono';
 import { Env, JwtPayload, Role } from '@/types';
-import { verifyToken, error } from '@/utils';
+import { verifyToken, error, hashToken } from '@/utils';
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -22,6 +22,15 @@ export const authMiddleware = async (c: Context<{ Bindings: Env }>, next: Next) 
 
   if (!payload) {
     return c.json(error('UNAUTHORIZED', '无效或过期的令牌'), 401);
+  }
+
+  const tokenHash = await hashToken(token);
+  const session = await c.env.DB.prepare(
+    'SELECT id FROM user_sessions WHERE token_hash = ? AND expires_at > ?'
+  ).bind(tokenHash, Date.now()).first();
+
+  if (!session) {
+    return c.json(error('UNAUTHORIZED', '会话已失效，请重新登录'), 401);
   }
 
   c.set('user', payload);

@@ -3,6 +3,12 @@
 -- 版本: 1.0
 -- 说明: 为搜索历史添加详细字段，支持显示更丰富的信息
 -- 执行顺序: 11
+-- 
+-- ⚠️ 字段冗余说明：
+--   query 和 keyword 字段存储相同值（搜索关键词）
+--   原因：早期版本使用 query，后续重构改为 keyword
+--   保留两个字段是为了向后兼容旧数据
+--   新代码应统一使用 keyword 字段，query 字段标记为 @deprecated
 -- ===============================================
 
 -- ===============================================
@@ -18,6 +24,7 @@ ALTER TABLE user_search_history ADD COLUMN duration TEXT;
 ALTER TABLE user_search_history ADD COLUMN tags TEXT;
 ALTER TABLE user_search_history ADD COLUMN release_date TEXT;
 ALTER TABLE user_search_history ADD COLUMN publisher TEXT;
+-- @deprecated 使用 keyword 字段替代，保留用于向后兼容
 ALTER TABLE user_search_history ADD COLUMN keyword TEXT;
 ALTER TABLE user_search_history ADD COLUMN updated_at INTEGER;
 

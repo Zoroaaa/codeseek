@@ -4,11 +4,12 @@
  * 作者：CodeSeek Team
  * 日期：2024
  */
-import { Hono, Context } from 'hono';
+import { Hono } from 'hono';
 import { Env, User, CommunitySourceReport, UserAction, JwtPayload, Role } from '@/types';
-import { success, error, verifyToken, logUserAction } from '@/utils';
+import { success, error, logUserAction } from '@/utils';
 import { ConfigService } from '@/services';
 import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
+import { authMiddleware, adminMiddleware } from '@/middleware/auth';
 import { adminSessionSchema, adminEventSchema, adminActionSchema } from '@/utils/validators';
 
 const R = VALIDATION_RULES;
@@ -23,34 +24,8 @@ function getPaginationConfig() {
   };
 }
 
-const getAdminUser = async (c: Context<{ Bindings: Env }>): Promise<JwtPayload | null> => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return null;
-  }
-
-  if (payload.role !== 'admin' && payload.role !== 'super_admin') {
-    return null;
-  }
-
-  return payload;
-};
-
-adminRoutes.use('*', async (c, next) => {
-  const adminUser = await getAdminUser(c);
-  if (!adminUser) {
-    return c.json(error('AUTH_ERROR', '需要管理员权限'), 403);
-  }
-  c.set('user', adminUser);
-  await next();
-});
+adminRoutes.use('*', authMiddleware);
+adminRoutes.use('*', adminMiddleware);
 
 /**
  * 获取角色列表

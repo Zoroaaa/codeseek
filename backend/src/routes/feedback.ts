@@ -335,7 +335,7 @@ feedbackRoutes.put('/admin/:id', async (c) => {
       try {
         const parsedFeedbackResult = feedbackSchema.safeParse(item);
         const parsedFeedback = parsedFeedbackResult.success ? parsedFeedbackResult.data : item;
-        emailResult = await sendFeedbackReplyEmail(c.env, parsedFeedback, adminReply as string, newStatus);
+        emailResult = await sendFeedbackReplyEmail(c.env, parsedFeedback as Parameters<typeof sendFeedbackReplyEmail>[1], adminReply as string, newStatus);
         if (emailResult.sent) {
           await c.env.DB.prepare(
             'UPDATE user_feedback SET email_sent = 1 WHERE id = ?'

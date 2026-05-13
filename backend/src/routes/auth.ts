@@ -5,23 +5,39 @@ import { recordFailedAttempt, recordPasswordResetLog, updatePasswordResetLog } f
 import { EmailVerificationService, emailVerificationUtils, ConfigService } from '@/services';
 import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
 import { authMiddleware } from '@/middleware/auth';
+import { validateBody, schemas } from '@/validation';
 
 const R = VALIDATION_RULES;
 
 export const authRoutes = new Hono<{ Bindings: Env }>();
 
-authRoutes.post('/login', async (c) => {
-  const body = await c.req.json();
+authRoutes.use('/request-email-change', authMiddleware);
+authRoutes.use('/send-email-change-code', authMiddleware);
+authRoutes.use('/verify-email-change-code', authMiddleware);
+authRoutes.use('/cancel-email-change-request', authMiddleware);
+authRoutes.use('/send-account-delete-code', authMiddleware);
+authRoutes.use('/user-verification-status', authMiddleware);
+
+authRoutes.post('/login', validateBody(schemas.auth.login), async (c) => {
+  const body = c.get('validatedBody') as { identifier: string; password: string };
   const { identifier, password } = body;
 
   if (!identifier || !password) {
     return c.json(error('VALIDATION_ERROR', '请输入用户名/邮箱和密码'), 400);
   }
 
-  const clientIP = getClientIP(c);
-  const userAgent = c.req.header('User-Agent') || '';
+  if (identifier.length > R.EMAIL.MAX_LENGTH) {
+    return c.json(error('VALIDATION_ERROR', `用户名/邮箱最多${R.EMAIL.MAX_LENGTH}个字符`), 400);
+  }
+
+  if (password.length > R.PASSWORD.MAX_LENGTH) {
+    return c.json(error('VALIDATION_ERROR', `密码最多${R.PASSWORD.MAX_LENGTH}个字符`), 400);
+  }
 
   try {
+    const clientIP = getClientIP(c);
+    const userAgent = c.req.header('User-Agent') || '';
+
     const lockoutCheck = await checkLockout(c.env.DB, 'login', identifier);
     if (lockoutCheck.isLocked) {
       const remainingTime = lockoutCheck.lockedUntil ? Math.ceil((lockoutCheck.lockedUntil - Date.now()) / 60000) : 0;
@@ -62,36 +78,42 @@ authRoutes.post('/login', async (c) => {
 
     if (!user.is_active) {
       await logUserAction(c.env, user.id, 'login_failed', { reason: '账号已被禁用', ip: clientIP }, c);
-      await recordSecurityEvent(c.env.DB, {
-        userId: user.id,
-        eventType: 'login',
-        eventStatus: 'failed',
-        eventData: { reason: 'account_disabled' },
-        ipAddress: clientIP,
-        userAgent,
-      });
+
+      c.executionCtx.waitUntil(
+        recordSecurityEvent(c.env.DB, {
+          userId: user.id,
+          eventType: 'login',
+          eventStatus: 'failed',
+          eventData: { reason: 'account_disabled' },
+          ipAddress: clientIP,
+          userAgent,
+        })
+      );
+
       return c.json(error('AUTH_ERROR', '账号已被禁用'), 403);
     }
 
     const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) {
       await logUserAction(c.env, user.id, 'login_failed', { reason: '密码错误', ip: clientIP }, c);
-      
+
       const lockoutResult = await recordFailedAttempt(c.env, 'login', identifier, undefined, undefined, clientIP, userAgent);
-      
-      await recordSecurityEvent(c.env.DB, {
-        userId: user.id,
-        eventType: 'login',
-        eventStatus: 'failed',
-        eventData: { reason: 'wrong_password', remainingAttempts: lockoutResult.remainingAttempts },
-        ipAddress: clientIP,
-        userAgent,
-      });
+
+      c.executionCtx.waitUntil(
+        recordSecurityEvent(c.env.DB, {
+          userId: user.id,
+          eventType: 'login',
+          eventStatus: 'failed',
+          eventData: { reason: 'wrong_password', remainingAttempts: lockoutResult.remainingAttempts },
+          ipAddress: clientIP,
+          userAgent,
+        })
+      );
 
       if (lockoutResult.isLocked) {
         return c.json(error('LOCKED', '登录失败次数过多，账户已锁定1小时'), 423);
       }
-      
+
       return c.json(error('AUTH_ERROR', `用户名/邮箱或密码错误${lockoutResult.remainingAttempts ? `，剩余${lockoutResult.remainingAttempts}次尝试机会` : ''}`), 401);
     }
 
@@ -109,7 +131,7 @@ authRoutes.post('/login', async (c) => {
     const tokenHash = await hashToken(token);
     const sessionId = generateId();
     const expiresAt = now + expiryDays * 24 * 60 * 60 * 1000;
-    
+
     await c.env.DB.prepare(`
       INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, last_activity, ip_address, user_agent)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -124,15 +146,17 @@ authRoutes.post('/login', async (c) => {
       userAgent
     ).run();
 
-    await logUserAction(c.env, user.id, 'login', { method: 'password', ip: clientIP }, c);
-    
-    await recordSecurityEvent(c.env.DB, {
-      userId: user.id,
-      eventType: 'login',
-      eventStatus: 'success',
-      ipAddress: clientIP,
-      userAgent,
-    });
+    c.executionCtx.waitUntil(logUserAction(c.env, user.id, 'login', { method: 'password', ip: clientIP }, c));
+
+    c.executionCtx.waitUntil(
+      recordSecurityEvent(c.env.DB, {
+        userId: user.id,
+        eventType: 'login',
+        eventStatus: 'success',
+        ipAddress: clientIP,
+        userAgent,
+      })
+    );
 
     return c.json(success({
       user: {
@@ -157,7 +181,7 @@ authRoutes.post('/login', async (c) => {
   }
 });
 
-authRoutes.post('/register', async (c) => {
+authRoutes.post('/register', validateBody(schemas.auth.register), async (c) => {
   const configService = new ConfigService(c.env);
   const enableRegistration = await configService.getBoolean(DB_CONFIG_KEYS.ENABLE_REGISTRATION, true);
   
@@ -165,7 +189,7 @@ authRoutes.post('/register', async (c) => {
     return c.json(error('FORBIDDEN', '注册功能已关闭'), 403);
   }
 
-  const body = await c.req.json();
+  const body = c.get('validatedBody') as { username: string; email: string; password: string; verificationCode?: string };
   const { username, email, password, verificationCode } = body;
 
   if (!username || !email || !password) {
@@ -326,9 +350,13 @@ authRoutes.get('/me', authMiddleware, async (c) => {
       return c.json(error('AUTH_ERROR', '会话已过期'), 401);
     }
 
-    await c.env.DB.prepare(
-      'UPDATE user_sessions SET last_activity = ? WHERE id = ?'
-    ).bind(Date.now(), session.id).run();
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    if ((session.last_activity as number) < fiveMinutesAgo) {
+      c.executionCtx.waitUntil(
+        c.env.DB.prepare('UPDATE user_sessions SET last_activity = ? WHERE id = ?')
+          .bind(Date.now(), session.id).run()
+      );
+    }
 
     return c.json(success({
       id: user.id,
@@ -609,6 +637,10 @@ authRoutes.delete('/account', authMiddleware, async (c) => {
     return c.json(error('VALIDATION_ERROR', '请输入正确的确认文字'), 400);
   }
 
+  if (!password) {
+    return c.json(error('VALIDATION_ERROR', '请输入密码以确认身份'), 400);
+  }
+
   try {
     const user = await c.env.DB.prepare(
       'SELECT * FROM users WHERE id = ?'
@@ -630,14 +662,15 @@ authRoutes.delete('/account', authMiddleware, async (c) => {
 
     await c.env.DB.prepare('DELETE FROM email_verifications WHERE id = ?').bind(verification.id).run();
 
-    if (password) {
-      const isValid = await verifyPassword(password, user.password_hash);
-      if (!isValid) {
-        return c.json(error('AUTH_ERROR', '密码错误'), 400);
-      }
+    const isValid = await verifyPassword(password, user.password_hash);
+    if (!isValid) {
+      return c.json(error('AUTH_ERROR', '密码错误'), 400);
     }
 
     await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM email_verifications WHERE user_id = ?').bind(user.id),
+      c.env.DB.prepare('DELETE FROM email_change_requests WHERE user_id = ?').bind(user.id),
+      c.env.DB.prepare('DELETE FROM password_reset_logs WHERE user_id = ?').bind(user.id),
       c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(user.id),
       c.env.DB.prepare('DELETE FROM user_favorites WHERE user_id = ?').bind(user.id),
       c.env.DB.prepare('DELETE FROM user_search_history WHERE user_id = ?').bind(user.id),
@@ -748,17 +781,7 @@ authRoutes.post('/send-registration-code', async (c) => {
 });
 
 authRoutes.post('/request-email-change', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const payload = c.get('user');
 
   const body = await c.req.json();
   const { newEmail, currentPassword } = body;
@@ -837,17 +860,7 @@ authRoutes.post('/request-email-change', async (c) => {
 });
 
 authRoutes.post('/send-email-change-code', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const payload = c.get('user');
 
   const body = await c.req.json();
   const { requestId, emailType } = body;
@@ -917,17 +930,7 @@ authRoutes.post('/send-email-change-code', async (c) => {
 });
 
 authRoutes.post('/verify-email-change-code', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const payload = c.get('user');
 
   const body = await c.req.json();
   const { requestId, emailType, code } = body;
@@ -1001,17 +1004,7 @@ authRoutes.post('/verify-email-change-code', async (c) => {
 });
 
 authRoutes.post('/cancel-email-change-request', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const payload = c.get('user');
 
   const body = await c.req.json();
   const { requestId } = body;
@@ -1037,17 +1030,7 @@ authRoutes.post('/cancel-email-change-request', async (c) => {
 });
 
 authRoutes.post('/send-account-delete-code', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const payload = c.get('user');
 
   try {
     const user = await c.env.DB.prepare(
@@ -1139,17 +1122,7 @@ authRoutes.get('/verification-status', async (c) => {
 });
 
 authRoutes.get('/user-verification-status', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+  const payload = c.get('user');
 
   try {
     const verifications = await c.env.DB.prepare(`

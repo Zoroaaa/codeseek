@@ -406,6 +406,24 @@ async function fetchRandomActresses(): Promise<GroupRanking[]> {
 // ─────────────────────────────────────────────
 
 javRoutes.get('/rankings', async (c) => {
+  const RANKINGS_CACHE_TTL = 20 * 60;
+  const forceRefresh = c.req.query('refresh') === '1';
+  
+  const cacheKey = new Request('https://internal/jav-rankings-v1');
+  const cache = caches.default;
+
+  if (!forceRefresh) {
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+      return new Response(cached.body, {
+        headers: {
+          ...Object.fromEntries(cached.headers),
+          'X-Cache': 'HIT',
+        },
+      });
+    }
+  }
+
   try {
     // 六路并发：有码、无码、高清、字幕、类别列表+抓取、女优列表+抓取
     const [r_censored, r_uncensored, r_hd, r_subtitle, r_genres, r_actresses] = await Promise.allSettled([
@@ -440,24 +458,69 @@ javRoutes.get('/rankings', async (c) => {
       fetchedAt: Date.now(), sources,
     };
 
-    return c.json({ success: true, data: response });
+    const responseBody = JSON.stringify({ success: true, data: response });
+    const newResponse = new Response(responseBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `public, max-age=${RANKINGS_CACHE_TTL}`,
+        'X-Cache': forceRefresh ? 'BYPASS' : 'MISS',
+        'X-Fetched-At': new Date().toISOString(),
+      },
+    });
+
+    c.executionCtx.waitUntil(cache.put(cacheKey, newResponse.clone()));
+
+    return newResponse;
   } catch (err) {
     console.error('JAV rankings error:', err);
     return c.json({ success: false, error: { code: 'FETCH_ERROR', message: '获取榜单失败' } }, 500);
   }
 });
 
-// suggestions 接口（轻量）
+// suggestions 接口（轻量）— 使用用户收藏数据，5分钟缓存
+
 javRoutes.get('/suggestions', async (c) => {
   const keyword = (c.req.query('keyword') || '').toUpperCase().trim();
   if (!keyword) return c.json({ success: true, data: [] });
+  
+  const user = c.get('user');
+  
   try {
+    const codes = await c.env.DB.prepare(
+      'SELECT DISTINCT code FROM user_favorites WHERE user_id = ? AND code LIKE ? LIMIT 10'
+    ).bind(user.userId, `${keyword}%`).all<{ code: string }>();
+    
+    const matchedCodes = (codes.results || []).map(r => r.code);
+    
+    if (matchedCodes.length >= 5) {
+      return c.json({ success: true, data: matchedCodes.slice(0, 10) });
+    }
+    
+    const cacheKey = new Request(`https://internal/jav-suggestions/${keyword}`);
+    const cache = caches.default;
+    
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+      const cachedData = await cached.json() as { success: boolean; data: string[] };
+      const combined = [...new Set([...matchedCodes, ...cachedData.data])].slice(0, 10);
+      return c.json({ success: true, data: combined });
+    }
+
     const html = await get('https://www.javbus.com/');
-    const matched = parseGrid(html, 'javbus')
+    const externalMatched = parseGrid(html, 'javbus')
       .map(i => i.code)
       .filter(code => code.startsWith(keyword) || code.includes(keyword))
       .slice(0, 10);
-    return c.json({ success: true, data: matched });
+    
+    const combined = [...new Set([...matchedCodes, ...externalMatched])].slice(0, 10);
+    
+    const response = c.json({ success: true, data: combined });
+    
+    c.executionCtx.waitUntil(
+      cache.put(cacheKey, new Response(JSON.stringify({ success: true, data: externalMatched })))
+    );
+    
+    return response;
   } catch {
     return c.json({ success: true, data: [] });
   }
@@ -594,6 +657,20 @@ javRoutes.get('/detail', async (c) => {
     return c.json({ success: false, error: { code: 'INVALID_CODE', message: '无效的番号格式' } }, 400);
   }
 
+  const DETAIL_CACHE_TTL = 3600;
+  const cacheKey = new Request(`https://internal/jav-detail/${code}`);
+  const cache = caches.default;
+
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    return new Response(cached.body, {
+      headers: {
+        ...Object.fromEntries(cached.headers),
+        'X-Cache': 'HIT',
+      },
+    });
+  }
+
   const detailUrl = `https://www.javbus.com/${code}`;
 
   try {
@@ -615,7 +692,17 @@ javRoutes.get('/detail', async (c) => {
       magnets = parseMagnets(magnetHtml);
     }
 
-    return c.json({ success: true, data: { ...detail, magnets } });
+    const detailResponse = JSON.stringify({ success: true, data: { ...detail, magnets } });
+    const newResponse = new Response(detailResponse, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `public, max-age=${DETAIL_CACHE_TTL}`,
+        'X-Cache': 'MISS',
+      },
+    });
+
+    c.executionCtx.waitUntil(cache.put(cacheKey, newResponse.clone()));
+    return newResponse;
   } catch (err) {
     console.error('JAV detail error:', err);
     return c.json({ success: false, error: { code: 'FETCH_ERROR', message: '获取详情失败' } }, 500);

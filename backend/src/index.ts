@@ -6,6 +6,7 @@
  */
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import { Env } from '@/types';
 import { authRoutes, githubOAuthRoutes, userRoutes, sourceRoutes, communityRoutes, systemRoutes, searchRoutes, adminRoutes, configRoutes, javRoutes } from '@/routes';
 import { feedbackRoutes } from '@/routes/feedback';
@@ -42,6 +43,13 @@ app.use('*', cors({
   maxAge: CONFIG.CORS.MAX_AGE,
 }));
 
+app.use('*', secureHeaders({
+  xFrameOptions: 'DENY',
+  xContentTypeOptions: 'nosniff',
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+}));
+
 app.get('/', (c) => {
   return c.json({
     name: 'CodeSeek API',
@@ -71,4 +79,13 @@ app.onError((err, c) => {
   return c.json({ success: false, error: { code: 'SERVER_ERROR', message: '服务器内部错误' } }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    if (event.cron === '0 * * * *') {
+      ctx.waitUntil(
+        env.DB.prepare('DELETE FROM user_sessions WHERE expires_at < ?').bind(Date.now()).run()
+      );
+    }
+  },
+};
