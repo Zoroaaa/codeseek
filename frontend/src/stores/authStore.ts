@@ -1,12 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User, UserSettings } from '@/types';
-import { encryptToken, decryptToken } from '@/utils/tokenStorage';
 
 interface AuthState {
   user: User | null;
   token: string | null;
-  encryptedToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   
@@ -25,10 +23,9 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
-      encryptedToken: null,
       isAuthenticated: false,
-      isLoading: true,
-      
+      isLoading: false, // token 同步恢复，无需异步等待
+
       setUser: (user) => {
         set({ 
           user, 
@@ -49,35 +46,21 @@ export const useAuthStore = create<AuthState>()(
           : null
       })),
 
+      // 登录时直接存 token（persist 会同步写 localStorage）
       persistToken: async (token) => {
-        try {
-          const encrypted = await encryptToken(token);
-          set({ encryptedToken: encrypted });
-        } catch {
-          set({ encryptedToken: null });
-        }
+        set({ token });
       },
 
+      // token 已在 persist 恢复时同步写入，这里直接返回
       restoreToken: async () => {
-        const { encryptedToken } = get();
-        if (!encryptedToken) return null;
-        try {
-          const plain = await decryptToken(encryptedToken);
-          if (plain) {
-            set({ token: plain });
-          }
-          return plain;
-        } catch {
-          set({ encryptedToken: null });
-          return null;
-        }
+        const { token } = get();
+        return token;
       },
       
       logout: () => {
         set({
           user: null,
           token: null,
-          encryptedToken: null,
           isAuthenticated: false,
           isLoading: false
         });
@@ -92,7 +75,7 @@ export const useAuthStore = create<AuthState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         user: state.user,
-        encryptedToken: state.encryptedToken,
+        token: state.token, // 直接持久化明文 token
         isAuthenticated: state.isAuthenticated,
       }),
     }

@@ -113,11 +113,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initAuth = async () => {
-      // 必须先 setLoading(true)，阻止 GuardRoute 在 token 就绪前放行组件发请求
       setLoading(true);
-	  console.log('[initAuth] start, token in store:', useAuthStore.getState().token);
       const token = await useAuthStore.getState().restoreToken();
-	  console.log('[initAuth] after restoreToken:', token ? 'got token' : 'no token');
 
       if (token) {
         try {
@@ -128,16 +125,15 @@ const App: React.FC = () => {
             logout();
           }
         } catch (err: unknown) {
-          // 只有 401 才登出，网络错误保持现有登录态
           const status = (err as { status?: number })?.status;
           if (status === 401) {
             logout();
           } else {
-            setLoading(false);
+            setLoading(false); // 网络问题，保持登录态
           }
         }
       } else {
-        logout(); // 无 token，确保清理状态
+        logout();
       }
     };
 
