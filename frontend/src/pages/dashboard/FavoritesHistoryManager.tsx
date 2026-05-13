@@ -9,7 +9,6 @@ import {
   Upload,
   SortAsc,
   SortDesc,
-  MoreVertical,
   Calendar,
   Tag,
   BarChart2,
@@ -18,9 +17,8 @@ import {
   Building2,
   User,
 } from 'lucide-react';
-import { Card, Button, Input, Badge, Modal, Loading, EmptyState, Dropdown } from '@/components/ui';
+import { Card, Button, Input, Badge, Modal, Loading, EmptyState } from '@/components/ui';
 import { ProxyImage } from '@/components/ui';
-import { convertToProxyUrl } from '@/services/proxy';
 import { userApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
@@ -44,7 +42,6 @@ const getProxyImageUrl = (url: string): string => {
 
 export const FavoritesManager: React.FC = () => {
   const toast = useToast();
-  const navigate = useNavigate();
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -160,16 +157,6 @@ export const FavoritesManager: React.FC = () => {
     }
   };
 
-  const handleSelectItem = (id: string) => {
-    const newSelected = new Set(selectedItems);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedItems(newSelected);
-  };
-
   const filteredFavorites = favorites
     .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => {
@@ -182,16 +169,6 @@ export const FavoritesManager: React.FC = () => {
         ? a.title.localeCompare(b.title) 
         : b.title.localeCompare(a.title);
     });
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   if (isLoading) {
     return (

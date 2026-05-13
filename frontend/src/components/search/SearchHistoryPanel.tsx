@@ -1,16 +1,7 @@
 import React from 'react';
-import { Clock, Search, Trash2, ChevronDown, ChevronRight, Calendar, User, Tag, Building2 } from 'lucide-react';
+import { Clock, Search, Trash2, ChevronDown, ChevronRight, Calendar, User, Building2 } from 'lucide-react';
 import { Loading } from '@/components/ui';
 import type { SearchHistoryItem } from '@/types';
-
-const resolveUrl = (relativePath: string, referenceUrl: string): string => {
-  try {
-    const base = new URL(referenceUrl);
-    return new URL(relativePath, base).href;
-  } catch {
-    return relativePath;
-  }
-};
 
 // ─── 高度常量（与 JavRankingsPanel 共享逻辑）────────────────────────
 // header: 64px（同 JAV 面板）
