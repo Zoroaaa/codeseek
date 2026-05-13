@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User, UserSettings } from '@/types';
-import { apiClient } from '@/services/api';
 
 interface AuthState {
   user: User | null;
@@ -19,7 +18,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       token: null,
       isAuthenticated: false,
@@ -35,7 +34,6 @@ export const useAuthStore = create<AuthState>()(
       
       setToken: (token) => {
         set({ token });
-        apiClient.setToken(token);
       },
       
       setLoading: (isLoading) => set({ isLoading }),
@@ -47,20 +45,15 @@ export const useAuthStore = create<AuthState>()(
       })),
       
       logout: () => {
-        apiClient.setToken(null);
-        set({ 
-          user: null, 
-          token: null, 
+        set({
+          user: null,
+          token: null,
           isAuthenticated: false,
-          isLoading: false 
+          isLoading: false
         });
       },
 
       initialize: () => {
-        const state = get();
-        if (state.token) {
-          apiClient.setToken(state.token);
-        }
         set({ isLoading: false });
       },
     }),

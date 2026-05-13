@@ -31,7 +31,11 @@ export const authApi = {
   login: async (data: LoginRequest): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', data);
     if (response.success && response.data?.token) {
-      apiClient.setToken(response.data.token);
+      if (typeof window !== 'undefined') {
+        const authStorage = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+        authStorage.state = { ...(authStorage.state || {}), token: response.data.token };
+        localStorage.setItem('auth-storage', JSON.stringify(authStorage));
+      }
     }
     return response;
   },
@@ -45,7 +49,9 @@ export const authApi = {
       const response = await apiClient.post<{ success: boolean; message: string }>('/auth/logout', {});
       return response;
     } finally {
-      apiClient.setToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth-storage');
+      }
     }
   },
 
@@ -55,7 +61,11 @@ export const authApi = {
 
   verifyToken: async (token?: string): Promise<{ success: boolean; data: TokenVerifyResponse }> => {
     if (token) {
-      apiClient.setToken(token);
+      if (typeof window !== 'undefined') {
+        const authStorage = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+        authStorage.state = { ...(authStorage.state || {}), token };
+        localStorage.setItem('auth-storage', JSON.stringify(authStorage));
+      }
     }
     return apiClient.post<{ success: boolean; data: TokenVerifyResponse }>('/auth/verify-token', {});
   },
@@ -63,7 +73,11 @@ export const authApi = {
   refreshToken: async (): Promise<{ success: boolean; data: { token: string } }> => {
     const response = await apiClient.post<{ success: boolean; data: { token: string } }>('/auth/refresh', {});
     if (response.success && response.data?.token) {
-      apiClient.setToken(response.data.token);
+      if (typeof window !== 'undefined') {
+        const authStorage = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+        authStorage.state = { ...(authStorage.state || {}), token: response.data.token };
+        localStorage.setItem('auth-storage', JSON.stringify(authStorage));
+      }
     }
     return response;
   },
@@ -93,7 +107,9 @@ export const authApi = {
       const response = await apiClient.delete<{ success: boolean; message: string }>('/auth/account', data);
       return response;
     } finally {
-      apiClient.setToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth-storage');
+      }
     }
   },
 

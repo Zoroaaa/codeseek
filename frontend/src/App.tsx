@@ -129,11 +129,7 @@ const App: React.FC = () => {
   const { resolvedTheme } = useThemeStore();
 
   useEffect(() => {
-    // 订阅 token 变化，同步到 apiClient
-    const unsub = useAuthStore.subscribe((state) => {
-      apiClient.setToken(state.token);
-    });
-    return () => unsub();
+    // apiClient 现在直接从 zustand persist 读取 token，无需手动同步
   }, []);
 
   useEffect(() => {
@@ -161,7 +157,6 @@ const App: React.FC = () => {
 
       if (token) {
         try {
-          apiClient.setToken(token);
           const response = await apiClient.get<{ success: boolean; data: import('@/types').User }>('/auth/me');
           if (response.success && response.data) {
             setUser(response.data);

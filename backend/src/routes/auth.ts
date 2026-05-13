@@ -4,6 +4,7 @@ import { success, error, generateId, hashPassword, verifyPassword, generateToken
 import { recordFailedAttempt, recordPasswordResetLog, updatePasswordResetLog } from '@/utils/security';
 import { EmailVerificationService, emailVerificationUtils, ConfigService } from '@/services';
 import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
+import { authMiddleware } from '@/middleware/auth';
 
 const R = VALIDATION_RULES;
 
@@ -27,19 +28,32 @@ authRoutes.post('/login', async (c) => {
       return c.json(error('LOCKED', `账户已锁定，请${remainingTime}分钟后再试`), 423);
     }
 
-    let queryField = 'username';
+    const ALLOWED_QUERY_FIELDS = ['username', 'email'] as const;
+    let queryField: 'username' | 'email' = 'username';
     const queryValue = identifier;
-    
+
     if (identifier.includes('@')) {
       queryField = 'email';
     }
-    
-    const user = await c.env.DB.prepare(
-      `SELECT u.*, r.name as role_name, r.display_name as role_display_name, r.permissions as role_permissions 
-       FROM users u 
-       LEFT JOIN roles r ON u.role_id = r.id 
-       WHERE u.${queryField} = ?`
-    ).bind(queryValue).first<User & { role_name?: string; role_display_name?: string; role_permissions?: string }>();
+
+    if (!ALLOWED_QUERY_FIELDS.includes(queryField)) {
+      return c.json(error('VALIDATION_ERROR', '无效的查询字段'), 400);
+    }
+
+    const userQueries = {
+      username: `SELECT u.*, r.name as role_name, r.display_name as role_display_name, r.permissions as role_permissions 
+                  FROM users u 
+                  LEFT JOIN roles r ON u.role_id = r.id 
+                  WHERE u.username = ?`,
+      email: `SELECT u.*, r.name as role_name, r.display_name as role_display_name, r.permissions as role_permissions 
+               FROM users u 
+               LEFT JOIN roles r ON u.role_id = r.id 
+               WHERE u.email = ?`
+    };
+
+    const user = await c.env.DB.prepare(userQueries[queryField])
+      .bind(queryValue)
+      .first<User & { role_name?: string; role_display_name?: string; role_permissions?: string }>();
 
     if (!user) {
       const lockoutResult = await recordFailedAttempt(c.env, 'login', identifier, undefined, undefined, clientIP, userAgent);
@@ -267,18 +281,9 @@ authRoutes.post('/register', async (c) => {
   }
 });
 
-authRoutes.post('/logout', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+authRoutes.post('/logout', authMiddleware, async (c) => {
+  const payload = c.get('user');
+  const token = c.get('authToken');
 
   try {
     const tokenHash = await hashPassword(token);
@@ -295,24 +300,15 @@ authRoutes.post('/logout', async (c) => {
   }
 });
 
-authRoutes.get('/me', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+authRoutes.get('/me', authMiddleware, async (c) => {
+  const payload = c.get('user');
+  const token = c.get('authToken');
 
   try {
     const user = await c.env.DB.prepare(
-      `SELECT u.*, r.name as role_name, r.display_name as role_display_name 
-       FROM users u 
-       LEFT JOIN roles r ON u.role_id = r.id 
+      `SELECT u.*, r.name as role_name, r.display_name as role_display_name
+       FROM users u
+       LEFT JOIN roles r ON u.role_id = r.id
        WHERE u.id = ?`
     ).bind(payload.userId).first<User & { role_name?: string; role_display_name?: string }>();
 
@@ -353,18 +349,9 @@ authRoutes.get('/me', async (c) => {
   }
 });
 
-authRoutes.post('/verify-token', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+authRoutes.post('/verify-token', authMiddleware, async (c) => {
+  const payload = c.get('user');
+  const token = c.get('authToken');
 
   try {
     const tokenHash = await hashPassword(token);
@@ -562,18 +549,8 @@ authRoutes.post('/reset-password', async (c) => {
   }
 });
 
-authRoutes.put('/change-password', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+authRoutes.put('/change-password', authMiddleware, async (c) => {
+  const payload = c.get('user');
 
   const body = await c.req.json();
   const { currentPassword, newPassword } = body;
@@ -616,18 +593,8 @@ authRoutes.put('/change-password', async (c) => {
   }
 });
 
-authRoutes.delete('/account', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const token = authHeader.slice(7);
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+authRoutes.delete('/account', authMiddleware, async (c) => {
+  const payload = c.get('user');
 
   const body = await c.req.json();
   const { password, verificationCode, confirmText } = body;
@@ -650,7 +617,7 @@ authRoutes.delete('/account', async (c) => {
     }
 
     const verification = await c.env.DB.prepare(`
-      SELECT * FROM email_verifications 
+      SELECT * FROM email_verifications
       WHERE user_id = ? AND email = ? AND verification_code = ? AND verification_type = 'account_delete' AND expires_at > ?
       ORDER BY created_at DESC LIMIT 1
     `).bind(user.id, user.email, verificationCode, Date.now()).first<EmailVerification>();
@@ -681,18 +648,9 @@ authRoutes.delete('/account', async (c) => {
   }
 });
 
-authRoutes.post('/refresh', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(error('AUTH_ERROR', '未授权'), 401);
-  }
-
-  const oldToken = authHeader.slice(7);
-  const payload = await verifyToken(oldToken, c.env.JWT_SECRET);
-
-  if (!payload) {
-    return c.json(error('AUTH_ERROR', '无效的Token'), 401);
-  }
+authRoutes.post('/refresh', authMiddleware, async (c) => {
+  const payload = c.get('user');
+  const oldToken = c.get('authToken');
 
   try {
     const oldTokenHash = await hashPassword(oldToken);
@@ -710,7 +668,7 @@ authRoutes.post('/refresh', async (c) => {
     const expiresAt = Date.now() + expiryDays * 24 * 60 * 60 * 1000;
 
     await c.env.DB.prepare(`
-      UPDATE user_sessions 
+      UPDATE user_sessions
       SET token_hash = ?, expires_at = ?, last_activity = ?
       WHERE id = ?
     `).bind(newTokenHash, expiresAt, Date.now(), session.id).run();

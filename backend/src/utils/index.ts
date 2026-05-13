@@ -18,16 +18,69 @@ export const generateId = (): string => {
 };
 
 export const hashPassword = async (password: string): Promise<string> => {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
   const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+
+  const hashBuffer = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    256
+  );
+
+  const saltBase64 = btoa(String.fromCharCode(...salt));
+  const hashBase64 = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+
+  return `$pbkdf2-sha256$100000$${saltBase64}$${hashBase64}`;
 };
 
-export const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
+export const verifyPassword = async (password: string, storedHash: string): Promise<boolean> => {
+  try {
+    if (!storedHash.startsWith('$pbkdf2-sha256$')) {
+      const passwordHash = await hashPassword(password);
+      return passwordHash === storedHash;
+    }
+
+    const [, , iterationsStr, saltBase64, hashBase64] = storedHash.split('$');
+    const iterations = parseInt(iterationsStr, 10);
+    const saltBytes = Uint8Array.from(atob(saltBase64), (c) => c.charCodeAt(0));
+
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveBits']
+    );
+
+    const hashBuffer = await crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        salt: saltBytes,
+        iterations,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      256
+    );
+
+    const computedHashBase64 = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+    return computedHashBase64 === hashBase64;
+  } catch {
+    return false;
+  }
 };
 
 export const generateToken = async (userId: string, username: string, secret: string, expiryDays: number = 30, role?: string): Promise<string> => {

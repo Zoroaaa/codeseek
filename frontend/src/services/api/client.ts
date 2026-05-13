@@ -26,34 +26,26 @@ interface RequestOptions {
 
 class ApiClient {
   private baseUrl: string;
-  private token: string | null = null;
   private maxRetries = API_CONFIG.MAX_RETRIES;
   private retryDelay = API_CONFIG.RETRY_DELAY;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
-    this.loadToken();
-  }
-
-  private loadToken(): void {
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
-    }
-  }
-
-  setToken(token: string | null) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('auth_token', token);
-      } else {
-        localStorage.removeItem('auth_token');
-      }
-    }
   }
 
   getToken(): string | null {
-    return this.token;
+    if (typeof window !== 'undefined') {
+      const authStorage = localStorage.getItem('auth-storage');
+      if (authStorage) {
+        try {
+          const parsed = JSON.parse(authStorage);
+          return parsed.state?.token || null;
+        } catch {
+          return null;
+        }
+      }
+    }
+    return null;
   }
 
   private getHeaders(customHeaders?: Record<string, string>): HeadersInit {
@@ -62,8 +54,9 @@ class ApiClient {
       ...customHeaders,
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const token = this.getToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     return headers;
@@ -113,7 +106,10 @@ class ApiClient {
         }
 
         if (response.status === 401) {
-          this.setToken(null);
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth-storage');
+            window.location.href = '/login';
+          }
           const authError = new Error('认证失败，请重新登录');
           (authError as unknown as Record<string, unknown>).code = 'AUTH_FAILED';
           throw authError;

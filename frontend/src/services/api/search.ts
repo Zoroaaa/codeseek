@@ -119,30 +119,32 @@ export const userApi = {
     return apiClient.patch(`/user/favorites/${id}/status`, { status });
   },
 
-  getSearchHistory: async (limit = 50): Promise<{ 
-    success: boolean; 
-    data: { history: SearchHistoryItem[] } 
+  getSearchHistory: async (limit = 50): Promise<{
+    success: boolean;
+    data: { history: SearchHistoryItem[] }
   }> => {
-    const response = await apiClient.get<{ success: boolean; data: { history: Array<{
-      id: string;
-      user_id: string;
-      query: string;
-      source: string;
-      results_count: number;
-      created_at: number;
-    }> } }>(`/user/search-history?limit=${limit}`);
-    
+    const response = await apiClient.get<{ success: boolean; data: { history: Array<Record<string, unknown>> } }>(`/user/search-history?limit=${limit}`);
+
     if (response.success && response.data) {
       return {
         success: true,
         data: {
           history: response.data.history.map(h => ({
-            id: h.id,
-            userId: h.user_id,
-            query: h.query,
-            source: h.source,
-            resultsCount: h.results_count,
-            createdAt: h.created_at,
+            id: h.id as string,
+            userId: h.user_id as string,
+            query: h.query as string,
+            source: h.source as string,
+            resultsCount: h.results_count as number,
+            createdAt: h.created_at as number,
+            title: h.title as string | undefined,
+            subtitle: h.subtitle as string | undefined,
+            code: h.code as string | undefined,
+            actors: h.actors as string | undefined,
+            duration: h.duration as string | undefined,
+            tags: h.tags as string | undefined,
+            releaseDate: h.release_date as string | undefined,
+            publisher: h.publisher as string | undefined,
+            keyword: h.keyword as string | undefined,
           }))
         }
       };
