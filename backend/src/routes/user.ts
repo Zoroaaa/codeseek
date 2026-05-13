@@ -281,14 +281,14 @@ userRoutes.post('/search-history', async (c) => {
 
   try {
     const body = await c.req.json();
-    const { query, source, resultsCount } = body;
+    const { query, source, resultsCount, title, subtitle, code, actors, duration, tags, releaseDate, publisher, keyword } = body;
 
     if (!query) {
       return c.json(error('VALIDATION_ERROR', '搜索关键词是必填项'), 400);
     }
 
     const maxHistory = R.SEARCH_HISTORY.MAX_COUNT;
-    
+
     const count = await c.env.DB.prepare(
       'SELECT COUNT(*) as count FROM user_search_history WHERE user_id = ?'
     ).bind(user.userId).first<{ count: number }>();
@@ -307,15 +307,24 @@ userRoutes.post('/search-history', async (c) => {
     const now = Date.now();
 
     await c.env.DB.prepare(`
-      INSERT INTO user_search_history (id, user_id, query, source, results_count, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO user_search_history (id, user_id, query, source, results_count, created_at, title, subtitle, code, actors, duration, tags, release_date, publisher, keyword)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       historyId,
       user.userId,
       query,
       source || '',
       resultsCount || 0,
-      now
+      now,
+      title || null,
+      subtitle || null,
+      code || null,
+      actors || null,
+      duration || null,
+      tags || null,
+      releaseDate || null,
+      publisher || null,
+      keyword || null
     ).run();
 
     return c.json(success({
@@ -324,10 +333,68 @@ userRoutes.post('/search-history', async (c) => {
       source: source || '',
       resultsCount: resultsCount || 0,
       createdAt: now,
+      title: title || null,
+      subtitle: subtitle || null,
+      code: code || null,
+      actors: actors || null,
+      duration: duration || null,
+      tags: tags || null,
+      releaseDate: releaseDate || null,
+      publisher: publisher || null,
+      keyword: keyword || null,
     }, '搜索历史已保存'));
   } catch (err) {
     console.error('Save search history error:', err);
     return c.json(error('SERVER_ERROR', '保存搜索历史失败'), 500);
+  }
+});
+
+userRoutes.put('/search-history/:id', async (c) => {
+  const user = c.get('user');
+  const historyId = c.req.param('id');
+
+  try {
+    const body = await c.req.json();
+    const { title, subtitle, code, actors, duration, tags, releaseDate, publisher, keyword } = body;
+
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM user_search_history WHERE id = ? AND user_id = ?'
+    ).bind(historyId, user.userId).first<{ id: string }>();
+
+    if (!existing) {
+      return c.json(error('NOT_FOUND', '搜索历史记录不存在'), 404);
+    }
+
+    const updateFields: string[] = [];
+    const updateValues: (string | number | null)[] = [];
+
+    if (title !== undefined) { updateFields.push('title = ?'); updateValues.push(title || null); }
+    if (subtitle !== undefined) { updateFields.push('subtitle = ?'); updateValues.push(subtitle || null); }
+    if (code !== undefined) { updateFields.push('code = ?'); updateValues.push(code || null); }
+    if (actors !== undefined) { updateFields.push('actors = ?'); updateValues.push(actors || null); }
+    if (duration !== undefined) { updateFields.push('duration = ?'); updateValues.push(duration || null); }
+    if (tags !== undefined) { updateFields.push('tags = ?'); updateValues.push(tags || null); }
+    if (releaseDate !== undefined) { updateFields.push('release_date = ?'); updateValues.push(releaseDate || null); }
+    if (publisher !== undefined) { updateFields.push('publisher = ?'); updateValues.push(publisher || null); }
+    if (keyword !== undefined) { updateFields.push('keyword = ?'); updateValues.push(keyword || null); }
+
+    if (updateFields.length === 0) {
+      return c.json(error('VALIDATION_ERROR', '没有需要更新的字段'), 400);
+    }
+
+    updateFields.push('updated_at = ?');
+    updateValues.push(Date.now());
+    updateValues.push(historyId);
+    updateValues.push(user.userId);
+
+    await c.env.DB.prepare(`
+      UPDATE user_search_history SET ${updateFields.join(', ')} WHERE id = ? AND user_id = ?
+    `).bind(...updateValues).run();
+
+    return c.json(success(null, '搜索历史已更新'));
+  } catch (err) {
+    console.error('Update search history error:', err);
+    return c.json(error('SERVER_ERROR', '更新搜索历史失败'), 500);
   }
 });
 

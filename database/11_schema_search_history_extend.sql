@@ -19,6 +19,7 @@ ALTER TABLE user_search_history ADD COLUMN tags TEXT;
 ALTER TABLE user_search_history ADD COLUMN release_date TEXT;
 ALTER TABLE user_search_history ADD COLUMN publisher TEXT;
 ALTER TABLE user_search_history ADD COLUMN keyword TEXT;
+ALTER TABLE user_search_history ADD COLUMN updated_at INTEGER;
 
 -- ===============================================
 -- 索引优化（可选字段索引）

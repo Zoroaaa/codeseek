@@ -166,6 +166,52 @@ export const MainSearchPage: React.FC = () => {
     }
   }, [selectedCategory]);
 
+  // JAV详情提取成功后自动更新搜索历史
+  useEffect(() => {
+    if (!isAuthenticated || !javDetail || javDetailStatus !== 'success' || !searchHistory.length) return;
+
+    const updateHistoryWithJavDetail = async () => {
+      try {
+        const targetHistory = searchHistory.find(h =>
+          h.query.toUpperCase().includes(javDetail!.code.toUpperCase()) ||
+          javDetail!.code.toUpperCase().includes(h.query.toUpperCase())
+        );
+
+        if (targetHistory) {
+          await userApi.updateSearchHistory(targetHistory.id, {
+            title: javDetail.title,
+            code: javDetail.code,
+            actors: javDetail.actresses?.join(', '),
+            duration: javDetail.duration,
+            tags: javDetail.tags?.join(', '),
+            releaseDate: javDetail.releaseDate,
+            publisher: javDetail.publisher || javDetail.maker,
+            keyword: javDetail.code,
+          });
+
+          setSearchHistory(prev => prev.map(h =>
+            h.id === targetHistory.id
+              ? { ...h,
+                  title: javDetail!.title,
+                  code: javDetail!.code,
+                  actors: javDetail!.actresses?.join(', '),
+                  duration: javDetail!.duration,
+                  tags: javDetail!.tags?.join(', '),
+                  releaseDate: javDetail!.releaseDate,
+                  publisher: javDetail!.publisher || javDetail!.maker,
+                  keyword: javDetail!.code,
+                }
+              : h
+          ));
+        }
+      } catch (error) {
+        console.error('Failed to update search history with JAV detail:', error);
+      }
+    };
+
+    updateHistoryWithJavDetail();
+  }, [javDetail, javDetailStatus, isAuthenticated]);
+
   const loadHistory = async () => {
     if (!isAuthenticated) return;
     setIsLoadingHistory(true);

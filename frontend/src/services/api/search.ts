@@ -166,6 +166,20 @@ export const userApi = {
     return apiClient.delete(`/user/search-history/${id}`);
   },
 
+  updateSearchHistory: async (id: string, data: {
+    title?: string;
+    subtitle?: string;
+    code?: string;
+    actors?: string;
+    duration?: string;
+    tags?: string;
+    releaseDate?: string;
+    publisher?: string;
+    keyword?: string;
+  }): Promise<{ success: boolean; message: string }> => {
+    return apiClient.put(`/user/search-history/${id}`, data);
+  },
+
   getSearchStats: async (): Promise<{ 
     success: boolean; 
     data: {

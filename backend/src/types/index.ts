@@ -102,6 +102,15 @@ export interface UserSearchHistory {
   source: string;
   results_count: number;
   created_at: number;
+  title?: string;
+  subtitle?: string;
+  code?: string;
+  actors?: string;
+  duration?: string;
+  tags?: string;
+  release_date?: string;
+  publisher?: string;
+  keyword?: string;
 }
 
 export interface UserAction {
