@@ -25,7 +25,6 @@
 版本 3.1.0 是 CodeSeek 的**工程质量与架构优化版本**，核心变化包括：
 
 - **📦 Monorepo 共享包**: 创建 `packages/shared`，统一类型定义和工具函数，消除前后端重复代码
-- **🔒 Token 加密存储**: AES-GCM 加密 localStorage 中的 Token，防御 XSS 窃取
 - **🚦 CI 门禁**: 部署前强制执行 typecheck + lint，拦截不合格代码
 - **⚡ 数据库索引**: 25 个高频查询索引，提升 D1 查询性能
 - **🧹 代码去重**: camelizeKeys 工具函数、共享验证规则、构建脚本优化
@@ -140,43 +139,7 @@ export { VALIDATION_RULES } from '@codeseek/shared';  // ← 不再自行定义
 
 ## 🔒 安全性加固
 
-### 1. Token AES-GCM 加密存储
-
-**变更文件**: [`frontend/src/utils/tokenStorage.ts`](../frontend/src/utils/tokenStorage.ts) (新增), [`frontend/src/stores/authStore.ts`](../frontend/src/stores/authStore.ts)
-
-**问题**: v3.0 的 Token 明文存储在 `localStorage`，任意 XSS 即可窃取。
-
-**方案**: 使用 Web Crypto API (PBKDF2 + AES-GCM) 对 Token 加密后再存入 localStorage。
-
-```typescript
-// 加密（setToken 时调用）
-const encrypted = await encryptToken(token);
-// → AES-GCM 加密 → Base64 编码 → 存入 localStorage
-
-// 解密（App.tsx initAuth 时调用）
-const token = await decryptToken(encrypted);
-// → Base64 解码 → AES-GCM 解密 → 还原 Token
-```
-
-**存储结构变化**:
-```
-v3.0: localStorage['auth-storage'] = { state: { token: "eyJhbG..." } }
-v3.1: localStorage['auth-storage'] = { state: { encryptedToken: "AES-GCM..." } }
-```
-
-**影响文件**:
-- `authStore.ts` — 新增 `persistToken`/`restoreToken` 方法
-- `App.tsx` — initAuth 改为 `restoreToken()` 解密
-- `client.ts` — getToken 从 store 内存读取
-- `auth.ts` — login/register/refresh 后调用 `persistToken`
-- `GitHubCallbackPage.tsx` — OAuth 登录后调用 `persistToken`
-
-**安全收益**:
-- ✅ XSS 无法直接窃取 Token 明文（需逆向密钥派生逻辑）
-- ✅ 符合 OWASP 客户端 Token 存储最佳实践
-- ✅ 对用户透明，不影响登录体验
-
-### 2. 关闭生产 Source Map
+### 关闭生产 Source Map
 
 **变更文件**: [`frontend/vite.config.ts`](../frontend/vite.config.ts)
 
@@ -296,8 +259,7 @@ export { VALIDATION_RULES } from '@codeseek/shared';
 
 ## 📄 文件变更清单
 
-### 新增文件 (15个)
-
+### 新增文件 (14个)
 | 文件路径 | 说明 |
 |----------|------|
 | `package.json` | npm workspaces 根配置 |
@@ -313,37 +275,26 @@ export { VALIDATION_RULES } from '@codeseek/shared';
 | `packages/shared/src/types/index.ts` | 类型总入口 |
 | `packages/shared/src/utils/camelize.ts` | camelizeKeys 工具 |
 | `packages/shared/src/utils/index.ts` | 工具总入口 |
-| `frontend/src/utils/tokenStorage.ts` | Token 加密存储工具 |
 | `database/12_index_performance.sql` | 数据库索引迁移 |
 
-### 修改文件 (15个)
-
-| 文件路径 | 变更类型 | 主要改动 |
+### 修改文件 (12个)
+| 文件文件 | 变更类型 | 主要改动 |
 |----------|----------|----------|
 | `.github/workflows/backend-deploy.yml` | CI/CD | 新增 typecheck + lint 步骤 |
 | `backend/package.json` | 依赖 | 新增 `@codeseek/shared` |
 | `backend/src/constants.ts` | 重构 | VALIDATION_RULES 从 shared 导入 |
 | `frontend/package.json` | 依赖+脚本 | 新增 shared 依赖；build 优化 |
 | `frontend/vite.config.ts` | 安全 | sourcemap: false |
-| `frontend/src/App.tsx` | 安全 | initAuth 改为 restoreToken |
 | `frontend/src/constants.ts` | 重构 | VALIDATION_RULES 从 shared 导入 |
-| `frontend/src/stores/authStore.ts` | 安全 | 新增 persistToken/restoreToken |
-| `frontend/src/services/api/client.ts` | 安全 | getToken 从 store 读取 |
-| `frontend/src/services/api/auth.ts` | 安全 | login/register/refresh 后加密 |
 | `frontend/src/services/api/search.ts` | 重构 | 使用 camelizeKeys |
 | `frontend/src/types/auth.ts` | 重构 | 从 shared 导入 + 类型修复 |
 | `frontend/src/types/search.ts` | 重构 | 从 shared 导入 |
 | `frontend/src/types/source.ts` | 重构 | 从 shared 导入 |
 | `frontend/src/types/common.ts` | 重构 | 从 shared 导入 |
 | `frontend/src/utils/index.ts` | 重构 | camelize 从 shared 导入 |
-| `frontend/src/pages/auth/GitHubCallbackPage.tsx` | 安全 | OAuth 登录后加密 Token |
 
-### 删除文件 (2个)
-
-| 文件路径 | 原因 |
-|----------|------|
-| `frontend/src/utils/camelize.ts` | 迁移至 packages/shared |
-| `shared/validations.ts` | 迁移至 packages/shared |
+### 删除文件 (0个)
+（无文件删除）
 
 ---
 

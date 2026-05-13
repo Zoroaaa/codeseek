@@ -211,7 +211,6 @@ frontend/
 │   ├── 📁 utils/                         # 🛠️ 工具函数
 │   │   ├── 📄 notificationTemplates.ts   # 通知模板
 │   │   ├── 📄 magnet.ts                  # 磁力链接工具
-│   │   ├── 📄 tokenStorage.ts            # Token 加密存储 (v3.1.0)
 │   │   └── 📄 index.ts                   # 工具函数导出
 │   │
 │   ├── 📄 App.tsx                        # 应用入口组件
@@ -564,13 +563,9 @@ CREATE INDEX idx_favorites_code ON user_favorites(code);
 
 ### 🔒 安全加固
 
-- Token 存储从明文升级为 **AES-GCM 加密** (Web Crypto API)
-- 新增 `frontend/src/utils/tokenStorage.ts` — 加解密工具
-- `authStore` 新增 `persistToken()` / `restoreToken()` 方法
-- `OAuth` 回调（GitHub）同步加密 Token
 - 关闭生产环境 source map (`vite.config.ts`)
 
-### 🚦 CI/CD 门禁
+### 🚦 CI/CD 改进
 
 - `backend-deploy.yml` 部署前强制运行 `typecheck` + `lint`
 - 类型错误和代码规范问题被拦截在 CI，不再推送到生产
@@ -590,10 +585,9 @@ CREATE INDEX idx_favorites_code ON user_favorites(code);
 - 删除冗余文件：`frontend/src/utils/camelize.ts`, `shared/validations.ts`
 
 ### 📄 文件变更
-
-- 新增 15 个文件（共享包 + tokenStorage + 数据库索引）
-- 修改 17 个文件（前端 12 + 后端 3 + CI 1 + 构建配置 1）
-- 删除 2 个文件（被迁移至共享包的冗余代码）
+- 新增 14 个文件（共享包 + 数据库索引）
+- 修改 12 个文件（前端 9 + 后端 3 + CI 1 + 构建配置 1）
+- 删除 0 个文件
 
 ---
 
