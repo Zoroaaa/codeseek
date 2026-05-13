@@ -5,6 +5,15 @@ export interface SearchHistoryItem {
   source: string;
   resultsCount: number;
   createdAt: number;
+  title?: string;
+  subtitle?: string;
+  code?: string;
+  actors?: string;
+  duration?: string;
+  tags?: string;
+  releaseDate?: string;
+  publisher?: string;
+  keyword?: string;
 }
 
 export interface FavoriteItem {

@@ -169,7 +169,7 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-col items-center gap-2 shrink-0">
                         <button
                           onClick={() => window.open(isProxyEnabled ? convertToProxyUrl(item.url) : item.url, '_blank')}
                           className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
@@ -186,7 +186,7 @@ export const FavoritesPanel: React.FC<FavoritesPanelProps> = ({
                     </div>
                   </div>
                   <div className="space-y-1 pl-0">
-                    <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{item.title}</p>
+                    <p className="text-sm font-medium text-surface-900 dark:text-surface-100 break-words">{item.title}</p>
                     {item.subtitle && (
                       <p className="text-xs text-surface-500 truncate">{item.subtitle}</p>
                     )}
