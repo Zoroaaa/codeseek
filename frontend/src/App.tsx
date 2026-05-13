@@ -121,10 +121,19 @@ const App: React.FC = () => {
           if (response.success && response.data) {
             setUser(response.data);
           } else {
+            // 服务器明确拒绝（401/403），清除登录态
             logout();
           }
-        } catch {
-          logout();
+        } catch (err: unknown) {
+          // 网络错误/超时：保留现有登录态，只结束 loading
+          // 只有收到明确 401 响应才登出
+          const status = (err as { status?: number })?.status;
+          if (status === 401 || status === 403) {
+            logout();
+          } else {
+            // 网络问题，保持 persist 恢复的状态，让用户继续使用
+            setLoading(false);
+          }
         }
       } else {
         setLoading(false);
