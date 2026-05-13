@@ -20,7 +20,9 @@ export const feedbackSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'urgent']),
   category: z.string().nullable(),
   email: z.string().email().nullable().optional(),
+  contact_email: z.string().email().nullable().optional(),
   screenshots: z.string().nullable(),
+  username: z.string().nullable().optional(),
   created_at: z.number(),
   updated_at: z.number(),
 });
@@ -52,6 +54,9 @@ export const adminEventSchema = z.object({
   source: z.string().nullable(),
   ip_address: z.string().nullable(),
   user_id: z.string().nullable(),
+  user_agent: z.string().nullable(),
+  session_id: z.string().nullable(),
+  referer: z.string().nullable(),
   created_at: z.number(),
 });
 

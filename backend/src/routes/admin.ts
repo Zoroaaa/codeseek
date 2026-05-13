@@ -1227,18 +1227,21 @@ adminRoutes.get('/analytics/events', async (c) => {
     `).bind(...params, pageSize, (page - 1) * pageSize).all();
 
     return c.json(success({
-      events: (events.results || []).map((e: any) => ({
-        id: e.id,
-        userId: e.user_id,
-        username: e.username,
-        sessionId: e.session_id,
-        eventType: e.event_type,
-        eventData: e.event_data ? JSON.parse(e.event_data) : {},
-        ipAddress: e.ip_address,
-        userAgent: e.user_agent,
-        referer: e.referer,
-        createdAt: e.created_at,
-      })),
+      events: (events.results || []).map((e) => {
+        const event = adminEventSchema.parse(e);
+        return {
+          id: event.id,
+          userId: event.user_id,
+          username: (e as Record<string, unknown>).username,
+          sessionId: event.session_id,
+          eventType: event.event_type,
+          eventData: event.data ? JSON.parse(event.data) : {},
+          ipAddress: event.ip_address,
+          userAgent: event.user_agent,
+          referer: event.referer,
+          createdAt: event.created_at,
+        };
+      }),
       total: countResult?.total || 0,
       page,
       pageSize,
@@ -1391,12 +1394,15 @@ adminRoutes.get('/dashboard/overview', async (c) => {
         reviews: communityStats?.reviews || 0,
         pendingReports: communityStats?.pending_reports || 0,
       },
-      recentActions: (recentActions.results || []).map((a: any) => ({
-        action: a.action,
-        data: a.data ? JSON.parse(a.data) : {},
-        createdAt: a.created_at,
-        username: a.username || '匿名',
-      })),
+      recentActions: (recentActions.results || []).map((a) => {
+        const action = adminActionSchema.parse(a);
+        return {
+          action: action.action,
+          data: action.data ? JSON.parse(action.data) : {},
+          createdAt: action.created_at,
+          username: (a as Record<string, unknown>).username || '匿名',
+        };
+      }),
     }));
   } catch (err) {
     console.error('Get dashboard overview error:', err);

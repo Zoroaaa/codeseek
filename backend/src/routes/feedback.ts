@@ -3,11 +3,11 @@
  * 功能：用户提交反馈、管理员查看/处理反馈、处理完成后自动发送邮件通知
  * 作者：CodeSeek Team
  */
-import { Hono } from 'hono';
-import { Context, Next } from 'hono';
+import { Hono, Context, Next } from 'hono';
 import { Env, JwtPayload } from '@/types';
 import { success, error, verifyToken, generateId, logUserAction } from '@/utils';
 import { feedbackSchema } from '@/utils/validators';
+import { z } from 'zod';
 
 export const feedbackRoutes = new Hono<{ Bindings: Env }>();
 
@@ -46,7 +46,7 @@ const STATUS_LABELS: Record<string, string> = {
 // -----------------------------------------------------------------------
 feedbackRoutes.post('/', async (c) => {
   const user = c.get('user') as JwtPayload | undefined;
-  let body: { type?: string; title?: string; content?: string; priority?: string; email?: string; contactEmail?: string; screenshots?: string };
+  let body: { type?: string; title?: string; content?: string; priority?: string; email?: string; contactEmail?: string; screenshots?: string; pageUrl?: string };
   try { body = await c.req.json(); } catch {
     return c.json(error('VALIDATION_ERROR', '请求体格式错误'), 400);
   }
@@ -297,10 +297,10 @@ feedbackRoutes.put('/admin/:id', async (c) => {
     `).bind(feedbackId).first();
 
     if (!item) return c.json(error('NOT_FOUND', '反馈不存在'), 404);
-    const feedback = feedbackSchema.parse(item);
+    feedbackSchema.parse(item);
 
     const now = Date.now();
-    const newStatus = status || item.status;
+    const newStatus = (status || (item as Record<string, unknown>).status) as string;
     const isResolved = newStatus === 'resolved' || newStatus === 'closed';
 
     await c.env.DB.prepare(`
@@ -327,9 +327,10 @@ feedbackRoutes.put('/admin/:id', async (c) => {
 
     // 发送邮件通知给用户（当管理员填写了回复内容且 sendEmail=true 时）
     let emailResult: { sent: boolean; error?: string } = { sent: false };
-    if (sendEmail && adminReply && item.contact_email) {
+    if (sendEmail && adminReply && (item as Record<string, unknown>).contact_email) {
       try {
-        emailResult = await sendFeedbackReplyEmail(c.env, item, adminReply, newStatus);
+        const parsedFeedback = feedbackSchema.parse(item);
+        emailResult = await sendFeedbackReplyEmail(c.env, parsedFeedback, adminReply as string, newStatus);
         if (emailResult.sent) {
           await c.env.DB.prepare(
             'UPDATE user_feedback SET email_sent = 1 WHERE id = ?'

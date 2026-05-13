@@ -10,6 +10,28 @@ export const javRoutes = new Hono<{ Bindings: Env }>();
 
 // 图片代理（无需认证）
 // GET /api/jav/proxy-image?url=<encoded_url>
+const ALLOWED_IMAGE_HOSTS = [
+  'www.javbus.com',
+  'javbus.com',
+  'pics.javbus.com',
+  'img.javbus.com',
+];
+
+function isPrivateIP(hostname: string): boolean {
+  const privatePatterns = [
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^169\.254\./,
+    /^::1$/,
+    /^fc00:/i,
+    /^fe80:/i,
+    /^localhost$/i,
+  ];
+  return privatePatterns.some(pattern => pattern.test(hostname));
+}
+
 javRoutes.get('/proxy-image', async (c) => {
   const rawUrl = c.req.query('url');
   if (!rawUrl) {
@@ -23,8 +45,24 @@ javRoutes.get('/proxy-image', async (c) => {
     return c.json({ success: false, error: { code: 'INVALID_URL', message: '无效的URL编码' } }, 400);
   }
 
-  if (!targetUrl.startsWith('http')) {
-    return c.json({ success: false, error: { code: 'INVALID_URL', message: '只支持http/https协议' } }, 400);
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return c.json({ success: false, error: { code: 'INVALID_URL', message: '无效的URL格式' } }, 400);
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return c.json({ success: false, error: { code: 'INVALID_PROTOCOL', message: '只支持http/https协议' } }, 400);
+  }
+
+  if (isPrivateIP(parsed.hostname)) {
+    console.warn('SSRF attempt blocked:', parsed.hostname);
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: '不允许访问内网地址' } }, 403);
+  }
+
+  if (!ALLOWED_IMAGE_HOSTS.includes(parsed.hostname)) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN_HOST', message: `不允许的域名: ${parsed.hostname}` } }, 403);
   }
 
   try {

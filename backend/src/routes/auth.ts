@@ -220,43 +220,44 @@ authRoutes.post('/register', async (c) => {
     const now = Date.now();
     const passwordHash = await hashPassword(password);
 
-    await c.env.DB.prepare(`
-      INSERT INTO users (id, username, email, password_hash, created_at, updated_at, permissions, settings, is_active, login_count, email_verified)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      userId,
-      username,
-      email,
-      passwordHash,
-      now,
-      now,
-      JSON.stringify([...CONFIG.Roles.DEFAULT_PERMISSIONS]),
-      JSON.stringify({}),
-      1,
-      0,
-      emailVerified
-    ).run();
-
     const expiryDays = parseInt(c.env.JWT_EXPIRY_DAYS || '30', 10);
     const token = await generateToken(userId, username, c.env.JWT_SECRET, expiryDays);
 
     const tokenHash = await hashPassword(token);
     const sessionId = generateId();
     const expiresAt = now + expiryDays * 24 * 60 * 60 * 1000;
-    
-    await c.env.DB.prepare(`
-      INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, last_activity, ip_address, user_agent)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      sessionId,
-      userId,
-      tokenHash,
-      expiresAt,
-      now,
-      now,
-      getClientIP(c),
-      c.req.header('User-Agent') || ''
-    ).run();
+
+    await c.env.DB.batch([
+      c.env.DB.prepare(`
+        INSERT INTO users (id, username, email, password_hash, created_at, updated_at, permissions, settings, is_active, login_count, email_verified)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        userId,
+        username,
+        email,
+        passwordHash,
+        now,
+        now,
+        JSON.stringify([...CONFIG.Roles.DEFAULT_PERMISSIONS]),
+        JSON.stringify({}),
+        1,
+        0,
+        emailVerified
+      ),
+      c.env.DB.prepare(`
+        INSERT INTO user_sessions (id, user_id, token_hash, expires_at, created_at, last_activity, ip_address, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        sessionId,
+        userId,
+        tokenHash,
+        expiresAt,
+        now,
+        now,
+        getClientIP(c),
+        c.req.header('User-Agent') || ''
+      ),
+    ]);
 
     await logUserAction(c.env, userId, 'register', { username, email }, c);
 
@@ -526,10 +527,16 @@ authRoutes.post('/reset-password', async (c) => {
 
     const passwordHash = await hashPassword(newPassword);
     const now = Date.now();
+    const currentTokenHash = await hashPassword(c.get('authToken'));
 
-    await c.env.DB.prepare(`
-      UPDATE users SET password_hash = ?, last_password_change = ?, updated_at = ? WHERE id = ?
-    `).bind(passwordHash, now, now, user.id).run();
+    await c.env.DB.batch([
+      c.env.DB.prepare(`
+        UPDATE users SET password_hash = ?, last_password_change = ?, updated_at = ? WHERE id = ?
+      `).bind(passwordHash, now, now, user.id),
+      c.env.DB.prepare(`
+        DELETE FROM user_sessions WHERE user_id = ? AND token_hash != ?
+      `).bind(user.id, currentTokenHash),
+    ]);
 
     await c.env.DB.prepare(
       'DELETE FROM user_sessions WHERE user_id = ?'
@@ -635,11 +642,13 @@ authRoutes.delete('/account', authMiddleware, async (c) => {
       }
     }
 
-    await c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(user.id).run();
-    await c.env.DB.prepare('DELETE FROM user_favorites WHERE user_id = ?').bind(user.id).run();
-    await c.env.DB.prepare('DELETE FROM user_search_history WHERE user_id = ?').bind(user.id).run();
-    await c.env.DB.prepare('DELETE FROM user_search_source_configs WHERE user_id = ?').bind(user.id).run();
-    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(user.id),
+      c.env.DB.prepare('DELETE FROM user_favorites WHERE user_id = ?').bind(user.id),
+      c.env.DB.prepare('DELETE FROM user_search_history WHERE user_id = ?').bind(user.id),
+      c.env.DB.prepare('DELETE FROM user_search_source_configs WHERE user_id = ?').bind(user.id),
+      c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id),
+    ]);
 
     return c.json(success(null, '账户已删除'));
   } catch (err) {

@@ -15,13 +15,25 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', cors({
   origin: (origin) => {
+    if (!origin) return CONFIG.CORS.ALLOWED_ORIGINS[0];
+
     if (CONFIG.CORS.ALLOWED_ORIGINS.includes(origin)) {
       return origin;
     }
-    if (origin.endsWith('.pages.dev') || origin.includes('cloudflare')) {
+
+    const allowedPatterns = [
+      /^https:\/\/codeseek\.pp\.ua$/,
+      /^https:\/\/www\.codeseek\.pp\.ua$/,
+      /^https:\/\/.*\.codeseek\.pages\.dev$/,
+      /^http:\/\/localhost:\d+$/,
+      /^http:\/\/127\.0\.0\.1:\d+$/,
+    ];
+
+    if (allowedPatterns.some(pattern => pattern.test(origin))) {
       return origin;
     }
-    return CONFIG.CORS.ALLOWED_ORIGINS[0];
+
+    return null;
   },
   allowMethods: CONFIG.CORS.ALLOW_METHODS,
   allowHeaders: CONFIG.CORS.ALLOW_HEADERS,
