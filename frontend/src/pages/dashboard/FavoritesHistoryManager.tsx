@@ -761,7 +761,7 @@ export const HistoryManager: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           {item.code && (
-                            <span className="text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded">
+                            <span className="text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded flex-shrink-0">
                               {item.code}
                             </span>
                           )}
@@ -773,7 +773,7 @@ export const HistoryManager: React.FC = () => {
                           <span>{formatDate(item.createdAt)}</span>
                           {item.resultsCount !== undefined && (
                             <span className="px-2 py-0.5 bg-surface-100 dark:bg-surface-800 rounded">
-                              {item.resultsCount} 条结果
+                              {item.resultsCount}条
                             </span>
                           )}
                           {item.source && (
@@ -807,35 +807,35 @@ export const HistoryManager: React.FC = () => {
                         {item.subtitle && (
                           <p className="text-xs text-surface-500 truncate">{item.subtitle}</p>
                         )}
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                           {item.actors && (
                             <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                              <User className="w-3 h-3" />
+                              <User className="w-2.5 h-2.5" />
                               {item.actors}
                             </span>
                           )}
                           {item.duration && (
                             <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                              <Clock className="w-3 h-3" />
+                              <Clock className="w-2.5 h-2.5" />
                               {item.duration}分钟
                             </span>
                           )}
                           {item.releaseDate && (
                             <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                              <Calendar className="w-3 h-3" />
+                              <Calendar className="w-2.5 h-2.5" />
                               {item.releaseDate}
                             </span>
                           )}
                           {item.publisher && (
                             <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400">
-                              <Building2 className="w-3 h-3" />
+                              <Building2 className="w-2.5 h-2.5" />
                               {item.publisher}
                             </span>
                           )}
                         </div>
                         {item.tags && (
-                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                            {item.tags.split(',').slice(0, 6).map((tag, i) => (
+                          <div className="flex items-center gap-1 flex-wrap mt-1">
+                            {item.tags.split(',').slice(0, 4).map((tag, i) => (
                               <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
                                 {tag.trim()}
                               </span>
