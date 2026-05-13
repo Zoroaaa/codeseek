@@ -108,7 +108,6 @@ class ApiClient {
 
         if (response.status === 401) {
           useAuthStore.getState().logout();
-          window.location.href = '/login';
           const authError = new Error('认证失败，请重新登录');
           (authError as unknown as Record<string, unknown>).code = 'AUTH_FAILED';
           throw authError;
