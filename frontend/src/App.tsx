@@ -115,7 +115,9 @@ const App: React.FC = () => {
     const initAuth = async () => {
       // 必须先 setLoading(true)，阻止 GuardRoute 在 token 就绪前放行组件发请求
       setLoading(true);
+	  console.log('[initAuth] start, token in store:', useAuthStore.getState().token);
       const token = await useAuthStore.getState().restoreToken();
+	  console.log('[initAuth] after restoreToken:', token ? 'got token' : 'no token');
 
       if (token) {
         try {
