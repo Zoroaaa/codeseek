@@ -77,45 +77,48 @@ javRoutes.get('/proxy-image', async (c) => {
     'Cache-Control': 'no-cache',
   };
 
-  try {
-    const resp = await fetch(targetUrl, {
-      headers: imageFetchHeaders,
-      signal: AbortSignal.timeout(10000),
-      redirect: 'follow',
-    });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const resp = await fetch(targetUrl, {
+        headers: imageFetchHeaders,
+        signal: AbortSignal.timeout(10000),
+        redirect: 'follow',
+      });
 
-    if (resp.status === 403) {
-      // Cloudflare Worker IP 被封，302 让浏览器直连原图
-      return new Response(null, {
-        status: 302,
+      if (resp.status === 403 && attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+
+      if (!resp.ok) {
+        console.error('Image fetch failed:', targetUrl, resp.status);
+        return c.json({ success: false, error: { code: 'FETCH_FAILED', message: `图片获取失败: ${resp.status}` } }, 502);
+      }
+
+      const contentType = resp.headers.get('content-type') || 'image/jpeg';
+      const data = await resp.arrayBuffer();
+
+      return new Response(data, {
         headers: {
-          'Location': targetUrl,
-          'Cache-Control': 'no-store',
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=86400',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+          'Cross-Origin-Resource-Policy': 'cross-origin',
         },
       });
+    } catch (err) {
+      if (attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+      console.error('Proxy image error:', targetUrl, err);
+      return c.json({ success: false, error: { code: 'TIMEOUT', message: '图片请求超时或失败' } }, 504);
     }
-
-    if (!resp.ok) {
-      console.error('Image fetch failed:', targetUrl, resp.status);
-      return c.json({ success: false, error: { code: 'FETCH_FAILED', message: `图片获取失败: ${resp.status}` } }, 502);
-    }
-
-    const contentType = resp.headers.get('content-type') || 'image/jpeg';
-    const data = await resp.arrayBuffer();
-
-    return new Response(data, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': '*',
-      },
-    });
-  } catch (err) {
-    console.error('Proxy image error:', targetUrl, err);
-    return c.json({ success: false, error: { code: 'TIMEOUT', message: '图片请求超时或失败' } }, 504);
   }
+
+  return c.json({ success: false, error: { code: 'FETCH_FAILED', message: '图片获取失败' } }, 502);
 });
 
 javRoutes.use('*', authMiddleware);

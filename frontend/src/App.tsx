@@ -113,6 +113,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initAuth = async () => {
+      // 必须先 setLoading(true)，阻止 GuardRoute 在 token 就绪前放行组件发请求
+      setLoading(true);
       const token = await useAuthStore.getState().restoreToken();
 
       if (token) {
@@ -121,22 +123,19 @@ const App: React.FC = () => {
           if (response.success && response.data) {
             setUser(response.data);
           } else {
-            // 服务器明确拒绝（401/403），清除登录态
             logout();
           }
         } catch (err: unknown) {
-          // 网络错误/超时：保留现有登录态，只结束 loading
-          // 只有收到明确 401 响应才登出
+          // 只有 401 才登出，网络错误保持现有登录态
           const status = (err as { status?: number })?.status;
-          if (status === 401 || status === 403) {
+          if (status === 401) {
             logout();
           } else {
-            // 网络问题，保持 persist 恢复的状态，让用户继续使用
             setLoading(false);
           }
         }
       } else {
-        setLoading(false);
+        logout(); // 无 token，确保清理状态
       }
     };
 
