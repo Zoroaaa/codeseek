@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { camelizeKeys } from '@/utils';
 import type {
   SearchHistoryItem,
   FavoriteItem,
@@ -128,25 +129,7 @@ export const userApi = {
     if (response.success && response.data) {
       return {
         success: true,
-        data: {
-          history: response.data.history.map(h => ({
-            id: h.id as string,
-            userId: h.user_id as string,
-            query: h.query as string,
-            source: h.source as string,
-            resultsCount: h.results_count as number,
-            createdAt: h.created_at as number,
-            title: h.title as string | undefined,
-            subtitle: h.subtitle as string | undefined,
-            code: h.code as string | undefined,
-            actors: h.actors as string | undefined,
-            duration: h.duration as string | undefined,
-            tags: h.tags as string | undefined,
-            releaseDate: h.release_date as string | undefined,
-            publisher: h.publisher as string | undefined,
-            keyword: h.keyword as string | undefined,
-          }))
-        }
+        data: { history: camelizeKeys<SearchHistoryItem[]>(response.data.history) }
       };
     }
     return { success: false, data: { history: [] } };

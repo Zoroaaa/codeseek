@@ -69,12 +69,12 @@ jobs:
           npx wrangler --version
           echo "Wrangler 版本验证完成"
       
-      - name: Validate Configuration
-        run: |
-          echo "验证配置文件..."
-          npx wrangler --version
-          npx wrangler whoami
-      
+      - name: Type Check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:

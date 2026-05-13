@@ -35,18 +35,7 @@ class ApiClient {
   }
 
   getToken(): string | null {
-    if (typeof window !== 'undefined') {
-      const authStorage = localStorage.getItem('auth-storage');
-      if (authStorage) {
-        try {
-          const parsed = JSON.parse(authStorage);
-          return parsed.state?.token || null;
-        } catch {
-          return null;
-        }
-      }
-    }
-    return null;
+    return useAuthStore.getState().token || null;
   }
 
   private getHeaders(customHeaders?: Record<string, string>): HeadersInit {
