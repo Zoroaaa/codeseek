@@ -326,33 +326,6 @@ export const MainSearchPage: React.FC = () => {
     }
   };
 
-  const handleFavoriteJavItem = async (item: { code: string; title: string; cover?: string; date?: string; actress?: string }) => {
-    if (!isAuthenticated) { toast.warning('请先登录'); navigate('/login'); return; }
-    const detailUrl = `https://javdb.com/search?q=${item.code}&f=all`;
-    const existingFavoriteId = getFavoriteId(detailUrl);
-    if (existingFavoriteId) {
-      try {
-        await userApi.removeFavorite(existingFavoriteId);
-        setFavorites(prev => prev.filter(f => f.id !== existingFavoriteId));
-        toast.success('已取消收藏');
-      } catch { toast.error('取消收藏失败', '请稍后重试'); }
-    } else {
-      try {
-        const response = await userApi.addFavorite({
-          title: item.title,
-          url: detailUrl,
-          code: item.code,
-          cover: item.cover,
-          actors: item.actress,
-          releaseDate: item.date,
-          keyword: item.code,
-        });
-        if (response.success && response.data) setFavorites(prev => [response.data, ...prev]);
-        toast.success('已添加到收藏');
-      } catch { toast.error('收藏失败', '请稍后重试'); }
-    }
-  };
-
   const handleFavoriteJavDetail = async (detail: JavDetail) => {
     if (!isAuthenticated) { toast.warning('请先登录'); navigate('/login'); return; }
     const detailUrl = detail.detailUrl || `https://javdb.com/search?q=${detail.code}&f=all`;
@@ -508,6 +481,8 @@ export const MainSearchPage: React.FC = () => {
 
   const handleCodeClick = (code: string) => {
     setKeyword(code);
+    // 自动触发搜索
+    setTimeout(() => handleSearch(), 0);
   };
 
   return (
@@ -700,7 +675,7 @@ export const MainSearchPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
           <div className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
-            <JavRankingsPanel onCodeClick={handleCodeClick} onFavorite={handleFavoriteJavItem} favoritedCodes={favoritedCodes} />
+            <JavRankingsPanel onCodeClick={handleCodeClick} />
 
             {isAuthenticated && (
               <SearchHistoryPanel
