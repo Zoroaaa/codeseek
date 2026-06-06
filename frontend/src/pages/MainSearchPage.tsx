@@ -238,8 +238,9 @@ export const MainSearchPage: React.FC = () => {
     }
   };
 
-  const handleSearch = useCallback(async () => {
-    if (!keyword.trim()) {
+  const handleSearch = useCallback(async (overrideKeyword?: string) => {
+    const query = overrideKeyword || keyword;
+    if (!query.trim()) {
       toast.warning('请输入搜索关键词');
       return;
     }
@@ -252,13 +253,13 @@ export const MainSearchPage: React.FC = () => {
       userId: user?.id,
       sessionId,
       eventType: 'search',
-      eventData: { keyword: keyword.trim() },
+      eventData: { keyword: query.trim() },
     }).catch(() => {});
     setSearching(true);
     setHasSearched(true);
     try {
       const response = await searchApi.search({
-        keyword: keyword.trim(),
+        keyword: query.trim(),
         categoryId: selectedCategory || undefined,
       }) as unknown as {
         success: boolean;
@@ -283,7 +284,7 @@ export const MainSearchPage: React.FC = () => {
           loadHistory();
         }
         // 若输入符合番号格式，自动触发磁力提取
-        const trimmed = keyword.trim().toUpperCase();
+        const trimmed = query.trim().toUpperCase();
         if (/^[A-Z]{2,8}-?\d{2,6}$/.test(trimmed)) {
           fetchJavDetail(trimmed);
         } else {
@@ -481,8 +482,7 @@ export const MainSearchPage: React.FC = () => {
 
   const handleCodeClick = (code: string) => {
     setKeyword(code);
-    // 自动触发搜索
-    setTimeout(() => handleSearch(), 0);
+    handleSearch(code);
   };
 
   return (
@@ -611,7 +611,7 @@ export const MainSearchPage: React.FC = () => {
               />
             </div>
             <button
-              onClick={handleSearch}
+              onClick={() => handleSearch()}
               disabled={isSearching}
               className="search-btn flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover-lift"
             >
