@@ -78,7 +78,6 @@ export const SourceManager: React.FC = () => {
     urlTemplate: '',
     homepageUrl: '',
     categoryId: '',
-    siteType: 'search',
     searchable: true,
     searchPriority: 0,
   });
@@ -274,7 +273,6 @@ export const SourceManager: React.FC = () => {
           urlTemplate: '',
           homepageUrl: '',
           categoryId: '',
-          siteType: 'search',
           searchable: true,
           searchPriority: 0,
         });
@@ -297,7 +295,6 @@ export const SourceManager: React.FC = () => {
         urlTemplate: formData.urlTemplate,
         homepageUrl: formData.homepageUrl,
         categoryId: formData.categoryId,
-        siteType: formData.siteType,
         searchable: formData.searchable,
         searchPriority: formData.searchPriority,
       };
@@ -863,7 +860,6 @@ export const SourceManager: React.FC = () => {
                                                     urlTemplate: source.urlTemplate,
                                                     homepageUrl: source.homepageUrl || '',
                                                     categoryId: source.categoryId,
-                                                    siteType: source.siteType,
                                                     searchable: source.searchable,
                                                     searchPriority: source.searchPriority,
                                                   });
@@ -935,7 +931,6 @@ export const SourceManager: React.FC = () => {
             urlTemplate: '',
             homepageUrl: '',
             categoryId: '',
-            siteType: 'search',
             searchable: true,
             searchPriority: 0,
           });
