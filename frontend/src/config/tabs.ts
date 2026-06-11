@@ -7,7 +7,7 @@ export const SEARCH_TABS: Record<SearchTabType, TabConfig> = {
     label: 'JAV番号搜索',
     icon: '🎬',
     gradient: 'from-blue-500 to-violet-600',
-    majorCategoryId: 'search_sources',
+    majorCategoryId: 'jav_sources',
     placeholder: '输入番号、关键词搜索资源...',
     description: '搜索日本成人视频番号和相关资源',
   },

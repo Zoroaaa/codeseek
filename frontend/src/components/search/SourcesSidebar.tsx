@@ -96,15 +96,9 @@ const SourceTree: React.FC<SourceTreeProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              {majorCategory.requiresKeyword ? (
-                <span className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg font-medium">
-                  {enabledSources}/{totalSources} 启用
-                </span>
-              ) : (
-                <span className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-lg font-medium">
-                  浏览型
-                </span>
-              )}
+              <span className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg font-medium">
+                {enabledSources}/{totalSources} 启用
+              </span>
             </div>
           </button>
 
@@ -136,13 +130,9 @@ const SourceTree: React.FC<SourceTreeProps> = ({
                         <span className="text-xs text-slate-400">{category.sources.length} 个源</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        {majorCategory.requiresKeyword ? (
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {categoryEnabledCount}/{category.sources.length} 启用
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-400 dark:text-slate-500">不参与搜索</span>
-                        )}
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {categoryEnabledCount}/{category.sources.length} 启用
+                        </span>
                       </div>
                     </button>
 
@@ -171,16 +161,14 @@ const SourceTree: React.FC<SourceTreeProps> = ({
                                         <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${getSiteTypeBadge(source.siteType)}`}>
                                           {getSiteTypeLabel(source.siteType)}
                                         </span>
-                                        {majorCategory.requiresKeyword && (
-                                          <span className={`flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded font-medium ${
-                                            isEnabled
-                                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                              : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                                          }`}>
-                                            {isEnabled ? <CheckCircle className="w-2 h-2" /> : <XCircle className="w-2 h-2" />}
-                                            {isEnabled ? '启用' : '禁用'}
-                                          </span>
-                                        )}
+                                        <span className={`flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded font-medium ${
+                                          isEnabled
+                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                            : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                                        }`}>
+                                          {isEnabled ? <CheckCircle className="w-2 h-2" /> : <XCircle className="w-2 h-2" />}
+                                          {isEnabled ? '启用' : '禁用'}
+                                        </span>
                                         {checkResult && (() => {
                                           const colorClass = checkResult.available
                                             ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'

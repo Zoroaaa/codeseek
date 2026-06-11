@@ -5,7 +5,7 @@ import type { MajorCategory, Category, SearchSource, UserSourceConfig, SourceChe
 // Tab 类型与 MajorCategory 的映射关系
 const getMajorCategoryIdByTab = (tab: string): string | null => {
   const mapping: Record<string, string | null> = {
-    jav: 'search_sources',
+    jav: 'jav_sources',
     anime: 'anime_sources',
     movie: 'movie_sources',
     sources: null,

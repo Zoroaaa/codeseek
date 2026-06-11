@@ -35,7 +35,6 @@ export interface CreateSourceRequest {
   homepageUrl?: string;
   siteType?: import('@codeseek/shared').SiteType;
   searchable?: boolean;
-  requiresKeyword?: boolean;
   searchPriority?: number;
 }
 
@@ -47,9 +46,7 @@ export interface UpdateSourceRequest {
   icon?: string;
   urlTemplate?: string;
   homepageUrl?: string;
-  siteType?: import('@codeseek/shared').SiteType;
   searchable?: boolean;
-  requiresKeyword?: boolean;
   searchPriority?: number;
 }
 
@@ -79,7 +76,6 @@ export interface CreateMajorCategoryRequest {
   description?: string;
   icon?: string;
   color?: string;
-  requiresKeyword?: boolean;
 }
 
 export interface UpdateMajorCategoryRequest {
@@ -87,7 +83,6 @@ export interface UpdateMajorCategoryRequest {
   description?: string;
   icon?: string;
   color?: string;
-  requiresKeyword?: boolean;
   displayOrder?: number;
   isActive?: boolean;
 }

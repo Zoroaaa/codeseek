@@ -501,7 +501,9 @@ export const MainSearchPage: React.FC = () => {
   }, [favorites]);
   const searchableCategories = categories.filter(cat => {
     const mc = majorCategories.find(mc => mc.id === cat.majorCategoryId);
-    return mc?.requiresKeyword === true;
+    // 双重门控：属于当前Tab对应的大类 AND 分类本身标记为可搜索
+    const isInCurrentMajorCategory = mc?.id === SEARCH_TABS[activeTab].majorCategoryId;
+    return isInCurrentMajorCategory && cat.defaultSearchable === true;
   });
 
   const handleCodeClick = (code: string) => {
@@ -533,6 +535,8 @@ export const MainSearchPage: React.FC = () => {
           <p className="text-xs sm:text-sm text-caption mt-0.5">{SEARCH_TABS[activeTab].description}</p>
         </div>
 
+        {/* 搜索框区域：仅在搜索类 Tab 显示（sources Tab 不需要） */}
+        {activeTab !== 'sources' && (
         <div className="bg-white dark:bg-surface-900/80 rounded-2xl shadow-xl shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 p-3 sm:p-5 mb-4 sm:mb-6 backdrop-blur-sm animate-slide-up relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-accent-500 to-cyan-500"></div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 relative z-10">
@@ -574,10 +578,8 @@ export const MainSearchPage: React.FC = () => {
                 >
                   全部
                 </button>
-                {/* 只显示当前激活 Tab 对应大类的子分类 */}
                 {searchableCategories
                   .filter(cat => {
-                    if (activeTab === 'sources') return true; // 显示所有浏览型分类
                     const mc = majorCategories.find(mc => mc.id === cat.majorCategoryId);
                     return mc?.id === SEARCH_TABS[activeTab].majorCategoryId;
                   })
@@ -595,79 +597,15 @@ export const MainSearchPage: React.FC = () => {
             </div>
           )}
         </div>
+        )}
 
-        {/* 主内容区：两列布局（左侧主内容 + 右侧源管理侧边栏） */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 lg:gap-6">
-
-          {/* 左侧主内容区 */}
-          <div className="flex flex-col gap-4">
-            {/* 仅在 JAV 搜索 Tab 时显示 JAV 相关面板 */}
-            {activeTab === 'jav' && (
-              <JavDetailPanel
-                detail={javDetail}
-                status={javDetailStatus}
-                onClose={resetJavDetail}
-                onFavorite={handleFavoriteJavDetail}
-                isFavorited={javDetail ? favoritedCodes.has(javDetail.code) : false}
-              />
-            )}
-
-            <SearchResultsPanel
-              results={searchResults}
-              viewMode={viewMode}
-              isAuthenticated={isAuthenticated}
-              isProxyEnabled={isProxyEnabled}
-              favorites={favorites}
-              categories={categories}
-              majorCategories={majorCategories}
-              onViewModeChange={setViewMode}
-              onClose={() => { setSearchResults([]); resetJavDetail(); }}
-              onToggleFavorite={handleToggleFavorite}
-            />
-
-            {/* 左下：排行榜 + 历史 + 收藏（仅在 JAV Tab 显示排行榜） */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-              <div className="lg:col-span-2 flex flex-col gap-4">
-                {/* 仅在 JAV 搜索 Tab 时显示排行榜 */}
-                {activeTab === 'jav' && (
-                  <JavRankingsPanel onCodeClick={handleCodeClick} />
-                )}
-
-                {isAuthenticated && (
-                  <SearchHistoryPanel
-                    history={searchHistory}
-                    isLoading={isLoadingHistory}
-                    show={showHistory}
-                    onToggle={() => setShowHistory(!showHistory)}
-                    onItemClick={(query) => setKeyword(query)}
-                    onClear={handleClearHistory}
-                  />
-                )}
-              </div>
-
-              {/* 桌面端收藏面板 */}
-              {isAuthenticated && (
-                <FavoritesPanel
-                  favorites={favorites}
-                  isLoading={isLoadingFavorites}
-                  show={showFavorites}
-                  isProxyEnabled={isProxyEnabled}
-                  onToggle={() => setShowFavorites(!showFavorites)}
-                  onRemove={handleRemoveFavorite}
-                  onExport={handleExportFavorites}
-                  onUpdate={loadFavorites}
-                />
-              )}
-
-            </div>
-          </div>
-
-          {/* 右侧：搜索源侧边栏 */}
+        {/* 根据 Tab 渲染不同内容 */}
+        {activeTab === 'sources' ? (
+          /* 搜索源访问：仅显示搜索源管理面板（全宽） */
           <SourcesSidebar
             show={true}
-            layoutMode="sidebar"
-            collapsible={true}
+            layoutMode="panel"
+            collapsible={false}
             defaultExpanded={true}
             allSources={allSources}
             majorCategoriesWithCategories={getMajorCategoriesWithCategories()}
@@ -684,23 +622,69 @@ export const MainSearchPage: React.FC = () => {
             getSiteTypeBadge={getSiteTypeBadge}
             getSiteTypeLabel={getSiteTypeLabel}
           />
+        ) : (
+        /* 搜索类 Tab（JAV/动漫/影视）：恢复原来三栏布局，不含源面板 */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* 左列：JAV详情 + 排行榜 + 历史 */}
+          <div className="flex flex-col gap-4">
+            {activeTab === 'jav' && (
+              <JavDetailPanel
+                detail={javDetail}
+                status={javDetailStatus}
+                onClose={resetJavDetail}
+                onFavorite={handleFavoriteJavDetail}
+                isFavorited={javDetail ? favoritedCodes.has(javDetail.code) : false}
+              />
+            )}
+
+            {activeTab === 'jav' && (
+              <JavRankingsPanel onCodeClick={handleCodeClick} />
+            )}
+
+            {isAuthenticated && (
+              <SearchHistoryPanel
+                history={searchHistory}
+                isLoading={isLoadingHistory}
+                show={showHistory}
+                onToggle={() => setShowHistory(!showHistory)}
+                onItemClick={(query) => setKeyword(query)}
+                onClear={handleClearHistory}
+              />
+            )}
+          </div>
+
+          {/* 中列：搜索结果 */}
+          <div className="lg:col-span-2 flex flex-col gap-4">
+            <SearchResultsPanel
+              results={searchResults}
+              viewMode={viewMode}
+              isAuthenticated={isAuthenticated}
+              isProxyEnabled={isProxyEnabled}
+              favorites={favorites}
+              categories={categories}
+              majorCategories={majorCategories}
+              onViewModeChange={setViewMode}
+              onClose={() => { setSearchResults([]); resetJavDetail(); }}
+              onToggleFavorite={handleToggleFavorite}
+            />
+
+            {/* 收藏面板 */}
+            {isAuthenticated && (
+              <FavoritesPanel
+                favorites={favorites}
+                isLoading={isLoadingFavorites}
+                show={showFavorites}
+                isProxyEnabled={isProxyEnabled}
+                onToggle={() => setShowFavorites(!showFavorites)}
+                onRemove={handleRemoveFavorite}
+                onExport={handleExportFavorites}
+                onUpdate={loadFavorites}
+              />
+            )}
+          </div>
 
         </div>
-
-        {/* 移动端：我的收藏 */}
-        {isAuthenticated && (
-          <div className="lg:hidden mt-4">
-            <FavoritesPanel
-              favorites={favorites}
-              isLoading={isLoadingFavorites}
-              show={showFavorites}
-              isProxyEnabled={isProxyEnabled}
-              onToggle={() => setShowFavorites(!showFavorites)}
-              onRemove={handleRemoveFavorite}
-              onExport={handleExportFavorites}
-              onUpdate={loadFavorites}
-            />
-          </div>
         )}
       </div>
 
