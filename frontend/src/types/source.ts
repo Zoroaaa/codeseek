@@ -10,6 +10,20 @@ export type {
   SourceStats,
 } from '@codeseek/shared';
 
+// 搜索 Tab 类型
+export type SearchTabType = 'jav' | 'anime' | 'movie' | 'sources';
+
+// Tab 配置接口
+export interface TabConfig {
+  id: SearchTabType;
+  label: string;
+  icon: string;
+  gradient: string;
+  majorCategoryId: string | null;
+  placeholder: string;
+  description: string;
+}
+
 // 前端专属请求类型
 export interface CreateSourceRequest {
   categoryId: string;
