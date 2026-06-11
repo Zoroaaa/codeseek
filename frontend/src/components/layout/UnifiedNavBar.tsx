@@ -21,7 +21,7 @@ import {
 import { clsx } from 'clsx';
 import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
 import type { SearchTabType } from '@/stores/sourceStore';
-import { DropdownMenu, userMenuItems, adminMenuItems, communityMenuItems, Modal } from '@/components/ui';
+import { DropdownMenu, userMenuItems, Modal } from '@/components/ui';
 import { SEARCH_TABS } from '@/config/tabs';
 
 /* ── 类型定义 ── */
@@ -167,51 +167,31 @@ const UserDropdown: React.FC<UserDropdownProps> = memo(
 
 UserDropdown.displayName = 'UserDropdown';
 
-/** 管理员下拉菜单 */
-interface AdminDropdownProps {
-  navigate: NavigateFunction;
-}
-
-const AdminDropdown: React.FC<AdminDropdownProps> = memo(({ navigate }) => (
-  <DropdownMenu
-    trigger={
-      <button
-        className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200"
-        title="管理后台"
-      >
-        <ShieldAlert className="w-4 h-4" />
-      </button>
-    }
-    items={adminMenuItems(navigate)}
-    triggerMode="click"
-    align="right"
-  />
+/** 管理员入口 */
+const AdminLink: React.FC = memo(() => (
+  <Link
+    to="/admin-panel"
+    className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200"
+    title="管理后台"
+  >
+    <ShieldAlert className="w-4 h-4" />
+  </Link>
 ));
 
-AdminDropdown.displayName = 'AdminDropdown';
+AdminLink.displayName = 'AdminLink';
 
-/** 社区下拉菜单 */
-interface CommunityDropdownProps {
-  navigate: NavigateFunction;
-}
-
-const CommunityDropdown: React.FC<CommunityDropdownProps> = memo(({ navigate }) => (
-  <DropdownMenu
-    trigger={
-      <button
-        className="p-2 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all duration-200"
-        title="社区"
-      >
-        <Globe className="w-4 h-4" />
-      </button>
-    }
-    items={communityMenuItems(navigate)}
-    triggerMode="click"
-    align="right"
-  />
+/** 社区入口 */
+const CommunityLink: React.FC = memo(() => (
+  <Link
+    to="/community"
+    className="p-2 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all duration-200"
+    title="社区"
+  >
+    <Globe className="w-4 h-4" />
+  </Link>
 ));
 
-CommunityDropdown.displayName = 'CommunityDropdown';
+CommunityLink.displayName = 'CommunityLink';
 
 /** 工具按钮行 */
 interface ToolButtonsProps {
@@ -346,10 +326,10 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
               <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700" />
 
               {/* 社区入口 */}
-              {communityEnabled && <CommunityDropdown navigate={navigate} />}
+              {communityEnabled && <CommunityLink />}
 
               {/* 管理员入口 */}
-              {isAdmin && <AdminDropdown navigate={navigate} />}
+              {isAdmin && <AdminLink />}
 
               {/* 用户菜单 */}
               <UserDropdown

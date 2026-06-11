@@ -18,9 +18,10 @@ import type {
   SearchSource,
   UserSourceConfig,
   JavDetail,
+  EnrichedSearchData,
 } from '@/types';
 
-import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesSidebar } from '@/components/search';
+import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesSidebar, AnimeSearchResultPanel, MovieSearchResultPanel } from '@/components/search';
 import { JavDetailPanel, JavRankingsPanel } from '@/components/jav';
 import { UnifiedNavBar } from '@/components/layout';
 import { useJavDetail } from '@/hooks';
@@ -128,6 +129,7 @@ export const MainSearchPage: React.FC = () => {
 
 
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
+  const [enrichedData, setEnrichedData] = useState<EnrichedSearchData | null>(null);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -281,30 +283,42 @@ export const MainSearchPage: React.FC = () => {
       eventData: { keyword: query.trim() },
     }).catch(() => {});
     setSearching(true);
+    setEnrichedData(null); // 重置聚合数据
     try {
       const response = await searchApi.search({
         keyword: query.trim(),
         categoryId: selectedCategory || undefined,
+        majorCategoryId: SEARCH_TABS[activeTab].majorCategoryId || undefined,
       }) as unknown as {
         success: boolean;
-        data: { keyword: string; results: Array<{ id: string; name: string; subtitle?: string; icon?: string; url: string; siteType: string; category: string; description?: string }> };
+        data: { keyword: string; results: Array<{ id: string; name: string; subtitle?: string; icon?: string; url: string; siteType: string; category: string; description?: string }> } | EnrichedSearchData;
       };
       if (response.success && response.data) {
-        const mappedResults: SearchResultItem[] = response.data.results.map(r => ({
-          sourceId: r.id,
-          sourceName: r.name,
-          sourceIcon: r.icon,
-          url: r.url,
-          subtitle: r.subtitle,
-          siteType: r.siteType,
-          category: r.category,
-          description: r.description,
-        }));
-        setResults(mappedResults as unknown as SearchResult[]);
-        setSearchResults(mappedResults);
-        if (mappedResults.length === 0) {
-          toast.info('未找到结果', '尝试更换关键词搜索');
+        // ── 检测聚合响应（anime / movie）──
+        let isEnriched = false;
+        if ('resultType' in response.data && (response.data.resultType === 'anime' || response.data.resultType === 'movie')) {
+          setEnrichedData(response.data as EnrichedSearchData);
+          setSearchResults([]); // 清空通用搜索结果
+          isEnriched = true;
         } else {
+          // ── 通用模式：搜索源 URL 列表 ──
+          const mappedResults: SearchResultItem[] = (response.data as { results: any[] }).results.map(r => ({
+            sourceId: r.id,
+            sourceName: r.name,
+            sourceIcon: r.icon,
+            url: r.url,
+            subtitle: r.subtitle,
+            siteType: r.siteType,
+            category: r.category,
+            description: r.description,
+          }));
+          setResults(mappedResults as unknown as SearchResult[]);
+          setSearchResults(mappedResults);
+          if (mappedResults.length === 0) {
+            toast.info('未找到结果', '尝试更换关键词搜索');
+          }
+        }
+        if (!isEnriched) {
           loadHistory();
         }
         // 若输入符合番号格式，自动触发磁力提取
@@ -635,7 +649,18 @@ export const MainSearchPage: React.FC = () => {
             />
           )}
 
-          {/* 搜索结果面板：全宽显示 */}
+          {/* 搜索结果面板：根据数据类型渲染不同 Panel */}
+          {enrichedData && enrichedData.resultType === 'anime' ? (
+            <AnimeSearchResultPanel
+              data={enrichedData}
+              isDark={document.documentElement.classList.contains('dark')}
+            />
+          ) : enrichedData && enrichedData.resultType === 'movie' ? (
+            <MovieSearchResultPanel
+              data={enrichedData}
+              isDark={document.documentElement.classList.contains('dark')}
+            />
+          ) : (
           <SearchResultsPanel
             results={searchResults}
             viewMode={viewMode}
@@ -645,9 +670,10 @@ export const MainSearchPage: React.FC = () => {
             categories={categories}
             majorCategories={majorCategories}
             onViewModeChange={setViewMode}
-            onClose={() => { setSearchResults([]); resetJavDetail(); }}
+            onClose={() => { setSearchResults([]); setEnrichedData(null); resetJavDetail(); }}
             onToggleFavorite={handleToggleFavorite}
           />
+          )}
 
           {/* 主内容区：左侧排行+历史(2列) / 右侧收藏(1列) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
