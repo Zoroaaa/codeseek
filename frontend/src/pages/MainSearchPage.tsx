@@ -623,54 +623,73 @@ export const MainSearchPage: React.FC = () => {
             getSiteTypeLabel={getSiteTypeLabel}
           />
         ) : (
-        /* 搜索类 Tab（JAV/动漫/影视）：恢复原来三栏布局，不含源面板 */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <>
+          {/* JAV详情面板：全宽显示 */}
+          {activeTab === 'jav' && (
+            <JavDetailPanel
+              detail={javDetail}
+              status={javDetailStatus}
+              onClose={resetJavDetail}
+              onFavorite={handleFavoriteJavDetail}
+              isFavorited={javDetail ? favoritedCodes.has(javDetail.code) : false}
+            />
+          )}
 
-          {/* 左列：JAV详情 + 排行榜 + 历史 */}
-          <div className="flex flex-col gap-4">
-            {activeTab === 'jav' && (
-              <JavDetailPanel
-                detail={javDetail}
-                status={javDetailStatus}
-                onClose={resetJavDetail}
-                onFavorite={handleFavoriteJavDetail}
-                isFavorited={javDetail ? favoritedCodes.has(javDetail.code) : false}
-              />
-            )}
+          {/* 搜索结果面板：全宽显示 */}
+          <SearchResultsPanel
+            results={searchResults}
+            viewMode={viewMode}
+            isAuthenticated={isAuthenticated}
+            isProxyEnabled={isProxyEnabled}
+            favorites={favorites}
+            categories={categories}
+            majorCategories={majorCategories}
+            onViewModeChange={setViewMode}
+            onClose={() => { setSearchResults([]); resetJavDetail(); }}
+            onToggleFavorite={handleToggleFavorite}
+          />
 
-            {activeTab === 'jav' && (
-              <JavRankingsPanel onCodeClick={handleCodeClick} />
-            )}
+          {/* 主内容区：左侧排行+历史(2列) / 右侧收藏(1列) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
+            <div className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
+              {activeTab === 'jav' && (
+                <JavRankingsPanel onCodeClick={handleCodeClick} />
+              )}
+
+              {isAuthenticated && (
+                <SearchHistoryPanel
+                  history={searchHistory}
+                  isLoading={isLoadingHistory}
+                  show={showHistory}
+                  onToggle={() => setShowHistory(!showHistory)}
+                  onItemClick={(query) => setKeyword(query)}
+                  onClear={handleClearHistory}
+                />
+              )}
+            </div>
+
+            {/* 右列：收藏 */}
             {isAuthenticated && (
-              <SearchHistoryPanel
-                history={searchHistory}
-                isLoading={isLoadingHistory}
-                show={showHistory}
-                onToggle={() => setShowHistory(!showHistory)}
-                onItemClick={(query) => setKeyword(query)}
-                onClear={handleClearHistory}
-              />
+              <div className="hidden lg:block self-start">
+                <FavoritesPanel
+                  favorites={favorites}
+                  isLoading={isLoadingFavorites}
+                  show={showFavorites}
+                  isProxyEnabled={isProxyEnabled}
+                  onToggle={() => setShowFavorites(!showFavorites)}
+                  onRemove={handleRemoveFavorite}
+                  onExport={handleExportFavorites}
+                  onUpdate={loadFavorites}
+                />
+              </div>
             )}
+
           </div>
 
-          {/* 中列：搜索结果 */}
-          <div className="lg:col-span-2 flex flex-col gap-4">
-            <SearchResultsPanel
-              results={searchResults}
-              viewMode={viewMode}
-              isAuthenticated={isAuthenticated}
-              isProxyEnabled={isProxyEnabled}
-              favorites={favorites}
-              categories={categories}
-              majorCategories={majorCategories}
-              onViewModeChange={setViewMode}
-              onClose={() => { setSearchResults([]); resetJavDetail(); }}
-              onToggleFavorite={handleToggleFavorite}
-            />
-
-            {/* 收藏面板 */}
-            {isAuthenticated && (
+          {/* 移动端：我的收藏 */}
+          {isAuthenticated && (
+            <div className="lg:hidden mt-3 sm:mt-4">
               <FavoritesPanel
                 favorites={favorites}
                 isLoading={isLoadingFavorites}
@@ -681,10 +700,9 @@ export const MainSearchPage: React.FC = () => {
                 onExport={handleExportFavorites}
                 onUpdate={loadFavorites}
               />
-            )}
-          </div>
-
-        </div>
+            </div>
+          )}
+        </>
         )}
       </div>
 

@@ -133,19 +133,19 @@ const UserDropdown: React.FC<UserDropdownProps> = memo(
   ({ isAuthenticated, user, navigate, handleLogout }) => (
     <DropdownMenu
       trigger={
-        <button className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200">
+        <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200">
           {isAuthenticated ? (
             <>
               <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-semibold bg-gradient-to-br from-blue-500 to-violet-600 shadow-sm">
                 {user?.username?.[0]?.toUpperCase() || 'U'}
               </div>
               <span className="hidden sm:inline text-sm font-medium">{user?.username}</span>
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </>
           ) : (
             <>
               <User className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm">登录</span>
+              <span className="hidden sm:inline text-sm font-medium">登录</span>
             </>
           )}
         </button>
@@ -176,10 +176,10 @@ const AdminDropdown: React.FC<AdminDropdownProps> = memo(({ navigate }) => (
   <DropdownMenu
     trigger={
       <button
-        className="p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-all duration-200 active:scale-95"
-        title="管理"
+        className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200"
+        title="管理后台"
       >
-        <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
+        <ShieldAlert className="w-4 h-4" />
       </button>
     }
     items={adminMenuItems(navigate)}
@@ -199,10 +199,10 @@ const CommunityDropdown: React.FC<CommunityDropdownProps> = memo(({ navigate }) 
   <DropdownMenu
     trigger={
       <button
-        className="p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-all duration-200 active:scale-95"
+        className="p-2 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all duration-200"
         title="社区"
       >
-        <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
+        <Globe className="w-4 h-4" />
       </button>
     }
     items={communityMenuItems(navigate)}
@@ -233,16 +233,7 @@ const ToolButtons: React.FC<ToolButtonsProps> = memo(({ setIsHelpModalOpen }) =>
   };
 
   return (
-    <div className="flex items-center gap-1">
-      {/* 帮助按钮 */}
-      <button
-        onClick={() => setIsHelpModalOpen(true)}
-        className="help-btn"
-        title="使用说明"
-      >
-        <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-      </button>
-
+    <div className="flex items-center gap-0.5">
       {/* 代理切换 */}
       <button
         onClick={toggleProxy}
@@ -251,14 +242,31 @@ const ToolButtons: React.FC<ToolButtonsProps> = memo(({ setIsHelpModalOpen }) =>
         title={isProxyEnabled ? '代理已启用 - 点击关闭' : '代理已关闭 - 点击启用'}
       >
         {isProxyLoading ? (
-          <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+          <Loader2 className="w-4 h-4 animate-spin" />
         ) : isProxyEnabled ? (
-          <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
+          <ShieldCheck className="w-4 h-4" />
         ) : proxyStatus === 'error' ? (
-          <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
+          <ShieldAlert className="w-4 h-4" />
         ) : (
-          <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
+          <Shield className="w-4 h-4" />
         )}
+      </button>
+
+      {/* 主题切换 */}
+      <button onClick={toggleTheme} className="theme-toggle-btn" aria-label="切换主题" title="切换深色/浅色模式">
+        {resolvedTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+      </button>
+
+      {/* 分隔线 */}
+      <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
+
+      {/* 帮助按钮 */}
+      <button
+        onClick={() => setIsHelpModalOpen(true)}
+        className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
+        title="使用说明"
+      >
+        <HelpCircle className="w-4 h-4" />
       </button>
 
       {/* GitHub 链接 */}
@@ -266,20 +274,11 @@ const ToolButtons: React.FC<ToolButtonsProps> = memo(({ setIsHelpModalOpen }) =>
         href="https://github.com/Zoroaaa/codeseek"
         target="_blank"
         rel="noopener noreferrer"
-        className="github-link-btn"
+        className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
         title="GitHub"
       >
-        <Github className="w-4 h-4 sm:w-5 sm:h-5" />
+        <Github className="w-4 h-4" />
       </a>
-
-      {/* 主题切换 */}
-      <button onClick={toggleTheme} className="theme-toggle-btn" aria-label="切换主题">
-        {resolvedTheme === 'dark' ? (
-          <Sun className="w-4 h-4 sm:w-5 sm:h-5" />
-        ) : (
-          <Moon className="w-4 h-4 sm:w-5 sm:h-5" />
-        )}
-      </button>
     </div>
   );
 });
@@ -338,43 +337,27 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
               </nav>
             </div>
 
-            {/* 右侧区域：用户菜单 + 管理员菜单 + 社区菜单 + 工具按钮 */}
-            <div className="flex items-center gap-1 sm:gap-2">
+            {/* 右侧区域：用户 + 功能按钮 */}
+            <div className="flex items-center gap-2">
+              {/* 功能工具组 */}
+              <ToolButtons setIsHelpModalOpen={setIsHelpModalOpen} />
+
+              {/* 分隔线 */}
+              <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700" />
+
+              {/* 社区入口 */}
+              {communityEnabled && <CommunityDropdown navigate={navigate} />}
+
+              {/* 管理员入口 */}
+              {isAdmin && <AdminDropdown navigate={navigate} />}
+
+              {/* 用户菜单 */}
               <UserDropdown
                 isAuthenticated={isAuthenticated}
                 user={user}
                 navigate={navigate}
                 handleLogout={handleLogout}
               />
-
-              {isAdmin && <AdminDropdown navigate={navigate} />}
-
-              {communityEnabled && <CommunityDropdown navigate={navigate} />}
-
-              <ToolButtons setIsHelpModalOpen={setIsHelpModalOpen} />
-
-              {/* 移动端菜单按钮（可选：用于展开更多选项） */}
-              <button
-                className="md:hidden p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-all duration-200"
-                onClick={() => {
-                  // 可以在这里添加移动端侧边栏或更多选项的逻辑
-                }}
-                aria-label="更多选项"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                  />
-                </svg>
-              </button>
             </div>
           </div>
         </div>
@@ -405,22 +388,32 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
         title="使用说明"
         size="lg"
       >
-        <div className="text-sm text-slate-600 dark:text-slate-300 space-y-3">
-          <p><strong>磁力快搜</strong>是一个高效的磁力搜索工具，帮助您快速找到所需资源。</p>
-          <h3 className="font-semibold text-base mt-4">主要功能：</h3>
-          <ul className="list-disc list-inside space-y-1.5 ml-2">
-            <li><strong>JAV番号搜索</strong>：搜索日本成人视频番号和相关资源</li>
-            <li><strong>动漫搜索</strong>：搜索动漫、番剧、漫画等ACG资源</li>
-            <li><strong>影视搜索</strong>：搜索电影、电视剧、综艺等影视资源</li>
-            <li><strong>搜索源访问</strong>：快速访问各类浏览型资源站点</li>
-          </ul>
-          <h3 className="font-semibold text-base mt-4">使用技巧：</h3>
-          <ul className="list-disc list-inside space-y-1.5 ml-2">
-            <li>使用顶部 Tab 切换不同类型的搜索</li>
-            <li>点击代理按钮可以开启/关闭网络代理</li>
-            <li>登录后可以收藏喜欢的资源和查看历史记录</li>
-            <li>使用主题按钮可以切换深色/浅色模式</li>
-          </ul>
+        <div className="text-sm text-slate-600 dark:text-slate-300 space-y-4">
+          <p><strong>磁力快搜</strong>是一站式磁力搜索工具，聚合多个资源站点，支持快速检索。</p>
+
+          <div>
+            <h3 className="font-semibold text-base mb-2">如何使用</h3>
+            <ol className="list-decimal list-inside space-y-1.5 ml-2">
+              <li>使用顶部导航切换搜索类型（JAV / 动漫 / 影视 / 搜索源）</li>
+              <li>在搜索框输入关键词或番号，按回车或点击搜索</li>
+              <li>使用分类标签筛选特定类型的资源</li>
+              <li>点击结果卡片上的按钮访问资源或收藏</li>
+            </ol>
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-base mb-2">快捷操作</h3>
+            <ul className="list-disc list-inside space-y-1.5 ml-2">
+              <li><strong>代理开关</strong>：访问受限资源时开启网络代理</li>
+              <li><strong>收藏功能</strong>：登录后可收藏资源，多端同步</li>
+              <li><strong>搜索历史</strong>：自动记录搜索记录，一键回搜</li>
+              <li><strong>JAV排行</strong>：JAV Tab 下展示热门番号排行</li>
+            </ul>
+          </div>
+
+          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs">
+            提示：输入 JAV 畗号格式（如 SONE-520）会自动触发详情提取
+          </div>
         </div>
       </Modal>
     </>
