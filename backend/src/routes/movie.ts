@@ -363,11 +363,11 @@ movieRoutes.get('/search', async (c) => {
 
       // TMDB（如有 key）
       if (tmdbKey) {
-        try { all.push(await searchTMDB(q, tmdbKey, page)); } catch {}
+        try { all.push(await searchTMDB(q, tmdbKey, page)); } catch { /* TMDB 失败，继续 */ }
       }
 
       // 豆瓣（始终尝试）
-      try { all.push(await searchDouban(q)); } catch {}
+      try { all.push(await searchDouban(q)); } catch { /* 豆瓣失败，继续 */ }
 
       return all.flat();
     })(),
@@ -379,7 +379,7 @@ movieRoutes.get('/search', async (c) => {
 
   let results: TMDBResult[] = metaRes.status === 'fulfilled' ? metaRes.value : [];
   let tmdbError: string | null = null;
-  let doubanError: string | null = null;
+  const doubanError: string | null = null;
 
   if (metaRes.status === 'rejected') {
     tmdbError = String(metaRes.reason);

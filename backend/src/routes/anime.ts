@@ -73,7 +73,7 @@ function parseNyaaRss(xml: string): NyaaTorrent[] {
     // size
     const sizeM = block.match(/<nyaa:size>([^<]+)<\/nyaa:size>/i) ||
                   block.match(/<length>([^<]+)<\/length>/i);
-    let size = sizeM ? sizeM[1].trim() : '';
+    const size = sizeM ? sizeM[1].trim() : '';
 
     // seeders, leechers, completed, trusted, category
     const seedersM = block.match(/<nyaa:seeders>([^<]+)<\/nyaa:seeders>/i);
