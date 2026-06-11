@@ -13,17 +13,18 @@ import { authMiddleware } from '@/middleware';
 export const movieRoutes = new Hono<{ Bindings: Env }>();
 movieRoutes.use('*', authMiddleware);
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-async function httpGet(url: string, timeout = 10000): Promise<string> {
+async function httpGet(url: string, headers?: Record<string, string>, timeout = 12000): Promise<string> {
   const r = await fetch(url, {
     headers: {
       'User-Agent': UA,
-      'Accept': 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+      'Accept': '*/*',
       'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-      'Referer': 'https://www.google.com/',
+      ...headers,
     },
     signal: AbortSignal.timeout(timeout),
+    redirect: 'follow',
   });
   if (!r.ok) throw new Error(`HTTP ${r.status} from ${url}`);
   return r.text();
@@ -52,7 +53,10 @@ export interface TMDBResult {
 
 async function searchTMDB(keyword: string, apiKey: string, page = 1): Promise<TMDBResult[]> {
   const url = `https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(keyword)}&language=zh-CN&page=${page}&include_adult=false`;
-  const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const r = await fetch(url, {
+    headers: { 'Accept': 'application/json' },
+    signal: AbortSignal.timeout(12000),
+  });
   if (!r.ok) throw new Error(`TMDB error: ${r.status}`);
   const data = await r.json() as { results?: any[] };
   if (!data.results) return [];
@@ -80,7 +84,7 @@ async function searchTMDB(keyword: string, apiKey: string, page = 1): Promise<TM
 }
 
 // =====================================================================
-// 豆瓣 API（元数据 fallback，无需配置 key）
+// 豆瓣搜索（多策略 fallback）
 // =====================================================================
 
 interface DoubanRawItem {
@@ -94,31 +98,79 @@ interface DoubanRawItem {
   is_tv: boolean;
 }
 
-async function searchDouban(keyword: string): Promise<TMDBResult[]> {
-  // 豆瓣搜索接口，返回电影+剧集混合结果
+/** 策略1：豆瓣旧版 AJAX 接口 */
+async function searchDoubanAjax(keyword: string): Promise<TMDBResult[]> {
   const url = `https://movie.douban.com/j/search_subjects?type=movie&tag=&sort=recommend&page_limit=20&page_start=0&search_text=${encodeURIComponent(keyword)}`;
   const r = await fetch(url, {
     headers: {
       'User-Agent': UA,
-      'Accept': 'application/json',
-      'Referer': 'https://movie.douban.com/',
+      'Accept': 'application/json, text/javascript, */*',
+      'Referer': 'https://movie.douban.com/explore',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Cookie': 'bid=""; __yadk_uid=dummy',
     },
     signal: AbortSignal.timeout(8000),
   });
-  if (!r.ok) throw new Error(`Douban error: ${r.status}`);
+  if (!r.ok) throw new Error(`Douban AJAX error: ${r.status}`);
   const data = await r.json() as { subjects?: DoubanRawItem[] };
   if (!data.subjects?.length) return [];
 
-  return data.subjects.slice(0, 15).map((item: DoubanRawItem) => ({
-    // 用负数 id 区分豆瓣来源（TMDB id 为正整数）
+  return mapDoubanItems(data.subjects);
+}
+
+/** 策略2：豆瓣新版搜索接口 */
+async function searchDoubanNew(keyword: string): Promise<TMDBResult[]> {
+  // 豆瓣电影搜索页（HTML），从中提取 JSON 数据
+  const url = `https://www.douban.com/search?q=${encodeURIComponent(keyword)}&cat=1002`;
+  const html = await httpGet(url, {
+    'Referer': 'https://www.douban.com/',
+  }, 8000);
+
+  // 豆瓣搜索页通常在 <script> 中嵌入数据，或直接有结构化内容
+  // 尝试提取 subject-item 的信息
+  const results: TMDBResult[] = [];
+  // 匹配搜索结果中的条目：标题 + 链接 + 评分
+  const itemRe = /<div\s+class="[^"]*subject-cast[^"]*"[^>]*>[\s\S]*?<a[^>]+href="(https?:\/\/(?:movie|www)\.douban\.com\/subject\/(\d+)\/)"[^>]*>([^<]+)<\/a>/gi;
+  let m: RegExpExecArray | null;
+
+  while ((m = itemRe.exec(html)) !== null && results.length < 15) {
+    const id = m[2];
+    const title = decodeHtmlEntities(m[3].trim());
+
+    // 在同块中找评分
+    const blockEnd = html.indexOf('</div>', m.index);
+    const block = html.slice(m.index, Math.min(m.index + 500, blockEnd > m.index ? blockEnd : m.index + 500));
+    const rateM = block.match(/<span[^>]*class="[^"]*rating_nums[^"]*"[^>]*>([\d.]+)<\/span>/);
+
+    results.push({
+      id: parseInt(id),
+      title,
+      originalTitle: title,
+      overview: '',
+      poster: null,
+      backdrop: null,
+      releaseDate: '',
+      year: '',
+      rating: parseFloat(rateM?.[1] || '0') || 0,
+      voteCount: 0,
+      mediaType: 'movie' as const,
+      source: 'douban' as const,
+    });
+  }
+
+  return results;
+}
+
+function mapDoubanItems(items: DoubanRawItem[]): TMDBResult[] {
+  return items.slice(0, 15).map((item) => ({
     id: -Math.abs(parseInt(item.id) || 0),
     title: item.title || '',
     originalTitle: item.title || '',
     overview: '',
-    poster: item.cover || null,
+    poster: item.cover?.startsWith('http') ? item.cover : (item.cover ? `https:${item.cover}` : null),
     backdrop: null,
     releaseDate: '',
-    year: '', // 豆瓣搜索接口不直接返回年份
+    year: '',
     rating: parseFloat(item.rate) || 0,
     voteCount: 0,
     mediaType: (item.is_tv ? 'tv' : 'movie') as 'movie' | 'tv',
@@ -126,8 +178,23 @@ async function searchDouban(keyword: string): Promise<TMDBResult[]> {
   }));
 }
 
+/** 统一入口：依次尝试各策略 */
+async function searchDouban(keyword: string): Promise<TMDBResult[]> {
+  try {
+    const results = await searchDoubanAjax(keyword);
+    if (results.length > 0) return results;
+  } catch { /* 继续尝试下一个策略 */ }
+
+  try {
+    const results = await searchDoubanNew(keyword);
+    if (results.length > 0) return results;
+  } catch { /* ignore */ }
+
+  return [];
+}
+
 // =====================================================================
-// 磁力资源站爬虫（通用 magnet 提取）
+// 磁力资源站爬虫
 // =====================================================================
 
 export interface ResourceItem {
@@ -139,51 +206,68 @@ export interface ResourceItem {
   sourceLabel: string;
 }
 
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n)));
+}
+
 /**
- * 通用 magnet 链接提取器
- * 从 HTML 中找到所有 magnet 链接，取最近的标题文本作为标题
+ * 从 HTML 中提取所有 magnet 链接及关联标题
  */
 function extractMagnets(html: string, source: string, sourceLabel: string): ResourceItem[] {
   const items: ResourceItem[] = [];
+  const seenMagnets = new Set<string>();
 
-  // 扫描全 HTML，找 magnet href，然后向前找最近标题
-  const magnetRe = /href="(magnet:[^"]{20,})"/gi;
+  // 扫描全 HTML，找所有 magnet 链接
+  const magnetRe = /href="(magnet:\?xt=urn:btih:[^"]{10,})"/gi;
   let m: RegExpExecArray | null;
 
-  // 收集所有 magnet 的位置
-  const magnets: { magnet: string; pos: number }[] = [];
-  while ((m = magnetRe.exec(html)) !== null) {
-    magnets.push({ magnet: m[1], pos: m.index });
-  }
+  while ((m = magnetRe.exec(html)) !== null && items.length < 30) {
+    const magnet = m[1];
+    if (seenMagnets.has(magnet)) continue;
+    seenMagnets.add(magnet);
 
-  // 对每个 magnet，向前 800 字符内找最近标题文本
-  for (const { magnet, pos } of magnets.slice(0, 30)) {
-    const before = html.slice(Math.max(0, pos - 800), pos);
-
-    // 尝试抓 <h1/h2/h3/td/a class="*title*"> 等
-    const titlePatterns = [
-      /<(?:h[1-4]|td)[^>]*>([^<]{4,80})<\/(?:h[1-4]|td)>/gi,
-      /<a[^>]+class="[^"]*(?:title|name|subject)[^"]*"[^>]*>([^<]{4,80})<\/a>/gi,
-      /title="([^"]{4,80})"/gi,
-    ];
+    const pos = m.index;
+    // 向前找标题 — 扩大范围到 1500 字符
+    const before = html.slice(Math.max(0, pos - 1500), pos);
 
     let title = '';
-    for (const pat of titlePatterns) {
+
+    // 按优先级尝试多种标题提取模式
+    const patterns = [
+      // 标题链接（最常见）
+      /<a[^>]+href="[^"]*"[^>]*class="[^"]*(?:title|post-title|entry-title|subject|name)[^"]*"[^>]*>\s*([^<]{3,100})\s*<\/a>/i,
+      // h1-h4 标签
+      /<(?:h[1-4])[^>]*>([^<]{3,100})<\/\1>/i,
+      // 带 title 属性的元素
+      /title="([^"]{3,100})"/i,
+      // 强调文本
+      /<(?:strong|b)[^>]*>([^<]{3,100})<\/(?:strong|b)>/i,
+      // 任意带 class 含 title/name 的链接
+      /<a[^>]+class="[^"]*"[^>]*>([^<]{5,80})<\/a>/i,
+    ];
+
+    for (const pat of patterns) {
       const hits: string[] = [];
-      let t: RegExpExecArray | null;
       pat.lastIndex = 0;
+      let t: RegExpExecArray | null;
       while ((t = pat.exec(before)) !== null) hits.push(t[1].trim());
       if (hits.length) {
-        title = hits[hits.length - 1]; // 最近的
+        title = hits[hits.length - 1]; // 取最近的匹配
         break;
       }
     }
 
     if (!title) continue;
-    title = title.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+    title = decodeHtmlEntities(title).trim();
 
-    // 去重
-    if (items.some(i => i.magnet === magnet)) continue;
+    // 过滤明显不是标题的文本
+    if (/^(复制|下载|magnet|分享|收藏|举报|点击|查看|详情)$/.test(title)) continue;
 
     items.push({ title, magnet, size: '', date: '', source, sourceLabel });
   }
@@ -193,46 +277,54 @@ function extractMagnets(html: string, source: string, sourceLabel: string): Reso
 
 /** LightBT 爬虫 */
 async function scrapeLightBT(keyword: string): Promise<ResourceItem[]> {
-  const html = await httpGet(
-    `https://www.lightbt.top/search?q=${encodeURIComponent(keyword)}`,
-    10000
-  );
-  return extractMagnets(html, 'lightbt', 'LightBT');
+  try {
+    const html = await httpGet(
+      `https://www.lightbt.top/search?q=${encodeURIComponent(keyword)}`,
+      undefined,
+      12000
+    );
+    return extractMagnets(html, 'lightbt', 'LightBT');
+  } catch {
+    return [];
+  }
 }
 
 /** 音范丝爬虫 */
 async function scrapeYinfans(keyword: string): Promise<ResourceItem[]> {
-  const html = await httpGet(
-    `https://www.yinfans.me/?s=${encodeURIComponent(keyword)}`,
-    10000
-  );
+  try {
+    const html = await httpGet(
+      `https://www.yinfans.me/?s=${encodeURIComponent(keyword)}`,
+      { Referer: 'https://www.yinfans.me/' },
+      12000
+    );
 
-  // 音范丝是 WordPress，搜索结果是文章列表，每篇文章有单独详情页
-  // 先从列表拿详情页链接，再爬详情页里的 magnet
-  const postLinks: string[] = [];
-  const linkRe = /<a\s+href="(https:\/\/www\.yinfans\.me\/[^"]+)"[^>]*class="[^"]*entry-title[^"]*"/gi;
-  let lm: RegExpExecArray | null;
-  while ((lm = linkRe.exec(html)) !== null) {
-    postLinks.push(lm[1]);
-  }
+    // 先从列表页提取文章链接
+    const postLinks: string[] = [];
+    const linkRe = /<a\s+href="(https:\/\/www\.yinfans\.me\/\d+\.html)"[^>]*>/gi;
+    let lm: RegExpExecArray | null;
+    while ((lm = linkRe.exec(html)) !== null) postLinks.push(lm[1]);
 
-  if (!postLinks.length) {
-    // fallback: 直接从搜索页提取 magnet
-    return extractMagnets(html, 'yinfans', '音范丝');
-  }
+    // 如果搜索页本身就有 magnet，直接返回
+    const directResults = extractMagnets(html, 'yinfans', '音范丝');
+    if (directResults.length > 0) return directResults;
 
-  // 最多抓前 3 篇详情
-  const details = await Promise.allSettled(
-    postLinks.slice(0, 3).map(url => httpGet(url, 10000))
-  );
+    // 否则抓详情页
+    if (postLinks.length === 0) return [];
 
-  const results: ResourceItem[] = [];
-  for (const d of details) {
-    if (d.status === 'fulfilled') {
-      results.push(...extractMagnets(d.value, 'yinfans', '音范丝'));
+    const details = await Promise.allSettled(
+      postLinks.slice(0, 3).map(url => httpGet(url, { Referer: 'https://www.yinfans.me/' }, 10000))
+    );
+
+    const results: ResourceItem[] = [];
+    for (const d of details) {
+      if (d.status === 'fulfilled') {
+        results.push(...extractMagnets(d.value, 'yinfans', '音范丝'));
+      }
     }
+    return results;
+  } catch {
+    return [];
   }
-  return results;
 }
 
 // =====================================================================
@@ -251,7 +343,7 @@ movieRoutes.get('/search', async (c) => {
   }
 
   // Cache
-  const CACHE_TTL = 300;
+  const CACHE_TTL = 180;
   const cacheKey = new Request(`https://internal/movie-search/${encodeURIComponent(q)}-p${page}`);
   const cache = caches.default;
   const cached = await cache.match(cacheKey);
@@ -263,34 +355,40 @@ movieRoutes.get('/search', async (c) => {
 
   const tmdbKey = c.env.TMDB_API_KEY;
 
-  // 并行请求：TMDB（如有 key）+ 豆瓣（始终）+ 资源站
-  const metaTasks: Promise<TMDBResult[]>[] = [];
-  if (tmdbKey) {
-    metaTasks.push(searchTMDB(q, tmdbKey, page));
-  }
-  metaTasks.push(searchDouban(q).catch(() => [] as TMDBResult[]));
+  // 并行请求所有源
+  const [metaRes, lightbtRes, yinfansRes] = await Promise.allSettled([
+    // 元数据源
+    (async (): Promise<TMDBResult[]> => {
+      const all: TMDBResult[][] = [];
 
-  const [metaResults, lightbtRes, yinfansRes] = await Promise.allSettled([
-    Promise.all(metaTasks).then(arr => arr.flat()),
-    scrapeLightBT(q).catch(() => [] as ResourceItem[]),
-    scrapeYinfans(q).catch(() => [] as ResourceItem[]),
+      // TMDB（如有 key）
+      if (tmdbKey) {
+        try { all.push(await searchTMDB(q, tmdbKey, page)); } catch {}
+      }
+
+      // 豆瓣（始终尝试）
+      try { all.push(await searchDouban(q)); } catch {}
+
+      return all.flat();
+    })(),
+
+    // 磁力源
+    scrapeLightBT(q),
+    scrapeYinfans(q),
   ]);
 
-  let results: TMDBResult[];
+  let results: TMDBResult[] = metaRes.status === 'fulfilled' ? metaRes.value : [];
   let tmdbError: string | null = null;
-  const doubanError: string | null = null;
+  let doubanError: string | null = null;
 
-  if (metaResults.status === 'fulfilled') {
-    results = metaResults.value;
-  } else {
-    results = [];
-    tmdbError = (metaResults.reason as Error).message;
+  if (metaRes.status === 'rejected') {
+    tmdbError = String(metaRes.reason);
   }
 
-  // 去重：按 title+year 去重，优先保留 TMDB 结果
+  // 去重：按 title 去重，优先保留 TMDB 结果
   const seen = new Set<string>();
   results = results.filter(item => {
-    const key = `${item.title}-${item.year}`.toLowerCase();
+    const key = item.title.toLowerCase().slice(0, 30); // 用前30字符做近似去重
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
