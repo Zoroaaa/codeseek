@@ -60,6 +60,6 @@ export const animeApi = {
    */
   search: (keyword: string, page = 1, source = 'all') =>
     apiClient.get<{ success: boolean; data: AnimeSearchData }>(
-      `/api/anime/search?q=${encodeURIComponent(keyword)}&page=${page}&source=${source}`
+      `/anime/search?q=${encodeURIComponent(keyword)}&page=${page}&source=${source}`
     ),
 };

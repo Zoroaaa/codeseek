@@ -87,6 +87,11 @@ const MovieCard: React.FC<{ item: TMDBResult; onSelect: (item: TMDBResult) => vo
         <p className="text-xs text-slate-500 truncate mt-0.5">{item.originalTitle}</p>
       )}
       <div className="flex flex-wrap gap-2 mt-1 text-xs text-slate-400">
+        {item.source === 'douban' ? (
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/20 text-green-400">豆瓣</span>
+        ) : (
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-cyan-500/20 text-cyan-400">TMDB</span>
+        )}
         <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
           item.mediaType === 'movie'
             ? 'bg-blue-500/20 text-blue-400'
@@ -269,7 +274,10 @@ export const MovieSearchPage: React.FC = () => {
             <p className="text-xs text-slate-600 mt-2">
               元数据：
               <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer"
-                 className="text-blue-400 hover:underline">TMDB</a>
+                 className="text-cyan-400 hover:underline">TMDB</a>
+              {' + '}
+              <a href="https://movie.douban.com" target="_blank" rel="noopener noreferrer"
+                 className="text-green-400 hover:underline">豆瓣</a>
               {' · '}
               磁力：
               <a href="https://www.lightbt.top" target="_blank" rel="noopener noreferrer"
@@ -277,9 +285,6 @@ export const MovieSearchPage: React.FC = () => {
               {' · '}
               <a href="https://www.yinfans.me" target="_blank" rel="noopener noreferrer"
                  className="text-blue-400 hover:underline">音范丝</a>
-            </p>
-            <p className="text-xs text-slate-700 mt-1">
-              注：需在 Worker 配置 <code className="text-blue-400 bg-slate-800 px-1 rounded">TMDB_API_KEY</code>
             </p>
           </div>
         )}
@@ -318,6 +323,13 @@ export const MovieSearchPage: React.FC = () => {
               </div>
             )}
 
+            {data.doubanError && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>豆瓣请求失败：{data.doubanError}</span>
+              </div>
+            )}
+
             {results.length === 0 && resources.length === 0 && (
               <div className="text-center py-12">
                 <Wifi className="w-8 h-8 text-slate-600 mx-auto mb-3" />
@@ -332,7 +344,7 @@ export const MovieSearchPage: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-1 h-4 rounded-full bg-blue-500" />
                     <h2 className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      TMDB 匹配
+                      影视匹配
                     </h2>
                     <span className="ml-auto text-xs text-slate-600">{results.length} 条</span>
                   </div>
@@ -397,15 +409,23 @@ export const MovieSearchPage: React.FC = () => {
                             )}
                           </div>
                           <a
-                            href={`https://www.themoviedb.org/${selectedItem.mediaType}/${selectedItem.id}`}
+                            href={selectedItem.source === 'douban'
+                              ? `https://movie.douban.com/subject/${Math.abs(selectedItem.id)}/`
+                              : `https://www.themoviedb.org/${selectedItem.mediaType}/${selectedItem.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex-shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-blue-400 transition-colors"
+                            title={selectedItem.source === 'douban' ? '在豆瓣查看' : '在 TMDB 查看'}
                           >
                             <ExternalLink className="w-4 h-4" />
                           </a>
                         </div>
                         <div className="flex flex-wrap gap-3 mt-2 text-sm text-slate-400">
+                          {selectedItem.source === 'douban' ? (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">豆瓣</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-500/20 text-cyan-400">TMDB</span>
+                          )}
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                             selectedItem.mediaType === 'movie'
                               ? 'bg-blue-500/20 text-blue-400'

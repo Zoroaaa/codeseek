@@ -19,6 +19,8 @@ export interface TMDBResult {
   voteCount: number;
   mediaType: 'movie' | 'tv';
   genres?: string[];
+  /** 数据来源 */
+  source?: 'tmdb' | 'douban';
 }
 
 export interface ResourceItem {
@@ -38,6 +40,7 @@ export interface MovieSearchData {
   total: number;
   resourceTotal: number;
   tmdbError: string | null;
+  doubanError?: string | null;
 }
 
 // ─── API ────────────────────────────────────────────────────────────────
@@ -50,6 +53,6 @@ export const movieApi = {
    */
   search: (keyword: string, page = 1) =>
     apiClient.get<{ success: boolean; data: MovieSearchData }>(
-      `/api/movie/search?q=${encodeURIComponent(keyword)}&page=${page}`
+      `/movie/search?q=${encodeURIComponent(keyword)}&page=${page}`
     ),
 };

@@ -1,7 +1,8 @@
 /**
  * 影视搜索路由
  * 数据源：
- *   - 元数据：TMDB API（需配置 TMDB_API_KEY secret）
+ *   - 元数据：TMDB API（主，需配置 TMDB_API_KEY secret）
+ *   - 元数据：豆瓣（fallback，无需配置）
  *   - 磁力资源：LightBT（HTML 爬取，降级失败不影响主结果）
  *   - 磁力资源：音范丝（HTML 爬取，降级失败不影响主结果）
  */
@@ -45,6 +46,8 @@ export interface TMDBResult {
   voteCount: number;
   mediaType: 'movie' | 'tv';
   genres?: string[];
+  /** 数据来源标识 */
+  source: 'tmdb' | 'douban';
 }
 
 async function searchTMDB(keyword: string, apiKey: string, page = 1): Promise<TMDBResult[]> {
@@ -71,8 +74,56 @@ async function searchTMDB(keyword: string, apiKey: string, page = 1): Promise<TM
         rating: Math.round((item.vote_average || 0) * 10) / 10,
         voteCount: item.vote_count || 0,
         mediaType: item.media_type as 'movie' | 'tv',
+        source: 'tmdb' as const,
       };
     });
+}
+
+// =====================================================================
+// 豆瓣 API（元数据 fallback，无需配置 key）
+// =====================================================================
+
+interface DoubanRawItem {
+  id: string;
+  title: string;
+  rate: string;
+  cover?: string;
+  cover_x?: number;
+  cover_y?: number;
+  url: string;
+  is_tv: boolean;
+}
+
+async function searchDouban(keyword: string): Promise<TMDBResult[]> {
+  // 豆瓣搜索接口，返回电影+剧集混合结果
+  const url = `https://movie.douban.com/j/search_subjects?type=movie&tag=&sort=recommend&page_limit=20&page_start=0&search_text=${encodeURIComponent(keyword)}`;
+  const r = await fetch(url, {
+    headers: {
+      'User-Agent': UA,
+      'Accept': 'application/json',
+      'Referer': 'https://movie.douban.com/',
+    },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!r.ok) throw new Error(`Douban error: ${r.status}`);
+  const data = await r.json() as { subjects?: DoubanRawItem[] };
+  if (!data.subjects?.length) return [];
+
+  return data.subjects.slice(0, 15).map((item: DoubanRawItem) => ({
+    // 用负数 id 区分豆瓣来源（TMDB id 为正整数）
+    id: -Math.abs(parseInt(item.id) || 0),
+    title: item.title || '',
+    originalTitle: item.title || '',
+    overview: '',
+    poster: item.cover || null,
+    backdrop: null,
+    releaseDate: '',
+    year: '', // 豆瓣搜索接口不直接返回年份
+    rating: parseFloat(item.rate) || 0,
+    voteCount: 0,
+    mediaType: (item.is_tv ? 'tv' : 'movie') as 'movie' | 'tv',
+    source: 'douban' as const,
+  }));
 }
 
 // =====================================================================
@@ -199,14 +250,6 @@ movieRoutes.get('/search', async (c) => {
     return c.json({ success: false, error: { code: 'MISSING_QUERY', message: '请输入搜索关键词' } }, 400);
   }
 
-  const tmdbKey = c.env.TMDB_API_KEY;
-  if (!tmdbKey) {
-    return c.json({
-      success: false,
-      error: { code: 'CONFIG_ERROR', message: 'TMDB_API_KEY 未配置，请执行 wrangler secret put TMDB_API_KEY' },
-    }, 500);
-  }
-
   // Cache
   const CACHE_TTL = 300;
   const cacheKey = new Request(`https://internal/movie-search/${encodeURIComponent(q)}-p${page}`);
@@ -218,14 +261,41 @@ movieRoutes.get('/search', async (c) => {
     });
   }
 
-  // 并行：TMDB + 资源站
-  const [tmdbRes, lightbtRes, yinfansRes] = await Promise.allSettled([
-    searchTMDB(q, tmdbKey, page),
+  const tmdbKey = c.env.TMDB_API_KEY;
+
+  // 并行请求：TMDB（如有 key）+ 豆瓣（始终）+ 资源站
+  const metaTasks: Promise<TMDBResult[]>[] = [];
+  if (tmdbKey) {
+    metaTasks.push(searchTMDB(q, tmdbKey, page));
+  }
+  metaTasks.push(searchDouban(q).catch(() => [] as TMDBResult[]));
+
+  const [metaResults, lightbtRes, yinfansRes] = await Promise.allSettled([
+    Promise.all(metaTasks).then(arr => arr.flat()),
     scrapeLightBT(q).catch(() => [] as ResourceItem[]),
     scrapeYinfans(q).catch(() => [] as ResourceItem[]),
   ]);
 
-  const results: TMDBResult[] = tmdbRes.status === 'fulfilled' ? tmdbRes.value : [];
+  let results: TMDBResult[];
+  let tmdbError: string | null = null;
+  let doubanError: string | null = null;
+
+  if (metaResults.status === 'fulfilled') {
+    results = metaResults.value;
+  } else {
+    results = [];
+    tmdbError = (metaResults.reason as Error).message;
+  }
+
+  // 去重：按 title+year 去重，优先保留 TMDB 结果
+  const seen = new Set<string>();
+  results = results.filter(item => {
+    const key = `${item.title}-${item.year}`.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
   const resources: ResourceItem[] = [
     ...(lightbtRes.status === 'fulfilled' ? lightbtRes.value : []),
     ...(yinfansRes.status === 'fulfilled' ? yinfansRes.value : []),
@@ -240,7 +310,8 @@ movieRoutes.get('/search', async (c) => {
       resources,
       total: results.length,
       resourceTotal: resources.length,
-      tmdbError: tmdbRes.status === 'rejected' ? (tmdbRes.reason as Error).message : null,
+      tmdbError,
+      doubanError,
     },
   });
 
