@@ -278,7 +278,7 @@ movieRoutes.get('/search', async (c) => {
 
   let results: TMDBResult[];
   let tmdbError: string | null = null;
-  let doubanError: string | null = null;
+  const doubanError: string | null = null;
 
   if (metaResults.status === 'fulfilled') {
     results = metaResults.value;
