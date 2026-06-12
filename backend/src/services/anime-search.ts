@@ -1,7 +1,7 @@
 /**
  * 动漫搜索服务
  * 元数据: Bangumi API
- * 磁力资源: Nyaa.si + AnimeTosho（fallback）+ Mikan Project
+ * 磁力资源: AnimeTosho RSS（主源，聚合多站）+ Nyaa.si（备用，可能被CF拦截）+ Torrentio（TMDB ID 聚合）
  */
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -13,7 +13,7 @@ export interface BangumiSubject {
   cover: string;
   summary: string;
   airDate: string;
-  airWeekday?: number;    // 0=未知 1=周一 … 7=周日
+  airWeekday?: number;
   rating: number;
   ratingCount?: number;
   rank?: number;
@@ -35,7 +35,7 @@ export interface NyaaTorrent {
   category: string;
   source?: string;
   sourceLabel?: string;
-  /** false = 该来源不提供做种数据（AnimeTosho RSS），显示 DHT 而非 0/0 */
+  /** false = 该来源不提供做种数据（如 AnimeTosho RSS），显示 DHT 而非 0/0 */
   hasSeedData?: boolean;
 }
 
@@ -78,7 +78,77 @@ function decodeHtmlEntities(str: string): string {
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n)));
 }
 
-// ─── Nyaa.si ───────────────────────────────────────────────────────────
+// ─── AnimeTosho（主源：聚合 Nyaa/多站的 RSS，最稳定可靠）────────────
+
+function parseAnimeToshoRss(xml: string): NyaaTorrent[] {
+  const results: NyaaTorrent[] = [];
+  const itemRe = /<item>([\s\S]*?)<\/item>/gi;
+  let m: RegExpExecArray | null;
+
+  while ((m = itemRe.exec(xml)) !== null) {
+    const block = m[1];
+    const titleM = block.match(/<title><!\[CDATA\[([^\]]*)\]\]><\/title>/i) || block.match(/<title>([^<]+)<\/title>/i);
+    if (!titleM) continue;
+    const title = decodeHtmlEntities(titleM[1].trim());
+
+    // AnimeTosho 提供磁力链接在 <link> 或 <enclosure> 中
+    const magnetM = block.match(/href="(magnet:\?xt=urn:btih:[^"]+)"/i)
+      || block.match(/<atm:magnetURI><!\[CDATA\[(magnet:\?xt=urn:btih:[^\]]+)\]\]>/i)
+      || block.match(/<enclosure[^>]+url="(magnet:\?xt=urn:btih:[^"]+)"/i);
+    const magnet = magnetM ? magnetM[1] : '';
+    if (!magnet) continue;
+
+    // 大小
+    const sizeM = block.match(/<atm:contentLength>(\d+)<\/atm:contentLength>/i)
+      || block.match(/<length>(\d+)<\/length>/i);
+    const sizeBytes = sizeM ? parseInt(sizeM[1]) : 0;
+    const size = sizeBytes > 1073741824 ? `${(sizeBytes / 1073741824).toFixed(1)} GiB`
+      : sizeBytes > 1048576 ? `${(sizeBytes / 1048576).toFixed(0)} MiB`
+        : sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(0)} KiB` : '';
+
+    // 发布日期
+    const pubDateM = block.match(/<pubDate>([^<]+)<\/pubDate>/i);
+
+    // 来源站点标记（从 description 中提取）
+    const descM = block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/i);
+    let srcLabel = 'AnimeTosho';
+    if (descM) {
+      const srcMatch = descM[1].match(/<a[^>]+href="https?:\/\/nyaa\.si[^"]*"[^>]*>\s*(?:<span[^>]*>)?([^<]+)/i);
+      if (srcMatch) srcLabel = `Nyaa · ${srcMatch[1].trim()}`;
+    }
+
+    results.push({
+      id: `at-${Math.random().toString(36).slice(2, 8)}`,
+      title,
+      magnet,
+      torrentUrl: '',
+      size,
+      date: pubDateM ? new Date(pubDateM[1]).toISOString().split('T')[0] : '',
+      seeders: 0,
+      leechers: 0,
+      completed: 0,
+      trusted: false,
+      category: 'Anime',
+      source: 'animetosho',
+      sourceLabel: srcLabel,
+      hasSeedData: false,
+    });
+  }
+  return results;
+}
+
+/** AnimeTosho 主搜索 */
+async function fetchAnimeTosho(keyword: string): Promise<NyaaTorrent[]> {
+  try {
+    const xml = await httpGet(
+      `https://feed.animetosho.org/rss2?q=${encodeURIComponent(keyword)}&orderby=seeds`,
+      15000
+    );
+    return parseAnimeToshoRss(xml);
+  } catch { return []; }
+}
+
+// ─── Nyaa.si（备用：可能被 Cloudflare 拦截）───────────────────────────
 
 function parseNyaaRss(xml: string): NyaaTorrent[] {
   const results: NyaaTorrent[] = [];
@@ -132,130 +202,18 @@ function parseNyaaRss(xml: string): NyaaTorrent[] {
   return results;
 }
 
+/** Nyaa.si 搜索（带超时保护，避免 CF 拖慢整体响应） */
 async function fetchNyaa(keyword: string, page: number): Promise<NyaaTorrent[]> {
-  // 优先 RSS（结构化、轻量）
   try {
     const rssXml = await httpGet(
       `https://nyaa.si/?f=0&c=0_0&q=${encodeURIComponent(keyword)}&s=seeders&o=desc&p=${page}&rss=1`,
-      12000
+      8000  // 短超时，快速失败
     );
-    const rssResults = parseNyaaRss(rssXml);
-    if (rssResults.length > 0) return rssResults;
-  } catch { /* fallthrough to HTML */ }
-
-  // HTML fallback
-  try {
-    const html = await httpGet(
-      `https://nyaa.si/?f=0&c=0_0&q=${encodeURIComponent(keyword)}&s=seeders&o=desc&p=${page}`,
-      12000
-    );
-    return parseNyaaHtml(html);
+    return parseNyaaRss(rssXml);
   } catch { return []; }
 }
 
-function parseNyaaHtml(html: string): NyaaTorrent[] {
-  const results: NyaaTorrent[] = [];
-  const tbodyM = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
-  if (!tbodyM) return results;
-
-  const rowRe = /<tr\s+(?:class="([^"]*)")?\s*>([\s\S]*?)<\/tr>/gi;
-  let row: RegExpExecArray | null;
-  while ((row = rowRe.exec(tbodyM[1])) !== null) {
-    const tds: string[] = [];
-    const tdRe = /<td(?:\s[^>]*)?>([^]*?)<\/td>/gi;
-    let td: RegExpExecArray | null;
-    while ((td = tdRe.exec(row[2]))) tds.push(td[1]);
-    if (tds.length < 7) continue;
-
-    const titleM = tds[1].match(/<a\s+href="\/view\/(\d+)"(?:\s[^>]*)?>([^<]*(?:<(?!\/a)[^<]*)*?)<\/a>/i);
-    if (!titleM) continue;
-
-    const magnetM = tds[2].match(/href="(magnet:\?xt=[^"]+)"/i);
-    if (!magnetM) continue;
-
-    const catM = tds[0].match(/title="([^"]+)"/i) || tds[0].match(/alt="([^"]+)"/i);
-    const tsM = tds[4].match(/data-timestamp="(\d+)"/i);
-
-    results.push({
-      id: titleM[1],
-      title: decodeHtmlEntities(titleM[2].replace(/<[^>]+>/g, '').trim()),
-      magnet: magnetM[1],
-      torrentUrl: `https://nyaa.si/download/${titleM[1]}.torrent`,
-      size: tds[3].replace(/<[^>]+>/g, '').trim(),
-      date: tsM ? new Date(parseInt(tsM[1]) * 1000).toISOString().split('T')[0] : tds[4].replace(/<[^>]+>/g, '').trim(),
-      seeders: parseInt(tds[5].replace(/<[^>]+>/g, '').trim()) || 0,
-      leechers: parseInt(tds[6].replace(/<[^>]+>/g, '').trim()) || 0,
-      completed: 0,
-      category: catM ? catM[1] : 'Anime',
-      trusted: row[1]?.includes('success'),
-      source: 'nyaa',
-      sourceLabel: 'Nyaa.si',
-      hasSeedData: true,
-    });
-  }
-  return results;
-}
-
-// ─── AnimeTosho（Nyaa fallback，同类 RSS）─────────────────────────────
-
-function parseAnimeToshoRss(xml: string): NyaaTorrent[] {
-  const results: NyaaTorrent[] = [];
-  const itemRe = /<item>([\s\S]*?)<\/item>/gi;
-  let m: RegExpExecArray | null;
-
-  while ((m = itemRe.exec(xml)) !== null) {
-    const block = m[1];
-    const titleM = block.match(/<title><!\[CDATA\[([^\]]*)\]\]><\/title>/i) || block.match(/<title>([^<]+)<\/title>/i);
-    if (!titleM) continue;
-    const title = decodeHtmlEntities(titleM[1].trim());
-
-    // AnimeTosho provides magnet in <link> or <enclosure>
-    const magnetM = block.match(/href="(magnet:\?xt=urn:btih:[^"]+)"/i)
-      || block.match(/<atm:magnetURI><!\[CDATA\[(magnet:\?xt=urn:btih:[^\]]+)\]\]>/i)
-      || block.match(/<enclosure[^>]+url="(magnet:\?xt=urn:btih:[^"]+)"/i);
-    const magnet = magnetM ? magnetM[1] : '';
-    if (!magnet) continue;
-
-    const sizeM = block.match(/<atm:contentLength>(\d+)<\/atm:contentLength>/i)
-      || block.match(/<length>(\d+)<\/length>/i);
-    const sizeBytes = sizeM ? parseInt(sizeM[1]) : 0;
-    const size = sizeBytes > 1073741824 ? `${(sizeBytes / 1073741824).toFixed(1)} GiB`
-      : sizeBytes > 1048576 ? `${(sizeBytes / 1048576).toFixed(0)} MiB`
-        : sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(0)} KiB` : '';
-
-    const pubDateM = block.match(/<pubDate>([^<]+)<\/pubDate>/i);
-
-    results.push({
-      id: `at-${Math.random().toString(36).slice(2)}`,
-      title,
-      magnet,
-      torrentUrl: '',
-      size,
-      date: pubDateM ? new Date(pubDateM[1]).toISOString().split('T')[0] : '',
-      seeders: 0,
-      leechers: 0,
-      completed: 0,
-      trusted: false,
-      category: 'Anime',
-      source: 'animetosho',
-      sourceLabel: 'AnimeTosho',
-      hasSeedData: false,  // AnimeTosho RSS 不含做种数
-    });
-  }
-  return results;
-}
-
-async function fetchAnimeTosho(keyword: string): Promise<NyaaTorrent[]> {
-  try {
-    const xml = await httpGet(
-      `https://feed.animetosho.org/rss2?q=${encodeURIComponent(keyword)}&orderby=seeds`,
-      12000
-    );
-    return parseAnimeToshoRss(xml);
-  } catch { return []; }
-}
-
-// ─── Mikan Project ─────────────────────────────────────────────────────
+// ─── Mikan Project（保留但降低优先级，经常超时）──────────────────────
 
 function parseMikanRss(xml: string): MikanItem[] {
   const items: MikanItem[] = [];
@@ -286,14 +244,18 @@ function parseMikanRss(xml: string): MikanItem[] {
   return items;
 }
 
+/** Mikan 搜索（短超时保护） */
 async function fetchMikan(keyword: string): Promise<MikanItem[]> {
   try {
-    const xml = await httpGet(`https://mikanani.me/RSS/Search?searchstr=${encodeURIComponent(keyword)}`, 12000);
+    const xml = await httpGet(
+      `https://mikanani.me/RSS/Search?searchstr=${encodeURIComponent(keyword)}`,
+      8000  // 短超时，Mikan 经常超时
+    );
     return parseMikanRss(xml);
   } catch { return []; }
 }
 
-// ─── Bangumi ───────────────────────────────────────────────────────────
+// ─── Bangumi 元数据 ───────────────────────────────────────────────────
 
 async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
   try {
@@ -325,36 +287,39 @@ async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
 export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearchResult> {
-  const [bgmResult, nyaaResult, animeToshoResult, mikanResult] = await Promise.allSettled([
+  // 并行请求所有数据源
+  const [bgmResult, animetoshoResult, nyaaResult, mikanResult] = await Promise.allSettled([
     fetchBangumi(keyword),
-    fetchNyaa(keyword, page),
-    fetchAnimeTosho(keyword),
-    fetchMikan(keyword),
+    fetchAnimeTosho(keyword),   // 主源
+    fetchNyaa(keyword, page),   // 备用
+    fetchMikan(keyword),        // 低优先级
   ]);
 
   const bgm = bgmResult.status === 'fulfilled' ? bgmResult.value : [];
 
-  // Nyaa + AnimeTosho 合并去重，Nyaa 优先
+  // AnimeTosho（主源）+ Nyaa（补充）合并去重
+  const toshoRaw = animetoshoResult.status === 'fulfilled' ? animetoshoResult.value : [];
   const nyaaRaw = nyaaResult.status === 'fulfilled' ? nyaaResult.value : [];
-  const toshoRaw = animeToshoResult.status === 'fulfilled' ? animeToshoResult.value : [];
 
-  // 按磁力 hash 前40字符去重
+  // 按 btih hash 去重
   const seenHashes = new Set<string>();
   const addTorrent = (t: NyaaTorrent) => {
     const key = t.magnet.slice(20, 60);
     if (seenHashes.has(key)) return false;
-    seenHashes.add(key);
-    return true;
+    seenHashes.add(key); return true;
   };
+
+  // AnimeTosho 结果在前（主源），Nyaa 补充在后
   const nyaa: NyaaTorrent[] = [
+    ...toshoRaw.filter(addTorrent),
     ...nyaaRaw.filter(addTorrent),
-    ...toshoRaw.filter(addTorrent), // AnimeTosho 作为补充
   ];
 
   const mikan = mikanResult.status === 'fulfilled' ? mikanResult.value : [];
 
-  const nyaaError = nyaaResult.status === 'rejected' && animeToshoResult.status === 'rejected'
-    ? String(nyaaResult.reason)
+  // 错误信息：只有当所有磁力源都失败时才报错
+  const nyaaError = (animetoshoResult.status === 'rejected' && nyaaResult.status === 'rejected')
+    ? `AnimeTosho: ${String(animetoshoResult.reason)}; Nyaa: ${String(nyaaResult.reason)}`
     : null;
 
   return {

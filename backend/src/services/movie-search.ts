@@ -1,7 +1,7 @@
 /**
  * 影视搜索服务
  * 元数据: TMDB（主）+ 豆瓣（fallback）
- * 磁力资源: YTS（英文电影 JSON API）+ 1337x（国际大站）+ LightBT + 音范丝（中文 fallback）
+ * 磁力资源: TPB API（关键词搜索）+ Torrentio（TMDB ID 聚合多源）
  */
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -52,21 +52,14 @@ export interface MovieSearchResult {
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-async function httpGet(url: string, headers?: Record<string, string>, timeout = 12000): Promise<string> {
-  const r = await fetch(url, {
-    headers: { 'User-Agent': UA, 'Accept': '*/*', 'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8', ...headers },
-    signal: AbortSignal.timeout(timeout),
-    redirect: 'follow',
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status} from ${url}`);
-  return r.text();
-}
+// ─── 工具函数 ─────────────────────────────────────────────────────────
 
-function decodeHtmlEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n)));
+function formatBytes(bytes: number): string {
+  if (!bytes) return '';
+  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GB`;
+  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(0)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
 }
 
 // ─── TMDB API ──────────────────────────────────────────────────────────
@@ -134,16 +127,6 @@ async function searchDouban(keyword: string): Promise<TMDBResult[]> {
   return [];
 }
 
-// ─── 工具函数 ─────────────────────────────────────────────────────────
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return '';
-  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GB`;
-  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(0)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${bytes} B`;
-}
-
 // ─── The Pirate Bay API（apibay.org JSON，最全，CF Workers 可达）──────
 
 async function searchTPB(keyword: string): Promise<ResourceItem[]> {
@@ -179,182 +162,86 @@ async function searchTPB(keyword: string): Promise<ResourceItem[]> {
   } catch { return []; }
 }
 
-// ─── YTS.mx API（英文电影，JSON API，最可靠）─────────────────────────
+// ─── Torrentio API（聚合 YTS/1337x/TPB/RARBG/TorrentGalaxy 等多源）───
 
-async function searchYTS(keyword: string): Promise<ResourceItem[]> {
+const TORRENTIO_BASE = 'https://torrentio.strem.fun';
+const TORRENTIO_TRACKERS = [
+  'udp%3A%2F%2Ftracker.openbittorrent.com%3A6969%2Fannounce',
+  'udp%3A%2F%2Fopen.demonii.com%3A1337%2Fannounce',
+  'udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce',
+  'udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce',
+].map(t => `&tr=${t}`).join('');
+
+/** 从 infoHash 构造磁力链接 */
+function buildMagnetFromHash(infoHash: string, title: string): string {
+  return `magnet:?xt=urn:btih:${infoHash.toLowerCase()}&dn=${encodeURIComponent(title)}${TORRENTIO_TRACKERS}`;
+}
+
+/** 从 Torrentio 标题中提取大小信息 */
+function extractSizeFromTitle(title: string): string {
+  const m = title.match(/\u{1F4BC}\s*([\d.]+\s*(?:GB|MB|TB|KB))/iu);
+  return m ? m[1] : '';
+}
+
+/**
+ * 通过 TMDB ID 查询 Torrentio
+ * 聚合了 YTS、1337x、TPB、RARBG、TorrentGalaxy 等多源结果
+ * 支持 movie / series 两种类型
+ */
+async function searchTorrentio(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<ResourceItem[]> {
   try {
-    const url = `https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(keyword)}&limit=15&sort_by=seeds&with_rt_ratings=false`;
+    const type = mediaType === 'movie' ? 'movie' : 'series';
+    const url = `${TORRENTIO_BASE}/stream/${type}/${tmdbId}.json`;
     const r = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(10000),
+      headers: { 'Accept': 'application/json', 'User-Agent': UA },
+      signal: AbortSignal.timeout(15000),
     });
     if (!r.ok) return [];
-    const data = await r.json() as {
-      data?: {
-        movie_count?: number;
-        movies?: Array<{
-          title: string;
-          year: number;
-          rating: number;
-          torrents?: Array<{ hash: string; quality: string; type: string; size: string; seeds: number; peers: number }>;
-        }>;
-      };
-    };
-    const movies = data.data?.movies ?? [];
-    const items: ResourceItem[] = [];
-    for (const movie of movies) {
-      for (const t of movie.torrents ?? []) {
-        if (!t.hash) continue;
-        const dn = encodeURIComponent(`${movie.title} ${movie.year} ${t.quality}`);
-        const trackers = [
-          'udp%3A%2F%2Fopen.demonii.com%3A1337%2Fannounce',
-          'udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce',
-          'udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce',
-          'udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce',
-        ].map(tr => `&tr=${tr}`).join('');
-        const magnet = `magnet:?xt=urn:btih:${t.hash}&dn=${dn}${trackers}`;
-        items.push({
-          title: `${movie.title} (${movie.year}) [${t.quality}][${t.type}]`,
-          magnet,
-          size: t.size,
-          date: String(movie.year),
-          source: 'yts',
-          sourceLabel: 'YTS',
-          resourceType: 'magnet',
-        });
-      }
-    }
-    return items;
-  } catch { return []; }
-}
+    const data = await r.json() as { streams?: Array<{
+      name: string;
+      title: string;
+      infoHash: string;
+      sources?: string[];
+    }> };
+    if (!data.streams?.length) return [];
 
-// ─── 1337x（国际主流种子站）──────────────────────────────────────────
+    // 去重（按 infoHash）
+    const seen = new Set<string>();
+    return data.streams
+      .filter(s => {
+        if (seen.has(s.infoHash)) return false;
+        seen.add(s.infoHash); return true;
+      })
+      .slice(0, 20)
+      .map(s => {
+        // 清理标题：移除 emoji 和尾部元信息
+        const cleanTitle = s.title
+          .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+          .replace(/\s*[\u{1F464}\u2699].*$/su, '')
+          .replace(/\n/g, ' ')
+          .trim();
+        // 提取来源站点标记
+        const sourceMatch = s.title.match(/\s*\u2699\s*(\w[\w\s]*?)(?:\n|$)/);
+        const srcLabel = sourceMatch?.[1]?.trim() || 'Torrentio';
 
-async function search1337x(keyword: string): Promise<ResourceItem[]> {
-  try {
-    // 获取搜索结果页
-    const searchHtml = await httpGet(
-      `https://1337x.to/search/${encodeURIComponent(keyword.replace(/\s+/g, '+'))}/1/`,
-      { 'Referer': 'https://1337x.to/' },
-      12000
-    );
-
-    // 提取详情页链接（取前5条）
-    const linkSet = new Set<string>();
-    const linkRe = /href="(\/torrent\/\d+\/[^"]+)"/gi;
-    let lm: RegExpExecArray | null;
-    while ((lm = linkRe.exec(searchHtml)) !== null && linkSet.size < 5) {
-      linkSet.add('https://1337x.to' + lm[1]);
-    }
-    if (linkSet.size === 0) return [];
-
-    // 并发获取详情页
-    const details = await Promise.allSettled(
-      [...linkSet].map(url => httpGet(url, { 'Referer': 'https://1337x.to/' }, 10000))
-    );
-
-    const items: ResourceItem[] = [];
-    for (const detail of details) {
-      if (detail.status !== 'fulfilled') continue;
-      const html = detail.value;
-
-      const magnetM = html.match(/href="(magnet:\?xt=urn:btih:[^"]+)"/i);
-      if (!magnetM) continue;
-
-      const titleM = html.match(/<h1[^>]*>\s*([^<]+)\s*<\/h1>/i);
-      const sizeM = html.match(/(?:Total size|File size)[^\n]*\n[^<]*<span[^>]*>\s*([^<]+)\s*<\/span>/i)
-        || html.match(/<dt>Size<\/dt>\s*<dd[^>]*>([^<]+)<\/dd>/i)
-        || html.match(/class="file-size"[^>]*>([^<]+)</i);
-      const dateM = html.match(/<dt>Date uploaded<\/dt>\s*<dd[^>]*>([^<]+)<\/dd>/i)
-        || html.match(/class="date"[^>]*>([^<]+)</i);
-
-      items.push({
-        title: titleM ? decodeHtmlEntities(titleM[1].trim()) : keyword,
-        magnet: magnetM[1],
-        size: sizeM ? sizeM[1].trim() : '',
-        date: dateM ? dateM[1].trim() : '',
-        source: '1337x',
-        sourceLabel: '1337x',
-        resourceType: 'magnet',
+        return {
+          title: cleanTitle || s.name.replace(/\n/g, ' ').trim(),
+          magnet: buildMagnetFromHash(s.infoHash, cleanTitle),
+          size: extractSizeFromTitle(s.title),
+          date: '',
+          source: 'torrentio',
+          sourceLabel: srcLabel,
+          resourceType: 'magnet' as const,
+        };
       });
-    }
-    return items;
-  } catch { return []; }
-}
-
-// ─── 磁力通用抓取（LightBT / 音范丝 fallback）────────────────────────
-
-function extractMagnets(html: string, source: string, sourceLabel: string): ResourceItem[] {
-  const items: ResourceItem[] = [];
-  const seenMagnets = new Set<string>();
-  const magnetRe = /href="(magnet:\?xt=urn:btih:[^"]{10,})"/gi;
-  let m: RegExpExecArray | null;
-
-  while ((m = magnetRe.exec(html)) !== null && items.length < 30) {
-    const magnet = m[1];
-    if (seenMagnets.has(magnet)) continue;
-    seenMagnets.add(magnet);
-    const before = html.slice(Math.max(0, m.index - 1500), m.index);
-
-    let title = '';
-    const patterns = [
-      /<a[^>]+href="[^"]*"[^>]*class="[^"]*(?:title|post-title|entry-title|subject|name)[^"]*"[^>]*>\s*([^<]{3,100})\s*<\/a>/i,
-      /<(?:h[1-4])[^>]*>([^<]{3,100})<\/(?:h[1-4])>/i,
-      /title="([^"]{3,100})"/i,
-      /<(?:strong|b)[^>]*>([^<]{3,100})<\/(?:strong|b)>/i,
-      /<a[^>]+class="[^"]*"[^>]*>([^<]{5,80})<\/a>/i,
-    ];
-    for (const pat of patterns) {
-      const hits: string[] = [];
-      let t: RegExpExecArray | null;
-      const re = new RegExp(pat.source, pat.flags);
-      while ((t = re.exec(before))) hits.push(t[1].trim());
-      if (hits.length) { title = hits[hits.length - 1]; break; }
-    }
-    if (!title) continue;
-    title = decodeHtmlEntities(title).trim();
-    if (/^(复制|下载|magnet|分享|收藏|举报|点击|查看|详情)$/.test(title)) continue;
-
-    items.push({ title, magnet, size: '', date: '', source, sourceLabel, resourceType: 'magnet' });
-  }
-  return items;
-}
-
-async function scrapeLightBT(keyword: string): Promise<ResourceItem[]> {
-  try {
-    const html = await httpGet(`https://www.lightbt.top/search?q=${encodeURIComponent(keyword)}`, undefined, 10000);
-    return extractMagnets(html, 'lightbt', 'LightBT');
-  } catch { return []; }
-}
-
-async function scrapeYinfans(keyword: string): Promise<ResourceItem[]> {
-  try {
-    const html = await httpGet(`https://www.yinfans.me/?s=${encodeURIComponent(keyword)}`, { Referer: 'https://www.yinfans.me/' }, 10000);
-    const directResults = extractMagnets(html, 'yinfans', '音范丝');
-    if (directResults.length > 0) return directResults;
-
-    const postLinks: string[] = [];
-    const linkRe = /<a\s+href="(https:\/\/www\.yinfans\.me\/\d+\.html)"[^>]*>/gi;
-    let lm: RegExpExecArray | null;
-    while ((lm = linkRe.exec(html))) postLinks.push(lm[1]);
-    if (postLinks.length === 0) return [];
-
-    const details = await Promise.allSettled(
-      postLinks.slice(0, 3).map(url => httpGet(url, { Referer: 'https://www.yinfans.me/' }, 8000))
-    );
-    const results: ResourceItem[] = [];
-    for (const d of details) {
-      if (d.status === 'fulfilled') results.push(...extractMagnets(d.value, 'yinfans', '音范丝'));
-    }
-    return results;
   } catch { return []; }
 }
 
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
 export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): Promise<MovieSearchResult> {
-  // 元数据 + 磁力资源并发获取
-  const [metaRes, tpbRes, ytsRes, x337Res, lightbtRes, yinfansRes] = await Promise.allSettled([
+  // Phase 1: 元数据 + TPB 关键词搜索 并行
+  const [metaRes, tpbRes] = await Promise.allSettled([
     // 元数据
     (async (): Promise<TMDBResult[]> => {
       const all: TMDBResult[][] = [];
@@ -364,16 +251,8 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
       try { all.push(await searchDouban(keyword)); } catch { /* Douban failed */ }
       return all.flat();
     })(),
-    // 资源：TPB API（覆盖最广，亚洲/国际内容均有）
+    // 资源：TPB API（关键词搜索，覆盖广）
     searchTPB(keyword),
-    // 资源：YTS（英文电影 JSON API）
-    searchYTS(keyword),
-    // 资源：1337x（国际大站）
-    search1337x(keyword),
-    // 资源：LightBT（中文 fallback）
-    scrapeLightBT(keyword),
-    // 资源：音范丝（中文 fallback）
-    scrapeYinfans(keyword),
   ]);
 
   let results: TMDBResult[] = metaRes.status === 'fulfilled' ? metaRes.value : [];
@@ -387,28 +266,42 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     seen.add(key); return true;
   });
 
-  // 合并资源，按来源标记可用性
+  // Phase 2: 用 TMDB 结果的 ID 查询 Torrentio（聚合多源）
+  const tmdbIds = results
+    .filter(r => r.id > 0 && r.source === 'tmdb')
+    .map(r => ({ id: r.id, type: r.mediaType }))
+    .slice(0, 5);
+
+  const torrentioPromises = tmdbIds.map(item =>
+    searchTorrentio(item.id, item.type).catch(() => [] as ResourceItem[])
+  );
+  const torrentioResults = await Promise.allSettled(torrentioPromises);
+
+  // 合并所有资源
   const resourceSources: string[] = [];
   const resources: ResourceItem[] = [];
 
-  const addResources = (settled: PromiseSettledResult<ResourceItem[]>, label: string) => {
-    if (settled.status === 'fulfilled' && settled.value.length > 0) {
-      resources.push(...settled.value);
-      resourceSources.push(label);
-    }
-  };
+  // TPB 结果
+  if (tpbRes.status === 'fulfilled' && tpbRes.value.length > 0) {
+    resources.push(...tpbRes.value);
+    resourceSources.push('TPB');
+  }
 
-  addResources(tpbRes, 'TPB');
-  addResources(ytsRes, 'YTS');
-  addResources(x337Res, '1337x');
-  addResources(lightbtRes, 'LightBT');
-  addResources(yinfansRes, '音范丝');
+  // Torrentio 结果（去重合并）
+  const torrentioAll: ResourceItem[] = [];
+  for (const res of torrentioResults) {
+    if (res.status === 'fulfilled') torrentioAll.push(...res.value);
+  }
+  if (torrentioAll.length > 0) {
+    resources.push(...torrentioAll);
+    resourceSources.push('Torrentio');
+  }
 
-  // 磁力去重
+  // 全局磁力去重（按 btih hash）
   const seenMagnets = new Set<string>();
   const dedupedResources = resources.filter(r => {
     if (!r.magnet) return true;
-    const key = r.magnet.slice(0, 60);
+    const key = r.magnet.slice(20, 60);
     if (seenMagnets.has(key)) return false;
     seenMagnets.add(key); return true;
   });
