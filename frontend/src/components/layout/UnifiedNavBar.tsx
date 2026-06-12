@@ -304,8 +304,8 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
   return (
     <>
       {/* ── 桌面端/平板端导航栏 ── */}
-      <header className="sticky top-0 z-40 glass overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-40 glass">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 min-w-0">
 
             {/* 左侧区域：Logo + Tab 切换器 */}

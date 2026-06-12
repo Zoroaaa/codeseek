@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Star, Calendar, Tv, Copy, Check, Download, ExternalLink,
+  Star, Calendar, Tv, Copy, Check, ExternalLink,
   Magnet, Wifi, RefreshCw, ChevronLeft, ChevronRight,
   ChevronDown, ChevronUp, Shield, Tag, Heart, Users, Trophy, Film,
 } from 'lucide-react';
@@ -8,7 +8,6 @@ import type {
   AnimeEnrichedData,
   BangumiSubject,
   NyaaTorrent,
-  MikanItem,
 } from '@/types/search';
 
 // ─── 图片代理（与 JAV 统一走后端 /api/jav/proxy-image）─────────────
@@ -104,77 +103,7 @@ function NyaaCard({ item }: { item: NyaaTorrent }) {
         {/* 操作按钮 */}
         <div className="flex items-center gap-0.5">
           <CopyBtn text={item.magnet} label="复制磁力链接" />
-          {item.torrentUrl && (
-            <a
-              href={item.torrentUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="下载 .torrent 文件"
-              className="p-1 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-            >
-              <Download className="w-3.5 h-3.5" />
-            </a>
-          )}
-          {/* 查看详情（跳转原站）——优先用 detailUrl，fallback 到 nyaa.si/view */}
-          {(item.detailUrl || (item.id && !item.id.startsWith('at-'))) && (
-            <a
-              href={item.detailUrl || `https://nyaa.si/view/${item.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={`在 ${item.sourceLabel || '原站'} 查看详情`}
-              className="p-1 rounded text-slate-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Mikan 磁力卡片 ─────────────────────────────────────────────────
-
-function MikanCard({ item }: { item: MikanItem }) {
-  return (
-    <div className="grid grid-cols-[1fr_80px] gap-2 items-center px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group">
-      {/* 左侧：标题 + 元信息 */}
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {item.group && (
-            <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300 rounded">
-              [{item.group}]
-            </span>
-          )}
-          <a
-            href={item.magnet}
-            className="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate"
-            title={`点击唤起 BT 客户端下载：${item.title}`}
-          >
-            {item.title}
-          </a>
-        </div>
-        <div className="flex flex-wrap gap-x-3 mt-1 text-[10px] text-slate-500">
-          {item.size && <span>{item.size}</span>}
-          {item.pubDate && <span>{item.pubDate.slice(0, 16)}</span>}
-        </div>
-      </div>
-
-      {/* 右侧：操作 */}
-      <div className="flex justify-end items-center gap-0.5">
-        <CopyBtn text={item.magnet} label="复制磁力链接" />
-        {/* 查看详情（跳转原站） */}
-        {item.detailUrl && (
-          <a
-            href={item.detailUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="在 Mikan 查看详情"
-            className="p-1 rounded text-slate-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-        )}
       </div>
     </div>
   );
@@ -340,35 +269,21 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
   onRefresh,
   onPageChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'nyaa' | 'mikan'>('nyaa');
   const [localPage, setLocalPage] = useState(1);
   const [showAllTorrents, setShowAllTorrents] = useState(false);
   const PAGE_SIZE = 10;
 
   const bgmList = data.bgm ?? [];
   const torrentList = data.nyaa ?? [];
-  const mikanList = data.mikan ?? [];
-  const hasResults = torrentList.length > 0 || mikanList.length > 0;
+  const hasResults = torrentList.length > 0;
 
-  const activeTorrents = activeTab === 'nyaa' ? torrentList : mikanList;
+  const activeTorrents = torrentList;  // 只有 AnimeTosho 一个源，不需要 tab 切换
   const totalPages = Math.max(1, Math.ceil(activeTorrents.length / PAGE_SIZE));
   const pagedTorrents = activeTorrents.slice((localPage - 1) * PAGE_SIZE, localPage * PAGE_SIZE);
 
-  // 切换来源 tab 时重置本地页码
-  const handleSubTabChange = (tab: 'nyaa' | 'mikan') => {
-    setActiveTab(tab);
-    setLocalPage(1);
-    setShowAllTorrents(false);
-  };
-
   // error states
   const hasBgmError = !!data.errors?.bangumi;
-  const hasNyaaError = !!data.errors?.nyaa;
-  const hasMikanError = !!data.errors?.mikan;
-
-  // 统计来源
-  const nyaaCount = torrentList.filter(t => !t.source || t.source === 'nyaa').length;
-  const toshoCount = torrentList.filter(t => t.source === 'animetosho').length;
+  const hasTorrentError = !!data.errors?.nyaa;
 
   return (
     <div className="space-y-6">
@@ -377,14 +292,7 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
         <div className="flex items-center gap-3">
           {hasResults && (
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              {activeTab === 'nyaa' ? (
-                <>
-                  {nyaaCount > 0 && <span className="px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 font-medium">Nyaa {nyaaCount}</span>}
-                  {toshoCount > 0 && <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 font-medium">AnimeTosho {toshoCount}</span>}
-                </>
-              ) : (
-                <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 font-medium">Mikan {mikanList.length}</span>
-              )}
+              <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 font-medium">AnimeTosho</span>
               <span>共 {data.total} 条资源</span>
             </div>
           )}
@@ -403,7 +311,7 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
       </div>
 
       {/* errors */}
-      {(hasBgmError || hasNyaaError || hasMikanError) && (
+      {(hasBgmError || hasTorrentError) && (
         <div className="space-y-2">
           {hasBgmError && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-violet-50 border border-violet-200 text-violet-700 text-sm dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-400">
@@ -411,23 +319,17 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
               <span>Bangumi 请求失败：{data.errors.bangumi}</span>
             </div>
           )}
-          {hasNyaaError && activeTab === 'nyaa' && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-700 text-sm dark:bg-cyan-500/10 dark:border-cyan-500/30 dark:text-cyan-400">
+          {hasTorrentError && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-violet-50 border border-violet-200 text-violet-700 text-sm dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-400">
               <Wifi className="w-4 h-4 flex-shrink-0" />
-              <span>Nyaa 请求失败：{data.errors.nyaa}</span>
-            </div>
-          )}
-          {hasMikanError && activeTab === 'mikan' && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 text-sm dark:bg-orange-500/10 dark:border-orange-500/30 dark:text-orange-400">
-              <Wifi className="w-4 h-4 flex-shrink-0" />
-              <span>Mikan 请求失败：{data.errors.mikan}</span>
+              <span>资源请求失败：{data.errors.nyaa}</span>
             </div>
           )}
         </div>
       )}
 
       {/* completely empty state */}
-      {!hasResults && bgmList.length === 0 && !hasBgmError && !hasNyaaError && !hasMikanError && (
+      {!hasResults && bgmList.length === 0 && !hasBgmError && !hasTorrentError && (
         <div className="text-center py-16">
           <Wifi className="w-10 h-10 text-slate-400 mx-auto mb-3" />
           <p className="text-sm text-slate-500">未找到相关结果</p>
@@ -466,35 +368,8 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
           </div>
         )}
 
-        {/* right: torrent results（增强版） */}
+        {/* right: torrent results */}
         <div className="min-w-0 space-y-4">
-          {/* tab switch */}
-          <div className="flex border-b border-slate-200 dark:border-slate-700 mb-4">
-            {[
-              { key: 'nyaa', label: 'Nyaa.si', count: torrentList.length },
-              { key: 'mikan', label: 'Mikan', count: mikanList.length },
-            ].map(({ key, label, count }) => (
-              <button
-                key={key}
-                onClick={() => handleSubTabChange(key as 'nyaa' | 'mikan')}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
-                  activeTab === key
-                    ? 'border-violet-500 text-violet-600 dark:text-violet-400'
-                    : `border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300`
-                }`}
-              >
-                {label}
-                {count > 0 && (
-                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
-                    activeTab === key ? 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700/50'
-                  }`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
           {/* empty state for torrents */}
           {!hasResults && (
             <div className="text-center py-12 bg-white dark:bg-slate-900/90 rounded-2xl shadow-lg shadow-slate-900/5 border border-slate-200/60 dark:border-slate-700/60">
@@ -530,25 +405,14 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
               <div className="p-4 sm:p-5">
                 <div className="space-y-1.5">
                   {/* 表头 */}
-                  {activeTab === 'nyaa' ? (
-                    <div className="grid grid-cols-[1fr_100px] gap-2 px-2 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800">
-                      <span>标题 / 分类 / 大小 / 日期</span>
-                      <span className="text-right">S/L · 操作</span>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-[1fr_80px] gap-2 px-2 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800">
-                      <span>标题 / 字幕组 / 大小 / 时间</span>
-                      <span className="text-right">操作</span>
-                    </div>
-                  )}
+                  <div className="grid grid-cols-[1fr_100px] gap-2 px-2 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800">
+                    <span>标题 / 分类 / 大小 / 日期</span>
+                    <span className="text-right">状态 · 操作</span>
+                  </div>
 
                   {/* 资源列表 */}
                   {(showAllTorrents ? pagedTorrents : pagedTorrents.slice(0, 5)).map((item, i) =>
-                    activeTab === 'nyaa' ? (
-                      <NyaaCard key={(item as NyaaTorrent).id || i} item={item as NyaaTorrent} />
-                    ) : (
-                      <MikanCard key={(item as MikanItem).magnet || i} item={item as MikanItem} />
-                    )
+                    <NyaaCard key={(item as NyaaTorrent).id || i} item={item as NyaaTorrent} />
                   )}
 
                   {/* 展开/收起 */}
@@ -595,8 +459,8 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
             </div>
           )}
 
-          {/* 服务端翻页（Nyaa 超过 75 条时请求下一页） */}
-          {onPageChange && activeTab === 'nyaa' && torrentList.length >= 60 && localPage >= totalPages && (
+          {/* 服务端翻页（超过 60 条时请求下一页） */}
+          {onPageChange && torrentList.length >= 60 && localPage >= totalPages && (
             <div className="flex justify-center gap-2 mt-1">
               <button
                 disabled={data.page <= 1}

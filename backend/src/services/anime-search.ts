@@ -107,8 +107,10 @@ function parseAnimeToshoRss(xml: string): NyaaTorrent[] {
     const magnetM = block.match(/href="(magnet:\?xt=urn:btih:[^"]+)"/i)
       || block.match(/<atm:magnetURI><!\[CDATA\[(magnet:\?xt=urn:btih:[^\]]+)\]\]>/i)
       || block.match(/<enclosure[^>]+url="(magnet:\?xt=urn:btih:[^"]+)"/i);
-    const magnet = magnetM ? magnetM[1] : '';
+    let magnet = magnetM ? magnetM[1] : '';
     if (!magnet) continue;
+    // XML 中 & 被编码为 &amp;，必须还原否则 BT 客户端无法识别
+    magnet = magnet.replace(/&amp;/g, '&');
 
     // 大小
     const sizeM = block.match(/<atm:contentLength>(\d+)<\/atm:contentLength>/i)
