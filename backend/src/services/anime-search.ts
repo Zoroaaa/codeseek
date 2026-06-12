@@ -141,7 +141,7 @@ function parseNyaaSearchHtml(html: string): NyaaSearchItem[] {
     let magnet = '';
     const magM = row.match(/href="(magnet:\?xt=urn:btih:[^"]+)"/i);
     if (magM) {
-      let rawMag = magM[1].replace(/&amp;/g, '&');
+      const rawMag = magM[1].replace(/&amp;/g, '&');
       const hashMatch = rawMag.match(/btih:([a-fA-F0-9]{40})/i);
       if (hashMatch) {
         magnet = `magnet:?xt=urn:btih:${hashMatch[1].toLowerCase()}${NYAA_ACTIVE_TRACKERS}`;
@@ -166,7 +166,7 @@ function parseNyaaSearchHtml(html: string): NyaaSearchItem[] {
     const category = catIdM ? (catMap[catIdM[1]] || 'Other') : 'Anime';
 
     // 是否为 Trusted/A+ 上传者
-    const trusted = /trusted|a\-plus|class="[^"]*trusted/i.test(row);
+    const trusted = /trusted|a-plus|class="[^"]*trusted/i.test(row);
 
     results.push({
       viewId,
