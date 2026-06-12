@@ -10,6 +10,7 @@ import type {
   NyaaTorrent,
   MikanItem,
 } from '@/types/search';
+import { convertToProxyUrl } from '@/services/proxy/proxy-config';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -205,7 +206,7 @@ const BangumiCard: React.FC<{ subject: BangumiSubject }> = ({ subject }) => (
     {/* 封面 */}
     {subject.cover && (
       <img
-        src={subject.cover}
+        src={convertToProxyUrl(subject.cover)}
         alt={subject.nameCN || subject.name}
         className="w-20 sm:w-24 h-[120px] sm:h-[140px] object-cover rounded-lg flex-shrink-0 bg-slate-200 dark:bg-slate-700 shadow-md"
         loading="lazy"

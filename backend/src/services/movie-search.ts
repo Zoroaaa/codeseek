@@ -281,7 +281,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
   // ── TPB 搜索：用 TMDB originalTitle（英文）搜 ──
   const englishTitles = results
     .map(r => r.originalTitle?.trim())
-    .filter((t): t is string => t && t.length > 1)
+    .filter((t): t is string => Boolean(t) && t.length > 1)
     .slice(0, 5);
 
   let tpbResults: ResourceItem[] = [];
