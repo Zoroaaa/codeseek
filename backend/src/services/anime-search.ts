@@ -1,7 +1,7 @@
 /**
  * 动漫搜索服务
  * 元数据: Bangumi API
- * 磁力资源: AnimeTosho RSS（聚合 Nyaa/多站，唯一可靠源）
+ * 磁力资源: Nyaa.si 搜索页 + 详情页提取磁力链接
  */
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -90,81 +90,126 @@ function decodeHtmlEntities(str: string): string {
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n)));
 }
 
-// ─── AnimeTosho（主源：聚合 Nyaa/多站的 RSS，最稳定可靠）────────────
+// ─── Nyaa.si 搜索（解析 HTML 搜索页 + 批量抓详情拿 magnet）─────────
 
-function parseAnimeToshoRss(xml: string): NyaaTorrent[] {
-  const results: NyaaTorrent[] = [];
-  const itemRe = /<item>([\s\S]*?)<\/item>/gi;
+const NYAA_ACTIVE_TRACKERS = [
+  'udp://tracker.openbittorrent.com:6969/announce',
+  'udp://open.demonii.com:1337/announce',
+  'udp://exodus.desync.com:6969/announce',
+  'udp://tracker.opentrackr.org:1337/announce',
+  'udp://open.stealth.si:80/announce',
+].map(t => `&tr=${encodeURIComponent(t)}`).join('');
+
+/** 解析 Nyaa 搜索页 HTML，提取种子列表（含 magnet） */
+interface NyaaSearchItem {
+  viewId: string;
+  title: string;
+  size: string;
+  date: string;
+  seeders: number;
+  leechers: number;
+  completed: number;
+  category: string;
+  trusted: boolean;
+  magnet: string;           // 从搜索页直接提取
+}
+
+function parseNyaaSearchHtml(html: string): NyaaSearchItem[] {
+  const results: NyaaSearchItem[] = [];
+  // 匹配每个 torrent 行
+  const rowRe = /<tr[^>]*class="[^"]*default"[^>]*>([\s\S]*?)<\/tr>/gi;
   let m: RegExpExecArray | null;
 
-  while ((m = itemRe.exec(xml)) !== null) {
-    const block = m[1];
-    const titleM = block.match(/<title><!\[CDATA\[([^\]]*)\]\]><\/title>/i) || block.match(/<title>([^<]+)<\/title>/i);
-    if (!titleM) continue;
-    const title = decodeHtmlEntities(titleM[1].trim());
+  while ((m = rowRe.exec(html)) !== null) {
+    const row = m[1];
 
-    // AnimeTosho 提供磁力链接在 <link> 或 <enclosure> 中
-    const magnetM = block.match(/href="(magnet:\?xt=urn:btih:[^"]+)"/i)
-      || block.match(/<atm:magnetURI><!\[CDATA\[(magnet:\?xt=urn:btih:[^\]]+)\]\]>/i)
-      || block.match(/<enclosure[^>]+url="(magnet:\?xt=urn:btih:[^"]+)"/i);
-    let magnet = magnetM ? magnetM[1] : '';
-    if (!magnet) continue;
-    // XML 中 & 被编码为 &amp;，必须还原否则 BT 客户端无法识别
-    magnet = magnet.replace(/&amp;/g, '&');
+    // 提取 view ID 和标题
+    const titleLinkM = row.match(/<a[^>]*href="\/view\/(\d+)"[^>]*title="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i)
+      || row.match(/<a[^>]*href="\/view\/(\d+)"[^>]*>([\s\S]*?)<\/a>/i);
+    if (!titleLinkM) continue;
 
-    // 大小
-    const sizeM = block.match(/<atm:contentLength>(\d+)<\/atm:contentLength>/i)
-      || block.match(/<length>(\d+)<\/length>/i);
-    const sizeBytes = sizeM ? parseInt(sizeM[1]) : 0;
-    const size = sizeBytes > 1073741824 ? `${(sizeBytes / 1073741824).toFixed(1)} GiB`
-      : sizeBytes > 1048576 ? `${(sizeBytes / 1048576).toFixed(0)} MiB`
-        : sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(0)} KiB` : '';
+    const viewId = titleLinkM[1];
+    let title = titleLinkM[2] || '';
+    if (!title) {
+      const rawTitle = titleLinkM[3] || '';
+      title = rawTitle.replace(/<[^>]+>/g, '').trim();
+    }
+    title = decodeHtmlEntities(title);
+    if (!title) continue;
 
-    // 发布日期
-    const pubDateM = block.match(/<pubDate>([^<]+)<\/pubDate>/i);
-
-    // 来源站点标记（从 description 中提取）
-    const descM = block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/i);
-    let srcLabel = 'AnimeTosho';
-    if (descM) {
-      const srcMatch = descM[1].match(/<a[^>]+href="https?:\/\/nyaa\.si[^"]*"[^>]*>\s*(?:<span[^>]*>)?([^<]+)/i);
-      if (srcMatch) srcLabel = `Nyaa · ${srcMatch[1].trim()}`;
+    // 直接从搜索行提取 magnet（U 形图标链接）
+    let magnet = '';
+    const magM = row.match(/href="(magnet:\?xt=urn:btih:[^"]+)"/i);
+    if (magM) {
+      let rawMag = magM[1].replace(/&amp;/g, '&');
+      const hashMatch = rawMag.match(/btih:([a-fA-F0-9]{40})/i);
+      if (hashMatch) {
+        magnet = `magnet:?xt=urn:btih:${hashMatch[1].toLowerCase()}${NYAA_ACTIVE_TRACKERS}`;
+      }
     }
 
+    // 大小
+    const sizeM = row.match(/<td[^>]*class="[^"]*size"[^>]*>\s*([\d.]+\s*(?:GiB|MiB|KiB|B|TB|GB|MB|KB))\s*<\/td>/i);
+
+    // 日期
+    const dateM = row.match(/<td[^>]*class="[^"]*date"[^>]*>\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*<\/td>/i);
+
+    // 做种/下载/完成数
+    const statsM = row.match(/<td[^>]*class="[^"]*seeders"[^>]*>\s*(\d+)\s*<\/td>[\s\S]*?<td[^>]*class="[^"]*leechers"[^>]*>\s*(\d+)\s*<\/td>[\s\S]*?<td[^>]*class="[^"]*completed"[^>]*>\s*(\d+)\s*<\/td>/i);
+
+    // 分类图标 → 分类名
+    const catMap: Record<string, string> = {
+      '1_2': 'Anime Eng', '1_3': 'Anime Non-Eng', '1_4': 'Anime Raw',
+      '0_0': 'All', '1_0': 'Anime', '2_0': 'Audio', '3_0': 'Literature', '4_0': 'Live Action',
+    };
+    const catIdM = row.match(/\/static\/img\/icons\/nyaa\/(\d+_\d+)\.png/i);
+    const category = catIdM ? (catMap[catIdM[1]] || 'Other') : 'Anime';
+
+    // 是否为 Trusted/A+ 上传者
+    const trusted = /trusted|a\-plus|class="[^"]*trusted/i.test(row);
+
     results.push({
-      id: `at-${Math.random().toString(36).slice(2, 8)}`,
+      viewId,
       title,
+      size: sizeM ? sizeM[1] : '',
+      date: dateM ? dateM[1] : '',
+      seeders: statsM ? parseInt(statsM[1]) || 0 : 0,
+      leechers: statsM ? parseInt(statsM[2]) || 0 : 0,
+      completed: statsM ? parseInt(statsM[3]) || 0 : 0,
+      category,
+      trusted,
       magnet,
-      torrentUrl: '',
-      size,
-      date: pubDateM ? new Date(pubDateM[1]).toISOString().split('T')[0] : '',
-      seeders: 0,
-      leechers: 0,
-      completed: 0,
-      trusted: false,
-      category: 'Anime',
-      source: 'animetosho',
-      sourceLabel: srcLabel,
-      hasSeedData: false,
-      // 从 description 中提取 Nyaa 原站链接作为详情页
-      detailUrl: (() => {
-        if (!descM) return undefined;
-        const linkMatch = descM[1].match(/<a[^>]+href="(https?:\/\/nyaa\.si\/view\/\d+)"[^>]*/i);
-        return linkMatch ? linkMatch[1] : undefined;
-      })(),
     });
   }
   return results;
 }
 
-/** AnimeTosho 主搜索 */
-async function fetchAnimeTosho(keyword: string): Promise<NyaaTorrent[]> {
+/** Nyaa 主搜索（一步到位：搜索页直接拿到所有数据 + magnet） */
+async function fetchNyaa(keyword: string): Promise<NyaaTorrent[]> {
   try {
-    const xml = await httpGet(
-      `https://feed.animetosho.org/rss2?q=${encodeURIComponent(keyword)}&orderby=seeds`,
-      15000
+    const html = await httpGet(
+      `https://nyaa.si/?f=0&c=1_0&q=${encodeURIComponent(keyword)}&s=seeders&o=desc`,
+      12000
     );
-    return parseAnimeToshoRss(xml);
+    const items = parseNyaaSearchHtml(html);
+
+    return items.map(item => ({
+      id: item.viewId,
+      title: item.title,
+      magnet: item.magnet,                          // 搜索页直接提取
+      torrentUrl: item.viewId ? `https://nyaa.si/download/${item.viewId}.torrent` : '',
+      size: item.size,
+      date: item.date ? item.date.split(' ')[0] : '',
+      seeders: item.seeders,
+      leechers: item.leechers,
+      completed: item.completed,
+      trusted: item.trusted,
+      category: item.category,
+      source: 'nyaa',
+      sourceLabel: 'Nyaa.si',
+      hasSeedData: true,
+      detailUrl: `https://nyaa.si/view/${item.viewId}`,
+    }));
   } catch { return []; }
 }
 
@@ -229,14 +274,14 @@ async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
 export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearchResult> {
-  // 并行：Bangumi 元数据 + AnimeTosho 磁力资源
-  const [bgmResult, toshoResult] = await Promise.allSettled([
+  // 并行：Bangumi 元数据 + Nyaa.si 磁力资源
+  const [bgmResult, nyaaResult] = await Promise.allSettled([
     fetchBangumi(keyword),
-    fetchAnimeTosho(keyword),
+    fetchNyaa(keyword),
   ]);
 
   const bgm = bgmResult.status === 'fulfilled' ? bgmResult.value : [];
-  const nyaa: NyaaTorrent[] = toshoResult.status === 'fulfilled' ? toshoResult.value : [];
+  const nyaa: NyaaTorrent[] = nyaaResult.status === 'fulfilled' ? nyaaResult.value : [];
 
   return {
     keyword,
@@ -247,7 +292,7 @@ export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearc
     total: nyaa.length,
     errors: {
       bangumi: bgmResult.status === 'rejected' ? String(bgmResult.reason) : null,
-      nyaa: toshoResult.status === 'rejected' ? String(toshoResult.reason) : null,
+      nyaa: nyaaResult.status === 'rejected' ? String(nyaaResult.reason) : null,
       mikan: null,
     },
   };

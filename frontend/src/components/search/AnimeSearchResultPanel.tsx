@@ -71,8 +71,8 @@ function NyaaCard({ item }: { item: NyaaTorrent }) {
             <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300 rounded">4K</span>
           ) : null}
           {/* 来源标记 */}
-          {item.source === 'animetosho' && (
-            <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-medium bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300 rounded">AnimeTosho</span>
+          {item.source === 'nyaa' && (
+            <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-medium bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300 rounded">Nyaa</span>
           )}
           {/* 标题（点击唤起客户端） */}
           <a
@@ -277,7 +277,7 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
   const torrentList = data.nyaa ?? [];
   const hasResults = torrentList.length > 0;
 
-  const activeTorrents = torrentList;  // 只有 AnimeTosho 一个源，不需要 tab 切换
+  const activeTorrents = torrentList;  // 只有 Nyaa.si 一个源，不需要 tab 切换
   const totalPages = Math.max(1, Math.ceil(activeTorrents.length / PAGE_SIZE));
   const pagedTorrents = activeTorrents.slice((localPage - 1) * PAGE_SIZE, localPage * PAGE_SIZE);
 
@@ -292,7 +292,7 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
         <div className="flex items-center gap-3">
           {hasResults && (
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 font-medium">AnimeTosho</span>
+              <span className="px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 font-medium">Nyaa.si</span>
               <span>共 {data.total} 条资源</span>
             </div>
           )}
