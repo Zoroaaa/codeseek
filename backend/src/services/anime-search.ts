@@ -19,6 +19,16 @@ export interface BangumiSubject {
   rank?: number;
   eps: number;
   url: string;
+  /** 作品类型：TV/OVA/Movie/Web/Music/Other */
+  type?: string;
+  /** 制作公司/工作室 */
+  studio?: string;
+  /** 标签（最多5个热门标签） */
+  tags?: string[];
+  /** 收藏数据 */
+  collection?: { wish: number; collect: number; doing: number; dropped: number };
+  /** 放送状态 */
+  status?: string;
 }
 
 export interface NyaaTorrent {
@@ -37,6 +47,8 @@ export interface NyaaTorrent {
   sourceLabel?: string;
   /** false = 该来源不提供做种数据（如 AnimeTosho RSS），显示 DHT 而非 0/0 */
   hasSeedData?: boolean;
+  /** 原站详情页链接 */
+  detailUrl?: string;
 }
 
 export interface MikanItem {
@@ -132,6 +144,12 @@ function parseAnimeToshoRss(xml: string): NyaaTorrent[] {
       source: 'animetosho',
       sourceLabel: srcLabel,
       hasSeedData: false,
+      // 从 description 中提取 Nyaa 原站链接作为详情页
+      detailUrl: (() => {
+        if (!descM) return undefined;
+        const linkMatch = descM[1].match(/<a[^>]+href="(https?:\/\/nyaa\.si\/view\/\d+)"[^>]*/i);
+        return linkMatch ? linkMatch[1] : undefined;
+      })(),
     });
   }
   return results;
@@ -197,6 +215,7 @@ function parseNyaaRss(xml: string): NyaaTorrent[] {
       source: 'nyaa',
       sourceLabel: 'Nyaa.si',
       hasSeedData: true,
+      detailUrl: viewId ? `https://nyaa.si/view/${viewId}` : undefined,
     });
   }
   return results;
@@ -259,7 +278,7 @@ async function fetchMikan(keyword: string): Promise<MikanItem[]> {
 
 async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
   try {
-    const url = `https://api.bgm.tv/search/subject/${encodeURIComponent(keyword)}?type=2&responseGroup=medium&max_results=6`;
+    const url = `https://api.bgm.tv/search/subject/${encodeURIComponent(keyword)}?type=2&responseGroup=large&max_results=6`;
     const r = await fetch(url, {
       headers: { 'User-Agent': 'codeseek/1.0 (https://github.com/Zoroaaa)', 'Accept': 'application/json' },
       signal: AbortSignal.timeout(10000),
@@ -267,20 +286,49 @@ async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
     if (!r.ok) return [];
     const data = await r.json() as { list?: any[] };
     if (!data.list?.length) return [];
-    return data.list.map((s: any) => ({
-      id: s.id,
-      name: s.name || '',
-      nameCN: s.name_cn || s.name || '',
-      cover: s.images?.large || s.images?.common || s.images?.medium || '',
-      summary: (s.summary || '').slice(0, 200),
-      airDate: s.air_date || '',
-      airWeekday: s.air_weekday ?? -1,
-      rating: s.rating?.score ?? 0,
-      ratingCount: s.rating?.total ?? 0,
-      rank: s.rank ?? 0,
-      eps: s.eps_count ?? s.eps ?? 0,
-      url: `https://bgm.tv/subject/${s.id}`,
-    }));
+    return data.list.map((s: any) => {
+      // 提取制作公司（从 staff 或 infobox 中）
+      const studio = s.infobox?.find((i: any) => i.key === '动画制作' || i.key === 'Studio')?.value
+        || s.staff?.find((st: any) => st.position === '动画制作')?.person?.name
+        || '';
+      // 提取标签（按热度排序，取前5）
+      const tagsRaw = s.tags?.sort((a: any, b: any) => (b.count || 0) - (a.count || 0)) || [];
+      const tags = tagsRaw.slice(0, 5).map((t: any) => t.name);
+      // 放送状态推断
+      let status = '';
+      if (s.eps_count > 0 && s.air_date) {
+        const airDate = new Date(s.air_date);
+        const now = new Date();
+        if (now < airDate) status = '未开播';
+        else status = '已完结';
+      }
+      if ((s.collection?.doing || 0) > 0 && !status.includes('已完结')) status = '连载中';
+
+      return {
+        id: s.id,
+        name: s.name || '',
+        nameCN: s.name_cn || s.name || '',
+        cover: s.images?.large || s.images?.common || s.images?.medium || '',
+        summary: (s.summary || '').slice(0, 300),
+        airDate: s.air_date || '',
+        airWeekday: s.air_weekday ?? -1,
+        rating: s.rating?.score ?? 0,
+        ratingCount: s.rating?.total ?? 0,
+        rank: s.rank ?? 0,
+        eps: s.eps_count ?? s.eps ?? 0,
+        url: `https://bgm.tv/subject/${s.id}`,
+        type: s.type || '',           // TV / OVA / Movie / Web / Music
+        studio: studio || '',          // 制作公司
+        tags: tags.length ? tags : undefined,
+        collection: s.collection ? {
+          wish: s.collection.wish || 0,
+          collect: s.collection.collect || 0,
+          doing: s.collection.doing || 0,
+          dropped: s.collection.dropped || 0,
+        } : undefined,
+        status: status || undefined,
+      };
+    });
   } catch { return []; }
 }
 

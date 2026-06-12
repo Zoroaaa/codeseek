@@ -34,6 +34,8 @@ export interface ResourceItem {
   driveUrl?: string;
   /** 提取码 */
   driveCode?: string;
+  /** 原站详情页链接（用于“查看详情”跳转） */
+  detailUrl?: string;
 }
 
 export interface MovieSearchResult {
@@ -158,6 +160,7 @@ async function searchTPB(keyword: string): Promise<ResourceItem[]> {
       source: 'tpb',
       sourceLabel: 'TPB',
       resourceType: 'magnet' as const,
+      detailUrl: item.id ? `https://thepiratebay.org/description.php?id=${item.id}` : undefined,
     }));
   } catch { return []; }
 }
@@ -232,6 +235,18 @@ async function searchTorrentio(tmdbId: number, mediaType: 'movie' | 'tv'): Promi
           source: 'torrentio',
           sourceLabel: srcLabel,
           resourceType: 'magnet' as const,
+          // 根据聚合来源生成详情页链接
+          detailUrl: (() => {
+            const q = encodeURIComponent(cleanTitle);
+            switch (srcLabel.toLowerCase()) {
+              case 'yts': return `https://yts.mx/browse-movies/${q}`;
+              case '1337x': return `https://1337x.st/search/${q}/1/`;
+              case 'thepiratebay': return `https://thepiratebay.org/search.php?q=${q}&cat=0`;
+              case 'torrentgalaxy': return `https://torrentgalaxy.to/search?search=${q}`;
+              case 'rarbg': return `https://rarbg2023.org/search/?search=${q}`;
+              default: return undefined;
+            }
+          })(),
         };
       });
   } catch { return []; }

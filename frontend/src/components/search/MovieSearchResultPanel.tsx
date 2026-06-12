@@ -116,6 +116,18 @@ function ResourceCard({ item }: { item: ResourceItem }) {
             </a>
           </>
         ) : null}
+        {/* 查看详情（跳转原站） */}
+        {item.detailUrl && (
+          <a
+            href={item.detailUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`在 ${item.sourceLabel} 查看详情`}
+            className="p-1 rounded text-slate-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )}
       </div>
     </div>
   );

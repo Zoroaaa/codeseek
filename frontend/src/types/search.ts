@@ -27,6 +27,16 @@ export interface BangumiSubject {
   rank?: number;
   eps: number;
   url: string;
+  /** 作品类型：TV/OVA/Movie/Web/Music/Other */
+  type?: string;
+  /** 制作公司/工作室 */
+  studio?: string;
+  /** 标签（最多5个热门标签） */
+  tags?: string[];
+  /** 收藏数据 */
+  collection?: { wish: number; collect: number; doing: number; dropped: number };
+  /** 放送状态：连载中 / 已完结 / 未开播 */
+  status?: string;
 }
 
 export interface NyaaTorrent {
@@ -44,6 +54,8 @@ export interface NyaaTorrent {
   source?: string;
   sourceLabel?: string;
   hasSeedData?: boolean;
+  /** 原站详情页链接 */
+  detailUrl?: string;
 }
 
 export interface MikanItem {
@@ -52,6 +64,8 @@ export interface MikanItem {
   size: string;
   pubDate: string;
   group: string;
+  /** 原站详情页链接 */
+  detailUrl?: string;
 }
 
 export interface AnimeEnrichedData {
@@ -90,6 +104,8 @@ export interface ResourceItem {
   resourceType?: 'magnet' | 'drive' | 'direct';
   driveUrl?: string;
   driveCode?: string;
+  /** 原站详情页链接 */
+  detailUrl?: string;
 }
 
 export interface MovieEnrichedData {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Star, Calendar, Tv, Copy, Check, Download, ExternalLink,
   Magnet, Wifi, RefreshCw, ChevronLeft, ChevronRight,
-  ChevronDown, ChevronUp, Shield,
+  ChevronDown, ChevronUp, Shield, Tag, Heart, Users, Trophy, Film,
 } from 'lucide-react';
 import type {
   AnimeEnrichedData,
@@ -107,13 +107,14 @@ function NyaaCard({ item }: { item: NyaaTorrent }) {
               <Download className="w-3.5 h-3.5" />
             </a>
           )}
-          {item.id && !item.id.startsWith('at-') && (
+          {/* 查看详情（跳转原站）——优先用 detailUrl，fallback 到 nyaa.si/view */}
+          {(item.detailUrl || (item.id && !item.id.startsWith('at-'))) && (
             <a
-              href={`https://nyaa.si/view/${item.id}`}
+              href={item.detailUrl || `https://nyaa.si/view/${item.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              title="在 Nyaa.si 查看"
-              className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+              title={`在 ${item.sourceLabel || '原站'} 查看详情`}
+              className="p-1 rounded text-slate-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -154,12 +155,57 @@ function MikanCard({ item }: { item: MikanItem }) {
       {/* 右侧：操作 */}
       <div className="flex justify-end items-center gap-0.5">
         <CopyBtn text={item.magnet} label="复制磁力链接" />
+        {/* 查看详情（跳转原站） */}
+        {item.detailUrl && (
+          <a
+            href={item.detailUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="在 Mikan 查看详情"
+            className="p-1 rounded text-slate-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )}
       </div>
     </div>
   );
 }
 
-// ─── Bangumi 卡片（增强版元数据展示） ───────────────────────────────
+// ─── 类型/状态标签颜色映射 ────────────────────────────────────────
+
+const typeColor = (t?: string) => {
+  switch (t?.toLowerCase()) {
+    case 'tv': return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300';
+    case 'movie': return 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300';
+    case 'ova': return 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300';
+    case 'web': return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300';
+    case 'music': return 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-300';
+    default: return 'bg-slate-100 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400';
+  }
+};
+
+const statusColor = (s?: string) => {
+  switch (s) {
+    case '连载中': return 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400';
+    case '已完结': return 'bg-slate-100 text-slate-500 dark:bg-slate-700/40 dark:text-slate-400';
+    case '未开播': return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
+    default: return '';
+  }
+};
+
+const typeLabel = (t?: string) => {
+  switch (t?.toLowerCase()) {
+    case 'tv': return 'TV';
+    case 'movie': return '剧场版';
+    case 'ova': return 'OVA';
+    case 'web': return 'Web';
+    case 'music': return '音乐';
+    default: return t || '';
+  }
+};
+
+// ─── Bangumi 卡片（详细元数据展示） ─────────────────────────────────
 
 const BangumiCard: React.FC<{ subject: BangumiSubject }> = ({ subject }) => (
   <a
@@ -168,18 +214,39 @@ const BangumiCard: React.FC<{ subject: BangumiSubject }> = ({ subject }) => (
     rel="noopener noreferrer"
     className="group flex gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-800/40 hover:border-violet-500/50 hover:bg-slate-50 dark:hover:bg-slate-800/70 transition-all"
   >
+    {/* 封面 */}
     {subject.cover && (
       <img
         src={subject.cover}
         alt={subject.nameCN || subject.name}
-        className="w-16 sm:w-20 object-cover rounded-lg flex-shrink-0 bg-slate-200 dark:bg-slate-700 shadow-md"
+        className="w-20 sm:w-24 h-[120px] sm:h-[140px] object-cover rounded-lg flex-shrink-0 bg-slate-200 dark:bg-slate-700 shadow-md"
         loading="lazy"
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
       />
     )}
+
     <div className="min-w-0 flex-1">
+      {/* 标题行：类型 + 状态 + 名称 + 外链 */}
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+            {subject.type && (
+              <span className={`shrink-0 px-1.5 py-0.5 text-[9px] font-bold rounded ${typeColor(subject.type)}`}>
+                {typeLabel(subject.type)}
+              </span>
+            )}
+            {subject.status && (
+              <span className={`shrink-0 px-1.5 py-0.5 text-[9px] font-bold rounded ${statusColor(subject.status)}`}>
+                {subject.status}
+              </span>
+            )}
+            {subject.rank && subject.rank > 0 && subject.rank <= 1000 && (
+              <span className="shrink-0 flex items-center gap-0.5 text-[10px] text-amber-500 font-medium">
+                <Trophy className="w-3 h-3" />#{subject.rank}
+              </span>
+            )}
+          </div>
+
           <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 leading-snug line-clamp-2 group-hover:text-violet-500 transition-colors">
             {subject.nameCN || subject.name}
           </h3>
@@ -190,12 +257,40 @@ const BangumiCard: React.FC<{ subject: BangumiSubject }> = ({ subject }) => (
         <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-violet-500 flex-shrink-0 mt-0.5 transition-colors" />
       </div>
 
-      {/* 详细信息 */}
-      <div className="space-y-1 mt-2">
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+      {/* 详细信息区 */}
+      <div className="space-y-1.5 mt-2">
+        {/* 第一行：评分 + 收藏 + 集数 + 放送日期 */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
           {subject.rating > 0 && (
-            <span className={`flex items-center gap-1 ${fmt.rating(subject.rating)}`}>
-              <Star className="w-3 h-3 fill-current" />{subject.rating.toFixed(1)}
+            <span className={`flex items-center gap-1 ${fmt.rating(subject.rating)} font-medium`}>
+              <Star className="w-3 h-3 fill-current" />
+              {subject.rating.toFixed(1)}
+              {subject.ratingCount ? (
+                <span className="text-[10px] text-slate-400 font-normal">({subject.ratingCount})</span>
+              ) : null}
+            </span>
+          )}
+
+          {subject.collection && (
+            <>
+              {subject.collection.collect > 0 && (
+                <span className="flex items-center gap-0.5 text-[10px]" title="收藏人数">
+                  <Heart className="w-3 h-3 text-red-400" />
+                  {(subject.collection.collect / 1000).toFixed(1)}k
+                </span>
+              )}
+              {subject.collection.doing > 0 && (
+                <span className="flex items-center gap-0.5 text-[10px]" title="在看人数">
+                  <Users className="w-3 h-3 text-blue-400" />
+                  {subject.collection.doing}
+                </span>
+              )}
+            </>
+          )}
+
+          {subject.eps > 0 && (
+            <span className="flex items-center gap-1">
+              <Tv className="w-3 h-3" />{subject.eps} 集
             </span>
           )}
           {subject.airDate && (
@@ -203,14 +298,29 @@ const BangumiCard: React.FC<{ subject: BangumiSubject }> = ({ subject }) => (
               <Calendar className="w-3 h-3" />{subject.airDate.slice(0, 7)}
             </span>
           )}
-          {subject.eps > 0 && (
-            <span className="flex items-center gap-1">
-              <Tv className="w-3 h-3" />{subject.eps} 集
-            </span>
-          )}
         </div>
+
+        {/* 制作公司 */}
+        {subject.studio && (
+          <span className="text-[10px] text-violet-500 dark:text-violet-400 truncate block">
+            <Film className="w-3 h-3 inline mr-0.5" />{subject.studio}
+          </span>
+        )}
+
+        {/* 标签 */}
+        {subject.tags && subject.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {subject.tags.map(tag => (
+              <span key={tag} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400">
+                <Tag className="w-2.5 h-2.5" />{tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* 简介 */}
         {subject.summary && (
-          <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 mt-1">
+          <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 mt-1">
             {subject.summary}
           </p>
         )}
