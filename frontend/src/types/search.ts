@@ -21,7 +21,10 @@ export interface BangumiSubject {
   cover: string;
   summary: string;
   airDate: string;
+  airWeekday?: number;
   rating: number;
+  ratingCount?: number;
+  rank?: number;
   eps: number;
   url: string;
 }
@@ -40,6 +43,7 @@ export interface NyaaTorrent {
   category: string;
   source?: string;
   sourceLabel?: string;
+  hasSeedData?: boolean;
 }
 
 export interface MikanItem {

@@ -126,10 +126,8 @@ const MovieCard: React.FC<{
   </button>
 );
 
-const ResourceRow: React.FC<{ item: ResourceItem; idx: number }> = ({ item, idx }) => (
-  <tr className={`border-b border-slate-800/60 hover:bg-slate-800/40 transition-colors ${
-    idx % 2 === 0 ? '' : 'bg-slate-900/20'
-  }`}>
+const ResourceRow: React.FC<{ item: ResourceItem; idx: number }> = ({ item, idx: _idx }) => (
+  <tr className="border-b border-slate-800/40 hover:bg-slate-800/50 transition-colors">
     <td className="py-2.5 px-3 max-w-0 w-full">
       <p className="text-sm text-slate-200 break-words leading-snug">{item.title}</p>
       <div className="flex flex-wrap gap-x-3 mt-0.5 text-xs text-slate-500">
@@ -193,6 +191,8 @@ export const MovieSearchResultPanel: React.FC<MovieSearchResultPanelProps> = ({
   const [selectedItem, setSelectedItem] = useState<TMDBResult | null>(
     data.results.length > 0 ? data.results[0] : null
   );
+  const [resourcePage, setResourcePage] = useState(1);
+  const RES_PAGE_SIZE = 10;
 
   const results = data.results ?? [];
   const resources = data.resources ?? [];
@@ -207,6 +207,14 @@ export const MovieSearchResultPanel: React.FC<MovieSearchResultPanelProps> = ({
     : resources;
 
   const displayResources = filteredResources.length > 0 ? filteredResources : resources;
+  const resTotalPages = Math.max(1, Math.ceil(displayResources.length / RES_PAGE_SIZE));
+  const pagedResources = displayResources.slice((resourcePage - 1) * RES_PAGE_SIZE, resourcePage * RES_PAGE_SIZE);
+
+  // 切换影视时重置资源页码
+  const handleSelectItem = (item: TMDBResult) => {
+    setSelectedItem(item);
+    setResourcePage(1);
+  };
 
   return (
     <div className="space-y-5">
@@ -271,7 +279,7 @@ export const MovieSearchResultPanel: React.FC<MovieSearchResultPanelProps> = ({
                 <MovieCard
                   key={`${item.mediaType}-${item.id}`}
                   item={item}
-                  onSelect={setSelectedItem}
+                  onSelect={handleSelectItem}
                   active={
                     selectedItem?.id === item.id &&
                     selectedItem?.mediaType === item.mediaType
@@ -433,22 +441,48 @@ export const MovieSearchResultPanel: React.FC<MovieSearchResultPanelProps> = ({
                 </p>
               </div>
             ) : (
-              <div className={`rounded-xl overflow-hidden border ${borderBase(isDark)}`}>
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className={`text-xs ${tableHead(isDark)}`}>
-                      <th className="py-2.5 px-3 font-medium">标题 / 大小 / 日期</th>
-                      <th className="py-2.5 px-2 font-medium">来源</th>
-                      <th className="py-2.5 px-2 font-medium">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayResources.map((item, i) => (
-                      <ResourceRow key={item.magnet + i} item={item} idx={i} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className={`rounded-xl overflow-hidden border ${borderBase(isDark)}`}>
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className={`text-xs ${tableHead(isDark)}`}>
+                        <th className="py-2.5 px-3 font-medium">标题 / 大小 / 日期</th>
+                        <th className="py-2.5 px-2 font-medium">来源</th>
+                        <th className="py-2.5 px-2 font-medium">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedResources.map((item, i) => (
+                        <ResourceRow key={item.magnet + i} item={item} idx={i} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {displayResources.length > RES_PAGE_SIZE && (
+                  <div className="flex items-center justify-center gap-2 mt-3">
+                    <button
+                      disabled={resourcePage <= 1}
+                      onClick={() => setResourcePage(p => p - 1)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-800/60 text-slate-400
+                                 hover:bg-slate-700 hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" /> 上一页
+                    </button>
+                    <span className="text-xs text-slate-500 px-2">
+                      {resourcePage} / {resTotalPages}
+                      <span className="ml-1 text-slate-600">（共 {displayResources.length} 条）</span>
+                    </span>
+                    <button
+                      disabled={resourcePage >= resTotalPages}
+                      onClick={() => setResourcePage(p => p + 1)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-800/60 text-slate-400
+                                 hover:bg-slate-700 hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      下一页 <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Star, Calendar, Tv, Copy, Check, Download, ExternalLink,
-  Magnet, Wifi, RefreshCw, Loader2,
+  Magnet, Wifi, RefreshCw, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import type {
   AnimeEnrichedData,
@@ -106,10 +106,8 @@ const CopyMagnetBtn: React.FC<{ magnet: string }> = ({ magnet }) => {
   );
 };
 
-const NyaaRow: React.FC<{ item: NyaaTorrent; idx: number; isDark: boolean }> = ({ item, idx, isDark: _isDark }) => (
-  <tr className={`border-b border-slate-800/60 hover:bg-slate-800/40 transition-colors ${
-    idx % 2 === 0 ? '' : 'bg-slate-900/20'
-  }`}>
+const NyaaRow: React.FC<{ item: NyaaTorrent; idx: number; isDark: boolean }> = ({ item, idx: _idx, isDark: _isDark }) => (
+  <tr className="border-b border-slate-800/40 hover:bg-slate-800/50 transition-colors">
     <td className="py-2.5 px-3 max-w-0 w-full">
       <div className="flex items-start gap-2">
         {item.trusted && (
@@ -127,9 +125,15 @@ const NyaaRow: React.FC<{ item: NyaaTorrent; idx: number; isDark: boolean }> = (
       </div>
     </td>
     <td className="py-2.5 px-2 text-center whitespace-nowrap">
-      <span className={`text-sm font-medium ${fmt.seedColor(item.seeders)}`}>{item.seeders}</span>
-      <span className="text-slate-600 mx-0.5">/</span>
-      <span className="text-sm text-red-400">{item.leechers}</span>
+      {item.hasSeedData === false ? (
+        <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-500" title="AnimeTosho RSS 不含做种数，种子仍可通过 DHT 获取">DHT</span>
+      ) : (
+        <>
+          <span className={`text-sm font-medium ${fmt.seedColor(item.seeders)}`}>{item.seeders}</span>
+          <span className="text-slate-600 mx-0.5">/</span>
+          <span className="text-sm text-red-400">{item.leechers}</span>
+        </>
+      )}
     </td>
     <td className="py-2.5 px-2 whitespace-nowrap">
       <div className="flex items-center gap-1">
@@ -161,10 +165,8 @@ const NyaaRow: React.FC<{ item: NyaaTorrent; idx: number; isDark: boolean }> = (
   </tr>
 );
 
-const MikanRow: React.FC<{ item: MikanItem; idx: number }> = ({ item, idx }) => (
-  <tr className={`border-b border-slate-800/60 hover:bg-slate-800/40 transition-colors ${
-    idx % 2 === 0 ? '' : 'bg-slate-900/20'
-  }`}>
+const MikanRow: React.FC<{ item: MikanItem; idx: number }> = ({ item, idx: _idx }) => (
+  <tr className="border-b border-slate-800/40 hover:bg-slate-800/50 transition-colors">
     <td className="py-2.5 px-3 max-w-0 w-full">
       <span className="text-sm text-slate-200 leading-snug break-words">{item.title}</span>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-slate-500">
@@ -198,11 +200,23 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
   onPageChange,
 }) => {
   const [activeTab, setActiveTab] = useState<'nyaa' | 'mikan'>('nyaa');
+  const [localPage, setLocalPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const bgmList = data.bgm ?? [];
   const torrentList = data.nyaa ?? [];
   const mikanList = data.mikan ?? [];
   const hasResults = torrentList.length > 0 || mikanList.length > 0;
+
+  const activeTorrents = activeTab === 'nyaa' ? torrentList : mikanList;
+  const totalPages = Math.max(1, Math.ceil(activeTorrents.length / PAGE_SIZE));
+  const pagedTorrents = activeTorrents.slice((localPage - 1) * PAGE_SIZE, localPage * PAGE_SIZE);
+
+  // 切换来源 tab 时重置本地页码
+  const handleSubTabChange = (tab: 'nyaa' | 'mikan') => {
+    setActiveTab(tab);
+    setLocalPage(1);
+  };
 
   // error states
   const hasBgmError = !!data.errors?.bangumi;
@@ -320,7 +334,7 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
             ].map(({ key, label, count }) => (
               <button
                 key={key}
-                onClick={() => setActiveTab(key as 'nyaa' | 'mikan')}
+                onClick={() => handleSubTabChange(key as 'nyaa' | 'mikan')}
                 className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
                   activeTab === key
                     ? 'border-violet-500 text-violet-400'
@@ -348,30 +362,29 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
             </div>
           )}
 
-          {/* Nyaa table */}
-          {activeTab === 'nyaa' && torrentList.length > 0 && (
+          {/* 结果表格（两个 tab 共用 pagedTorrents） */}
+          {pagedTorrents.length > 0 && activeTab === 'nyaa' && (
             <div className={`rounded-xl overflow-hidden border ${borderBase(isDark)}`}>
               <table className="w-full text-left">
                 <thead>
                   <tr className={`text-xs ${tableHead(isDark)}`}>
                     <th className="py-2.5 px-3 font-medium">标题 / 分类 / 大小</th>
                     <th className="py-2.5 px-2 text-center font-medium whitespace-nowrap">
-                      <span title="做种/下载">S/L</span>
+                      <span title="做种/下载（AnimeTosho 显示 DHT）">S/L</span>
                     </th>
                     <th className="py-2.5 px-2 font-medium">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {torrentList.map((item, i) => (
-                    <NyaaRow key={item.id} item={item} idx={i} isDark={isDark} />
+                  {(pagedTorrents as NyaaTorrent[]).map((item, i) => (
+                    <NyaaRow key={item.id || i} item={item} idx={i} isDark={isDark} />
                   ))}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Mikan table */}
-          {activeTab === 'mikan' && mikanList.length > 0 && (
+          {pagedTorrents.length > 0 && activeTab === 'mikan' && (
             <div className={`rounded-xl overflow-hidden border ${borderBase(isDark)}`}>
               <table className="w-full text-left">
                 <thead>
@@ -382,32 +395,58 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {mikanList.map((item, i) => (
-                    <MikanRow key={item.magnet} item={item} idx={i} />
+                  {(pagedTorrents as MikanItem[]).map((item, i) => (
+                    <MikanRow key={(item as MikanItem).magnet || i} item={item as MikanItem} idx={i} />
                   ))}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* pagination */}
-          {onPageChange && activeTab === 'nyaa' && torrentList.length >= 60 && (
-            <div className="flex justify-center gap-2 mt-4">
+          {/* 客户端分页（10条/页） */}
+          {activeTorrents.length > PAGE_SIZE && (
+            <div className="flex items-center justify-center gap-2 mt-3">
               <button
-                disabled={data.page <= 1}
-                onClick={() => onPageChange(data.page - 1)}
+                disabled={localPage <= 1}
+                onClick={() => setLocalPage(p => p - 1)}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-800/60 text-slate-400
                            hover:bg-slate-700 hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
-                <Loader2 className="w-3.5 h-3.5" style={{ transform: 'rotate(-90deg)' }} /> 上一页
+                <ChevronLeft className="w-3.5 h-3.5" /> 上一页
               </button>
-              <span className="flex items-center px-3 text-xs text-slate-500">第 {data.page} 页</span>
+              <span className="text-xs text-slate-500 px-2">
+                {localPage} / {totalPages}
+                <span className="ml-1 text-slate-600">（共 {activeTorrents.length} 条）</span>
+              </span>
+              <button
+                disabled={localPage >= totalPages}
+                onClick={() => setLocalPage(p => p + 1)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-800/60 text-slate-400
+                           hover:bg-slate-700 hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                下一页 <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* 服务端翻页（Nyaa 超过 75 条时请求下一页） */}
+          {onPageChange && activeTab === 'nyaa' && torrentList.length >= 60 && localPage >= totalPages && (
+            <div className="flex justify-center gap-2 mt-1">
+              <button
+                disabled={data.page <= 1}
+                onClick={() => onPageChange(data.page - 1)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-violet-800/40 text-violet-300
+                           hover:bg-violet-700/60 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" /> 上一批
+              </button>
+              <span className="flex items-center px-3 text-xs text-slate-500">第 {data.page} 批</span>
               <button
                 onClick={() => onPageChange(data.page + 1)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-800/60 text-slate-400
-                           hover:bg-slate-700 hover:text-slate-200 transition-all"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-violet-800/40 text-violet-300
+                           hover:bg-violet-700/60 transition-all"
               >
-                下一页 <Loader2 className="w-3.5 h-3.5" style={{ transform: 'rotate(90deg)' }} />
+                下一批 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           )}

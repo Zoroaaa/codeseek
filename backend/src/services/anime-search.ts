@@ -13,7 +13,10 @@ export interface BangumiSubject {
   cover: string;
   summary: string;
   airDate: string;
+  airWeekday?: number;    // 0=未知 1=周一 … 7=周日
   rating: number;
+  ratingCount?: number;
+  rank?: number;
   eps: number;
   url: string;
 }
@@ -32,6 +35,8 @@ export interface NyaaTorrent {
   category: string;
   source?: string;
   sourceLabel?: string;
+  /** false = 该来源不提供做种数据（AnimeTosho RSS），显示 DHT 而非 0/0 */
+  hasSeedData?: boolean;
 }
 
 export interface MikanItem {
@@ -121,6 +126,7 @@ function parseNyaaRss(xml: string): NyaaTorrent[] {
       category: categoryMap[catIdM?.[1] || ''] || `Cat-${catIdM?.[1]}`,
       source: 'nyaa',
       sourceLabel: 'Nyaa.si',
+      hasSeedData: true,
     });
   }
   return results;
@@ -184,6 +190,7 @@ function parseNyaaHtml(html: string): NyaaTorrent[] {
       trusted: row[1]?.includes('success'),
       source: 'nyaa',
       sourceLabel: 'Nyaa.si',
+      hasSeedData: true,
     });
   }
   return results;
@@ -226,13 +233,14 @@ function parseAnimeToshoRss(xml: string): NyaaTorrent[] {
       torrentUrl: '',
       size,
       date: pubDateM ? new Date(pubDateM[1]).toISOString().split('T')[0] : '',
-      seeders: parseInt(seederM?.[1] || '0') || 0,
+      seeders: 0,
       leechers: 0,
       completed: 0,
       trusted: false,
       category: 'Anime',
       source: 'animetosho',
       sourceLabel: 'AnimeTosho',
+      hasSeedData: false,  // AnimeTosho RSS 不含做种数
     });
   }
   return results;
@@ -290,7 +298,7 @@ async function fetchMikan(keyword: string): Promise<MikanItem[]> {
 
 async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
   try {
-    const url = `https://api.bgm.tv/search/subject/${encodeURIComponent(keyword)}?type=2&responseGroup=small&max_results=6`;
+    const url = `https://api.bgm.tv/search/subject/${encodeURIComponent(keyword)}?type=2&responseGroup=medium&max_results=6`;
     const r = await fetch(url, {
       headers: { 'User-Agent': 'codeseek/1.0 (https://github.com/Zoroaaa)', 'Accept': 'application/json' },
       signal: AbortSignal.timeout(10000),
@@ -299,10 +307,17 @@ async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
     const data = await r.json() as { list?: any[] };
     if (!data.list?.length) return [];
     return data.list.map((s: any) => ({
-      id: s.id, name: s.name || '', nameCN: s.name_cn || s.name || '',
-      cover: s.images?.large || s.images?.common || '',
-      summary: (s.summary || '').slice(0, 200), airDate: s.air_date || '',
-      rating: s.rating?.score ?? 0, eps: s.eps_count ?? s.eps ?? 0,
+      id: s.id,
+      name: s.name || '',
+      nameCN: s.name_cn || s.name || '',
+      cover: s.images?.large || s.images?.common || s.images?.medium || '',
+      summary: (s.summary || '').slice(0, 200),
+      airDate: s.air_date || '',
+      airWeekday: s.air_weekday ?? -1,
+      rating: s.rating?.score ?? 0,
+      ratingCount: s.rating?.total ?? 0,
+      rank: s.rank ?? 0,
+      eps: s.eps_count ?? s.eps ?? 0,
       url: `https://bgm.tv/subject/${s.id}`,
     }));
   } catch { return []; }

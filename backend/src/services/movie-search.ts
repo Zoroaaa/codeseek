@@ -134,6 +134,51 @@ async function searchDouban(keyword: string): Promise<TMDBResult[]> {
   return [];
 }
 
+// ─── 工具函数 ─────────────────────────────────────────────────────────
+
+function formatBytes(bytes: number): string {
+  if (!bytes) return '';
+  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GB`;
+  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(0)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+// ─── The Pirate Bay API（apibay.org JSON，最全，CF Workers 可达）──────
+
+async function searchTPB(keyword: string): Promise<ResourceItem[]> {
+  try {
+    const url = `https://apibay.org/q.php?q=${encodeURIComponent(keyword)}&cat=0`;
+    const r = await fetch(url, {
+      headers: { 'Accept': 'application/json', 'User-Agent': UA },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!r.ok) return [];
+    const items = await r.json() as Array<{
+      id: string; name: string; info_hash: string;
+      leechers: string; seeders: string; size: string; added: string;
+    }>;
+    if (!items?.length || items[0]?.name === 'No results returned') return [];
+
+    const trackers = [
+      'udp%3A%2F%2Ftracker.openbittorrent.com%3A6969%2Fannounce',
+      'udp%3A%2F%2Fopen.demonii.com%3A1337%2Fannounce',
+      'udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce',
+      'udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce',
+    ].map(t => `&tr=${t}`).join('');
+
+    return items.slice(0, 20).map(item => ({
+      title: item.name,
+      magnet: `magnet:?xt=urn:btih:${item.info_hash.toLowerCase()}&dn=${encodeURIComponent(item.name)}${trackers}`,
+      size: formatBytes(parseInt(item.size) || 0),
+      date: item.added ? new Date(parseInt(item.added) * 1000).toISOString().split('T')[0] : '',
+      source: 'tpb',
+      sourceLabel: 'TPB',
+      resourceType: 'magnet' as const,
+    }));
+  } catch { return []; }
+}
+
 // ─── YTS.mx API（英文电影，JSON API，最可靠）─────────────────────────
 
 async function searchYTS(keyword: string): Promise<ResourceItem[]> {
@@ -222,6 +267,7 @@ async function search1337x(keyword: string): Promise<ResourceItem[]> {
         || html.match(/class="file-size"[^>]*>([^<]+)</i);
       const dateM = html.match(/<dt>Date uploaded<\/dt>\s*<dd[^>]*>([^<]+)<\/dd>/i)
         || html.match(/class="date"[^>]*>([^<]+)</i);
+      const seedM = html.match(/<span class="seeds">([^<]+)<\/span>/i);
 
       items.push({
         title: titleM ? decodeHtmlEntities(titleM[1].trim()) : keyword,
@@ -309,7 +355,7 @@ async function scrapeYinfans(keyword: string): Promise<ResourceItem[]> {
 
 export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): Promise<MovieSearchResult> {
   // 元数据 + 磁力资源并发获取
-  const [metaRes, ytsRes, x337Res, lightbtRes, yinfansRes] = await Promise.allSettled([
+  const [metaRes, tpbRes, ytsRes, x337Res, lightbtRes, yinfansRes] = await Promise.allSettled([
     // 元数据
     (async (): Promise<TMDBResult[]> => {
       const all: TMDBResult[][] = [];
@@ -319,9 +365,11 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
       try { all.push(await searchDouban(keyword)); } catch { /* Douban failed */ }
       return all.flat();
     })(),
-    // 资源：YTS（英文电影 JSON API，最可靠）
+    // 资源：TPB API（覆盖最广，亚洲/国际内容均有）
+    searchTPB(keyword),
+    // 资源：YTS（英文电影 JSON API）
     searchYTS(keyword),
-    // 资源：1337x（国际大站，支持中英文）
+    // 资源：1337x（国际大站）
     search1337x(keyword),
     // 资源：LightBT（中文 fallback）
     scrapeLightBT(keyword),
@@ -351,6 +399,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     }
   };
 
+  addResources(tpbRes, 'TPB');
   addResources(ytsRes, 'YTS');
   addResources(x337Res, '1337x');
   addResources(lightbtRes, 'LightBT');
