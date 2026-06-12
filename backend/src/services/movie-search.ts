@@ -350,7 +350,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
 
   // ── Phase 3: EZTV 剧集搜索（需要 IMDB ID）──
   let eztvResults: ResourceItem[] = [];
-  let eztvError: string | null = null;
+  const eztvError: string | null = null;
   const tvItems = results.filter(r => r.mediaType === 'tv');
   if (tvItems.length > 0 && tmdbKey) {
     const eztvPromises = tvItems.slice(0, 5).map(async (item) => {
