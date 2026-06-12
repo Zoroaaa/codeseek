@@ -267,7 +267,6 @@ async function search1337x(keyword: string): Promise<ResourceItem[]> {
         || html.match(/class="file-size"[^>]*>([^<]+)</i);
       const dateM = html.match(/<dt>Date uploaded<\/dt>\s*<dd[^>]*>([^<]+)<\/dd>/i)
         || html.match(/class="date"[^>]*>([^<]+)</i);
-      const seedM = html.match(/<span class="seeds">([^<]+)<\/span>/i);
 
       items.push({
         title: titleM ? decodeHtmlEntities(titleM[1].trim()) : keyword,

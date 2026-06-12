@@ -224,7 +224,6 @@ function parseAnimeToshoRss(xml: string): NyaaTorrent[] {
         : sizeBytes > 0 ? `${(sizeBytes / 1024).toFixed(0)} KiB` : '';
 
     const pubDateM = block.match(/<pubDate>([^<]+)<\/pubDate>/i);
-    const seederM = block.match(/<atm:trackerSeeds>(\d+)<\/atm:trackerSeeds>/i);
 
     results.push({
       id: `at-${Math.random().toString(36).slice(2)}`,
