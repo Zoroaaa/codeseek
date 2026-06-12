@@ -255,9 +255,8 @@ async function searchTorrentio(tmdbId: number, mediaType: 'movie' | 'tv'): Promi
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
 export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): Promise<MovieSearchResult> {
-  // Phase 1: 元数据 + TPB 关键词搜索 并行
-  const [metaRes, tpbRes] = await Promise.allSettled([
-    // 元数据
+  // Phase 1: 元数据（TMDB + 豆瓣）
+  const metaRes = await Promise.allSettled([
     (async (): Promise<TMDBResult[]> => {
       const all: TMDBResult[][] = [];
       if (tmdbKey) {
@@ -266,12 +265,10 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
       try { all.push(await searchDouban(keyword)); } catch { /* Douban failed */ }
       return all.flat();
     })(),
-    // 资源：TPB API（关键词搜索，覆盖广）
-    searchTPB(keyword),
   ]);
 
-  let results: TMDBResult[] = metaRes.status === 'fulfilled' ? metaRes.value : [];
-  const tmdbError = metaRes.status === 'rejected' ? String(metaRes.reason) : null;
+  let results: TMDBResult[] = metaRes[0].status === 'fulfilled' ? metaRes[0].value : [];
+  const tmdbError = metaRes[0].status === 'rejected' ? String(metaRes[0].reason) : null;
 
   // 元数据去重（按 title 前30字符）
   const seen = new Set<string>();
@@ -280,6 +277,30 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     if (seen.has(key)) return false;
     seen.add(key); return true;
   });
+
+  // ── TPB 搜索：用 TMDB originalTitle（英文）搜 ──
+  const englishTitles = results
+    .map(r => r.originalTitle?.trim())
+    .filter((t): t is string => t && t.length > 1)
+    .slice(0, 5);
+
+  let tpbResults: ResourceItem[] = [];
+  if (englishTitles.length > 0) {
+    const tpbPromises = englishTitles.map(title =>
+      searchTPB(title).catch(() => [] as ResourceItem[])
+    );
+    const tpbRes = await Promise.allSettled(tpbPromises);
+    for (const res of tpbRes) {
+      if (res.status === 'fulfilled') tpbResults.push(...res.value);
+    }
+    // 按 btih 去重
+    const seenHashes = new Set<string>();
+    tpbResults = tpbResults.filter(r => {
+      const hash = r.magnet?.slice(20, 60) || '';
+      if (!hash || seenHashes.has(hash)) return false;
+      seenHashes.add(hash); return true;
+    }).slice(0, 30);
+  }
 
   // Phase 2: 用 TMDB 结果的 ID 查询 Torrentio（聚合多源）
   const tmdbIds = results
@@ -297,8 +318,8 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
   const resources: ResourceItem[] = [];
 
   // TPB 结果
-  if (tpbRes.status === 'fulfilled' && tpbRes.value.length > 0) {
-    resources.push(...tpbRes.value);
+  if (tpbResults.length > 0) {
+    resources.push(...tpbResults);
     resourceSources.push('TPB');
   }
 

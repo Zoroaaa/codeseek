@@ -27,8 +27,8 @@ export interface BangumiSubject {
   rank?: number;
   eps: number;
   url: string;
-  /** 作品类型：TV/OVA/Movie/Web/Music/Other */
-  type?: string;
+  /** 作品类型：TV(2)/OVA/Movie(6)/Web(4)/Music(3) — 数字或字符串 */
+  type?: string | number;
   /** 制作公司/工作室 */
   studio?: string;
   /** 标签（最多5个热门标签） */
