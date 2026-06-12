@@ -63,8 +63,9 @@ export interface AnimeSearchResult {
   bgm: BangumiSubject[];
   nyaa: NyaaTorrent[];
   mikan: MikanItem[];
+  animetosho: NyaaTorrent[];
   total: number;
-  errors: { bangumi: string | null; nyaa: string | null; mikan: string | null };
+  errors: { bangumi: string | null; nyaa: string | null; mikan: string | null; animetosho: string | null };
 }
 
 // ─── Nyaa.si RSS 搜索 ─────────────────────────────────────────────────
@@ -184,6 +185,80 @@ async function fetchNyaa(keyword: string): Promise<NyaaTorrent[]> {
   return parseNyaaRss(xml);
 }
 
+// ─── AnimeTosho JSON API ──────────────────────────────────────────────
+
+/** 从 magnet URI 提取 infoHash（40位 hex） */
+function extractHash(magnet: string): string {
+  const m = magnet.match(/urn:btih:([a-fA-F0-9]{40})/i);
+  return m ? m[1].toLowerCase() : '';
+}
+
+/**
+ * AnimeTosho JSON API 搜索
+ * URL: https://feed.animetosho.org/json?q={keyword}
+ * 无需 key，无 bot 检测，返回最多 ~30 条
+ * 返回格式复用 NyaaTorrent（结构一致）
+ */
+async function fetchAnimeTosho(keyword: string): Promise<NyaaTorrent[]> {
+  const url = `https://feed.animetosho.org/json?q=${encodeURIComponent(keyword)}`;
+  const r = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (compatible; CodeSeek/1.0)',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!r.ok) {
+    throw new Error(`animetosho_http_${r.status}`);
+  }
+
+  const data = await r.json() as Array<{
+    id: number;
+    title: string;
+    magnet_uri: string;
+    torrent_url?: string;
+    seeders?: number;
+    leechers?: number;
+    torrent_downloaded_count?: number;
+    file_size?: number;
+    timestamp?: number;
+    nyaa_id?: number;
+    website_url?: string;
+  }>;
+
+  if (!Array.isArray(data) || data.length === 0) return [];
+
+  return data.map(item => ({
+    id: String(item.nyaa_id ?? item.id ?? ''),
+    title: item.title || '',
+    magnet: item.magnet_uri || '',
+    torrentUrl: item.torrent_url || '',
+    size: item.file_size != null ? formatBytesAT(item.file_size) : '',
+    date: item.timestamp ? new Date(item.timestamp * 1000).toISOString().slice(0, 10) : '',
+    seeders: item.seeders || 0,
+    leechers: item.leechers || 0,
+    completed: item.torrent_downloaded_count || 0,
+    trusted: false,
+    category: 'Anime',
+    source: 'animetosho' as const,
+    sourceLabel: 'AnimeTosho',
+    hasSeedData: !!item.seeders,
+    detailUrl: item.nyaa_id
+      ? `https://nyaa.si/view/${item.nyaa_id}`
+      : (item.website_url || ''),
+  }));
+}
+
+/** bytes → 可读字符串（AnimeTosho 用，避免与 movie-search 的 formatBytes 冲突命名） */
+function formatBytesAT(bytes: number): string {
+  if (!bytes) return '';
+  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GiB`;
+  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(0)} MiB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KiB`;
+  return `${bytes} B`;
+}
+
 // ─── Bangumi 元数据 ───────────────────────────────────────────────────
 
 async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
@@ -242,13 +317,15 @@ async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
 export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearchResult> {
-  const [bgmResult, nyaaResult] = await Promise.allSettled([
+  const [bgmResult, nyaaResult, atosResult] = await Promise.allSettled([
     fetchBangumi(keyword),
     fetchNyaa(keyword),
+    fetchAnimeTosho(keyword),
   ]);
 
   const bgm  = bgmResult.status  === 'fulfilled' ? bgmResult.value  : [];
   const nyaa = nyaaResult.status === 'fulfilled' ? nyaaResult.value : [];
+  const atos = atosResult.status === 'fulfilled' ? atosResult.value : [];
 
   // 错误信息现在能正确传递给前端（原来 fetchNyaa 内部 catch 导致永远是 null）
   const nyaaError = nyaaResult.status === 'rejected'
@@ -259,17 +336,31 @@ export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearc
     console.error('[anime-search] nyaa failed:', nyaaError);
   }
 
+  // 合并 Nyaa + AnimeTosho，按 infoHash 去重
+  const allNyaa = [...nyaa, ...atos];
+  const seenHashes = new Set<string>();
+  const dedupedNyaa = allNyaa.filter(r => {
+    const hash = extractHash(r.magnet);
+    if (!hash || seenHashes.has(hash)) return false;
+    seenHashes.add(hash);
+    return true;
+  });
+  // 按 seeders 降序
+  dedupedNyaa.sort((a, b) => (b.seeders ?? 0) - (a.seeders ?? 0));
+
   return {
     keyword,
     page,
     bgm:   bgm.slice(0, 6),
-    nyaa,
+    nyaa:  dedupedNyaa,
     mikan: [],
-    total: nyaa.length,
+    animetosho: atos,
+    total: dedupedNyaa.length,
     errors: {
       bangumi: bgmResult.status === 'rejected' ? String(bgmResult.reason) : null,
       nyaa:    nyaaError,
       mikan:   null,
+      animetosho: atosResult.status === 'rejected' ? String(atosResult.reason) : null,
     },
   };
 }

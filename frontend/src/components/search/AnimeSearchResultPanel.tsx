@@ -274,16 +274,17 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
   const PAGE_SIZE = 10;
 
   const bgmList = data.bgm ?? [];
+  // 合并 Nyaa + AnimeTosho（后端已按 infoHash 去重并排序）
   const torrentList = data.nyaa ?? [];
   const hasResults = torrentList.length > 0;
 
-  const activeTorrents = torrentList;  // 只有 Nyaa.si 一个源，不需要 tab 切换
+  const activeTorrents = torrentList;
   const totalPages = Math.max(1, Math.ceil(activeTorrents.length / PAGE_SIZE));
   const pagedTorrents = activeTorrents.slice((localPage - 1) * PAGE_SIZE, localPage * PAGE_SIZE);
 
   // error states
   const hasBgmError = !!data.errors?.bangumi;
-  const hasTorrentError = !!data.errors?.nyaa;
+  const hasTorrentError = !!data.errors?.nyaa || !!data.errors?.animetosho;
 
   return (
     <div className="space-y-6">
@@ -292,8 +293,14 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
         <div className="flex items-center gap-3">
           {hasResults && (
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 font-medium">Nyaa.si</span>
+              <span className="px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 font-medium">多源聚合</span>
               <span>共 {data.total} 条资源</span>
+              {(data.nyaa?.length > 0) && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">Nyaa</span>
+              )}
+              {(data.animetosho?.length > 0) && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300">AT</span>
+              )}
             </div>
           )}
           {!hasResults && (
@@ -319,10 +326,16 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
               <span>Bangumi 请求失败：{data.errors.bangumi}</span>
             </div>
           )}
-          {hasTorrentError && (
+          {data.errors?.nyaa && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-violet-50 border border-violet-200 text-violet-700 text-sm dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-400">
               <Wifi className="w-4 h-4 flex-shrink-0" />
-              <span>资源请求失败：{data.errors.nyaa}</span>
+              <span>Nyaa 请求失败：{data.errors.nyaa}</span>
+            </div>
+          )}
+          {data.errors?.animetosho && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-sm dark:bg-purple-500/10 dark:border-purple-500/30 dark:text-purple-400">
+              <Wifi className="w-4 h-4 flex-shrink-0" />
+              <span>AnimeTosho 请求失败：{data.errors.animetosho}</span>
             </div>
           )}
         </div>

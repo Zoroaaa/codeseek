@@ -50,6 +50,16 @@ function ResourceCard({ item }: { item: ResourceItem }) {
       {/* 左侧：标题 + 元信息 */}
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
+          {/* 来源徽章 */}
+          {item.source === 'yts' && (
+            <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 rounded">YTS</span>
+          )}
+          {item.source === 'eztv' && (
+            <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 rounded">EZTV</span>
+          )}
+          {item.source === 'tpb' && (
+            <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-400 rounded">TPB</span>
+          )}
           {/* 资源类型标签 */}
           {item.resourceType === 'drive' && (
             <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 rounded">网盘</span>
@@ -288,9 +298,21 @@ export const MovieSearchResultPanel: React.FC<MovieSearchResultPanelProps> = ({
           <span>豆瓣请求失败：{data.doubanError}</span>
         </div>
       )}
+      {data.ytsError && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>YTS 请求失败：{data.ytsError}</span>
+        </div>
+      )}
+      {data.eztvError && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-700 text-sm dark:bg-cyan-500/10 dark:border-cyan-500/30 dark:text-cyan-400">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>EZTV 请求失败：{data.eztvError}</span>
+        </div>
+      )}
 
       {/* completely empty state */}
-      {results.length === 0 && resources.length === 0 && !data.tmdbError && !data.doubanError && (
+      {results.length === 0 && resources.length === 0 && !data.tmdbError && !data.doubanError && !data.ytsError && !data.eztvError && (
         <div className="text-center py-16">
           <Wifi className="w-10 h-10 text-slate-400 mx-auto mb-3" />
           <p className="text-sm text-slate-500">未找到相关结果</p>

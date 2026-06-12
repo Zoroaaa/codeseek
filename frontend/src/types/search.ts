@@ -75,8 +75,9 @@ export interface AnimeEnrichedData {
   bgm: BangumiSubject[];
   nyaa: NyaaTorrent[];
   mikan: MikanItem[];
+  animetosho: NyaaTorrent[];
   total: number;
-  errors: { bangumi: string | null; nyaa: string | null; mikan: string | null };
+  errors: { bangumi: string | null; nyaa: string | null; mikan: string | null; animetosho: string | null };
 }
 
 export interface TMDBResult {
@@ -118,6 +119,8 @@ export interface MovieEnrichedData {
   resourceTotal: number;
   tmdbError: string | null;
   doubanError: string | null;
+  ytsError: string | null;      // NEW
+  eztvError: string | null;     // NEW
   resourceSources?: string[];
 }
 
