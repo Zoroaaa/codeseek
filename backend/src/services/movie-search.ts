@@ -66,8 +66,8 @@ function formatBytes(bytes: number): string {
 
 // ─── TMDB API ──────────────────────────────────────────────────────────
 
-async function searchTMDB(keyword: string, apiKey: string, page = 1): Promise<TMDBResult[]> {
-  const url = `https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(keyword)}&language=zh-CN&page=${page}&include_adult=false`;
+async function searchTMDB(keyword: string, apiKey: string, page = 1, lang = 'zh-CN'): Promise<TMDBResult[]> {
+  const url = `https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(keyword)}&language=${lang}&page=${page}&include_adult=false`;
   const r = await fetch(url, {
     headers: { 'Accept': 'application/json' },
     signal: AbortSignal.timeout(12000),
@@ -255,20 +255,21 @@ async function searchTorrentio(tmdbId: number, mediaType: 'movie' | 'tv'): Promi
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
 export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): Promise<MovieSearchResult> {
-  // Phase 1: 元数据（TMDB + 豆瓣）
-  const metaRes = await Promise.allSettled([
-    (async (): Promise<TMDBResult[]> => {
-      const all: TMDBResult[][] = [];
-      if (tmdbKey) {
-        try { all.push(await searchTMDB(keyword, tmdbKey, page)); } catch { /* TMDB failed */ }
-      }
-      try { all.push(await searchDouban(keyword)); } catch { /* Douban failed */ }
-      return all.flat();
-    })(),
+  // Phase 1: 元数据 — 中文 TMDB + 英文 TMDB（拿英文名搜 TPB）+ 豆瓣 三路并行
+  const [zhMetaRes, enMetaRes, doubanRes] = await Promise.allSettled([
+    // 中文元数据（用于展示）
+    tmdbKey ? searchTMDB(keyword, tmdbKey, page, 'zh-CN').catch(() => [] as TMDBResult[]) : Promise.resolve([] as TMDBResult[]),
+    // 英文元数据（用于 TPB 搜索关键词）
+    tmdbKey ? searchTMDB(keyword, tmdbKey, page, 'en-US').catch(() => [] as TMDBResult[]) : Promise.resolve([] as TMDBResult[]),
+    // 豆瓣
+    searchDouban(keyword).catch(() => [] as TMDBResult[]),
   ]);
 
-  let results: TMDBResult[] = metaRes[0].status === 'fulfilled' ? metaRes[0].value : [];
-  const tmdbError = metaRes[0].status === 'rejected' ? String(metaRes[0].reason) : null;
+  let results: TMDBResult[] = zhMetaRes.status === 'fulfilled' ? zhMetaRes.value : [];
+  if (doubanRes.status === 'fulfilled' && doubanRes.value.length > 0) {
+    results.push(...doubanRes.value);
+  }
+  const tmdbError = zhMetaRes.status === 'rejected' ? String(zhMetaRes.reason) : null;
 
   // 元数据去重（按 title 前30字符）
   const seen = new Set<string>();
@@ -278,22 +279,34 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     seen.add(key); return true;
   });
 
-  // ── TPB 搜索：用 TMDB originalTitle（英文）搜 ──
-  const englishTitles = results
-    .map(r => r.originalTitle?.trim())
-    .filter((t): t is string => Boolean(t) && t.length > 1)
-    .slice(0, 5);
+  // ── 构建 TMDB ID → 英文标题 映射表 ──
+  const enResults: TMDBResult[] = enMetaRes.status === 'fulfilled' ? enMetaRes.value : [];
+  const idToEnglishTitle = new Map<number, string>();
+  for (const item of enResults) {
+    if (item.id > 0 && item.title) {
+      idToEnglishTitle.set(item.id, item.title);
+    }
+  }
+
+  // ── TPB 搜索：优先用英文标题，fallback 到 originalTitle ──
+  const tpbKeywords: string[] = [];
+  for (const r of results) {
+    // 优先从英文映射取，其次用 originalTitle
+    const en = idToEnglishTitle.get(r.id) || r.originalTitle?.trim() || '';
+    if (en && en.length > 1 && !tpbKeywords.includes(en)) {
+      tpbKeywords.push(en);
+    }
+  }
 
   let tpbResults: ResourceItem[] = [];
-  if (englishTitles.length > 0) {
-    const tpbPromises = englishTitles.map(title =>
+  if (tpbKeywords.length > 0) {
+    const tpbPromises = tpbKeywords.slice(0, 5).map(title =>
       searchTPB(title).catch(() => [] as ResourceItem[])
     );
     const tpbRes = await Promise.allSettled(tpbPromises);
     for (const res of tpbRes) {
       if (res.status === 'fulfilled') tpbResults.push(...res.value);
     }
-    // 按 btih 去重
     const seenHashes = new Set<string>();
     tpbResults = tpbResults.filter(r => {
       const hash = r.magnet?.slice(20, 60) || '';
