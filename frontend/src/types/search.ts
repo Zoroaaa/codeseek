@@ -38,6 +38,8 @@ export interface NyaaTorrent {
   completed: number;
   trusted: boolean;
   category: string;
+  source?: string;
+  sourceLabel?: string;
 }
 
 export interface MikanItem {
@@ -81,6 +83,9 @@ export interface ResourceItem {
   date: string;
   source: string;
   sourceLabel: string;
+  resourceType?: 'magnet' | 'drive' | 'direct';
+  driveUrl?: string;
+  driveCode?: string;
 }
 
 export interface MovieEnrichedData {
@@ -93,6 +98,7 @@ export interface MovieEnrichedData {
   resourceTotal: number;
   tmdbError: string | null;
   doubanError: string | null;
+  resourceSources?: string[];
 }
 
 export type EnrichedSearchData = AnimeEnrichedData | MovieEnrichedData;

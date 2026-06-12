@@ -144,14 +144,32 @@ const ResourceRow: React.FC<{ item: ResourceItem; idx: number }> = ({ item, idx 
     </td>
     <td className="py-2.5 px-2 whitespace-nowrap">
       <div className="flex items-center gap-1">
-        <CopyBtn text={item.magnet} />
-        <a
-          href={item.magnet}
-          title="打开磁力链接"
-          className="p-1.5 rounded-lg bg-slate-700/60 text-slate-400 hover:bg-blue-600/30 hover:text-blue-300 transition-all"
-        >
-          <Magnet className="w-3.5 h-3.5" />
-        </a>
+        {item.resourceType === 'drive' && item.driveUrl ? (
+          <>
+            <a
+              href={item.driveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs bg-blue-600/20 text-blue-300 hover:bg-blue-600/40 transition-all"
+            >
+              <ExternalLink className="w-3 h-3" /> 网盘
+            </a>
+            {item.driveCode && (
+              <CopyBtn text={item.driveCode} label={`码: ${item.driveCode}`} />
+            )}
+          </>
+        ) : item.magnet ? (
+          <>
+            <CopyBtn text={item.magnet} />
+            <a
+              href={item.magnet}
+              title="打开磁力链接"
+              className="p-1.5 rounded-lg bg-slate-700/60 text-slate-400 hover:bg-blue-600/30 hover:text-blue-300 transition-all"
+            >
+              <Magnet className="w-3.5 h-3.5" />
+            </a>
+          </>
+        ) : null}
       </div>
     </td>
   </tr>
@@ -195,9 +213,14 @@ export const MovieSearchResultPanel: React.FC<MovieSearchResultPanelProps> = ({
       {/* stats bar */}
       <div className="flex items-center justify-between">
         <div className={`flex items-center gap-3 text-xs ${textMuted(isDark)}`}>
-          <span>TMDB {data.total} 条</span>
+          <span>{data.total} 条影视</span>
           <span>·</span>
-          <span>磁力资源 {data.resourceTotal} 条</span>
+          <span>{data.resourceTotal} 条资源</span>
+          {data.resourceSources && data.resourceSources.length > 0 && (
+            <span className="text-slate-600">
+              来自 {data.resourceSources.join(' / ')}
+            </span>
+          )}
         </div>
         {onRefresh && (
           <button
@@ -399,30 +422,13 @@ export const MovieSearchResultPanel: React.FC<MovieSearchResultPanelProps> = ({
                 }`}
               >
                 <Magnet className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">未抓取到磁力资源</p>
+                <p className="text-sm text-slate-500">未抓取到资源</p>
                 <p className="text-xs text-slate-600 mt-1">
-                  资源站可能暂不可访问，可直接前往
-                  <a
-                    href={`https://www.lightbt.top/search?q=${encodeURIComponent(
-                      data.keyword
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:underline mx-1"
-                  >
-                    LightBT
-                  </a>
-                  或
-                  <a
-                    href={`https://www.yinfans.me/?s=${encodeURIComponent(
-                      data.keyword
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:underline mx-1"
-                  >
-                    音范丝
-                  </a>
+                  可直接前往
+                  <a href={`https://yts.mx/movies?query_term=${encodeURIComponent(data.keyword)}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline mx-1">YTS</a>·
+                  <a href={`https://1337x.to/search/${encodeURIComponent(data.keyword)}/1/`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline mx-1">1337x</a>·
+                  <a href={`https://www.lightbt.top/search?q=${encodeURIComponent(data.keyword)}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline mx-1">LightBT</a>·
+                  <a href={`https://www.yinfans.me/?s=${encodeURIComponent(data.keyword)}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline mx-1">音范丝</a>
                   搜索
                 </p>
               </div>

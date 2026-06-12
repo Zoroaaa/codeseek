@@ -119,8 +119,11 @@ const NyaaRow: React.FC<{ item: NyaaTorrent; idx: number; isDark: boolean }> = (
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-slate-500">
         <span>{item.category}</span>
-        <span>{item.size}</span>
-        <span>{item.date}</span>
+        {item.size && <span>{item.size}</span>}
+        {item.date && <span>{item.date}</span>}
+        {item.source === 'animetosho' && (
+          <span className="text-violet-400/70">AnimeTosho</span>
+        )}
       </div>
     </td>
     <td className="py-2.5 px-2 text-center whitespace-nowrap">
@@ -131,24 +134,28 @@ const NyaaRow: React.FC<{ item: NyaaTorrent; idx: number; isDark: boolean }> = (
     <td className="py-2.5 px-2 whitespace-nowrap">
       <div className="flex items-center gap-1">
         <CopyMagnetBtn magnet={item.magnet} />
-        <a
-          href={item.torrentUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="下载 .torrent"
-          className="p-1.5 rounded-lg bg-slate-700/60 text-slate-400 hover:bg-blue-600/30 hover:text-blue-300 transition-all"
-        >
-          <Download className="w-3.5 h-3.5" />
-        </a>
-        <a
-          href={`https://nyaa.si/view/${item.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="在 Nyaa 查看"
-          className="p-1.5 rounded-lg bg-slate-700/60 text-slate-400 hover:bg-slate-600 hover:text-slate-200 transition-all"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+        {item.torrentUrl && (
+          <a
+            href={item.torrentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="下载 .torrent"
+            className="p-1.5 rounded-lg bg-slate-700/60 text-slate-400 hover:bg-blue-600/30 hover:text-blue-300 transition-all"
+          >
+            <Download className="w-3.5 h-3.5" />
+          </a>
+        )}
+        {item.id && !item.id.startsWith('at-') && (
+          <a
+            href={`https://nyaa.si/view/${item.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="在 Nyaa 查看"
+            className="p-1.5 rounded-lg bg-slate-700/60 text-slate-400 hover:bg-slate-600 hover:text-slate-200 transition-all"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )}
       </div>
     </td>
   </tr>
@@ -207,9 +214,25 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
       {/* toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className={`text-xs ${textMuted(isDark)}`}>
-            磁力 {data.total} 条
-          </span>
+          {torrentList.length > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              {/* 来源分布 */}
+              {(() => {
+                const nyaaCount = torrentList.filter(t => !t.source || t.source === 'nyaa').length;
+                const toshoCount = torrentList.filter(t => t.source === 'animetosho').length;
+                return (
+                  <>
+                    {nyaaCount > 0 && <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">Nyaa {nyaaCount}</span>}
+                    {toshoCount > 0 && <span className="px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400">AnimeTosho {toshoCount}</span>}
+                  </>
+                );
+              })()}
+              <span className={textMuted(isDark)}>共 {data.total} 条资源</span>
+            </div>
+          )}
+          {torrentList.length === 0 && (
+            <span className={`text-xs ${textMuted(isDark)}`}>磁力 {data.total} 条</span>
+          )}
         </div>
         {onRefresh && (
           <button

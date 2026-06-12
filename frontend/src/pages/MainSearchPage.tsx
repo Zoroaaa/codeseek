@@ -83,53 +83,41 @@ export const MainSearchPage: React.FC = () => {
     }
   }, []);
 
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [darkMode, setDarkMode] = useState(() =>
+    typeof window !== 'undefined' && document.documentElement.classList.contains('dark')
+  );
+  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
+  const [enrichedData, setEnrichedData] = useState<EnrichedSearchData | null>(null);
+  const [enrichedPage, setEnrichedPage] = useState(1);
+
+  // 响应系统/用户主题切换
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setDarkMode(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+  const [showHistory, setShowHistory] = useState(true);
+  const [showFavorites, setShowFavorites] = useState(true);
+
   // Tab 切换处理函数（包含 URL 同步和分类联动）
   const handleTabChange = useCallback((tab: SearchTabType) => {
     setActiveTab(tab);
     setSearchParams({ tab }, { replace: true });
-    
-    // 根据选中的 Tab 更新 UI 上下文
-    switch (tab) {
-      case 'jav':
-        setSelectedCategory(null);
-        break;
-      case 'anime': {
-        const animeMC = majorCategories.find(mc => mc.id === 'anime_sources');
-        if (animeMC) {
-          const defaultCat = categories.find(c =>
-            c.majorCategoryId === animeMC.id && c.defaultSearchable
-          );
-          setSelectedCategory(defaultCat?.id || null);
-        }
-        break;
-      }
-      case 'movie': {
-        const movieMC = majorCategories.find(mc => mc.id === 'movie_sources');
-        if (movieMC) {
-          const defaultCat = categories.find(c =>
-            c.majorCategoryId === movieMC.id && c.defaultSearchable
-          );
-          setSelectedCategory(defaultCat?.id || null);
-        }
-        break;
-      }
-      case 'sources':
-        setSelectedCategory(null);
-        break;
-    }
-  }, [setActiveTab, setSearchParams, majorCategories, categories]);
-
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(true);
-  const [showFavorites, setShowFavorites] = useState(true);
+    // anime/movie 走聚合模式，分类过滤无影响，统一重置为"全部"
+    setSelectedCategory(null);
+    // 切换 Tab 时清空上次搜索结果，避免展示错误类型数据
+    setSearchResults([]);
+    setEnrichedData(null);
+  }, [setActiveTab, setSearchParams]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
     typeof window !== 'undefined' && window.innerWidth >= 768 ? 'grid' : 'list'
   );
 
 
 
-  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
-  const [enrichedData, setEnrichedData] = useState<EnrichedSearchData | null>(null);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -265,7 +253,7 @@ export const MainSearchPage: React.FC = () => {
     }
   };
 
-  const handleSearch = useCallback(async (overrideKeyword?: string) => {
+  const handleSearch = useCallback(async (overrideKeyword?: string, page = 1) => {
     const query = overrideKeyword || keyword;
     if (!query.trim()) {
       toast.warning('请输入搜索关键词');
@@ -284,11 +272,13 @@ export const MainSearchPage: React.FC = () => {
     }).catch(() => {});
     setSearching(true);
     setEnrichedData(null); // 重置聚合数据
+    setEnrichedPage(page);
     try {
       const response = await searchApi.search({
         keyword: query.trim(),
         categoryId: selectedCategory || undefined,
         majorCategoryId: SEARCH_TABS[activeTab].majorCategoryId || undefined,
+        page,
       }) as unknown as {
         success: boolean;
         data: { keyword: string; results: Array<{ id: string; name: string; subtitle?: string; icon?: string; url: string; siteType: string; category: string; description?: string }> } | EnrichedSearchData;
@@ -579,7 +569,8 @@ export const MainSearchPage: React.FC = () => {
             </button>
           </div>
 
-          {searchableCategories.length > 0 && (
+          {/* 分类过滤：仅 JAV tab 显示，anime/movie 走聚合模式无需过滤 */}
+          {searchableCategories.length > 0 && activeTab === 'jav' && (
             <div className="category-filter-wrapper">
               <div className="flex items-center gap-1.5 shrink-0">
                 <Filter className="w-3.5 h-3.5 text-surface-400" />
@@ -651,14 +642,18 @@ export const MainSearchPage: React.FC = () => {
 
           {/* 搜索结果面板：根据数据类型渲染不同 Panel */}
           {enrichedData && enrichedData.resultType === 'anime' ? (
-            <AnimeSearchResultPanel
-              data={enrichedData}
-              isDark={document.documentElement.classList.contains('dark')}
+          <AnimeSearchResultPanel
+            data={enrichedData}
+            isDark={darkMode}
+            onRefresh={() => handleSearch(keyword, enrichedPage)}
+            onPageChange={(p) => handleSearch(keyword, p)}
             />
           ) : enrichedData && enrichedData.resultType === 'movie' ? (
             <MovieSearchResultPanel
               data={enrichedData}
-              isDark={document.documentElement.classList.contains('dark')}
+              isDark={darkMode}
+              onRefresh={() => handleSearch(keyword, enrichedPage)}
+              onPageChange={(p) => handleSearch(keyword, p)}
             />
           ) : (
           <SearchResultsPanel
