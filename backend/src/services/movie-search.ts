@@ -165,103 +165,13 @@ async function searchTPB(keyword: string): Promise<ResourceItem[]> {
   } catch { return []; }
 }
 
-// ─── Torrentio API（聚合 YTS/1337x/TPB/RARBG/TorrentGalaxy 等多源）───
-
-const TORRENTIO_BASE = 'https://torrentio.strem.fun';
-const TORRENTIO_TRACKERS = [
-  'udp%3A%2F%2Ftracker.openbittorrent.com%3A6969%2Fannounce',
-  'udp%3A%2F%2Fopen.demonii.com%3A1337%2Fannounce',
-  'udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce',
-  'udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce',
-].map(t => `&tr=${t}`).join('');
-
-/** 从 infoHash 构造磁力链接 */
-function buildMagnetFromHash(infoHash: string, title: string): string {
-  return `magnet:?xt=urn:btih:${infoHash.toLowerCase()}&dn=${encodeURIComponent(title)}${TORRENTIO_TRACKERS}`;
-}
-
-/** 从 Torrentio 标题中提取大小信息 */
-function extractSizeFromTitle(title: string): string {
-  const m = title.match(/\u{1F4BC}\s*([\d.]+\s*(?:GB|MB|TB|KB))/iu);
-  return m ? m[1] : '';
-}
-
-/**
- * 通过 TMDB ID 查询 Torrentio
- * 聚合了 YTS、1337x、TPB、RARBG、TorrentGalaxy 等多源结果
- * 支持 movie / series 两种类型
- */
-async function searchTorrentio(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<ResourceItem[]> {
-  try {
-    const type = mediaType === 'movie' ? 'movie' : 'series';
-    const url = `${TORRENTIO_BASE}/stream/${type}/${tmdbId}.json`;
-    const r = await fetch(url, {
-      headers: { 'Accept': 'application/json', 'User-Agent': UA },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!r.ok) return [];
-    const data = await r.json() as { streams?: Array<{
-      name: string;
-      title: string;
-      infoHash: string;
-      sources?: string[];
-    }> };
-    if (!data.streams?.length) return [];
-
-    // 去重（按 infoHash）
-    const seen = new Set<string>();
-    return data.streams
-      .filter(s => {
-        if (seen.has(s.infoHash)) return false;
-        seen.add(s.infoHash); return true;
-      })
-      .slice(0, 20)
-      .map(s => {
-        // 清理标题：移除 emoji 和尾部元信息
-        const cleanTitle = s.title
-          .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
-          .replace(/\s*[\u{1F464}\u2699].*$/su, '')
-          .replace(/\n/g, ' ')
-          .trim();
-        // 提取来源站点标记
-        const sourceMatch = s.title.match(/\s*\u2699\s*(\w[\w\s]*?)(?:\n|$)/);
-        const srcLabel = sourceMatch?.[1]?.trim() || 'Torrentio';
-
-        return {
-          title: cleanTitle || s.name.replace(/\n/g, ' ').trim(),
-          magnet: buildMagnetFromHash(s.infoHash, cleanTitle),
-          size: extractSizeFromTitle(s.title),
-          date: '',
-          source: 'torrentio',
-          sourceLabel: srcLabel,
-          resourceType: 'magnet' as const,
-          // 根据聚合来源生成详情页链接
-          detailUrl: (() => {
-            const q = encodeURIComponent(cleanTitle);
-            switch (srcLabel.toLowerCase()) {
-              case 'yts': return `https://yts.mx/browse-movies/${q}`;
-              case '1337x': return `https://1337x.st/search/${q}/1/`;
-              case 'thepiratebay': return `https://thepiratebay.org/search.php?q=${q}&cat=0`;
-              case 'torrentgalaxy': return `https://torrentgalaxy.to/search?search=${q}`;
-              case 'rarbg': return `https://rarbg2023.org/search/?search=${q}`;
-              default: return undefined;
-            }
-          })(),
-        };
-      });
-  } catch { return []; }
-}
-
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
 export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): Promise<MovieSearchResult> {
   // Phase 1: 元数据 — 中文 TMDB + 英文 TMDB（拿英文名搜 TPB）+ 豆瓣 三路并行
   const [zhMetaRes, enMetaRes, doubanRes] = await Promise.allSettled([
-    // 中文元数据（用于展示）
     tmdbKey ? searchTMDB(keyword, tmdbKey, page, 'zh-CN').catch(() => [] as TMDBResult[]) : Promise.resolve([] as TMDBResult[]),
-    // 英文元数据（用于 TPB 搜索关键词）
     tmdbKey ? searchTMDB(keyword, tmdbKey, page, 'en-US').catch(() => [] as TMDBResult[]) : Promise.resolve([] as TMDBResult[]),
-    // 豆瓣
     searchDouban(keyword).catch(() => [] as TMDBResult[]),
   ]);
 
@@ -279,91 +189,54 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     seen.add(key); return true;
   });
 
-  // ── 构建 TMDB ID → 英文标题 映射表 ──
+  // ── 构建 TPB 搜索关键词列表 ──
   const enResults: TMDBResult[] = enMetaRes.status === 'fulfilled' ? enMetaRes.value : [];
   const idToEnglishTitle = new Map<number, string>();
   for (const item of enResults) {
-    if (item.id > 0 && item.title) {
-      idToEnglishTitle.set(item.id, item.title);
-    }
+    if (item.id > 0 && item.title) idToEnglishTitle.set(item.id, item.title);
   }
 
-  // ── TPB 搜索：优先用英文标题，fallback 到 originalTitle ──
+  // 收集关键词：英文名 + 英文名+年份，去重
   const tpbKeywords: string[] = [];
-  for (const r of results) {
-    // 优先从英文映射取，其次用 originalTitle
+  for (const r of results.slice(0, 8)) {
     const en = idToEnglishTitle.get(r.id) || r.originalTitle?.trim() || '';
-    if (en && en.length > 1 && !tpbKeywords.includes(en)) {
-      tpbKeywords.push(en);
+    if (en && en.length > 1) {
+      if (!tpbKeywords.includes(en)) tpbKeywords.push(en);
+      // 加上年份提高精度
+      if (r.year && !tpbKeywords.includes(`${en} ${r.year}`)) {
+        tpbKeywords.push(`${en} ${r.year}`);
+      }
     }
   }
 
-  let tpbResults: ResourceItem[] = [];
+  // ── TPB 并发搜索（所有关键词）──
+  let allTpbResults: ResourceItem[] = [];
   if (tpbKeywords.length > 0) {
-    const tpbPromises = tpbKeywords.slice(0, 5).map(title =>
+    const tpbPromises = tpbKeywords.map(title =>
       searchTPB(title).catch(() => [] as ResourceItem[])
     );
     const tpbRes = await Promise.allSettled(tpbPromises);
     for (const res of tpbRes) {
-      if (res.status === 'fulfilled') tpbResults.push(...res.value);
+      if (res.status === 'fulfilled') allTpbResults.push(...res.value);
     }
+    // 按 btih 去重
     const seenHashes = new Set<string>();
-    tpbResults = tpbResults.filter(r => {
+    allTpbResults = allTpbResults.filter(r => {
       const hash = r.magnet?.slice(20, 60) || '';
       if (!hash || seenHashes.has(hash)) return false;
       seenHashes.add(hash); return true;
-    }).slice(0, 30);
+    }).slice(0, 40);
   }
-
-  // Phase 2: 用 TMDB 结果的 ID 查询 Torrentio（聚合多源）
-  const tmdbIds = results
-    .filter(r => r.id > 0 && r.source === 'tmdb')
-    .map(r => ({ id: r.id, type: r.mediaType }))
-    .slice(0, 5);
-
-  const torrentioPromises = tmdbIds.map(item =>
-    searchTorrentio(item.id, item.type).catch(() => [] as ResourceItem[])
-  );
-  const torrentioResults = await Promise.allSettled(torrentioPromises);
-
-  // 合并所有资源
-  const resourceSources: string[] = [];
-  const resources: ResourceItem[] = [];
-
-  // TPB 结果
-  if (tpbResults.length > 0) {
-    resources.push(...tpbResults);
-    resourceSources.push('TPB');
-  }
-
-  // Torrentio 结果（去重合并）
-  const torrentioAll: ResourceItem[] = [];
-  for (const res of torrentioResults) {
-    if (res.status === 'fulfilled') torrentioAll.push(...res.value);
-  }
-  if (torrentioAll.length > 0) {
-    resources.push(...torrentioAll);
-    resourceSources.push('Torrentio');
-  }
-
-  // 全局磁力去重（按 btih hash）
-  const seenMagnets = new Set<string>();
-  const dedupedResources = resources.filter(r => {
-    if (!r.magnet) return true;
-    const key = r.magnet.slice(20, 60);
-    if (seenMagnets.has(key)) return false;
-    seenMagnets.add(key); return true;
-  });
 
   return {
     keyword,
     page,
     results,
-    resources: dedupedResources,
+    resources: allTpbResults,
     total: results.length,
-    resourceTotal: dedupedResources.length,
+    resourceTotal: allTpbResults.length,
     tmdbError,
     doubanError: null,
-    resourceSources,
+    resourceSources: allTpbResults.length > 0 ? ['TPB'] : [],
   };
 }

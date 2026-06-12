@@ -10,7 +10,14 @@ import type {
   NyaaTorrent,
   MikanItem,
 } from '@/types/search';
-import { convertToProxyUrl } from '@/services/proxy/proxy-config';
+
+// ─── 图片代理（与 JAV 统一走后端 /api/jav/proxy-image）─────────────
+const getProxyImageUrl = (url: string): string => {
+  const baseUrl = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? ''
+    : 'https://backend.codeseek.pp.ua';
+  return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
+};
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -206,7 +213,7 @@ const BangumiCard: React.FC<{ subject: BangumiSubject }> = ({ subject }) => (
     {/* 封面 */}
     {subject.cover && (
       <img
-        src={convertToProxyUrl(subject.cover)}
+        src={getProxyImageUrl(subject.cover)}
         alt={subject.nameCN || subject.name}
         className="w-20 sm:w-24 h-[120px] sm:h-[140px] object-cover rounded-lg flex-shrink-0 bg-slate-200 dark:bg-slate-700 shadow-md"
         loading="lazy"

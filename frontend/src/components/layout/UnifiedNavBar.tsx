@@ -105,16 +105,16 @@ const MobileTab: React.FC<MobileTabProps> = memo(({ tab, isActive, onClick }) =>
   <button
     onClick={onClick}
     className={clsx(
-      'flex flex-col items-center justify-center py-2 px-3 min-w-[60px] transition-all duration-200',
+      'flex flex-col items-center justify-center py-1.5 px-2 flex-1 transition-all duration-200',
       isActive
         ? 'text-blue-600 dark:text-blue-400 scale-105'
         : 'text-slate-500 dark:text-slate-400'
     )}
     style={isActive ? { animation: 'bounceGentle 0.3s ease' } : undefined}
   >
-    <span className="text-xl">{tab.icon}</span>
-    <span className="text-[10px] xs:text-xs mt-0.5 font-medium">
-      {tab.label.replace('搜索', '')}
+    <span className="text-lg sm:text-xl">{tab.icon}</span>
+    <span className="text-[10px] xs:text-xs mt-0.5 font-medium leading-tight">
+      {tab.label.replace('搜索', '').replace('访问', '')}
     </span>
   </button>
 ));
@@ -277,7 +277,15 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
 }) => {
   const navigate = useNavigate();
   const { logout } = useAuthStore();
+  const { resolvedTheme, toggleTheme } = useThemeStore();
+  const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy } = useProxyStore();
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
+  const getProxyButtonClass = () => {
+    if (isProxyEnabled) return 'proxy-toggle-btn enabled';
+    if (proxyStatus === 'error') return 'proxy-toggle-btn error';
+    return 'proxy-toggle-btn disabled';
+  };
 
   // 处理登出
   const handleLogout = useCallback(() => {
@@ -296,12 +304,12 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
   return (
     <>
       {/* ── 桌面端/平板端导航栏 ── */}
-      <header className="sticky top-0 z-40 glass">
+      <header className="sticky top-0 z-40 glass overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-16 min-w-0">
 
             {/* 左侧区域：Logo + Tab 切换器 */}
-            <div className="flex items-center gap-4 lg:gap-6">
+            <div className="flex items-center gap-4 lg:gap-6 min-w-0 flex-shrink">
               <LogoSection />
 
               {/* Tab 切换器 - 桌面端显示 */}
@@ -318,20 +326,70 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
             </div>
 
             {/* 右侧区域：用户 + 功能按钮 */}
-            <div className="flex items-center gap-2">
-              {/* 功能工具组 */}
-              <ToolButtons setIsHelpModalOpen={setIsHelpModalOpen} />
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+              {/* 功能工具组 - 移动端精简显示 */}
+              <div className="flex items-center gap-0.5">
+                {/* 代理切换 - 移动端仅显示图标 */}
+                <button
+                  onClick={toggleProxy}
+                  disabled={isProxyLoading}
+                  className={clsx(getProxyButtonClass(), 'sm:p-2 p-1.5')}
+                  title={isProxyEnabled ? '代理已启用' : '代理已关闭'}
+                >
+                  {isProxyLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : isProxyEnabled ? (
+                    <ShieldCheck className="w-4 h-4" />
+                  ) : proxyStatus === 'error' ? (
+                    <ShieldAlert className="w-4 h-4" />
+                  ) : (
+                    <Shield className="w-4 h-4" />
+                  )}
+                </button>
 
-              {/* 分隔线 */}
-              <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700" />
+                {/* 主题切换 */}
+                <button onClick={toggleTheme} className="theme-toggle-btn sm:p-2 p-1.5" aria-label="切换主题" title="切换主题">
+                  {resolvedTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </button>
+              </div>
 
-              {/* 社区入口 */}
-              {communityEnabled && <CommunityLink />}
+              {/* 分隔线 - 仅桌面端显示 */}
+              <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 
-              {/* 管理员入口 */}
-              {isAdmin && <AdminLink />}
+              {/* 以下按钮移动端隐藏，避免溢出 */}
+              <div className="hidden sm:flex items-center gap-0.5">
+                {/* 帮助按钮 */}
+                <button
+                  onClick={() => setIsHelpModalOpen(true)}
+                  className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
+                  title="使用说明"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </button>
 
-              {/* 用户菜单 */}
+                {/* GitHub 链接 */}
+                <a
+                  href="https://github.com/Zoroaaa/codeseek"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
+                  title="GitHub"
+                >
+                  <Github className="w-4 h-4" />
+                </a>
+              </div>
+
+              {/* 社区/管理员入口 - 移动端隐藏 */}
+              <div className="hidden sm:flex items-center gap-0.5">
+                {communityEnabled && (
+                  <CommunityLink />
+                )}
+                {isAdmin && (
+                  <AdminLink />
+                )}
+              </div>
+
+              {/* 用户菜单 - 移动端紧凑显示 */}
               <UserDropdown
                 isAuthenticated={isAuthenticated}
                 user={user}
@@ -345,11 +403,11 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
 
       {/* ── 移动端底部导航栏 ── */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass safe-area-inset-bottom"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass safe-area-inset-bottom border-t border-slate-200/60 dark:border-slate-700/60"
         role="navigation"
         aria-label="主导航"
       >
-        <div className="flex items-center justify-around py-2 px-2">
+        <div className="flex items-stretch justify-between h-14 max-w-lg mx-auto">
           {Object.entries(SEARCH_TABS).map(([key, tab]) => (
             <MobileTab
               key={key}
