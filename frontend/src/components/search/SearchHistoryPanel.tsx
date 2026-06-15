@@ -5,12 +5,23 @@ import { API_BASE_URL } from '@/constants';
 import type { SearchHistoryItem } from '@/types';
 
 // ─── 图片代理（与搜索结果统一走后端 /api/jav/proxy-image）─────────
+
+/** 将相对路径转为完整 URL（JAV 封面存的是 /pics/cover/xxx.jpg） */
+const resolveCoverUrl = (cover: string): string => {
+  if (!cover) return '';
+  // 已是完整 URL → 直接返回
+  if (cover.startsWith('http://') || cover.startsWith('https://')) return cover;
+  // 相对路径 → 拼接 JavBus 域名
+  if (cover.startsWith('/')) return `https://www.javbus.com${cover}`;
+  return cover;
+};
+
 const getProxyImageUrl = (url: string): string => {
   const isLocal = typeof window !== 'undefined' && (
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   );
   const baseUrl = isLocal ? '' : API_BASE_URL.PRODUCTION.replace('/api', '');
-  return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
+  return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(resolveCoverUrl(url))}`;
 };
 
 // ─── 高度常量（与 JavRankingsPanel 共享逻辑）────────────────────────
