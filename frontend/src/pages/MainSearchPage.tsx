@@ -702,6 +702,7 @@ export const MainSearchPage: React.FC = () => {
                   onRemove={handleRemoveFavorite}
                   onExport={handleExportFavorites}
                   onUpdate={loadFavorites}
+                  hasJavRankings={activeTab === 'jav'}
                 />
               </div>
             )}
@@ -720,6 +721,7 @@ export const MainSearchPage: React.FC = () => {
                 onRemove={handleRemoveFavorite}
                 onExport={handleExportFavorites}
                 onUpdate={loadFavorites}
+                hasJavRankings={activeTab === 'jav'}
               />
             </div>
           )}

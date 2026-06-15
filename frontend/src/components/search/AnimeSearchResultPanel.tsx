@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Star, Calendar, Tv, Copy, Check, ExternalLink,
   Magnet, Wifi, RefreshCw, ChevronLeft, ChevronRight,
-  ChevronDown, ChevronUp, Tag, Heart, Users, Trophy, Film,
+  Tag, Heart, Users, Trophy, Film,
 } from 'lucide-react';
 import type {
   AnimeEnrichedData,
@@ -343,7 +343,11 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
   onPageChange,
 }) => {
   const [localPage, setLocalPage] = useState(1);
-  const [showAllTorrents, setShowAllTorrents] = useState(false);
+  // 各源独立分页 state
+  const [atosPage, setAtosPage] = useState(1);
+  const [mikanPage, setMikanPage] = useState(1);
+  const [srPage, setSrPage] = useState(1);
+  const SOURCE_PAGE_SIZE = 10; // 统一每页10条
   const PAGE_SIZE = 10;
 
   const bgmList = data.bgm ?? [];
@@ -514,21 +518,10 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
                   </div>
 
                   {/* 资源列表 */}
-                  {(showAllTorrents ? pagedTorrents : pagedTorrents.slice(0, 5)).map((item, i) =>
+                  {pagedTorrents.map((item, i) =>
                     <NyaaCard key={(item as NyaaTorrent).id || i} item={item as NyaaTorrent} />
                   )}
 
-                  {/* 展开/收起 */}
-                  {pagedTorrents.length > 5 && (
-                    <button
-                      onClick={() => setShowAllTorrents(!showAllTorrents)}
-                      className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-slate-400 hover:text-violet-500 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-lg transition-all"
-                    >
-                      {showAllTorrents
-                        ? <><ChevronUp className="w-3.5 h-3.5" />收起</>
-                        : <><ChevronDown className="w-3.5 h-3.5" />展开全部（共 {pagedTorrents.length} 条）</>}
-                    </button>
-                  )}
                 </div>
 
                 {/* 分页 */}
@@ -581,12 +574,45 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
                     <span>标题 / 大小 / 日期</span>
                     <span className="text-right">操作</span>
                   </div>
-                  {atosList.slice(0, 20).map((item, i) =>
-                    <NyaaCard key={(item as NyaaTorrent).id || i} item={item as NyaaTorrent} />
-                  )}
-                  {atosList.length > 20 && (
-                    <div className="text-center py-2 text-[10px] text-slate-400">还有 {atosList.length - 20} 条未显示，可前往 AT 站内查看完整结果</div>
-                  )}
+                  {/* 计算分页 */}
+                  {(() => {
+                    const atosTotalPages = Math.max(1, Math.ceil(atosList.length / SOURCE_PAGE_SIZE));
+                    const pagedAtos = atosList.slice((atosPage - 1) * SOURCE_PAGE_SIZE, atosPage * SOURCE_PAGE_SIZE);
+                    return (
+                      <>
+                        {pagedAtos.map((item, i) =>
+                          <NyaaCard key={(item as NyaaTorrent).id || `atos-${i}`} item={item as NyaaTorrent} />
+                        )}
+                        {/* 分页控件 */}
+                        {atosList.length > SOURCE_PAGE_SIZE && (
+                          <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                              disabled={atosPage <= 1}
+                              onClick={() => setAtosPage(p => p - 1)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-500
+                                         hover:bg-slate-200 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all
+                                         dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" /> 上一页
+                            </button>
+                            <span className="text-xs text-slate-500 px-2">
+                              {atosPage} / {atosTotalPages}
+                              <span className="ml-1 text-slate-400">（共 {atosList.length} 条）</span>
+                            </span>
+                            <button
+                              disabled={atosPage >= atosTotalPages}
+                              onClick={() => setAtosPage(p => p + 1)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-500
+                                         hover:bg-slate-200 hover:text-slate-700 transition-all
+                                         dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                            >
+                              下一页 <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -622,14 +648,45 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
                     <span>标题 / 字幕组 / 大小 / 日期</span>
                     <span className="text-right">操作</span>
                   </div>
-                  {mikanList.slice(0, 15).map((item, i) => (
-                    <MikanCard key={i} item={item} />
-                  ))}
-                  {mikanList.length > 15 && (
-                    <div className="text-center py-2 text-[10px] text-slate-400">
-                      还有 {mikanList.length - 15} 条未显示，可前往 Mikan 站内查看完整结果
-                    </div>
-                  )}
+                  {/* 计算分页 */}
+                  {(() => {
+                    const mikanTotalPages = Math.max(1, Math.ceil(mikanList.length / SOURCE_PAGE_SIZE));
+                    const pagedMikan = mikanList.slice((mikanPage - 1) * SOURCE_PAGE_SIZE, mikanPage * SOURCE_PAGE_SIZE);
+                    return (
+                      <>
+                        {pagedMikan.map((item, i) =>
+                          <MikanCard key={i} item={item} />
+                        )}
+                        {/* 分页控件 */}
+                        {mikanList.length > SOURCE_PAGE_SIZE && (
+                          <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                              disabled={mikanPage <= 1}
+                              onClick={() => setMikanPage(p => p - 1)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-500
+                                         hover:bg-slate-200 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all
+                                         dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" /> 上一页
+                            </button>
+                            <span className="text-xs text-slate-500 px-2">
+                              {mikanPage} / {mikanTotalPages}
+                              <span className="ml-1 text-slate-400">（共 {mikanList.length} 条）</span>
+                            </span>
+                            <button
+                              disabled={mikanPage >= mikanTotalPages}
+                              onClick={() => setMikanPage(p => p + 1)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-500
+                                         hover:bg-slate-200 hover:text-slate-700 transition-all
+                                         dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                            >
+                              下一页 <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -661,9 +718,45 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
               </div>
               <div className="p-4 sm:p-5">
                 <div className="space-y-1.5">
-                  {showrssList.slice(0, 15).map((item, i) => (
-                    <ShowRssCard key={i} item={item} />
-                  ))}
+                  {/* 计算分页 */}
+                  {(() => {
+                    const srTotalPages = Math.max(1, Math.ceil(showrssList.length / SOURCE_PAGE_SIZE));
+                    const pagedSr = showrssList.slice((srPage - 1) * SOURCE_PAGE_SIZE, srPage * SOURCE_PAGE_SIZE);
+                    return (
+                      <>
+                        {pagedSr.map((item, i) => (
+                          <ShowRssCard key={i} item={item} />
+                        ))}
+                        {/* 分页控件 */}
+                        {showrssList.length > SOURCE_PAGE_SIZE && (
+                          <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                              disabled={srPage <= 1}
+                              onClick={() => setSrPage(p => p - 1)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-500
+                                         hover:bg-slate-200 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all
+                                         dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" /> 上一页
+                            </button>
+                            <span className="text-xs text-slate-500 px-2">
+                              {srPage} / {srTotalPages}
+                              <span className="ml-1 text-slate-400">（共 {showrssList.length} 条）</span>
+                            </span>
+                            <button
+                              disabled={srPage >= srTotalPages}
+                              onClick={() => setSrPage(p => p + 1)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-500
+                                         hover:bg-slate-200 hover:text-slate-700 transition-all
+                                         dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                            >
+                              下一页 <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
