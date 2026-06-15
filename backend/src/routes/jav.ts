@@ -26,6 +26,7 @@ const ALLOWED_IMAGE_HOSTS = [
   'pics.javbus.com',
   'img.javbus.com',
   'lain.bgm.tv',
+  'image.tmdb.org',
 ];
 
 function isPrivateIP(hostname: string): boolean {

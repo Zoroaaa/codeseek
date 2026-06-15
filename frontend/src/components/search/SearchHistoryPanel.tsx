@@ -1,8 +1,17 @@
 import React from 'react';
 import { Clock, Search, Trash2, ChevronDown, ChevronRight, Calendar, User, Building2 } from 'lucide-react';
 import { Loading } from '@/components/ui';
-import { convertToProxyUrl } from '@/services/proxy';
+import { API_BASE_URL } from '@/constants';
 import type { SearchHistoryItem } from '@/types';
+
+// ─── 图片代理（与搜索结果统一走后端 /api/jav/proxy-image）─────────
+const getProxyImageUrl = (url: string): string => {
+  const isLocal = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  );
+  const baseUrl = isLocal ? '' : API_BASE_URL.PRODUCTION.replace('/api', '');
+  return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
+};
 
 // ─── 高度常量（与 JavRankingsPanel 共享逻辑）────────────────────────
 // header: 64px（同 JAV 面板）
@@ -71,7 +80,7 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
                   {item.cover ? (
                     <>
                       <img
-                        src={convertToProxyUrl(item.cover)}
+                        src={getProxyImageUrl(item.cover)}
                         alt={item.title || item.query}
                         className="w-14 h-20 sm:w-16 sm:h-22 object-cover rounded-md shrink-0 bg-surface-100"
                         loading="lazy"
@@ -92,7 +101,40 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
                             {item.code}
                           </span>
                         )}
-                        <p className="text-[10px] xs:text-xs text-surface-400 truncate">{item.query}</p>
+                        {(item.actors || item.duration || item.releaseDate || item.publisher) && (
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] xs:text-xs">
+                            {item.actors && (
+                              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 truncate max-w-[120px]">
+                                <User className="w-2 h-2 shrink-0" />
+                                {item.actors}
+                              </span>
+                            )}
+                            {item.duration && (
+                              <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                                <Clock className="w-2 h-2" />{item.duration}分钟
+                              </span>
+                            )}
+                            {item.releaseDate && (
+                              <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                                <Calendar className="w-2 h-2" />{item.releaseDate}
+                              </span>
+                            )}
+                            {item.publisher && (
+                              <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 truncate max-w-[100px]">
+                                <Building2 className="w-2 h-2 shrink-0" />{item.publisher}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {item.tags && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {item.tags.split(',').slice(0, 4).map((tag, i) => (
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
+                                {tag.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </>
                   ) : (

@@ -46,8 +46,8 @@ async function saveEnrichedHistory(
 
   switch (resultType) {
     case 'anime': {
-      // 动漫：提取首条 Bangumi 元数据 → title + cover + code(bgm:id)
-      const bgm = (result as { bgm?: Array<{ id: number; name: string; nameCN: string; cover: string }> }).bgm;
+      // 动漫：提取首条 Bangumi 元数据 → title + cover + code(bgm:id) + tags + studio(publisher)
+      const bgm = (result as { bgm?: Array<{ id: number; name: string; nameCN: string; cover: string; tags?: string[]; studio?: string; rating?: number }> }).bgm;
       const firstBgm = bgm?.[0];
       if (firstBgm) {
         updateFields.push('title=?, cover=?, code=?');
@@ -56,12 +56,24 @@ async function saveEnrichedHistory(
           firstBgm.cover,
           `bgm:${firstBgm.id}`
         );
+        if (firstBgm.tags?.length) {
+          updateFields.push('tags=?');
+          updateValues.push(firstBgm.tags.join(','));
+        }
+        if (firstBgm.studio) {
+          updateFields.push('publisher=?');
+          updateValues.push(firstBgm.studio);
+        }
+        if (firstBgm.rating != null) {
+          updateFields.push('subtitle=?');
+          updateValues.push(`${firstBgm.rating} 分`);
+        }
       }
       break;
     }
     case 'movie': {
-      // 影视：提取首条 TMDB 结果 → title + cover(poster) + code(tmdb:id)
-      const results = (result as { results?: Array<{ id: number; title: string; poster: string | null }> }).results;
+      // 影视：提取首条 TMDB 结果 → title + cover(poster) + code(tmdb:id) + release_date
+      const results = (result as { results?: Array<{ id: number; title: string; poster: string | null; release_date?: string; first_air_date?: string; vote_average?: number }> }).results;
       const firstResult = results?.[0];
       if (firstResult) {
         updateFields.push('title=?, cover=?, code=?');
@@ -70,15 +82,44 @@ async function saveEnrichedHistory(
           firstResult.poster || '',
           `tmdb:${firstResult.id}`
         );
+        const release = firstResult.release_date || firstResult.first_air_date;
+        if (release) {
+          updateFields.push('release_date=?');
+          updateValues.push(release);
+        }
+        if (firstResult.vote_average != null) {
+          updateFields.push('subtitle=?');
+          updateValues.push(`${firstResult.vote_average} 分`);
+        }
       }
       break;
     }
     case 'jav': {
-      // JAV：提取详情数据 → title + cover + code(番号)
-      const detail = (result as { detail?: { code: string; title: string; cover?: string } }).detail;
+      // JAV：提取详情数据 → title + cover + code(番号) + actors + duration + release_date + publisher + tags
+      const detail = (result as { detail?: { code: string; title: string; cover?: string; actresses?: string[]; duration?: string; releaseDate?: string; publisher?: string; tags?: string[] } }).detail;
       if (detail) {
         updateFields.push('title=?, cover=?');
         updateValues.push(detail.title, detail.cover || '');
+        if (detail.actresses?.length) {
+          updateFields.push('actors=?');
+          updateValues.push(detail.actresses.join(','));
+        }
+        if (detail.duration) {
+          updateFields.push('duration=?');
+          updateValues.push(detail.duration);
+        }
+        if (detail.releaseDate) {
+          updateFields.push('release_date=?');
+          updateValues.push(detail.releaseDate);
+        }
+        if (detail.publisher) {
+          updateFields.push('publisher=?');
+          updateValues.push(detail.publisher);
+        }
+        if (detail.tags?.length) {
+          updateFields.push('tags=?');
+          updateValues.push(detail.tags.join(','));
+        }
       }
       break;
     }
