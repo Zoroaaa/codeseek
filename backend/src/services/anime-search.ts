@@ -57,14 +57,6 @@ export interface MikanItem {
   group: string;
 }
 
-/** SubsPlease 单条资源 */
-export interface SubsPleaseItem {
-  title: string;
-  magnet: string;
-  episode: string;
-  resolution: string;
-  date: string;
-}
 
 /** showRSS 单条资源 */
 export interface ShowRssItem {
@@ -79,7 +71,6 @@ export interface AnimeSearchResult {
   nyaa: NyaaTorrent[];
   mikan: MikanItem[];
   animetosho: NyaaTorrent[];
-  subsplease: SubsPleaseItem[];
   showrss: ShowRssItem[];
   total: number;
   errors: {
@@ -87,7 +78,6 @@ export interface AnimeSearchResult {
     nyaa: string | null;
     mikan: string | null;
     animetosho: string | null;
-    subsplease: string | null;
     showrss: string | null;
   };
 }
@@ -271,12 +261,12 @@ async function fetchAnimeTosho(keyword: string): Promise<NyaaTorrent[]> {
   const data = await r.json() as Array<{
     id: number;
     title: string;
-    magnet_uri: string;
+    info_hash?: string;
     torrent_url?: string;
     seeders?: number;
     leechers?: number;
     torrent_downloaded_count?: number;
-    file_size?: number;
+    total_size?: number;
     timestamp?: number;
     nyaa_id?: number;
     website_url?: string;
@@ -284,25 +274,41 @@ async function fetchAnimeTosho(keyword: string): Promise<NyaaTorrent[]> {
 
   if (!Array.isArray(data) || data.length === 0) return [];
 
-  return data.map(item => ({
-    id: String(item.nyaa_id ?? item.id ?? ''),
-    title: item.title || '',
-    magnet: item.magnet_uri || '',
-    torrentUrl: item.torrent_url || '',
-    size: item.file_size != null ? formatBytesAT(item.file_size) : '',
-    date: item.timestamp ? new Date(item.timestamp * 1000).toISOString().slice(0, 10) : '',
-    seeders: item.seeders || 0,
-    leechers: item.leechers || 0,
-    completed: item.torrent_downloaded_count || 0,
-    trusted: false,
-    category: 'Anime',
-    source: 'animetosho' as const,
-    sourceLabel: 'AnimeTosho',
-    hasSeedData: !!item.seeders,
-    detailUrl: item.nyaa_id
-      ? `https://nyaa.si/view/${item.nyaa_id}`
-      : (item.website_url || ''),
-  }));
+  // AT 通用 trackers
+  const AT_TRACKERS = [
+    'udp://open.stealth.si:80/announce',
+    'udp://tracker.opentrackr.org:1337/announce',
+    'udp://exodus.desync.com:6969/announce',
+    'udp://tracker.torrent.eu.org:451/announce',
+    'http://nyaa.tracker.wf:7777/announce',
+  ].map(t => `&tr=${encodeURIComponent(t)}`).join('');
+
+  return data.map(item => {
+    // 始终用 info_hash 自行拼接（API 的 magnet_uri 用 base32 编码，部分客户端不兼容）
+    const magnet = item.info_hash
+      ? `magnet:?xt=urn:btih:${item.info_hash.toUpperCase()}${AT_TRACKERS}`
+      : '';
+
+    return {
+      id: String(item.nyaa_id ?? item.id ?? ''),
+      title: item.title || '',
+      magnet,
+      torrentUrl: item.torrent_url || '',
+      size: item.total_size != null ? formatBytesAT(item.total_size) : '',
+      date: item.timestamp ? new Date(item.timestamp * 1000).toISOString().slice(0, 10) : '',
+      seeders: item.seeders || 0,
+      leechers: item.leechers || 0,
+      completed: item.torrent_downloaded_count || 0,
+      trusted: false,
+      category: 'Anime',
+      source: 'animetosho' as const,
+      sourceLabel: 'AnimeTosho',
+      hasSeedData: !!item.seeders,
+      detailUrl: item.nyaa_id
+        ? `https://nyaa.si/view/${item.nyaa_id}`
+        : (item.website_url || ''),
+    };
+  });
 }
 
 /** bytes → 可读字符串（AnimeTosho 用，避免与 movie-search 的 formatBytes 冲突命名） */
@@ -422,7 +428,8 @@ async function arrayBufferToHexSHA1(data: ArrayBuffer): Promise<string> {
 }
 
 /** 从 torrent URL 下载并提取 infoHash，生成 magnet */
-async function torrentUrlToMagnet(torrentUrl: string, title: string): Promise<string> {
+async function torrentUrlToMagnet(torrentUrl: string, title: string, pageUrl?: string): Promise<string> {
+  // 策略1：下载 .torrent → bencode 解析 infoHash
   try {
     const r = await fetch(torrentUrl, {
       signal: AbortSignal.timeout(10000),
@@ -431,11 +438,33 @@ async function torrentUrlToMagnet(torrentUrl: string, title: string): Promise<st
     if (!r.ok) return '';
     const data = await r.arrayBuffer();
     const infoHash = await extractInfoHashFromTorrent(data);
-    if (!infoHash) return '';
-    return `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(title)}${MIKAN_TRACKERS}`;
-  } catch {
-    return '';
+    if (infoHash) {
+      return `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(title)}${MIKAN_TRACKERS}`;
+    }
+  } catch (e) {
+    console.warn('[mikan] torrent download failed:', e instanceof Error ? e.message : e);
   }
+
+  // 策略2：fallback — 从番剧页面 HTML 提取 magnet
+  if (pageUrl) {
+    try {
+      const pr = await fetch(pageUrl, {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      });
+      if (!pr.ok) return '';
+      const html = await pr.text();
+      // 匹配 magnet:?xt=urn:btih:...
+      const magnetMatch = html.match(/magnet:\?xt=urn:btih:[a-fA-F0-9]{40}/i);
+      if (magnetMatch) {
+        return magnetMatch[0] + MIKAN_TRACKERS;
+      }
+    } catch {
+      // 页面提取也失败，静默返回空
+    }
+  }
+
+  return '';
 }
 
 async function fetchMikan(keyword: string): Promise<MikanItem[]> {
@@ -510,7 +539,7 @@ async function fetchMikan(keyword: string): Promise<MikanItem[]> {
   for (let i = 0; i < rawItems.length; i += BATCH_SIZE) {
     const batch = rawItems.slice(i, i + BATCH_SIZE);
     const magnets = await Promise.allSettled(
-      batch.map(item => torrentUrlToMagnet(item.torrentUrl, item.title))
+      batch.map(item => torrentUrlToMagnet(item.torrentUrl, item.title, item.pageUrl))
     );
 
     for (let j = 0; j < batch.length; j++) {
@@ -530,94 +559,6 @@ async function fetchMikan(keyword: string): Promise<MikanItem[]> {
   return results.slice(0, 30);
 }
 
-// ─── SubsPlease API 搜索 ──────────────────────────────────────────────
-
-/**
- * SubsPlease API 搜索
- * 策略：
- *   1. GET /api/?f=shows 获取番剧列表
- *   2. 用关键词模糊匹配找到 show_id（匹配 title 或 altname）
- *   3. GET /api/?f=show&sid={id} 获取该番剧最新发布
- *   4. 从 downloads[].torrent 提取 magnet
- */
-
-/** SubsPlease show 列表项 */
-interface SpShow {
-  id: string;
-  title: string;
-  altnames?: string[];
-}
-
-async function fetchSubsPlease(keyword: string): Promise<SubsPleaseItem[]> {
-  try {
-    // Step 1: 获取番剧列表
-    const showsUrl = 'https://subsplease.org/api/?f=shows';
-    const showsR = await fetchWithRetry(showsUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      signal: AbortSignal.timeout(15000),
-    }, { retries: 1, baseDelay: 1000 });
-
-    if (!showsR.ok) throw new Error(`subsplease_shows_http_${showsR.status}`);
-
-    const showsData = await showsR.json() as SpShow[];
-    if (!Array.isArray(showsData)) return [];
-
-    // 关键词模糊匹配（不区分大小写）
-    const kw = keyword.toLowerCase();
-    const matched = showsData.filter(s =>
-      s.title.toLowerCase().includes(kw) ||
-      s.altnames?.some(a => a.toLowerCase().includes(kw))
-    ).slice(0, 3); // 最多匹配 3 个番剧
-
-    if (matched.length === 0) return [];
-
-    // Step 2: 并发获取每个匹配番剧的最新发布
-    const allResults: SubsPleaseItem[] = [];
-
-    for (const show of matched) {
-      try {
-        const detailUrl = `https://subsplease.org/api/?f=show&tz=Asia/Tokyo&sid=${show.id}`;
-        const detailR = await fetch(detailUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-          signal: AbortSignal.timeout(12000),
-        });
-
-        if (!detailR.ok) continue;
-
-        const ep = await detailR.json() as {
-          episode?: string;
-          title?: string;
-          downloads?: Array<{
-            res: string;
-            torrent: string;
-          }>;
-        };
-
-        if (!ep.downloads?.length) continue;
-
-        const showTitle = ep.title || show.title;
-
-        for (const dl of ep.downloads) {
-          if (!dl.torrent || !dl.torrent.startsWith('magnet:?')) continue;
-
-          allResults.push({
-            title: `[${showTitle}] E${ep.episode ?? '?'} [${dl.res}p]`,
-            magnet: dl.torrent,
-            episode: ep.episode ?? '',
-            resolution: dl.res,
-            date: new Date().toISOString().slice(0, 10),
-          });
-        }
-      } catch {
-        // 单个番剧失败不影响其他
-      }
-    }
-
-    return allResults.slice(0, 20);
-  } catch (e) {
-    throw e instanceof Error ? e : new Error(String(e));
-  }
-}
 
 // ─── showRSS RSS 搜索 ────────────────────────────────────────────────
 
@@ -742,12 +683,11 @@ async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
 export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearchResult> {
-  const [bgmResult, nyaaResult, mikanResult, atosResult, spResult, srResult] = await Promise.allSettled([
+  const [bgmResult, nyaaResult, mikanResult, atosResult, srResult] = await Promise.allSettled([
     fetchBangumi(keyword),
     fetchNyaa(keyword),
     fetchMikan(keyword),
     fetchAnimeTosho(keyword),
-    fetchSubsPlease(keyword),
     fetchShowRss(keyword),
   ]);
 
@@ -755,17 +695,14 @@ export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearc
   const nyaa  = nyaaResult.status === 'fulfilled' ? nyaaResult.value : [];
   const mikan = mikanResult.status === 'fulfilled' ? mikanResult.value : [];
   const atos  = atosResult.status === 'fulfilled' ? atosResult.value  : [];
-  const subsplease = spResult.status === 'fulfilled' ? spResult.value : [];
   const showrss   = srResult.status === 'fulfilled' ? srResult.value : [];
 
   // 错误信息传递给前端
   const nyaaError  = nyaaResult.status === 'rejected'  ? String(nyaaResult.reason)  : null;
   const mikanError = mikanResult.status === 'rejected' ? String(mikanResult.reason) : null;
-  const spError    = spResult.status === 'rejected'   ? String(spResult.reason)     : null;
 
   if (nyaaError)  console.error('[anime-search] nyaa failed:', nyaaError);
   if (mikanError) console.error('[anime-search] mikan failed:', mikanError);
-  if (spError)    console.error('[anime-search] subsplease failed:', spError);
 
   // 各源独立，不再合并
   const sortedNyaa = [...nyaa].sort((a, b) => (b.seeders ?? 0) - (a.seeders ?? 0));
@@ -778,15 +715,13 @@ export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearc
     nyaa:  sortedNyaa,
     mikan: mikan,
     animetosho: sortedAtos,
-    subsplease,
     showrss,
-    total: sortedNyaa.length + mikan.length + sortedAtos.length + subsplease.length + showrss.length,
+    total: sortedNyaa.length + mikan.length + sortedAtos.length + showrss.length,
     errors: {
       bangumi: bgmResult.status === 'rejected' ? String(bgmResult.reason) : null,
       nyaa:    nyaaError,
       mikan:   mikanError,
       animetosho: atosResult.status === 'rejected' ? String(atosResult.reason) : null,
-      subsplease: spError,
       showrss:   srResult.status === 'rejected' ? String(srResult.reason) : null,
     },
   };

@@ -282,6 +282,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     results.push(...doubanRes.value);
   }
   const tmdbError = zhMetaRes.status === 'rejected' ? String(zhMetaRes.reason) : null;
+  const doubanError = doubanRes.status === 'rejected' ? String(doubanRes.reason) : null;
 
   // 元数据去重（按 title 前30字符）
   const seen = new Set<string>();
@@ -340,7 +341,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
 
   // ── Phase 2: EZTV 剧集搜索（需要 IMDB ID）──
   let eztvResults: ResourceItem[] = [];
-  const eztvError: string | null = null;
+  let eztvError: string | null = null;
   const tvItems = results.filter(r => r.mediaType === 'tv');
   if (tvItems.length > 0 && tmdbKey) {
     const eztvPromises = tvItems.slice(0, 5).map(async (item) => {
@@ -350,10 +351,14 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
           return await fetchEZTV(extIds.imdb_id);
         }
         return [] as ResourceItem[];
-      } catch { return [] as ResourceItem[] }
+      } catch (e) { throw e; }
     });
-    const eztvAll = await Promise.all(eztvPromises);
-    eztvResults = eztvAll.flat();
+    try {
+      const eztvAll = await Promise.all(eztvPromises);
+      eztvResults = eztvAll.flat();
+    } catch (e) {
+      eztvError = e instanceof Error ? e.message : String(e);
+    }
   }
 
   // ── 合并所有资源 + 去重 + 排序 ──
@@ -379,7 +384,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     total: results.length,
     resourceTotal: dedupedResources.length,
     tmdbError,
-    doubanError: null,
+    doubanError,
     tpbError,
     eztvError,
     resourceSources: Array.from(sourceNames),

@@ -68,14 +68,6 @@ export interface MikanItem {
   detailUrl?: string;
 }
 
-export interface SubsPleaseItem {
-  title: string;
-  magnet: string;
-  episode: string;
-  resolution: string;
-  date: string;
-}
-
 export interface ShowRssItem {
   title: string;
   magnet: string;
@@ -89,10 +81,9 @@ export interface AnimeEnrichedData {
   nyaa: NyaaTorrent[];
   mikan: MikanItem[];
   animetosho: NyaaTorrent[];
-  subsplease: SubsPleaseItem[];
   showrss: ShowRssItem[];
   total: number;
-  errors: { bangumi: string | null; nyaa: string | null; mikan: string | null; animetosho: string | null; subsplease: string | null; showrss: string | null };
+  errors: { bangumi: string | null; nyaa: string | null; mikan: string | null; animetosho: string | null; showrss: string | null };
 }
 
 export interface TMDBResult {
