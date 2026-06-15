@@ -52,6 +52,45 @@ export interface MovieSearchResult {
   resourceSources: string[];
 }
 
+// ─── 通用工具：带重试的 fetch ────────────────────────────────────────
+
+interface RetryOptions {
+  retries?: number;
+  baseDelay?: number;
+}
+
+async function fetchWithRetry(
+  url: string,
+  init?: RequestInit,
+  opts?: RetryOptions
+): Promise<Response> {
+  const { retries = 2, baseDelay = 1000 } = opts ?? {};
+  let lastError: Error | null = null;
+
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const r = await fetch(url, init);
+      // 429/503 → 重试
+      if ((r.status === 429 || r.status === 503) && i < retries) {
+        const delay = baseDelay * Math.pow(2, i) + Math.random() * 500;
+        console.warn(`[retry] ${url} → ${r.status}, retry #${i + 1} after ${Math.round(delay)}ms`);
+        await new Promise(res => setTimeout(res, delay));
+        continue;
+      }
+      return r;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      if (i < retries) {
+        const delay = baseDelay * Math.pow(2, i);
+        console.warn(`[retry] ${url} → error, retry #${i + 1} after ${Math.round(delay)}ms`);
+        await new Promise(res => setTimeout(res, delay));
+      }
+    }
+  }
+
+  throw lastError || new Error('fetchWithRetry exhausted');
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -142,10 +181,10 @@ async function searchDouban(keyword: string): Promise<TMDBResult[]> {
 async function searchTPB(keyword: string): Promise<ResourceItem[]> {
   try {
     const url = `https://apibay.org/q.php?q=${encodeURIComponent(keyword)}&cat=0`;
-    const r = await fetch(url, {
+    const r = await fetchWithRetry(url, {
       headers: { 'Accept': 'application/json', 'User-Agent': UA },
-      signal: AbortSignal.timeout(12000),
-    });
+      signal: AbortSignal.timeout(30000),
+    }, { retries: 2, baseDelay: 1000 });
     if (!r.ok) return [];
     const items = await r.json() as Array<{
       id: string; name: string; info_hash: string;
@@ -170,57 +209,9 @@ async function searchTPB(keyword: string): Promise<ResourceItem[]> {
       resourceType: 'magnet' as const,
       detailUrl: item.id ? `https://thepiratebay.org/description.php?id=${item.id}` : undefined,
     }));
-  } catch { return []; }
-}
-
-// ─── YTS JSON API（电影专用）──────────────────────────────────────────
-
-const YTS_TRACKERS = [
-  'udp://open.stealth.si:80/announce',
-  'udp://tracker.opentrackr.org:1337/announce',
-  'udp://exodus.desync.com:6969/announce',
-].map(t => `&tr=${encodeURIComponent(t)}`).join('');
-
-async function fetchYTS(keyword: string): Promise<ResourceItem[]> {
-  try {
-    const url = `https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(keyword)}&sort_by=seeds&limit=20`;
-    const r = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!r.ok) throw new Error(`yts_http_${r.status}`);
-
-    const data = await r.json() as {
-      data?: { movies?: Array<{
-        id: number; title: string; year: number;
-        torrents: Array<{
-          hash: string; quality: string; type: string;
-          seeds: number; peers: number; size: string; date_uploaded: string;
-        }>;
-      }> };
-    };
-
-    if (!data.data?.movies?.length) return [];
-
-    const results: ResourceItem[] = [];
-    for (const movie of data.data.movies) {
-      for (const t of movie.torrents) {
-        if (!t.hash || !/^[a-fA-F0-9]{40}$/.test(t.hash)) continue;
-        const magnet = `magnet:?xt=urn:btih:${t.hash.toLowerCase()}&dn=${encodeURIComponent(`${movie.title} ${t.quality}`)}${YTS_TRACKERS}`;
-        results.push({
-          title: `${movie.title} (${t.quality})`,
-          magnet,
-          size: t.size || '',
-          date: t.date_uploaded ? t.date_uploaded.split(' ')[0] : '',
-          source: 'yts',
-          sourceLabel: 'YTS',
-          resourceType: 'magnet' as const,
-        });
-      }
-    }
-    return results;
   } catch (e) {
-    throw e instanceof Error ? e : new Error(String(e));
+    console.error('[movie-search] tpb failed:', e instanceof Error ? e.message : e);
+    return [];
   }
 }
 
@@ -339,16 +330,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     }).slice(0, 40);
   }
 
-  // ── Phase 2: YTS 电影搜索（一次关键词搜索即可）──
-  let ytsResults: ResourceItem[] = [];
-  let ytsError: string | null = null;
-  try {
-    ytsResults = await fetchYTS(keyword);
-  } catch (e) {
-    ytsError = e instanceof Error ? e.message : String(e);
-  }
-
-  // ── Phase 3: EZTV 剧集搜索（需要 IMDB ID）──
+  // ── Phase 2: EZTV 剧集搜索（需要 IMDB ID）──
   let eztvResults: ResourceItem[] = [];
   const eztvError: string | null = null;
   const tvItems = results.filter(r => r.mediaType === 'tv');
@@ -367,7 +349,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
   }
 
   // ── 合并所有资源 + 去重 + 排序 ──
-  const allResources = [...allTpbResults, ...ytsResults, ...eztvResults];
+  const allResources = [...allTpbResults, ...eztvResults];
   const seenHashes = new Set<string>();
   const dedupedResources = allResources.filter(r => {
     const hash = extractHash(r.magnet);
@@ -379,7 +361,6 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
   // 收集实际命中的源列表
   const sourceNames = new Set<string>();
   if (allTpbResults.length > 0) sourceNames.add('TPB');
-  if (ytsResults.length > 0) sourceNames.add('YTS');
   if (eztvResults.length > 0) sourceNames.add('EZTV');
 
   return {
@@ -391,7 +372,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     resourceTotal: dedupedResources.length,
     tmdbError,
     doubanError: null,
-    ytsError,
+    ytsError: null, // YTS 已下线，不再使用
     eztvError,
     resourceSources: Array.from(sourceNames),
   };

@@ -7,6 +7,7 @@ import {
 import type {
   AnimeEnrichedData,
   BangumiSubject,
+  MikanItem,
   NyaaTorrent,
 } from '@/types/search';
 
@@ -104,6 +105,46 @@ function NyaaCard({ item }: { item: NyaaTorrent }) {
         <div className="flex items-center gap-0.5">
           <CopyBtn text={item.magnet} label="复制磁力链接" />
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Mikan 磁力卡片 ──────────────────────────────────────────────────
+
+function MikanCard({ item }: { item: MikanItem }) {
+  return (
+    <div className="grid grid-cols-[1fr_100px] gap-2 items-center px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-medium bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300 rounded">Mikan</span>
+          {item.group && (
+            <span className="shrink-0 px-1.5 py-0.5 text-[9px] bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded truncate max-w-[80px]" title={`字幕组：${item.group}`}>
+              {item.group}
+            </span>
+          )}
+          {item.magnet ? (
+            <a
+              href={item.magnet}
+              className="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate"
+              title={`点击唤起 BT 客户端下载：${item.title}`}
+            >
+              {item.title}
+            </a>
+          ) : (
+            <span className="text-xs text-slate-600 dark:text-slate-300 truncate" title={item.title}>
+              {item.title}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-slate-500">
+          {item.size && <span>{item.size}</span>}
+          {item.pubDate && <span>{item.pubDate}</span>}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {item.magnet && <CopyBtn text={item.magnet} label="复制磁力链接" />}
       </div>
     </div>
   );
@@ -276,7 +317,9 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
   const bgmList = data.bgm ?? [];
   // 合并 Nyaa + AnimeTosho（后端已按 infoHash 去重并排序）
   const torrentList = data.nyaa ?? [];
-  const hasResults = torrentList.length > 0;
+  // Mikan 独立数据源
+  const mikanList = data.mikan ?? [];
+  const hasResults = torrentList.length > 0 || mikanList.length > 0;
 
   const activeTorrents = torrentList;
   const totalPages = Math.max(1, Math.ceil(activeTorrents.length / PAGE_SIZE));
@@ -285,6 +328,7 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
   // error states
   const hasBgmError = !!data.errors?.bangumi;
   const hasTorrentError = !!data.errors?.nyaa || !!data.errors?.animetosho;
+  const hasMikanError = !!data.errors?.mikan;
 
   return (
     <div className="space-y-6">
@@ -300,6 +344,9 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
               )}
               {(data.animetosho?.length > 0) && (
                 <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300">AT</span>
+              )}
+              {(mikanList.length > 0) && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">Mikan {mikanList.length}</span>
               )}
             </div>
           )}
@@ -318,7 +365,7 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
       </div>
 
       {/* errors */}
-      {(hasBgmError || hasTorrentError) && (
+      {(hasBgmError || hasTorrentError || hasMikanError) && (
         <div className="space-y-2">
           {hasBgmError && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-violet-50 border border-violet-200 text-violet-700 text-sm dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-400">
@@ -332,6 +379,12 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
               <span>Nyaa 请求失败：{data.errors.nyaa}</span>
             </div>
           )}
+          {data.errors?.mikan && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400">
+              <Wifi className="w-4 h-4 flex-shrink-0" />
+              <span>Mikan 请求失败：{data.errors.mikan}</span>
+            </div>
+          )}
           {data.errors?.animetosho && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-sm dark:bg-purple-500/10 dark:border-purple-500/30 dark:text-purple-400">
               <Wifi className="w-4 h-4 flex-shrink-0" />
@@ -342,7 +395,7 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
       )}
 
       {/* completely empty state */}
-      {!hasResults && bgmList.length === 0 && !hasBgmError && !hasTorrentError && (
+      {!hasResults && bgmList.length === 0 && !hasBgmError && !hasTorrentError && !hasMikanError && (
         <div className="text-center py-16">
           <Wifi className="w-10 h-10 text-slate-400 mx-auto mb-3" />
           <p className="text-sm text-slate-500">未找到相关结果</p>
@@ -468,6 +521,49 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Mikan 结果（独立展示） */}
+          {mikanList.length > 0 && (
+            <div className="bg-white dark:bg-slate-900/90 rounded-2xl shadow-lg shadow-slate-900/5 border border-slate-200/60 dark:border-slate-700/60 overflow-hidden mt-4">
+              <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                    <Magnet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 dark:text-emerald-400" />
+                  </div>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm sm:text-base">
+                    Mikan 资源
+                  </span>
+                  <span className="px-2 py-0.5 text-xs font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full">
+                    {mikanList.length} 条
+                  </span>
+                </div>
+                <a
+                  href={`https://mikanani.me/RSS/Search?searchstr=${encodeURIComponent(data.keyword)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-emerald-500 hover:text-emerald-400 transition-colors"
+                >
+                  Mikan 站内搜索 →
+                </a>
+              </div>
+              <div className="p-4 sm:p-5">
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-[1fr_100px] gap-2 px-2 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800">
+                    <span>标题 / 字幕组 / 大小 / 日期</span>
+                    <span className="text-right">操作</span>
+                  </div>
+                  {mikanList.slice(0, 15).map((item, i) => (
+                    <MikanCard key={i} item={item} />
+                  ))}
+                  {mikanList.length > 15 && (
+                    <div className="text-center py-2 text-[10px] text-slate-400">
+                      还有 {mikanList.length - 15} 条未显示，可前往 Mikan 站内查看完整结果
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
