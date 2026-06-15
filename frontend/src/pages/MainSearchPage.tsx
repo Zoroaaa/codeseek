@@ -285,6 +285,7 @@ export const MainSearchPage: React.FC = () => {
       };
       if (response.success && response.data) {
         // ── 检测聚合响应（anime / movie）──
+        // 注意：JAV 不走 enriched 模式，保持"多源列表 + 详情抽取"双轨并行
         let isEnriched = false;
         if ('resultType' in response.data && (response.data.resultType === 'anime' || response.data.resultType === 'movie')) {
           setEnrichedData(response.data as EnrichedSearchData);
