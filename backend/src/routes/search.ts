@@ -12,7 +12,7 @@
  * 日期：2024 / 2026 重构
  */
 import { Hono } from 'hono';
-import { Env, SearchSource } from '@/types';
+import { Env, SearchSource, JwtPayload } from '@/types';
 import { success, error, generateId } from '@/utils';
 import { authMiddleware } from '@/middleware';
 import { VALIDATION_RULES } from '@/constants';
@@ -33,15 +33,15 @@ searchRoutes.use('*', authMiddleware);
  * 利用 Bangumi ID/封面、TMDB ID/poster 等数据增强历史展示
  */
 async function saveEnrichedHistory(
-  db: any,
+  db: D1Database,
   historyId: string | null,
-  user: any,
+  user: JwtPayload,
   result: Record<string, unknown>
 ): Promise<void> {
   if (!historyId || !user) return;
 
   const resultType = result.resultType as string;
-  let updateFields: string[] = [];
+  const updateFields: string[] = [];
   const updateValues: (string | number)[] = [];
 
   switch (resultType) {

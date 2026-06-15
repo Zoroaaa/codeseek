@@ -7,6 +7,16 @@
 import { SearchProvider, SearchResultBase, SearchOptions, SuggestionItem, TrendingItem } from '@/services/search-provider';
 import { searchAnime } from '@/services/anime-search';
 
+/** Bangumi 搜索/热门 API 返回的条目 */
+interface BgmApiSubject {
+  id: number;
+  name: string;
+  name_cn: string;
+  images?: { common?: string };
+  collection?: { collect?: number };
+  rating?: { score?: number };
+}
+
 export class AnimeProvider implements SearchProvider {
   readonly id = 'anime';
   readonly name = '动漫搜索';
@@ -28,10 +38,10 @@ export class AnimeProvider implements SearchProvider {
         signal: AbortSignal.timeout(8000),
       });
       if (!r.ok) return [];
-      const data = await r.json() as { list?: any[] };
+      const data = await r.json() as { list?: BgmApiSubject[] };
       if (!data.list?.length) return [];
 
-      return data.list.map((s: any) => ({
+      return data.list.map((s: BgmApiSubject) => ({
         text: s.name_cn || s.name || '',
         meta: { id: s.id, cover: s.images?.common || '' },
       }));
@@ -52,10 +62,10 @@ export class AnimeProvider implements SearchProvider {
         signal: AbortSignal.timeout(10000),
       });
       if (!r.ok) return [];
-      const data = await r.json() as { list?: any[] };
+      const data = await r.json() as { list?: BgmApiSubject[] };
       if (!data.list?.length) return [];
 
-      return data.list.slice(0, 10).map((s: any) => ({
+      return data.list.slice(0, 10).map((s: BgmApiSubject) => ({
         keyword: s.name_cn || s.name || '',
         count: s.collection?.collect || 0,
         cover: s.images?.common || '',

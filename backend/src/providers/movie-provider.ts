@@ -14,6 +14,19 @@ export function setTmdbApiKey(key: string | undefined): void {
   _tmdbApiKey = key;
 }
 
+/** TMDB 搜索/热门 API 返回的条目 */
+interface TmdbApiItem {
+  id: number;
+  title?: string;
+  name?: string;
+  media_type?: 'movie' | 'tv';
+  release_date?: string;
+  first_air_date?: string;
+  poster_path?: string | null;
+  popularity?: number;
+  vote_average?: number;
+}
+
 export class MovieProvider implements SearchProvider {
   readonly id = 'movie';
   readonly name = '影视搜索';
@@ -34,13 +47,13 @@ export class MovieProvider implements SearchProvider {
         signal: AbortSignal.timeout(8000),
       });
       if (!r.ok) return [];
-      const data = await r.json() as { results?: any[] };
+      const data = await r.json() as { results?: TmdbApiItem[] };
       if (!data.results?.length) return [];
 
       return data.results
-        .filter((item: any) => item.media_type === 'movie' || item.media_type === 'tv')
+        .filter((item: TmdbApiItem) => item.media_type === 'movie' || item.media_type === 'tv')
         .slice(0, 8)
-        .map((item: any) => ({
+        .map((item: TmdbApiItem) => ({
           text: item.title || item.name || '',
           meta: {
             id: item.id,
@@ -64,12 +77,12 @@ export class MovieProvider implements SearchProvider {
         signal: AbortSignal.timeout(10000),
       });
       if (!r.ok) return [];
-      const data = await r.json() as { results?: any[] };
+      const data = await r.json() as { results?: TmdbApiItem[] };
       if (!data.results?.length) return [];
 
       return data.results
         .slice(0, 10)
-        .map((item: any) => ({
+        .map((item: TmdbApiItem) => ({
           keyword: item.title || item.name || '',
           count: item.popularity || 0,
           cover: item.poster_path
