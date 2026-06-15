@@ -345,13 +345,11 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
   const tvItems = results.filter(r => r.mediaType === 'tv');
   if (tvItems.length > 0 && tmdbKey) {
     const eztvPromises = tvItems.slice(0, 5).map(async (item) => {
-      try {
-        const extIds = await fetchTMDBExternalIds(item.id, tmdbKey);
-        if (extIds.imdb_id) {
-          return await fetchEZTV(extIds.imdb_id);
-        }
-        return [] as ResourceItem[];
-      } catch (e) { throw e; }
+      const extIds = await fetchTMDBExternalIds(item.id, tmdbKey);
+      if (extIds.imdb_id) {
+        return await fetchEZTV(extIds.imdb_id);
+      }
+      return [] as ResourceItem[];
     });
     try {
       const eztvAll = await Promise.all(eztvPromises);
