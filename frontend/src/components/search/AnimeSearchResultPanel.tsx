@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import {
   Star, Calendar, Tv, Copy, Check, ExternalLink,
   Magnet, Wifi, RefreshCw, ChevronLeft, ChevronRight,
-  ChevronDown, ChevronUp, Shield, Tag, Heart, Users, Trophy, Film,
+  ChevronDown, ChevronUp, Tag, Heart, Users, Trophy, Film,
 } from 'lucide-react';
 import type {
   AnimeEnrichedData,
   BangumiSubject,
   MikanItem,
   NyaaTorrent,
+  ShowRssItem,
+  SubsPleaseItem,
 } from '@/types/search';
 
 // ─── 图片代理（与 JAV 统一走后端 /api/jav/proxy-image）─────────────
@@ -140,6 +142,81 @@ function MikanCard({ item }: { item: MikanItem }) {
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-slate-500">
           {item.size && <span>{item.size}</span>}
           {item.pubDate && <span>{item.pubDate}</span>}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {item.magnet && <CopyBtn text={item.magnet} label="复制磁力链接" />}
+      </div>
+    </div>
+  );
+}
+
+// ─── SubsPlease 磁力卡片 ──────────────────────────────────────────────
+
+function SubsPleaseCard({ item }: { item: SubsPleaseItem }) {
+  return (
+    <div className="grid grid-cols-[1fr_100px] gap-2 items-center px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-medium bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 rounded">Subs</span>
+          {item.resolution && (
+            <span className="shrink-0 px-1.5 py-0.5 text-[9px] bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded">
+              {item.resolution}p
+            </span>
+          )}
+          {item.episode && (
+            <span className="shrink-0 px-1.5 py-0.5 text-[9px] bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 rounded">
+              EP{item.episode}
+            </span>
+          )}
+          {item.magnet ? (
+            <a
+              href={item.magnet}
+              className="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate"
+              title={`点击唤起 BT 客户端下载：${item.title}`}
+            >
+              {item.title}
+            </a>
+          ) : (
+            <span className="text-xs text-slate-600 dark:text-slate-300 truncate" title={item.title}>
+              {item.title}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-slate-500">
+          {item.date && <span>{item.date}</span>}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {item.magnet && <CopyBtn text={item.magnet} label="复制磁力链接" />}
+      </div>
+    </div>
+  );
+}
+
+// ─── showRSS 磁力卡片 ────────────────────────────────────────────────
+
+function ShowRssCard({ item }: { item: ShowRssItem }) {
+  return (
+    <div className="grid grid-cols-[1fr_100px] gap-2 items-center px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-medium bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300 rounded">SR</span>
+          {item.magnet ? (
+            <a
+              href={item.magnet}
+              className="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate"
+              title={`点击唤起 BT 客户端下载：${item.title}`}
+            >
+              {item.title}
+            </a>
+          ) : (
+            <span className="text-xs text-slate-600 dark:text-slate-300 truncate" title={item.title}>
+              {item.title}
+            </span>
+          )}
         </div>
       </div>
 
@@ -315,20 +392,26 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
   const PAGE_SIZE = 10;
 
   const bgmList = data.bgm ?? [];
-  // 合并 Nyaa + AnimeTosho（后端已按 infoHash 去重并排序）
-  const torrentList = data.nyaa ?? [];
-  // Mikan 独立数据源
+  // 各源独立
+  const nyaaList = data.nyaa ?? [];
+  const atosList = data.animetosho ?? [];
   const mikanList = data.mikan ?? [];
-  const hasResults = torrentList.length > 0 || mikanList.length > 0;
+  const subspleaseList = data.subsplease ?? [];
+  const showrssList = data.showrss ?? [];
+  const hasResults = nyaaList.length > 0 || atosList.length > 0 || mikanList.length > 0 || subspleaseList.length > 0 || showrssList.length > 0;
 
-  const activeTorrents = torrentList;
+  // Nyaa 翻页（保留原有分页逻辑）
+  const activeTorrents = nyaaList;
   const totalPages = Math.max(1, Math.ceil(activeTorrents.length / PAGE_SIZE));
   const pagedTorrents = activeTorrents.slice((localPage - 1) * PAGE_SIZE, localPage * PAGE_SIZE);
 
   // error states
   const hasBgmError = !!data.errors?.bangumi;
-  const hasTorrentError = !!data.errors?.nyaa || !!data.errors?.animetosho;
+  const hasNyaaError = !!data.errors?.nyaa;
+  const hasAtosError = !!data.errors?.animetosho;
   const hasMikanError = !!data.errors?.mikan;
+  const hasSpError = !!data.errors?.subsplease;
+  const hasSrError = !!data.errors?.showrss;
 
   return (
     <div className="space-y-6">
@@ -339,14 +422,20 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
               <span className="px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 font-medium">多源聚合</span>
               <span>共 {data.total} 条资源</span>
-              {(data.nyaa?.length > 0) && (
-                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">Nyaa</span>
+              {(nyaaList.length > 0) && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">Nyaa {nyaaList.length}</span>
               )}
-              {(data.animetosho?.length > 0) && (
-                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300">AT</span>
+              {(atosList.length > 0) && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300">AT {atosList.length}</span>
               )}
               {(mikanList.length > 0) && (
                 <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">Mikan {mikanList.length}</span>
+              )}
+              {(subspleaseList.length > 0) && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">Subs {subspleaseList.length}</span>
+              )}
+              {(showrssList.length > 0) && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300">SR {showrssList.length}</span>
               )}
             </div>
           )}
@@ -365,7 +454,7 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
       </div>
 
       {/* errors */}
-      {(hasBgmError || hasTorrentError || hasMikanError) && (
+      {(hasBgmError || hasNyaaError || hasAtosError || hasMikanError || hasSpError || hasSrError) && (
         <div className="space-y-2">
           {hasBgmError && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-violet-50 border border-violet-200 text-violet-700 text-sm dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-400">
@@ -391,11 +480,23 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
               <span>AnimeTosho 请求失败：{data.errors.animetosho}</span>
             </div>
           )}
+          {data.errors?.subsplease && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-400">
+              <Wifi className="w-4 h-4 flex-shrink-0" />
+              <span>SubsPlease 请求失败：{data.errors.subsplease}</span>
+            </div>
+          )}
+          {data.errors?.showrss && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 text-sm dark:bg-orange-500/10 dark:border-orange-500/30 dark:text-orange-400">
+              <Wifi className="w-4 h-4 flex-shrink-0" />
+              <span>showRSS 请求失败：{data.errors.showrss}</span>
+            </div>
+          )}
         </div>
       )}
 
       {/* completely empty state */}
-      {!hasResults && bgmList.length === 0 && !hasBgmError && !hasTorrentError && !hasMikanError && (
+      {!hasResults && bgmList.length === 0 && !hasBgmError && !hasNyaaError && !hasAtosError && !hasMikanError && !hasSpError && !hasSrError && (
         <div className="text-center py-16">
           <Wifi className="w-10 h-10 text-slate-400 mx-auto mb-3" />
           <p className="text-sm text-slate-500">未找到相关结果</p>
@@ -445,26 +546,18 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
             </div>
           )}
 
-          {/* 磁力列表容器（增强版卡片式） */}
+          {/* Nyaa 磁力列表 */}
           {pagedTorrents.length > 0 && (
             <div className="bg-white dark:bg-slate-900/90 rounded-2xl shadow-lg shadow-slate-900/5 border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
-              {/* 标题栏 */}
               <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
                     <Magnet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-500 dark:text-violet-400" />
                   </div>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm sm:text-base">
-                    磁力链接
-                  </span>
-                  <span className="px-2 py-0.5 text-xs font-bold bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-full">
-                    {activeTorrents.length} 条
-                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm sm:text-base">Nyaa 资源</span>
+                  <span className="px-2 py-0.5 text-xs font-bold bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-full">{nyaaList.length} 条</span>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                  <Shield className="w-3 h-3" />
-                  点击名称唤起客户端 · 图标复制/下载
-                </div>
+                <a href={`https://nyaa.si/?f=0&c=1_0&q=${encodeURIComponent(data.keyword)}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-violet-500 hover:text-violet-400 transition-colors">Nyaa 站内搜索 →</a>
               </div>
 
               {/* 内容区 */}
@@ -525,6 +618,36 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
             </div>
           )}
 
+          {/* AnimeTosho 磁力列表 */}
+          {atosList.length > 0 && (
+            <div className="bg-white dark:bg-slate-900/90 rounded-2xl shadow-lg shadow-slate-900/5 border border-slate-200/60 dark:border-slate-700/60 overflow-hidden mt-4">
+              <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <Magnet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500 dark:text-purple-400" />
+                  </div>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm sm:text-base">AnimeTosho 资源</span>
+                  <span className="px-2 py-0.5 text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full">{atosList.length} 条</span>
+                </div>
+                <a href={`https://feed.animetosho.org/json?filter=${encodeURIComponent(data.keyword)}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-purple-500 hover:text-purple-400 transition-colors">AT 站内搜索 →</a>
+              </div>
+              <div className="p-4 sm:p-5">
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-[1fr_100px] gap-2 px-2 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800">
+                    <span>标题 / 大小 / 日期</span>
+                    <span className="text-right">操作</span>
+                  </div>
+                  {atosList.slice(0, 20).map((item, i) =>
+                    <NyaaCard key={(item as NyaaTorrent).id || i} item={item as NyaaTorrent} />
+                  )}
+                  {atosList.length > 20 && (
+                    <div className="text-center py-2 text-[10px] text-slate-400">还有 {atosList.length - 20} 条未显示，可前往 AT 站内查看完整结果</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Mikan 结果（独立展示） */}
           {mikanList.length > 0 && (
             <div className="bg-white dark:bg-slate-900/90 rounded-2xl shadow-lg shadow-slate-900/5 border border-slate-200/60 dark:border-slate-700/60 overflow-hidden mt-4">
@@ -568,8 +691,76 @@ export const AnimeSearchResultPanel: React.FC<AnimeSearchResultPanelProps> = ({
             </div>
           )}
 
+          {/* SubsPlease 结果 */}
+          {subspleaseList.length > 0 && (
+            <div className="bg-white dark:bg-slate-900/90 rounded-2xl shadow-lg shadow-slate-900/5 border border-slate-200/60 dark:border-slate-700/60 overflow-hidden mt-4">
+              <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                    <Magnet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 dark:text-blue-400" />
+                  </div>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm sm:text-base">
+                    SubsPlease 资源
+                  </span>
+                  <span className="px-2 py-0.5 text-xs font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full">
+                    {subspleaseList.length} 条
+                  </span>
+                </div>
+                <a
+                  href={`https://subsplease.org`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-blue-500 hover:text-blue-400 transition-colors"
+                >
+                  SubsPlease 站内 →
+                </a>
+              </div>
+              <div className="p-4 sm:p-5">
+                <div className="space-y-1.5">
+                  {subspleaseList.slice(0, 15).map((item, i) => (
+                    <SubsPleaseCard key={i} item={item} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* showRSS 结果 */}
+          {showrssList.length > 0 && (
+            <div className="bg-white dark:bg-slate-900/90 rounded-2xl shadow-lg shadow-slate-900/5 border border-slate-200/60 dark:border-slate-700/60 overflow-hidden mt-4">
+              <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                    <Magnet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500 dark:text-orange-400" />
+                  </div>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm sm:text-base">
+                    showRSS 资源
+                  </span>
+                  <span className="px-2 py-0.5 text-xs font-bold bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full">
+                    {showrssList.length} 条
+                  </span>
+                </div>
+                <a
+                  href="https://showrss.info"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-orange-500 hover:text-orange-400 transition-colors"
+                >
+                  showRSS 站内 →
+                </a>
+              </div>
+              <div className="p-4 sm:p-5">
+                <div className="space-y-1.5">
+                  {showrssList.slice(0, 15).map((item, i) => (
+                    <ShowRssCard key={i} item={item} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 服务端翻页（超过 60 条时请求下一页） */}
-          {onPageChange && torrentList.length >= 60 && localPage >= totalPages && (
+          {onPageChange && nyaaList.length >= 60 && localPage >= totalPages && (
             <div className="flex justify-center gap-2 mt-1">
               <button
                 disabled={data.page <= 1}

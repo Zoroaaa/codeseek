@@ -298,10 +298,10 @@ export const MovieSearchResultPanel: React.FC<MovieSearchResultPanelProps> = ({
           <span>豆瓣请求失败：{data.doubanError}</span>
         </div>
       )}
-      {data.ytsError && (
+      {data.tpbError && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>YTS 请求失败：{data.ytsError}</span>
+          <span>TPB 请求失败：{data.tpbError}</span>
         </div>
       )}
       {data.eztvError && (
@@ -312,7 +312,7 @@ export const MovieSearchResultPanel: React.FC<MovieSearchResultPanelProps> = ({
       )}
 
       {/* completely empty state */}
-      {results.length === 0 && resources.length === 0 && !data.tmdbError && !data.doubanError && !data.ytsError && !data.eztvError && (
+      {results.length === 0 && resources.length === 0 && !data.tmdbError && !data.doubanError && !data.tpbError && !data.eztvError && (
         <div className="text-center py-16">
           <Wifi className="w-10 h-10 text-slate-400 mx-auto mb-3" />
           <p className="text-sm text-slate-500">未找到相关结果</p>

@@ -47,7 +47,7 @@ export interface MovieSearchResult {
   resourceTotal: number;
   tmdbError: string | null;
   doubanError: string | null;
-  ytsError: string | null;
+  tpbError: string | null;
   eztvError: string | null;
   resourceSources: string[];
 }
@@ -313,13 +313,21 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
 
   // ── TPB 并发搜索（所有关键词）──
   let allTpbResults: ResourceItem[] = [];
+  let tpbError: string | null = null;
   if (tpbKeywords.length > 0) {
     const tpbPromises = tpbKeywords.map(title =>
-      searchTPB(title).catch(() => [] as ResourceItem[])
+      searchTPB(title).catch((e) => ({ _error: String(e) }) as unknown as ResourceItem[])
     );
     const tpbRes = await Promise.allSettled(tpbPromises);
     for (const res of tpbRes) {
-      if (res.status === 'fulfilled') allTpbResults.push(...res.value);
+      if (res.status === 'fulfilled') {
+        // 检查是否是错误标记结果
+        if (res.value.length === 1 && (res.value[0] as any)?._error) {
+          if (!tpbError) tpbError = `TPB: ${(res.value[0] as any)._error}`;
+        } else {
+          allTpbResults.push(...res.value);
+        }
+      }
     }
     // 按 btih 去重
     const seenHashes = new Set<string>();
@@ -372,7 +380,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     resourceTotal: dedupedResources.length,
     tmdbError,
     doubanError: null,
-    ytsError: null, // YTS 已下线，不再使用
+    tpbError,
     eztvError,
     resourceSources: Array.from(sourceNames),
   };
