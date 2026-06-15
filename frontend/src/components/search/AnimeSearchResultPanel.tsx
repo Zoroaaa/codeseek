@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Star, Calendar, Tv, Copy, Check, ExternalLink,
+  Star, Calendar, Tv, ExternalLink,
   Magnet, Wifi, RefreshCw, ChevronLeft, ChevronRight,
   Tag, Heart, Users, Trophy, Film,
 } from 'lucide-react';
@@ -11,12 +11,16 @@ import type {
   NyaaTorrent,
   ShowRssItem,
 } from '@/types/search';
+import { API_BASE_URL } from '@/constants';
+import { CopyButton } from '@/components/ui/CopyButton';
 
 // ─── 图片代理（与 JAV 统一走后端 /api/jav/proxy-image）─────────────
 const getProxyImageUrl = (url: string): string => {
-  const baseUrl = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? ''
-    : 'https://backend.codeseek.pp.ua';
+  const isLocal = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  );
+  // 复用 API_BASE_URL 常量，避免硬编码部署地址
+  const baseUrl = isLocal ? '' : API_BASE_URL.PRODUCTION.replace('/api', '');
   return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
 };
 
@@ -28,30 +32,6 @@ const fmt = {
   rating: (n: number) =>
     n >= 8 ? 'text-emerald-400' : n >= 6 ? 'text-yellow-400' : 'text-slate-400',
 };
-
-// ─── 复制按钮（带反馈） ─────────────────────────────────────────────
-
-function CopyBtn({ text, label }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    const ok = await navigator.clipboard.writeText(text).then(() => true).catch(() => false);
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-  return (
-    <button
-      onClick={copy}
-      title={label ?? '复制磁力链接'}
-      className="p-1 rounded text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
-    >
-      {copied
-        ? <Check className="w-3.5 h-3.5 text-emerald-500" />
-        : <Copy className="w-3.5 h-3.5" />}
-    </button>
-  );
-}
 
 // ─── Nyaa 磁力卡片 ──────────────────────────────────────────────────
 
@@ -104,7 +84,7 @@ function NyaaCard({ item }: { item: NyaaTorrent }) {
         )}
         {/* 操作按钮 */}
         <div className="flex items-center gap-0.5">
-          <CopyBtn text={item.magnet} label="复制磁力链接" />
+          <CopyButton text={item.magnet} label="复制磁力链接" />
         </div>
       </div>
     </div>
@@ -145,7 +125,7 @@ function MikanCard({ item }: { item: MikanItem }) {
       </div>
 
       <div className="flex items-center gap-2">
-        {item.magnet && <CopyBtn text={item.magnet} label="复制磁力链接" />}
+        {item.magnet && <CopyButton text={item.magnet} label="复制磁力链接" />}
       </div>
     </div>
   );
@@ -176,7 +156,7 @@ function ShowRssCard({ item }: { item: ShowRssItem }) {
       </div>
 
       <div className="flex items-center gap-2">
-        {item.magnet && <CopyBtn text={item.magnet} label="复制磁力链接" />}
+        {item.magnet && <CopyButton text={item.magnet} label="复制磁力链接" />}
       </div>
     </div>
   );

@@ -311,9 +311,9 @@ export const MainSearchPage: React.FC = () => {
         if (!isEnriched) {
           loadHistory();
         }
-        // 若输入符合番号格式，自动触发磁力提取
+        // 若输入符合番号格式且当前在 JAV tab，自动触发磁力提取
         const trimmed = query.trim().toUpperCase();
-        if (/^[A-Z]{2,8}-?\d{2,6}$/.test(trimmed)) {
+        if (activeTab === 'jav' && /^[A-Z]{2,8}-?\d{2,6}$/.test(trimmed)) {
           fetchJavDetail(trimmed);
         } else {
           resetJavDetail();

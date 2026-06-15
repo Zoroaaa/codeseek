@@ -2,6 +2,10 @@
  * 影视搜索服务
  * 元数据: TMDB（主）+ 豆瓣（fallback）
  * 磁力资源: TPB API（关键词搜索）+ Torrentio（TMDB ID 聚合多源）
+ *
+ * ⚠️ 类型契约：本文件导出的接口（TMDBResult, ResourceItem, MovieSearchResult）
+ *    与 frontend/src/types/search.ts 保持结构同步。
+ *    修改任一端时，请同步更新另一端。
  */
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -52,58 +56,9 @@ export interface MovieSearchResult {
   resourceSources: string[];
 }
 
-// ─── 通用工具：带重试的 fetch ────────────────────────────────────────
-
-interface RetryOptions {
-  retries?: number;
-  baseDelay?: number;
-}
-
-async function fetchWithRetry(
-  url: string,
-  init?: RequestInit,
-  opts?: RetryOptions
-): Promise<Response> {
-  const { retries = 2, baseDelay = 1000 } = opts ?? {};
-  let lastError: Error | null = null;
-
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const r = await fetch(url, init);
-      // 429/503 → 重试
-      if ((r.status === 429 || r.status === 503) && i < retries) {
-        const delay = baseDelay * Math.pow(2, i) + Math.random() * 500;
-        console.warn(`[retry] ${url} → ${r.status}, retry #${i + 1} after ${Math.round(delay)}ms`);
-        await new Promise(res => setTimeout(res, delay));
-        continue;
-      }
-      return r;
-    } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e));
-      if (i < retries) {
-        const delay = baseDelay * Math.pow(2, i);
-        console.warn(`[retry] ${url} → error, retry #${i + 1} after ${Math.round(delay)}ms`);
-        await new Promise(res => setTimeout(res, delay));
-      }
-    }
-  }
-
-  throw lastError || new Error('fetchWithRetry exhausted');
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────
-
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-
-// ─── 工具函数 ─────────────────────────────────────────────────────────
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return '';
-  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GB`;
-  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(0)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${bytes} B`;
-}
+import { fetchWithRetry } from '@/utils/fetch';
+import { formatBytes } from '@/utils/format';
+import { sanitizeError } from '@/utils/error';
 
 /** 从 magnet URI 提取 infoHash（40位 hex） */
 function extractHash(magnet: string): string {
@@ -145,30 +100,39 @@ async function searchTMDB(keyword: string, apiKey: string, page = 1, lang = 'zh-
     });
 }
 
-// ─── 豆瓣搜索 ─────────────────────────────────────────────────────────
+// ─── 豆瓣搜索（best-effort fallback）───────────────────────────────
+//
+// ⚠️ 豆瓣反爬策略可能随时变化，此接口不保证长期可用。
+//    当前作为 TMDB 中文元数据的补充，失败时静默降级，不影响主流程。
+//    如豆瓣持续不可用，可移除此函数及调用点。
 
 interface DoubanRawItem { id: string; title: string; rate: string; cover?: string; url: string; is_tv: boolean; }
 
 async function searchDoubanAjax(keyword: string): Promise<TMDBResult[]> {
-  const url = `https://movie.douban.com/j/search_subjects?type=movie&tag=&sort=recommend&page_limit=20&page_start=0&search_text=${encodeURIComponent(keyword)}`;
-  const r = await fetch(url, {
-    headers: {
-      'User-Agent': UA, 'Accept': 'application/json, text/javascript, */*',
-      'Referer': 'https://movie.douban.com/explore', 'X-Requested-With': 'XMLHttpRequest',
-      'Cookie': 'bid=""; __yadk_uid=dummy',
-    },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!r.ok) throw new Error(`Douban AJAX error: ${r.status}`);
-  const data = await r.json() as { subjects?: DoubanRawItem[] };
-  if (!data.subjects?.length) return [];
-  return data.subjects.slice(0, 15).map((item) => ({
+  try {
+    const url = `https://movie.douban.com/j/search_subjects?type=movie&tag=&sort=recommend&page_limit=20&page_start=0&search_text=${encodeURIComponent(keyword)}`;
+    const r = await fetch(url, {
+      headers: {
+        'User-Agent': UA, 'Accept': 'application/json, text/javascript, */*',
+        'Referer': 'https://movie.douban.com/explore', 'X-Requested-With': 'XMLHttpRequest',
+        'Cookie': 'bid=""; __yadk_uid=dummy',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) throw new Error(`Douban AJAX error: ${r.status}`);
+    const data = await r.json() as { subjects?: DoubanRawItem[] };
+    if (!data.subjects?.length) return [];
+    return data.subjects.slice(0, 15).map((item) => ({
     id: -Math.abs(parseInt(item.id) || 0), title: item.title || '', originalTitle: item.title || '',
     overview: '', poster: item.cover?.startsWith('http') ? item.cover : (item.cover ? `https:${item.cover}` : null),
     backdrop: null, releaseDate: '', year: '',
     rating: parseFloat(item.rate) || 0, voteCount: 0,
     mediaType: (item.is_tv ? 'tv' : 'movie') as 'movie' | 'tv', source: 'douban' as const,
   }));
+  } catch {
+    // 豆瓣不可用时静默降级，TMDB 已足够覆盖
+    return [];
+  }
 }
 
 async function searchDouban(keyword: string): Promise<TMDBResult[]> {
@@ -281,8 +245,8 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
   if (doubanRes.status === 'fulfilled' && doubanRes.value.length > 0) {
     results.push(...doubanRes.value);
   }
-  const tmdbError = zhMetaRes.status === 'rejected' ? String(zhMetaRes.reason) : null;
-  const doubanError = doubanRes.status === 'rejected' ? String(doubanRes.reason) : null;
+  const tmdbErrorRaw = zhMetaRes.status === 'rejected' ? String(zhMetaRes.reason) : null;
+  const doubanErrorRaw = doubanRes.status === 'rejected' ? String(doubanRes.reason) : null;
 
   // 元数据去重（按 title 前30字符）
   const seen = new Set<string>();
@@ -316,10 +280,21 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
   let allTpbResults: ResourceItem[] = [];
   let tpbError: string | null = null;
   if (tpbKeywords.length > 0) {
-    const tpbPromises = tpbKeywords.map(title =>
+    // 限制最多使用前 6 个关键词，避免过多并发请求
+    const limitedKeywords = tpbKeywords.slice(0, 6);
+    const TPB_CONCURRENCY = 3; // 每批最多 3 个并发
+
+    const tpbPromises = limitedKeywords.map(title =>
       searchTPB(title).catch((e) => ({ _error: String(e) }) as unknown as ResourceItem[])
     );
-    const tpbRes = await Promise.allSettled(tpbPromises);
+
+    // 分批执行，避免同时发起大量请求触发限流
+    const tpbRes: PromiseSettledResult<ResourceItem[]>[] = [];
+    for (let i = 0; i < tpbPromises.length; i += TPB_CONCURRENCY) {
+      const batch = tpbPromises.slice(i, i + TPB_CONCURRENCY);
+      const batchResults = await Promise.allSettled(batch);
+      tpbRes.push(...batchResults);
+    }
     for (const res of tpbRes) {
       if (res.status === 'fulfilled') {
         // 检查是否是错误标记结果
@@ -381,10 +356,10 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     resources: dedupedResources,
     total: results.length,
     resourceTotal: dedupedResources.length,
-    tmdbError,
-    doubanError,
-    tpbError,
-    eztvError,
+    tmdbError:  sanitizeError(tmdbErrorRaw),
+    doubanError: sanitizeError(doubanErrorRaw),
+    tpbError:    sanitizeError(tpbError),
+    eztvError:   sanitizeError(eztvError),
     resourceSources: Array.from(sourceNames),
   };
 }

@@ -3,6 +3,10 @@
  * 元数据: Bangumi API
  * 磁力资源: Nyaa.si RSS（?page=rss）
  *
+ * ⚠️ 类型契约：本文件导出的接口（BangumiSubject, NyaaTorrent, MikanItem, ShowRssItem, AnimeSearchResult）
+ *    与 frontend/src/types/search.ts 保持结构同步。
+ *    修改任一端时，请同步更新另一端。
+ *
  * 改用 RSS 原因：
  *   HTML 接口从 Cloudflare Workers 出站 IP 请求时触发 bot protection，
  *   返回 403 或 JS challenge 页，原 HTML 正则静默失败返回空数组。
@@ -82,44 +86,9 @@ export interface AnimeSearchResult {
   };
 }
 
-// ─── 通用工具：带重试的 fetch ────────────────────────────────────────
-
-interface RetryOptions {
-  retries?: number;
-  baseDelay?: number;
-}
-
-async function fetchWithRetry(
-  url: string,
-  init?: RequestInit,
-  opts?: RetryOptions
-): Promise<Response> {
-  const { retries = 2, baseDelay = 1000 } = opts ?? {};
-  let lastError: Error | null = null;
-
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const r = await fetch(url, init);
-      // 429 Too Many Requests → 重试
-      if (r.status === 429 && i < retries) {
-        const delay = baseDelay * Math.pow(2, i) + Math.random() * 500;
-        console.warn(`[retry] ${url} → 429, retry #${i + 1} after ${Math.round(delay)}ms`);
-        await new Promise(res => setTimeout(res, delay));
-        continue;
-      }
-      return r;
-    } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e));
-      if (i < retries) {
-        const delay = baseDelay * Math.pow(2, i);
-        console.warn(`[retry] ${url} → error, retry #${i + 1} after ${Math.round(delay)}ms`);
-        await new Promise(res => setTimeout(res, delay));
-      }
-    }
-  }
-
-  throw lastError || new Error('fetchWithRetry exhausted');
-}
+import { fetchWithRetry } from '@/utils/fetch';
+import { formatBytes } from '@/utils/format';
+import { sanitizeError } from '@/utils/error';
 
 // ─── Nyaa.si RSS 搜索 ─────────────────────────────────────────────────
 
@@ -294,7 +263,7 @@ async function fetchAnimeTosho(keyword: string): Promise<NyaaTorrent[]> {
       title: item.title || '',
       magnet,
       torrentUrl: item.torrent_url || '',
-      size: item.total_size != null ? formatBytesAT(item.total_size) : '',
+      size: item.total_size != null ? formatBytes(item.total_size) : '',
       date: item.timestamp ? new Date(item.timestamp * 1000).toISOString().slice(0, 10) : '',
       seeders: item.seeders || 0,
       leechers: item.leechers || 0,
@@ -311,14 +280,7 @@ async function fetchAnimeTosho(keyword: string): Promise<NyaaTorrent[]> {
   });
 }
 
-/** bytes → 可读字符串（AnimeTosho 用，避免与 movie-search 的 formatBytes 冲突命名） */
-function formatBytesAT(bytes: number): string {
-  if (!bytes) return '';
-  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GiB`;
-  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(0)} MiB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KiB`;
-  return `${bytes} B`;
-}
+// formatBytes 已从 @/utils/format 导入，此处不再重复定义
 
 // ─── Mikan Project RSS 搜索 ────────────────────────────────────────────
 
@@ -435,14 +397,23 @@ async function torrentUrlToMagnet(torrentUrl: string, title: string, pageUrl?: s
       signal: AbortSignal.timeout(10000),
       headers: { 'User-Agent': 'Mozilla/5.0' },
     });
-    if (!r.ok) return '';
+    if (!r.ok) {
+      console.warn('[mikan] torrent download HTTP', r.status, 'for', torrentUrl);
+      return '';
+    }
     const data = await r.arrayBuffer();
+    // 最小校验：.torrent 文件应该以 'd' (dict) 开头
+    if (data.byteLength < 20 || new Uint8Array(data)[0] !== 0x64) {
+      console.warn('[mikan] invalid torrent file, size=', data.byteLength, 'for', title);
+      return '';
+    }
     const infoHash = await extractInfoHashFromTorrent(data);
     if (infoHash) {
       return `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(title)}${MIKAN_TRACKERS}`;
     }
+    console.warn('[mikan] bencode parse succeeded but info hash not found for', title);
   } catch (e) {
-    console.warn('[mikan] torrent download failed:', e instanceof Error ? e.message : e);
+    console.warn('[mikan] torrent download/parse failed:', e instanceof Error ? e.message : e, 'for', title);
   }
 
   // 策略2：fallback — 从番剧页面 HTML 提取 magnet
@@ -524,7 +495,7 @@ async function fetchMikan(keyword: string): Promise<MikanItem[]> {
 
     rawItems.push({
       title,
-      size: sizeBytes ? formatBytesAT(sizeBytes) : '',
+      size: sizeBytes ? formatBytes(sizeBytes) : '',
       pubDate: parseRssDate(xmlTag(item, 'pubDate')),
       group,
       torrentUrl,
@@ -579,7 +550,8 @@ async function fetchShowRss(keyword: string): Promise<ShowRssItem[]> {
   const allResults: ShowRssItem[] = [];
   const seenMagnets = new Set<string>();
 
-  for (const showId of SHOWRSS_SHOW_IDS) {
+  // 并发请求所有频道（原为串行遍历，延迟高）
+  const channelPromises = SHOWRSS_SHOW_IDS.map(async (showId) => {
     try {
       const url = `https://showrss.info/show/${showId}.rss`;
       const r = await fetch(url, {
@@ -590,11 +562,12 @@ async function fetchShowRss(keyword: string): Promise<ShowRssItem[]> {
         signal: AbortSignal.timeout(10000),
       });
 
-      if (!r.ok) continue;
+      if (!r.ok) return [];
 
       const xml = await r.text();
-      if (!xml.includes('<item')) continue;
+      if (!xml.includes('<item')) return [];
 
+      const items: ShowRssItem[] = [];
       const itemRe = /<item>([\s\S]*?)<\/item>/gi;
       let m: RegExpExecArray | null;
       const kw = keyword.toLowerCase();
@@ -612,13 +585,21 @@ async function fetchShowRss(keyword: string): Promise<ShowRssItem[]> {
 
         if (!magnet || seenMagnets.has(magnet)) continue;
         seenMagnets.add(magnet);
-
-        allResults.push({ title, magnet });
+        items.push({ title, magnet });
       }
+      return items;
     } catch {
       // 单个频道失败跳过
+      return [];
     }
+  });
 
+  // 所有频道并发执行
+  const channelResults = await Promise.allSettled(channelPromises);
+  for (const res of channelResults) {
+    if (res.status === 'fulfilled') {
+      allResults.push(...res.value);
+    }
     if (allResults.length >= 20) break; // 够了就停止
   }
 
@@ -682,8 +663,12 @@ async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
 
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
+/** 动漫搜索总超时（ms），超时后返回已有结果 + 标记未完成的源 */
+const ANIME_SEARCH_TIMEOUT_MS = 20_000;
+
 export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearchResult> {
-  const [bgmResult, nyaaResult, mikanResult, atosResult, srResult] = await Promise.allSettled([
+  // 外层超时控制：避免 5 路并发最坏情况耗时过长
+  const searchPromise = Promise.allSettled([
     fetchBangumi(keyword),
     fetchNyaa(keyword),
     fetchMikan(keyword),
@@ -691,18 +676,44 @@ export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearc
     fetchShowRss(keyword),
   ]);
 
+  const timeoutPromise = new Promise<never>((_resolve, reject) =>
+    setTimeout(() => reject(new Error('SEARCH_TIMEOUT')), ANIME_SEARCH_TIMEOUT_MS)
+  );
+
+  let bgmResult, nyaaResult, mikanResult, atosResult, srResult;
+  try {
+    [bgmResult, nyaaResult, mikanResult, atosResult, srResult] = await Promise.race([searchPromise, timeoutPromise]);
+  } catch (err) {
+    // 超时时 searchPromise 仍在执行，但已无法 await
+    // 返回空结果 + 超时错误提示，让前端知道是超时而非完全失败
+    console.warn('[anime-search] total timeout after', ANIME_SEARCH_TIMEOUT_MS, 'ms');
+    return {
+      keyword,
+      page,
+      bgm: [], nyaa: [], mikan: [], animetosho: [], showrss: [],
+      total: 0,
+      errors: {
+        bangumi:   '搜索超时，请稍后重试',
+        nyaa:      '搜索超时，请稍后重试',
+        mikan:     '搜索超时，请稍后重试',
+        animetosho: '搜索超时，请稍后重试',
+        showrss:   '搜索超时，请稍后重试',
+      },
+    };
+  }
+
   const bgm   = bgmResult.status  === 'fulfilled' ? bgmResult.value  : [];
   const nyaa  = nyaaResult.status === 'fulfilled' ? nyaaResult.value : [];
   const mikan = mikanResult.status === 'fulfilled' ? mikanResult.value : [];
   const atos  = atosResult.status === 'fulfilled' ? atosResult.value  : [];
   const showrss   = srResult.status === 'fulfilled' ? srResult.value : [];
 
-  // 错误信息传递给前端
-  const nyaaError  = nyaaResult.status === 'rejected'  ? String(nyaaResult.reason)  : null;
-  const mikanError = mikanResult.status === 'rejected' ? String(mikanResult.reason) : null;
+  // 错误信息：原始信息用于日志，脱敏后传给前端
+  const nyaaErrorRaw  = nyaaResult.status === 'rejected'  ? String(nyaaResult.reason)  : null;
+  const mikanErrorRaw = mikanResult.status === 'rejected' ? String(mikanResult.reason) : null;
 
-  if (nyaaError)  console.error('[anime-search] nyaa failed:', nyaaError);
-  if (mikanError) console.error('[anime-search] mikan failed:', mikanError);
+  if (nyaaErrorRaw)  console.error('[anime-search] nyaa failed:', nyaaErrorRaw);
+  if (mikanErrorRaw) console.error('[anime-search] mikan failed:', mikanErrorRaw);
 
   // 各源独立，不再合并
   const sortedNyaa = [...nyaa].sort((a, b) => (b.seeders ?? 0) - (a.seeders ?? 0));
@@ -718,11 +729,11 @@ export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearc
     showrss,
     total: sortedNyaa.length + mikan.length + sortedAtos.length + showrss.length,
     errors: {
-      bangumi: bgmResult.status === 'rejected' ? String(bgmResult.reason) : null,
-      nyaa:    nyaaError,
-      mikan:   mikanError,
-      animetosho: atosResult.status === 'rejected' ? String(atosResult.reason) : null,
-      showrss:   srResult.status === 'rejected' ? String(srResult.reason) : null,
+      bangumi:   sanitizeError(bgmResult.status === 'rejected' ? String(bgmResult.reason) : null),
+      nyaa:      sanitizeError(nyaaErrorRaw),
+      mikan:     sanitizeError(mikanErrorRaw),
+      animetosho: sanitizeError(atosResult.status === 'rejected' ? String(atosResult.reason) : null),
+      showrss:   sanitizeError(srResult.status === 'rejected' ? String(srResult.reason) : null),
     },
   };
 }

@@ -15,6 +15,7 @@ import { authMiddleware } from '@/middleware';
 import { VALIDATION_RULES } from '@/constants';
 import { searchAnime } from '@/services/anime-search';
 import { searchMovie } from '@/services/movie-search';
+import { checkRateLimit } from '@/utils/rate-limit';
 
 const R = VALIDATION_RULES;
 
@@ -29,6 +30,14 @@ searchRoutes.use('*', authMiddleware);
  */
 searchRoutes.post('/', async (c) => {
   const userPayload = c.get('user');
+
+  // 搜索接口速率限制：每用户每分钟最多 15 次
+  const rateLimitKey = userPayload ? `search:${userPayload.userId}` : `search:ip:${c.req.header('cf-connecting-ip') || 'unknown'}`;
+  const rl = checkRateLimit(rateLimitKey);
+  if (!rl.allowed) {
+    return c.json(error('RATE_LIMITED', '请求过于频繁，请稍后再试'), 429);
+  }
+
   const body = await c.req.json();
   const { keyword, page = 1, pageSize = 20, majorCategoryId, categoryId } = body;
 
