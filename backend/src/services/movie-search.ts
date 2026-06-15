@@ -52,6 +52,45 @@ export interface MovieSearchResult {
   resourceSources: string[];
 }
 
+// ─── 通用工具：带重试的 fetch ────────────────────────────────────────
+
+interface RetryOptions {
+  retries?: number;
+  baseDelay?: number;
+}
+
+async function fetchWithRetry(
+  url: string,
+  init?: RequestInit,
+  opts?: RetryOptions
+): Promise<Response> {
+  const { retries = 2, baseDelay = 1000 } = opts ?? {};
+  let lastError: Error | null = null;
+
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const r = await fetch(url, init);
+      // 429/503 → 重试
+      if ((r.status === 429 || r.status === 503) && i < retries) {
+        const delay = baseDelay * Math.pow(2, i) + Math.random() * 500;
+        console.warn(`[retry] ${url} → ${r.status}, retry #${i + 1} after ${Math.round(delay)}ms`);
+        await new Promise(res => setTimeout(res, delay));
+        continue;
+      }
+      return r;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      if (i < retries) {
+        const delay = baseDelay * Math.pow(2, i);
+        console.warn(`[retry] ${url} → error, retry #${i + 1} after ${Math.round(delay)}ms`);
+        await new Promise(res => setTimeout(res, delay));
+      }
+    }
+  }
+
+  throw lastError || new Error('fetchWithRetry exhausted');
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -142,10 +181,10 @@ async function searchDouban(keyword: string): Promise<TMDBResult[]> {
 async function searchTPB(keyword: string): Promise<ResourceItem[]> {
   try {
     const url = `https://apibay.org/q.php?q=${encodeURIComponent(keyword)}&cat=0`;
-    const r = await fetch(url, {
+    const r = await fetchWithRetry(url, {
       headers: { 'Accept': 'application/json', 'User-Agent': UA },
-      signal: AbortSignal.timeout(12000),
-    });
+      signal: AbortSignal.timeout(15000),
+    }, { retries: 2, baseDelay: 1000 });
     if (!r.ok) return [];
     const items = await r.json() as Array<{
       id: string; name: string; info_hash: string;
@@ -170,58 +209,97 @@ async function searchTPB(keyword: string): Promise<ResourceItem[]> {
       resourceType: 'magnet' as const,
       detailUrl: item.id ? `https://thepiratebay.org/description.php?id=${item.id}` : undefined,
     }));
-  } catch { return []; }
+  } catch (e) {
+    console.error('[movie-search] tpb failed:', e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
-// ─── YTS JSON API（电影专用）──────────────────────────────────────────
+// ─── Movie Torrent 搜索（电影专用，替代已下线的 YTS）─────────────────
+// YTS (yts.mx) 自 2025 年起持续返回 530 Cloudflare 错误
+// 本模块复用 TPB API 但使用电影分类(cat=207) + 多关键词策略，输出独立源标识
 
-const YTS_TRACKERS = [
+const MOVIE_TRACKERS = [
   'udp://open.stealth.si:80/announce',
   'udp://tracker.opentrackr.org:1337/announce',
   'udp://exodus.desync.com:6969/announce',
+  'udp://tracker.openbittorrent.com:6969/announce',
 ].map(t => `&tr=${encodeURIComponent(t)}`).join('');
 
-async function fetchYTS(keyword: string): Promise<ResourceItem[]> {
+interface TpbItem {
+  id: string;
+  name: string;
+  info_hash: string;
+  seeders: string;
+  size: string;
+  added: string;
+}
+
+/**
+ * 电影专用种子搜索
+ * 策略：
+ *   1. 用关键词搜 TPB 电影分类 (cat=207)
+ *   2. 用关键词搜 TPB 全类（补充）
+ *   3. 合并去重
+ */
+async function fetchMovieSource(keyword: string): Promise<ResourceItem[]> {
+  const allResults: ResourceItem[] = [];
+  const seenHashes = new Set<string>();
+
+  // 辅助：处理单次请求结果
+  const processItems = (items: TpbItem[]) => {
+    for (const item of items) {
+      if (!item.info_hash || !/^[a-fA-F0-9]{40}$/i.test(item.info_hash)) continue;
+      if (seenHashes.has(item.info_hash.toLowerCase())) continue;
+      seenHashes.add(item.info_hash.toLowerCase());
+
+      allResults.push({
+        title: item.name,
+        magnet: `magnet:?xt=urn:btih:${item.info_hash.toLowerCase()}&dn=${encodeURIComponent(item.name)}${MOVIE_TRACKERS}`,
+        size: formatBytes(parseInt(item.size) || 0),
+        date: item.added ? new Date(parseInt(item.added) * 1000).toISOString().split('T')[0] : '',
+        source: 'movieSource',
+        sourceLabel: 'Movies',
+        resourceType: 'magnet' as const,
+      });
+    }
+  };
+
   try {
-    const url = `https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(keyword)}&sort_by=seeds&limit=20`;
-    const r = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!r.ok) throw new Error(`yts_http_${r.status}`);
+    // ── 策略1: TPB 电影分类精确搜索 ──
+    const movieCatUrl = `https://apibay.org/q.php?q=${encodeURIComponent(keyword)}&cat=207`;
+    const r1 = await fetchWithRetry(movieCatUrl, {
+      headers: { 'Accept': 'application/json', 'User-Agent': UA },
+      signal: AbortSignal.timeout(10000),
+    }, { retries: 1, baseDelay: 800 });
 
-    const data = await r.json() as {
-      data?: { movies?: Array<{
-        id: number; title: string; year: number;
-        torrents: Array<{
-          hash: string; quality: string; type: string;
-          seeds: number; peers: number; size: string; date_uploaded: string;
-        }>;
-      }> };
-    };
-
-    if (!data.data?.movies?.length) return [];
-
-    const results: ResourceItem[] = [];
-    for (const movie of data.data.movies) {
-      for (const t of movie.torrents) {
-        if (!t.hash || !/^[a-fA-F0-9]{40}$/.test(t.hash)) continue;
-        const magnet = `magnet:?xt=urn:btih:${t.hash.toLowerCase()}&dn=${encodeURIComponent(`${movie.title} ${t.quality}`)}${YTS_TRACKERS}`;
-        results.push({
-          title: `${movie.title} (${t.quality})`,
-          magnet,
-          size: t.size || '',
-          date: t.date_uploaded ? t.date_uploaded.split(' ')[0] : '',
-          source: 'yts',
-          sourceLabel: 'YTS',
-          resourceType: 'magnet' as const,
-        });
+    if (r1.ok) {
+      const items = (await r1.json()) as TpbItem[];
+      if (items?.length && items[0]?.name !== 'No results returned') {
+        processItems(items.slice(0, 15));
       }
     }
-    return results;
+
+    // ── 策略2: 原始关键词通用搜索（补充策略1可能遗漏的）──
+    const generalUrl = `https://apibay.org/q.php?q=${encodeURIComponent(keyword)}&cat=0`;
+    const r2 = await fetchWithRetry(generalUrl, {
+      headers: { 'Accept': 'application/json', 'User-Agent': UA },
+      signal: AbortSignal.timeout(10000),
+    }, { retries: 1, baseDelay: 800 });
+
+    if (r2.ok) {
+      const items = (await r2.json()) as TpbItem[];
+      if (items?.length && items[0]?.name !== 'No results returned') {
+        processItems(items.slice(0, 15));
+      }
+    }
   } catch (e) {
-    throw e instanceof Error ? e : new Error(String(e));
+    console.error('[movie-source] search failed:', e instanceof Error ? e.message : e);
+    // 不抛错，返回已有结果
   }
+
+  // 按 seeders 降序（需要额外请求或从结果推断，这里简单返回）
+  return allResults.slice(0, 25);
 }
 
 // ─── TMDB External IDs（获取 IMDB ID 用于 EZTV）──────────────────────
@@ -339,13 +417,13 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     }).slice(0, 40);
   }
 
-  // ── Phase 2: YTS 电影搜索（一次关键词搜索即可）──
-  let ytsResults: ResourceItem[] = [];
-  let ytsError: string | null = null;
+  // ── Phase 2: MovieSource 电影搜索（替代已下线的 YTS）──
+  let movieResults: ResourceItem[] = [];
+  let movieError: string | null = null;
   try {
-    ytsResults = await fetchYTS(keyword);
+    movieResults = await fetchMovieSource(keyword);
   } catch (e) {
-    ytsError = e instanceof Error ? e.message : String(e);
+    movieError = e instanceof Error ? e.message : String(e);
   }
 
   // ── Phase 3: EZTV 剧集搜索（需要 IMDB ID）──
@@ -367,7 +445,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
   }
 
   // ── 合并所有资源 + 去重 + 排序 ──
-  const allResources = [...allTpbResults, ...ytsResults, ...eztvResults];
+  const allResources = [...allTpbResults, ...movieResults, ...eztvResults];
   const seenHashes = new Set<string>();
   const dedupedResources = allResources.filter(r => {
     const hash = extractHash(r.magnet);
@@ -379,7 +457,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
   // 收集实际命中的源列表
   const sourceNames = new Set<string>();
   if (allTpbResults.length > 0) sourceNames.add('TPB');
-  if (ytsResults.length > 0) sourceNames.add('YTS');
+  if (movieResults.length > 0) sourceNames.add('Movies');
   if (eztvResults.length > 0) sourceNames.add('EZTV');
 
   return {
@@ -391,7 +469,7 @@ export async function searchMovie(keyword: string, page = 1, tmdbKey?: string): 
     resourceTotal: dedupedResources.length,
     tmdbError,
     doubanError: null,
-    ytsError,
+    ytsError: movieError, // 兼容旧字段名，实际为 MovieSource 错误信息
     eztvError,
     resourceSources: Array.from(sourceNames),
   };

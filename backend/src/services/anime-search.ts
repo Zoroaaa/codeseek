@@ -68,6 +68,45 @@ export interface AnimeSearchResult {
   errors: { bangumi: string | null; nyaa: string | null; mikan: string | null; animetosho: string | null };
 }
 
+// ─── 通用工具：带重试的 fetch ────────────────────────────────────────
+
+interface RetryOptions {
+  retries?: number;
+  baseDelay?: number;
+}
+
+async function fetchWithRetry(
+  url: string,
+  init?: RequestInit,
+  opts?: RetryOptions
+): Promise<Response> {
+  const { retries = 2, baseDelay = 1000 } = opts ?? {};
+  let lastError: Error | null = null;
+
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const r = await fetch(url, init);
+      // 429 Too Many Requests → 重试
+      if (r.status === 429 && i < retries) {
+        const delay = baseDelay * Math.pow(2, i) + Math.random() * 500;
+        console.warn(`[retry] ${url} → 429, retry #${i + 1} after ${Math.round(delay)}ms`);
+        await new Promise(res => setTimeout(res, delay));
+        continue;
+      }
+      return r;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      if (i < retries) {
+        const delay = baseDelay * Math.pow(2, i);
+        console.warn(`[retry] ${url} → error, retry #${i + 1} after ${Math.round(delay)}ms`);
+        await new Promise(res => setTimeout(res, delay));
+      }
+    }
+  }
+
+  throw lastError || new Error('fetchWithRetry exhausted');
+}
+
 // ─── Nyaa.si RSS 搜索 ─────────────────────────────────────────────────
 
 const NYAA_TRACKERS = [
@@ -165,17 +204,16 @@ function parseNyaaRss(xml: string): NyaaTorrent[] {
   return results;
 }
 
-/** Nyaa RSS 主搜索，错误向上抛出（由 searchAnime 捕获并写入 errors.nyaa） */
+/** Nyaa RSS 主搜索，带 429 重试（指数退避，最多 2 次） */
 async function fetchNyaa(keyword: string): Promise<NyaaTorrent[]> {
   const url = `https://nyaa.si/?page=rss&q=${encodeURIComponent(keyword)}&c=1_0&f=0`;
-  const r = await fetch(url, {
+  const r = await fetchWithRetry(url, {
     headers: {
-      // 显式声明 XML Accept，防止服务端返回 HTML 重定向
       'Accept': 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
       'User-Agent': 'Mozilla/5.0 (compatible; FeedFetcher/1.0)',
     },
-    signal: AbortSignal.timeout(12000),
-  });
+    signal: AbortSignal.timeout(15000),
+  }, { retries: 2, baseDelay: 1500 });
 
   if (!r.ok) {
     throw new Error(`nyaa_rss_http_${r.status}`);
@@ -259,6 +297,73 @@ function formatBytesAT(bytes: number): string {
   return `${bytes} B`;
 }
 
+// ─── Mikan Project RSS 搜索 ────────────────────────────────────────────
+
+/**
+ * Mikan Project RSS 搜索
+ * URL: https://mikanani.me/RSS/Search?searchstr={keyword}
+ * 无需认证，返回 RSS XML
+ */
+async function fetchMikan(keyword: string): Promise<MikanItem[]> {
+  const url = `https://mikanani.me/RSS/Search?searchstr=${encodeURIComponent(keyword)}`;
+  const r = await fetchWithRetry(url, {
+    headers: {
+      'Accept': 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+      'User-Agent': 'Mozilla/5.0 (compatible; FeedFetcher/1.0)',
+    },
+    signal: AbortSignal.timeout(15000),
+  }, { retries: 1, baseDelay: 1000 });
+
+  if (!r.ok) {
+    throw new Error(`mikan_http_${r.status}`);
+  }
+
+  const xml = await r.text();
+
+  // 检查是否被重定向到 HTML 页面
+  if (/<html[\s>]/i.test(xml)) {
+    throw new Error('mikan_blocked: response is HTML (bot protection or redirect)');
+  }
+
+  if (!xml.includes('<item')) {
+    return []; // 正常无结果
+  }
+
+  const results: MikanItem[] = [];
+  const itemRe = /<item>([\s\S]*?)<\/item>/gi;
+  let m: RegExpExecArray | null;
+
+  while ((m = itemRe.exec(xml)) !== null) {
+    const item = m[1];
+
+    const title = xmlTag(item, 'title');
+    if (!title) continue;
+
+    // 从 <enclosure> 提取 size
+    const enclosureM = item.match(/<enclosure[^>]*length="(\d+)"[^>]*>/i);
+    const sizeBytes = enclosureM?.[1] ? parseInt(enclosureM[1]) : 0;
+
+    // 从 <link> 提取 magnet 或 torrent URL
+    const link = xmlTag(item, 'link');
+    const magnet = link.startsWith('magnet:') ? link : '';
+
+    // 从 <description> 提取字幕组名
+    const desc = xmlTag(item, 'description');
+    const groupMatch = desc.match(/字幕组[：:]\s*(.+?)(?:<br\s*\/?>|\s*$)/i);
+    const group = groupMatch?.[1]?.trim() || '';
+
+    results.push({
+      title,
+      magnet,
+      size: sizeBytes ? formatBytesAT(sizeBytes) : '',
+      pubDate: parseRssDate(xmlTag(item, 'pubDate')),
+      group,
+    });
+  }
+
+  return results.slice(0, 30); // 限制返回数量
+}
+
 // ─── Bangumi 元数据 ───────────────────────────────────────────────────
 
 async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
@@ -317,24 +422,24 @@ async function fetchBangumi(keyword: string): Promise<BangumiSubject[]> {
 // ─── 主入口 ────────────────────────────────────────────────────────────
 
 export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearchResult> {
-  const [bgmResult, nyaaResult, atosResult] = await Promise.allSettled([
+  const [bgmResult, nyaaResult, mikanResult, atosResult] = await Promise.allSettled([
     fetchBangumi(keyword),
     fetchNyaa(keyword),
+    fetchMikan(keyword),
     fetchAnimeTosho(keyword),
   ]);
 
-  const bgm  = bgmResult.status  === 'fulfilled' ? bgmResult.value  : [];
-  const nyaa = nyaaResult.status === 'fulfilled' ? nyaaResult.value : [];
-  const atos = atosResult.status === 'fulfilled' ? atosResult.value : [];
+  const bgm   = bgmResult.status  === 'fulfilled' ? bgmResult.value  : [];
+  const nyaa  = nyaaResult.status === 'fulfilled' ? nyaaResult.value : [];
+  const mikan = mikanResult.status === 'fulfilled' ? mikanResult.value : [];
+  const atos  = atosResult.status === 'fulfilled' ? atosResult.value  : [];
 
-  // 错误信息现在能正确传递给前端（原来 fetchNyaa 内部 catch 导致永远是 null）
-  const nyaaError = nyaaResult.status === 'rejected'
-    ? String(nyaaResult.reason)
-    : null;
+  // 错误信息传递给前端
+  const nyaaError  = nyaaResult.status === 'rejected'  ? String(nyaaResult.reason)  : null;
+  const mikanError = mikanResult.status === 'rejected' ? String(mikanResult.reason) : null;
 
-  if (nyaaError) {
-    console.error('[anime-search] nyaa failed:', nyaaError);
-  }
+  if (nyaaError)  console.error('[anime-search] nyaa failed:', nyaaError);
+  if (mikanError) console.error('[anime-search] mikan failed:', mikanError);
 
   // 合并 Nyaa + AnimeTosho，按 infoHash 去重
   const allNyaa = [...nyaa, ...atos];
@@ -353,13 +458,13 @@ export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearc
     page,
     bgm:   bgm.slice(0, 6),
     nyaa:  dedupedNyaa,
-    mikan: [],
+    mikan: mikan,
     animetosho: atos,
-    total: dedupedNyaa.length,
+    total: dedupedNyaa.length + mikan.length,
     errors: {
       bangumi: bgmResult.status === 'rejected' ? String(bgmResult.reason) : null,
       nyaa:    nyaaError,
-      mikan:   null,
+      mikan:   mikanError,
       animetosho: atosResult.status === 'rejected' ? String(atosResult.reason) : null,
     },
   };
