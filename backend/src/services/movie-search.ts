@@ -60,6 +60,10 @@ import { fetchWithRetry } from '@/utils/fetch';
 import { formatBytes } from '@/utils/format';
 import { sanitizeError } from '@/utils/error';
 
+// ─── Constants ───────────────────────────────────────────────────────────
+
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
 /** 从 magnet URI 提取 infoHash（40位 hex） */
 function extractHash(magnet: string): string {
   const m = magnet.match(/urn:btih:([a-fA-F0-9]{40})/i);
