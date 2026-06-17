@@ -21,6 +21,7 @@ import type {
   EnrichedSearchData,
   JavEnrichedData,
 } from '@/types';
+import type { BangumiSubject, TMDBResult } from '@/types/search';
 
 import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesSidebar, AnimeSearchResultPanel, MovieSearchResultPanel } from '@/components/search';
 import { JavDetailPanel, JavRankingsPanel } from '@/components/jav';
@@ -419,6 +420,61 @@ export const MainSearchPage: React.FC = () => {
     }
   };
 
+  // 动漫收藏（Bangumi 条目）
+  const handleToggleFavoriteAnime = async (subject: BangumiSubject) => {
+    if (!isAuthenticated) { toast.warning('请先登录'); navigate('/login'); return; }
+    const existingFavoriteId = getFavoriteId(subject.url);
+    if (existingFavoriteId) {
+      try {
+        await userApi.removeFavorite(existingFavoriteId);
+        setFavorites(prev => prev.filter(f => f.id !== existingFavoriteId));
+        toast.success('已取消收藏');
+      } catch { toast.error('取消收藏失败', '请稍后重试'); }
+    } else {
+      try {
+        const response = await userApi.addFavorite({
+          title: subject.nameCN || subject.name,
+          url: subject.url,
+          cover: subject.cover,
+          subtitle: subject.name !== subject.nameCN ? subject.name : undefined,
+          tags: subject.tags?.join(', '),
+          keyword: keyword.trim() || undefined,
+        });
+        if (response.success && response.data) setFavorites(prev => [response.data, ...prev]);
+        toast.success('已添加到收藏');
+      } catch { toast.error('收藏失败', '请稍后重试'); }
+    }
+  };
+
+  // 影视收藏（TMDB / 豆瓣条目）
+  const handleToggleFavoriteMovie = async (item: TMDBResult) => {
+    if (!isAuthenticated) { toast.warning('请先登录'); navigate('/login'); return; }
+    const url = item.source === 'douban'
+      ? `https://movie.douban.com/subject/${Math.abs(item.id)}/`
+      : `https://www.themoviedb.org/${item.mediaType}/${item.id}`;
+    const existingFavoriteId = getFavoriteId(url);
+    if (existingFavoriteId) {
+      try {
+        await userApi.removeFavorite(existingFavoriteId);
+        setFavorites(prev => prev.filter(f => f.id !== existingFavoriteId));
+        toast.success('已取消收藏');
+      } catch { toast.error('取消收藏失败', '请稍后重试'); }
+    } else {
+      try {
+        const response = await userApi.addFavorite({
+          title: item.title,
+          url,
+          cover: item.poster ?? undefined,
+          subtitle: item.originalTitle && item.originalTitle !== item.title ? item.originalTitle : undefined,
+          tags: item.year ? String(item.year) : undefined,
+          keyword: keyword.trim() || undefined,
+        });
+        if (response.success && response.data) setFavorites(prev => [response.data, ...prev]);
+        toast.success('已添加到收藏');
+      } catch { toast.error('收藏失败', '请稍后重试'); }
+    }
+  };
+
   const handleRemoveFavorite = async (id: string) => {
     try {
       await userApi.removeFavorite(id);
@@ -679,15 +735,21 @@ export const MainSearchPage: React.FC = () => {
           <AnimeSearchResultPanel
             data={enrichedData}
             isDark={darkMode}
+            isAuthenticated={isAuthenticated}
+            favorites={favorites}
             onRefresh={() => handleSearch(keyword, enrichedPage)}
             onPageChange={(p) => handleSearch(keyword, p)}
-            />
+            onToggleFavorite={handleToggleFavoriteAnime}
+          />
           ) : enrichedData && enrichedData.resultType === 'movie' ? (
             <MovieSearchResultPanel
               data={enrichedData}
               isDark={darkMode}
+              isAuthenticated={isAuthenticated}
+              favorites={favorites}
               onRefresh={() => handleSearch(keyword, enrichedPage)}
               onPageChange={(p) => handleSearch(keyword, p)}
+              onToggleFavorite={handleToggleFavoriteMovie}
             />
           ) : (
           <SearchResultsPanel
