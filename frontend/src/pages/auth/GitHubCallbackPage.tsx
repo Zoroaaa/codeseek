@@ -60,7 +60,7 @@ export const GitHubCallbackPage: React.FC = () => {
       persistToken(token);
       setUser(user);
       notification.success('登录成功', `欢迎回来，${user.username}！`);
-      navigate('/dashboard', { replace: true });
+      navigate('/main', { replace: true });
     } catch {
       notification.error('登录失败', '用户数据解析失败，请重试');
       navigate('/login', { replace: true });
