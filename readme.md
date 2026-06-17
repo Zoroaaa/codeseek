@@ -1,335 +1,440 @@
-<p align="center">
-  <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=modern%20minimalist%20search%20engine%20logo%2C%20magnifying%20glass%20with%20code%20brackets%2C%20gradient%20blue%20to%20purple%2C%20clean%20white%20background%2C%20professional%20tech%20brand&image_size=square_hd" width="120" alt="CodeSeek Logo" />
-</p>
+<div align="center">
 
-<h1 align="center">CodeSeek</h1>
+<img src="frontend/public/logo.png" alt="CodeSeek Logo" width="120" height="120">
 
-<p align="center">
-  <strong>开源聚合搜索引擎</strong> — JAV / 动漫 / 影视，一站式搜索
-</p>
+# 磁力快搜 - CodeSeek
 
-<p align="center">
-  <a href="#功能特性">功能</a> •
-  <a href="#技术架构">架构</a> •
-  <a href="#快速开始">快速开始</a> •
-  <a href="#项目结构">目录</a> •
-  <a href="#部署指南">部署</a> •
-  <a href="#api-文档">API</a> •
-  <a href="#更新日志">更新</a>
- •
-  <a href="#贡献指南">贡献</a>
-</p>
+**现代化的磁力搜索聚合平台 - 基于 Cloudflare 边缘计算的无服务器架构**
 
----
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](https://github.com/Zoroaaa/codeseek)
+[![Cloudflare](https://img.shields.io/badge/Powered%20by-Cloudflare-orange.svg)](https://www.cloudflare.com/)
+[![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%2B%20TypeScript-green.svg)](/)
+[![Backend](https://img.shields.io/badge/Backend-Hono%20%2B%20TypeScript-blue.svg)](/)
 
-## 功能特性
+</div>
 
-### 三大搜索类别
+## 📑 目录
 
-| 类别 | 说明 | 数据源 |
-|------|------|--------|
-| **JAV** | 成人影片元数据 + 磁力链接 | DMM/FANZA、JavBus、JavDB、磁力源 |
-| **动漫** | 动画番剧信息 + 字幕组资源 + 磁力 | Bangumi、Mikan、Nyaa、ShowRSS |
-| **影视** | 电影/剧集元数据 + 种子资源 | TMDB、YTS、EZTV、TPB |
+- [快速访问](#-快速访问)
+- [项目文档](#-项目文档)
+- [项目特色](#-项目特色)
+- [技术栈概览](#️-技术栈概览)
+- [快速开始](#-快速开始)
+- [性能优化](#-性能优化)
+- [安全特性](#-安全特性)
+- [许可证](#-许可证)
+- [致谢](#-致谢)
+- [联系与支持](#-联系与支持)
 
-### 三层搜索架构
+## 🔗 快速访问
+
+<div align="center">
+
+| 资源类型 | 链接 | 备注 |
+|---------|------|------|
+| 📖 项目文档 | 👉 [完整介绍](https://zread.ai/Zoroaaa/codeseek) | 详细的项目说明和使用指南 |
+| 🚀 在线体验 | 👉 [https://codeseek.pp.ua](https://codeseek.pp.ua) | 体验完整功能 |
+| 🔑 演示密码 | 👉 `pp520` | 代理网页访问密码 |
+
+</div>
+
+## 📚 项目文档
+
+本项目采用模块化文档管理，各专项文档独立维护，确保内容完整、准确、专业。
+
+### 核心文档
+
+| 文档 | 说明 | 链接 |
+|------|------|------|
+| **API 接口文档** | 完整的 RESTful API 接口说明，包含搜索接口（JAV/动漫/影视三大类别）、认证方式、源管理等 | [docs/api/index.md](docs/api/index.md) |
+| **架构设计文档** | 前后端目录结构、技术栈版本、部署架构、数据库模块化设计详解 | [docs/backend-frontend-tree.md](docs/backend-frontend-tree.md) |
+| **配置说明文档** | 前端配置、后端配置、环境变量、代理服务、数据库配置、角色权限配置 | [docs/config.md](docs/config.md) |
+| **部署指南文档** | 环境要求、本地开发、后端部署、前端部署、数据库配置、常见问题解答 | [docs/deploy.md](docs/deploy.md) |
+| **版本变更日志** | 完整的版本变更记录：v2.0（架构重构）、v3.0（安全增强+功能扩展）、v3.1（Monorepo共享+安全加固+性能优化）、**v4.0（动漫&影视搜索+架构升级）** | [docs/changelogv.2.0.md](docs/changelogv.2.0.md) / [docs/changelogv3.0.md](docs/changelogv3.0.md) / [docs/changelogv3.1.0.md](docs/changelogv3.1.0.md) / [docs/changelogv4.0.0.md](docs/changelogv4.0.0.md) |
+| **GitHub 推送指南** | Git 操作流程、提交规范、分支管理、GitHub Actions 自动部署配置 | [docs/github_push.md](docs/github_push.md) |
+
+### 前端专项文档
+
+| 文档 | 说明 | 链接 |
+|------|------|------|
+| **通知组件文档** | Toast 通知组件的使用方法、API 文档、配置选项和最佳实践 | [frontend/docs/notification.md](frontend/docs/notification.md) |
+
+## ✨ 项目特色
+
+### 🎯 核心优势
+
+#### 1. 现代化技术架构
+- ⚛️ **React 19 + TypeScript**: 采用最新的 React 特性，配合 TypeScript 实现完整的类型安全，大幅减少运行时错误
+- ⚡ **Vite 极速构建**: 毫秒级热更新，开发体验丝滑流畅，生产构建优化到极致
+- 🎨 **Tailwind CSS**: 原子化 CSS 方案，样式开发效率提升 300%，支持亮色/暗色主题无缝切换
+- 📦 **Zustand 状态管理**: 轻量级状态管理方案，自动持久化存储，告别 Redux 的繁琐
+
+#### 2. 云原生边缘计算
+- ☁️ **Cloudflare 全栈部署**: 前端 Pages + 后端 Workers + 数据库 D1，完全 Serverless 架构
+- 🌍 **全球 CDN 加速**: 利用 Cloudflare 全球 300+ 边缘节点，用户就近访问，响应速度提升 80%
+- 💰 **零运维成本**: 无需购买服务器，免费额度即可支撑中小型应用，真正实现"部署即忘"
+- 📈 **自动弹性伸缩**: 流量高峰自动扩容，无需担心服务器宕机或资源浪费
+
+#### 3. 多类别聚合搜索引擎 (v4.0 重构)
+- 🎌 **动漫搜索**: Bangumi 番剧信息 + Mikan 字幕组 + Nyaa 磁力 + ShowRSS 订阅
+- 🎬 **影视搜索**: TMDB 电影剧集 + YTS 电影种子 + EZTV 剧集种子 + TPB 兜底磁力
+- 🔞 **JAV 搜索**: DMM/FANZA 元数据聚合 + JavBus/JavDB 磁力多源搜索
+- 🏗️ **三层架构**: Category（大类）→ Classification（分类）→ Source（源），Provider 注册模式扩展
+- 📊 **搜索源状态监控**: 实时检测搜索源可用性，自动跳过失效源，保证搜索成功率
+- ⚙️ **高度可定制**: 用户可自由启用/禁用搜索源、调整优先级、添加自定义搜索源
+
+#### 4. 企业级安全防护
+- 🔐 **JWT 无状态认证**: 基于 jose 库实现的 Token 认证，支持自动刷新，安全可靠
+- 📧 **完整邮箱验证**: 注册验证、密码重置、邮箱更改、账户删除，全流程邮箱确认
+- 🛡️ **多层安全机制**: 登录失败锁定、验证码频率限制、临时邮箱黑名单、安全事件日志
+- 🔑 **RBAC 权限系统**: 四级角色权限（超级管理员/管理员/用户/访客），细粒度权限控制
+
+### 🚀 技术亮点
+
+#### 前端技术栈
+```
+React 19              → 并发渲染、Suspense、自动批处理
+TypeScript            → 完整类型推断、泛型约束、类型守卫
+Vite                  → ESM 原生支持、按需编译、极速 HMR
+Tailwind CSS          → JIT 编译、暗色模式、响应式设计
+Zustand               → 极简 API、中间件支持、持久化存储
+@codeseek/shared      → Monorepo 共享包 (类型、工具、验证规则)
+React Router          → 数据路由、懒加载、嵌套布局
+Lucide React          → 1000+ 精美图标、Tree-shaking 优化
+date-fns              → 轻量级日期处理、国际化支持
+```
+
+#### 后端技术栈
+```
+Hono 4.x              → 超轻量 Web 框架、多运行时支持
+TypeScript            → 类型安全、接口定义、泛型约束
+Cloudflare Workers    → 边缘计算、V8 隔离环境、零冷启动
+Cloudflare D1         → SQLite 兼容、全球分布、自动备份
+JWT (jose)            → 标准化认证、多种算法支持
+Resend                → 现代邮件服务、高送达率、实时追踪
+```
+
+### 📱 用户体验
+
+#### 完美响应式设计
+- 📱 **移动端优先**: 从 320px 到 4K 显示器，完美适配所有设备尺寸
+- 🎯 **触摸优化**: 手势操作、滑动菜单、长按交互，移动端体验媲美原生 APP
+- ⚡ **性能优先**: 首屏加载 <1s，交互响应 <100ms，Lighthouse 评分 90+
+
+#### 智能交互体验
+- 🔔 **Toast 通知系统**: 统一的消息提示，支持成功/错误/警告/信息四种类型
+- 💾 **自动数据同步**: 跨设备同步搜索历史、收藏夹、个人设置
+- 🎨 **主题定制**: 亮色/暗色/跟随系统，一键切换，状态持久化
+- ⌨️ **快捷键支持**: 常用操作支持键盘快捷键，提升操作效率
+
+## 🎯 核心功能
+
+### 1. 🔍 智能搜索系统 (v4.0 三层架构重构)
+
+#### 三大搜索类别
+
+| 类别 | 数据源 | 说明 |
+|------|--------|------|
+| **🎌 动漫** | Bangumi / Mikan / Nyaa / ShowRSS | 番剧元数据 + 字幕组 + 磁力链接 |
+| **🎬 影视** | TMDB / YTS / EZTV / TPB | 电影剧集元数据 + 种子资源 |
+| **🔞 JAV** | DMM/FANZA / JavBus / JavDB | 成人影片元数据 + 磁力聚合 |
+
+#### 三层搜索架构
 
 ```
-搜索大类 (Category)          搜索分类 (Classification)        搜索源 (Source)
-┌─────────────┐           ┌──────────────────┐           ┌──────────────┐
-│   anime     │ ────────> │ bangumi          │ ────────> │ Bangumi API  │
-│             │           │ mikan            │           │ Mikan Project│
-│             │           │ nyaa             │           │ Nyaa.si      │
-│             │           │ showrss          │           │ ShowRSS      │
-├─────────────┤           ├──────────────────┤           ├──────────────┤
-│   movie     │ ────────> │ tmdb             │ ────────> │ TMDB API     │
-│             │           │ yts              │           │ YTS          │
-│             │           │ eztv             │           │ EZTV         │
-│             │           │ tpb              │           │ TPB          │
-├─────────────┤           ├──────────────────┤           ├──────────────┤
-│    jav      │ ────────> │ metadata         │ ────────> │ DMM/FANZA    │
-│             │           │ magnet           │           │ JavBus       │
-│             │           │                  │           │ JavDB        │
-└─────────────┘           └──────────────────┘           └──────────────┘
+Category (大类)        Classification (分类)         Source (源实例)
+┌─────────────┐       ┌──────────────────┐       ┌──────────────┐
+│   anime     │ ────> │ bangumi          │ ────> │ Bangumi API  │
+│             │       │ mikan            │       │ Mikan Project│
+│             │       │ nyaa             │       │ Nyaa.si      │
+│             │       │ showrss          │       │ ShowRSS      │
+├─────────────┤       ├──────────────────┤       ├──────────────┤
+│   movie     │ ────> │ tmdb             │ ────> │ TMDB API     │
+│             │       │ yts              │       │ YTS          │
+│             │       │ eztv             │       │ EZTV         │
+│             │       │ tpb              │       │ TPB          │
+├─────────────┤       ├──────────────────┐       ├──────────────┤
+│    jav      │ ────> │ metadata         │ ────> │ DMM/FANZA    │
+│             │       │ magnet           │       │ JavBus       │
+└─────────────┘       └──────────────────┘       │ JavDB        │
+                                                └──────────────┘
 ```
 
 **核心设计：**
 - **Provider 注册模式**：新增搜索类别只需创建 Provider 类并在 `backend/src/index.ts` 注册一行
 - **分类独立路由**：每个分类有独立的搜索逻辑和结果面板
-- **数据库驱动的源管理**：搜索源的启用/禁用/权重通过后台管理
+- **数据库驱动源管理**：搜索源的启用/禁用/权重通过后台管理
 
-### 其他核心功能
+#### 多源聚合搜索
+- **一键聚合**: 选择类别和分类，输入关键词，结果统一展示
+- **智能排序**: 根据搜索源优先级、使用频率、可用状态智能排序结果
+- **分类筛选**: 支持按大类（动漫/影视/JAV）和子分类筛选搜索源
+- **历史记录**: 自动保存搜索历史（含封面图），支持快速重搜和历史统计
 
-- **用户系统**：GitHub OAuth 登录、收藏管理、搜索历史（支持三大类别）
-- **社区模块**：评论、评分、举报、排行榜
-- **后台管理**：用户/评论/源管理、系统监控仪表盘
-- **反馈系统**：用户反馈收集与处理
-- **暗色模式**：完整的明暗主题切换
-- **图片代理**：统一后端代理，解决跨域和防盗链问题
+#### 搜索建议与热门
+- **智能提示**: 输入关键词时自动提示相关搜索建议
+- **热门搜索**: 实时展示热门搜索关键词，发现热门资源
+- **搜索统计**: 个人搜索统计，了解自己的搜索习惯
 
-## 技术架构
+#### 搜索源管理
+- **启用/禁用**: 自由控制哪些搜索源参与搜索
+- **优先级调整**: 自定义搜索源的显示顺序
+- **状态监控**: 实时查看搜索源可用性状态
+- **自定义添加**: 支持添加自定义搜索源（URL 模板）
+
+### 2. 👤 用户系统
+
+#### 认证与安全
+- **GitHub OAuth 登录**: 一键使用 GitHub 账号登录，自动创建/关联账号
+- **JWT Token 认证**: 无状态认证，支持 Token 自动刷新
+- **登录保护**: 连续失败 5 次自动锁定 15 分钟
+- **会话管理**: 查看活跃会话，支持强制登出
+
+#### 个人数据管理
+- **收藏夹**: 收藏常用搜索结果（支持动漫/影视/JAV 全类别），支持分类管理
+- **搜索历史**: 自动记录搜索历史（含封面缩略图），支持清空和删除
+- **数据同步**: 跨设备同步收藏、历史、设置
+- **数据导出**: 支持导出个人数据（JSON 格式）
+
+### 3. 👥 社区功能
+
+#### 搜索源分享
+- **分享搜索源**: 将自己发现的好用搜索源分享给社区
+- **标签管理**: 为搜索源添加标签，方便分类查找
+- **审核机制**: 管理员审核后才能上架，保证质量
+
+#### 互动功能
+- **评论评分**: 对搜索源发表评价，帮助他人选择
+- **点赞收藏**: 为优质搜索源点赞，收藏到个人列表
+- **举报机制**: 发现违规内容可举报，管理员处理
+
+#### 贡献统计
+- **个人贡献**: 查看自己分享的搜索源数量、下载量、评分
+- **社区排行**: 热门分享、活跃贡献者排行
+
+### 5. 📝 用户反馈
+
+#### 反馈提交
+- **多种反馈类型**: 问题反馈、优化建议、其他
+- **匿名支持**: 未登录用户也可提交反馈
+- **自动收集**: 自动记录页面 URL、浏览器信息
+
+#### 反馈管理
+- **状态跟踪**: 查看反馈处理状态（待处理/处理中/已解决/已关闭）
+- **邮件通知**: 反馈处理完成后自动发送邮件通知
+- **历史记录**: 查看自己的反馈历史
+
+#### 管理员功能
+- **反馈列表**: 分页查询、多条件筛选、搜索
+- **统计面板**: 各状态、类型、优先级统计
+- **处理回复**: 修改状态、优先级、添加回复
+- **邮件通知**: 处理完成后发送邮件通知用户
+
+### 6. 🛠️ 管理员功能
+
+#### 用户管理
+- **用户列表**: 分页查询、搜索筛选、状态查看
+- **角色权限**: 四级角色（超级管理员/管理员/用户/访客）
+- **状态控制**: 启用/禁用用户账户
+- **登录日志**: 查看用户登录记录和 IP 信息
+
+#### 内容管理
+- **搜索源管理**: 增删改查系统搜索源和分类（支持三大类别）
+- **社区审核**: 审核用户分享的搜索源
+- **举报处理**: 处理用户举报内容
+
+#### 系统监控
+- **仪表盘**: 一览系统运行状态、用户活跃度
+- **趋势分析**: 用户增长、搜索趋势、活跃度变化
+- **行为日志**: 用户操作行为记录和分析
+- **配置管理**: 动态修改系统配置，无需重新部署
+
+### 7. 📊 JAV 榜单功能
+
+#### 多维度榜单
+- **有码精选**: JavBus 首页前 3 页随机 20 条
+- **无码精选**: 无码专区前 3 页随机 20 条
+- **高清榜单**: 高清分类前 3 页随机 20 条
+- **字幕榜单**: 字幕分类前 3 页随机 20 条
+- **随机类别**: 随机 10 个类别，每个类别 12 条
+- **随机女优**: 随机 10 个女优，每个女优 12 条
+
+#### 智能推荐
+- **番号建议**: 输入关键词自动匹配番号
+- **数据来源**: 支持多数据源聚合展示
+- **登录可见**: 需要用户登录认证后才能访问
+
+## 🏗️ 技术栈概览
 
 ```
-codeseek/
-├── frontend/              # React 19 + Vite 前端
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── search/           # 搜索组件（含动漫/影视/JAV 面板）
-│   │   │   ├── jav/              # JAV 专属组件
-│   │   │   └── ui/               # 通用 UI 组件
-│   │   ├── pages/                # 页面（首页/登录/详情/管理）
-│   │   └── types/                # TypeScript 类型定义
-│   └── package.json
-│
-├── backend/               # Hono + Cloudflare Workers 后端
-│   ├── src/
-│   │   ├── providers/            # 搜索 Provider（核心扩展点）
-│   │   │   ├── anime-provider.ts # 动漫搜索 Provider
-│   │   │   ├── movie-provider.ts  # 影视搜索 Provider
-│   │   │   └── jav-provider.ts   # JAV 搜索 Provider
-│   │   ├── services/             # 业务服务层
-│   │   │   ├── anime-search.ts   # 动漫搜索服务
-│   │   │   ├── movie-search.ts   # 影视搜索服务
-│   │   │   └── search-provider.ts # Provider 注册中心
-│   │   ├── routes/               # API 路由
-│   │   └── types/                # 后端类型定义
-│   └── wrangler.toml
-│
-├── packages/shared/        # 共享类型与工具
-│   └── src/types/search.ts # 统一搜索类型定义
-│
-├── database/              # Cloudflare D1 数据库
-│   ├── schema.sql         # 完整建表语句
-│   ├── 06_data_search_sources.sql  # 搜索源种子数据
-│   └── 13_schema_history_cover.sql # 历史记录封面字段
-│
-└── docs/                  # 项目文档
-    ├── api/               # API 文档
-    │   ├── index.md       # API 总览
-    │   ├── search.md      # 搜索接口文档
-    │   ├── sources.md     # 搜索源管理
-    │   └── auth.md        # 认证接口
-    ├── config.md          # 配置说明
-    ├── deploy.md          # 部署指南
-    └── changelog*.md      # 版本更新记录
+┌─────────────────────────────────────────────────────────┐
+│                    前端层 (v4.0.0)                      │
+│  • React 19 + TypeScript                                │
+│  • Vite 构建工具                                         │
+│  • Tailwind CSS 样式框架                                 │
+│  • Zustand 状态管理                                      │
+│  • React Router 路由管理                                 │
+│  • AnimeSearchResultPanel / MovieSearchResultPanel      │
+│  • 部署：Cloudflare Pages                                │
+├─────────────────────────────────────────────────────────┤
+│                  Provider 层 (v4.0 新增)                 │
+│  • SearchProvider 接口 + ProviderRegistry 注册中心       │
+│  • anime-provider (Bangumi/Mikan/Nyaa/ShowRSS)          │
+│  • movie-provider (TMDB/YTS/EZTV/TPB)                   │
+│  • jav-provider (Metadata/Magnet)                       │
+├─────────────────────────────────────────────────────────┤
+│                  后端服务层 (v4.0.0)                     │
+│  • Hono 框架 (轻量级 Web 框架)                           │
+│  • TypeScript 类型安全                                   │
+│  • Cloudflare Workers (边缘计算)                         │
+│  • Cloudflare D1 (SQLite 数据库)                         │
+│  • JWT Token 认证 (jose)                                 │
+│  • Resend 邮件服务                                       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### 技术栈
+👉 [查看完整架构设计](docs/backend-frontend-tree.md)
 
-| 层级 | 技术 |
-|------|------|
-| **前端框架** | React 19 + TypeScript + Vite |
-| **UI 库** | Tailwind CSS + Lucide Icons + Framer Motion |
-| **状态管理** | Zustand |
-| **后端框架** | Hono (Cloudflare Workers) |
-| **运行时** | Cloudflare Workers + Edge Runtime |
-| **数据库** | Cloudflare D1 (SQLite) |
-| **对象存储** | Cloudflare R2 |
-| **认证** | GitHub OAuth (PKCE) |
-| **构建工具** | Turborepo (monorepo) |
-| **包管理** | pnpm |
-
-## 快速开始
+## 🚀 快速开始
 
 ### 环境要求
 
-- Node.js >= 18
-- pnpm >= 8
-- Cloudflare 账号（Workers + D1 + R2）
+- **Node.js**: >= 18.0.0
+- **pnpm**: >= 8.0.0
+- **Cloudflare 账户**: 用于部署 Workers 和 D1 数据库
+- **Wrangler CLI**: Cloudflare 开发工具 (>= 3.x)
 
-### 1. 克隆并安装依赖
+### 快速部署
 
 ```bash
-git clone https://github.com/codeseek-team/codeseek.git
+# 克隆项目
+git clone https://github.com/Zoroaaa/codeseek.git
 cd codeseek
+
+# 安装依赖
 pnpm install
-```
 
-### 2. 配置环境变量
-
-```bash
-# 复制模板
-cp .env.example .env.local
-
-# 编辑配置（必填项）
-# GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET - GitHub OAuth
-# TMDB_API_KEY - TMDB API（影视搜索）
-# BANGUMI_API_KEY - Bangumi API（动漫搜索，可选）
-# R2_*** - R2 对象存储（封面图等）
-```
-
-### 3. 初始化数据库
-
-```bash
-# 创建 D1 数据库
+# 初始化数据库（含 v4.0 新增的动漫/影视搜索源）
 npx wrangler d1 create codeseek-db
-
-# 执行建表 SQL
 npx wrangler d1 execute codeseek-db --file=database/schema.sql
 npx wrangler d1 execute codeseek-db --file=database/06_data_search_sources.sql
-```
+npx wrangler d1 execute codeseek-db --file=database/13_schema_history_cover.sql
 
-### 4. 本地开发
-
-```bash
-# 启动开发服务器（前端 :5173 + 后端 :8787）
+# 本地开发
 pnpm dev
+
+# 生产部署
+pnpm build && cd backend && npx wrangler deploy
 ```
 
-访问 http://localhost:5173 即可使用。
+👉 [查看详细部署指南](docs/deploy.md)
+👉 [查看配置说明](docs/config.md)
+👉 [查看完整 API 文档](docs/api/index.md)
+👉 [查看 v4.0 变更日志](docs/changelogv4.0.0.md)
 
-### 5. 生产部署
+## 📊 性能优化
 
-```bash
-# 构建并部署到 Cloudflare Workers
-pnpm deploy
-```
+### 前端性能优化
+- ✅ React 19 并发特性 + Vite 快速构建
+- ✅ 代码分割，路由级别懒加载，Tree-shaking
+- ✅ Zustand 持久化状态 + API 响应缓存
+- ✅ React.memo 和 useMemo 优化重渲染
 
-详细部署步骤见 [deploy.md](docs/deploy.md)
+### 后端性能优化
+- ✅ Cloudflare 全球边缘节点就近处理
+- ✅ 数据库索引优化 + 参数化查询
+- ✅ 响应压缩 (gzip/brotli) + 批量操作支持
+- ✅ 请求限流 + 并发控制 + 降级策略
 
-## 项目结构
+## 🔒 安全特性
 
-详见上方 [技术架构](#技术架构) 章节。
+### 前端安全
+- ✅ XSS 防护 + CSRF 保护
+- ✅ 内容安全策略 (CSP) + 子资源完整性 (SRI)
+- ✅ JWT Token 认证 + 请求签名验证
 
-关键扩展点：
+### 后端安全
+- ✅ JWT Token 认证 (jose 库) + RBAC 权限控制
+- ✅ SQL 注入防护 + 密码加密存储 (bcrypt)
+- ✅ 登录失败锁定机制 + 安全事件日志
+- ✅ CORS 配置 + 速率限制 + IP 记录
 
-- **新增搜索类别** → 创建 `backend/src/providers/xxx-provider.ts` → 在 `index.ts` 注册
-- **新增搜索源** → 在 `search_sources` 表插入记录或通过后台管理界面添加
-- **新增前端页面** → 在 `frontend/src/pages/` 创建组件并在 `App.tsx` 配置路由
+## 📄 许可证
 
-## 部署指南
+本项目基于 [MIT License](LICENSE) 开源协议。
 
-完整部署文档见 [deploy.md](docs/deploy.md)，包括：
-- Cloudflare Workers 部署
-- D1 数据库初始化与迁移
-- R2 存储桶配置
-- 自定义域名 + SSL
-- 环境变量管理
-- CI/CD 自动化部署
+### 许可说明
 
-## API 文档
+您可以自由地：
+- ✅ **使用** - 用于任何目的，包括商业用途
+- ✅ **修改** - 修改源代码以适应您的需求
+- ✅ **分发** - 分享项目或其修改版本
+- ✅ **私有使用** - 在私有项目中使用
 
-### 核心接口
+但您必须：
+- 📋 **保留版权声明** - 保留原始版权声明和许可证文本
+- 📝 **声明修改** - 说明对源代码所做的修改
 
-| 模块 | 路径 | 说明 |
-|------|------|------|
-| **搜索** | `POST /api/search` | 统一搜索入口（支持 anime/movie/jav） |
-| **搜索源** | `GET /api/search-sources` | 获取所有搜索源列表 |
-| **历史** | `GET /api/search/history` | 搜索历史（含封面） |
-| **收藏** | `GET/POST /api/favorites` | 收藏管理 |
-| **用户** | `GET /api/user/me` | 当前用户信息 |
-| **认证** | `GET /api/auth/github` | GitHub OAuth 登录 |
-| **社区** | `GET/POST /api/community/comments` | 评论系统 |
-| **反馈** | `POST /api/feedback` | 提交反馈 |
-| **JAV** | `GET /api/jav/:id` | JAV 详情（含代理图片） |
-| **管理** | `GET /api/admin/*` | 后台管理接口 |
+免责声明：
+- ⚠️ **无担保** - 软件按"原样"提供，不提供任何形式的担保
+- 🚫 **无责任** - 作者不对使用软件造成的任何损害负责
 
-完整 API 文档见 [docs/api/index.md](docs/api/index.md)
+## 🙏 致谢
 
-### 搜索接口示例
+### 技术平台
+- **[Cloudflare](https://www.cloudflare.com/)** - 提供优秀的边缘计算平台
+- **[GitHub](https://github.com/)** - 代码托管和协作平台
+- **[Resend](https://resend.com/)** - 邮件发送服务
 
-```bash
-# 动漫搜索
-curl -X POST https://api.codeseek.pp.ua/api/search \
-  -H "Content-Type: application/json" \
-  -d '{"category":"anime","keyword":"葬送的芙莉莲","classification":"bangumi"}'
+### 开源社区
+感谢所有为开源社区做出贡献的开发者们！
 
-# 影视搜索
-curl -X POST https://api.codeseek.pp.ua/api/search \
-  -H "Content-Type: application/json" \
-  -d '{"category":"movie","keyword":"盗梦空间","classification":"tmdb"}'
+### 特别感谢
+- 所有提交 Issue 和 PR 的贡献者
+- 使用并反馈问题的用户们
+- 分享和推广项目的朋友们
 
-# JAV 搜索
-curl -X POST https://api.codeseek.pp.ua/api/search \
-  -H "Content-Type: application/json" \
-  -d '{"category":"jav","keyword":"SSIS","classification":"metadata"}'
-```
+## 📧 联系与支持
 
-## 更新日志
+### 官方渠道
+- 🏠 **项目主页**: [GitHub - CodeSeek](https://github.com/Zoroaaa/codeseek)
+- 🐛 **问题反馈**: [GitHub Issues](https://github.com/Zoroaaa/codeseek/issues)
+- 💬 **功能建议**: [GitHub Discussions](https://github.com/Zoroaaa/codeseek/discussions)
+- 📖 **项目文档**: [在线文档](https://zread.ai/Zoroaaa/codeseek)
 
-### v4.0.0 — 动漫 & 影视搜索 + 架构升级 (2026-06)
+### 如何贡献
+我们欢迎各种形式的贡献：
+- 🐛 报告 Bug
+- 💡 提出新功能建议
+- 📝 改进文档
+- 🔧 提交代码
+- 🌍 翻译文档
 
-#### 新增功能
-- **动漫搜索系统**
-  - Bangumi 番剧信息集成（评分、标签、放送日期）
-  - Mikan Project 字幕组数据（订阅数、更新状态）
-  - Nyaa.si 磁力搜索（做种/下载量、可信标记）
-  - ShowRSS RSS 订阅源
-  - 专属 AnimeSearchResultPanel 结果面板
-
-- **影视搜索系统**
-  - TMDB 电影/剧集元数据（海报、评分、简介）
-  - YTS 电影种子（720p/1080p/4K 多画质）
-  - EZTV 剧集种子（季/集信息）
-  - TPB 兜底磁力源
-  - 专属 MovieSearchResultPanel 结果面板
-
-- **三层搜索架构重构**
-  - Category（大类）→ Classification（分类）→ Source（源）
-  - Provider 注册模式，新增类别只需一行注册代码
-  - 数据库驱动源管理，支持动态启停
-
-#### 架构改进
-- 新增 `SearchProvider` 接口与 `ProviderRegistry` 注册中心
-- 新增 `anime-provider`、`movie-provider` Provider 实现
-- `history` 表扩展支持 anime/movie/jav 全类别
-- `history` 表新增 `cover_image` 封面字段
-- `search_sources` 表新增 `category` / `classification` 字段
-- 共享类型包 `packages/shared` 统一前后端类型
-- 图片代理统一走 `/api/jav/proxy-image`（复用于动漫/影视封面）
-
-#### 前端改进
-- 搜索页新增「动漫」「影视」Tab 切换
-- 分类选择器按类别动态加载
-- 动漫结果面板：Bangumi 卡片 + Mikan 字幕组 + Nyaa 磁力列表
-- 影视结果面板：TMDB 卡片 + YTS/EZTV/TPB 资源列表
-- 暗色模式全面适配新组件
-
-<details>
-<summary><b>历史版本</b></summary>
-
-### v3.1.0 — 社区互动 + 反馈机制 (2026-05)
-- 社区评论系统（嵌套回复、点赞、排序）
-- 用户反馈系统（分类提交、管理审核）
-- 后台管理增强（评论/反馈/用户管理、操作日志）
-- 前端交互优化（无限滚动、骨架屏、错误边界）
-
-### v3.0.0 — 用户体系 + 安全加固 (2026-04)
-- GitHub OAuth 登录（PKCE 流程）
-- 收藏夹 / 搜索历史 / 个人中心
-- 安全中间件（速率限制、CSRF、输入校验）
-- Cloudflare D1 数据库迁移
-
-### v2.0.0 — MVP 上线 (2026-03)
-- JAV 元数据聚合（DMM/FANZA、JavBus、JavDB）
-- 磁力链接搜索（多源聚合、去重排序）
-- 前后端分离架构（React + Hono）
-
-</details>
-
-## 贡献指南
-
-欢迎贡献！请遵循以下流程：
-
+#### 贡献步骤
 1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'feat: add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 提交 Pull Request
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
-### 开发规范
-
-- 使用 **Conventional Commits** 规范提交信息
-- 前端代码遵循项目现有 ESLint/Prettier 配置
-- 后端代码使用 TypeScript strict 模式
-- 新增搜索类别需同步更新：Provider → Service → Route → Frontend Panel → Type → DB Seed
-
-## License
-
-MIT License © 2024-2026 CodeSeek Team
+### 支持项目
+如果这个项目对您有帮助，请考虑：
+- ⭐ 给项目点个 Star
+- 🔄 分享给更多的人
+- 💖 成为贡献者
 
 ---
 
-<p align="center">
-  Built with ❤️ by <a href="https://github.com/codeseek-team">CodeSeek Team</a>
-</p>
+<div align="center">
+
+### ✨ 感谢您使用磁力快搜！ ✨
+
+<p>⭐ 如果这个项目对你有帮助，请给我们一个Star！ ⭐</p>
+<p>💪 欢迎加入我们的开源社区，一起改进和发展！ 💪</p>
+
+**让搜索更简单，让体验更美好！**
+
+Made with ❤️ by [Zoro](https://github.com/Zoroaaa)
+
+</div>
