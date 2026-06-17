@@ -23,7 +23,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 export const GitHubCallbackPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { setUser, setToken, persistToken } = useAuthStore();
+  const { setUser, setToken, persistToken, markOAuthHandled } = useAuthStore();
   const notification = useNotification();
   const processed = useRef(false);
 
@@ -51,6 +51,8 @@ export const GitHubCallbackPage: React.FC = () => {
 
     try {
       const user = JSON.parse(decodeURIComponent(userRaw));
+      // 先标记 OAuth 已处理，阻止 App initAuth 的竞态 /auth/me 请求
+      markOAuthHandled();
       setToken(token);
       persistToken(token);
       setUser(user);

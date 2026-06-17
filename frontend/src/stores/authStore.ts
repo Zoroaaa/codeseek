@@ -7,7 +7,8 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  
+  skipInitAuth: boolean;
+
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -16,6 +17,7 @@ interface AuthState {
   restoreToken: () => Promise<string | null>;
   logout: () => void;
   initialize: () => void;
+  markOAuthHandled: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -24,7 +26,8 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
-      isLoading: true, // 初始状态为加载中，等待初始化完成
+      isLoading: true,
+      skipInitAuth: false,
 
       setUser: (user) => {
         set({ 
@@ -69,14 +72,19 @@ export const useAuthStore = create<AuthState>()(
       initialize: () => {
         set({ isLoading: false });
       },
+
+      // OAuth 回调已处理，通知 initAuth 跳过 /auth/me 请求
+      markOAuthHandled: () => {
+        set({ skipInitAuth: true, isLoading: false });
+      },
     }),
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
+      // 仅持久化 token（不可变凭证），不持久化 user（可变状态）
+      // 每次启动从服务端验证 token，避免残留数据导致假登录态
       partialize: (state) => ({
-        user: state.user,
-        token: state.token, // 直接持久化明文 token
-        isAuthenticated: state.isAuthenticated,
+        token: state.token,
       }),
     }
   )
