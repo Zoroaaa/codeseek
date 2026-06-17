@@ -113,12 +113,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initAuth = async () => {
-      // OAuth 回调页面已处理认证，跳过 initAuth 避免竞态
-      if (useAuthStore.getState().skipInitAuth) {
-        setLoading(false);
-        return;
-      }
-
       setLoading(true);
       const token = await useAuthStore.getState().restoreToken();
 

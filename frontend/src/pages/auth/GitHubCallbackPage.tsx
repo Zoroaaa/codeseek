@@ -23,13 +23,18 @@ const ERROR_MESSAGES: Record<string, string> = {
 export const GitHubCallbackPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { setUser, setToken, persistToken, markOAuthHandled } = useAuthStore();
+  const { setUser, setToken, persistToken } = useAuthStore();
   const notification = useNotification();
   const processed = useRef(false);
+  // 等待 zustand persist 从 localStorage 恢复完成，避免 hydration 覆盖新 token
+  const hasHydrated = useAuthStore.persist.hasHydrated();
 
   useEffect(() => {
     // 严格模式下 useEffect 会执行两次，用 ref 防止重复处理
     if (processed.current) return;
+
+    // persist 尚未 hydrate 完成，等下一轮 effect
+    if (!hasHydrated) return;
     processed.current = true;
 
     const token = searchParams.get('token');
@@ -51,8 +56,6 @@ export const GitHubCallbackPage: React.FC = () => {
 
     try {
       const user = JSON.parse(decodeURIComponent(userRaw));
-      // 先标记 OAuth 已处理，阻止 App initAuth 的竞态 /auth/me 请求
-      markOAuthHandled();
       setToken(token);
       persistToken(token);
       setUser(user);
@@ -62,7 +65,7 @@ export const GitHubCallbackPage: React.FC = () => {
       notification.error('登录失败', '用户数据解析失败，请重试');
       navigate('/login', { replace: true });
     }
-  }, []);
+  }, [hasHydrated]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
