@@ -21,7 +21,7 @@ export const ProxyImage: React.FC<ImagePreviewProps> = ({ src, alt, className })
       {isZoomed && (
         <div
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-          onClick={() => setIsZoomed(false)}
+          onClick={(e) => { e.stopPropagation(); setIsZoomed(false); }}
         >
           <button
             onClick={(e) => { e.stopPropagation(); setIsZoomed(false); }}
