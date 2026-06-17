@@ -50,12 +50,12 @@ const LogoSection: React.FC = memo(() => (
       <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 opacity-0 group-hover:opacity-20 blur-lg transition-all duration-300" />
       <img
         src="/logo.png"
-        alt="磁力快搜"
+        alt="Atlas"
         className="relative w-full h-full rounded-xl shadow-lg object-cover"
       />
     </div>
     <span className="text-lg sm:text-xl font-bold gradient-text display-font hidden sm:block">
-      磁力快搜
+      Atlas
     </span>
   </Link>
 ));
@@ -437,7 +437,7 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
         size="lg"
       >
         <div className="text-sm text-slate-600 dark:text-slate-300 space-y-4">
-          <p><strong>磁力快搜</strong>是一站式磁力搜索工具，聚合多个资源站点，支持快速检索。</p>
+          <p><strong>Atlas</strong>是一站式聚合搜索引擎，覆盖 JAV / 动漫 / 影视，支持多源聚合搜索。</p>
 
           <div>
             <h3 className="font-semibold text-base mb-2">如何使用</h3>

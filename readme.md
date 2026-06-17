@@ -1,20 +1,20 @@
 <div align="center">
 
-<img src="frontend/public/logo.png" alt="CodeSeek Logo" width="120" height="120">
+<img src="frontend/public/logo.png" alt="Atlas Logo" width="120" height="120">
 
-# 磁力快搜 - CodeSeek
+# Atlas
 
-**现代化的磁力搜索聚合平台 - 基于 Cloudflare 边缘计算的无服务器架构**
+**开源聚合搜索引擎 — JAV / 动漫 / 影视，一站式搜索**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](https://github.com/Zoroaaa/codeseek)
+[![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](https://github.com/Zoroaaa/Atlas)
 [![Cloudflare](https://img.shields.io/badge/Powered%20by-Cloudflare-orange.svg)](https://www.cloudflare.com/)
 [![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%2B%20TypeScript-green.svg)](/)
 [![Backend](https://img.shields.io/badge/Backend-Hono%20%2B%20TypeScript-blue.svg)](/)
 
 </div>
 
-## 📑 目录
+## 目录
 
 - [快速访问](#-快速访问)
 - [项目文档](#-项目文档)
@@ -27,21 +27,19 @@
 - [致谢](#-致谢)
 - [联系与支持](#-联系与支持)
 
-## 🔗 快速访问
+## 快速访问
 
 <div align="center">
 
 | 资源类型 | 链接 | 备注 |
 |---------|------|------|
-| 📖 项目文档 | 👉 [完整介绍](https://zread.ai/Zoroaaa/codeseek) | 详细的项目说明和使用指南 |
-| 🚀 在线体验 | 👉 [https://codeseek.pp.ua](https://codeseek.pp.ua) | 体验完整功能 |
-| 🔑 演示密码 | 👉 `pp520` | 代理网页访问密码 |
+| 在线体验 | [https://codeseek.pp.ua](https://codeseek.pp.ua) | 体验完整功能 |
 
 </div>
 
-## 📚 项目文档
+## 项目文档
 
-本项目采用模块化文档管理，各专项文档独立维护，确保内容完整、准确、专业。
+本项目采用模块化文档管理，各专项文档独立维护。
 
 ### 核心文档
 
@@ -51,7 +49,7 @@
 | **架构设计文档** | 前后端目录结构、技术栈版本、部署架构、数据库模块化设计详解 | [docs/backend-frontend-tree.md](docs/backend-frontend-tree.md) |
 | **配置说明文档** | 前端配置、后端配置、环境变量、代理服务、数据库配置、角色权限配置 | [docs/config.md](docs/config.md) |
 | **部署指南文档** | 环境要求、本地开发、后端部署、前端部署、数据库配置、常见问题解答 | [docs/deploy.md](docs/deploy.md) |
-| **版本变更日志** | 完整的版本变更记录：v2.0（架构重构）、v3.0（安全增强+功能扩展）、v3.1（Monorepo共享+安全加固+性能优化）、**v4.0（动漫&影视搜索+架构升级）** | [docs/changelogv.2.0.md](docs/changelogv.2.0.md) / [docs/changelogv3.0.md](docs/changelogv3.0.md) / [docs/changelogv3.1.0.md](docs/changelogv3.1.0.md) / [docs/changelogv4.0.0.md](docs/changelogv4.0.0.md) |
+| **版本变更日志** | 完整的版本变更记录：v2.0（架构重构）、v3.0（安全增强+功能扩展）、v3.1（Monorepo共享+安全加固+性能优化）、**v4.0（动漫&影视搜索+架构升级）** | [docs/changelogv2.0.md](docs/changelogv2.0.md) / [docs/changelogv3.0.md](docs/changelogv3.0.md) / [docs/changelogv3.1.0.md](docs/changelogv3.1.0.md) / [docs/changelogv4.0.0.md](docs/changelogv4.0.0.md) |
 | **GitHub 推送指南** | Git 操作流程、提交规范、分支管理、GitHub Actions 自动部署配置 | [docs/github_push.md](docs/github_push.md) |
 
 ### 前端专项文档
@@ -60,37 +58,35 @@
 |------|------|------|
 | **通知组件文档** | Toast 通知组件的使用方法、API 文档、配置选项和最佳实践 | [frontend/docs/notification.md](frontend/docs/notification.md) |
 
-## ✨ 项目特色
+## 项目特色
 
-### 🎯 核心优势
+### 核心优势
 
-#### 1. 现代化技术架构
-- ⚛️ **React 19 + TypeScript**: 采用最新的 React 特性，配合 TypeScript 实现完整的类型安全，大幅减少运行时错误
-- ⚡ **Vite 极速构建**: 毫秒级热更新，开发体验丝滑流畅，生产构建优化到极致
-- 🎨 **Tailwind CSS**: 原子化 CSS 方案，样式开发效率提升 300%，支持亮色/暗色主题无缝切换
-- 📦 **Zustand 状态管理**: 轻量级状态管理方案，自动持久化存储，告别 Redux 的繁琐
+#### 1. 开源聚合搜索引擎
+- **JAV 搜索**: DMM/FANZA 元数据聚合 + JavBus/JavDB 磁力多源搜索
+- **动漫搜索**: Bangumi 番剧信息 + Mikan 字幕组 + Nyaa 磁力 + ShowRSS 订阅
+- **影视搜索**: TMDB 电影剧集 + YTS 电影种子 + EZTV 剧集种子 + TPB 兜底磁力
+- **一站式体验**: 三大类别统一入口，一次搜索聚合多源结果
 
-#### 2. 云原生边缘计算
-- ☁️ **Cloudflare 全栈部署**: 前端 Pages + 后端 Workers + 数据库 D1，完全 Serverless 架构
-- 🌍 **全球 CDN 加速**: 利用 Cloudflare 全球 300+ 边缘节点，用户就近访问，响应速度提升 80%
-- 💰 **零运维成本**: 无需购买服务器，免费额度即可支撑中小型应用，真正实现"部署即忘"
-- 📈 **自动弹性伸缩**: 流量高峰自动扩容，无需担心服务器宕机或资源浪费
+#### 2. 现代化技术架构
+- **React 19 + TypeScript**: 采用最新的 React 特性，配合 TypeScript 实现完整的类型安全
+- **Vite 极速构建**: 毫秒级热更新，开发体验丝滑流畅
+- **Tailwind CSS**: 原子化 CSS 方案，支持亮色/暗色主题无缝切换
+- **Zustand 状态管理**: 轻量级状态管理方案，自动持久化存储
 
-#### 3. 多类别聚合搜索引擎 (v4.0 重构)
-- 🎌 **动漫搜索**: Bangumi 番剧信息 + Mikan 字幕组 + Nyaa 磁力 + ShowRSS 订阅
-- 🎬 **影视搜索**: TMDB 电影剧集 + YTS 电影种子 + EZTV 剧集种子 + TPB 兜底磁力
-- 🔞 **JAV 搜索**: DMM/FANZA 元数据聚合 + JavBus/JavDB 磁力多源搜索
-- 🏗️ **三层架构**: Category（大类）→ Classification（分类）→ Source（源），Provider 注册模式扩展
-- 📊 **搜索源状态监控**: 实时检测搜索源可用性，自动跳过失效源，保证搜索成功率
-- ⚙️ **高度可定制**: 用户可自由启用/禁用搜索源、调整优先级、添加自定义搜索源
+#### 3. 云原生边缘计算
+- **Cloudflare 全栈部署**: 前端 Pages + 后端 Workers + 数据库 D1，完全 Serverless 架构
+- **全球 CDN 加速**: 利用 Cloudflare 全球 300+ 边缘节点，用户就近访问
+- **零运维成本**: 无需购买服务器，免费额度即可支撑中小型应用
+- **自动弹性伸缩**: 流量高峰自动扩容，无需担心服务器宕机
 
 #### 4. 企业级安全防护
-- 🔐 **JWT 无状态认证**: 基于 jose 库实现的 Token 认证，支持自动刷新，安全可靠
-- 📧 **完整邮箱验证**: 注册验证、密码重置、邮箱更改、账户删除，全流程邮箱确认
-- 🛡️ **多层安全机制**: 登录失败锁定、验证码频率限制、临时邮箱黑名单、安全事件日志
-- 🔑 **RBAC 权限系统**: 四级角色权限（超级管理员/管理员/用户/访客），细粒度权限控制
+- **JWT 无状态认证**: 基于 jose 库实现的 Token 认证，支持自动刷新
+- **完整邮箱验证**: 注册验证、密码重置、邮箱更改、账户删除，全流程邮箱确认
+- **多层安全机制**: 登录失败锁定、验证码频率限制、临时邮箱黑名单、安全事件日志
+- **RBAC 权限系统**: 四级角色权限（超级管理员/管理员/用户/访客），细粒度权限控制
 
-### 🚀 技术亮点
+### 技术亮点
 
 #### 前端技术栈
 ```
@@ -115,50 +111,50 @@ JWT (jose)            → 标准化认证、多种算法支持
 Resend                → 现代邮件服务、高送达率、实时追踪
 ```
 
-### 📱 用户体验
+### 用户体验
 
 #### 完美响应式设计
-- 📱 **移动端优先**: 从 320px 到 4K 显示器，完美适配所有设备尺寸
-- 🎯 **触摸优化**: 手势操作、滑动菜单、长按交互，移动端体验媲美原生 APP
-- ⚡ **性能优先**: 首屏加载 <1s，交互响应 <100ms，Lighthouse 评分 90+
+- **移动端优先**: 从 320px 到 4K 显示器，完美适配所有设备尺寸
+- **触摸优化**: 手势操作、滑动菜单、长按交互，移动端体验媲美原生 APP
+- **性能优先**: 首屏加载 <1s，交互响应 <100ms，Lighthouse 评分 90+
 
 #### 智能交互体验
-- 🔔 **Toast 通知系统**: 统一的消息提示，支持成功/错误/警告/信息四种类型
-- 💾 **自动数据同步**: 跨设备同步搜索历史、收藏夹、个人设置
-- 🎨 **主题定制**: 亮色/暗色/跟随系统，一键切换，状态持久化
-- ⌨️ **快捷键支持**: 常用操作支持键盘快捷键，提升操作效率
+- **Toast 通知系统**: 统一的消息提示，支持成功/错误/警告/信息四种类型
+- **自动数据同步**: 跨设备同步搜索历史、收藏夹、个人设置
+- **主题定制**: 亮色/暗色/跟随系统，一键切换，状态持久化
+- **快捷键支持**: 常用操作支持键盘快捷键，提升操作效率
 
-## 🎯 核心功能
+## 核心功能
 
-### 1. 🔍 智能搜索系统 (v4.0 三层架构重构)
+### 1. 智能搜索系统 (v4.0 三层架构重构)
 
 #### 三大搜索类别
 
 | 类别 | 数据源 | 说明 |
 |------|--------|------|
-| **🎌 动漫** | Bangumi / Mikan / Nyaa / ShowRSS | 番剧元数据 + 字幕组 + 磁力链接 |
-| **🎬 影视** | TMDB / YTS / EZTV / TPB | 电影剧集元数据 + 种子资源 |
-| **🔞 JAV** | DMM/FANZA / JavBus / JavDB | 成人影片元数据 + 磁力聚合 |
+| **JAV** | DMM/FANZA / JavBus / JavDB | 成人影片元数据 + 磁力聚合 |
+| **动漫** | Bangumi / Mikan / Nyaa / ShowRSS | 番剧元数据 + 字幕组 + 磁力链接 |
+| **影视** | TMDB / YTS / EZTV / TPB | 电影剧集元数据 + 种子资源 |
 
 #### 三层搜索架构
 
 ```
 Category (大类)        Classification (分类)         Source (源实例)
 ┌─────────────┐       ┌──────────────────┐       ┌──────────────┐
+│    jav      │ ────> │ metadata         │ ────> │ DMM/FANZA    │
+│             │       │ magnet           │       │ JavBus       │
+│             │       │                  │       │ JavDB        │
+├─────────────┤       ├──────────────────┤       ├──────────────┤
 │   anime     │ ────> │ bangumi          │ ────> │ Bangumi API  │
 │             │       │ mikan            │       │ Mikan Project│
 │             │       │ nyaa             │       │ Nyaa.si      │
 │             │       │ showrss          │       │ ShowRSS      │
-├─────────────┤       ├──────────────────┤       ├──────────────┤
+├─────────────┤       ├──────────────────┐       ├──────────────┤
 │   movie     │ ────> │ tmdb             │ ────> │ TMDB API     │
 │             │       │ yts              │       │ YTS          │
 │             │       │ eztv             │       │ EZTV         │
 │             │       │ tpb              │       │ TPB          │
-├─────────────┤       ├──────────────────┐       ├──────────────┤
-│    jav      │ ────> │ metadata         │ ────> │ DMM/FANZA    │
-│             │       │ magnet           │       │ JavBus       │
-└─────────────┘       └──────────────────┘       │ JavDB        │
-                                                └──────────────┘
+└─────────────┘       └──────────────────┘       └──────────────┘
 ```
 
 **核心设计：**
@@ -169,7 +165,7 @@ Category (大类)        Classification (分类)         Source (源实例)
 #### 多源聚合搜索
 - **一键聚合**: 选择类别和分类，输入关键词，结果统一展示
 - **智能排序**: 根据搜索源优先级、使用频率、可用状态智能排序结果
-- **分类筛选**: 支持按大类（动漫/影视/JAV）和子分类筛选搜索源
+- **分类筛选**: 支持按大类（JAV/动漫/影视）和子分类筛选搜索源
 - **历史记录**: 自动保存搜索历史（含封面图），支持快速重搜和历史统计
 
 #### 搜索建议与热门
@@ -183,7 +179,7 @@ Category (大类)        Classification (分类)         Source (源实例)
 - **状态监控**: 实时查看搜索源可用性状态
 - **自定义添加**: 支持添加自定义搜索源（URL 模板）
 
-### 2. 👤 用户系统
+### 2. 用户系统
 
 #### 认证与安全
 - **GitHub OAuth 登录**: 一键使用 GitHub 账号登录，自动创建/关联账号
@@ -192,12 +188,12 @@ Category (大类)        Classification (分类)         Source (源实例)
 - **会话管理**: 查看活跃会话，支持强制登出
 
 #### 个人数据管理
-- **收藏夹**: 收藏常用搜索结果（支持动漫/影视/JAV 全类别），支持分类管理
+- **收藏夹**: 收藏常用搜索结果（支持 JAV/动漫/影视 全类别），支持分类管理
 - **搜索历史**: 自动记录搜索历史（含封面缩略图），支持清空和删除
 - **数据同步**: 跨设备同步收藏、历史、设置
 - **数据导出**: 支持导出个人数据（JSON 格式）
 
-### 3. 👥 社区功能
+### 3. 社区功能
 
 #### 搜索源分享
 - **分享搜索源**: 将自己发现的好用搜索源分享给社区
@@ -213,7 +209,7 @@ Category (大类)        Classification (分类)         Source (源实例)
 - **个人贡献**: 查看自己分享的搜索源数量、下载量、评分
 - **社区排行**: 热门分享、活跃贡献者排行
 
-### 5. 📝 用户反馈
+### 4. 用户反馈
 
 #### 反馈提交
 - **多种反馈类型**: 问题反馈、优化建议、其他
@@ -225,13 +221,7 @@ Category (大类)        Classification (分类)         Source (源实例)
 - **邮件通知**: 反馈处理完成后自动发送邮件通知
 - **历史记录**: 查看自己的反馈历史
 
-#### 管理员功能
-- **反馈列表**: 分页查询、多条件筛选、搜索
-- **统计面板**: 各状态、类型、优先级统计
-- **处理回复**: 修改状态、优先级、添加回复
-- **邮件通知**: 处理完成后发送邮件通知用户
-
-### 6. 🛠️ 管理员功能
+### 5. 管理员功能
 
 #### 用户管理
 - **用户列表**: 分页查询、搜索筛选、状态查看
@@ -250,7 +240,7 @@ Category (大类)        Classification (分类)         Source (源实例)
 - **行为日志**: 用户操作行为记录和分析
 - **配置管理**: 动态修改系统配置，无需重新部署
 
-### 7. 📊 JAV 榜单功能
+### 6. JAV 榜单功能
 
 #### 多维度榜单
 - **有码精选**: JavBus 首页前 3 页随机 20 条
@@ -265,7 +255,7 @@ Category (大类)        Classification (分类)         Source (源实例)
 - **数据来源**: 支持多数据源聚合展示
 - **登录可见**: 需要用户登录认证后才能访问
 
-## 🏗️ 技术栈概览
+## 技术栈概览
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -294,9 +284,9 @@ Category (大类)        Classification (分类)         Source (源实例)
 └─────────────────────────────────────────────────────────┘
 ```
 
-👉 [查看完整架构设计](docs/backend-frontend-tree.md)
+[查看完整架构设计](docs/backend-frontend-tree.md)
 
-## 🚀 快速开始
+## 快速开始
 
 ### 环境要求
 
@@ -309,17 +299,17 @@ Category (大类)        Classification (分类)         Source (源实例)
 
 ```bash
 # 克隆项目
-git clone https://github.com/Zoroaaa/codeseek.git
-cd codeseek
+git clone https://github.com/Zoroaaa/Atlas.git
+cd Atlas
 
 # 安装依赖
 pnpm install
 
 # 初始化数据库（含 v4.0 新增的动漫/影视搜索源）
-npx wrangler d1 create codeseek-db
-npx wrangler d1 execute codeseek-db --file=database/schema.sql
-npx wrangler d1 execute codeseek-db --file=database/06_data_search_sources.sql
-npx wrangler d1 execute codeseek-db --file=database/13_schema_history_cover.sql
+npx wrangler d1 create atlas-db
+npx wrangler d1 execute atlas-db --file=database/schema.sql
+npx wrangler d1 execute atlas-db --file=database/06_data_search_sources.sql
+npx wrangler d1 execute atlas-db --file=database/13_schema_history_cover.sql
 
 # 本地开发
 pnpm dev
@@ -328,59 +318,53 @@ pnpm dev
 pnpm build && cd backend && npx wrangler deploy
 ```
 
-👉 [查看详细部署指南](docs/deploy.md)
-👉 [查看配置说明](docs/config.md)
-👉 [查看完整 API 文档](docs/api/index.md)
-👉 [查看 v4.0 变更日志](docs/changelogv4.0.0.md)
+[查看详细部署指南](docs/deploy.md)
+[查看配置说明](docs/config.md)
+[查看完整 API 文档](docs/api/index.md)
+[查看 v4.0 变更日志](docs/changelogv4.0.0.md)
 
-## 📊 性能优化
+## 性能优化
 
 ### 前端性能优化
-- ✅ React 19 并发特性 + Vite 快速构建
-- ✅ 代码分割，路由级别懒加载，Tree-shaking
-- ✅ Zustand 持久化状态 + API 响应缓存
-- ✅ React.memo 和 useMemo 优化重渲染
+- React 19 并发特性 + Vite 快速构建
+- 代码分割，路由级别懒加载，Tree-shaking
+- Zustand 持久化状态 + API 响应缓存
+- React.memo 和 useMemo 优化重渲染
 
 ### 后端性能优化
-- ✅ Cloudflare 全球边缘节点就近处理
-- ✅ 数据库索引优化 + 参数化查询
-- ✅ 响应压缩 (gzip/brotli) + 批量操作支持
-- ✅ 请求限流 + 并发控制 + 降级策略
+- Cloudflare 全球边缘节点就近处理
+- 数据库索引优化 + 参数化查询
+- 响应压缩 (gzip/brotli) + 批量操作支持
+- 请求限流 + 并发控制 + 降级策略
 
-## 🔒 安全特性
+## 安全特性
 
 ### 前端安全
-- ✅ XSS 防护 + CSRF 保护
-- ✅ 内容安全策略 (CSP) + 子资源完整性 (SRI)
-- ✅ JWT Token 认证 + 请求签名验证
+- XSS 防护 + CSRF 保护
+- 内容安全策略 (CSP) + 子资源完整性 (SRI)
+- JWT Token 认证 + 请求签名验证
 
 ### 后端安全
-- ✅ JWT Token 认证 (jose 库) + RBAC 权限控制
-- ✅ SQL 注入防护 + 密码加密存储 (bcrypt)
-- ✅ 登录失败锁定机制 + 安全事件日志
-- ✅ CORS 配置 + 速率限制 + IP 记录
+- JWT Token 认证 (jose 库) + RBAC 权限控制
+- SQL 注入防护 + 密码加密存储 (bcrypt)
+- 登录失败锁定机制 + 安全事件日志
+- CORS 配置 + 速率限制 + IP 记录
 
-## 📄 许可证
+## 许可证
 
 本项目基于 [MIT License](LICENSE) 开源协议。
 
-### 许可说明
-
 您可以自由地：
-- ✅ **使用** - 用于任何目的，包括商业用途
-- ✅ **修改** - 修改源代码以适应您的需求
-- ✅ **分发** - 分享项目或其修改版本
-- ✅ **私有使用** - 在私有项目中使用
+- **使用** - 用于任何目的，包括商业用途
+- **修改** - 修改源代码以适应您的需求
+- **分发** - 分享项目或其修改版本
+- **私有使用** - 在私有项目中使用
 
 但您必须：
-- 📋 **保留版权声明** - 保留原始版权声明和许可证文本
-- 📝 **声明修改** - 说明对源代码所做的修改
+- **保留版权声明** - 保留原始版权声明和许可证文本
+- **声明修改** - 说明对源代码所做的修改
 
-免责声明：
-- ⚠️ **无担保** - 软件按"原样"提供，不提供任何形式的担保
-- 🚫 **无责任** - 作者不对使用软件造成的任何损害负责
-
-## 🙏 致谢
+## 致谢
 
 ### 技术平台
 - **[Cloudflare](https://www.cloudflare.com/)** - 提供优秀的边缘计算平台
@@ -390,26 +374,20 @@ pnpm build && cd backend && npx wrangler deploy
 ### 开源社区
 感谢所有为开源社区做出贡献的开发者们！
 
-### 特别感谢
-- 所有提交 Issue 和 PR 的贡献者
-- 使用并反馈问题的用户们
-- 分享和推广项目的朋友们
-
-## 📧 联系与支持
+## 联系与支持
 
 ### 官方渠道
-- 🏠 **项目主页**: [GitHub - CodeSeek](https://github.com/Zoroaaa/codeseek)
-- 🐛 **问题反馈**: [GitHub Issues](https://github.com/Zoroaaa/codeseek/issues)
-- 💬 **功能建议**: [GitHub Discussions](https://github.com/Zoroaaa/codeseek/discussions)
-- 📖 **项目文档**: [在线文档](https://zread.ai/Zoroaaa/codeseek)
+- **项目主页**: [GitHub - Atlas](https://github.com/Zoroaaa/Atlas)
+- **问题反馈**: [GitHub Issues](https://github.com/Zoroaaa/Atlas/issues)
+- **功能建议**: [GitHub Discussions](https://github.com/Zoroaaa/Atlas/discussions)
 
 ### 如何贡献
 我们欢迎各种形式的贡献：
-- 🐛 报告 Bug
-- 💡 提出新功能建议
-- 📝 改进文档
-- 🔧 提交代码
-- 🌍 翻译文档
+- 报告 Bug
+- 提出新功能建议
+- 改进文档
+- 提交代码
+- 翻译文档
 
 #### 贡献步骤
 1. Fork 本仓库
@@ -418,22 +396,13 @@ pnpm build && cd backend && npx wrangler deploy
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 开启 Pull Request
 
-### 支持项目
-如果这个项目对您有帮助，请考虑：
-- ⭐ 给项目点个 Star
-- 🔄 分享给更多的人
-- 💖 成为贡献者
-
 ---
 
 <div align="center">
 
-### ✨ 感谢您使用磁力快搜！ ✨
+### Atlas — 开源聚合搜索引擎
 
-<p>⭐ 如果这个项目对你有帮助，请给我们一个Star！ ⭐</p>
-<p>💪 欢迎加入我们的开源社区，一起改进和发展！ 💪</p>
-
-**让搜索更简单，让体验更美好！**
+**JAV / 动漫 / 影视，一站式搜索**
 
 Made with ❤️ by [Zoro](https://github.com/Zoroaaa)
 
