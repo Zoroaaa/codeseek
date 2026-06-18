@@ -97,19 +97,19 @@ export const SourceManager: React.FC = () => {
       if (sourcesRes.success && sourcesRes.data) {
         setSources(sourcesRes.data);
       }
-      
+
       const majorCategoriesRes = await sourceApi.getMajorCategories();
       if (majorCategoriesRes.success && majorCategoriesRes.data) {
         setMajorCategories(majorCategoriesRes.data);
         setExpandedMajorCategories(new Set(majorCategoriesRes.data.map(m => m.id)));
       }
-      
+
       const categoriesRes = await sourceApi.getCategories();
       if (categoriesRes.success && categoriesRes.data) {
         setCategories(categoriesRes.data);
         setExpandedCategories(new Set(categoriesRes.data.map(c => c.id)));
       }
-      
+
       const statsRes = await sourceApi.getSourceStats();
       if (statsRes.success && statsRes.data) {
         setStats(statsRes.data);
@@ -119,7 +119,8 @@ export const SourceManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [notification.source]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     loadData();

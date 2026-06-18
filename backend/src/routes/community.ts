@@ -546,10 +546,32 @@ communityRoutes.post('/posts', async (c) => {
     const id = generateId();
     const now = Date.now();
 
+    // 执行 INSERT（FTS 触发器会自动同步到全文搜索表）
     await c.env.DB.prepare(
       `INSERT INTO community_posts (id, user_id, post_type, title, cover_image, content_data, caption, tags, view_count, like_count, comment_count, favorite_count, share_count, status, is_featured, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 'active', 0, ?, ?)`
     ).bind(id, user.userId, postType, title.trim(), coverImage, typeof contentData === 'string' ? contentData : JSON.stringify(contentData), caption?.trim() || '', JSON.stringify(tags || []), now, now).run();
+
+    // 应用层更新用户统计（独立于触发器，即使触发器失败也不影响主流程）
+    try {
+      const existingStats = await c.env.DB.prepare(
+        'SELECT id, posts_count, reputation_score, created_at FROM community_user_stats WHERE user_id = ?'
+      ).bind(user.userId).first<{ id: string; posts_count: number; reputation_score: number; created_at: number }>();
+
+      const newPostsCount = (existingStats?.posts_count || 0) + 1;
+      const newReputation = (existingStats?.reputation_score || 0) + 5;
+      const newLevel = newPostsCount >= 50 ? 'master' : newPostsCount >= 20 ? 'expert' : newPostsCount >= 5 ? 'contributor' : 'beginner';
+      const statsId = existingStats?.id || `${user.userId}_stats`;
+      const statsCreatedAt = existingStats?.created_at || now;
+
+      await c.env.DB.prepare(
+        `INSERT OR REPLACE INTO community_user_stats (id, user_id, posts_count, likes_received, favorites_received, comments_count, reputation_score, contribution_level, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(statsId, user.userId, newPostsCount, 0, 0, 0, newReputation, newLevel, statsCreatedAt, now).run();
+    } catch (statsErr) {
+      // 统计更新失败不影响帖子创建成功
+      console.error('Update user stats after create post failed (non-critical):', statsErr);
+    }
 
     return c.json(success({
       id,
@@ -571,8 +593,9 @@ communityRoutes.post('/posts', async (c) => {
       updatedAt: now,
     }, '发布成功'));
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
     console.error('Create post error:', err);
-    return c.json(error('SERVER_ERROR', '发布失败'), 500);
+    return c.json(error('SERVER_ERROR', `发布失败: ${errorMessage}`, { rawError: errorMessage }), 500);
   }
 });
 

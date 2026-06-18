@@ -50,12 +50,7 @@ export const BrowseTab: React.FC = () => {
   const [page, setPage] = useState(1);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 初始加载
-  useEffect(() => {
-    fetchPosts({ page: 1 });
-  }, [fetchPosts]);
-
-  // 筛选/排序变化时重新加载
+  // 初始加载 & 筛选/排序变化时重新加载（合并为单个 effect 避免重复请求）
   useEffect(() => {
     fetchPosts({ page: 1 });
   }, [postTypeFilter, sortBy, fetchPosts]);

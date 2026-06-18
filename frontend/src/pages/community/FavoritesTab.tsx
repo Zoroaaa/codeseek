@@ -16,12 +16,7 @@ export const FavoritesTab: React.FC = () => {
 
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchMyFavorites({ page: 1 });
-    }
-  }, [isAuthenticated, fetchMyFavorites]);
-
+  // 合并初始加载与分页为单个 effect，避免挂载时重复请求
   useEffect(() => {
     if (isAuthenticated) {
       fetchMyFavorites({ page });

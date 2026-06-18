@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search,
   Loader2,
@@ -149,6 +149,7 @@ export const MainSearchPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const loadData = async () => {
       try {
         const [majorCategoriesData, allCategoriesData, allSourcesData] = await Promise.all([
@@ -156,6 +157,7 @@ export const MainSearchPage: React.FC = () => {
           sourceApi.getCategories(),
           sourceApi.getSourcesWithUserConfig(),
         ]);
+        if (cancelled) return;
         if (majorCategoriesData.success && majorCategoriesData.data) {
           setMajorCategories(majorCategoriesData.data);
           setExpandedMajorCategories(new Set(majorCategoriesData.data.map(c => c.id)));
@@ -173,34 +175,46 @@ export const MainSearchPage: React.FC = () => {
     };
     loadData();
     initializeProxy();
-  }, [setMajorCategories, setCategories, initializeProxy, isAuthenticated]);
+    return () => { cancelled = true; };
+  }, [setMajorCategories, setCategories, initializeProxy]);
 
   // 注意：不在 selectedCategory 变化时自动搜索，避免 Tab 切换等场景下触发意外搜索
   // 用户需要手动点击搜索按钮或按 Enter 键来执行搜索
 
-  // JAV详情提取成功后自动更新搜索历史
+  // JAV详情提取成功后自动更新搜索历史（防循环：用 ref 跟踪已处理的 code）
+  const updatedHistoryCodesRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!isAuthenticated || !javDetail || javDetailStatus !== 'success' || !searchHistory.length) return;
 
+    const code = javDetail.code.toUpperCase();
+    // 防止同一 code 重复更新（打破 searchHistory → effect 循环）
+    if (updatedHistoryCodesRef.current.has(code)) return;
+
+    let cancelled = false;
     const updateHistoryWithJavDetail = async () => {
       try {
         const targetHistory = searchHistory.find(h =>
-          h.query.toUpperCase().includes(javDetail!.code.toUpperCase()) ||
-          javDetail!.code.toUpperCase().includes(h.query.toUpperCase())
+          h.query.toUpperCase().includes(code) ||
+          code.includes(h.query.toUpperCase())
         );
 
         if (targetHistory) {
+          // 标记该 code 已处理
+          updatedHistoryCodesRef.current.add(code);
+
           await userApi.updateSearchHistory(targetHistory.id, {
-            title: javDetail.title,
-            code: javDetail.code,
-            actors: javDetail.actresses?.join(', '),
-            duration: javDetail.duration,
-            tags: javDetail.tags?.join(', '),
-            releaseDate: javDetail.releaseDate,
-            publisher: javDetail.publisher || javDetail.maker,
-            keyword: javDetail.code,
+            title: javDetail!.title,
+            code: javDetail!.code,
+            actors: javDetail!.actresses?.join(', '),
+            duration: javDetail!.duration,
+            tags: javDetail!.tags?.join(', '),
+            releaseDate: javDetail!.releaseDate,
+            publisher: javDetail!.publisher || javDetail!.maker,
+            keyword: javDetail!.code,
           });
 
+          if (cancelled) return;
           setSearchHistory(prev => prev.map(h =>
             h.id === targetHistory.id
               ? { ...h,
@@ -222,6 +236,7 @@ export const MainSearchPage: React.FC = () => {
     };
 
     updateHistoryWithJavDetail();
+    return () => { cancelled = true; };
   }, [javDetail, javDetailStatus, isAuthenticated, searchHistory]);
 
   const loadHistory = useCallback(async () => {

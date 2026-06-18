@@ -47,18 +47,14 @@ export const MyPostsTab: React.FC = () => {
   const [editModal, setEditModal] = useState<{ open: boolean; post: any }>({ open: false, post: null });
   const [editForm, setEditForm] = useState({ caption: '', tags: [] as string[] });
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchMyPosts({ page: 1, status: statusFilter || undefined });
-      fetchUserStats();
-    }
-  }, [isAuthenticated, fetchMyPosts, fetchUserStats, statusFilter]);
-
+  // 合并初始加载、状态筛选变化、分页为单个 effect，避免重复请求
   useEffect(() => {
     if (isAuthenticated) {
       fetchMyPosts({ page, status: statusFilter || undefined });
+      // 仅在初始加载或 statusFilter 变化时获取用户统计（分页不需要）
+      if (page === 1) fetchUserStats();
     }
-  }, [page, statusFilter, isAuthenticated, fetchMyPosts]);
+  }, [isAuthenticated, fetchMyPosts, fetchUserStats, statusFilter, page]);
 
   const handleStatusChange = (value: string) => {
     setStatusFilter(value);

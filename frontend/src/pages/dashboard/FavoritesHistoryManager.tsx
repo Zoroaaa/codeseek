@@ -64,7 +64,8 @@ export const FavoritesManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     loadFavorites();
@@ -442,7 +443,8 @@ export const HistoryManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     loadHistory();

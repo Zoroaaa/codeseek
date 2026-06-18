@@ -18,15 +18,18 @@ export const TrendingTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       setLoading(true);
       try {
         const response = await communityApi.getPosts({ sort: 'hot', pageSize: 10 });
-        setPopular(response.items || []);
-      } catch { toast.error('加载失败'); } finally { setLoading(false); }
+        if (!cancelled) setPopular(response.items || []);
+      } catch { if (!cancelled) toast.error('加载失败'); } finally { if (!cancelled) setLoading(false); }
     };
     load();
-  }, [toast]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) return <div className="flex justify-center py-12"><Loading /></div>;
 

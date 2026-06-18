@@ -132,16 +132,20 @@ const App: React.FC = () => {
           if (status === 401) {
             logout();
           } else {
-            setLoading(false); // 网络问题，保持登录态
+            // 网络问题，保持登录态
           }
+        } finally {
+          setLoading(false);
         }
       } else {
         logout();
+        setLoading(false);
       }
     };
 
     initAuth();
-  }, [logout, setLoading, setUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <BrowserRouter>

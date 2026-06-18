@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS community_likes (
     post_id TEXT NOT NULL,                      -- 关联帖子ID
     user_id TEXT NOT NULL,                      -- 操作用户ID
     like_type TEXT NOT NULL CHECK (like_type IN ('like', 'favorite')), -- 操作类型
-    created_at INTEGER NOT NULL,                -- 操作时间戳
+    created_at INTEGER NOT NULL,                -- 创建时间戳
     FOREIGN KEY (post_id) REFERENCES community_posts (id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     UNIQUE(post_id, user_id, like_type)         -- 确保用户对同一帖子的同一种操作只能执行一次
@@ -193,6 +193,9 @@ CREATE TRIGGER IF NOT EXISTS community_posts_fts_delete
 
 -- ===============================================
 -- 9. 触发器定义
+-- 注意: 用户统计触发器(update_user_stats_*)已移除
+--       统计更新逻辑已迁移至后端应用层(community.ts)
+--       原因: D1 中复杂子查询触发器可能导致 INSERT 回滚
 -- ===============================================
 
 -- 触发器：插入评论后更新帖子评论计数
@@ -261,108 +264,4 @@ CREATE TRIGGER IF NOT EXISTS update_post_favorite_count_after_delete
             favorite_count = MAX(favorite_count - 1, 0),
             updated_at = strftime('%s', 'now') * 1000
         WHERE id = OLD.post_id;
-    END;
-
--- 触发器：发布帖子后更新用户统计
-CREATE TRIGGER IF NOT EXISTS update_user_stats_after_post
-    AFTER INSERT ON community_posts
-    FOR EACH ROW
-    WHEN NEW.status = 'active'
-    BEGIN
-        INSERT OR REPLACE INTO community_user_stats (
-            id, user_id, posts_count, likes_received, favorites_received, comments_count,
-            reputation_score, contribution_level, created_at, updated_at
-        ) VALUES (
-            COALESCE(
-                (SELECT id FROM community_user_stats WHERE user_id = NEW.user_id),
-                NEW.user_id || '_stats'
-            ),
-            NEW.user_id,
-            COALESCE((SELECT posts_count FROM community_user_stats WHERE user_id = NEW.user_id), 0) + 1,
-            COALESCE((SELECT likes_received FROM community_user_stats WHERE user_id = NEW.user_id), 0),
-            COALESCE((SELECT favorites_received FROM community_user_stats WHERE user_id = NEW.user_id), 0),
-            COALESCE((SELECT comments_count FROM community_user_stats WHERE user_id = NEW.user_id), 0),
-            COALESCE((SELECT reputation_score FROM community_user_stats WHERE user_id = NEW.user_id), 0) + 5,
-            CASE 
-                WHEN COALESCE((SELECT posts_count FROM community_user_stats WHERE user_id = NEW.user_id), 0) + 1 >= 50 THEN 'master'
-                WHEN COALESCE((SELECT posts_count FROM community_user_stats WHERE user_id = NEW.user_id), 0) + 1 >= 20 THEN 'expert'
-                WHEN COALESCE((SELECT posts_count FROM community_user_stats WHERE user_id = NEW.user_id), 0) + 1 >= 5 THEN 'contributor'
-                ELSE 'beginner'
-            END,
-            CASE 
-                WHEN (SELECT created_at FROM community_user_stats WHERE user_id = NEW.user_id) IS NULL 
-                THEN strftime('%s', 'now') * 1000
-                ELSE (SELECT created_at FROM community_user_stats WHERE user_id = NEW.user_id)
-            END,
-            strftime('%s', 'now') * 1000
-        );
-    END;
-
--- 触发器：收到点赞后更新用户统计
-CREATE TRIGGER IF NOT EXISTS update_user_stats_after_like
-    AFTER INSERT ON community_likes
-    FOR EACH ROW
-    WHEN NEW.like_type = 'like'
-    BEGIN
-        UPDATE community_user_stats 
-        SET likes_received = likes_received + 1,
-            reputation_score = reputation_score + 1,
-            updated_at = strftime('%s', 'now') * 1000
-        WHERE user_id = (SELECT user_id FROM community_posts WHERE id = NEW.post_id);
-        
-        INSERT OR IGNORE INTO community_user_stats (
-            id, user_id, posts_count, likes_received, favorites_received, comments_count,
-            reputation_score, contribution_level, created_at, updated_at
-        ) VALUES (
-            (SELECT user_id || '_stats' FROM community_posts WHERE id = NEW.post_id),
-            (SELECT user_id FROM community_posts WHERE id = NEW.post_id),
-            0, 1, 0, 0, 1, 'beginner',
-            strftime('%s', 'now') * 1000,
-            strftime('%s', 'now') * 1000
-        );
-    END;
-
--- 触发器：收到收藏后更新用户统计
-CREATE TRIGGER IF NOT EXISTS update_user_stats_after_favorite
-    AFTER INSERT ON community_likes
-    FOR EACH ROW
-    WHEN NEW.like_type = 'favorite'
-    BEGIN
-        UPDATE community_user_stats 
-        SET favorites_received = favorites_received + 1,
-            updated_at = strftime('%s', 'now') * 1000
-        WHERE user_id = (SELECT user_id FROM community_posts WHERE id = NEW.post_id);
-        
-        INSERT OR IGNORE INTO community_user_stats (
-            id, user_id, posts_count, likes_received, favorites_received, comments_count,
-            reputation_score, contribution_level, created_at, updated_at
-        ) VALUES (
-            (SELECT user_id || '_stats' FROM community_posts WHERE id = NEW.post_id),
-            (SELECT user_id FROM community_posts WHERE id = NEW.post_id),
-            0, 0, 1, 0, 0, 'beginner',
-            strftime('%s', 'now') * 1000,
-            strftime('%s', 'now') * 1000
-        );
-    END;
-
--- 触发器：发表评论后更新用户统计
-CREATE TRIGGER IF NOT EXISTS update_user_stats_after_comment
-    AFTER INSERT ON community_comments
-    FOR EACH ROW
-    BEGIN
-        UPDATE community_user_stats 
-        SET comments_count = comments_count + 1,
-            updated_at = strftime('%s', 'now') * 1000
-        WHERE user_id = NEW.user_id;
-        
-        INSERT OR IGNORE INTO community_user_stats (
-            id, user_id, posts_count, likes_received, favorites_received, comments_count,
-            reputation_score, contribution_level, created_at, updated_at
-        ) VALUES (
-            NEW.user_id || '_stats',
-            NEW.user_id,
-            0, 0, 0, 1, 0, 'beginner',
-            strftime('%s', 'now') * 1000,
-            strftime('%s', 'now') * 1000
-        );
     END;
