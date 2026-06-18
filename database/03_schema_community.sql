@@ -165,10 +165,9 @@ CREATE INDEX IF NOT EXISTS idx_reports_status ON community_reports(status);
 
 -- ===============================================
 -- 9. 触发器定义
--- 注意: 用户统计触发器(update_user_stats_*)已移除
---       统计更新逻辑已迁移至后端应用层(community.ts)
---       原因: D1 中复杂子查询触发器可能导致 INSERT 回滚
 -- ===============================================
+
+-- ---- 9a. 帖子计数触发器（自动维护 post 表的 like/comment/favorite count）----
 
 -- 触发器：插入评论后更新帖子评论计数
 CREATE TRIGGER IF NOT EXISTS update_post_comment_count_after_insert
@@ -236,4 +235,97 @@ CREATE TRIGGER IF NOT EXISTS update_post_favorite_count_after_delete
             favorite_count = MAX(favorite_count - 1, 0),
             updated_at = strftime('%s', 'now') * 1000
         WHERE id = OLD.post_id;
+    END;
+
+-- ---- 9b. 用户统计触发器（自动维护 community_user_stats 表）----
+-- 设计: 采用 INSERT OR IGNORE + UPDATE 两步模式（避免复杂子查询在 D1 中失败）
+--       先确保目标行存在，再做增量更新
+
+-- 触发器：发布帖子后更新用户统计
+CREATE TRIGGER IF NOT EXISTS update_user_stats_after_post
+    AFTER INSERT ON community_posts
+    FOR EACH ROW
+    WHEN NEW.status = 'active'
+    BEGIN
+        -- 确保统计行存在
+        INSERT OR IGNORE INTO community_user_stats (
+            id, user_id, posts_count, likes_received, favorites_received,
+            comments_count, reputation_score, contribution_level, created_at, updated_at
+        ) VALUES (
+            NEW.user_id || '_stats', NEW.user_id, 0, 0, 0, 0, 0, 'beginner',
+            strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000
+        );
+        -- 增量更新
+        UPDATE community_user_stats SET
+            posts_count = posts_count + 1,
+            reputation_score = reputation_score + 5,
+            contribution_level = CASE
+                WHEN posts_count + 1 >= 50 THEN 'master'
+                WHEN posts_count + 1 >= 20 THEN 'expert'
+                WHEN posts_count + 1 >= 5 THEN 'contributor'
+                ELSE 'beginner'
+            END,
+            updated_at = strftime('%s', 'now') * 1000
+        WHERE user_id = NEW.user_id;
+    END;
+
+-- 触发器：收到点赞后更新帖子作者统计
+CREATE TRIGGER IF NOT EXISTS update_user_stats_after_like
+    AFTER INSERT ON community_likes
+    FOR EACH ROW
+    WHEN NEW.like_type = 'like'
+    BEGIN
+        INSERT OR IGNORE INTO community_user_stats (
+            id, user_id, posts_count, likes_received, favorites_received,
+            comments_count, reputation_score, contribution_level, created_at, updated_at
+        ) VALUES (
+            (SELECT user_id || '_stats' FROM community_posts WHERE id = NEW.post_id),
+            (SELECT user_id FROM community_posts WHERE id = NEW.post_id),
+            0, 0, 0, 0, 0, 'beginner',
+            strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000
+        );
+        UPDATE community_user_stats SET
+            likes_received = likes_received + 1,
+            reputation_score = reputation_score + 1,
+            updated_at = strftime('%s', 'now') * 1000
+        WHERE user_id = (SELECT user_id FROM community_posts WHERE id = NEW.post_id);
+    END;
+
+-- 触发器：收到收藏后更新帖子作者统计
+CREATE TRIGGER IF NOT EXISTS update_user_stats_after_favorite
+    AFTER INSERT ON community_likes
+    FOR EACH ROW
+    WHEN NEW.like_type = 'favorite'
+    BEGIN
+        INSERT OR IGNORE INTO community_user_stats (
+            id, user_id, posts_count, likes_received, favorites_received,
+            comments_count, reputation_score, contribution_level, created_at, updated_at
+        ) VALUES (
+            (SELECT user_id || '_stats' FROM community_posts WHERE id = NEW.post_id),
+            (SELECT user_id FROM community_posts WHERE id = NEW.post_id),
+            0, 0, 0, 0, 0, 'beginner',
+            strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000
+        );
+        UPDATE community_user_stats SET
+            favorites_received = favorites_received + 1,
+            updated_at = strftime('%s', 'now') * 1000
+        WHERE user_id = (SELECT user_id FROM community_posts WHERE id = NEW.post_id);
+    END;
+
+-- 触发器：发表评论后更新评论者统计
+CREATE TRIGGER IF NOT EXISTS update_user_stats_after_comment
+    AFTER INSERT ON community_comments
+    FOR EACH ROW
+    BEGIN
+        INSERT OR IGNORE INTO community_user_stats (
+            id, user_id, posts_count, likes_received, favorites_received,
+            comments_count, reputation_score, contribution_level, created_at, updated_at
+        ) VALUES (
+            NEW.user_id || '_stats', NEW.user_id, 0, 0, 0, 0, 0, 'beginner',
+            strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000
+        );
+        UPDATE community_user_stats SET
+            comments_count = comments_count + 1,
+            updated_at = strftime('%s', 'now') * 1000
+        WHERE user_id = NEW.user_id;
     END;

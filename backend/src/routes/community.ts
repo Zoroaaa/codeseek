@@ -552,32 +552,11 @@ communityRoutes.post('/posts', async (c) => {
     const id = generateId();
     const now = Date.now();
 
-    // 执行 INSERT（FTS5 已移除，改用 LIKE 搜索）
+    // 执行 INSERT（触发器 update_user_stats_after_post 自动更新用户统计）
     await c.env.DB.prepare(
       `INSERT INTO community_posts (id, user_id, post_type, title, cover_image, content_data, caption, tags, view_count, like_count, comment_count, favorite_count, share_count, status, is_featured, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 'active', 0, ?, ?)`
     ).bind(id, user.userId, postType, title.trim(), coverImage, typeof contentData === 'string' ? contentData : JSON.stringify(contentData), caption?.trim() || '', JSON.stringify(tags || []), now, now).run();
-
-    // 应用层更新用户统计（独立于触发器，即使触发器失败也不影响主流程）
-    try {
-      const existingStats = await c.env.DB.prepare(
-        'SELECT id, posts_count, reputation_score, created_at FROM community_user_stats WHERE user_id = ?'
-      ).bind(user.userId).first<{ id: string; posts_count: number; reputation_score: number; created_at: number }>();
-
-      const newPostsCount = (existingStats?.posts_count || 0) + 1;
-      const newReputation = (existingStats?.reputation_score || 0) + 5;
-      const newLevel = newPostsCount >= 50 ? 'master' : newPostsCount >= 20 ? 'expert' : newPostsCount >= 5 ? 'contributor' : 'beginner';
-      const statsId = existingStats?.id || `${user.userId}_stats`;
-      const statsCreatedAt = existingStats?.created_at || now;
-
-      await c.env.DB.prepare(
-        `INSERT OR REPLACE INTO community_user_stats (id, user_id, posts_count, likes_received, favorites_received, comments_count, reputation_score, contribution_level, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(statsId, user.userId, newPostsCount, 0, 0, 0, newReputation, newLevel, statsCreatedAt, now).run();
-    } catch (statsErr) {
-      // 统计更新失败不影响帖子创建成功
-      console.error('Update user stats after create post failed (non-critical):', statsErr);
-    }
 
     return c.json(success({
       id,
@@ -1070,46 +1049,35 @@ communityRoutes.get('/stats', async (c) => {
   }
 });
 
-/** 当前用户统计 */
+/** 当前用户统计（由触发器自动维护 community_user_stats 表） */
 communityRoutes.get('/user-stats', async (c) => {
   const user = c.get('user');
 
   try {
+    // 直接读取触发器维护的统计表
     const stats = await c.env.DB.prepare(
       `SELECT * FROM community_user_stats WHERE user_id = ?`
-    ).bind(user.userId).first<{
-      posts_count: number;
-      likes_received: number;
-      favorites_received: number;
-      comments_count: number;
-      reputation_score: number;
-      contribution_level: string;
-    }>();
+    ).bind(user.userId).first<Record<string, unknown>>();
 
     const recentPosts = await c.env.DB.prepare(
-      `SELECT p.*, u.username as userName
-       FROM community_posts p
-       LEFT JOIN users u ON p.user_id = u.id
-       WHERE p.user_id = ? AND p.status = 'active'
-       ORDER BY p.created_at DESC
-       LIMIT 5`
-    ).bind(user.userId).all<Record<string, unknown> & { userName: string }>();
+      `SELECT * FROM community_posts
+       WHERE user_id = ? AND status = 'active'
+       ORDER BY created_at DESC LIMIT 5`
+    ).bind(user.userId).all<Record<string, unknown>>();
 
     return c.json(success({
-      postsCount: stats?.posts_count || 0,
-      likesReceived: stats?.likes_received || 0,
-      favoritesReceived: stats?.favorites_received || 0,
-      commentsCount: stats?.comments_count || 0,
-      reputationScore: stats?.reputation_score || 0,
-      contributionLevel: stats?.contribution_level || 'beginner',
+      postsCount: (stats?.posts_count as number) || 0,
+      likesReceived: (stats?.likes_received as number) || 0,
+      favoritesReceived: (stats?.favorites_received as number) || 0,
+      commentsCount: (stats?.comments_count as number) || 0,
+      reputationScore: (stats?.reputation_score as number) || 0,
+      contributionLevel: (stats?.contribution_level as string) || 'beginner',
       recentPosts: (recentPosts.results || []).map(p => ({
         id: p.id,
         userId: p.user_id,
-        userName: p.userName,
         postType: p.post_type,
         title: p.title,
         coverImage: p.cover_image,
-        contentData: p.content_data,
         caption: p.caption,
         tags: typeof p.tags === 'string' ? JSON.parse(p.tags as string) : p.tags,
         viewCount: p.view_count,
