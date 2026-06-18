@@ -175,13 +175,6 @@ export const MainSearchPage: React.FC = () => {
     initializeProxy();
   }, [setMajorCategories, setCategories, initializeProxy, isAuthenticated]);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadHistory();
-      loadFavorites();
-    }
-  }, [isAuthenticated, loadHistory, loadFavorites]);
-
   // 注意：不在 selectedCategory 变化时自动搜索，避免 Tab 切换等场景下触发意外搜索
   // 用户需要手动点击搜索按钮或按 Enter 键来执行搜索
 
@@ -256,6 +249,13 @@ export const MainSearchPage: React.FC = () => {
       setIsLoadingFavorites(false);
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadHistory();
+      loadFavorites();
+    }
+  }, [isAuthenticated, loadHistory, loadFavorites]);
 
   const handleSearch = useCallback(async (overrideKeyword?: string, page = 1) => {
     const query = overrideKeyword || keyword;
