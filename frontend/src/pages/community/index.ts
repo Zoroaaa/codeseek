@@ -1,6 +1,5 @@
 // 主入口
 export { CommunityManager } from './CommunityManager';
-export type { CommunityManagerHandle } from './CommunityManager';
 
 // Tab 组件
 export { BrowseTab } from './BrowseTab';

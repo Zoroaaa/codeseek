@@ -230,6 +230,126 @@ communityRoutes.delete('/tags/:id', async (c) => {
 });
 
 // ============================================================
+// 6. 个人中心（必须在 /posts/:id 之前注册！）
+// ============================================================
+
+/** 我的帖子 */
+communityRoutes.get('/posts/my-posts', async (c) => {
+  const user = c.get('user');
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const pageSize = Math.min(50, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
+  const status = c.req.query('status');
+
+  try {
+    let whereClause = 'WHERE user_id = ?';
+    const params: (string | number)[] = [user.userId];
+
+    if (status && ['active', 'pending', 'rejected', 'hidden'].includes(status)) {
+      whereClause += ' AND status = ?';
+      params.push(status);
+    }
+
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM community_posts ${whereClause}`
+    ).bind(...params).first<{ total: number }>();
+
+    const total = countResult?.total || 0;
+
+    const posts = await c.env.DB.prepare(
+      `SELECT * FROM community_posts ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(...params, pageSize, (page - 1) * pageSize).all<Record<string, unknown>>();
+
+    return c.json(success({
+      items: (posts.results || []).map(p => ({
+        id: p.id,
+        userId: p.user_id,
+        postType: p.post_type,
+        title: p.title,
+        coverImage: p.cover_image,
+        contentData: p.content_data,
+        caption: p.caption,
+        tags: typeof p.tags === 'string' ? JSON.parse(p.tags as string) : p.tags,
+        viewCount: p.view_count,
+        likeCount: p.like_count,
+        commentCount: p.comment_count,
+        favoriteCount: p.favorite_count,
+        shareCount: p.share_count,
+        status: p.status,
+        isFeatured: !!p.is_featured,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+      })),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    }));
+  } catch (err) {
+    console.error('Get my posts error:', err);
+    return c.json(error('SERVER_ERROR', '获取我的帖子失败'), 500);
+  }
+});
+
+/** 我的收藏 */
+communityRoutes.get('/posts/my-favorites', async (c) => {
+  const user = c.get('user');
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const pageSize = Math.min(50, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
+
+  try {
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM community_likes l
+       JOIN community_posts p ON l.post_id = p.id
+       WHERE l.user_id = ? AND l.like_type = 'favorite' AND p.status = 'active'`
+    ).bind(user.userId).first<{ total: number }>();
+
+    const total = countResult?.total || 0;
+
+    const posts = await c.env.DB.prepare(
+      `SELECT p.*, u.username as userName
+       FROM community_likes l
+       JOIN community_posts p ON l.post_id = p.id
+       LEFT JOIN users u ON p.user_id = u.id
+       WHERE l.user_id = ? AND l.like_type = 'favorite' AND p.status = 'active'
+       ORDER BY l.created_at DESC
+       LIMIT ? OFFSET ?`
+    ).bind(user.userId, pageSize, (page - 1) * pageSize)
+     .all<Record<string, unknown> & { userName: string }>();
+
+    return c.json(success({
+      items: (posts.results || []).map(p => ({
+        id: p.id,
+        userId: p.user_id,
+        userName: p.userName,
+        postType: p.post_type,
+        title: p.title,
+        coverImage: p.cover_image,
+        contentData: p.content_data,
+        caption: p.caption,
+        tags: typeof p.tags === 'string' ? JSON.parse(p.tags as string) : p.tags,
+        viewCount: p.view_count,
+        likeCount: p.like_count,
+        commentCount: p.comment_count,
+        favoriteCount: p.favorite_count,
+        shareCount: p.share_count,
+        status: p.status,
+        isFeatured: !!p.is_featured,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+        isFavorited: true,
+      })),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    }));
+  } catch (err) {
+    console.error('Get my favorites error:', err);
+    return c.json(error('SERVER_ERROR', '获取收藏失败'), 500);
+  }
+});
+
+// ============================================================
 // 2. 帖子管理
 // ============================================================
 
@@ -851,126 +971,6 @@ communityRoutes.post('/posts/:id/report', async (c) => {
   } catch (err) {
     console.error('Report post error:', err);
     return c.json(error('SERVER_ERROR', '举报失败'), 500);
-  }
-});
-
-// ============================================================
-// 6. 个人中心
-// ============================================================
-
-/** 我的帖子 */
-communityRoutes.get('/posts/my-posts', async (c) => {
-  const user = c.get('user');
-  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
-  const pageSize = Math.min(50, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
-  const status = c.req.query('status');
-
-  try {
-    let whereClause = 'WHERE user_id = ?';
-    const params: (string | number)[] = [user.userId];
-
-    if (status && ['active', 'pending', 'rejected', 'hidden'].includes(status)) {
-      whereClause += ' AND status = ?';
-      params.push(status);
-    }
-
-    const countResult = await c.env.DB.prepare(
-      `SELECT COUNT(*) as total FROM community_posts ${whereClause}`
-    ).bind(...params).first<{ total: number }>();
-
-    const total = countResult?.total || 0;
-
-    const posts = await c.env.DB.prepare(
-      `SELECT * FROM community_posts ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).bind(...params, pageSize, (page - 1) * pageSize).all<Record<string, unknown>>();
-
-    return c.json(success({
-      items: (posts.results || []).map(p => ({
-        id: p.id,
-        userId: p.user_id,
-        postType: p.post_type,
-        title: p.title,
-        coverImage: p.cover_image,
-        contentData: p.content_data,
-        caption: p.caption,
-        tags: typeof p.tags === 'string' ? JSON.parse(p.tags as string) : p.tags,
-        viewCount: p.view_count,
-        likeCount: p.like_count,
-        commentCount: p.comment_count,
-        favoriteCount: p.favorite_count,
-        shareCount: p.share_count,
-        status: p.status,
-        isFeatured: !!p.is_featured,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at,
-      })),
-      total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
-    }));
-  } catch (err) {
-    console.error('Get my posts error:', err);
-    return c.json(error('SERVER_ERROR', '获取我的帖子失败'), 500);
-  }
-});
-
-/** 我的收藏 */
-communityRoutes.get('/posts/my-favorites', async (c) => {
-  const user = c.get('user');
-  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
-  const pageSize = Math.min(50, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
-
-  try {
-    const countResult = await c.env.DB.prepare(
-      `SELECT COUNT(*) as total FROM community_likes l
-       JOIN community_posts p ON l.post_id = p.id
-       WHERE l.user_id = ? AND l.like_type = 'favorite' AND p.status = 'active'`
-    ).bind(user.userId).first<{ total: number }>();
-
-    const total = countResult?.total || 0;
-
-    const posts = await c.env.DB.prepare(
-      `SELECT p.*, u.username as userName
-       FROM community_likes l
-       JOIN community_posts p ON l.post_id = p.id
-       LEFT JOIN users u ON p.user_id = u.id
-       WHERE l.user_id = ? AND l.like_type = 'favorite' AND p.status = 'active'
-       ORDER BY l.created_at DESC
-       LIMIT ? OFFSET ?`
-    ).bind(user.userId, pageSize, (page - 1) * pageSize)
-     .all<Record<string, unknown> & { userName: string }>();
-
-    return c.json(success({
-      items: (posts.results || []).map(p => ({
-        id: p.id,
-        userId: p.user_id,
-        userName: p.userName,
-        postType: p.post_type,
-        title: p.title,
-        coverImage: p.cover_image,
-        contentData: p.content_data,
-        caption: p.caption,
-        tags: typeof p.tags === 'string' ? JSON.parse(p.tags as string) : p.tags,
-        viewCount: p.view_count,
-        likeCount: p.like_count,
-        commentCount: p.comment_count,
-        favoriteCount: p.favorite_count,
-        shareCount: p.share_count,
-        status: p.status,
-        isFeatured: !!p.is_featured,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at,
-        isFavorited: true,
-      })),
-      total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
-    }));
-  } catch (err) {
-    console.error('Get my favorites error:', err);
-    return c.json(error('SERVER_ERROR', '获取收藏失败'), 500);
   }
 });
 

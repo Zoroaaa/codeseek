@@ -4,7 +4,6 @@ import { RefreshCw, Bell, Heart, MessageSquare, Bookmark, AlertTriangle, Inbox }
 import { communityApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Loading } from '@/components/ui/Loading';
-import { useToast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores';
 import type { CommunityNotification } from '@/types';
 import { Pagination } from './shared';
@@ -17,7 +16,6 @@ const TYPE_CONFIG: Record<CommunityNotification['type'], { icon: typeof Heart; l
 };
 
 export const NotificationsTab: React.FC = () => {
-  const toast = useToast();
   const { isAuthenticated } = useAuthStore();
   const [notifications, setNotifications] = useState<CommunityNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,11 +45,12 @@ export const NotificationsTab: React.FC = () => {
       setTotalPages(response.totalPages || 1);
       setTotal(response.total || 0);
     } catch {
-      toast.error('加载通知失败');
+      // 静默失败，不阻塞 UI
     } finally {
       setLoading(false);
     }
-  }, [page, isAuthenticated, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, isAuthenticated]);
 
   useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
