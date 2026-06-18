@@ -8,7 +8,6 @@ import { useSearchStore, useSourceStore, useAuthStore, useProxyStore } from '@/s
 import { searchApi, sourceApi, userApi, analyticsApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useFeatureFlags } from '@/contexts';
 import type {
   SearchResult,
   FavoriteItem,
@@ -75,12 +74,11 @@ export const MainSearchPage: React.FC = () => {
     isEnabled: isProxyEnabled,
     initializeProxy,
   } = useProxyStore();
-  const { communityEnabled } = useFeatureFlags();
 
   // 从 URL 参数初始化 Tab 状态
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['jav', 'anime', 'movie', 'sources'].includes(tabParam)) {
+    if (tabParam && ['jav', 'anime', 'movie', 'sources', 'community'].includes(tabParam)) {
       setActiveTab(tabParam as SearchTabType);
     }
   }, [searchParams, setActiveTab]);
@@ -106,6 +104,10 @@ export const MainSearchPage: React.FC = () => {
 
   // Tab 切换处理函数（包含 URL 同步和分类联动）
   const handleTabChange = useCallback((tab: SearchTabType) => {
+    if (tab === 'community') {
+      navigate('/community');
+      return;
+    }
     setActiveTab(tab);
     setSearchParams({ tab }, { replace: true });
     // anime/movie 走聚合模式，分类过滤无影响，统一重置为"全部"
@@ -113,7 +115,7 @@ export const MainSearchPage: React.FC = () => {
     // 切换 Tab 时清空上次搜索结果，避免展示错误类型数据
     setSearchResults([]);
     setEnrichedData(null);
-  }, [setActiveTab, setSearchParams]);
+  }, [setActiveTab, setSearchParams, navigate]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
     typeof window !== 'undefined' && window.innerWidth >= 768 ? 'grid' : 'list'
   );
@@ -630,7 +632,6 @@ export const MainSearchPage: React.FC = () => {
         isAuthenticated={isAuthenticated}
         user={user}
         isAdmin={isAdmin}
-        communityEnabled={communityEnabled}
       />
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
