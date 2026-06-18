@@ -16,10 +16,9 @@ CREATE TABLE IF NOT EXISTS community_tags (
     tag_description TEXT,                       -- 标签描述
     tag_color TEXT DEFAULT '#3b82f6',           -- 标签颜色
     tag_active INTEGER DEFAULT 1,               -- 是否激活（1:激活 0:禁用）
-    created_by TEXT NOT NULL,                   -- 创建者用户ID
+    created_by TEXT,                            -- 创建者用户ID
     created_at INTEGER NOT NULL,                -- 创建时间戳
-    updated_at INTEGER NOT NULL,                -- 更新时间戳
-    FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+    updated_at INTEGER NOT NULL                 -- 更新时间戳
 );
 
 -- ===============================================

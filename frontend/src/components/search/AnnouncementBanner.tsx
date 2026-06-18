@@ -23,16 +23,12 @@ const HEADER = 64;
 export const AnnouncementPanel: React.FC = () => {
   const [items, setItems] = useState<Announcement[]>([]);
   const [show, setShow] = useState(true);
-  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    announcementApi.getActive().then((data) => {
-      setItems(data);
-      setLoaded(true);
-    }).catch(() => setLoaded(true));
+    announcementApi.getActive().then(setItems).catch(() => {});
   }, []);
 
-  if (!loaded || items.length === 0) return null;
+  const hasData = items.length > 0;
 
   return (
     <div
@@ -49,12 +45,14 @@ export const AnnouncementPanel: React.FC = () => {
             <Megaphone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-600 dark:text-violet-400" />
           </div>
           <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base">网站公告</span>
-          <span className="text-[11px] text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">{items.length}</span>
+          {hasData && (
+            <span className="text-[11px] text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">{items.length}</span>
+          )}
         </div>
         <ChevronDown className={clsx('w-4 h-4 text-surface-400 transition-transform duration-200', show && 'rotate-180')} />
       </button>
 
-      {show && (
+      {show && hasData && (
         <div className="p-3 space-y-2 overflow-y-auto" style={{ height: JAV_PANEL_HEIGHT - HEADER }}>
           {items.map((item) => {
             const style = TYPE_STYLE[item.type] || TYPE_STYLE.info;
