@@ -131,9 +131,10 @@ DROP TABLE IF EXISTS community_shared_sources;
 
 -- ===============================================
 -- 8. 索引定义
+-- 注意: FTS5 全文搜索已移除
+--       原因: community_posts.id 为 UUID(TEXT)，FTS5 rowid 要求整数导致 SQLITE_MISMATCH
+--       搜索改用 LIKE 查询（title/caption 模糊匹配）
 -- ===============================================
-
--- 帖子表索引
 CREATE INDEX IF NOT EXISTS idx_posts_user ON community_posts(user_id);
 CREATE INDEX IF NOT EXISTS idx_posts_type ON community_posts(post_type);
 CREATE INDEX IF NOT EXISTS idx_posts_status ON community_posts(status);
@@ -161,35 +162,6 @@ CREATE INDEX IF NOT EXISTS idx_likes_type ON community_likes(like_type);
 -- 举报表索引
 CREATE INDEX IF NOT EXISTS idx_reports_post ON community_reports(post_id);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON community_reports(status);
-
--- FTS5 全文搜索索引（用于社区帖子搜索）
-CREATE VIRTUAL TABLE IF NOT EXISTS community_posts_fts USING fts5(
-  title,
-  caption,
-  content='community_posts',
-  content_rowid='id'
-);
-
--- 触发器：同步数据到 FTS 表
-CREATE TRIGGER IF NOT EXISTS community_posts_fts_insert
-    AFTER INSERT ON community_posts FOR EACH ROW BEGIN
-      INSERT INTO community_posts_fts(rowid, title, caption)
-      VALUES (NEW.id, NEW.title, NEW.caption);
-    END;
-
-CREATE TRIGGER IF NOT EXISTS community_posts_fts_update
-    AFTER UPDATE ON community_posts FOR EACH ROW BEGIN
-      INSERT INTO community_posts_fts(community_posts_fts, rowid, title, caption)
-      VALUES ('delete', OLD.id, OLD.title, OLD.caption);
-      INSERT INTO community_posts_fts(rowid, title, caption)
-      VALUES (NEW.id, NEW.title, NEW.caption);
-    END;
-
-CREATE TRIGGER IF NOT EXISTS community_posts_fts_delete
-    AFTER DELETE ON community_posts FOR EACH ROW BEGIN
-      INSERT INTO community_posts_fts(community_posts_fts, rowid, title, caption)
-      VALUES ('delete', OLD.id, OLD.title, OLD.caption);
-    END;
 
 -- ===============================================
 -- 9. 触发器定义

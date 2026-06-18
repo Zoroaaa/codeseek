@@ -374,8 +374,9 @@ communityRoutes.get('/posts', async (c) => {
     }
 
     if (search) {
-      whereClauses.push('(p.id IN (SELECT rowid FROM community_posts_fts WHERE community_posts_fts MATCH ?))');
-      params.push(search.split(/\s+/).map(s => `"${s}"`).join(' OR '));
+      whereClauses.push('(p.title LIKE ? OR p.caption LIKE ?)');
+      const searchTerm = `%${search}%`;
+      params.push(searchTerm, searchTerm);
     }
 
     if (tags) {
@@ -546,7 +547,7 @@ communityRoutes.post('/posts', async (c) => {
     const id = generateId();
     const now = Date.now();
 
-    // 执行 INSERT（FTS 触发器会自动同步到全文搜索表）
+    // 执行 INSERT（FTS5 已移除，改用 LIKE 搜索）
     await c.env.DB.prepare(
       `INSERT INTO community_posts (id, user_id, post_type, title, cover_image, content_data, caption, tags, view_count, like_count, comment_count, favorite_count, share_count, status, is_featured, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 'active', 0, ?, ?)`
