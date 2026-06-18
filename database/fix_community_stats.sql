@@ -60,16 +60,16 @@ SELECT
     COALESCE(u.first_post_time, strftime('%s', 'now') * 1000),
     strftime('%s', 'now') * 1000
 FROM (
-    -- 聚合每个用户的所有统计数据
+    -- 聚合每个用户的所有统计数据（含自身操作）
     SELECT
         p.user_id,
         COUNT(DISTINCT p.id) as posts,
         (SELECT COUNT(*) FROM community_likes l JOIN community_posts lp ON l.post_id = lp.id
-         WHERE lp.user_id = p.user_id AND l.like_type = 'like' AND l.user_id != p.user_id) as likes,
+         WHERE lp.user_id = p.user_id AND l.like_type = 'like') as likes,
         (SELECT COUNT(*) FROM community_likes l JOIN community_posts lp ON l.post_id = lp.id
-         WHERE lp.user_id = p.user_id AND l.like_type = 'favorite' AND l.user_id != p.user_id) as favorites,
+         WHERE lp.user_id = p.user_id AND l.like_type = 'favorite') as favorites,
         (SELECT COUNT(*) FROM community_comments c JOIN community_posts cp ON c.post_id = cp.id
-         WHERE cp.user_id = p.user_id AND c.user_id != p.user_id) as comments,
+         WHERE cp.user_id = p.user_id) as comments,
         MIN(p.created_at) as first_post_time
     FROM community_posts p
     GROUP BY p.user_id
