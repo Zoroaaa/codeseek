@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Hash } from 'lucide-react';
+import { Badge } from '@/components/ui';
+import { useCommunityStore } from '@/stores/communityStore';
 import { BrowseTab } from './BrowseTab';
 import { MyPostsTab } from './MyPostsTab';
 import { FavoritesTab } from './FavoritesTab';
 import { TagsTab } from './TagsTab';
-import { StatsBanner } from './StatsBanner';
 import { ShareToCommunityModal } from './ShareToCommunityModal';
 import { NotificationsTab } from './NotificationsTab';
 
@@ -28,6 +30,12 @@ export const CommunityManager: React.FC = () => {
     setActiveTab(pathToTab(location.pathname));
   }, [location.pathname]);
 
+  const { tags, fetchTags } = useCommunityStore();
+
+  useEffect(() => {
+    fetchTags();
+  }, [fetchTags]);
+
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareInitialData, setShareInitialData] = useState<{
     postType: 'jav' | 'anime' | 'movie';
@@ -49,7 +57,31 @@ export const CommunityManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {activeTab === 'browse' && <StatsBanner />}
+      {/* 热门标签 - 仅发现页显示 */}
+      {activeTab === 'browse' && tags.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <Hash className="w-4 h-4 text-primary-500 shrink-0" />
+          {tags
+            .sort((a, b) => (b.postsCount || 0) - (a.postsCount || 0))
+            .map(t => (
+              <Badge
+                key={t.id}
+                variant="default"
+                size="md"
+                style={{
+                  backgroundColor: t.tagColor + '15',
+                  color: t.tagColor,
+                  border: `1px solid ${t.tagColor}30`,
+                }}
+              >
+                #{t.tagName.replace(/^#/, '')}
+                {(t.postsCount || 0) > 0 && (
+                  <span className="ml-1 opacity-60">({t.postsCount})</span>
+                )}
+              </Badge>
+            ))}
+        </div>
+      )}
 
       <div className="min-h-[400px]">
         {activeTab === 'browse' && <BrowseTab />}

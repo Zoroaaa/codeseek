@@ -1007,37 +1007,16 @@ communityRoutes.post('/posts/:id/report', async (c) => {
 // 7. 统计
 // ============================================================
 
-/** 社区统计（带缓存） */
+/** 社区统计（实时查询，社区数据变化频繁不适合缓存） */
 communityRoutes.get('/stats', async (c) => {
   try {
-    // 尝试使用 Cache API 缓存，不可用时跳过
-    let cached: Response | null = null;
-    let cache: Cache | undefined;
-    try {
-      const cacheObj = caches.default;
-      if (cacheObj) {
-        cache = cacheObj;
-        const cacheKey = new Request('https://internal/community-stats');
-        cached = await cacheObj.match(cacheKey) || null;
-        if (cached) {
-          return new Response(cached.body, {
-            headers: {
-              ...Object.fromEntries(cached.headers),
-              'X-Cache': 'HIT',
-            },
-          });
-        }
-      }
-    } catch {
-      // Cache API 不可用时静默跳过
-    }
-
-    const [totalPostsResult, totalUsersResult, totalCommentsResult, totalLikesResult, postsByTypeResult, recentActivityResult] =
+    const [totalPostsResult, totalUsersResult, totalCommentsResult, totalLikesResult, totalFavoritesResult, postsByTypeResult, recentActivityResult] =
       await c.env.DB.batch([
         c.env.DB.prepare("SELECT COUNT(*) as count FROM community_posts WHERE status = 'active'"),
         c.env.DB.prepare('SELECT COUNT(DISTINCT user_id) as count FROM community_posts WHERE status = \'active\''),
         c.env.DB.prepare('SELECT COUNT(*) as count FROM community_comments'),
         c.env.DB.prepare('SELECT COALESCE(SUM(like_count), 0) as total FROM community_posts'),
+        c.env.DB.prepare('SELECT COALESCE(SUM(favorite_count), 0) as total FROM community_posts'),
         c.env.DB.prepare(`
           SELECT post_type as type, COUNT(*) as count
           FROM community_posts WHERE status = 'active'
@@ -1053,6 +1032,7 @@ communityRoutes.get('/stats', async (c) => {
         { results: Array<{ count: number }> },
         { results: Array<{ count: number }> },
         { results: Array<{ total: number }> },
+        { results: Array<{ total: number }> },
         { results: Array<{ post_type: string; count: number }> },
         { results: Array<{ id: string; post_type: string; title: string; created_at: number }> },
       ];
@@ -1061,15 +1041,17 @@ communityRoutes.get('/stats', async (c) => {
     const totalUsers = totalUsersResult.results?.[0]?.count || 0;
     const totalComments = totalCommentsResult.results?.[0]?.count || 0;
     const totalLikes = totalLikesResult.results?.[0]?.total || 0;
+    const totalFavorites = totalFavoritesResult.results?.[0]?.total || 0;
     const averageEngagement = totalPosts > 0
-      ? Math.round(((totalLikes + totalComments) / totalPosts) * 100) / 100
+      ? Math.round(((totalLikes + totalFavorites + totalComments) / totalPosts) * 100) / 100
       : 0;
 
-    const response = c.json(success({
+    return c.json(success({
       totalPosts,
       totalUsers,
       totalComments,
       totalLikes,
+      totalFavorites,
       averageEngagement,
       postsByType: (postsByTypeResult.results || []).map(item => ({
         type: (item as Record<string, unknown>).post_type || '',
@@ -1082,17 +1064,6 @@ communityRoutes.get('/stats', async (c) => {
         createdAt: item.created_at,
       })),
     }));
-
-    // 异步写入缓存（仅当 Cache API 可用时）
-    if (cache) {
-      try {
-        const cacheKey = new Request('https://internal/community-stats');
-        c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
-      } catch {
-        // 缓存写入失败不影响响应
-      }
-    }
-    return response;
   } catch (err) {
     console.error('Get community stats error:', err);
     return c.json(error('SERVER_ERROR', '获取社区统计失败'), 500);

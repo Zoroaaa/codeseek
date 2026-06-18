@@ -128,6 +128,7 @@ export interface CommunityStats {
   totalUsers: number;
   totalComments: number;
   totalLikes: number;
+  totalFavorites: number;
   averageEngagement: number;
   postsByType: { type: string; count: number }[];
   recentActivity: Array<{

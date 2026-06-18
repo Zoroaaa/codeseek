@@ -5,6 +5,7 @@ import {
   Users,
   MessageSquare,
   Heart,
+  Bookmark,
   TrendingUp,
   Hash,
   Clock,
@@ -13,11 +14,12 @@ import { Card, Badge } from '@/components/ui';
 import { useCommunityStore } from '@/stores/communityStore';
 
 export const StatsBanner: React.FC = () => {
-  const { communityStats, tags, fetchCommunityStats } = useCommunityStore();
+  const { communityStats, tags, fetchCommunityStats, fetchTags } = useCommunityStore();
 
   useEffect(() => {
     fetchCommunityStats();
-  }, [fetchCommunityStats]);
+    fetchTags();
+  }, [fetchCommunityStats, fetchTags]);
 
   if (!communityStats) return null;
 
@@ -52,18 +54,24 @@ export const StatsBanner: React.FC = () => {
       color: 'text-rose-500 bg-rose-50 dark:bg-rose-900/20',
     },
     {
-      label: '平均互动率',
-      value: `${(communityStats.averageEngagement * 100).toFixed(1)}%`,
-      icon: TrendingUp,
+      label: '总收藏',
+      value: communityStats.totalFavorites ?? 0,
+      icon: Bookmark,
       gradient: 'from-amber-400 to-amber-600',
       color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20',
     },
+    {
+      label: '互动率',
+      value: `${(communityStats.averageEngagement * 100).toFixed(1)}%`,
+      icon: TrendingUp,
+      gradient: 'from-cyan-400 to-cyan-600',
+      color: 'text-cyan-500 bg-cyan-50 dark:bg-cyan-900/20',
+    },
   ];
 
-  // 获取热门标签（从 store tags 数据取前4）
+  // 获取热门标签（优先有帖子的标签，不足时补充其他活跃标签）
   const hotTags = (tags || [])
-    .filter(t => (t.postsCount || 0) > 0)
-    .sort((a, b) => (b.postsCount || 0) - (a.postsCount || 0))
+    .sort((a, b) => (b.postsCount || 0) - (a.postsCount || 0) || a.tagName.localeCompare(b.tagName))
     .slice(0, 4)
     .map(t => ({
       name: t.tagName.replace(/^#/, ''),
@@ -84,7 +92,7 @@ export const StatsBanner: React.FC = () => {
   return (
     <div className="space-y-5">
       {/* 统计卡片 */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6">
         {statCards.map((item) => (
           <Card key={item.label} padding="md" hover>
             <div className="flex items-center gap-3">
@@ -176,72 +184,6 @@ export const StatsBanner: React.FC = () => {
           )}
         </Card>
       </div>
-
-      {/* 帖子类型分布 */}
-      {communityStats.postsByType && communityStats.postsByType.length > 0 && (
-        <Card padding="md">
-          <h3 className="flex items-center gap-2 font-semibold text-sm text-slate-900 dark:text-slate-100 mb-3">
-            <TrendingUp className="w-4 h-4 text-primary-500" />
-            内容分布
-          </h3>
-          <div className="flex gap-4 flex-wrap">
-            {communityStats.postsByType.map((type, idx) => {
-              const typeLabels: Record<string, string> = {
-                jav: '番号',
-                anime: '动漫',
-                movie: '影视',
-              };
-              const typeColors: Record<string, string> = {
-                jav: '#F43F5E',
-                anime: '#8B5CF6',
-                movie: '#3B82F6',
-              };
-              const total = communityStats.postsByType.reduce((sum, t) => sum + t.count, 0);
-              const percentage = total > 0 ? ((type.count / total) * 100).toFixed(1) : '0';
-
-              return (
-                <div key={idx} className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: typeColors[type.type] || '#94A3B8' }}
-                  />
-                  <span className="text-sm text-slate-700 dark:text-slate-300">
-                    {typeLabels[type.type] || type.type}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {type.count}
-                  </span>
-                  <span className="text-xs text-slate-400">({percentage}%)</span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 进度条可视化 */}
-          <div className="mt-3 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
-            {communityStats.postsByType.map((type, idx) => {
-              const total = communityStats.postsByType.reduce((sum, t) => sum + t.count, 0);
-              const width = total > 0 ? (type.count / total) * 100 : 0;
-              const typeColors: Record<string, string> = {
-                jav: '#F43F5E',
-                anime: '#8B5CF6',
-                movie: '#3B82F6',
-              };
-
-              return (
-                <div
-                  key={idx}
-                  className="h-full first:rounded-l-full last:rounded-r-full transition-all"
-                  style={{
-                    width: `${width}%`,
-                    backgroundColor: typeColors[type.type] || '#94A3B8',
-                  }}
-                />
-              );
-            })}
-          </div>
-        </Card>
-      )}
     </div>
   );
 };

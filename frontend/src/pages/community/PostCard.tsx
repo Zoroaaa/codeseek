@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { clsx } from 'clsx';
 import { Heart, Star, MessageSquare, Eye, Bookmark, Users, Film, Tv } from 'lucide-react';
-import { Card, Badge } from '@/components/ui';
+import { Card, Badge, ProxyImage } from '@/components/ui';
 import type { CommunityPost } from '@/types/community';
 
 interface PostCardProps {
@@ -72,13 +72,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onFavorite, on
       padding="none"
     >
       {/* 封面图区域 */}
-      <div className="relative aspect-[16/10] max-h-[200px] overflow-hidden bg-slate-100 dark:bg-slate-800">
+      <div className="relative aspect-[16/10] max-h-[200px] overflow-hidden bg-slate-100 dark:bg-slate-800" onClick={(e) => e.stopPropagation()}>
         {post.coverImage ? (
-          <img
+          <ProxyImage
             src={post.coverImage}
             alt={post.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
