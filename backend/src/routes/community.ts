@@ -6,9 +6,6 @@
 import { Hono } from 'hono';
 import { Env } from '@/types';
 import {
-  CommunityPost,
-  CommunityTag,
-  CommunityComment,
   CreatePostRequest,
   UpdatePostRequest,
   CreateCommentRequest,
@@ -32,17 +29,17 @@ communityRoutes.get('/tags', async (c) => {
   try {
     const tags = await c.env.DB.prepare(
       'SELECT * FROM community_tags WHERE tag_active = 1 ORDER BY tag_name ASC'
-    ).all<CommunityTag>();
+    ).all<Record<string, unknown>>();
 
     return c.json(success(
       (tags.results || []).map(t => ({
         id: t.id,
-        tagName: t.tagName,
-        tagDescription: t.tagDescription,
-        tagColor: t.tagColor,
-        isActive: t.isActive,
-        createdAt: t.createdAt,
-        createdBy: t.createdBy,
+        tagName: t.tag_name,
+        tagDescription: t.tag_description,
+        tagColor: t.tag_color,
+        isActive: !!t.tag_active,
+        createdAt: t.created_at,
+        createdBy: t.created_by,
       }))
     ));
   } catch (err) {
@@ -100,7 +97,7 @@ communityRoutes.get('/tags/:id', async (c) => {
   try {
     const tag = await c.env.DB.prepare(
       'SELECT * FROM community_tags WHERE id = ?'
-    ).bind(tagId).first<CommunityTag>();
+    ).bind(tagId).first<Record<string, unknown>>();
 
     if (!tag) {
       return c.json(error('NOT_FOUND', '标签不存在'), 404);
@@ -108,12 +105,12 @@ communityRoutes.get('/tags/:id', async (c) => {
 
     return c.json(success({
       id: tag.id,
-      tagName: tag.tagName,
-      tagDescription: tag.tagDescription,
-      tagColor: tag.tagColor,
-      isActive: tag.isActive,
-      createdAt: tag.createdAt,
-      createdBy: tag.createdBy,
+      tagName: tag.tag_name,
+      tagDescription: tag.tag_description,
+      tagColor: tag.tag_color,
+      isActive: !!tag.tag_active,
+      createdAt: tag.created_at,
+      createdBy: tag.created_by,
     }));
   } catch (err) {
     console.error('Get tag error:', err);
@@ -130,7 +127,7 @@ communityRoutes.put('/tags/:id', async (c) => {
   try {
     const existingTag = await c.env.DB.prepare(
       'SELECT * FROM community_tags WHERE id = ?'
-    ).bind(tagId).first<CommunityTag>();
+    ).bind(tagId).first<Record<string, unknown>>();
 
     if (!existingTag) {
       return c.json(error('NOT_FOUND', '标签不存在'), 404);
@@ -154,7 +151,7 @@ communityRoutes.put('/tags/:id', async (c) => {
     const updates: string[] = [];
     const params: (string | number | boolean | null)[] = [];
 
-    if (name !== undefined && name.trim() !== existingTag.tagName) {
+    if (name !== undefined && name.trim() !== existingTag.tag_name) {
       updates.push('tag_name = ?');
       params.push(name.trim());
     }
@@ -204,13 +201,13 @@ communityRoutes.delete('/tags/:id', async (c) => {
   try {
     const existingTag = await c.env.DB.prepare(
       'SELECT * FROM community_tags WHERE id = ?'
-    ).bind(tagId).first<CommunityTag>();
+    ).bind(tagId).first<Record<string, unknown>>();
 
     if (!existingTag) {
       return c.json(error('NOT_FOUND', '标签不存在'), 404);
     }
 
-    if (existingTag.createdBy !== user.userId) {
+    if (existingTag.created_by !== user.userId) {
       return c.json(error('FORBIDDEN', '无权删除此标签'), 403);
     }
 
@@ -283,14 +280,14 @@ communityRoutes.get('/posts', async (c) => {
     const total = countResult?.total || 0;
 
     const posts = await c.env.DB.prepare(
-      `SELECT p.*, u.username as userName, u.avatar as userAvatar
+      `SELECT p.*, u.username as userName
        FROM community_posts p
        LEFT JOIN users u ON p.user_id = u.id
        WHERE ${whereClause}
        ORDER BY ${orderBy}
        LIMIT ? OFFSET ?`
     ).bind(...params, pageSize, (page - 1) * pageSize)
-     .all<CommunityPost & { userName: string; userAvatar?: string }>();
+     .all<Record<string, unknown> & { userName: string }>();
 
     // 批量查询当前用户的点赞/收藏状态
     const likedPostIds = new Set<string>();
@@ -315,12 +312,26 @@ communityRoutes.get('/posts', async (c) => {
     }
 
     const items = (posts.results || []).map(p => ({
-      ...p,
-      userId: p.userId,
+      id: p.id,
+      userId: p.user_id,
       userName: p.userName,
-      userAvatar: p.userAvatar,
-      isLiked: likedPostIds.has(p.id),
-      isFavorited: favoritedPostIds.has(p.id),
+      postType: p.post_type,
+      title: p.title,
+      coverImage: p.cover_image,
+      contentData: p.content_data,
+      caption: p.caption,
+      tags: typeof p.tags === 'string' ? JSON.parse(p.tags as string) : p.tags,
+      viewCount: p.view_count,
+      likeCount: p.like_count,
+      commentCount: p.comment_count,
+      favoriteCount: p.favorite_count,
+      shareCount: p.share_count,
+      status: p.status,
+      isFeatured: !!p.is_featured,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+      isLiked: likedPostIds.has(p.id as string),
+      isFavorited: favoritedPostIds.has(p.id as string),
     }));
 
     return c.json(success({
@@ -343,11 +354,11 @@ communityRoutes.get('/posts/:id', async (c) => {
 
   try {
     const post = await c.env.DB.prepare(
-      `SELECT p.*, u.username as userName, u.avatar as userAvatar
+      `SELECT p.*, u.username as userName
        FROM community_posts p
        LEFT JOIN users u ON p.user_id = u.id
        WHERE p.id = ?`
-    ).bind(postId).first<CommunityPost & { userName: string; userAvatar?: string }>();
+    ).bind(postId).first<Record<string, unknown> & { userName: string }>();
 
     if (!post) {
       return c.json(error('NOT_FOUND', '帖子不存在'), 404);
@@ -365,11 +376,24 @@ communityRoutes.get('/posts/:id', async (c) => {
     ]) as unknown as [{ results: Array<{ id: string }> }, { results: Array<{ id: string }> }];
 
     return c.json(success({
-      ...post,
-      userId: post.userId,
+      id: post.id,
+      userId: post.user_id,
       userName: post.userName,
-      userAvatar: post.userAvatar,
-      viewCount: post.viewCount + 1,
+      postType: post.post_type,
+      title: post.title,
+      coverImage: post.cover_image,
+      contentData: post.content_data,
+      caption: post.caption,
+      tags: typeof post.tags === 'string' ? JSON.parse(post.tags) : post.tags,
+      viewCount: (post.view_count as number) + 1,
+      likeCount: post.like_count,
+      commentCount: post.comment_count,
+      favoriteCount: post.favorite_count,
+      shareCount: post.share_count,
+      status: post.status,
+      isFeatured: !!post.is_featured,
+      createdAt: post.created_at,
+      updatedAt: post.updated_at,
       isLiked: !!likeRecord.results?.length,
       isFavorited: !!favoriteRecord.results?.length,
     }));
@@ -441,13 +465,13 @@ communityRoutes.put('/posts/:id', async (c) => {
   try {
     const post = await c.env.DB.prepare(
       'SELECT * FROM community_posts WHERE id = ?'
-    ).bind(postId).first<CommunityPost>();
+    ).bind(postId).first<Record<string, unknown>>();
 
     if (!post) {
       return c.json(error('NOT_FOUND', '帖子不存在'), 404);
     }
 
-    if (post.userId !== user.userId) {
+    if (post.user_id !== user.userId) {
       return c.json(error('FORBIDDEN', '无权编辑此帖子'), 403);
     }
 
@@ -679,21 +703,24 @@ communityRoutes.get('/posts/:id/comments', async (c) => {
     const total = countResult?.total || 0;
 
     const comments = await c.env.DB.prepare(
-      `SELECT c.*, u.username as userName, u.avatar as userAvatar
+      `SELECT c.*, u.username as userName
        FROM community_comments c
        LEFT JOIN users u ON c.user_id = u.id
        WHERE c.post_id = ?
        ORDER BY c.created_at DESC
        LIMIT ? OFFSET ?`
     ).bind(postId, pageSize, (page - 1) * pageSize)
-     .all<CommunityComment & { userName: string; userAvatar?: string }>();
+     .all<Record<string, unknown> & { userName: string }>();
 
     return c.json(success({
       items: (comments.results || []).map(cm => ({
-        ...cm,
-        userId: cm.userId,
+        id: cm.id,
+        postId: cm.post_id,
+        userId: cm.user_id,
         userName: cm.userName,
-        userAvatar: cm.userAvatar,
+        content: cm.content,
+        createdAt: cm.created_at,
+        updatedAt: cm.updated_at,
       })),
       total,
       page,
@@ -760,14 +787,14 @@ communityRoutes.delete('/comments/:id', async (c) => {
   try {
     const comment = await c.env.DB.prepare(
       'SELECT * FROM community_comments WHERE id = ?'
-    ).bind(commentId).first<CommunityComment>();
+    ).bind(commentId).first<Record<string, unknown>>();
 
     if (!comment) {
       return c.json(error('NOT_FOUND', '评论不存在'), 404);
     }
 
     const isAdmin = user.role === 'admin' || user.role === 'super_admin';
-    if (comment.userId !== user.userId && !isAdmin) {
+    if (comment.user_id !== user.userId && !isAdmin) {
       return c.json(error('FORBIDDEN', '无权删除此评论'), 403);
     }
 
@@ -855,10 +882,28 @@ communityRoutes.get('/posts/my-posts', async (c) => {
 
     const posts = await c.env.DB.prepare(
       `SELECT * FROM community_posts ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).bind(...params, pageSize, (page - 1) * pageSize).all<CommunityPost>();
+    ).bind(...params, pageSize, (page - 1) * pageSize).all<Record<string, unknown>>();
 
     return c.json(success({
-      items: posts.results || [],
+      items: (posts.results || []).map(p => ({
+        id: p.id,
+        userId: p.user_id,
+        postType: p.post_type,
+        title: p.title,
+        coverImage: p.cover_image,
+        contentData: p.content_data,
+        caption: p.caption,
+        tags: typeof p.tags === 'string' ? JSON.parse(p.tags as string) : p.tags,
+        viewCount: p.view_count,
+        likeCount: p.like_count,
+        commentCount: p.comment_count,
+        favoriteCount: p.favorite_count,
+        shareCount: p.share_count,
+        status: p.status,
+        isFeatured: !!p.is_featured,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+      })),
       total,
       page,
       pageSize,
@@ -886,7 +931,7 @@ communityRoutes.get('/posts/my-favorites', async (c) => {
     const total = countResult?.total || 0;
 
     const posts = await c.env.DB.prepare(
-      `SELECT p.*, u.username as userName, u.avatar as userAvatar
+      `SELECT p.*, u.username as userName
        FROM community_likes l
        JOIN community_posts p ON l.post_id = p.id
        LEFT JOIN users u ON p.user_id = u.id
@@ -894,14 +939,28 @@ communityRoutes.get('/posts/my-favorites', async (c) => {
        ORDER BY l.created_at DESC
        LIMIT ? OFFSET ?`
     ).bind(user.userId, pageSize, (page - 1) * pageSize)
-     .all<CommunityPost & { userName: string; userAvatar?: string }>();
+     .all<Record<string, unknown> & { userName: string }>();
 
     return c.json(success({
       items: (posts.results || []).map(p => ({
-        ...p,
-        userId: p.userId,
+        id: p.id,
+        userId: p.user_id,
         userName: p.userName,
-        userAvatar: p.userAvatar,
+        postType: p.post_type,
+        title: p.title,
+        coverImage: p.cover_image,
+        contentData: p.content_data,
+        caption: p.caption,
+        tags: typeof p.tags === 'string' ? JSON.parse(p.tags as string) : p.tags,
+        viewCount: p.view_count,
+        likeCount: p.like_count,
+        commentCount: p.comment_count,
+        favoriteCount: p.favorite_count,
+        shareCount: p.share_count,
+        status: p.status,
+        isFeatured: !!p.is_featured,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
         isFavorited: true,
       })),
       total,
@@ -922,17 +981,26 @@ communityRoutes.get('/posts/my-favorites', async (c) => {
 /** 社区统计（带缓存） */
 communityRoutes.get('/stats', async (c) => {
   try {
-    const cacheKey = new Request('https://internal/community-stats');
-    const cache = caches.default;
-
-    const cached = await cache.match(cacheKey);
-    if (cached) {
-      return new Response(cached.body, {
-        headers: {
-          ...Object.fromEntries(cached.headers),
-          'X-Cache': 'HIT',
-        },
-      });
+    // 尝试使用 Cache API 缓存，不可用时跳过
+    let cached: Response | null = null;
+    let cache: Cache | undefined;
+    try {
+      const cacheObj = caches.default;
+      if (cacheObj) {
+        cache = cacheObj;
+        const cacheKey = new Request('https://internal/community-stats');
+        cached = await cacheObj.match(cacheKey) || null;
+        if (cached) {
+          return new Response(cached.body, {
+            headers: {
+              ...Object.fromEntries(cached.headers),
+              'X-Cache': 'HIT',
+            },
+          });
+        }
+      }
+    } catch {
+      // Cache API 不可用时静默跳过
     }
 
     const [totalPostsResult, totalUsersResult, totalCommentsResult, totalLikesResult, postsByTypeResult, recentActivityResult] =
@@ -956,14 +1024,14 @@ communityRoutes.get('/stats', async (c) => {
         { results: Array<{ count: number }> },
         { results: Array<{ count: number }> },
         { results: Array<{ total: number }> },
-        { results: Array<{ type: string; count: number }> },
-        { results: Array<{ id: string; type: string; title: string; createdAt: number }> },
+        { results: Array<{ post_type: string; count: number }> },
+        { results: Array<{ id: string; post_type: string; title: string; created_at: number }> },
       ];
 
-    const totalPosts = totalPostsResult.results[0]?.count || 0;
-    const totalUsers = totalUsersResult.results[0]?.count || 0;
-    const totalComments = totalCommentsResult.results[0]?.count || 0;
-    const totalLikes = totalLikesResult.results[0]?.total || 0;
+    const totalPosts = totalPostsResult.results?.[0]?.count || 0;
+    const totalUsers = totalUsersResult.results?.[0]?.count || 0;
+    const totalComments = totalCommentsResult.results?.[0]?.count || 0;
+    const totalLikes = totalLikesResult.results?.[0]?.total || 0;
     const averageEngagement = totalPosts > 0
       ? Math.round(((totalLikes + totalComments) / totalPosts) * 100) / 100
       : 0;
@@ -974,14 +1042,27 @@ communityRoutes.get('/stats', async (c) => {
       totalComments,
       totalLikes,
       averageEngagement,
-      postsByType: postsByTypeResult.results || [],
+      postsByType: (postsByTypeResult.results || []).map(item => ({
+        type: (item as Record<string, unknown>).post_type || '',
+        count: (item as Record<string, unknown>).count || 0,
+      })),
       recentActivity: (recentActivityResult.results || []).map(item => ({
-        ...item,
-        createdAt: item.createdAt,
+        id: item.id,
+        type: item.post_type || '',
+        title: item.title || '',
+        createdAt: item.created_at,
       })),
     }));
 
-    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+    // 异步写入缓存（仅当 Cache API 可用时）
+    if (cache) {
+      try {
+        const cacheKey = new Request('https://internal/community-stats');
+        c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+      } catch {
+        // 缓存写入失败不影响响应
+      }
+    }
     return response;
   } catch (err) {
     console.error('Get community stats error:', err);
@@ -1006,13 +1087,13 @@ communityRoutes.get('/user-stats', async (c) => {
     }>();
 
     const recentPosts = await c.env.DB.prepare(
-      `SELECT p.*, u.username as userName, u.avatar as userAvatar
+      `SELECT p.*, u.username as userName
        FROM community_posts p
        LEFT JOIN users u ON p.user_id = u.id
        WHERE p.user_id = ? AND p.status = 'active'
        ORDER BY p.created_at DESC
        LIMIT 5`
-    ).bind(user.userId).all<CommunityPost & { userName: string; userAvatar?: string }>();
+    ).bind(user.userId).all<Record<string, unknown> & { userName: string }>();
 
     return c.json(success({
       postsCount: stats?.posts_count || 0,
@@ -1022,10 +1103,24 @@ communityRoutes.get('/user-stats', async (c) => {
       reputationScore: stats?.reputation_score || 0,
       contributionLevel: stats?.contribution_level || 'beginner',
       recentPosts: (recentPosts.results || []).map(p => ({
-        ...p,
-        userId: p.userId,
+        id: p.id,
+        userId: p.user_id,
         userName: p.userName,
-        userAvatar: p.userAvatar,
+        postType: p.post_type,
+        title: p.title,
+        coverImage: p.cover_image,
+        contentData: p.content_data,
+        caption: p.caption,
+        tags: typeof p.tags === 'string' ? JSON.parse(p.tags as string) : p.tags,
+        viewCount: p.view_count,
+        likeCount: p.like_count,
+        commentCount: p.comment_count,
+        favoriteCount: p.favorite_count,
+        shareCount: p.share_count,
+        status: p.status,
+        isFeatured: !!p.is_featured,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
       })),
     }));
   } catch (err) {

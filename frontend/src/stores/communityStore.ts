@@ -129,16 +129,12 @@ export const useCommunityStore = create<CommunityState>()(
             search: params?.search || get().searchQuery || undefined,
           });
 
-          if (response.success) {
-            set({
-              posts: response.data.items,
-              postsTotal: response.data.total,
-              postsPage: response.data.page,
-              postsLoading: false,
-            });
-          } else {
-            set({ postsLoading: false });
-          }
+          set({
+            posts: response.items,
+            postsTotal: response.total,
+            postsPage: response.page,
+            postsLoading: false,
+          });
         } catch (error) {
           console.error('获取帖子列表失败:', error);
           set({ postsLoading: false });
@@ -148,16 +144,12 @@ export const useCommunityStore = create<CommunityState>()(
       fetchPost: async (id) => {
         set({ postsLoading: true });
         try {
-          const response = await communityApi.getPost(id);
+          const post = await communityApi.getPost(id);
 
-          if (response.success) {
-            set({
-              currentPost: response.data,
-              postsLoading: false,
-            });
-          } else {
-            set({ postsLoading: false });
-          }
+          set({
+            currentPost: post,
+            postsLoading: false,
+          });
         } catch (error) {
           console.error('获取帖子详情失败:', error);
           set({ postsLoading: false });
@@ -169,15 +161,11 @@ export const useCommunityStore = create<CommunityState>()(
         try {
           const response = await communityApi.createPost(data);
 
-          if (response.success) {
-            set((state) => ({
-              posts: [response.data, ...state.posts],
-              postsTotal: state.postsTotal + 1,
-              postsLoading: false,
-            }));
-          } else {
-            set({ postsLoading: false });
-          }
+          set((state) => ({
+            posts: [response.data, ...state.posts],
+            postsTotal: state.postsTotal + 1,
+            postsLoading: false,
+          }));
         } catch (error) {
           console.error('创建帖子失败:', error);
           set({ postsLoading: false });
@@ -186,19 +174,17 @@ export const useCommunityStore = create<CommunityState>()(
 
       updatePost: async (id, data) => {
         try {
-          const response = await communityApi.updatePost(id, data);
+          await communityApi.updatePost(id, data);
 
-          if (response.success) {
-            set((state) => ({
-              posts: state.posts.map((p) =>
-                p.id === id ? { ...p, ...data } : p
-              ),
-              currentPost:
-                state.currentPost && state.currentPost.id === id
-                  ? { ...state.currentPost, ...data }
-                  : state.currentPost,
-            }));
-          }
+          set((state) => ({
+            posts: state.posts.map((p) =>
+              p.id === id ? { ...p, ...data } : p
+            ),
+            currentPost:
+              state.currentPost && state.currentPost.id === id
+                ? { ...state.currentPost, ...data }
+                : state.currentPost,
+          }));
         } catch (error) {
           console.error('更新帖子失败:', error);
         }
@@ -206,15 +192,13 @@ export const useCommunityStore = create<CommunityState>()(
 
       deletePost: async (id) => {
         try {
-          const response = await communityApi.deletePost(id);
+          await communityApi.deletePost(id);
 
-          if (response.success) {
-            set((state) => ({
-              posts: state.posts.filter((p) => p.id !== id),
-              postsTotal: state.postsTotal - 1,
-              currentPost: state.currentPost && state.currentPost.id === id ? null : state.currentPost,
-            }));
-          }
+          set((state) => ({
+            posts: state.posts.filter((p) => p.id !== id),
+            postsTotal: state.postsTotal - 1,
+            currentPost: state.currentPost && state.currentPost.id === id ? null : state.currentPost,
+          }));
         } catch (error) {
           console.error('删除帖子失败:', error);
         }
@@ -245,10 +229,10 @@ export const useCommunityStore = create<CommunityState>()(
         }));
 
         try {
-          const response = await communityApi.toggleLike(postId);
+          const result = await communityApi.toggleLike(postId);
 
           // 如果服务端返回失败，回滚状态
-          if (!response.success || !response.data.liked !== newLikedState) {
+          if (result.liked !== newLikedState) {
             set((state) => ({
               posts: state.posts.map((p) =>
                 p.id === postId
@@ -303,13 +287,10 @@ export const useCommunityStore = create<CommunityState>()(
         }));
 
         try {
-          const response = await communityApi.toggleFavorite(postId);
+          const result = await communityApi.toggleFavorite(postId);
 
           // 如果服务端返回失败，回滚状态
-          if (
-            !response.success ||
-            !response.data.favorited !== newFavoritedState
-          ) {
+          if (result.favorited !== newFavoritedState) {
             set((state) => ({
               posts: state.posts.map((p) =>
                 p.id === postId
@@ -362,14 +343,10 @@ export const useCommunityStore = create<CommunityState>()(
         try {
           const response = await communityApi.getComments(postId);
 
-          if (response.success) {
-            set({
-              comments: response.data.items,
-              commentsLoading: false,
-            });
-          } else {
-            set({ commentsLoading: false });
-          }
+          set({
+            comments: response.items,
+            commentsLoading: false,
+          });
         } catch (error) {
           console.error('获取评论列表失败:', error);
           set({ commentsLoading: false });
@@ -380,24 +357,22 @@ export const useCommunityStore = create<CommunityState>()(
         try {
           const response = await communityApi.createComment(data);
 
-          if (response.success) {
-            set((state) => ({
-              comments: [...state.comments, response.data],
-              // 更新帖子的评论数
-              posts: state.posts.map((p) =>
-                p.id === data.postId
-                  ? { ...p, commentCount: p.commentCount + 1 }
-                  : p
-              ),
-              currentPost:
-                state.currentPost && state.currentPost.id === data.postId
-                  ? {
-                      ...state.currentPost,
-                      commentCount: state.currentPost.commentCount + 1,
-                    }
-                  : state.currentPost,
-            }));
-          }
+          set((state) => ({
+            comments: [...state.comments, response.data],
+            // 更新帖子的评论数
+            posts: state.posts.map((p) =>
+              p.id === data.postId
+                ? { ...p, commentCount: p.commentCount + 1 }
+                : p
+            ),
+            currentPost:
+              state.currentPost && state.currentPost.id === data.postId
+                ? {
+                    ...state.currentPost,
+                    commentCount: state.currentPost.commentCount + 1,
+                  }
+                : state.currentPost,
+          }));
         } catch (error) {
           console.error('添加评论失败:', error);
         }
@@ -405,27 +380,25 @@ export const useCommunityStore = create<CommunityState>()(
 
       deleteComment: async (id) => {
         try {
-          const response = await communityApi.deleteComment(id);
+          await communityApi.deleteComment(id);
 
-          if (response.success) {
-            const comment = get().comments.find((c) => c.id === id);
-            set((state) => ({
-              comments: state.comments.filter((c) => c.id !== id),
-              // 更新帖子的评论数
-              posts: state.posts.map((p) =>
-                p.id === comment?.postId
-                  ? { ...p, commentCount: Math.max(0, p.commentCount - 1) }
-                  : p
-              ),
-              currentPost:
-                state.currentPost && state.currentPost.id === comment?.postId
-                  ? {
-                      ...state.currentPost,
-                      commentCount: Math.max(0, state.currentPost.commentCount - 1),
-                    }
-                  : state.currentPost,
-            }));
-          }
+          const comment = get().comments.find((c) => c.id === id);
+          set((state) => ({
+            comments: state.comments.filter((c) => c.id !== id),
+            // 更新帖子的评论数
+            posts: state.posts.map((p) =>
+              p.id === comment?.postId
+                ? { ...p, commentCount: Math.max(0, p.commentCount - 1) }
+                : p
+            ),
+            currentPost:
+              state.currentPost && state.currentPost.id === comment?.postId
+                ? {
+                    ...state.currentPost,
+                    commentCount: Math.max(0, state.currentPost.commentCount - 1),
+                  }
+                : state.currentPost,
+          }));
         } catch (error) {
           console.error('删除评论失败:', error);
         }
@@ -436,16 +409,12 @@ export const useCommunityStore = create<CommunityState>()(
       fetchTags: async () => {
         set({ tagsLoading: true });
         try {
-          const response = await communityApi.getTags();
+          const tags = await communityApi.getTags();
 
-          if (response.success) {
-            set({
-              tags: response.data,
-              tagsLoading: false,
-            });
-          } else {
-            set({ tagsLoading: false });
-          }
+          set({
+            tags,
+            tagsLoading: false,
+          });
         } catch (error) {
           console.error('获取标签列表失败:', error);
           set({ tagsLoading: false });
@@ -459,14 +428,10 @@ export const useCommunityStore = create<CommunityState>()(
         try {
           const response = await communityApi.getMyPosts(params);
 
-          if (response.success) {
-            set({
-              myPosts: response.data.items,
-              postsLoading: false,
-            });
-          } else {
-            set({ postsLoading: false });
-          }
+          set({
+            myPosts: response.items,
+            postsLoading: false,
+          });
         } catch (error) {
           console.error('获取我的帖子失败:', error);
           set({ postsLoading: false });
@@ -478,14 +443,10 @@ export const useCommunityStore = create<CommunityState>()(
         try {
           const response = await communityApi.getMyFavorites(params);
 
-          if (response.success) {
-            set({
-              myFavorites: response.data.items,
-              postsLoading: false,
-            });
-          } else {
-            set({ postsLoading: false });
-          }
+          set({
+            myFavorites: response.items,
+            postsLoading: false,
+          });
         } catch (error) {
           console.error('获取我的收藏失败:', error);
           set({ postsLoading: false });
@@ -494,11 +455,8 @@ export const useCommunityStore = create<CommunityState>()(
 
       fetchUserStats: async () => {
         try {
-          const response = await communityApi.getUserStats();
-
-          if (response.success) {
-            set({ userStats: response.data });
-          }
+          const stats = await communityApi.getUserStats();
+          set({ userStats: stats });
         } catch (error) {
           console.error('获取用户统计失败:', error);
         }
@@ -508,11 +466,8 @@ export const useCommunityStore = create<CommunityState>()(
 
       fetchCommunityStats: async () => {
         try {
-          const response = await communityApi.getCommunityStats();
-
-          if (response.success) {
-            set({ communityStats: response.data });
-          }
+          const stats = await communityApi.getCommunityStats();
+          set({ communityStats: stats });
         } catch (error) {
           console.error('获取社区统计失败:', error);
         }
@@ -524,12 +479,10 @@ export const useCommunityStore = create<CommunityState>()(
         try {
           const response = await communityApi.getNotifications(params);
 
-          if (response.success) {
-            set({
-              notifications: response.data.items,
-              notificationsUnread: response.data.items.filter((n) => !n.isRead).length,
-            });
-          }
+          set({
+            notifications: response.items,
+            notificationsUnread: response.items.filter((n) => !n.isRead).length,
+          });
         } catch (error) {
           console.error('获取通知列表失败:', error);
         }

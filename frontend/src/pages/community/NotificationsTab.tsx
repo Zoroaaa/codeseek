@@ -43,11 +43,9 @@ export const NotificationsTab: React.FC = () => {
     setLoading(true);
     try {
       const response = await communityApi.getNotifications({ page, pageSize: 20 });
-      if (response.success && response.data) {
-        setNotifications(response.data.items || []);
-        setTotalPages(response.data.totalPages || 1);
-        setTotal(response.data.total || 0);
-      }
+      setNotifications(response.items || []);
+      setTotalPages(response.totalPages || 1);
+      setTotal(response.total || 0);
     } catch {
       toast.error('加载通知失败');
     } finally {
