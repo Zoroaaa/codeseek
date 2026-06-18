@@ -64,7 +64,7 @@ export const FavoritesManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadFavorites();
@@ -442,7 +442,7 @@ export const HistoryManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadHistory();

@@ -29,7 +29,7 @@ export const ReportsTab: React.FC = () => {
       setReports(response.items);
       setTotalPages(response.totalPages);
     } catch { toast.error('加载举报列表失败'); } finally { setLoading(false); }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, toast]);
 
   useEffect(() => { loadReports(); }, [loadReports]);
 

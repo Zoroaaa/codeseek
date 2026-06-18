@@ -215,7 +215,7 @@ export const AnnouncementTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, toast]);
 
   useEffect(() => { loadItems(); }, [loadItems]);
 

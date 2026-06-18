@@ -1,141 +1,106 @@
 import React, { useEffect, useState } from 'react';
 import { clsx } from 'clsx';
-import { X, Info, AlertTriangle, CheckCircle2, AlertCircle, ChevronRight } from 'lucide-react';
+import { Megaphone, ChevronDown, Info, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
 import { announcementApi, type Announcement } from '@/services/api/announcement';
+import { JAV_PANEL_HEIGHT, JAV_HEADER_HEIGHT } from '@/components/jav/JavRankingsPanel';
 
-const ICON_MAP: Record<string, React.FC<any>> = {
+const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   info: Info,
   warning: AlertTriangle,
   success: CheckCircle2,
   error: AlertCircle,
 };
 
-const STYLE_MAP: Record<string, { border: string; bg: string; iconColor: string; badge: string }> = {
-  info: { border: 'border-blue-200 dark:border-blue-800', bg: 'bg-blue-50/80 dark:bg-blue-900/15', iconColor: 'text-blue-500', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  warning: { border: 'border-amber-200 dark:border-amber-800', bg: 'bg-amber-50/80 dark:bg-amber-900/15', iconColor: 'text-amber-500', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-  success: { border: 'border-green-200 dark:border-green-800', bg: 'bg-green-50/80 dark:bg-green-900/15', iconColor: 'text-green-500', badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-  error: { border: 'border-red-200 dark:border-red-800', bg: 'bg-red-50/80 dark:bg-red-900/15', iconColor: 'text-red-500', badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+const TYPE_STYLE: Record<string, { dot: string; badge: string; label: string }> = {
+  info:    { dot: 'bg-blue-500', badge: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', label: '信息' },
+  warning: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', label: '注意' },
+  success: { dot: 'bg-green-500', badge: 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400', label: '好消息' },
+  error:   { dot: 'bg-red-500', badge: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400', label: '重要' },
 };
 
-interface AnnouncementBannerProps {
+// 与 JAV榜单等高
+export const PANEL_HEADER_HEIGHT = JAV_HEADER_HEIGHT; // 64
+
+interface AnnouncementPanelProps {
   className?: string;
 }
 
-export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ className }) => {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [visible, setVisible] = useState(true);
+export const AnnouncementPanel: React.FC<AnnouncementPanelProps> = ({ className }) => {
+  const [items, setItems] = useState<Announcement[]>([]);
+  const [show, setShow] = useState(true);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    announcementApi.getActive().then(setAnnouncements).catch(() => {});
+    announcementApi.getActive().then((data) => {
+      setItems(data);
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
   }, []);
 
-  const visibleItems = announcements.filter((a) => !dismissed.has(a.id));
-  if (!visible || visibleItems.length === 0) return null;
+  if (!loaded) return null;
+  if (items.length === 0) return null;
 
-  // 只显示第一条，其余可展开查看
-  const first = visibleItems[0];
-  const rest = visibleItems.slice(1);
-  const style = STYLE_MAP[first.type] || STYLE_MAP.info;
-  const Icon = ICON_MAP[first.type] || Info;
+  // 固定总高 = JAV榜单高度（与 JavRankingsPanel 并排等高）
+  const totalHeight = show ? JAV_PANEL_HEIGHT : PANEL_HEADER_HEIGHT;
+  const contentH = totalHeight - PANEL_HEADER_HEIGHT;
 
   return (
-    <div className={clsx('w-full', className)}>
-      <div className={clsx(
-        'rounded-xl border overflow-hidden transition-all duration-300',
-        style.border, style.bg
-      )}>
-        {/* 首条公告 */}
-        <div className="flex items-start gap-3 px-4 py-3">
-          <Icon className={clsx('w-5 h-5 mt-0.5 flex-shrink-0', style.iconColor)} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase', style.badge)}>
-                {first.type === 'info' ? '公告' : first.type === 'warning' ? '注意' : first.type === 'success' ? '好消息' : '重要'}
-              </span>
-              {first.is_pinned === 1 && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">置顶</span>
-              )}
-              <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">{first.title}</h4>
-            </div>
-            <p className={clsx(
-              'text-sm text-slate-600 dark:text-slate-400 leading-relaxed',
-              expanded === 0 ? '' : 'line-clamp-1'
-            )}>
-              {first.content}
-            </p>
+    <div
+      className={clsx(
+        'collapsible-section animate-fade-in transition-all duration-300 overflow-hidden shrink-0',
+        className
+      )}
+      style={{ animationDelay: '0ms', height: totalHeight }}
+    >
+      {/* Header */}
+      <button
+        onClick={() => setShow(!show)}
+        className="collapsible-header"
+        style={{ height: PANEL_HEADER_HEIGHT }}
+      >
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+            <Megaphone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-600 dark:text-violet-400" />
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {first.content.length > 60 && (
-              <button
-                onClick={() => setExpanded(expanded === 0 ? null : 0)}
-                className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-              >
-                <ChevronRight className={clsx('w-4 h-4 transition-transform', expanded === 0 && 'rotate-90')} />
-              </button>
-            )}
-            <button
-              onClick={() => { setDismissed(new Set([...dismissed, first.id])); }}
-              className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-              title="关闭此条"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm sm:text-base">网站公告</span>
+          <span className="text-[11px] text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">{items.length}</span>
         </div>
+        <ChevronDown className={clsx('w-4 h-4 text-surface-400 transition-transform duration-200', show && 'rotate-180')} />
+      </button>
 
-        {/* 展开的其余公告 */}
-        {expanded === 0 && rest.length > 0 && (
-          <div className="border-t border-slate-200/50 dark:border-slate-700/50 divide-y divide-slate-200/50 dark:divide-slate-700/50">
-            {rest.map((item) => {
-              const s = STYLE_MAP[item.type] || STYLE_MAP.info;
-              const Ic = ICON_MAP[item.type] || Info;
-              return (
-                <div key={item.id} className="flex items-start gap-3 px-4 py-3">
-                  <Ic className={clsx('w-4 h-4 mt-0.5 flex-shrink-0', s.iconColor)} />
+      {/* Content */}
+      {show && (
+        <div className="p-3 space-y-2 overflow-y-auto" style={{ height: contentH }}>
+          {items.map((item) => {
+            const style = TYPE_STYLE[item.type] || TYPE_STYLE.info;
+            const Icon = ICON_MAP[item.type] || Info;
+            return (
+              <div
+                key={item.id}
+                className={clsx(
+                  'rounded-xl p-3 border transition-colors',
+                  style.badge,
+                  item.is_pinned === 1 && 'ring-1 ring-inset ring-violet-200 dark:ring-violet-800'
+                )}
+              >
+                <div className="flex items-start gap-2.5">
+                  <Icon className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-70" />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase', s.badge)}>
-                        {item.type === 'info' ? '公告' : item.type === 'warning' ? '注意' : item.type === 'success' ? '好消息' : '重要'}
-                      </span>
-                      <h4 className="font-medium text-sm text-slate-800 dark:text-slate-200 truncate">{item.title}</h4>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className={clsx('w-1.5 h-1.5 rounded-full flex-shrink-0', style.dot)} />
+                      <h4 className="font-medium text-sm truncate">{item.title}</h4>
+                      {item.is_pinned === 1 && (
+                        <span className="text-[10px] font-medium px-1 py-0.5 rounded bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">置顶</span>
+                      )}
                     </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{item.content}</p>
+                    <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400 line-clamp-2">{item.content}</p>
                   </div>
-                  <button
-                    onClick={() => setDismissed(new Set([...dismissed, item.id]))}
-                    className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors flex-shrink-0"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        /* 展开按钮 */
-        {rest.length > 0 && expanded !== 0 && (
-          <button
-            onClick={() => setExpanded(0)}
-            className="w-full flex items-center justify-center gap-1 px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 border-t border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-100/50 dark:hover:bg-slate-800/30 transition-colors"
-          >
-            还有 {rest.length} 条公告
-            <ChevronRight className="w-3 h-3" />
-          </button>
-        )}
-
-        {/* 全部关闭后隐藏整个 banner */}
-        {visibleItems.length > 1 && (
-          <button
-            onClick={() => setVisible(false)}
-            className="w-full text-center text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 py-1 border-t border-slate-200/50 dark:border-slate-700/50 transition-colors"
-          >
-            全部关闭
-          </button>
-        )}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

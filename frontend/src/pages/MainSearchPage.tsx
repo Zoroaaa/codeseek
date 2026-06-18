@@ -23,7 +23,7 @@ import type {
 } from '@/types';
 import type { BangumiSubject, TMDBResult } from '@/types/search';
 
-import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesSidebar, AnimeSearchResultPanel, MovieSearchResultPanel } from '@/components/search';
+import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesSidebar, AnimeSearchResultPanel, MovieSearchResultPanel, AnnouncementPanel } from '@/components/search';
 import { JavDetailPanel, JavRankingsPanel } from '@/components/jav';
 import { UnifiedNavBar } from '@/components/layout';
 import { useJavDetail } from '@/hooks';
@@ -83,7 +83,7 @@ export const MainSearchPage: React.FC = () => {
     if (tabParam && ['jav', 'anime', 'movie', 'sources'].includes(tabParam)) {
       setActiveTab(tabParam as SearchTabType);
     }
-  }, []);
+  }, [searchParams, setActiveTab]);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(() =>
@@ -180,7 +180,7 @@ export const MainSearchPage: React.FC = () => {
       loadHistory();
       loadFavorites();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadHistory, loadFavorites]);
 
   // 注意：不在 selectedCategory 变化时自动搜索，避免 Tab 切换等场景下触发意外搜索
   // 用户需要手动点击搜索按钮或按 Enter 键来执行搜索
@@ -229,9 +229,9 @@ export const MainSearchPage: React.FC = () => {
     };
 
     updateHistoryWithJavDetail();
-  }, [javDetail, javDetailStatus, isAuthenticated]);
+  }, [javDetail, javDetailStatus, isAuthenticated, searchHistory]);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoadingHistory(true);
     try {
@@ -242,9 +242,9 @@ export const MainSearchPage: React.FC = () => {
     } finally {
       setIsLoadingHistory(false);
     }
-  };
+  }, [isAuthenticated]);
 
-  const loadFavorites = async () => {
+  const loadFavorites = useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoadingFavorites(true);
     try {
@@ -255,7 +255,7 @@ export const MainSearchPage: React.FC = () => {
     } finally {
       setIsLoadingFavorites(false);
     }
-  };
+  }, [isAuthenticated]);
 
   const handleSearch = useCallback(async (overrideKeyword?: string, page = 1) => {
     const query = overrideKeyword || keyword;
@@ -359,7 +359,7 @@ export const MainSearchPage: React.FC = () => {
     } finally {
       setSearching(false);
     }
-  }, [keyword, selectedCategory, setResults, setSearching, toast]);
+  }, [keyword, selectedCategory, setResults, setSearching, toast, activeTab, fetchJavDetail, javEnrichedDetail, loadHistory, resetJavDetail, user?.id]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSearch();
@@ -727,6 +727,8 @@ export const MainSearchPage: React.FC = () => {
               onClose={() => { resetJavDetail(); setJavEnrichedDetail(null); }}
               onFavorite={handleFavoriteJavDetail}
               isFavorited={(javEnrichedDetail || javDetail) ? favoritedCodes.has((javEnrichedDetail || javDetail)!.code) : false}
+              isAuthenticated={isAuthenticated}
+              onLoginRequired={() => { toast.warning('请先登录'); navigate('/login'); }}
             />
           )}
 
@@ -740,6 +742,7 @@ export const MainSearchPage: React.FC = () => {
             onRefresh={() => handleSearch(keyword, enrichedPage)}
             onPageChange={(p) => handleSearch(keyword, p)}
             onToggleFavorite={handleToggleFavoriteAnime}
+            onLoginRequired={() => { toast.warning('请先登录'); navigate('/login'); }}
           />
           ) : enrichedData && enrichedData.resultType === 'movie' ? (
             <MovieSearchResultPanel
@@ -750,6 +753,7 @@ export const MainSearchPage: React.FC = () => {
               onRefresh={() => handleSearch(keyword, enrichedPage)}
               onPageChange={(p) => handleSearch(keyword, p)}
               onToggleFavorite={handleToggleFavoriteMovie}
+              onLoginRequired={() => { toast.warning('请先登录'); navigate('/login'); }}
             />
           ) : (
           <SearchResultsPanel
@@ -770,10 +774,15 @@ export const MainSearchPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
             <div className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
+              {/* JAV tab：榜单 + 公告并排等高 */}
               {activeTab === 'jav' && (
-                <JavRankingsPanel onCodeClick={handleCodeClick} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <JavRankingsPanel onCodeClick={handleCodeClick} />
+                  <AnnouncementPanel />
+                </div>
               )}
 
+              {/* 搜索历史（所有 Tab） */}
               {isAuthenticated && (
                 <SearchHistoryPanel
                   history={searchHistory}
@@ -782,6 +791,7 @@ export const MainSearchPage: React.FC = () => {
                   onToggle={() => setShowHistory(!showHistory)}
                   onItemClick={(query) => setKeyword(query)}
                   onClear={handleClearHistory}
+                  heightMultiplier={2}
                 />
               )}
             </div>
@@ -798,11 +808,9 @@ export const MainSearchPage: React.FC = () => {
                   onRemove={handleRemoveFavorite}
                   onExport={handleExportFavorites}
                   onUpdate={loadFavorites}
-                  hasJavRankings={activeTab === 'jav'}
                 />
               </div>
             )}
-
           </div>
 
           {/* 移动端：我的收藏 */}
@@ -817,7 +825,6 @@ export const MainSearchPage: React.FC = () => {
                 onRemove={handleRemoveFavorite}
                 onExport={handleExportFavorites}
                 onUpdate={loadFavorites}
-                hasJavRankings={activeTab === 'jav'}
               />
             </div>
           )}

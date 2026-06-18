@@ -119,7 +119,7 @@ export const SourceManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [notification.source]);
 
   useEffect(() => {
     loadData();

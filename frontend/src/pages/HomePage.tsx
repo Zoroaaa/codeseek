@@ -18,7 +18,6 @@ import { UnifiedNavBar } from '@/components/layout';
 import { useNavigate } from 'react-router-dom';
 import { useFeatureFlags } from '@/contexts';
 import { FeedbackButton } from '@/components/feedback';
-import { AnnouncementBanner } from '@/components/search/AnnouncementBanner';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -98,11 +97,6 @@ export const HomePage: React.FC = () => {
         isAdmin={isAdmin}
         communityEnabled={enableRegistration}
       />
-
-      {/* ── 公告横幅 ── */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-        <AnnouncementBanner />
-      </div>
 
       {/* ── Hero Section ── */}
       <section className="relative pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24 px-4 sm:px-6 lg:px-8">

@@ -91,7 +91,7 @@ const PageTracker: React.FC = () => {
       eventData: { path: location.pathname },
       referer: document.referrer || undefined,
     }).catch(() => {});
-  }, [location.pathname, isAuthenticated]);
+  }, [location.pathname, isAuthenticated, user?.id]);
 
   return null;
 };
@@ -141,7 +141,7 @@ const App: React.FC = () => {
     };
 
     initAuth();
-  }, []);
+  }, [logout, setLoading, setUser]);
 
   return (
     <BrowserRouter>

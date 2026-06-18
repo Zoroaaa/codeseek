@@ -87,7 +87,7 @@ export const CategoryManager: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadData();
