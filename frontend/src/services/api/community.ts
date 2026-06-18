@@ -61,7 +61,8 @@ export const communityApi = {
     if (params?.sort) queryParams.append('sort', params.sort);
     if (params?.search) queryParams.append('search', params.search);
 
-    return apiClient.get<PostsResponse>(`/community/posts?${queryParams.toString()}`);
+    const response = await apiClient.get<{ success: boolean; data: PostsResponse }>(`/community/posts?${queryParams.toString()}`);
+    return response.data;
   },
 
   getPost: async (id: string): Promise<CommunityPost> => {
@@ -102,7 +103,8 @@ export const communityApi = {
   // ==================== 评论管理 ====================
 
   getComments: async (postId: string): Promise<CommentsResponse> => {
-    return apiClient.get<CommentsResponse>(`/community/posts/${postId}/comments`);
+    const response = await apiClient.get<{ success: boolean; data: CommentsResponse }>(`/community/posts/${postId}/comments`);
+    return response.data;
   },
 
   createComment: async (data: CreateCommentRequest): Promise<{ data: CommunityComment; message: string }> => {
@@ -129,7 +131,8 @@ export const communityApi = {
     queryParams.append('pageSize', String(pageSize));
     if (params?.status) queryParams.append('status', params.status);
 
-    return apiClient.get<PostsResponse>(`/community/posts/my-posts?${queryParams.toString()}`);
+    const response = await apiClient.get<{ success: boolean; data: PostsResponse }>(`/community/posts/my-posts?${queryParams.toString()}`);
+    return response.data;
   },
 
   getMyFavorites: async (params?: { page?: number; pageSize?: number }): Promise<PostsResponse> => {
@@ -139,7 +142,8 @@ export const communityApi = {
     queryParams.append('page', String(page));
     queryParams.append('pageSize', String(pageSize));
 
-    return apiClient.get<PostsResponse>(`/community/posts/my-favorites?${queryParams.toString()}`);
+    const response = await apiClient.get<{ success: boolean; data: PostsResponse }>(`/community/posts/my-favorites?${queryParams.toString()}`);
+    return response.data;
   },
 
   // ==================== 统计数据 ====================
@@ -163,6 +167,7 @@ export const communityApi = {
     queryParams.append('page', String(page));
     queryParams.append('pageSize', String(pageSize));
 
-    return apiClient.get<NotificationsResponse>(`/community/notifications?${queryParams.toString()}`);
+    const response = await apiClient.get<{ success: boolean; data: NotificationsResponse }>(`/community/notifications?${queryParams.toString()}`);
+    return response.data;
   },
 };
