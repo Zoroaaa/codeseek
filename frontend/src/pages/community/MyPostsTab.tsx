@@ -175,7 +175,7 @@ export const MyPostsTab: React.FC = () => {
             <Card key={post.id} padding="md" hover>
               <div className="flex gap-4">
                 {/* 封面缩略图 */}
-                <div className="w-20 h-28 rounded-lg overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800">
+                <div className="w-24 h-16 rounded-lg overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800">
                   {post.coverImage ? (
                     <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover" loading="lazy" />
                   ) : (

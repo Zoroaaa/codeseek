@@ -49,6 +49,7 @@ export interface CommunityTag {
   tagDescription?: string;
   tagColor: string;
   isActive: boolean;
+  postsCount?: number;     // 使用此标签的帖子数
   createdAt: number;
   createdBy: string;
 }

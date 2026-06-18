@@ -13,7 +13,7 @@ import { Card, Badge } from '@/components/ui';
 import { useCommunityStore } from '@/stores/communityStore';
 
 export const StatsBanner: React.FC = () => {
-  const { communityStats, fetchCommunityStats } = useCommunityStore();
+  const { communityStats, tags, fetchCommunityStats } = useCommunityStore();
 
   useEffect(() => {
     fetchCommunityStats();
@@ -60,13 +60,16 @@ export const StatsBanner: React.FC = () => {
     },
   ];
 
-  // 获取热门标签（从postsByType或假设有hotTags字段）
-  const hotTags = [
-    { name: '推荐', count: Math.floor(communityStats.totalPosts * 0.3), color: '#3B82F6' },
-    { name: '高清', count: Math.floor(communityStats.totalPosts * 0.25), color: '#8B5CF6' },
-    { name: '经典', count: Math.floor(communityStats.totalPosts * 0.2), color: '#F59E0B' },
-    { name: '新作', count: Math.floor(communityStats.totalPosts * 0.15), color: '#10B981' },
-  ];
+  // 获取热门标签（从 store tags 数据取前4）
+  const hotTags = (tags || [])
+    .filter(t => (t.postsCount || 0) > 0)
+    .sort((a, b) => (b.postsCount || 0) - (a.postsCount || 0))
+    .slice(0, 4)
+    .map(t => ({
+      name: t.tagName.replace(/^#/, ''),
+      count: t.postsCount || 0,
+      color: t.tagColor,
+    }));
 
   // 格式化时间
   const formatTime = (timestamp: number) => {
@@ -81,7 +84,7 @@ export const StatsBanner: React.FC = () => {
   return (
     <div className="space-y-5">
       {/* 统计卡片 */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {statCards.map((item) => (
           <Card key={item.label} padding="md" hover>
             <div className="flex items-center gap-3">
@@ -109,6 +112,7 @@ export const StatsBanner: React.FC = () => {
       {/* 热门标签 + 最近活动 */}
       <div className="grid gap-4 sm:grid-cols-2">
         {/* 热门标签 */}
+        {hotTags.length > 0 && (
         <Card padding="md">
           <div className="flex items-center gap-2 mb-3">
             <Hash className="w-4 h-4 text-primary-500" />
@@ -132,7 +136,7 @@ export const StatsBanner: React.FC = () => {
             ))}
           </div>
         </Card>
-
+        )}
         {/* 最近活动 */}
         <Card padding="md">
           <div className="flex items-center gap-2 mb-3">

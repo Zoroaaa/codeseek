@@ -25,8 +25,8 @@ export const TagsTab: React.FC = () => {
       )
     : tags;
 
-  // 按使用次数排序（模拟，实际应从后端获取）
-  const sortedTags = [...filteredTags].sort((a, b) => b.createdAt - a.createdAt);
+  // 按帖子数量降序（多的在前）
+  const sortedTags = [...filteredTags].sort((a, b) => (b.postsCount || 0) - (a.postsCount || 0));
 
   const handleCreateTag = async () => {
     if (!newTagName.trim()) {
@@ -173,7 +173,7 @@ export const TagsTab: React.FC = () => {
 
                 {/* 使用数 */}
                 <div className="shrink-0 px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 group-hover:bg-slate-200 dark:group-hover:bg-slate-700 transition-colors">
-                  {0} 帖子
+                  {tag.postsCount || 0} 帖子
                 </div>
               </div>
             </Card>

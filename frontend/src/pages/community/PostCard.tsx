@@ -72,7 +72,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onFavorite, on
       padding="none"
     >
       {/* 封面图区域 */}
-      <div className="relative aspect-[3/4] overflow-hidden bg-slate-100 dark:bg-slate-800">
+      <div className="relative aspect-[16/10] max-h-[200px] overflow-hidden bg-slate-100 dark:bg-slate-800">
         {post.coverImage ? (
           <img
             src={post.coverImage}

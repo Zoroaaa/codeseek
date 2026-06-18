@@ -50,9 +50,9 @@ const formatDate = (timestamp: number) => {
 const JAVContentRenderer: React.FC<{ data: Record<string, any> }> = ({ data }) => (
   <div className="space-y-4">
     {/* 封面大图 */}
-    {data.coverImage && (
+    {(data.coverImage || data.cover) && (
       <div className="rounded-xl overflow-hidden">
-        <img src={data.coverImage} alt={data.title || ''} className="w-full max-h-[400px] object-cover" />
+        <img src={data.coverImage || data.cover} alt={data.title || ''} className="w-full max-h-[400px] object-cover" />
       </div>
     )}
 
@@ -76,10 +76,10 @@ const JAVContentRenderer: React.FC<{ data: Record<string, any> }> = ({ data }) =
           <p className="text-slate-700 dark:text-slate-300">{data.duration}</p>
         </div>
       )}
-      {data.studio && (
+      {(data.studio || data.publisher || data.maker) && (
         <div>
           <span className="text-slate-400">制作商</span>
-          <p className="text-slate-700 dark:text-slate-300">{data.studio}</p>
+          <p className="text-slate-700 dark:text-slate-300">{data.studio || data.publisher || data.maker}</p>
         </div>
       )}
     </div>
@@ -116,14 +116,14 @@ const JAVContentRenderer: React.FC<{ data: Record<string, any> }> = ({ data }) =
     )}
 
     {/* 磁力链接列表 */}
-    {data.magnetLinks && Array.isArray(data.magnetLinks) && data.magnetLinks.length > 0 && (
+    {(data.magnetLinks || data.magnets) && Array.isArray(data.magnetLinks || data.magnets) && (data.magnetLinks || data.magnets).length > 0 && (
       <div>
         <h4 className="flex items-center gap-2 font-medium text-sm text-slate-700 dark:text-slate-300 mb-2">
           <LinkIcon className="w-4 h-4" />
-          磁力链接 ({data.magnetLinks.length})
+          磁力链接 ({(data.magnetLinks || data.magnets).length})
         </h4>
         <div className="space-y-2">
-          {data.magnetLinks.map((link: any, idx: number) => (
+          {(data.magnetLinks || data.magnets).map((link: any, idx: number) => (
             <MagnetLinkItem key={idx} link={link} index={idx + 1} />
           ))}
         </div>
@@ -136,9 +136,9 @@ const JAVContentRenderer: React.FC<{ data: Record<string, any> }> = ({ data }) =
 const AnimeContentRenderer: React.FC<{ data: Record<string, any> }> = ({ data }) => (
   <div className="space-y-4">
     {/* 封面 */}
-    {data.coverImage && (
+    {(data.coverImage || data.cover) && (
       <div className="rounded-xl overflow-hidden">
-        <img src={data.coverImage} alt={data.title || ''} className="w-full max-h-[350px] object-cover" />
+        <img src={data.coverImage || data.cover} alt={data.title || ''} className="w-full max-h-[350px] object-cover" />
       </div>
     )}
 
@@ -206,9 +206,9 @@ const AnimeContentRenderer: React.FC<{ data: Record<string, any> }> = ({ data })
 const MovieContentRenderer: React.FC<{ data: Record<string, any> }> = ({ data }) => (
   <div className="space-y-4">
     {/* 海报 */}
-    {data.posterPath && (
+    {(data.posterPath || data.coverImage || data.cover) && (
       <div className="rounded-xl overflow-hidden max-w-xs mx-auto">
-        <img src={data.posterPath} alt={data.title || ''} className="w-full object-cover" />
+        <img src={data.posterPath || data.coverImage || data.cover} alt={data.title || ''} className="w-full object-cover" />
       </div>
     )}
 
@@ -448,6 +448,17 @@ export const PostDetail: React.FC<PostDetailProps> = ({ postId, onBack }) => {
       {/* 帖子头部 */}
       <Card padding="lg">
         <div className="space-y-4">
+          {/* 帖子封面 */}
+          {currentPost.coverImage && (
+            <div className="rounded-xl overflow-hidden -mt-2 -mx-2 mb-4">
+              <img
+                src={currentPost.coverImage}
+                alt={currentPost.title}
+                className="w-full max-h-[360px] object-contain bg-slate-100 dark:bg-slate-800"
+              />
+            </div>
+          )}
+
           {/* 标题 */}
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
             {currentPost.title}

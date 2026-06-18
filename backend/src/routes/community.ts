@@ -28,7 +28,11 @@ communityRoutes.use('*', authMiddleware);
 communityRoutes.get('/tags', async (c) => {
   try {
     const tags = await c.env.DB.prepare(
-      'SELECT * FROM community_tags WHERE tag_active = 1 ORDER BY tag_name ASC'
+      `SELECT t.*,
+         (SELECT COUNT(*) FROM community_posts p WHERE p.status = 'active' AND p.tags LIKE '%' || t.id || '%') as posts_count
+       FROM community_tags t
+       WHERE t.tag_active = 1
+       ORDER BY tag_name ASC`
     ).all<Record<string, unknown>>();
 
     return c.json(success(
@@ -40,6 +44,7 @@ communityRoutes.get('/tags', async (c) => {
         isActive: !!t.tag_active,
         createdAt: t.created_at,
         createdBy: t.created_by,
+        postsCount: (t.posts_count as number) || 0,
       }))
     ));
   } catch (err) {
