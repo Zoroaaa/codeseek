@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { clsx } from 'clsx';
 import { Megaphone, ChevronDown, Info, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
 import { announcementApi, type Announcement } from '@/services/api/announcement';
-import { JAV_PANEL_HEIGHT, JAV_HEADER_HEIGHT } from '@/components/jav/JavRankingsPanel';
+import { JAV_PANEL_HEIGHT } from '@/components/jav/JavRankingsPanel';
 
 const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   info: Info,
@@ -11,21 +11,16 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   error: AlertCircle,
 };
 
-const TYPE_STYLE: Record<string, { dot: string; badge: string; label: string }> = {
-  info:    { dot: 'bg-blue-500', badge: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', label: '信息' },
-  warning: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', label: '注意' },
-  success: { dot: 'bg-green-500', badge: 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400', label: '好消息' },
-  error:   { dot: 'bg-red-500', badge: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400', label: '重要' },
+const TYPE_STYLE: Record<string, { dot: string; badge: string }> = {
+  info:    { dot: 'bg-blue-500', badge: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  warning: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  success: { dot: 'bg-green-500', badge: 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  error:   { dot: 'bg-red-500', badge: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
 };
 
-// 与 JAV榜单等高
-export const PANEL_HEADER_HEIGHT = JAV_HEADER_HEIGHT; // 64
+const HEADER = 64;
 
-interface AnnouncementPanelProps {
-  className?: string;
-}
-
-export const AnnouncementPanel: React.FC<AnnouncementPanelProps> = ({ className }) => {
+export const AnnouncementPanel: React.FC = () => {
   const [items, setItems] = useState<Announcement[]>([]);
   const [show, setShow] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -37,26 +32,17 @@ export const AnnouncementPanel: React.FC<AnnouncementPanelProps> = ({ className 
     }).catch(() => setLoaded(true));
   }, []);
 
-  if (!loaded) return null;
-  if (items.length === 0) return null;
-
-  // 固定总高 = JAV榜单高度（与 JavRankingsPanel 并排等高）
-  const totalHeight = show ? JAV_PANEL_HEIGHT : PANEL_HEADER_HEIGHT;
-  const contentH = totalHeight - PANEL_HEADER_HEIGHT;
+  if (!loaded || items.length === 0) return null;
 
   return (
     <div
-      className={clsx(
-        'collapsible-section animate-fade-in transition-all duration-300 overflow-hidden shrink-0',
-        className
-      )}
-      style={{ animationDelay: '0ms', height: totalHeight }}
+      className="collapsible-section animate-fade-in transition-all duration-300 overflow-hidden shrink-0"
+      style={{ height: show ? JAV_PANEL_HEIGHT : HEADER }}
     >
-      {/* Header */}
       <button
         onClick={() => setShow(!show)}
         className="collapsible-header"
-        style={{ height: PANEL_HEADER_HEIGHT }}
+        style={{ height: HEADER }}
       >
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
@@ -68,9 +54,8 @@ export const AnnouncementPanel: React.FC<AnnouncementPanelProps> = ({ className 
         <ChevronDown className={clsx('w-4 h-4 text-surface-400 transition-transform duration-200', show && 'rotate-180')} />
       </button>
 
-      {/* Content */}
       {show && (
-        <div className="p-3 space-y-2 overflow-y-auto" style={{ height: contentH }}>
+        <div className="p-3 space-y-2 overflow-y-auto" style={{ height: JAV_PANEL_HEIGHT - HEADER }}>
           {items.map((item) => {
             const style = TYPE_STYLE[item.type] || TYPE_STYLE.info;
             const Icon = ICON_MAP[item.type] || Info;

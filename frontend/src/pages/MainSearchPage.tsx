@@ -774,12 +774,8 @@ export const MainSearchPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
             <div className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
-              {/* JAV tab：榜单 + 公告并排等高 */}
               {activeTab === 'jav' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <JavRankingsPanel onCodeClick={handleCodeClick} />
-                  <AnnouncementPanel />
-                </div>
+                <JavRankingsPanel onCodeClick={handleCodeClick} />
               )}
 
               {/* 搜索历史（所有 Tab） */}
@@ -791,14 +787,14 @@ export const MainSearchPage: React.FC = () => {
                   onToggle={() => setShowHistory(!showHistory)}
                   onItemClick={(query) => setKeyword(query)}
                   onClear={handleClearHistory}
-                  heightMultiplier={2}
                 />
               )}
             </div>
 
-            {/* 右列：收藏 */}
-            {isAuthenticated && (
-              <div className="hidden lg:block self-start">
+            {/* 右列：公告(jav only) + 收藏 */}
+            <div className="hidden lg:flex flex-col gap-3 sm:gap-4 self-start">
+              {activeTab === 'jav' && <AnnouncementPanel />}
+              {isAuthenticated && (
                 <FavoritesPanel
                   favorites={favorites}
                   isLoading={isLoadingFavorites}
@@ -809,8 +805,8 @@ export const MainSearchPage: React.FC = () => {
                   onExport={handleExportFavorites}
                   onUpdate={loadFavorites}
                 />
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* 移动端：我的收藏 */}

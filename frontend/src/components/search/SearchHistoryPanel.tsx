@@ -25,12 +25,8 @@ const getProxyImageUrl = (url: string): string => {
 };
 
 // ─── 高度常量（与 JavRankingsPanel 共享逻辑）────────────────────────
-// header: 64px（同 JAV 面板）
-// 内容区: p-3(12)*2 + 列表项(每项约80-100px)
-// footer: 约 36px
-// 总计 = 64 + 内容 + 36
-export const HIST_PANEL_HEIGHT = 400;
-export const HIST_HEADER_HEIGHT = 64;
+const HIST_PANEL_HEIGHT = 800;
+const HIST_HEADER_HEIGHT = 64;
 
 const CONTENT_H = HIST_PANEL_HEIGHT - HIST_HEADER_HEIGHT - 36;
 
@@ -41,24 +37,17 @@ interface SearchHistoryPanelProps {
   onToggle: () => void;
   onItemClick: (query: string) => void;
   onClear: () => void;
-  heightMultiplier?: number; // 高度倍数，默认 1
 }
 
 export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
   history, isLoading, show, onToggle, onItemClick, onClear,
-  heightMultiplier = 1,
-}) => {
-  const panelHeight = HIST_PANEL_HEIGHT * heightMultiplier;
-  const headerHeight = HIST_HEADER_HEIGHT * heightMultiplier;
-  const contentH = (panelHeight - headerHeight - (36 * heightMultiplier));
-
-  return (
+}) => (
   <div
     className="collapsible-section animate-fade-in transition-all duration-300 overflow-hidden shrink-0"
-    style={{ animationDelay: '100ms', height: show ? panelHeight : headerHeight }}
+    style={{ animationDelay: '100ms', height: show ? HIST_PANEL_HEIGHT : HIST_HEADER_HEIGHT }}
   >
     {/* Header */}
-    <button onClick={onToggle} className="collapsible-header" style={{ height: headerHeight }}>
+    <button onClick={onToggle} className="collapsible-header" style={{ height: HIST_HEADER_HEIGHT }}>
       <div className="flex items-center gap-2 sm:gap-3">
         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
           <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400" />
@@ -76,15 +65,15 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
     </button>
 
     {/* 内容区：固定高度 */}
-    <div style={{ height: panelHeight - headerHeight }}>
+    <div style={{ height: HIST_PANEL_HEIGHT - HIST_HEADER_HEIGHT }}>
       {isLoading ? (
-        <div className="flex justify-center items-center" style={{ height: contentH + (24 * heightMultiplier) }}>
+        <div className="flex justify-center items-center" style={{ height: CONTENT_H + 24 }}>
           <Loading />
         </div>
       ) : history.length > 0 ? (
         <>
           {/* 历史列表：固定内容高度，内部滚动 */}
-          <div className="p-3 sm:p-4 overflow-y-auto scrollbar-thin" style={{ height: contentH + (24 * heightMultiplier) }}>
+          <div className="p-3 sm:p-4 overflow-y-auto scrollbar-thin" style={{ height: CONTENT_H + 24 }}>
             <div className="space-y-1.5 sm:space-y-2">
               {history.map((item) => (
                 <div
@@ -242,5 +231,4 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
       )}
     </div>
   </div>
-  );
-};
+);
