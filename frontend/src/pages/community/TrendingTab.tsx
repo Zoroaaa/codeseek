@@ -22,7 +22,7 @@ export const TrendingTab: React.FC = () => {
       setLoading(true);
       try {
         const response = await communityApi.getPosts({ sort: 'hot', pageSize: 10 });
-        setPopular(response.items);
+        setPopular(response.items || []);
       } catch { toast.error('加载失败'); } finally { setLoading(false); }
     };
     load();

@@ -130,9 +130,9 @@ export const useCommunityStore = create<CommunityState>()(
           });
 
           set({
-            posts: response.items,
-            postsTotal: response.total,
-            postsPage: response.page,
+            posts: response.items || [],
+            postsTotal: response.total || 0,
+            postsPage: response.page || 1,
             postsLoading: false,
           });
         } catch (error) {
@@ -344,7 +344,7 @@ export const useCommunityStore = create<CommunityState>()(
           const response = await communityApi.getComments(postId);
 
           set({
-            comments: response.items,
+            comments: response.items || [],
             commentsLoading: false,
           });
         } catch (error) {
@@ -429,7 +429,7 @@ export const useCommunityStore = create<CommunityState>()(
           const response = await communityApi.getMyPosts(params);
 
           set({
-            myPosts: response.items,
+            myPosts: response.items || [],
             postsLoading: false,
           });
         } catch (error) {
@@ -444,7 +444,7 @@ export const useCommunityStore = create<CommunityState>()(
           const response = await communityApi.getMyFavorites(params);
 
           set({
-            myFavorites: response.items,
+            myFavorites: response.items || [],
             postsLoading: false,
           });
         } catch (error) {
@@ -480,8 +480,8 @@ export const useCommunityStore = create<CommunityState>()(
           const response = await communityApi.getNotifications(params);
 
           set({
-            notifications: response.items,
-            notificationsUnread: response.items.filter((n) => !n.isRead).length,
+            notifications: response.items || [],
+            notificationsUnread: (response.items || []).filter((n) => !n.isRead).length,
           });
         } catch (error) {
           console.error('获取通知列表失败:', error);
