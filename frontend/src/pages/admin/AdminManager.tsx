@@ -10,8 +10,9 @@ import { RolesTab } from './RolesTab';
 import { CleanupTab } from './CleanupTab';
 import { ConfigTab } from './ConfigTab';
 import { FeedbackTab } from './FeedbackTab';
+import { AnnouncementTab } from './AnnouncementTab';
 
-type TabType = 'users' | 'sessions' | 'actions' | 'analytics' | 'trends' | 'reports' | 'roles' | 'config' | 'cleanup' | 'feedback';
+type TabType = 'users' | 'sessions' | 'actions' | 'analytics' | 'trends' | 'reports' | 'roles' | 'config' | 'cleanup' | 'feedback' | 'announcements';
 
 export const AdminManager: React.FC = () => {
   const location = useLocation();
@@ -27,6 +28,7 @@ export const AdminManager: React.FC = () => {
     if (p.includes('/config')) return 'config';
     if (p.includes('/cleanup')) return 'cleanup';
     if (p.includes('/feedback')) return 'feedback';
+    if (p.includes('/announcements')) return 'announcements';
     return 'users';
   };
 
@@ -45,6 +47,7 @@ export const AdminManager: React.FC = () => {
       {activeTab === 'config' && <ConfigTab />}
       {activeTab === 'cleanup' && <CleanupTab />}
       {activeTab === 'feedback' && <FeedbackTab />}
+      {activeTab === 'announcements' && <AnnouncementTab />}
     </div>
   );
 };
