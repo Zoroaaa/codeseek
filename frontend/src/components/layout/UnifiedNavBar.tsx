@@ -274,7 +274,7 @@ const ToolButtons: React.FC<ToolButtonsProps> = memo(({ setIsHelpModalOpen }) =>
 
       {/* GitHub 链接 */}
       <a
-        href="https://github.com/Zoroaaa/codeseek"
+        href="https://github.com/Zoroaaa/Atlas"
         target="_blank"
         rel="noopener noreferrer"
         className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
