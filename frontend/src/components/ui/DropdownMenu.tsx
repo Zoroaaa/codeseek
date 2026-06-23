@@ -144,8 +144,8 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // 过滤出可交互的菜单项（排除分隔线）
   const interactiveItems = items.filter(item => !item.divider);
