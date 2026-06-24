@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import { useAuthStore, useThemeStore } from '@/stores';
 import { useFeatureFlags } from '@/contexts';
-import { SIDEBAR_CONFIG } from '@/constants';
 
 interface NavItem {
   id: string;
@@ -226,7 +225,7 @@ export const DashboardLayout: React.FC = () => {
       {/* ── Desktop Sidebar ── */}
       <aside className={clsx(
         'dashboard-sidebar hidden lg:flex',
-        sidebarCollapsed ? `w-[${SIDEBAR_CONFIG.COLLAPSED_WIDTH}px]` : 'w-64'
+        sidebarCollapsed ? 'w-20' : 'w-64'
       )}>
         <SidebarContent />
       </aside>
@@ -244,16 +243,18 @@ export const DashboardLayout: React.FC = () => {
         'fixed inset-y-0 left-0 z-50 w-72 lg:hidden flex flex-col',
         'bg-white dark:bg-[#111113] border-r border-stone-200/80 dark:border-stone-800',
         'transform transition-transform duration-300 ease-out',
-        mobileMenuOpen ? 'transtone-x-0' : '-transtone-x-full'
+        mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <SidebarContent mobile />
       </aside>
 
       {/* ── Main Content ── */}
-      <div className={clsx(
-        'flex-1 flex flex-col transition-all duration-300 min-w-0',
-        sidebarCollapsed ? `lg:ml-[${SIDEBAR_CONFIG.COLLAPSED_WIDTH}px]` : 'lg:ml-64'
-      )}>
+      <div
+        className={clsx(
+          'flex-1 flex flex-col transition-all duration-300 min-w-0',
+          sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'
+        )}
+      >
 
         {/* Header */}
         <header className="dashboard-header">

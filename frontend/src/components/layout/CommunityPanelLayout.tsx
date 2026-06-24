@@ -215,7 +215,7 @@ export const CommunityPanelLayout: React.FC = () => {
         'fixed inset-y-0 left-0 z-50 w-72 lg:hidden flex flex-col',
         'bg-white dark:bg-[#111113] border-r border-stone-200/80 dark:border-stone-800',
         'transform transition-transform duration-300 ease-out',
-        mobileMenuOpen ? 'transtone-x-0' : '-transtone-x-full'
+        mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <SidebarContent mobile />
       </aside>

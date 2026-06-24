@@ -185,6 +185,7 @@ export const MainSearchPage: React.FC = () => {
               {renderFavoritesPanel()}
             </div>
           </div>
+          {activeTab === 'jav' && <div className="lg:hidden mt-3 sm:mt-4"><AnnouncementPanel /></div>}
           {isAuthenticated && (
             <div className="lg:hidden mt-3 sm:mt-4">{renderFavoritesPanel()}</div>
           )}

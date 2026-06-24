@@ -335,7 +335,7 @@ export const RegisterPage: React.FC = () => {
 
         <div className="w-full max-w-md relative">
           <Link to="/" className="inline-flex items-center gap-2 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200 mb-8 transition-colors text-sm font-medium group">
-            <ArrowLeft className="w-4 h-4 group-hover:-transtone-x-0.5 transition-transform" />
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
             返回首页
           </Link>
 
@@ -385,7 +385,7 @@ export const RegisterPage: React.FC = () => {
       <div className="w-full max-w-md relative">
 
         <Link to="/" className="inline-flex items-center gap-2 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200 mb-8 transition-colors text-sm font-medium group">
-          <ArrowLeft className="w-4 h-4 group-hover:-transtone-x-0.5 transition-transform" />
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
           返回首页
         </Link>
 

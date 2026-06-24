@@ -139,7 +139,7 @@ export const JavRankingsPanel: React.FC<JavRankingsPanelProps> = ({ onCodeClick 
     // 固定总高度：展开时 JAV_PANEL_HEIGHT，收缩时 JAV_HEADER_HEIGHT
     <div
       className="collapsible-section animate-fade-in transition-all duration-300 overflow-hidden shrink-0"
-      style={{ height: expanded ? JAV_PANEL_HEIGHT : JAV_HEADER_HEIGHT }}
+      style={{ height: expanded ? JAV_PANEL_HEIGHT : JAV_HEADER_HEIGHT, maxHeight: expanded ? '60vh' : undefined }}
     >
       {/* Header */}
       <button onClick={() => setExpanded(!expanded)} className="collapsible-header" style={{ height: JAV_HEADER_HEIGHT }}>

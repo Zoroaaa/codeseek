@@ -33,7 +33,7 @@ export const AnnouncementPanel: React.FC = () => {
   return (
     <div
       className="collapsible-section animate-fade-in transition-all duration-300 overflow-hidden shrink-0"
-      style={{ height: show ? JAV_PANEL_HEIGHT : HEADER }}
+      style={{ height: show ? JAV_PANEL_HEIGHT : HEADER, maxHeight: show ? '60vh' : undefined }}
     >
       <button
         onClick={() => setShow(!show)}
