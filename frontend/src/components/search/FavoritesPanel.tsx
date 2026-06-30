@@ -5,6 +5,7 @@ import { convertToProxyUrl } from '@/services/proxy';
 import type { FavoriteItem } from '@/types';
 import { userApi } from '@/services/api/search';
 import { useToast } from '@/components/ui/Toast';
+import { getBackendBaseUrl } from '@/constants';
 
 const resolveUrl = (relativePath: string, referenceUrl: string): string => {
   try {
@@ -16,9 +17,7 @@ const resolveUrl = (relativePath: string, referenceUrl: string): string => {
 };
 
 const getProxyImageUrl = (url: string): string => {
-  const baseUrl = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? ''
-    : 'https://backend.codeseek.pp.ua';
+  const baseUrl = getBackendBaseUrl();
   return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
 };
 

@@ -18,6 +18,7 @@ import {
   User,
 } from 'lucide-react';
 import { Card, Button, Input, Badge, Modal, Loading, EmptyState } from '@/components/ui';
+import { getBackendBaseUrl } from '@/constants';
 import { ProxyImage } from '@/components/ui';
 import { userApi } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
@@ -34,9 +35,7 @@ const resolveUrl = (relativePath: string, referenceUrl: string): string => {
 };
 
 const getProxyImageUrl = (url: string): string => {
-  const baseUrl = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? ''
-    : 'https://backend.codeseek.pp.ua';
+  const baseUrl = getBackendBaseUrl();
   return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
 };
 
