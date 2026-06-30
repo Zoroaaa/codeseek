@@ -23,7 +23,7 @@ APP_ENV = "production"
 SITE_URL = "https://mail.wort.uk"
 
 # 前端域名 — OAuth 回调后跳转目标
-FRONTEND_URL = "https://codeseek.pp.ua"
+FRONTEND_URL = "https://atlas.wort.uk"
 
 # 后端 API 域名 — 用于 OAuth callback URI 构造
 BACKEND_URL = "https://atlasapi.wort.uk"
