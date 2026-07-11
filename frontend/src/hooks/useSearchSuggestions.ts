@@ -14,7 +14,7 @@ interface UseSearchSuggestionsOptions {
 export function useSearchSuggestions(options: UseSearchSuggestionsOptions = {}) {
   const validationRules = useValidationRules();
   const searchConfig = useSearchConfig();
-  const { debounceMs = searchConfig.searchDebounceMs, maxSuggestions = searchConfig.suggestionsMaxLimit, minChars = validationRules.SEARCH_KEYWORD_MIN_LENGTH } = options;
+  const { debounceMs = searchConfig.searchDebounceMs, maxSuggestions = searchConfig.suggestionsMaxLimit, minChars = 2 } = options; // API建议最小2字符，避免单字符无效请求
   const { keyword } = useSearchStore();
   const { data: searchHistory = [] } = useSearchHistory(5);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
@@ -54,10 +54,16 @@ export function useSearchSuggestions(options: UseSearchSuggestionsOptions = {}) 
   }, [debounceMs, fetchSuggestions]);
 
   useEffect(() => {
-    if (keyword && keyword.length >= minChars) {
-      debouncedFetch(keyword);
+    if (keyword && keyword.trim().length > 0) {
+      setShowSuggestions(true); // 有输入就开启建议（优先显示历史）
+      if (keyword.length >= minChars) {
+        debouncedFetch(keyword); // 达到最小长度才请求API
+      } else {
+        setSuggestions([]); // 太短不请求API，只显示历史
+      }
     } else {
       setSuggestions([]);
+      setShowSuggestions(false); // 无输入时关闭
     }
 
     return () => {
