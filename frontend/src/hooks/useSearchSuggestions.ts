@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchStore } from '@/stores';
 import { searchApi } from '@/services/api';
-import { useValidationRules, useSearchConfig } from '@/contexts';
+import { useSearchConfig } from '@/contexts';
 import { useSearchHistory } from './useSearchHistoryQuery';
 import type { SearchSuggestion } from '@/types';
 
@@ -12,7 +12,6 @@ interface UseSearchSuggestionsOptions {
 }
 
 export function useSearchSuggestions(options: UseSearchSuggestionsOptions = {}) {
-  const validationRules = useValidationRules();
   const searchConfig = useSearchConfig();
   const { debounceMs = searchConfig.searchDebounceMs, maxSuggestions = searchConfig.suggestionsMaxLimit, minChars = 2 } = options; // API建议最小2字符，避免单字符无效请求
   const { keyword } = useSearchStore();

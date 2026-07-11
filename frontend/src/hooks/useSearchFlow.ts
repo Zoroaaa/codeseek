@@ -181,7 +181,8 @@ export function useSearchFlow({
             // Anime/Movie: 检查聚合搜索的各数据源错误
             const enriched = response.data as EnrichedSearchData;
             if ('errors' in enriched && enriched.total === 0) {
-              const errorKeys = Object.keys(enriched.errors).filter(k => enriched.errors[k]);
+              const errors = enriched.errors as Record<string, string | null>;
+              const errorKeys = Object.keys(errors).filter(k => errors[k]);
               if (errorKeys.length > 0) {
                 toast.info('暂无相关资源', '尝试更换关键词或稍后再试');
               }
