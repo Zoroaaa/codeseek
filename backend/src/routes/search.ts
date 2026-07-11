@@ -359,15 +359,17 @@ searchRoutes.get('/suggestions', async (c) => {
   }
 
   // ── 通用模式：基于全局搜索历史统计 ──
+  // 只统计近30天数据，避免全表扫描（从80万+降至几千条）
   try {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const suggestions = await c.env.DB.prepare(
       `SELECT query as keyword, COUNT(*) as count
        FROM user_search_history
-       WHERE query LIKE ?
+       WHERE created_at > ? AND query LIKE ?
        GROUP BY query
        ORDER BY count DESC
        LIMIT ?`
-    ).bind(`${keyword}%`, limit).all<{ keyword: string; count: number }>();
+    ).bind(thirtyDaysAgo, `${keyword}%`, limit).all<{ keyword: string; count: number }>();
 
     return c.json(success(suggestions.results || []));
   } catch (err) {
