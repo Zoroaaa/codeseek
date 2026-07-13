@@ -9,7 +9,7 @@ import { Env, User, CommunityReport, UserAction, JwtPayload, Role } from '@/type
 import { success, error, logUserAction } from '@/utils';
 import { ConfigService } from '@/services';
 import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
-import { authMiddleware, adminMiddleware } from '@/middleware/auth';
+import { authMiddleware, adminMiddleware, checkIsSuperAdmin } from '@/middleware/auth';
 import { adminSessionSchema, adminEventSchema, adminActionSchema } from '@/utils/validators';
 
 const R = VALIDATION_RULES;
@@ -283,7 +283,7 @@ adminRoutes.put('/users/:id/role', async (c) => {
       return c.json(error('NOT_FOUND', '角色不存在'), 404);
     }
 
-    if (role.is_system !== 1 && adminUser.role !== 'super_admin') {
+    if (role.is_system !== 1 && !await checkIsSuperAdmin(c.env.DB, adminUser.userId)) {
       return c.json(error('FORBIDDEN', '只有超级管理员可以分配自定义角色'), 403);
     }
 
@@ -295,13 +295,19 @@ adminRoutes.put('/users/:id/role', async (c) => {
       return c.json(error('NOT_FOUND', '用户不存在'), 404);
     }
 
-    if (user.role_id === 'super_admin' && adminUser.role !== 'super_admin') {
+    if (user.role_id === 'super_admin' && !await checkIsSuperAdmin(c.env.DB, adminUser.userId)) {
       return c.json(error('FORBIDDEN', '无法修改超级管理员角色'), 403);
     }
 
+    // 更新角色
     await c.env.DB.prepare(
       'UPDATE users SET role_id = ?, updated_at = ? WHERE id = ?'
     ).bind(roleId, Date.now(), userId).run();
+
+    // 关键修复：清除该用户所有session，强制重新登录获取新token
+    await c.env.DB.prepare(
+      'DELETE FROM user_sessions WHERE user_id = ?'
+    ).bind(userId).run();
 
     await logUserAction(c.env, adminUser.userId, 'admin_update_user_role', {
       targetUserId: userId,
@@ -479,7 +485,7 @@ adminRoutes.put('/users/:id/status', async (c) => {
       return c.json(error('NOT_FOUND', '用户不存在'), 404);
     }
 
-    if (user.role_id === 'super_admin' && adminUser.role !== 'super_admin') {
+    if (user.role_id === 'super_admin' && !await checkIsSuperAdmin(c.env.DB, adminUser.userId)) {
       return c.json(error('FORBIDDEN', '无法禁用超级管理员'), 403);
     }
 
