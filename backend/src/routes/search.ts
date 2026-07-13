@@ -304,16 +304,6 @@ searchRoutes.post('/', async (c) => {
       ).bind(searchResults.length, historyId, userPayload.userId).run();
     }
 
-    // 增量更新关键词统计表，用于搜索建议（写时聚合，避免后续全表扫描）
-    const now = Date.now();
-    await c.env.DB.prepare(`
-      INSERT INTO search_keyword_stats (keyword, count, created_at, updated_at)
-      VALUES (?, 1, ?, ?)
-      ON CONFLICT(keyword) DO UPDATE SET
-        count = count + 1,
-        updated_at = ?
-    `).bind(trimmedKeyword, now, now, now).run();
-
     return c.json(success({
       keyword: trimmedKeyword,
       results: searchResults,
@@ -368,50 +358,27 @@ searchRoutes.get('/suggestions', async (c) => {
     }
   }
 
-  // ── 通用模式：基于预聚合的关键词统计表 ──
-  // search_keyword_stats 表在每次搜索时增量更新，避免全表扫描原始日志
+  // ── 通用模式：基于全局搜索历史统计 ──
+  // 数据量不大时直接查历史表；缓存和前端防抖是控制请求量的关键
   try {
     const trimmedKeyword = keyword.trim();
-    const prefix = `${trimmedKeyword}%`;
-
-    // 1) 优先从聚合表查（走 idx_search_keyword_stats_keyword + count 索引）
-    const stats = await c.env.DB.prepare(
-      `SELECT keyword, count
-       FROM search_keyword_stats
-       WHERE keyword LIKE ?
-       ORDER BY count DESC, keyword ASC
-       LIMIT ?`
-    ).bind(prefix, limit).all<{ keyword: string; count: number }>();
-
-    const results = stats.results || [];
-
-    // 2) 聚合表结果不足时，从近7天原始历史兜底补充
-    if (results.length < limit) {
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      const existing = new Set(results.map(r => r.keyword));
-      const need = limit - results.length;
-
-      const fallback = await c.env.DB.prepare(
-        `SELECT query as keyword, COUNT(*) as count
-         FROM user_search_history
-         WHERE created_at > ? AND query LIKE ?
-         GROUP BY query
-         ORDER BY count DESC
-         LIMIT ?`
-      ).bind(sevenDaysAgo, prefix, need + existing.size).all<{ keyword: string; count: number }>();
-
-      for (const item of (fallback.results || [])) {
-        if (!existing.has(item.keyword)) {
-          results.push(item);
-          existing.add(item.keyword);
-          if (results.length >= limit) break;
-        }
-      }
+    if (trimmedKeyword.length < R.SUGGESTIONS.MIN_KEYWORD_LENGTH) {
+      return c.json(success([]));
     }
+
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const suggestions = await c.env.DB.prepare(
+      `SELECT query as keyword, COUNT(*) as count
+       FROM user_search_history
+       WHERE created_at > ? AND query LIKE ?
+       GROUP BY query
+       ORDER BY count DESC
+       LIMIT ?`
+    ).bind(thirtyDaysAgo, `${trimmedKeyword}%`, limit).all<{ keyword: string; count: number }>();
 
     // CDN 缓存 60 秒，减少重复前缀的请求压力
     c.header('Cache-Control', 'public, max-age=60');
-    return c.json(success(results));
+    return c.json(success(suggestions.results || []));
   } catch (err) {
     console.error('Get suggestions error:', err);
     return c.json(success([]));
