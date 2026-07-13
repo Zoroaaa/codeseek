@@ -328,6 +328,18 @@ userRoutes.post('/search-history', async (c) => {
       keyword || null
     ).run();
 
+    // 增量更新全局关键词统计表，用于搜索建议
+    const suggestKeyword = (query || keyword || '').trim();
+    if (suggestKeyword) {
+      await c.env.DB.prepare(`
+        INSERT INTO search_keyword_stats (keyword, count, created_at, updated_at)
+        VALUES (?, 1, ?, ?)
+        ON CONFLICT(keyword) DO UPDATE SET
+          count = count + 1,
+          updated_at = ?
+      `).bind(suggestKeyword, now, now, now).run();
+    }
+
     return c.json(success({
       id: historyId,
       query,

@@ -9,7 +9,7 @@ import { Env, User, CommunityReport, UserAction, JwtPayload, Role } from '@/type
 import { success, error, logUserAction } from '@/utils';
 import { ConfigService } from '@/services';
 import { CONFIG, VALIDATION_RULES, DB_CONFIG_KEYS } from '@/constants';
-import { authMiddleware, adminMiddleware } from '@/middleware/auth';
+import { authMiddleware, adminMiddleware, checkIsSuperAdmin } from '@/middleware/auth';
 import { adminSessionSchema, adminEventSchema, adminActionSchema } from '@/utils/validators';
 
 const R = VALIDATION_RULES;
@@ -894,6 +894,7 @@ adminRoutes.post('/cleanup', async (c) => {
       oldPasswordResetLogs: 0,
       oldActions: 0,
       oldSecurityEvents: 0,
+      oldKeywordStats: 0,
     };
 
     const oldPasswordResetLogs = await c.env.DB.prepare(
@@ -910,6 +911,12 @@ adminRoutes.post('/cleanup', async (c) => {
       'DELETE FROM user_security_events WHERE created_at < ?'
     ).bind(now - securityEventRetentionDays * CONFIG.Stats.DAY_IN_MS).run();
     results.oldSecurityEvents = oldSecurityEvents.meta.changes || 0;
+
+    // 清理 90 天内无更新的冷门关键词统计，防止聚合表无限增长
+    const oldKeywordStats = await c.env.DB.prepare(
+      'DELETE FROM search_keyword_stats WHERE updated_at < ?'
+    ).bind(now - 90 * CONFIG.Stats.DAY_IN_MS).run();
+    results.oldKeywordStats = oldKeywordStats.meta.changes || 0;
 
     await logUserAction(c.env, adminUser.userId, 'admin_cleanup', results, c);
 
