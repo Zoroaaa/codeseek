@@ -1,5 +1,0 @@
-id,name,description,icon,color,display_order,is_system,is_active,created_at,updated_at
-jav_sources,🔍 JAV搜索,JAV番号、在线播放、磁力资源等,🔍,#3b82f6,1,1,1,1781162174000,1781162174000
-anime_sources,🎌 动漫搜索,动漫、番剧、漫画相关搜索源,🎌,#8b82f6,2,1,1,1781162202000,1781162202000
-movie_sources,🎥 影视搜索,电影、电视剧、综艺节目相关搜索源,🎥,#3b82f6,3,1,1,1781162202000,1781162202000
-manga_sources,📖 漫画搜索,漫画、条漫相关搜索源,📖,#a855f7,4,1,1,1784253148000,1784253148000
