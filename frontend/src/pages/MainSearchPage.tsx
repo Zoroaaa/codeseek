@@ -177,25 +177,29 @@ export const MainSearchPage: React.FC = () => {
             <JavDetailPanel detail={javFlow.javDetail} status={javFlow.javDetailStatus} onClose={() => javFlow.resetJavDetail()} onFavorite={favoritesManager.handleFavoriteJavDetail} isFavorited={javFlow.javDetail ? favoritesManager.favoritedCodes.has(javFlow.javDetail.code) : false} isAuthenticated={isAuthenticated} onLoginRequired={() => { navigate('/login'); }} />
           )}
           {(() => {
-            const Panel = getResultPanel(searchFlow.enrichedData?.resultType);
-            const commonProps = {
-              isDark: darkMode,
-              isAuthenticated,
-              favorites: favoritesManager.favorites,
-              onLoginRequired: () => navigate('/login')
-            };
+            const resultType = searchFlow.enrichedData?.resultType;
+            const Panel = getResultPanel(resultType);
 
-            return searchFlow.enrichedData ? (
-              <Panel
-                data={searchFlow.enrichedData}
-                {...commonProps}
-                onRefresh={() => searchFlow.handleSearch(searchFlow.keyword, searchFlow.enrichedPage)}
-                onPageChange={(p: number) => searchFlow.handleSearch(searchFlow.keyword, p)}
-                onToggleFavorite={searchFlow.enrichedData.resultType === 'anime'
-                  ? favoritesManager.handleToggleFavoriteAnime
-                  : favoritesManager.handleToggleFavoriteMovie}
-              />
-            ) : (
+            if (searchFlow.enrichedData && Panel) {
+              const commonProps = {
+                isDark: darkMode,
+                isAuthenticated,
+                favorites: favoritesManager.favorites,
+                onLoginRequired: () => navigate('/login'),
+              };
+              return (
+                <Panel
+                  data={searchFlow.enrichedData}
+                  {...commonProps}
+                  onRefresh={() => searchFlow.handleSearch(searchFlow.keyword, searchFlow.enrichedPage)}
+                  onPageChange={(p: number) => searchFlow.handleSearch(searchFlow.keyword, p)}
+                  onToggleFavorite={resultType === 'anime' ? favoritesManager.handleToggleFavoriteAnime : favoritesManager.handleToggleFavoriteMovie}
+                />
+              );
+            }
+
+            // jav 以及任何未注册专属面板的类型，都走这里——props 形状和 Panel 分支不通用，不能合并
+            return (
               <SearchResultsPanel
                 results={searchFlow.searchResults}
                 viewMode={viewMode}
