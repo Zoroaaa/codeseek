@@ -45,11 +45,9 @@
 
 | 文档 | 说明 | 链接 |
 |------|------|------|
-| **API 接口文档** | 完整的 RESTful API 接口说明，包含搜索接口（JAV/动漫/影视三大类别）、认证方式、源管理等 | [docs/api/index.md](docs/api/index.md) |
-| **架构设计文档** | 前后端目录结构、技术栈版本、部署架构、数据库模块化设计详解 | [docs/backend-frontend-tree.md](docs/backend-frontend-tree.md) |
 | **配置说明文档** | 前端配置、后端配置、环境变量、代理服务、数据库配置、角色权限配置 | [docs/config.md](docs/config.md) |
 | **部署指南文档** | 环境要求、本地开发、后端部署、前端部署、数据库配置、常见问题解答 | [docs/deploy.md](docs/deploy.md) |
-| **版本变更日志** | 完整的版本变更记录：v2.0（架构重构）、v3.0（安全增强+功能扩展）、v3.1（Monorepo共享+安全加固+性能优化）、v4.0（动漫&影视搜索+架构升级）、**v4.1（漫画搜索+架构优化）** | [docs/changelogv2.0.md](docs/changelogv2.0.md) / [docs/changelogv3.0.md](docs/changelogv3.0.md) / [docs/changelogv3.1.0.md](docs/changelogv3.1.0.md) / [docs/changelogv4.0.0.md](docs/changelogv4.0.0.md) / [docs/changelogv4.1.0.md](docs/changelogv4.1.0.md) |
+| **版本变更日志** | 完整的版本变更记录：v2.0（架构重构）、v3.0（安全增强+功能扩展）、v3.1（Monorepo共享+安全加固+性能优化）、v4.0（动漫&影视搜索+架构升级）、**v4.1（漫画搜索+架构优化）** | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
 | **GitHub 推送指南** | Git 操作流程、提交规范、分支管理、GitHub Actions 自动部署配置 | [docs/github_push.md](docs/github_push.md) |
 
 ### 前端专项文档
