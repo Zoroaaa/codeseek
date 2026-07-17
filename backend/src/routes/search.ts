@@ -183,8 +183,8 @@ searchRoutes.post('/', async (c) => {
   const limitPageSize = Math.min(Math.max(1, pageSize), maxPageSize);
   const limitPage = Math.max(1, page);
 
+  let historyId: string | null = null;
   try {
-    let historyId: string | null = null;
     if (userPayload) {
       historyId = generateId();
       await c.env.DB.prepare(
@@ -266,6 +266,15 @@ searchRoutes.post('/', async (c) => {
           return c.json(success(enrichedData, '搜索完成'));
         } catch (err) {
           console.error(`[Provider:${provider.id}] search error:`, err);
+          // 搜索失败，删除已写入的历史记录
+          if (historyId && userPayload) {
+            try {
+              await c.env.DB.prepare('DELETE FROM user_search_history WHERE id = ? AND user_id = ?')
+                .bind(historyId, userPayload.userId).run();
+            } catch (delErr) {
+              console.error('[search] Failed to delete history on error:', delErr);
+            }
+          }
           return c.json(error('SERVER_ERROR', '搜索失败'), 500);
         }
       }
@@ -337,6 +346,15 @@ searchRoutes.post('/', async (c) => {
     }, '搜索完成'));
   } catch (err) {
     console.error('Search error:', err);
+    // 搜索失败，删除已写入的历史记录
+    if (historyId && userPayload) {
+      try {
+        await c.env.DB.prepare('DELETE FROM user_search_history WHERE id = ? AND user_id = ?')
+          .bind(historyId, userPayload.userId).run();
+      } catch (delErr) {
+        console.error('[search] Failed to delete history on error:', delErr);
+      }
+    }
     return c.json(error('SERVER_ERROR', '搜索失败'), 500);
   }
 });

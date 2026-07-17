@@ -218,7 +218,7 @@ export const MainSearchPage: React.FC = () => {
             <div className="lg:col-span-2 flex flex-col gap-3 sm:gap-4">
               {activeTab === 'jav' && <JavRankingsPanel onCodeClick={searchFlow.handleCodeClick} />}
               {isAuthenticated && (
-                <SearchHistoryPanel history={historyManager.searchHistory} isLoading={historyManager.isLoadingHistory} show={showHistory} onToggle={() => setShowHistory(!showHistory)} onItemClick={(query) => searchFlow.setKeyword(query)} onClear={historyManager.handleClearHistory} />
+                <SearchHistoryPanel history={historyManager.searchHistory} isLoading={historyManager.isLoadingHistory} show={showHistory} onToggle={() => setShowHistory(!showHistory)} onItemClick={(query) => searchFlow.setKeyword(query)} onClear={historyManager.handleClearHistory} onDeleteSelected={historyManager.handleDeleteSelected} />
               )}
             </div>
             <div className="hidden lg:flex flex-col gap-3 sm:gap-4 self-start">
