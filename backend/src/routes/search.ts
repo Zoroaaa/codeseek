@@ -124,7 +124,7 @@ async function saveEnrichedHistory(
       break;
     }
     case 'manga': {
-      // 漫画：提取首条 MangaDex 结果 → title + cover + code(manga:id) + status + tags
+      // 漫画：提取首条 MangaDex 结果 → title + cover + code(manga:id) + tags
       const manga = (result as { manga?: Array<{ id: string; title: string; cover: string; status?: string; tags?: string[] }> }).manga;
       const firstManga = manga?.[0];
       if (firstManga) {
@@ -134,10 +134,6 @@ async function saveEnrichedHistory(
           firstManga.cover,
           `manga:${firstManga.id}`
         );
-        if (firstManga.status) {
-          updateFields.push('status=?');
-          updateValues.push(firstManga.status);
-        }
         if (firstManga.tags?.length) {
           updateFields.push('tags=?');
           updateValues.push(firstManga.tags.join(','));
@@ -259,7 +255,12 @@ searchRoutes.post('/', async (c) => {
 
           // 增强搜索历史记录（方案 B）
           if (historyId && userPayload) {
-            await saveEnrichedHistory(c.env.DB, historyId, userPayload, enrichedData);
+            try {
+              await saveEnrichedHistory(c.env.DB, historyId, userPayload, enrichedData);
+            } catch (histErr) {
+              // 历史记录失败不该影响搜索结果返回，只记日志
+              console.error(`[saveEnrichedHistory] ${provider.id} history save failed:`, histErr);
+            }
           }
 
           return c.json(success(enrichedData, '搜索完成'));
