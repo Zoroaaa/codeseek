@@ -303,6 +303,7 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy } = useProxyStore();
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
+  const [isProxyConfirmOpen, setIsProxyConfirmOpen] = useState(false);
 
   const getProxyButtonClass = () => {
     if (isProxyEnabled) return 'proxy-toggle-btn enabled';
@@ -350,12 +351,12 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
                   <DropdownMenu
                     trigger={
                       <button className={clsx(
-                        'px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-1',
+                        'px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200',
                         OVERFLOW_TABS.some(t => t.id === activeTab)
                           ? 'text-white shadow-md bg-gradient-to-br from-stone-500 to-stone-600'
                           : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
                       )}>
-                        <span>更多</span><ChevronDown className="w-3.5 h-3.5" />
+                        更多
                       </button>
                     }
                     items={OVERFLOW_TABS.map(tab => ({
@@ -379,10 +380,18 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
               <div className="flex items-center gap-0.5">
                 {/* 代理切换 - 移动端仅显示图标 */}
                 <button
-                  onClick={toggleProxy}
+                  onClick={() => {
+                    if (isProxyEnabled) {
+                      // 已开启时直接关闭，无需确认
+                      toggleProxy();
+                    } else {
+                      // 未开启时显示确认弹窗
+                      setIsProxyConfirmOpen(true);
+                    }
+                  }}
                   disabled={isProxyLoading}
                   className={clsx(getProxyButtonClass(), 'sm:p-2 p-1.5')}
-                  title={isProxyEnabled ? '代理已启用' : '代理已关闭'}
+                  title={isProxyEnabled ? '代理已启用 - 点击关闭' : '代理已关闭 - 点击启用'}
                 >
                   {isProxyLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -547,6 +556,58 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
               <span className="text-sm font-medium">{tab.label}</span>
             </button>
           ))}
+        </div>
+      </Modal>
+
+      {/* ── 代理确认弹窗 ── */}
+      <Modal
+        isOpen={isProxyConfirmOpen}
+        onClose={() => setIsProxyConfirmOpen(false)}
+        title="开启访问代理"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800/30">
+            <ShieldCheck className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
+            <div className="space-y-2">
+              <p className="text-sm text-stone-700 dark:text-stone-300 font-medium">
+                开启后，以下访问将通过代理服务器转发：
+              </p>
+              <ul className="text-xs text-stone-600 dark:text-stone-400 space-y-1 ml-4 list-disc">
+                <li>JAV 搜索结果访问</li>
+                <li>动漫搜索结果访问</li>
+                <li>影视搜索结果访问</li>
+                <li>漫画搜索结果访问</li>
+                <li>我的收藏中的第三方链接</li>
+              </ul>
+            </div>
+          </div>
+          <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/30">
+            <p className="text-xs text-violet-700 dark:text-violet-300">
+              <strong>代理访问密钥：</strong>
+              <code className="ml-2 px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-800/50 font-mono">pp520</code>
+            </p>
+          </div>
+          <p className="text-xs text-stone-500 dark:text-stone-400 text-center">
+            旨在解决网络限制导致的第三方网站访问失败问题
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setIsProxyConfirmOpen(false)}
+              className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              onClick={() => {
+                setIsProxyConfirmOpen(false);
+                toggleProxy();
+              }}
+              className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-md shadow-amber-500/25 transition-all"
+            >
+              确认开启
+            </button>
+          </div>
         </div>
       </Modal>
     </>

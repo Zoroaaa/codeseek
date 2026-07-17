@@ -184,8 +184,14 @@ export const MainSearchPage: React.FC = () => {
               const commonProps = {
                 isDark: darkMode,
                 isAuthenticated,
+                isProxyEnabled,
                 favorites: favoritesManager.favorites,
                 onLoginRequired: () => navigate('/login'),
+              };
+              const getToggleFavorite = () => {
+                if (resultType === 'anime') return favoritesManager.handleToggleFavoriteAnime;
+                if (resultType === 'manga') return favoritesManager.handleToggleFavoriteManga;
+                return favoritesManager.handleToggleFavoriteMovie;
               };
               return (
                 <Panel
@@ -193,7 +199,7 @@ export const MainSearchPage: React.FC = () => {
                   {...commonProps}
                   onRefresh={() => searchFlow.handleSearch(searchFlow.keyword, searchFlow.enrichedPage)}
                   onPageChange={(p: number) => searchFlow.handleSearch(searchFlow.keyword, p)}
-                  onToggleFavorite={resultType === 'anime' ? favoritesManager.handleToggleFavoriteAnime : favoritesManager.handleToggleFavoriteMovie}
+                  onToggleFavorite={getToggleFavorite()}
                 />
               );
             }

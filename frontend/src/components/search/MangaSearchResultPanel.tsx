@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { BookOpen, ExternalLink, Heart, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, ExternalLink, Heart, RefreshCw, ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
 import type { FavoriteItem } from '@/types';
 import { getProxyImageUrl } from '@/utils/imageProxy';
+import { ShareToCommunityButton } from '@/components/community';
+import { convertToProxyUrl } from '@/services/proxy';
 
 interface MangaItem {
   id: string;
@@ -24,13 +26,14 @@ const statusColor = (s: string) => s === 'ongoing'
   ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
   : 'bg-stone-100 text-stone-500 dark:bg-stone-700/40 dark:text-stone-400';
 
-function MangaCard({ item, isAuthenticated, isFavorited, onToggleFavorite }: {
-  item: MangaItem; isAuthenticated: boolean; isFavorited: boolean; onToggleFavorite: (item: MangaItem) => void;
+function MangaCard({ item, isAuthenticated, isFavorited, onToggleFavorite, isProxyEnabled }: {
+  item: MangaItem; isAuthenticated: boolean; isFavorited: boolean; onToggleFavorite: (item: MangaItem) => void; isProxyEnabled: boolean;
 }) {
+  const mangaUrl = `https://mangadex.org/title/${item.id}`;
   return (
     <div className="group flex gap-4 p-4 rounded-xl border border-stone-200 dark:border-stone-700/50 bg-white dark:bg-stone-800/40 hover:border-violet-500/50 hover:bg-stone-50 dark:hover:bg-stone-800/70 transition-all">
       {item.cover && (
-        <a href={`https://mangadex.org/title/${item.id}`} target="_blank" rel="noopener noreferrer" className="shrink-0">
+        <a href={isProxyEnabled ? convertToProxyUrl(mangaUrl) : mangaUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
           <img src={getProxyImageUrl(item.cover)} alt={item.title}
             className="w-20 sm:w-24 h-[120px] sm:h-[140px] object-cover rounded-lg bg-stone-200 dark:bg-stone-700 shadow-md"
             loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -39,9 +42,16 @@ function MangaCard({ item, isAuthenticated, isFavorited, onToggleFavorite }: {
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <span className={`inline-block px-1.5 py-0.5 text-[9px] font-bold rounded mb-1 ${statusColor(item.status)}`}>
-              {statusLabel(item.status)}
-            </span>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className={`inline-block px-1.5 py-0.5 text-[9px] font-bold rounded ${statusColor(item.status)}`}>
+                {statusLabel(item.status)}
+              </span>
+              {isProxyEnabled && (
+                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <ShieldCheck className="w-3 h-3" />代理
+                </span>
+              )}
+            </div>
             <h3 className="font-semibold text-sm text-stone-900 dark:text-stone-100 leading-snug line-clamp-2 group-hover:text-violet-500 transition-colors">
               {item.title}
             </h3>
@@ -54,8 +64,12 @@ function MangaCard({ item, isAuthenticated, isFavorited, onToggleFavorite }: {
                 <Heart className={`w-3.5 h-3.5 ${isFavorited ? 'fill-current' : ''}`} />
               </button>
             )}
-            <a href={`https://mangadex.org/title/${item.id}`} target="_blank" rel="noopener noreferrer"
-              className="p-1.5 rounded-lg text-stone-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors">
+            <a href={isProxyEnabled ? convertToProxyUrl(mangaUrl) : mangaUrl} target="_blank" rel="noopener noreferrer"
+              className={`p-1.5 rounded-lg transition-all ${
+                isProxyEnabled
+                  ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                  : 'text-stone-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20'
+              }`}>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
@@ -75,14 +89,16 @@ function MangaCard({ item, isAuthenticated, isFavorited, onToggleFavorite }: {
 interface MangaSearchResultPanelProps {
   data: MangaEnrichedData;
   isAuthenticated?: boolean;
+  isProxyEnabled?: boolean;
   favorites?: FavoriteItem[];
   onRefresh?: () => void;
   onPageChange?: (page: number) => void;
   onToggleFavorite?: (item: MangaItem) => void;
+  onLoginRequired?: () => void;
 }
 
 export const MangaSearchResultPanel: React.FC<MangaSearchResultPanelProps> = ({
-  data, isAuthenticated = false, favorites = [], onRefresh, onPageChange, onToggleFavorite,
+  data, isAuthenticated = false, isProxyEnabled = false, favorites = [], onRefresh, onPageChange, onToggleFavorite, onLoginRequired,
 }) => {
   const [localPage, setLocalPage] = useState(1);
   const PAGE_SIZE = 10;
@@ -96,11 +112,27 @@ export const MangaSearchResultPanel: React.FC<MangaSearchResultPanelProps> = ({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs text-stone-500">共 {data.total} 条结果</span>
-        {onRefresh && (
-          <button onClick={onRefresh} className="p-1.5 rounded-lg text-stone-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors" title="刷新">
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <ShareToCommunityButton
+            postData={{
+              postType: 'manga',
+              title: data.manga[0]?.title || data.keyword,
+              coverImage: data.manga[0]?.cover ? getProxyImageUrl(data.manga[0].cover) : '',
+              contentData: JSON.stringify({
+                keyword: data.keyword,
+                manga: data.manga,
+              }),
+            }}
+            isAuthenticated={isAuthenticated}
+            onLoginRequired={onLoginRequired}
+            size="small"
+          />
+          {onRefresh && (
+            <button onClick={onRefresh} className="p-1.5 rounded-lg text-stone-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors" title="刷新">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {hasError && (
@@ -119,7 +151,8 @@ export const MangaSearchResultPanel: React.FC<MangaSearchResultPanelProps> = ({
           {paged.map(item => (
             <MangaCard key={item.id} item={item} isAuthenticated={isAuthenticated}
               isFavorited={isFavorited(item.id)}
-              onToggleFavorite={(m) => onToggleFavorite?.(m)} />
+              onToggleFavorite={(m) => onToggleFavorite?.(m)}
+              isProxyEnabled={isProxyEnabled} />
           ))}
         </div>
       )}
