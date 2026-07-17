@@ -16,7 +16,8 @@ INSERT OR REPLACE INTO search_major_categories (
 ) VALUES
     ('jav_sources', '🔍 JAV搜索', 'JAV番号、在线播放、磁力资源等', '🔍', '#3b82f6', 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
     ('anime_sources', '🎌 动漫搜索', '动漫、番剧、漫画相关搜索源', '🎌', '#8b82f6', 2, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-    ('movie_sources', '🎥 影视搜索', '电影、电视剧、综艺节目相关搜索源', '🎥', '#3b82f6', 3, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+    ('movie_sources', '🎥 影视搜索', '电影、电视剧、综艺节目相关搜索源', '🎥', '#3b82f6', 3, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('manga_sources', '📖 漫画搜索', '漫画、条漫相关搜索源', '📖', '#a855f7', 4, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- ===============================================
 -- 2. 搜索源分类初始化数据
@@ -130,18 +131,7 @@ INSERT OR REPLACE INTO search_sources (
     ('sex8cc', 'community', 'Sex8.cc', '杏吧论坛', '大型成人社区论坛', '🍑', 'https://sex8.cc', 'https://sex8.cc', 'browse', 0, 99, 1, 1, 36, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
 
 -- ===============================================
--- 7. 动漫/影视搜索大类
--- ===============================================
-
-INSERT OR REPLACE INTO search_major_categories (
-    id, name, description, icon, color,
-    display_order, is_system, is_active, created_at, updated_at
-) VALUES
-('anime_sources', '🎌 动漫搜索', '动漫、番剧、漫画相关搜索源', '🎌', '#8b82f6', 2, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
-('movie_sources', '🎥 影视搜索', '电影、电视剧、综艺节目相关搜索源', '🎥', '#3b82f6', 3, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
-
--- ===============================================
--- 8. 动漫搜索分类（4个子分类）
+-- 7. 动漫搜索分类（4个子分类）
 -- ===============================================
 
 INSERT OR REPLACE INTO search_source_categories (
@@ -288,3 +278,48 @@ INSERT OR REPLACE INTO search_sources (
 ('putlocker', 'movie_streaming', 'Putlocker', '免费影视流媒体', '知名的免费在线影视观看平台', '🎥', 'https://putlockers.name/search/{keyword}', 'https://putlockers.name', 'search', 1, 6, 1, 1, 6, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('fmovies', 'movie_streaming', 'FMovies', '免费电影电视剧站', '提供大量免费电影和电视剧在线观看', '🎬', 'https://fmovies.to/movie/search.html?keyword={keyword}', 'https://fmovies.to', 'search', 1, 7, 1, 1, 7, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
 ('solarmovie', 'movie_streaming', 'SolarMovie', '高清影视在线观看', '高清画质的免费影视在线观看平台', '☀️', 'https://solarmovie.pe/search/{keyword}', 'https://solarmovie.pe', 'search', 1, 8, 1, 1, 8, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+
+-- ===============================================
+-- 17. 漫画搜索分类（2个子分类）
+-- ===============================================
+
+INSERT OR REPLACE INTO search_source_categories (
+    id, major_category_id, name, description, icon, color, display_order,
+    is_system, is_active, default_searchable, default_site_type, search_priority,
+    created_at, updated_at
+) VALUES
+    ('manga_database', 'manga_sources', '📚 漫画资料站', 'MangaDex、AniList等漫画资料站点', '📚', '#a855f7', 1, 1, 1, 1, 'search', 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('manga_resources', 'manga_sources', '📖 漫画资源', '在线漫画阅读和下载站点', '📖', '#7c3aed', 2, 1, 1, 1, 'search', 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+
+-- ===============================================
+-- 18. 漫画搜索源 - 漫画资料站
+-- ===============================================
+
+INSERT OR REPLACE INTO search_sources (
+    id, category_id, name, subtitle, description, icon, url_template, homepage_url,
+    site_type, searchable, search_priority, is_system, is_active,
+    display_order, created_at, updated_at
+) VALUES
+    ('mangadex', 'manga_database', 'MangaDex', '开源漫画聚合平台', '全球最大的开源漫画聚合阅读平台，支持多语言', '📖', 'https://mangadex.org/titles?q={keyword}', 'https://mangadex.org', 'search', 1, 1, 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('anilist_manga', 'manga_database', 'AniList Manga', '现代UI设计，API友好', '现代化的动漫追踪平台的漫画频道，提供精美的界面和强大的API支持', '📋', 'https://anilist.co/search/manga?sort=SEARCH_MATCH&search={keyword}', 'https://anilist.co', 'search', 1, 2, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('kitsu_manga', 'manga_database', 'Kitsu Manga', '开源漫画追踪平台', '开源的动漫和 manga 追踪平台，支持多种集成', '🦊', 'https://kitsu.io/manga?text={keyword}', 'https://kitsu.io', 'search', 1, 3, 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('myanimelist_manga', 'manga_database', 'MyAnimeList Manga', '全球最大动漫资料站漫画频道', '全球最大的动漫社交网络和数据库的漫画板块', '🌟', 'https://myanimelist.net/manga.php?q={keyword}', 'https://myanimelist.net', 'search', 1, 4, 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('mangaupdates', 'manga_database', 'MangaUpdates', '漫画更新追踪站', '专注于漫画更新信息和发行追踪的数据库', '📡', 'https://www.mangaupdates.com/series.html?search={keyword}', 'https://www.mangaupdates.com', 'search', 1, 5, 1, 1, 5, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);
+
+-- ===============================================
+-- 19. 漫画搜索源 - 漫画资源
+-- ===============================================
+
+INSERT OR REPLACE INTO search_sources (
+    id, category_id, name, subtitle, description, icon, url_template, homepage_url,
+    site_type, searchable, search_priority, is_system, is_active,
+    display_order, created_at, updated_at
+) VALUES
+    ('manganelo', 'manga_resources', 'MangaNelo', '热门漫画阅读站', '知名的漫画在线阅读网站，资源丰富更新快', '📚', 'https://manganelo.com/search/story/{keyword}', 'https://manganelo.com', 'search', 1, 1, 1, 1, 1, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('mangakakalot', 'manga_resources', 'MangaKakalot', '免费漫画阅读平台', '大型免费漫画阅读网站，收录大量漫画作品', '📖', 'https://mangakakalot.com/search_result/?keyw={keyword}', 'https://mangakakalot.com', 'search', 1, 2, 1, 1, 2, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('bilibili_comic', 'manga_resources', '哔哩哔哩漫画', 'B站官方漫画平台', '哔哩哔哩旗下的正版漫画阅读平台', '📱', 'https://manga.bilibili.com/search-result?word={keyword}', 'https://manga.bilibili.com', 'search', 1, 3, 1, 1, 3, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('dmzj', 'manga_resources', '动漫之家', '老牌中文漫画站', '历史悠久的中文漫画资讯和阅读平台', '🏠', 'https://so.dmzj.com/keywords/{keyword}.html', 'https://www.dmzj.com', 'search', 1, 4, 1, 1, 4, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('manhuagui', 'manga_resources', '漫画柜', '中文漫画在线阅读', '中文漫画在线阅读网站，资源丰富分类清晰', '🗄️', 'https://www.manhuagui.com/soso.html?keyword={keyword}', 'https://www.manhuagui.com', 'search', 1, 5, 1, 1, 5, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('mangafire', 'manga_resources', 'MangaFire', '现代UI漫画阅读站', '界面现代化的漫画阅读平台，体验流畅', '🔥', 'https://mangafire.to/search?q={keyword}', 'https://mangafire.to', 'search', 1, 6, 1, 1, 6, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('mangasee', 'manga_resources', 'MangaSee', '高清漫画阅读站', '专注于提供高清画质漫画的在线阅读平台', '👁️', 'https://mangasee123.com/search/?name={keyword}', 'https://mangasee123.com', 'search', 1, 7, 1, 1, 7, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000),
+    ('comicwalker', 'manga_resources', 'ComicWalker', '角川官方漫画站', 'KADOKAWA旗下的免费漫画阅读平台', '🎴', 'https://comic-walker.com/search/?word={keyword}', 'https://comic-walker.com', 'search', 1, 8, 1, 1, 8, strftime('%s', 'now') * 1000, strftime('%s', 'now') * 1000);

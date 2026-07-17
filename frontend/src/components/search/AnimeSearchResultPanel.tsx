@@ -12,19 +12,9 @@ import type {
   ShowRssItem,
 } from '@/types/search';
 import type { FavoriteItem } from '@/types';
-import { API_BASE_URL } from '@/constants';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { ShareToCommunityButton } from '@/components/community';
-
-// ─── 图片代理（与 JAV 统一走后端 /api/jav/proxy-image）─────────────
-const getProxyImageUrl = (url: string): string => {
-  const isLocal = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  );
-  // 复用 API_BASE_URL 常量，避免硬编码部署地址
-  const baseUrl = isLocal ? '' : API_BASE_URL.PRODUCTION.replace('/api', '');
-  return `${baseUrl}/api/jav/proxy-image?url=${encodeURIComponent(url)}`;
-};
+import { getProxyImageUrl } from '@/utils/imageProxy';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 

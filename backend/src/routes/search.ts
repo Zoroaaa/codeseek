@@ -123,6 +123,28 @@ async function saveEnrichedHistory(
       }
       break;
     }
+    case 'manga': {
+      // 漫画：提取首条 MangaDex 结果 → title + cover + code(manga:id) + status + tags
+      const manga = (result as { manga?: Array<{ id: string; title: string; cover: string; status?: string; tags?: string[] }> }).manga;
+      const firstManga = manga?.[0];
+      if (firstManga) {
+        updateFields.push('title=?, cover=?, code=?');
+        updateValues.push(
+          firstManga.title,
+          firstManga.cover,
+          `manga:${firstManga.id}`
+        );
+        if (firstManga.status) {
+          updateFields.push('status=?');
+          updateValues.push(firstManga.status);
+        }
+        if (firstManga.tags?.length) {
+          updateFields.push('tags=?');
+          updateValues.push(firstManga.tags.join(','));
+        }
+      }
+      break;
+    }
   }
 
   if (updateFields.length > 0) {

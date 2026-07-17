@@ -20,9 +20,9 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuthStore, useThemeStore, useProxyStore } from '@/stores';
-import type { SearchTabType } from '@/stores/sourceStore';
+import type { SearchTabType } from '@/types/source';
 import { DropdownMenu, userMenuItems, Modal } from '@/components/ui';
-import { SEARCH_TABS } from '@/config/tabs';
+import { SEARCH_TABS, PINNED_TABS, OVERFLOW_TABS } from '@/config/tabs';
 
 /* ── 类型定义 ── */
 
@@ -302,6 +302,7 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
   const { resolvedTheme, toggleTheme } = useThemeStore();
   const { isEnabled: isProxyEnabled, status: proxyStatus, isLoading: isProxyLoading, toggleProxy } = useProxyStore();
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
 
   const getProxyButtonClass = () => {
     if (isProxyEnabled) return 'proxy-toggle-btn enabled';
@@ -337,14 +338,36 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
               {/* Tab 切换器 - 桌面端显示，登录后可见 */}
               {isAuthenticated && (
               <nav role="tablist" className="hidden md:flex items-center gap-1">
-                {Object.entries(SEARCH_TABS).map(([key, tab]) => (
+                {PINNED_TABS.map((tab) => (
                   <TabButton
-                    key={key}
-                    tab={tab}
-                    isActive={activeTab === key}
-                    onClick={() => handleTabChange(key)}
+                    key={tab.id}
+                    tab={tab as (typeof SEARCH_TABS)[SearchTabType]}
+                    isActive={activeTab === tab.id}
+                    onClick={() => handleTabChange(tab.id)}
                   />
                 ))}
+                {OVERFLOW_TABS.length > 0 && (
+                  <DropdownMenu
+                    trigger={
+                      <button className={clsx(
+                        'px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-1',
+                        OVERFLOW_TABS.some(t => t.id === activeTab)
+                          ? 'text-white shadow-md bg-gradient-to-br from-stone-500 to-stone-600'
+                          : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+                      )}>
+                        <span>更多</span><ChevronDown className="w-3.5 h-3.5" />
+                      </button>
+                    }
+                    items={OVERFLOW_TABS.map(tab => ({
+                      id: tab.id,
+                      label: tab.label,
+                      icon: <span>{tab.icon}</span>,
+                      onClick: () => handleTabChange(tab.id),
+                    }))}
+                    triggerMode="click"
+                    align="left"
+                  />
+                )}
               </nav>
               )}
             </div>
@@ -436,14 +459,28 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
         aria-label="主导航"
       >
         <div className="flex items-stretch justify-between h-14 max-w-lg mx-auto">
-          {Object.entries(SEARCH_TABS).map(([key, tab]) => (
+          {PINNED_TABS.map((tab) => (
             <MobileTab
-              key={key}
-              tab={tab}
-              isActive={activeTab === key}
-              onClick={() => handleTabChange(key)}
+              key={tab.id}
+              tab={tab as (typeof SEARCH_TABS)[SearchTabType]}
+              isActive={activeTab === tab.id}
+              onClick={() => handleTabChange(tab.id)}
             />
           ))}
+          {OVERFLOW_TABS.length > 0 && (
+            <button
+              onClick={() => setIsMoreSheetOpen(true)}
+              className={clsx(
+                'flex flex-col items-center justify-center py-1.5 px-2 flex-1 transition-all duration-200',
+                OVERFLOW_TABS.some(t => t.id === activeTab)
+                  ? 'text-amber-700 dark:text-amber-400 scale-105'
+                  : 'text-stone-500 dark:text-stone-400'
+              )}
+            >
+              <span className="text-lg sm:text-xl">⋯</span>
+              <span className="text-[10px] xs:text-xs mt-0.5 font-medium">更多</span>
+            </button>
+          )}
         </div>
       </nav>
       )}
@@ -481,6 +518,35 @@ export const UnifiedNavBar: React.FC<UnifiedNavBarProps> = memo(({
           <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-xs">
             提示：输入 JAV 畗号格式（如 SONE-520）会自动触发详情提取
           </div>
+        </div>
+      </Modal>
+
+      {/* ── 移动端"更多"Modal ── */}
+      <Modal
+        isOpen={isMoreSheetOpen}
+        onClose={() => setIsMoreSheetOpen(false)}
+        title="更多"
+        size="md"
+      >
+        <div className="grid grid-cols-2 gap-3">
+          {OVERFLOW_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                handleTabChange(tab.id);
+                setIsMoreSheetOpen(false);
+              }}
+              className={clsx(
+                'flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-200',
+                activeTab === tab.id
+                  ? 'border-amber-500/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                  : 'border-stone-200 dark:border-stone-700 hover:border-stone-300 dark:hover:border-stone-600 hover:bg-stone-50 dark:hover:bg-stone-800/50 text-stone-600 dark:text-stone-400'
+              )}
+            >
+              <span className="text-2xl mb-2">{tab.icon}</span>
+              <span className="text-sm font-medium">{tab.label}</span>
+            </button>
+          ))}
         </div>
       </Modal>
     </>
