@@ -34,7 +34,6 @@ const CONTENT_H = HIST_PANEL_HEIGHT - HIST_HEADER_HEIGHT - 36;
 
 function groupByDay(items: SearchHistoryItem[]): Map<string, SearchHistoryItem[]> {
   const groups = new Map<string, SearchHistoryItem[]>();
-  const now = Date.now();
   const todayStart = new Date(new Date().toLocaleDateString()).getTime();
   const yesterdayStart = todayStart - 86400000;
 
@@ -73,7 +72,7 @@ export const SearchHistoryPanel: React.FC<SearchHistoryPanelProps> = ({
 
   const groupedHistory = useMemo(() => groupByDay(history), [history]);
 
-  const toggleSelectAll = (dayKey: string, items: SearchHistoryItem[]) => {
+  const toggleSelectAll = (_dayKey: string, items: SearchHistoryItem[]) => {
     const allSelected = items.every(item => selectedIds.has(item.id));
     const newSet = new Set(selectedIds);
     if (allSelected) {
