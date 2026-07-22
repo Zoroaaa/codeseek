@@ -47,7 +47,7 @@ const LogoSection: React.FC = memo(() => (
     <div className="relative w-9 h-9 sm:w-10 sm:h-10">
       <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#d4a853] to-[#f59e0b] opacity-0 group-hover:opacity-20 blur-lg transition-all duration-300" />
       <img
-        src="/logo.png"
+        src="/logo.svg"
         alt="Atlas"
         className="relative w-full h-full rounded-xl shadow-lg object-cover"
       />
