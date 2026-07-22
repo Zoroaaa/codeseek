@@ -184,8 +184,9 @@ export const MainSearchPage: React.FC = () => {
           </div>
           {/* JAV 子模式提示 */}
           {activeTab === 'jav' && (
-            <>
-              {javSubMode === 'code' && searchFlow.keyword.trim().length > 0 && !searchFlow.javFormatValid && (
+            <div className="relative z-10">
+              {/* 番号格式错误提示：仅在输入框未聚焦时显示，避免与搜索建议冲突 */}
+              {javSubMode === 'code' && !isInputFocused && searchFlow.keyword.trim().length > 0 && !searchFlow.javFormatValid && (
                 <p className="text-xs text-red-400 mt-2 ml-1">格式請按照【SONE-520】或【SONE520】搜尋</p>
               )}
               {javSubMode === 'actress' && (
@@ -194,7 +195,7 @@ export const MainSearchPage: React.FC = () => {
               {javSubMode === 'title' && (
                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-2 ml-1">提示：請嘗試縮短字數，並優先使用【日文】搜尋</p>
               )}
-            </>
+            </div>
           )}
           {searchFlow.searchableCategories.length > 0 && activeTab === 'jav' && (
             <div className="category-filter-wrapper">
