@@ -38,6 +38,19 @@ async function generateIcons() {
     console.log(`✓ 生成图标: icon-${size}x${size}.png`);
   }
 
+  // Favicon PNG sizes for browsers and search engines
+  for (const size of [16, 32]) {
+    const outputPath = join(publicDir, `favicon-${size}x${size}.png`);
+    await sharp(logoPath)
+      .resize(size, size, {
+        fit: 'contain',
+        background: { r: 10, g: 10, b: 11, alpha: 1 }
+      })
+      .png()
+      .toFile(outputPath);
+    console.log(`✓ 生成 favicon: favicon-${size}x${size}.png`);
+  }
+
   await sharp(logoPath)
     .resize(180, 180, {
       fit: 'contain',
