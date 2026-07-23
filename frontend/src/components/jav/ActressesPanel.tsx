@@ -40,7 +40,7 @@ const CodeGrid: React.FC<{ items: JavItem[]; onCodeClick: (c: string) => void }>
     );
   }
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 content-start">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 content-start">
       {items.map((item, i) => (
         <button
           key={`${item.code}-${i}`}
@@ -72,7 +72,7 @@ const StarModal: React.FC<StarModalProps> = ({ actress, onClose, onCodeClick }) 
   }, [actress.key, fetch]);
 
   return (
-    <Modal isOpen={true} onClose={onClose} title={`${actress.name} 的作品`} size="md">
+    <Modal isOpen={true} onClose={onClose} title={`${actress.name} 的作品`} size="lg">
       {status === 'loading' && (
         <div className="flex flex-col items-center justify-center py-12 gap-3 text-surface-400">
           <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
