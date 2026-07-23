@@ -217,6 +217,17 @@ const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
               </div>
             </div>
 
+            <div className="flex items-start gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+              <Shield className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div className="text-sm text-emerald-900 dark:text-emerald-100">
+                <p className="font-medium mb-1">推荐使用 PikPak 播放</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-200 leading-relaxed">
+                  通过 Google Play 商店下载 PikPak，复制磁力链接后可直接解析播放，体验更流畅。
+                  <span className="text-emerald-600 dark:text-emerald-300">（免费用户存储空间 6GB）</span>
+                </p>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <label className="text-xs font-medium text-surface-500 dark:text-surface-400">
                 磁力链接
