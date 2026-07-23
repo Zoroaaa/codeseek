@@ -3,7 +3,7 @@ import {
   Magnet, Film, Calendar, Clock, User, Building2,
   Tag, Star, ExternalLink, Copy, Check, Loader2,
   AlertCircle, Search, ChevronDown, ChevronUp, X,
-  Shield, Play, FileDown, Tv, Heart,
+  Shield, Play, FileDown, Heart, ExternalLink as ExternalLinkIcon,
 } from 'lucide-react';
 import type { JavDetail, MagnetItem } from '@/types';
 import {
@@ -11,7 +11,7 @@ import {
   getWebtorUrl,
   copyToClipboard,
 } from '@/utils/magnet';
-import { ProxyImage } from '@/components/ui';
+import { ProxyImage, Modal } from '@/components/ui';
 import { ShareToCommunityButton } from '@/components/community';
 import { getProxyImageUrl } from '@/utils/imageProxy';
 
@@ -109,11 +109,22 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
 
 const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
   const [showAll, setShowAll] = useState(false);
+  const [playModal, setPlayModal] = useState<{ magnet: string; name: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const displayed = showAll ? magnets : magnets.slice(0, 5);
 
-  const openExternal = useCallback((url: string) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const handleCopyMagnet = useCallback(async (magnet: string) => {
+    const ok = await copyToClipboard(magnet);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, []);
+
+  const handleOpenWebtor = useCallback((magnet: string) => {
+    window.open(getWebtorUrl(magnet), '_blank', 'noopener,noreferrer');
+    setPlayModal(null);
   }, []);
 
   if (magnets.length === 0) {
@@ -159,7 +170,7 @@ const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
             <div className="flex justify-end items-center gap-0.5">
               {/* 在线播放（WebTor） */}
               <button
-                onClick={() => openExternal(getWebtorUrl(m.magnet))}
+                onClick={() => setPlayModal({ magnet: m.magnet, name: m.name })}
                 title="WebTor 在线播放"
                 className="p-1 rounded transition-all text-surface-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
               >
@@ -186,6 +197,63 @@ const MagnetList: React.FC<{ magnets: MagnetItem[] }> = ({ magnets }) => {
             : <><ChevronDown className="w-3.5 h-3.5" />展开全部（共 {magnets.length} 条）</>}
         </button>
       )}
+
+      {/* WebTor 播放提示弹窗 */}
+      <Modal
+        isOpen={!!playModal}
+        onClose={() => setPlayModal(null)}
+        title="在线播放提示"
+        size="sm"
+      >
+        {playModal && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-sm text-amber-900 dark:text-amber-100">
+                <p className="font-medium mb-1">即将跳转至第三方网站 WebTor</p>
+                <p className="text-xs text-amber-700 dark:text-amber-200">
+                  请先复制磁力链接，在 WebTor 中粘贴后搜索播放
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-surface-500 dark:text-surface-400">
+                磁力链接
+              </label>
+              <div className="p-2 bg-surface-100 dark:bg-surface-900 rounded text-xs text-surface-600 dark:text-surface-300 break-all font-mono max-h-20 overflow-y-auto">
+                {playModal.magnet}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleCopyMagnet(playModal.magnet)}
+                className="flex-1 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    已复制
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    复制磁力链接
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => handleOpenWebtor(playModal.magnet)}
+                className="flex-1 px-4 py-2.5 bg-surface-200 dark:bg-surface-700 hover:bg-surface-300 dark:hover:bg-surface-600 text-surface-700 dark:text-surface-200 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <ExternalLinkIcon className="w-4 h-4" />
+                前往 WebTor
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
