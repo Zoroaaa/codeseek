@@ -372,7 +372,10 @@ searchRoutes.get('/suggestions', async (c) => {
           count: 0, // Provider suggestions 不提供计数
           ...(item.meta || {}),
         }));
-        return c.json(success(mapped));
+        // 只有非空结果才直接返回，空结果继续 fallback 到数据库历史
+        if (mapped.length > 0) {
+          return c.json(success(mapped));
+        }
       } catch (err) {
         console.error(`[Provider:${provider.id}] suggestions error:`, err);
         // fallback 到通用模式
@@ -442,7 +445,10 @@ searchRoutes.get('/trending', async (c) => {
           ...(item.cover ? { cover: item.cover } : {}),
           ...(item.subtitle ? { subtitle: item.subtitle } : {}),
         }));
-        return c.json(success(mapped));
+        // 只有非空结果才直接返回，空结果继续 fallback 到数据库历史
+        if (mapped.length > 0) {
+          return c.json(success(mapped));
+        }
       } catch (err) {
         console.error(`[Provider:${provider.id}] trending error:`, err);
         // fallback 到通用模式
