@@ -117,7 +117,7 @@ export const MainSearchPage: React.FC = () => {
         </div>
 
         {activeTab !== 'sources' && (
-        <div className="bg-white dark:bg-[#111113]/80 rounded-2xl shadow-xl shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 p-3 sm:p-5 mb-4 sm:mb-6 backdrop-blur-sm animate-slide-up relative overflow-visible">
+        <div className="bg-white dark:bg-[#111113]/80 rounded-2xl shadow-xl shadow-surface-900/5 border border-surface-200/60 dark:border-surface-700/60 p-3 sm:p-5 mb-4 sm:mb-6 backdrop-blur-sm animate-slide-up relative z-30 overflow-visible">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-accent-500 to-amber-500"></div>
           {/* JAV 子搜索模式切换 */}
           {activeTab === 'jav' && (
