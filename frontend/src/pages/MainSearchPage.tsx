@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Loader2, Filter } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { useAuthStore, useSourceStore, useProxyStore } from '@/stores';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { SearchTabType, JavSubMode } from '@/types/source';
@@ -28,7 +28,6 @@ export const MainSearchPage: React.FC = () => {
 
   const javFlow = useJavSearchFlow();
   const sourceManager = useSourceManager();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [javSubMode, setJavSubMode] = useState<JavSubMode>('code');
 
   // ── URL 同步：搜索时更新 URL ──
@@ -40,10 +39,6 @@ export const MainSearchPage: React.FC = () => {
 
   const searchFlow = useSearchFlow({
     activeTab,
-    selectedCategory,
-    setSelectedCategory,
-    majorCategories: sourceManager.majorCategories,
-    categories: sourceManager.categories,
     fetchJavDetail: javFlow.fetchJavDetail,
     resetJavDetail: javFlow.resetJavDetail,
     javEnrichedDetail: javFlow.javEnrichedDetail,
@@ -99,7 +94,6 @@ export const MainSearchPage: React.FC = () => {
     if (searchFlow.keyword.trim()) params.q = searchFlow.keyword.trim();
     programmaticUrlRef.current = true;
     setSearchParams(params, { replace: true });
-    setSelectedCategory(null);
     searchFlow.resetResults();
   }, [setActiveTab, setSearchParams, navigate, searchFlow.keyword, searchFlow.resetResults]);
 
@@ -197,22 +191,7 @@ export const MainSearchPage: React.FC = () => {
               )}
             </div>
           )}
-          {searchFlow.searchableCategories.length > 0 && activeTab === 'jav' && (
-            <div className="category-filter-wrapper">
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Filter className="w-3.5 h-3.5 text-surface-400" />
-                <span className="text-xs text-surface-400 font-medium hidden sm:inline">分类</span>
-              </div>
-              <div className="flex items-center gap-1.5 flex-nowrap">
-                <button onClick={() => searchFlow.setSelectedCategory(null)} className={`category-filter-btn ${selectedCategory === null ? 'active' : ''}`}>全部</button>
-                {searchFlow.searchableCategories.map((category) => (
-                  <button key={category.id} onClick={() => searchFlow.setSelectedCategory(category.id)} className={`category-filter-btn ${selectedCategory === category.id ? 'active' : ''}`}>
-                    {category.icon && <span className="mr-1">{category.icon}</span>}{category.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
         )}
 

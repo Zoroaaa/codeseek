@@ -171,7 +171,7 @@ searchRoutes.post('/', async (c) => {
   }
 
   const body = await c.req.json();
-  const { keyword, page = 1, pageSize = 20, majorCategoryId, categoryId } = body;
+  const { keyword, page = 1, pageSize = 20, majorCategoryId } = body;
 
   if (!keyword || !keyword.trim()) {
     return c.json(error('VALIDATION_ERROR', '搜索关键词不能为空'), 400);
@@ -190,7 +190,7 @@ searchRoutes.post('/', async (c) => {
       await c.env.DB.prepare(
         `INSERT INTO user_search_history (id, user_id, query, source, results_count, created_at, keyword)
          VALUES (?, ?, ?, ?, 0, ?, ?)`
-      ).bind(historyId, userPayload.userId, trimmedKeyword, categoryId || majorCategoryId || 'all', Date.now(), trimmedKeyword).run();
+      ).bind(historyId, userPayload.userId, trimmedKeyword, majorCategoryId || 'all', Date.now(), trimmedKeyword).run();
     }
 
     let userEnabledSources: Set<string> | null = null;
@@ -206,17 +206,8 @@ searchRoutes.post('/', async (c) => {
     }
 
     // ── Provider 分发模式：通过 Registry 查找匹配的搜索引擎 ──
-    let actualMajorCategoryId: string | undefined = majorCategoryId;
-
-    if (!actualMajorCategoryId && categoryId) {
-      const catRow = await c.env.DB.prepare(
-        'SELECT major_category_id FROM search_source_categories WHERE id = ?'
-      ).bind(categoryId).first<{ major_category_id: string }>();
-      actualMajorCategoryId = catRow?.major_category_id;
-    }
-
-    if (actualMajorCategoryId) {
-      const provider = providerRegistry.getByCategory(actualMajorCategoryId);
+    if (majorCategoryId) {
+      const provider = providerRegistry.getByCategory(majorCategoryId);
       if (provider) {
         try {
           // 注入 TMDB API Key（供 MovieProvider 的 suggestions/trending 使用）
@@ -234,7 +225,7 @@ searchRoutes.post('/', async (c) => {
               WHERE s.is_active = 1 AND s.searchable = 1 AND c.major_category_id = ?
               AND (s.is_system = 1 OR s.created_by = ?)
               ORDER BY c.search_priority ASC, s.search_priority ASC, s.display_order ASC
-            `).bind(actualMajorCategoryId, userPayload?.userId || '').all<SearchSource>();
+            `).bind(majorCategoryId, userPayload?.userId || '').all<SearchSource>();
 
             const filteredSources = userEnabledSources
               ? (sources.results || []).filter(s => userEnabledSources.has(s.id))
@@ -284,16 +275,7 @@ searchRoutes.post('/', async (c) => {
     let query: string;
     let params: (string | number)[];
 
-    if (categoryId) {
-      query = `
-        SELECT s.* FROM search_sources s
-        INNER JOIN search_source_categories c ON s.category_id = c.id
-        WHERE s.is_active = 1 AND s.searchable = 1 AND c.default_searchable = 1 AND s.category_id = ?
-        AND (s.is_system = 1 OR s.created_by = ?)
-        ORDER BY c.search_priority ASC, s.search_priority ASC, s.display_order ASC
-      `;
-      params = [categoryId, userPayload?.userId || ''];
-    } else if (majorCategoryId) {
+    if (majorCategoryId) {
       query = `
         SELECT s.* FROM search_sources s
         INNER JOIN search_source_categories c ON s.category_id = c.id
@@ -361,14 +343,13 @@ searchRoutes.post('/', async (c) => {
 
 /**
  * 获取搜索建议
- * GET /api/search/suggestions?keyword=xxx&categoryId=xxx
- * 支持两种模式：
- *   - 带 categoryId 且对应 Provider 支持 suggestions → 走 Provider
- *   - 否则 fallback 到全局搜索历史统计
+ * GET /api/search/suggestions?keyword=xxx&source=xxx
+ * source 参数：按搜索源过滤历史（优先具体 source，同时兼容 'all'）
+ * Provider 模式：带 source 且对应 Provider 支持 suggestions → 走 Provider
  */
 searchRoutes.get('/suggestions', async (c) => {
   const keyword = c.req.query('keyword');
-  const categoryId = c.req.query('categoryId');
+  const source = c.req.query('source');
   const limit = Math.min(
     Math.max(1, parseInt(c.req.query('limit') || '10')),
     R.SUGGESTIONS.MAX_LIMIT
@@ -379,8 +360,8 @@ searchRoutes.get('/suggestions', async (c) => {
   }
 
   // ── Provider suggestions 模式 ──
-  if (categoryId) {
-    const provider = providerRegistry.getByCategory(categoryId);
+  if (source && source !== 'all') {
+    const provider = providerRegistry.getByCategory(source);
     if (provider?.suggestions) {
       try {
         setTmdbApiKey(c.env.TMDB_API_KEY ?? undefined);
@@ -408,14 +389,16 @@ searchRoutes.get('/suggestions', async (c) => {
     }
 
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+    // source 过滤：优先查具体 source，同时兼容 'all'
     const suggestions = await c.env.DB.prepare(
       `SELECT query as keyword, COUNT(*) as count
        FROM user_search_history
-       WHERE created_at > ? AND query LIKE ?
+       WHERE created_at > ? AND query LIKE ? AND (source = ? OR source = 'all')
        GROUP BY query
        ORDER BY count DESC
        LIMIT ?`
-    ).bind(thirtyDaysAgo, `${trimmedKeyword}%`, limit).all<{ keyword: string; count: number }>();
+    ).bind(thirtyDaysAgo, `${trimmedKeyword}%`, source || 'all', limit).all<{ keyword: string; count: number }>();
 
     // CDN 缓存 60 秒，减少重复前缀的请求压力
     c.header('Cache-Control', 'public, max-age=60');
@@ -428,13 +411,12 @@ searchRoutes.get('/suggestions', async (c) => {
 
 /**
  * 获取热门搜索关键词
- * GET /api/search/trending?categoryId=xxx
- * 支持两种模式：
- *   - 带 categoryId 且对应 Provider supports trending → 走 Provider
- *   - 否则 fallback 到全局搜索历史统计
+ * GET /api/search/trending?source=xxx
+ * Provider 模式：带 source 且对应 Provider 支持 trending → 走 Provider
+ * 否则 fallback 到全局搜索历史统计
  */
 searchRoutes.get('/trending', async (c) => {
-  const categoryId = c.req.query('categoryId');
+  const source = c.req.query('source');
   const hourInMs = 60 * 60 * 1000;
 
   const limit = Math.min(
@@ -447,8 +429,8 @@ searchRoutes.get('/trending', async (c) => {
   );
 
   // ── Provider trending 模式 ──
-  if (categoryId) {
-    const provider = providerRegistry.getByCategory(categoryId);
+  if (source && source !== 'all') {
+    const provider = providerRegistry.getByCategory(source);
     if (provider?.trending) {
       try {
         setTmdbApiKey(c.env.TMDB_API_KEY ?? undefined);
