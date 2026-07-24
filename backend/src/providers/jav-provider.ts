@@ -101,61 +101,6 @@ export class JavProvider implements SearchProvider {
       };
     }
   }
-
-  async suggestions(keyword: string): Promise<{ text: string; meta?: Record<string, unknown> }[]> {
-    try {
-      const upperKeyword = keyword.toUpperCase().trim();
-      if (!upperKeyword) return [];
-
-      // 从 JavBus 首页提取匹配的番号
-      const html = await get('https://www.javbus.com/', 10000);
-      if (!html) return [];
-
-      const codes: string[] = [];
-      const re = /<span[^>]*class="[^"]*id[^"]*"[^>]*>([A-Za-z0-9]+-\d+)<\/span>/gi;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(html)) !== null) {
-        const c = normalizeCode(m[1]);
-        if (c.startsWith(upperKeyword) || c.includes(upperKeyword)) {
-          if (codes.length < 10 && !codes.includes(c)) codes.push(c);
-        }
-      }
-      return codes.map(c => ({ text: c }));
-    } catch {
-      return [];
-    }
-  }
-
-  async trending(): Promise<{ keyword: string; count: number; cover?: string; subtitle?: string }[]> {
-    try {
-      const html = await get('https://www.javbus.com/', 10000);
-      if (!html) return [];
-
-      const items: { keyword: string; count: number; cover?: string; subtitle?: string }[] = [];
-      const re = /<a[^>]+class="movie-box"[^>]*>([\s\S]*?)<\/a>/gi;
-      let m: RegExpExecArray | null;
-
-      while ((m = re.exec(html)) !== null && items.length < 10) {
-        const block = m[1];
-        const codeM = block.match(/<span[^>]*class="[^"]*id[^"]*"[^>]*>([A-Za-z0-9]+-\d+)<\/span>/i);
-        if (!codeM) continue;
-
-        const code = normalizeCode(codeM[1]);
-        const titleM = block.match(/title="([^"]+)"/i);
-        const coverM = block.match(/<img[^>]+src="([^"]+)"/i);
-
-        items.push({
-          keyword: code,
-          count: 0,
-          subtitle: titleM ? titleM[1].slice(0, 30) : undefined,
-          cover: coverM ? coverM[1] : undefined,
-        });
-      }
-      return items;
-    } catch {
-      return [];
-    }
-  }
 }
 
 /** 导出单例 */
