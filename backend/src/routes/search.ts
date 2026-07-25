@@ -209,6 +209,21 @@ searchRoutes.post('/', async (c) => {
     if (majorCategoryId) {
       const provider = providerRegistry.getByCategory(majorCategoryId);
       if (provider) {
+        // ── Cache Layer: 缓存热门搜索结果 ──
+        const SEARCH_CACHE_TTL = 10 * 60; // 10 分钟
+        const cacheKey = new Request(`https://internal/search/${majorCategoryId}/${encodeURIComponent(trimmedKeyword)}?page=${limitPage}`);
+        const cache = caches.default;
+
+        const cached = await cache.match(cacheKey);
+        if (cached) {
+          return new Response(cached.body, {
+            headers: {
+              ...Object.fromEntries(cached.headers),
+              'X-Cache': 'HIT',
+            },
+          });
+        }
+
         try {
           // 注入 TMDB API Key（供 MovieProvider 的 suggestions/trending 使用）
           setTmdbApiKey(c.env.TMDB_API_KEY ?? undefined);
@@ -254,7 +269,18 @@ searchRoutes.post('/', async (c) => {
             }
           }
 
-          return c.json(success(enrichedData, '搜索完成'));
+          // ── Cache Layer: 缓存搜索结果 ──
+          const responseBody = JSON.stringify(success(enrichedData, '搜索完成'));
+          const newResponse = new Response(responseBody, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': `public, max-age=${SEARCH_CACHE_TTL}`,
+              'X-Cache': 'MISS',
+            },
+          });
+
+          c.executionCtx.waitUntil(cache.put(cacheKey, newResponse.clone()));
+          return newResponse;
         } catch (err) {
           console.error(`[Provider:${provider.id}] search error:`, err);
           // 搜索失败，删除已写入的历史记录
@@ -348,6 +374,15 @@ searchRoutes.post('/', async (c) => {
  * Provider 模式：带 source 且对应 Provider 支持 suggestions → 走 Provider
  */
 searchRoutes.get('/suggestions', async (c) => {
+  const userPayload = c.get('user');
+
+  // 速率限制：每用户每分钟最多 30 次（自动补全高频场景）
+  const rateLimitKey = userPayload ? `suggestions:${userPayload.userId}` : `suggestions:ip:${c.req.header('cf-connecting-ip') || 'unknown'}`;
+  const rl = checkRateLimit(rateLimitKey, 60_000, 30);
+  if (!rl.allowed) {
+    return c.json(error('RATE_LIMITED', '请求过于频繁，请稍后再试'), 429);
+  }
+
   const keyword = c.req.query('keyword');
   const source = c.req.query('source');
   const limit = Math.min(
@@ -363,6 +398,21 @@ searchRoutes.get('/suggestions', async (c) => {
   if (source && source !== 'all') {
     const provider = providerRegistry.getByCategory(source);
     if (provider?.suggestions) {
+      // ── Cache Layer: 缓存 Provider suggestions ──
+      const SUGGESTIONS_CACHE_TTL = 5 * 60; // 5 分钟
+      const cacheKey = new Request(`https://internal/suggestions/${source}/${encodeURIComponent(keyword)}`);
+      const cache = caches.default;
+
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        return new Response(cached.body, {
+          headers: {
+            ...Object.fromEntries(cached.headers),
+            'X-Cache': 'HIT',
+          },
+        });
+      }
+
       try {
         setTmdbApiKey(c.env.TMDB_API_KEY ?? undefined);
         const items = await provider.suggestions(keyword);
@@ -374,7 +424,17 @@ searchRoutes.get('/suggestions', async (c) => {
         }));
         // 只有非空结果才直接返回，空结果继续 fallback 到数据库历史
         if (mapped.length > 0) {
-          return c.json(success(mapped));
+          const responseBody = JSON.stringify(success(mapped));
+          const newResponse = new Response(responseBody, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': `public, max-age=${SUGGESTIONS_CACHE_TTL}`,
+              'X-Cache': 'MISS',
+            },
+          });
+
+          c.executionCtx.waitUntil(cache.put(cacheKey, newResponse.clone()));
+          return newResponse;
         }
       } catch (err) {
         console.error(`[Provider:${provider.id}] suggestions error:`, err);
@@ -419,6 +479,15 @@ searchRoutes.get('/suggestions', async (c) => {
  * 否则 fallback 到全局搜索历史统计
  */
 searchRoutes.get('/trending', async (c) => {
+  const userPayload = c.get('user');
+
+  // 速率限制：每用户每分钟最多 20 次
+  const rateLimitKey = userPayload ? `trending:${userPayload.userId}` : `trending:ip:${c.req.header('cf-connecting-ip') || 'unknown'}`;
+  const rl = checkRateLimit(rateLimitKey, 60_000, 20);
+  if (!rl.allowed) {
+    return c.json(error('RATE_LIMITED', '请求过于频繁，请稍后再试'), 429);
+  }
+
   const source = c.req.query('source');
   const hourInMs = 60 * 60 * 1000;
 
@@ -435,6 +504,21 @@ searchRoutes.get('/trending', async (c) => {
   if (source && source !== 'all') {
     const provider = providerRegistry.getByCategory(source);
     if (provider?.trending) {
+      // ── Cache Layer: 缓存 Provider trending ──
+      const TRENDING_CACHE_TTL = 30 * 60; // 30 分钟
+      const cacheKey = new Request(`https://internal/trending/${source}`);
+      const cache = caches.default;
+
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        return new Response(cached.body, {
+          headers: {
+            ...Object.fromEntries(cached.headers),
+            'X-Cache': 'HIT',
+          },
+        });
+      }
+
       try {
         setTmdbApiKey(c.env.TMDB_API_KEY ?? undefined);
         const items = await provider.trending();
@@ -447,7 +531,17 @@ searchRoutes.get('/trending', async (c) => {
         }));
         // 只有非空结果才直接返回，空结果继续 fallback 到数据库历史
         if (mapped.length > 0) {
-          return c.json(success(mapped));
+          const responseBody = JSON.stringify(success(mapped));
+          const newResponse = new Response(responseBody, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': `public, max-age=${TRENDING_CACHE_TTL}`,
+              'X-Cache': 'MISS',
+            },
+          });
+
+          c.executionCtx.waitUntil(cache.put(cacheKey, newResponse.clone()));
+          return newResponse;
         }
       } catch (err) {
         console.error(`[Provider:${provider.id}] trending error:`, err);

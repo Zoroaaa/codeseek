@@ -9,7 +9,7 @@ import { Env } from '@/types';
 import { authMiddleware } from '@/middleware';
 import {
   normalizeCode,
-  get,
+  getHtml,
   extractGidUc,
   parseMagnets,
   parseJavDetail,
@@ -339,7 +339,7 @@ async function fetchSubtitle(): Promise<JavItem[]> {
 interface Entry { key: string; name: string; }
 
 async function fetchGenreList(): Promise<Entry[]> {
-  const html = await get('https://www.javbus.com/genre');
+  const html = await getHtml('https://www.javbus.com/genre');
   if (!html) return [];
   const entries: Entry[] = [];
   const re = /href="https?:\/\/www\.javbus\.com\/genre\/([a-z0-9]+)"[^>]*>([^<]+)</gi;
@@ -386,7 +386,7 @@ async function fetchRandomGenres(): Promise<GroupRanking[]> {
 // ─────────────────────────────────────────────
 
 async function fetchActressList(): Promise<Entry[]> {
-  const html = await get('https://www.javbus.com/actresses');
+  const html = await getHtml('https://www.javbus.com/actresses');
   if (!html) return [];
   const entries: Entry[] = [];
   // <a href="https://www.javbus.com/star/okq">苍井空</a> 或带 avatar 的结构
@@ -561,7 +561,7 @@ javRoutes.get('/detail', async (c) => {
 
   try {
     // Step 1：抓详情页
-    const html = await get(detailUrl, 15000);
+    const html = await getHtml(detailUrl, 15000);
     if (!html || html.length < 500) {
       return c.json({ success: false, error: { code: 'NOT_FOUND', message: '未找到该番号' } }, 404);
     }
@@ -574,7 +574,7 @@ javRoutes.get('/detail', async (c) => {
     const gidUc = extractGidUc(html);
     if (gidUc) {
       const magnetUrl = `https://www.javbus.com/ajax/uncledatoolsbyajax.php?lang=zh&gid=${gidUc.gid}&uc=${gidUc.uc}&floor=${Date.now()}`;
-      const magnetHtml = await get(magnetUrl, 12000);
+      const magnetHtml = await getHtml(magnetUrl, 12000);
       magnets = parseMagnets(magnetHtml);
     }
 
@@ -715,7 +715,7 @@ javRoutes.get('/actresses', async (c) => {
   }
 
   try {
-    const html = await get('https://www.javbus.com/actresses', 15000);
+    const html = await getHtml('https://www.javbus.com/actresses', 15000);
     if (!html || html.length < 500) {
       return c.json({ success: false, error: { code: 'FETCH_ERROR', message: '获取女优列表失败' } }, 500);
     }
@@ -757,7 +757,7 @@ javRoutes.get('/star/:key', async (c) => {
   }
 
   try {
-    const html = await get(`https://www.javbus.com/star/${key}`, 15000);
+    const html = await getHtml(`https://www.javbus.com/star/${key}`, 15000);
     if (!html || html.length < 500) {
       return c.json({ success: false, error: { code: 'NOT_FOUND', message: '未找到该女优' } }, 404);
     }

@@ -6,7 +6,6 @@
  */
 import { SearchProvider, SearchResultBase, SearchOptions } from '@/services/search-provider';
 import { searchManga } from '@/services/manga-search';
-import { fetchWithRetry } from '@/utils/fetch';
 
 export class MangaProvider implements SearchProvider {
   readonly id = 'manga';
@@ -23,11 +22,12 @@ export class MangaProvider implements SearchProvider {
       const trimmedKeyword = keyword.trim();
       if (!trimmedKeyword) return [];
 
-      // MangaDex 搜索建议 API
+      // MangaDex 搜索建议 API（8 秒超时,避免前端自动补全卡死）
       const url = `https://api.mangadex.org/manga?title=${encodeURIComponent(trimmedKeyword)}&limit=10&contentRating%5B%5D=safe&contentRating%5B%5D=suggestive&contentRating%5B%5D=erotica`;
-      const response = await fetchWithRetry(url, {
+      const response = await fetch(url, {
         headers: { 'User-Agent': 'Atlas/1.0' },
-      }, { retries: 3, baseDelay: 8000 });
+        signal: AbortSignal.timeout(8000),
+      });
 
       if (!response.ok) return [];
 
