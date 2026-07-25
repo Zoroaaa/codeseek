@@ -274,7 +274,7 @@ function parseGrid(html: string, source: string): JavItem[] {
 
 async function fetchCensored(): Promise<JavItem[]> {
   const pages = ['https://www.javbus.com/', 'https://www.javbus.com/page/2', 'https://www.javbus.com/page/3'];
-  const results = await Promise.allSettled(pages.map(u => get(u)));
+  const results = await Promise.allSettled(pages.map(u => getHtml(u)));
   const all = results.flatMap((r, i) =>
     r.status === 'fulfilled' ? parseGrid(r.value, `javbus-p${i + 1}`) : []
   );
@@ -291,7 +291,7 @@ async function fetchUncensored(): Promise<JavItem[]> {
     'https://www.javbus.com/uncensored/page/2',
     'https://www.javbus.com/uncensored/page/3',
   ];
-  const results = await Promise.allSettled(pages.map(u => get(u)));
+  const results = await Promise.allSettled(pages.map(u => getHtml(u)));
   const all = results.flatMap((r, i) =>
     r.status === 'fulfilled' ? parseGrid(r.value, `javbus-u${i + 1}`) : []
   );
@@ -308,7 +308,7 @@ async function fetchHD(): Promise<JavItem[]> {
     'https://www.javbus.com/genre/hd/2',
     'https://www.javbus.com/genre/hd/3',
   ];
-  const results = await Promise.allSettled(pages.map(u => get(u)));
+  const results = await Promise.allSettled(pages.map(u => getHtml(u)));
   const all = results.flatMap((r, i) =>
     r.status === 'fulfilled' ? parseGrid(r.value, `javbus-hd${i + 1}`) : []
   );
@@ -325,7 +325,7 @@ async function fetchSubtitle(): Promise<JavItem[]> {
     'https://www.javbus.com/genre/sub/2',
     'https://www.javbus.com/genre/sub/3',
   ];
-  const results = await Promise.allSettled(pages.map(u => get(u)));
+  const results = await Promise.allSettled(pages.map(u => getHtml(u)));
   const all = results.flatMap((r, i) =>
     r.status === 'fulfilled' ? parseGrid(r.value, `javbus-sub${i + 1}`) : []
   );
@@ -367,7 +367,7 @@ async function fetchRandomGenres(): Promise<GroupRanking[]> {
   const picked = sample(pool, 10);
 
   const results = await Promise.allSettled(
-    picked.map(g => get(`https://www.javbus.com/genre/${g.key}`))
+    picked.map(g => getHtml(`https://www.javbus.com/genre/${g.key}`))
   );
 
   return picked
@@ -429,7 +429,7 @@ async function fetchRandomActresses(): Promise<GroupRanking[]> {
   const picked = sample(pool, 10);
 
   const results = await Promise.allSettled(
-    picked.map(a => get(`https://www.javbus.com/star/${a.key}`))
+    picked.map(a => getHtml(`https://www.javbus.com/star/${a.key}`))
   );
 
   return picked
