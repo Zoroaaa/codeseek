@@ -30,8 +30,8 @@
 | `D1_DATABASE_ID` | Cloudflare D1 数据库 ID | `xxxxxx...` |
 | `R2_ACCESS_KEY_ID` | R2 存储访问密钥 ID | `abc...` |
 | `R2_SECRET_ACCESS_KEY` | R2 存储密钥 | `xyz...` |
-| `R2_BUCKET_NAME` | R2 存储桶名称 | `codeseek-assets` |
-| `R2_PUBLIC_URL` | R2 公开访问 URL | `https://assets.codeseek.pp.ua` |
+| `R2_BUCKET_NAME` | R2 存储桶名称 | `atlas-assets` |
+| `R2_PUBLIC_URL` | R2 公开访问 URL | `https://assets.atlas.wort.uk` |
 
 ### 可选项（按搜索类别）
 
@@ -48,7 +48,7 @@
 |--------|------|--------|
 | `APP_VERSION` | 应用版本号 | `2.0.0` |
 | `NODE_ENV` | 运行环境 | `production` |
-| `CORS_ORIGIN` | CORS 允许的源 | `https://codeseek.pp.ua` |
+| `CORS_ORIGIN` | CORS 允许的源 | `https://atlas.wort.uk` |
 | `ADMIN_GITHUB_IDS` | 管理员 GitHub ID 列表（逗号分隔） | `` |
 
 ---
@@ -58,7 +58,7 @@
 ### GitHub OAuth
 
 1. 访问 https://github.com/settings/developers 创建 OAuth App
-2. 设置回调地址：`https://api.codeseek.pp.ua/api/auth/github/callback`
+2. 设置回调地址：`https://atlasapi.wort.uk/api/auth/github/callback`
 3. 将获得的 Client ID 和 Secret 填入环境变量
 
 ### JWT 配置
@@ -113,7 +113,7 @@ VALUES ('Bangumi API', 'anime', 'bangumi', 'https://api.bgm.tv', 'api', 10,
 或通过 API 创建：
 
 ```bash
-curl -X POST https://api.codeseek.pp.ua/api/search-sources \
+curl -X POST https://atlasapi.wort.uk/api/search-sources \
   -H "Authorization: Bearer <admin_token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -145,10 +145,10 @@ R2 用于存储用户上传内容和代理缓存图片。
 
 ```bash
 # 创建 R2 存储桶
-wrangler r2 bucket create codeseek-assets
+wrangler r2 bucket create atlas-assets
 
 # 设置公开访问（可选，通过自定义域名）
-wrangler r2 bucket public codeseek-assets
+wrangler r2 bucket public atlas-assets
 ```
 
 **用途（v4.0 扩展）：**
@@ -164,7 +164,7 @@ wrangler r2 bucket public codeseek-assets
 ### CORS
 
 ```bash
-CORS_ORIGIN=https://codeseek.pp.ua,https://www.codeseek.pp.ua
+CORS_ORIGIN=https://atlas.wort.uk,https://www.atlas.wort.uk
 ```
 
 支持逗号分隔的多域名，开发时可加入 `http://localhost:5173`。
@@ -252,14 +252,14 @@ VALUES ('Spotify API', 'music', 'spotify', 'https://api.spotify.com', 'api', 10)
 
 ```bash
 # 健康检查（返回配置摘要）
-curl https://api.codeseek.pp.ua/api/health
+curl https://atlasapi.wort.uk/api/health
 
 # 搜索源状态
 curl -H "Authorization: Bearer <token>" \
-  https://api.codeseek.pp.ua/api/search-sources?includeStats=true
+  https://atlasapi.wort.uk/api/search-sources?includeStats=true
 
 # 分类列表验证
-curl https://api.codeseek.pp.ua/api/search-sources/classifications/anime
-curl https://api.codeseek.pp.ua/api/search-sources/classifications/movie
-curl https://api.codeseek.pp.ua/api/search-sources/classifications/jav
+curl https://atlasapi.wort.uk/api/search-sources/classifications/anime
+curl https://atlasapi.wort.uk/api/search-sources/classifications/movie
+curl https://atlasapi.wort.uk/api/search-sources/classifications/jav
 ```

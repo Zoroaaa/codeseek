@@ -47,15 +47,15 @@ wrangler login
 ### 1.1 创建项目目录并克隆
 
 ```bash
-git clone https://github.com/codeseek-team/codeseek.git
-cd codeseek
+git clone https://github.com/your-username/atlas.git
+cd atlas
 pnpm install
 ```
 
 ### 1.2 项目结构确认
 
 ```
-codeseek/
+atlas/
 ├── frontend/          # React 前端 (Vite)
 ├── backend/           # Hono 后端 (Workers)
 ├── packages/shared/   # 共享类型
@@ -70,7 +70,7 @@ codeseek/
 ### 2.1 创建数据库
 
 ```bash
-npx wrangler d1 create codeseek-db
+npx wrangler d1 create atlas-db
 ```
 
 记下输出的 `database_id`，后续配置使用。
@@ -115,7 +115,7 @@ npx wrangler d1 execute $D1_ID --command="SELECT category, COUNT(*) as cnt FROM 
 ### 3.1 创建存储桶
 
 ```bash
-npx wrangler r2 bucket create codeseek-assets
+npx wrangler r2 bucket create atlas-assets
 ```
 
 ### 3.2 设置 CORS 规则（可选）
@@ -125,7 +125,7 @@ npx wrangler r2 bucket create codeseek-assets
 ```json
 [
   {
-    "AllowedOrigins": ["https://codeseek.pp.ua"],
+    "AllowedOrigins": ["https://atlas.wort.uk"],
     "AllowedMethods": ["GET", "HEAD"],
     "AllowedHeaders": ["*"],
     "MaxAgeSeconds": 3600
@@ -159,7 +159,7 @@ D1_DATABASE_ID=xxxxxxx_from_step_2
 # ── 存储 (R2) ──
 R2_ACCESS_KEY_ID=abc...
 R2_SECRET_ACCESS_KEY=xyz...
-R2_BUCKET_NAME=codeseek-assets
+R2_BUCKET_NAME=atlas-assets
 R2_PUBLIC_URL=https://pub-xxxx.r2.dev
 
 # ── JAV 搜索源 ──
@@ -194,7 +194,7 @@ wrangler secret put TMDB_API_KEY          # v4.0 新增
 # wrangler secret put BANGUMI_API_KEY     # 可选
 
 # 方式 B: 通过 Cloudflare Dashboard
-# Workers & Pages → codeseek-api → Settings → Variables and Secrets
+# Workers & Pages → atlas-api → Settings → Variables and Secrets
 ```
 
 ---
@@ -238,7 +238,7 @@ curl -X POST http://localhost:8787/api/search \
 
 ```bash
 # 查看 D1 本地数据
-npx wrangler d1 execute codeseek-db --local --command="SELECT * FROM search_sources;"
+npx wrangler d1 execute atlas-db --local --command="SELECT * FROM search_sources;"
 
 # 重置本地数据库
 rm -rf .wrangler/state/v3/d1/miniflare-D1DatabaseObject/
@@ -270,7 +270,7 @@ npx wrangler deploy
 ```bash
 # 方式 A: 手动部署
 cd frontend
-npx wrangler pages deploy dist --project-name=codeseek-frontend
+npx wrangler pages deploy dist --project-name=atlas-frontend
 
 # 方式 B: 连接 GitHub 仓库自动部署（推荐）
 # Cloudflare Dashboard → Pages → Create → Connect to Git
@@ -280,13 +280,13 @@ npx wrangler pages deploy dist --project-name=codeseek-frontend
 
 ```bash
 # API 健康检查
-curl https://api.codeseek.pp.ua/api/health
+curl https://atlasapi.wort.uk/api/health
 
 # 搜索源就绪检查
-curl https://api.codeseek.pp.ua/api/config/search-sources
+curl https://atlasapi.wort.uk/api/config/search-sources
 
 # 前端可访问性
-curl -I https://codeseek.pp.ua
+curl -I https://atlas.wort.uk
 ```
 
 ---
@@ -297,17 +297,17 @@ curl -I https://codeseek.pp.ua
 
 ```bash
 # 在 Cloudflare Dashboard 操作:
-# Workers & Pages → codeseek-api → Settings → Domains & Certificates
-# Add Custom Domain → api.codeseek.pp.ua
+# Workers & Pages → atlas-api → Settings → Domains & Certificates
+# Add Custom Domain → atlasapi.wort.uk
 # （Cloudflare DNS 会自动添加 CNAME 记录）
 ```
 
 ### 7.2 前端域名
 
 ```bash
-# Pages → codeseek-frontend → Settings → Domains & Certificates
-# Add Custom Domain → codeseek.pp.ua
-# 或 www.codeseek.pp.ua
+# Pages → atlas-frontend → Settings → Domains & Certificates
+# Add Custom Domain → atlas.wort.uk
+# 或 www.atlas.wort.uk
 ```
 
 ### 7.3 SSL 证书
@@ -321,7 +321,7 @@ Cloudflare 自动提供免费 SSL 证书（Let's Encrypt），无需手动配置
 ### GitHub Actions 工作流示例
 
 ```yaml
-name: Deploy CodeSeek
+name: Deploy Atlas
 
 on:
   push:
@@ -359,10 +359,10 @@ jobs:
 
 ```bash
 # 导出完整数据库
-npx wrangler d1 export codeseek-db --remote > backup_$(date +%Y%m%d).sql
+npx wrangler d1 export atlas-db --remote > backup_$(date +%Y%m%d).sql
 
 # 导入恢复（谨慎操作）
-npx wrangler d1 execute codeseek-db --remote --file=backup_20260615.sql
+npx wrangler d1 execute atlas-db --remote --file=backup_20260615.sql
 ```
 
 ### 搜索源管理
@@ -370,16 +370,16 @@ npx wrangler d1 execute codeseek-db --remote --file=backup_20260615.sql
 ```bash
 # 查看所有源状态
 curl -H "Authorization: Bearer <admin_token>" \
-  "https://api.codeseek.pp.ua/api/search-sources?includeStats=true"
+  "https://atlasapi.wort.uk/api/search-sources?includeStats=true"
 
 # 健康检查
 curl -H "Authorization: Bearer <admin_token>" \
-  "https://api.codeseek.pp.ua/api/search-sources/health"
+  "https://atlasapi.wort.uk/api/search-sources/health"
 
 # 禁用某个源
 curl -X PUT -H "Authorization: Bearer <admin_token>" \
   -H "Content-Type: application/json" \
-  "https://api.codeseek.pp.ua/api/search-sources/3" \
+  "https://atlasapi.wort.uk/api/search-sources/3" \
   -d '{"isActive": false}'
 ```
 
@@ -390,14 +390,14 @@ curl -X PUT -H "Authorization: Bearer <admin_token>" \
 npx wrangler tail  # 后端日志
 
 # 或通过 Cloudflare Dashboard:
-# Workers & Pages → codeseek-api → Logs → Begin log stream
+# Workers & Pages → atlas-api → Logs → Begin log stream
 ```
 
 ### 版本回滚
 
 ```bash
 # 回滚到上一个版本
-# Cloudflare Dashboard → Workers → codeseek-api → Deployments
+# Cloudflare Dashboard → Workers → atlas-api → Deployments
 # 点击之前的 Deployment → Rollback
 ```
 
@@ -439,7 +439,7 @@ npx wrangler tail  # 后端日志
     ┌──────────────┐ ┌──────────┐ ┌──────────┐
     │ Cloudflare   │ │ Cloudflare│ │ Cloudflare│
     │ Pages (前端)  │ │ Workers  │ │    D1     │
-    │ codeseek.pp.ua│ │ (API)    │ │ (数据库)  │
+    │ atlas.wort.uk│ │ (API)    │ │ (数据库)  │
     └──────────────┘ └────┬─────┘ └────┬─────┘
                           │            │
                 ┌─────────┼────────────┤
