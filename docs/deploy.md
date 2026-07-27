@@ -11,12 +11,11 @@
 - [前置要求](#前置要求)
 - [Step 1: Cloudflare 初始化](#step-1-cloudflare-初始化)
 - [Step 2: D1 数据库](#step-2-d1-数据库)
-- [Step 3: R2 对象存储](#step-3-r2-对象存储)
-- [Step 4: 环境变量配置](#step-4-环境变量配置)
-- [Step 5: 本地开发](#step-5-本地开发)
-- [Step 6: 生产部署](#step-6-生产部署)
-- [Step 7: 自定义域名](#step-7-自定义域名)
-- [Step 8: CI/CD 自动化](#step-8-cicd-自动化)
+- [Step 3: 环境变量配置](#step-3-环境变量配置)
+- [Step 4: 本地开发](#step-4-本地开发)
+- [Step 5: 生产部署](#step-5-生产部署)
+- [Step 6: 自定义域名](#step-6-自定义域名)
+- [Step 7: CI/CD 自动化](#step-7-cicd-自动化)
 - [运维操作](#运维操作)
 - [故障排查](#故障排查)
 
@@ -30,7 +29,7 @@
 | pnpm | >= 8 | 包管理 |
 | Wrangler CLI | >= 3.x | CF 部署工具 |
 | Git | 任意 | 版本控制 |
-| Cloudflare 账号 | - | Workers/D1/R2 |
+| Cloudflare 账号 | - | Workers/D1 |
 
 ```bash
 # 安装 wrangler
@@ -110,36 +109,9 @@ npx wrangler d1 execute $D1_ID --command="SELECT category, COUNT(*) as cnt FROM 
 
 ---
 
-## Step 3: R2 对象存储
+## Step 3: 环境变量配置
 
-### 3.1 创建存储桶
-
-```bash
-npx wrangler r2 bucket create atlas-assets
-```
-
-### 3.2 设置 CORS 规则（可选）
-
-如果前端直连 R2，需配置 CORS：
-
-```json
-[
-  {
-    "AllowedOrigins": ["https://atlas.wort.uk"],
-    "AllowedMethods": ["GET", "HEAD"],
-    "AllowedHeaders": ["*"],
-    "MaxAgeSeconds": 3600
-  }
-]
-```
-
-**注意：** v4.0 推荐使用后端图片代理 (`/api/jav/proxy-image`) 而非直连 R2，可跳过此步。
-
----
-
-## Step 4: 环境变量配置
-
-### 4.1 创建 `.env.local`（本地开发）
+### 3.1 创建 `.env.local`（本地开发）
 
 ```bash
 cp .env.example .env.local
@@ -155,12 +127,6 @@ JWT_SECRET=rand0m-s3cr3t-k3y-32chars-min!!
 
 # ── 数据库 ──
 D1_DATABASE_ID=xxxxxxx_from_step_2
-
-# ── 存储 (R2) ──
-R2_ACCESS_KEY_ID=abc...
-R2_SECRET_ACCESS_KEY=xyz...
-R2_BUCKET_NAME=atlas-assets
-R2_PUBLIC_URL=https://pub-xxxx.r2.dev
 
 # ── JAV 搜索源 ──
 DMM_API_ID=your_dmm_api_id
@@ -178,7 +144,7 @@ NODE_ENV=development
 ADMIN_GITHUB_IDS=your_github_numeric_id
 ```
 
-### 4.2 生产环境 Secrets（Cloudflare Dashboard 或 Wrangler）
+### 3.2 生产环境 Secrets（Cloudflare Dashboard 或 Wrangler）
 
 ```bash
 # 方式 A: 交互式设置（推荐首次使用）
@@ -186,8 +152,6 @@ wrangler secret put GITHUB_CLIENT_ID
 wrangler secret put GITHUB_CLIENT_SECRET
 wrangler secret put JWT_SECRET
 wrangler secret put D1_DATABASE_ID
-wrangler secret put R2_ACCESS_KEY_ID
-wrangler secret put R2_SECRET_ACCESS_KEY
 wrangler secret put DMM_API_ID
 wrangler secret put DMM_API_KEY
 wrangler secret put TMDB_API_KEY          # v4.0 新增
@@ -199,16 +163,16 @@ wrangler secret put TMDB_API_KEY          # v4.0 新增
 
 ---
 
-## Step 5: 本地开发
+## Step 4: 本地开发
 
-### 5.1 启动开发服务器
+### 4.1 启动开发服务器
 
 ```bash
 # 启动全部服务（前端 :5173 + 后端 :8787 + D1 本地模拟）
 pnpm dev
 ```
 
-### 5.2 验证 v4.0 新功能
+### 4.2 验证 v4.0 新功能
 
 ```bash
 # 测试 1: 健康检查
@@ -234,7 +198,7 @@ curl -X POST http://localhost:8787/api/search \
   -d '{"category":"movie","classification":"tmdb","keyword":"Inception"}'
 ```
 
-### 5.3 本地数据库管理
+### 4.3 本地数据库管理
 
 ```bash
 # 查看 D1 本地数据
@@ -247,23 +211,23 @@ pnpm dev  # 会自动重建
 
 ---
 
-## Step 6: 生产部署
+## Step 5: 生产部署
 
-### 6.1 构建
+### 5.1 构建
 
 ```bash
 # 构建所有包
 pnpm build
 ```
 
-### 6.2 部署后端 API
+### 5.2 部署后端 API
 
 ```bash
 cd backend
 npx wrangler deploy
 ```
 
-### 6.3 部署前端
+### 5.3 部署前端
 
 前端部署到 Cloudflare Pages：
 
@@ -276,7 +240,7 @@ npx wrangler pages deploy dist --project-name=atlas-frontend
 # Cloudflare Dashboard → Pages → Create → Connect to Git
 ```
 
-### 6.4 验证生产环境
+### 5.4 验证生产环境
 
 ```bash
 # API 健康检查
@@ -291,9 +255,9 @@ curl -I https://atlas.wort.uk
 
 ---
 
-## Step 7: 自定义域名
+## Step 6: 自定义域名
 
-### 7.1 API 域名
+### 6.1 API 域名
 
 ```bash
 # 在 Cloudflare Dashboard 操作:
@@ -302,7 +266,7 @@ curl -I https://atlas.wort.uk
 # （Cloudflare DNS 会自动添加 CNAME 记录）
 ```
 
-### 7.2 前端域名
+### 6.2 前端域名
 
 ```bash
 # Pages → atlas-frontend → Settings → Domains & Certificates
@@ -310,13 +274,13 @@ curl -I https://atlas.wort.uk
 # 或 www.atlas.wort.uk
 ```
 
-### 7.3 SSL 证书
+### 6.3 SSL 证书
 
 Cloudflare 自动提供免费 SSL 证书（Let's Encrypt），无需手动配置。
 
 ---
 
-## Step 8: CI/CD 自动化
+## Step 7: CI/CD 自动化
 
 ### GitHub Actions 工作流示例
 

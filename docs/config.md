@@ -28,10 +28,6 @@
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth App Client Secret | `abc123...` |
 | `JWT_SECRET` | JWT 签名密钥（>=32字符随机字符串） | `rand0m-s3cr3t-k3y-32chars!!` |
 | `D1_DATABASE_ID` | Cloudflare D1 数据库 ID | `xxxxxx...` |
-| `R2_ACCESS_KEY_ID` | R2 存储访问密钥 ID | `abc...` |
-| `R2_SECRET_ACCESS_KEY` | R2 存储密钥 | `xyz...` |
-| `R2_BUCKET_NAME` | R2 存储桶名称 | `atlas-assets` |
-| `R2_PUBLIC_URL` | R2 公开访问 URL | `https://assets.atlas.wort.uk` |
 
 ### 可选项（按搜索类别）
 
@@ -138,24 +134,6 @@ curl -X POST https://atlasapi.wort.uk/api/search-sources \
 ---
 
 ## 存储配置
-
-### Cloudflare R2
-
-R2 用于存储用户上传内容和代理缓存图片。
-
-```bash
-# 创建 R2 存储桶
-wrangler r2 bucket create atlas-assets
-
-# 设置公开访问（可选，通过自定义域名）
-wrangler r2 bucket public atlas-assets
-```
-
-**用途（v4.0 扩展）：**
-- JAV 封面图代理缓存
-- 动漫 Bangumi 封面缓存
-- 影视 TMDB 海报缓存
-- 用户头像
 
 ---
 

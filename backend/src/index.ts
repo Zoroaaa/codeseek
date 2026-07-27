@@ -39,7 +39,6 @@ app.use('*', cors({
     const allowedPatterns = [
       /^https:\/\/atlas\.wort\.uk$/,
       /^https:\/\/www\.atlas\.wort\.uk$/,
-      /^https:\/\/.*\.atlas\.pages\.dev$/,
       /^http:\/\/localhost:\d+$/,
       /^http:\/\/127\.0\.0\.1:\d+$/,
     ];
