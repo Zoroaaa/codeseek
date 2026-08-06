@@ -1724,20 +1724,28 @@ adminRoutes.get('/errors', async (c) => {
       `SELECT COUNT(*) as count FROM system_errors ${whereClause}`
     ).bind(...params).first<{ count: number }>();
 
+    type ErrorRow = {
+      id: number; source: string; error_type: string; message: string;
+      stack: string | null; url: string | null; line_number: number | null;
+      column_number: number | null; user_id: string | null; session_id: string | null;
+      ip_address: string | null; user_agent: string | null; fingerprint: string;
+      created_at: string;
+    };
+
     const items = await c.env.DB.prepare(
       `SELECT id, source, error_type, message, stack, url, line_number, column_number,
               user_id, session_id, ip_address, user_agent, fingerprint, created_at
        FROM system_errors ${whereClause}
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`
-    ).bind(...params, pageSize, offset).all();
+    ).bind(...params, pageSize, offset).all<ErrorRow>();
 
     // 关联用户名（一次查询）
     const userIds = [...new Set((items.results || [])
-      .map((e: any) => e.user_id)
-      .filter(Boolean))] as string[];
+      .map((e) => e.user_id)
+      .filter((v): v is string => Boolean(v)))];
 
-    let userMap: Record<string, string> = {};
+    const userMap: Record<string, string> = {};
     if (userIds.length > 0) {
       const placeholders = userIds.map(() => '?').join(',');
       const users = await c.env.DB.prepare(
@@ -1749,7 +1757,7 @@ adminRoutes.get('/errors', async (c) => {
       }
     }
 
-    const enriched = (items.results || []).map((e: any) => ({
+    const enriched = (items.results || []).map((e) => ({
       ...e,
       username: e.user_id ? userMap[e.user_id] || null : null,
     }));
