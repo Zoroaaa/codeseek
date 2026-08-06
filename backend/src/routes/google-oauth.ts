@@ -119,11 +119,9 @@ googleOAuthRoutes.get('/google', async (c) => {
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 
   // state + code_verifier 通过短期 httpOnly cookie 传递（回调时校验）
-  const cookieParts = [
-    `g_oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`,
-    `g_oauth_verifier=${codeVerifier}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`,
-  ];
-  c.header('Set-Cookie', cookieParts.join(', '));
+  // 注意：多个 cookie 必须用多个 Set-Cookie header，不能合并成逗号分隔的单个值
+  c.header('Set-Cookie', `g_oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`, { append: true });
+  c.header('Set-Cookie', `g_oauth_verifier=${codeVerifier}; HttpOnly; Secure; SameSite=Lax; Max-Age=600; Path=/`, { append: true });
 
   return c.redirect(googleAuthUrl, 302);
 });
@@ -367,10 +365,8 @@ googleOAuthRoutes.get('/google/callback', async (c) => {
     );
 
     // 清除 state + verifier cookie
-    c.header(
-      'Set-Cookie',
-      'g_oauth_state=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/, g_oauth_verifier=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/'
-    );
+    c.header('Set-Cookie', 'g_oauth_state=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/', { append: true });
+    c.header('Set-Cookie', 'g_oauth_verifier=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/', { append: true });
 
     return c.redirect(
       `${frontendBase}/auth/google/callback?token=${encodeURIComponent(token)}&user=${userData}`,
