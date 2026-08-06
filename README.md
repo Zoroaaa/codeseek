@@ -14,7 +14,10 @@
 
 </div>
 
-> This repository contains both English and Chinese documentation. English README is this file (README.md). The original Chinese README has been preserved as README.zh-CN.md.
+> This repository contains both English and Chinese documentation.
+
+**English** — this file is the English README.
+**中文（简体）** — [查看中文 README](README.zh-CN.md)
 
 ## Table of Contents
 
