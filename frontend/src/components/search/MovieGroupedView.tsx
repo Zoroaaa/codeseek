@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Star, Film, Tv2, Calendar, ExternalLink, Magnet,
   ChevronDown, ChevronRight, Heart,
-  Filter, ArrowUpDown,
+  Filter, ArrowUpDown, Maximize2,
 } from 'lucide-react';
 import type {
   MovieEnrichedData,
@@ -125,6 +126,8 @@ function GroupedMovieCard({
   isFavorited,
   onToggleFavorite,
   defaultExpanded,
+  keyword,
+  related,
 }: {
   subject: TMDBResult;
   resources: ResourceItem[];
@@ -132,6 +135,8 @@ function GroupedMovieCard({
   isFavorited: boolean;
   onToggleFavorite: (item: TMDBResult) => void;
   defaultExpanded: boolean;
+  keyword: string;
+  related: TMDBResult[];
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [sortBy, setSortBy] = useState<SortKey>('date');
@@ -257,9 +262,19 @@ function GroupedMovieCard({
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className="p-1.5 rounded-lg text-stone-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"
+                title="在原站查看"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
+              <Link
+                to={`/detail/movie/${subject.id}`}
+                state={{ subject, resources, keyword, type: 'movie', related }}
+                onClick={(e) => e.stopPropagation()}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"
+                title="查看作品详情"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </Link>
               <span className="p-1.5 text-stone-400">
                 {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </span>
@@ -462,6 +477,8 @@ export const MovieGroupedView: React.FC<MovieGroupedViewProps> = ({
               isFavorited={isMovieFavorited(group.subject)}
               onToggleFavorite={(itm) => onToggleFavorite?.(itm)}
               defaultExpanded={i === 0}
+              keyword={data.keyword}
+              related={withResources.filter(g => g.subject.id !== group.subject.id).map(g => g.subject).slice(0, 6)}
             />
           ))}
         </div>
