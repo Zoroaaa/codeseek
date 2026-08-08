@@ -47,7 +47,7 @@ export function normalizeTitle(title: string): string {
   //    第01话, 第1话, 第01集, 第1集
   s = s.replace(/第\s*\d+\s*[话集話]/g, ' ');
   //    - 01, _01, .01 (前面是空格或分隔符)
-  s = s.replace(/[\s._\-]\d{1,3}(?![\d\-])/g, ' ');
+  s = s.replace(/[\s._-]\d{1,3}(?![\d-])/g, ' ');
   //    vol.01, vol 1, volume 1
   s = s.replace(/vol\.?\s*\d+/gi, ' ');
   //    01-12, 01~12 (集数范围)
