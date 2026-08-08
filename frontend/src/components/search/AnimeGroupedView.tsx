@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Star, Calendar, Tv, ExternalLink, Magnet,
   ChevronDown, ChevronRight, Heart, Users, Trophy,
-  Film, Tag, ShieldCheck, Filter, ArrowUpDown, Maximize2,
+  Film, Tag, ShieldCheck, Filter, ArrowUpDown,
 } from 'lucide-react';
 import type {
   AnimeEnrichedData,
@@ -138,8 +137,6 @@ function GroupedSubjectCard({
   onToggleFavorite,
   isProxyEnabled,
   defaultExpanded,
-  keyword,
-  related,
 }: {
   group: AnimeGroupedItem;
   isAuthenticated: boolean;
@@ -147,8 +144,6 @@ function GroupedSubjectCard({
   onToggleFavorite: (subject: BangumiSubject) => void;
   isProxyEnabled: boolean;
   defaultExpanded: boolean;
-  keyword: string;
-  related: BangumiSubject[];
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [sortBy, setSortBy] = useState<SortKey>('seeders');
@@ -278,20 +273,9 @@ function GroupedSubjectCard({
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className="p-1.5 rounded-lg text-stone-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"
-                title="在 Bangumi 查看原站"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
-              {/* 查看详情页 */}
-              <Link
-                to={`/detail/anime/${subject.id}`}
-                state={{ subject, resources: group.resources, keyword, type: 'anime', related }}
-                onClick={(e) => e.stopPropagation()}
-                className="p-1.5 rounded-lg text-stone-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"
-                title="查看作品详情"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-              </Link>
               {/* 展开/收起指示 */}
               <span className="p-1.5 text-stone-400">
                 {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -350,9 +334,15 @@ function GroupedSubjectCard({
         </div>
       </button>
 
-      {/* 展开内容：资源列表 + 筛选排序 */}
+      {/* 展开内容：简介 + 资源列表 + 筛选排序 */}
       {expanded && processedResources.length > 0 && (
         <div className="px-4 pb-4 border-t border-stone-100 dark:border-stone-800">
+          {/* 简介 */}
+          {subject.summary && (
+            <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed py-3 line-clamp-3">
+              {subject.summary}
+            </p>
+          )}
           {/* 筛选排序栏 */}
           <div className="flex flex-wrap items-center gap-2 py-3">
             <div className="flex items-center gap-1 text-[10px] text-stone-400">
@@ -545,8 +535,6 @@ export const AnimeGroupedView: React.FC<AnimeGroupedViewProps> = ({
               onToggleFavorite={(s) => onToggleFavorite?.(s)}
               isProxyEnabled={isProxyEnabled}
               defaultExpanded={i === 0}
-              keyword={data.keyword}
-              related={withResources.filter(g => g.subject.id !== group.subject.id).map(g => g.subject).slice(0, 6)}
             />
           ))}
         </div>

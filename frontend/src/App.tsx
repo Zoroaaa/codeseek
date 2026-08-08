@@ -13,7 +13,6 @@ import { ToastContainer } from '@/components/ui/Toast';
 import { useFeatureFlags } from '@/contexts';
 import { HomePage } from '@/pages/HomePage';
 import { MainSearchPage } from '@/pages/MainSearchPage';
-import { SubjectDetailPage } from '@/pages/SubjectDetailPage';
 import { TermsPage } from '@/pages/TermsPage';
 import { PrivacyPage } from '@/pages/PrivacyPage';
 import { DashboardPage, UserActivitiesPage } from '@/pages/dashboard';
@@ -172,12 +171,6 @@ const App: React.FC = () => {
         <Route path="/main" element={
           <GuardRoute>
             <MainSearchPage />
-          </GuardRoute>
-        } />
-        {/* 作品详情页：从搜索结果聚合视图跳转进入 */}
-        <Route path="/detail/:type/:id" element={
-          <GuardRoute>
-            <SubjectDetailPage />
           </GuardRoute>
         } />
         {/* 
