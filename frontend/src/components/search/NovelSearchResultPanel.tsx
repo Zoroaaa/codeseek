@@ -26,6 +26,7 @@ const formatColor = (fmt: string): string => {
 function NovelCard({ item, isAuthenticated, isFavorited, onToggleFavorite, isProxyEnabled }: {
   item: NovelItem; isAuthenticated: boolean; isFavorited: boolean; onToggleFavorite: (item: NovelItem) => void; isProxyEnabled: boolean;
 }) {
+  const [descExpanded, setDescExpanded] = useState(false);
   const link = isProxyEnabled ? convertToProxyUrl(item.detailUrl) : item.detailUrl;
   return (
     <div className="group flex gap-4 p-4 rounded-xl border border-stone-200 dark:border-stone-700/50 bg-white dark:bg-stone-800/40 hover:border-emerald-500/50 hover:bg-stone-50 dark:hover:bg-stone-800/70 transition-all">
@@ -96,7 +97,20 @@ function NovelCard({ item, isAuthenticated, isFavorited, onToggleFavorite, isPro
             <span className="truncate">{item.publisher}</span>
           </div>
         )}
-        {item.category && (
+        {item.description && (
+          <div className="mt-1.5">
+            <p className={`text-xs text-stone-500 dark:text-stone-400 leading-relaxed ${descExpanded ? '' : 'line-clamp-2'}`}>
+              {item.description}
+            </p>
+            {item.description.length > 80 && (
+              <button onClick={() => setDescExpanded(!descExpanded)}
+                className="text-[10px] text-emerald-500 hover:text-emerald-600 mt-0.5">
+                {descExpanded ? '收起' : '展开全部'}
+              </button>
+            )}
+          </div>
+        )}
+        {item.category && !item.description && (
           <div className="mt-1.5">
             <span className="text-[10px] text-stone-400 dark:text-stone-500">{item.category}</span>
           </div>

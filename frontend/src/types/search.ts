@@ -229,6 +229,8 @@ export interface NovelItem {
   title: string;
   /** 作者 */
   author: string;
+  /** 图书描述 / 简介（从详情页抓取） */
+  description: string;
   /** 出版社 / 来源机构（含年份，如 "shu.im, 2011"） */
   publisher: string;
   /** 封面图 URL */
