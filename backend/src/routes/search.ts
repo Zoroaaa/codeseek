@@ -141,6 +141,33 @@ async function saveEnrichedHistory(
       }
       break;
     }
+    case 'novel': {
+      // 小说：提取首条 Anna's Archive 结果 → title + cover + code(md5:id) + actors(作者) + publisher + tags
+      const novels = (result as { novels?: Array<{ id: string; title: string; cover: string; author?: string; publisher?: string; format?: string; year?: string; category?: string }> }).novels;
+      const firstNovel = novels?.[0];
+      if (firstNovel) {
+        updateFields.push('title=?, cover=?, code=?');
+        updateValues.push(
+          firstNovel.title,
+          firstNovel.cover,
+          `md5:${firstNovel.id}`
+        );
+        if (firstNovel.author) {
+          updateFields.push('actors=?');
+          updateValues.push(firstNovel.author);
+        }
+        if (firstNovel.publisher) {
+          updateFields.push('publisher=?');
+          updateValues.push(firstNovel.publisher);
+        }
+        const tags = [firstNovel.format, firstNovel.year, firstNovel.category].filter(Boolean).join(',');
+        if (tags) {
+          updateFields.push('tags=?');
+          updateValues.push(tags);
+        }
+      }
+      break;
+    }
   }
 
   if (updateFields.length > 0) {

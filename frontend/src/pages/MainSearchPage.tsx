@@ -217,6 +217,7 @@ export const MainSearchPage: React.FC = () => {
               const getToggleFavorite = () => {
                 if (resultType === 'anime') return favoritesManager.handleToggleFavoriteAnime;
                 if (resultType === 'manga') return favoritesManager.handleToggleFavoriteManga;
+                if (resultType === 'novel') return favoritesManager.handleToggleFavoriteNovel;
                 return favoritesManager.handleToggleFavoriteMovie;
               };
               return (
