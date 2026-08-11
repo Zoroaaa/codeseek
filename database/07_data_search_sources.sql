@@ -18,7 +18,7 @@ INSERT OR REPLACE INTO search_major_categories (
     ('anime_sources', '🎌 动漫搜索', '动漫、番剧、漫画相关搜索源', '🎌', '#8b82f6', 2, 1, 1, 1781162202000, 1781162202000),
     ('movie_sources', '🎥 影视搜索', '电影、电视剧、综艺节目相关搜索源', '🎥', '#3b82f6', 3, 1, 1, 1781162202000, 1781162202000),
     ('manga_sources', '📖 漫画搜索', '漫画、条漫相关搜索源', '📖', '#a855f7', 4, 1, 1, 1784253148000, 1784253148000),
-    ('novel_sources', '📚 小说搜索', '小说、电子书搜索源（Anna\'s Archive）', '📚', '#10b981', 5, 1, 1, 1786419800000, 1786419800000);
+    ('novel_sources', '📚 小说搜索', '小说、电子书搜索源（Anna''s Archive）', '📚', '#10b981', 5, 1, 1, 1786419800000, 1786419800000);
 
 -- ===============================================
 -- 2. 搜索源分类初始化数据
@@ -43,7 +43,7 @@ INSERT OR REPLACE INTO search_source_categories (
     ('movie_streaming', 'movie_sources', '📺 在线观看', '在线影视播放平台', '📺', '#0891b2', 3, 1, 1, 1, 'search', 3, NULL, 1781162203000, 1781162203000),
     ('manga_database', 'manga_sources', '📚 漫画资料站', '漫画数据库和资料站', '📚', '#a855f7', 1, 0, 1, 1, 'search', 5, NULL, 1784253149000, 1784253149000),
     ('manga_resources', 'manga_sources', '📖 漫画资源', '在线漫画阅读站点', '📖', '#a855f7', 2, 0, 1, 1, 'search', 5, NULL, 1784253149000, 1784253149000),
-    ('novel_database', 'novel_sources', '📚 电子书库', 'Anna\'s Archive 电子书搜索引擎', '📚', '#10b981', 1, 1, 1, 1, 'search', 1, NULL, 1786419801000, 1786419801000);
+    ('novel_database', 'novel_sources', '📚 电子书库', 'Anna''s Archive 电子书搜索引擎', '📚', '#10b981', 1, 1, 1, 1, 'search', 1, NULL, 1786419801000, 1786419801000);
 
 -- ===============================================
 -- 3. 搜索源初始化数据 - 番号资料站
@@ -260,11 +260,11 @@ INSERT OR REPLACE INTO search_sources (
     site_type, searchable, search_priority, is_system, is_active,
     display_order, usage_count, last_used_at, created_by, created_at, updated_at
 ) VALUES
-    ('mangadex', 'manga_database', 'MangaDex', '', '最大的漫画数据库', '📖', 'https://mangadex.org/search?q={keyword}', 'https://mangadex.org', 'enriched', 1, 1, 0, 1, 999, 0, NULL, NULL, 1784253150000, 1784253150000),
-    ('anilist_manga', 'manga_database', 'AniList Manga', '', 'AniList漫画数据库', '📚', 'https://anilist.co/search/manga?search={keyword}', 'https://anilist.co', 'enriched', 1, 2, 0, 1, 999, 0, NULL, NULL, 1784253151000, 1784253151000),
-    ('kitsu_manga', 'manga_database', 'Kitsu Manga', '', 'Kitsu漫画数据库', '📖', 'https://kitsu.io/manga?text={keyword}', 'https://kitsu.io', 'enriched', 1, 3, 0, 1, 999, 0, NULL, NULL, 1784253152000, 1784253152000),
-    ('mal_manga', 'manga_database', 'MyAnimeList Manga', '', 'MAL漫画数据库', '📚', 'https://myanimelist.net/manga.php?q={keyword}', 'https://myanimelist.net', 'enriched', 1, 4, 0, 1, 999, 0, NULL, NULL, 1784253152000, 1784253152000),
-    ('mangaupdates', 'manga_database', 'MangaUpdates', '', '漫画更新追踪站', '📖', 'https://www.mangaupdates.com/series.html?search={keyword}', 'https://www.mangaupdates.com', 'enriched', 1, 5, 0, 1, 999, 0, NULL, NULL, 1784253153000, 1784253153000);
+    ('mangadex', 'manga_database', 'MangaDex', '', '最大的漫画数据库', '📖', 'https://mangadex.org/search?q={keyword}', 'https://mangadex.org', 'enriched', 1, 1, 1, 1, 999, 0, NULL, NULL, 1784253150000, 1784253150000),
+    ('anilist_manga', 'manga_database', 'AniList Manga', '', 'AniList漫画数据库', '📚', 'https://anilist.co/search/manga?search={keyword}', 'https://anilist.co', 'enriched', 1, 2, 1, 1, 999, 0, NULL, NULL, 1784253151000, 1784253151000),
+    ('kitsu_manga', 'manga_database', 'Kitsu Manga', '', 'Kitsu漫画数据库', '📖', 'https://kitsu.io/manga?text={keyword}', 'https://kitsu.io', 'enriched', 1, 3, 1, 1, 999, 0, NULL, NULL, 1784253152000, 1784253152000),
+    ('mal_manga', 'manga_database', 'MyAnimeList Manga', '', 'MAL漫画数据库', '📚', 'https://myanimelist.net/manga.php?q={keyword}', 'https://myanimelist.net', 'enriched', 1, 4, 1, 1, 999, 0, NULL, NULL, 1784253152000, 1784253152000),
+    ('mangaupdates', 'manga_database', 'MangaUpdates', '', '漫画更新追踪站', '📖', 'https://www.mangaupdates.com/series.html?search={keyword}', 'https://www.mangaupdates.com', 'enriched', 1, 5, 1, 1, 999, 0, NULL, NULL, 1784253153000, 1784253153000);
 
 -- ===============================================
 -- 15. 漫画搜索源 - 漫画资源 (is_system=0)
@@ -275,14 +275,14 @@ INSERT OR REPLACE INTO search_sources (
     site_type, searchable, search_priority, is_system, is_active,
     display_order, usage_count, last_used_at, created_by, created_at, updated_at
 ) VALUES
-    ('manganelo', 'manga_resources', 'MangaNelo', '', '在线漫画阅读站', '📖', 'https://manganelo.com/search/story/{keyword}', 'https://manganelo.com', 'browse', 1, 1, 0, 1, 999, 0, NULL, NULL, 1784253154000, 1784253154000),
-    ('mangakakalot', 'manga_resources', 'MangaKakalot', '', '在线漫画阅读站', '📖', 'https://mangakakalot.com/search/story/{keyword}', 'https://mangakakalot.com', 'browse', 1, 2, 0, 1, 999, 0, NULL, NULL, 1784253154000, 1784253154000),
-    ('bilibili_manga', 'manga_resources', '哔哩哔哩漫画', '', 'B站漫画平台', '📺', 'https://manga.bilibili.com/search?word={keyword}', 'https://manga.bilibili.com', 'browse', 1, 3, 0, 1, 999, 0, NULL, NULL, 1784253155000, 1784253155000),
-    ('dmzj', 'manga_resources', '动漫之家', '', '国内漫画平台', '📖', 'https://www.dmzj.com/search/{keyword}', 'https://www.dmzj.com', 'browse', 1, 4, 0, 1, 999, 0, NULL, NULL, 1784253156000, 1784253156000),
-    ('manhuagui', 'manga_resources', '漫画柜', '', '在线漫画阅读站', '📖', 'https://www.manhuagui.com/s/{keyword}.html', 'https://www.manhuagui.com', 'browse', 1, 5, 0, 1, 999, 0, NULL, NULL, 1784253156000, 1784253156000),
-    ('mangafire', 'manga_resources', 'MangaFire', '', '在线漫画阅读站', '📖', 'https://mangafire.to/search?keyword={keyword}', 'https://mangafire.to', 'browse', 1, 6, 0, 1, 999, 0, NULL, NULL, 1784253157000, 1784253157000),
-    ('mangasee', 'manga_resources', 'MangaSee', '', '在线漫画阅读站', '📖', 'https://mangasee123.com/search/?name={keyword}', 'https://mangasee123.com', 'browse', 1, 7, 0, 1, 999, 0, NULL, NULL, 1784253158000, 1784253158000),
-    ('comicwalker', 'manga_resources', 'ComicWalker', '', '角川漫画平台', '📖', 'https://comic-walker.com/search/?q={keyword}', 'https://comic-walker.com', 'browse', 1, 8, 0, 1, 999, 0, NULL, NULL, 1784253159000, 1784253159000);
+    ('manganelo', 'manga_resources', 'MangaNelo', '', '在线漫画阅读站', '📖', 'https://manganelo.com/search/story/{keyword}', 'https://manganelo.com', 'browse', 1, 1, 1, 1, 999, 0, NULL, NULL, 1784253154000, 1784253154000),
+    ('mangakakalot', 'manga_resources', 'MangaKakalot', '', '在线漫画阅读站', '📖', 'https://mangakakalot.com/search/story/{keyword}', 'https://mangakakalot.com', 'browse', 1, 2, 1, 1, 999, 0, NULL, NULL, 1784253154000, 1784253154000),
+    ('bilibili_manga', 'manga_resources', '哔哩哔哩漫画', '', 'B站漫画平台', '📺', 'https://manga.bilibili.com/search?word={keyword}', 'https://manga.bilibili.com', 'browse', 1, 3, 1, 1, 999, 0, NULL, NULL, 1784253155000, 1784253155000),
+    ('dmzj', 'manga_resources', '动漫之家', '', '国内漫画平台', '📖', 'https://www.dmzj.com/search/{keyword}', 'https://www.dmzj.com', 'browse', 1, 4, 1, 1, 999, 0, NULL, NULL, 1784253156000, 1784253156000),
+    ('manhuagui', 'manga_resources', '漫画柜', '', '在线漫画阅读站', '📖', 'https://www.manhuagui.com/s/{keyword}.html', 'https://www.manhuagui.com', 'browse', 1, 5, 1, 1, 999, 0, NULL, NULL, 1784253156000, 1784253156000),
+    ('mangafire', 'manga_resources', 'MangaFire', '', '在线漫画阅读站', '📖', 'https://mangafire.to/search?keyword={keyword}', 'https://mangafire.to', 'browse', 1, 6, 1, 1, 999, 0, NULL, NULL, 1784253157000, 1784253157000),
+    ('mangasee', 'manga_resources', 'MangaSee', '', '在线漫画阅读站', '📖', 'https://mangasee123.com/search/?name={keyword}', 'https://mangasee123.com', 'browse', 1, 7, 1, 1, 999, 0, NULL, NULL, 1784253158000, 1784253158000),
+    ('comicwalker', 'manga_resources', 'ComicWalker', '', '角川漫画平台', '📖', 'https://comic-walker.com/search/?q={keyword}', 'https://comic-walker.com', 'browse', 1, 8, 1, 1, 999, 0, NULL, NULL, 1784253159000, 1784253159000);
 
 -- ===============================================
 -- 10. 搜索源初始化数据 - 电子书库（Anna's Archive）
