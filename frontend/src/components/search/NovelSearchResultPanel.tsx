@@ -65,6 +65,11 @@ function NovelCard({ item, isAuthenticated, isFavorited, onToggleFavorite, isPro
                   {item.language}
                 </span>
               )}
+              {item.source === '奇书网' && (
+                <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  奇书网 · TXT直链
+                </span>
+              )}
               {isProxyEnabled && (
                 <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                   <ShieldCheck className="w-3 h-3" />代理
@@ -149,12 +154,13 @@ export const NovelSearchResultPanel: React.FC<NovelSearchResultPanelProps> = ({
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const paged = list.slice((localPage - 1) * PAGE_SIZE, localPage * PAGE_SIZE);
   const isFavorited = (id: string) => favorites.some(f => f.url?.includes(id));
-  const hasError = !!data.errors?.annas_archive;
+  const aaError = data.errors?.annas_archive;
+  const xqsError = data.errors?.xqishuta;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-xs text-stone-500">共 {data.total} 条结果 · 来源 Anna's Archive</span>
+        <span className="text-xs text-stone-500">共 {data.total} 条结果 · 来源 Anna's Archive + 奇书网</span>
         <div className="flex items-center gap-2">
           {onRefresh && (
             <button onClick={onRefresh} className="p-1.5 rounded-lg text-stone-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="刷新">
@@ -164,13 +170,18 @@ export const NovelSearchResultPanel: React.FC<NovelSearchResultPanelProps> = ({
         </div>
       </div>
 
-      {hasError && (
+      {xqsError && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-xs">
+          奇书网抓取失败：{xqsError}（不影响下方 Anna's Archive 结果）
+        </div>
+      )}
+      {aaError && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs">
-          Anna's Archive 请求失败：{data.errors.annas_archive}
+          Anna's Archive 请求失败：{aaError}
         </div>
       )}
 
-      {list.length === 0 && !hasError ? (
+      {list.length === 0 && !aaError && !xqsError ? (
         <div className="flex flex-col items-center justify-center py-16 text-stone-400">
           <BookOpen className="w-10 h-10 mb-2" />
           <span className="text-sm">没有找到相关电子书</span>
