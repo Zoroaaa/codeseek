@@ -210,13 +210,6 @@ export const NovelSearchResultPanel: React.FC<NovelSearchResultPanelProps> = ({
           </button>
         </div>
       )}
-      {onPageChange && localPage >= totalPages && (
-        <div className="flex justify-center gap-2">
-          <button onClick={() => onPageChange(data.page + 1)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-all dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60">
-            加载更多 <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
     </div>
   );
 };

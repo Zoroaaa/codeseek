@@ -1,7 +1,7 @@
 /**
  * 小说搜索服务
  * 数据源:
- *   1. Anna's Archive (https://zh.annas-archive.gl) — 前 10 条电子书结果
+ *   1. Anna's Archive (https://zh.annas-archive.gl) — 第一页全部电子书结果（上限 50 条）
  *   2. 奇书网 (http://www.xqishuta.org) — 搜索第一本书，抓取详情页 txt 下载链接，置顶展示
  *
  * ⚠️ 类型契约：本文件导出的接口（NovelItem, NovelSearchResult）
@@ -44,10 +44,10 @@ const XQS_HEADERS = {
   'Referer': `http://${XQS_DOMAIN}/`,
 } as Record<string, string>;
 
-/** 每次返回的结果数上限（用户需求：前 10 条） */
-const PAGE_LIMIT = 10;
-/** 详情页描述抓取并发上限 */
-const DESC_CONCURRENCY = 5;
+/** 每次返回的结果数上限（取 Anna's Archive 第一页全部结果，上限 50 防极端情况） */
+const PAGE_LIMIT = 50;
+/** 详情页描述抓取并发上限（结果数增大后需提高并发避免长尾等待） */
+const DESC_CONCURRENCY = 10;
 /** 单次请求超时（ms） */
 const FETCH_TIMEOUT = 15000;
 

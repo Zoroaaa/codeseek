@@ -143,8 +143,9 @@ async function saveEnrichedHistory(
     }
     case 'novel': {
       // 小说：提取首条 Anna's Archive 结果 → title + cover + code(md5:id) + actors(作者) + publisher + tags
-      const novels = (result as { novels?: Array<{ id: string; title: string; cover: string; author?: string; publisher?: string; format?: string; year?: string; category?: string }> }).novels;
-      const firstNovel = novels?.[0];
+      // 注意：novels[0] 是奇书网置顶项，需跳过，取第一条 Anna's Archive 结果
+      const novels = (result as { novels?: Array<{ id: string; title: string; cover: string; author?: string; publisher?: string; format?: string; year?: string; category?: string; source?: string }> }).novels;
+      const firstNovel = novels?.find(n => n.source !== '奇书网');
       if (firstNovel) {
         updateFields.push('title=?, cover=?, code=?');
         updateValues.push(
