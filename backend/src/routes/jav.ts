@@ -35,6 +35,12 @@ const ALLOWED_IMAGE_HOSTS = [
   'annas-archive.gl',
   'annas-archive.pk',
   'annas-archive.gd',
+  // 小说封面：Anna's Archive 封面 CDN（z-lib 域名变体）
+  'covers.z-lib.sk',
+  'covers.z-lib.to',
+  'covers.z-lib.se',
+  'covers.z-lib.org',
+  'covers1.z-lib.sk',
   // 小说封面：奇书网（详情页封面，需 Referer 防盗链）
   'www.xqishuta.org',
 ];
