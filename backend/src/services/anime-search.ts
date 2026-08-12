@@ -737,7 +737,7 @@ export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearc
       total: 0,
       errors: {
         bangumi:   '搜索超时，请稍后重试',
-        nyaa:      '已禁用（部署环境无法解决 nyaa 验证）',
+        nyaa:      null,
         mikan:     '搜索超时，请稍后重试',
         animetosho: '搜索超时，请稍后重试',
         showrss:   '搜索超时，请稍后重试',
@@ -802,8 +802,8 @@ export async function searchAnime(keyword: string, page = 1): Promise<AnimeSearc
     total: sortedNyaa.length + mikan.length + sortedAtos.length + showrss.length,
     errors: {
       bangumi:   sanitizeError(bgmResult.status === 'rejected' ? String(bgmResult.reason) : null),
-      // nyaa 已禁用：部署环境无法解决 nyaa.si 的 bot 验证
-      nyaa:      '已禁用（部署环境无法解决 nyaa 验证）',
+      // nyaa 已禁用（部署环境无法解决 nyaa.si 验证）：返回 null，前端不显示任何提示
+      nyaa:      null,
       mikan:     sanitizeError(mikanErrorRaw),
       animetosho: sanitizeError(atosResult.status === 'rejected' ? String(atosResult.reason) : null),
       showrss:   sanitizeError(srResult.status === 'rejected' ? String(srResult.reason) : null),
