@@ -8,5 +8,5 @@ export { AnimeSearchResultPanel } from './AnimeSearchResultPanel';
 export { MovieSearchResultPanel } from './MovieSearchResultPanel';
 export { MangaSearchResultPanel } from './MangaSearchResultPanel';
 export { NovelSearchResultPanel } from './NovelSearchResultPanel';
-export { AnnouncementPanel } from './AnnouncementBanner';
+export { AnnouncementBar } from './AnnouncementBar';
 export { SearchSuggestionsDropdown } from './SearchSuggestionsDropdown';
