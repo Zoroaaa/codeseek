@@ -141,12 +141,11 @@ interface NovelSearchResultPanelProps {
   isProxyEnabled?: boolean;
   favorites?: FavoriteItem[];
   onRefresh?: () => void;
-  onPageChange?: (page: number) => void;
   onToggleFavorite?: (item: NovelItem) => void;
 }
 
 export const NovelSearchResultPanel: React.FC<NovelSearchResultPanelProps> = ({
-  data, isAuthenticated = false, isProxyEnabled = false, favorites = [], onRefresh, onPageChange, onToggleFavorite,
+  data, isAuthenticated = false, isProxyEnabled = false, favorites = [], onRefresh, onToggleFavorite,
 }) => {
   const [localPage, setLocalPage] = useState(1);
   const PAGE_SIZE = 10;
