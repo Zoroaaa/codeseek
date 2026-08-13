@@ -3,7 +3,7 @@ import { Search, Loader2 } from 'lucide-react';
 import { useAuthStore, useSourceStore, useProxyStore } from '@/stores';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { SearchTabType, JavSubMode } from '@/types/source';
-import { TAB_IDS } from '@/types/source';
+import { TAB_IDS, JAV_SUB_MODES } from '@/types/source';
 import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesSidebar, AnnouncementBar, SearchSuggestionsDropdown, QuickActionsPanel } from '@/components/search';
 import { useFeatureFlags } from '@/contexts/ConfigContext';
 import { JavDetailPanel, JavRankingsPanel, ActressesPanel, JavActressResultsPanel } from '@/components/jav';
@@ -36,8 +36,10 @@ export const MainSearchPage: React.FC = () => {
   const programmaticUrlRef = useRef(false);
   const handleSearchUrlSync = useCallback((keyword: string) => {
     programmaticUrlRef.current = true;
-    setSearchParams({ tab: activeTab, q: keyword }, { replace: true });
-  }, [setSearchParams, activeTab]);
+    const params: Record<string, string> = { tab: activeTab, q: keyword };
+    if (activeTab === 'jav') params.sub = javSubMode;
+    setSearchParams(params, { replace: true });
+  }, [setSearchParams, activeTab, javSubMode]);
 
   const searchFlow = useSearchFlow({
     activeTab,
@@ -68,8 +70,15 @@ export const MainSearchPage: React.FC = () => {
       programmaticUrlRef.current = false;
       return;
     }
+    // 读取 sub 参数：避免 setJavSubMode 异步导致 handleSearch 闭包仍是旧值（code 模式番号校验误报）
+    const subParam = searchParams.get('sub');
+    let overrideSubMode: JavSubMode | undefined;
+    if (activeTab === 'jav' && subParam && JAV_SUB_MODES.includes(subParam as JavSubMode)) {
+      overrideSubMode = subParam as JavSubMode;
+      setJavSubMode(overrideSubMode);
+    }
     searchFlow.setKeyword(qParam);
-    searchFlow.handleSearch(qParam);
+    searchFlow.handleSearch(qParam, 1, overrideSubMode);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -77,6 +86,11 @@ export const MainSearchPage: React.FC = () => {
     const tabParam = searchParams.get('tab');
     if (tabParam && TAB_IDS.includes(tabParam as SearchTabType)) {
       setActiveTab(tabParam as SearchTabType);
+    }
+    // 兜底同步子模式 UI：URL 无 q 时 q effect 会 early return，这里确保切到 jav 且带 sub 时按钮高亮正确
+    const subParam = searchParams.get('sub');
+    if (subParam && JAV_SUB_MODES.includes(subParam as JavSubMode)) {
+      setJavSubMode(subParam as JavSubMode);
     }
   }, [searchParams, setActiveTab]);
 
@@ -94,10 +108,11 @@ export const MainSearchPage: React.FC = () => {
     setActiveTab(tab);
     const params: Record<string, string> = { tab };
     if (searchFlow.keyword.trim()) params.q = searchFlow.keyword.trim();
+    if (tab === 'jav') params.sub = javSubMode;
     programmaticUrlRef.current = true;
     setSearchParams(params, { replace: true });
     searchFlow.resetResults();
-  }, [setActiveTab, setSearchParams, navigate, searchFlow.keyword, searchFlow.resetResults]);
+  }, [setActiveTab, setSearchParams, navigate, searchFlow.keyword, searchFlow.resetResults, javSubMode]);
 
   const isAdmin = isAuthenticated && user != null && (user.role === 'admin' || user.role === 'super_admin');
 
@@ -132,7 +147,14 @@ export const MainSearchPage: React.FC = () => {
               ].map((sub) => (
                 <button
                   key={sub.id}
-                  onClick={() => setJavSubMode(sub.id)}
+                  onClick={() => {
+                    setJavSubMode(sub.id);
+                    // 同步 URL：切换子模式即更新 sub 参数（保留当前 q），刷新/分享链接可还原正确子模式
+                    programmaticUrlRef.current = true;
+                    const params: Record<string, string> = { tab: 'jav', sub: sub.id };
+                    if (searchFlow.keyword.trim()) params.q = searchFlow.keyword.trim();
+                    setSearchParams(params, { replace: true });
+                  }}
                   className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
                     javSubMode === sub.id
                       ? 'bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-sm'
