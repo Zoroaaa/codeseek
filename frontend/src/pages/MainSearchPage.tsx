@@ -34,10 +34,11 @@ export const MainSearchPage: React.FC = () => {
 
   // ── URL 同步：搜索时更新 URL ──
   const programmaticUrlRef = useRef(false);
-  const handleSearchUrlSync = useCallback((keyword: string) => {
+  // subMode 由调用方传入（handleSearch 的 effectiveSubMode），避免闭包捕获异步未更新的 javSubMode
+  const handleSearchUrlSync = useCallback((keyword: string, subMode?: JavSubMode) => {
     programmaticUrlRef.current = true;
     const params: Record<string, string> = { tab: activeTab, q: keyword };
-    if (activeTab === 'jav') params.sub = javSubMode;
+    if (activeTab === 'jav') params.sub = subMode ?? javSubMode;
     setSearchParams(params, { replace: true });
   }, [setSearchParams, activeTab, javSubMode]);
 
@@ -70,10 +71,11 @@ export const MainSearchPage: React.FC = () => {
       programmaticUrlRef.current = false;
       return;
     }
-    // 读取 sub 参数：避免 setJavSubMode 异步导致 handleSearch 闭包仍是旧值（code 模式番号校验误报）
+    // 用 URL 的 tab 判断（而非 activeTab state）：首次渲染时 store 的 activeTab 可能尚未同步为 URL 的 tab
+    const tabParam = searchParams.get('tab');
     const subParam = searchParams.get('sub');
     let overrideSubMode: JavSubMode | undefined;
-    if (activeTab === 'jav' && subParam && JAV_SUB_MODES.includes(subParam as JavSubMode)) {
+    if (tabParam === 'jav' && subParam && JAV_SUB_MODES.includes(subParam as JavSubMode)) {
       overrideSubMode = subParam as JavSubMode;
       setJavSubMode(overrideSubMode);
     }

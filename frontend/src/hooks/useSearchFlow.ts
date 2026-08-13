@@ -31,7 +31,7 @@ interface UseSearchFlowOptions {
   javEnrichedDetail: JavDetail | null;
   setJavEnrichedDetail: (detail: JavDetail | null) => void;
   javSubMode: JavSubMode;
-  onSearch?: (keyword: string) => void;
+  onSearch?: (keyword: string, subMode?: JavSubMode) => void;
 }
 
 export function useSearchFlow({
@@ -119,8 +119,8 @@ export function useSearchFlow({
     }
     // 关闭搜索建议
     setShowSuggestions(false);
-    // 通知外部（用于 URL 同步等）
-    onSearch?.(query.trim());
+    // 通知外部（用于 URL 同步等）：携带 effectiveSubMode，避免外部闭包捕获旧 javSubMode
+    onSearch?.(query.trim(), activeTab === 'jav' ? effectiveSubMode : undefined);
     const sessionId = sessionStorage.getItem('analytics_session_id') || (() => {
       const id = Math.random().toString(36).slice(2);
       sessionStorage.setItem('analytics_session_id', id);
