@@ -138,6 +138,7 @@ export function useSearchFlow({
         keyword: query.trim(),
         majorCategoryId: SEARCH_TABS[activeTab].majorCategoryId || undefined,
         page,
+        javSubMode: activeTab === 'jav' ? javSubMode : undefined,
       });
       if (response.success && response.data) {
         if ('resultType' in response.data && ['anime', 'movie', 'jav', 'manga', 'novel'].includes(response.data.resultType)) {

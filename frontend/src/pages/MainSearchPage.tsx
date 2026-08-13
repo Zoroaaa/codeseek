@@ -6,7 +6,7 @@ import type { SearchTabType, JavSubMode } from '@/types/source';
 import { TAB_IDS } from '@/types/source';
 import { SearchResultsPanel, SearchHistoryPanel, FavoritesPanel, SourcesSidebar, AnnouncementBar, SearchSuggestionsDropdown, QuickActionsPanel } from '@/components/search';
 import { useFeatureFlags } from '@/contexts/ConfigContext';
-import { JavDetailPanel, JavRankingsPanel, ActressesPanel } from '@/components/jav';
+import { JavDetailPanel, JavRankingsPanel, ActressesPanel, JavActressResultsPanel } from '@/components/jav';
 import { UnifiedNavBar } from '@/components/layout';
 import { useSearchFlow } from '@/hooks/useSearchFlow';
 import { useFavoritesManager } from '@/hooks/useFavoritesManager';
@@ -208,6 +208,16 @@ export const MainSearchPage: React.FC = () => {
           {(() => {
             const resultType = searchFlow.enrichedData?.resultType;
             const Panel = getResultPanel(resultType);
+
+            // JAV 女优搜索子模式：渲染女优结果面板
+            if (activeTab === 'jav' && javSubMode === 'actress' && searchFlow.enrichedData && resultType === 'jav') {
+              return (
+                <JavActressResultsPanel
+                  data={searchFlow.enrichedData as import('@/types/search').JavEnrichedData}
+                  isProxyEnabled={isProxyEnabled}
+                />
+              );
+            }
 
             if (searchFlow.enrichedData && Panel) {
               const commonProps = {

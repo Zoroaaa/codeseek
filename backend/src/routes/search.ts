@@ -19,6 +19,7 @@ import { VALIDATION_RULES } from '@/constants';
 import { checkMultiLevelRateLimit, checkRateLimitD1 } from '@/utils/rate-limit';
 import { providerRegistry } from '@/services/search-provider';
 import { setTmdbApiKey } from '@/providers/movie-provider';
+import { fetchActresses, type ActressProfile } from '@/services/actress-search';
 
 const R = VALIDATION_RULES;
 
@@ -203,7 +204,7 @@ searchRoutes.post('/', async (c) => {
   }
 
   const body = await c.req.json();
-  const { keyword, page = 1, pageSize = 20, majorCategoryId } = body;
+  const { keyword, page = 1, pageSize = 20, majorCategoryId, javSubMode } = body;
 
   if (!keyword || !keyword.trim()) {
     return c.json(error('VALIDATION_ERROR', '搜索关键词不能为空'), 400);
@@ -259,6 +260,40 @@ searchRoutes.post('/', async (c) => {
         try {
           // 注入 TMDB API Key（供 MovieProvider 的 suggestions/trending 使用）
           setTmdbApiKey(c.env.TMDB_API_KEY ?? undefined);
+
+          // ── JAV 女优搜索子模式：短路 JavProvider，调 minnano-av 抓取 ──
+          if (provider.id === 'jav' && javSubMode === 'actress') {
+            let actresses: ActressProfile[] = [];
+            let actressError: string | null = null;
+            try {
+              actresses = await fetchActresses(trimmedKeyword);
+            } catch (e) {
+              actressError = String(e);
+              console.error('[search] minnano actress search failed:', e);
+            }
+            const actressData: Record<string, unknown> = {
+              resultType: 'jav',
+              keyword: trimmedKeyword,
+              page: limitPage,
+              total: actresses.length,
+              errors: { search: actressError },
+              actresses,
+            };
+
+            // 更新搜索历史
+            if (historyId && userPayload) {
+              try {
+                await c.env.DB.prepare('UPDATE user_search_history SET results_count = ? WHERE id = ? AND user_id = ?')
+                  .bind(actresses.length, historyId, userPayload.userId).run();
+              } catch (e) { console.warn('Failed to update search history:', e); }
+            }
+
+            const responsePayload = { success: true, data: actressData };
+            return new Response(JSON.stringify(responsePayload), {
+              headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' },
+            });
+          }
+
           const enrichedData = await provider.search(trimmedKeyword, limitPage, {
             apiKeys: { TMDB_API_KEY: c.env.TMDB_API_KEY ?? '' },
           }) as unknown as Record<string, unknown>;
