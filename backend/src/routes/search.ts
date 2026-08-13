@@ -96,11 +96,15 @@ async function saveEnrichedHistory(
       break;
     }
     case 'jav': {
-      // JAV：提取详情数据 → title + cover + code(番号) + actors + duration + release_date + publisher + tags
+      // JAV 番号搜索：提取详情数据 → title + cover + code(番号) + actors + duration + release_date + publisher + tags
       const detail = (result as { detail?: { code: string; title: string; cover?: string; actresses?: string[]; duration?: string; releaseDate?: string; publisher?: string; tags?: string[] } }).detail;
       if (detail) {
         updateFields.push('title=?, cover=?');
         updateValues.push(detail.title, detail.cover || '');
+        if (detail.code) {
+          updateFields.push('code=?');
+          updateValues.push(detail.code);
+        }
         if (detail.actresses?.length) {
           updateFields.push('actors=?');
           updateValues.push(detail.actresses.join(','));
@@ -120,6 +124,29 @@ async function saveEnrichedHistory(
         if (detail.tags?.length) {
           updateFields.push('tags=?');
           updateValues.push(detail.tags.join(','));
+        }
+      } else {
+        // JAV 女优搜索（无 detail，有 actresses）：提取首位女优 → title + cover + code(actress:id) + actors + tags
+        const actresses = (result as { actresses?: Array<{ id: string; name: string; cover?: string; ruby?: string; romaji?: string; tags?: string[] }> }).actresses;
+        const firstActress = actresses?.[0];
+        if (firstActress) {
+          updateFields.push('title=?, cover=?, code=?');
+          updateValues.push(
+            firstActress.name,
+            firstActress.cover || '',
+            `actress:${firstActress.id}`
+          );
+          updateFields.push('actors=?');
+          updateValues.push(firstActress.name);
+          const subtitle = [firstActress.ruby, firstActress.romaji].filter(Boolean).join(' / ');
+          if (subtitle) {
+            updateFields.push('subtitle=?');
+            updateValues.push(subtitle);
+          }
+          if (firstActress.tags?.length) {
+            updateFields.push('tags=?');
+            updateValues.push(firstActress.tags.join(','));
+          }
         }
       }
       break;
@@ -307,11 +334,10 @@ searchRoutes.post('/', async (c) => {
               results: multiSourceResults,
             };
 
-            // 更新搜索历史
+            // 更新搜索历史：复用 saveEnrichedHistory，女优子模式走 case 'jav' 的 actresses fallback
             if (historyId && userPayload) {
               try {
-                await c.env.DB.prepare('UPDATE user_search_history SET results_count = ? WHERE id = ? AND user_id = ?')
-                  .bind(multiSourceResults.length, historyId, userPayload.userId).run();
+                await saveEnrichedHistory(c.env.DB, historyId, userPayload, actressData);
               } catch (e) { console.warn('Failed to update search history:', e); }
             }
 

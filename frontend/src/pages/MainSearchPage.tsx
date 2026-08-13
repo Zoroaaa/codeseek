@@ -239,7 +239,13 @@ export const MainSearchPage: React.FC = () => {
               return (
                 <div className="flex flex-col gap-3 sm:gap-4">
                   {/* 女优资料卡片（minnano-av 抓取） */}
-                  <JavActressResultsPanel data={javData} />
+                  <JavActressResultsPanel
+                    data={javData}
+                    favoritedCodes={favoritesManager.favoritedCodes}
+                    isAuthenticated={isAuthenticated}
+                    onToggleFavorite={favoritesManager.handleToggleFavoriteActress}
+                    onLoginRequired={() => { navigate('/login'); }}
+                  />
                   {/* 多源跳转卡片（用户启用的 jav 源） */}
                   <SearchResultsPanel
                     results={searchFlow.searchResults}

@@ -8,9 +8,10 @@
  * 而非前缀式 convertToProxyUrl —— 后者对图片会触发浏览器的 ORB。
  */
 import { useState } from 'react';
-import { ExternalLink, Users, ChevronLeft, ChevronRight, Wifi, MapPin, Calendar, Building2, Star, Link2, Ruler } from 'lucide-react';
+import { Heart, Users, ChevronLeft, ChevronRight, Wifi, MapPin, Calendar, Building2, Star, Link2, Ruler } from 'lucide-react';
 import type { JavEnrichedData, ActressProfile } from '@/types/search';
 import { getProxyImageUrl } from '@/utils/imageProxy';
+import { ShareToCommunityButton } from '@/components/community/ShareToCommunityButton';
 
 const PAGE_SIZE = 10;
 
@@ -26,7 +27,15 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ cla
   );
 }
 
-function ActressCard({ item }: { item: ActressProfile }) {
+interface ActressCardProps {
+  item: ActressProfile;
+  isFavorited: boolean;
+  isAuthenticated: boolean;
+  onToggleFavorite: (actress: ActressProfile) => void;
+  onLoginRequired: () => void;
+}
+
+function ActressCard({ item, isFavorited, isAuthenticated, onToggleFavorite, onLoginRequired }: ActressCardProps) {
   // 统一走后端 /api/jav/proxy-image 避开浏览器 ORB
   const imgSrc = item.cover ? getProxyImageUrl(item.cover) : undefined;
 
@@ -155,18 +164,54 @@ function ActressCard({ item }: { item: ActressProfile }) {
         )}
       </div>
 
-      {/* 详情外链 */}
-      {item.detailUrl && (
-        <a
-          href={item.detailUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 p-1.5 rounded-lg text-pink-500 hover:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-all"
-          title="查看完整资料"
+      {/* 收藏 + 分享 */}
+      <div className="flex flex-col items-center gap-1.5 shrink-0">
+        <button
+          onClick={() => onToggleFavorite(item)}
+          disabled={!isAuthenticated}
+          className={`p-1.5 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+            isFavorited
+              ? 'text-rose-500 bg-rose-50 dark:bg-rose-900/20'
+              : 'text-stone-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20'
+          }`}
+          title={isFavorited ? '取消收藏' : '收藏'}
         >
-          <ExternalLink className="w-4 h-4" />
-        </a>
-      )}
+          <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
+        </button>
+        <ShareToCommunityButton
+          postData={{
+            postType: 'actress',
+            title: item.name,
+            coverImage: item.cover ? getProxyImageUrl(item.cover) : '',
+            contentData: JSON.stringify({
+              id: item.id,
+              name: item.name,
+              ruby: item.ruby,
+              romaji: item.romaji,
+              alias: item.alias,
+              birthday: item.birthday,
+              zodiac: item.zodiac,
+              height: item.height,
+              bust: item.bust,
+              cup: item.cup,
+              waist: item.waist,
+              hip: item.hip,
+              prefecture: item.prefecture,
+              agency: item.agency,
+              activePeriod: item.activePeriod,
+              debutWork: item.debutWork,
+              blogUrl: item.blogUrl,
+              officialUrl: item.officialUrl,
+              detailUrl: item.detailUrl,
+              cover: item.cover,
+              tags: item.tags,
+            }),
+          }}
+          isAuthenticated={isAuthenticated}
+          onLoginRequired={onLoginRequired}
+          size="small"
+        />
+      </div>
     </div>
   );
 }
@@ -175,9 +220,13 @@ function ActressCard({ item }: { item: ActressProfile }) {
 
 export interface JavActressResultsPanelProps {
   data: JavEnrichedData;
+  favoritedCodes: Set<string>;
+  isAuthenticated: boolean;
+  onToggleFavorite: (actress: ActressProfile) => void;
+  onLoginRequired: () => void;
 }
 
-export function JavActressResultsPanel({ data }: JavActressResultsPanelProps) {
+export function JavActressResultsPanel({ data, favoritedCodes, isAuthenticated, onToggleFavorite, onLoginRequired }: JavActressResultsPanelProps) {
   const [page, setPage] = useState(1);
   const actresses = data.actresses ?? [];
   const errorMsg = data.errors?.search;
@@ -227,7 +276,14 @@ export function JavActressResultsPanel({ data }: JavActressResultsPanelProps) {
       <div className="p-4 sm:p-5">
         <div className="space-y-2.5">
           {paged.map((item) => (
-            <ActressCard key={item.id} item={item} />
+            <ActressCard
+              key={item.id}
+              item={item}
+              isFavorited={favoritedCodes.has(`actress:${item.id}`)}
+              isAuthenticated={isAuthenticated}
+              onToggleFavorite={onToggleFavorite}
+              onLoginRequired={onLoginRequired}
+            />
           ))}
 
           {/* 分页 */}
