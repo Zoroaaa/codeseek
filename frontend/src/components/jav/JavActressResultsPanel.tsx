@@ -3,18 +3,32 @@
  *
  * 当 javtab 处于 actress 子模式时渲染，展示 minnano-av.com 抓取的女优资料。
  * 数据来源：后端 routes/search.ts 在 javSubMode==='actress' 时短路调用 fetchActresses。
+ *
+ * 图片代理：统一走后端 /api/jav/proxy-image（getProxyImageUrl），
+ * 而非前缀式 convertToProxyUrl —— 后者对图片会触发浏览器的 ORB。
  */
 import { useState } from 'react';
-import { ExternalLink, Users, ChevronLeft, ChevronRight, Wifi, MapPin, Calendar, Building2, Star, Link2 } from 'lucide-react';
+import { ExternalLink, Users, ChevronLeft, ChevronRight, Wifi, MapPin, Calendar, Building2, Star, Link2, Ruler } from 'lucide-react';
 import type { JavEnrichedData, ActressProfile } from '@/types/search';
-import { convertToProxyUrl } from '@/services/proxy';
+import { getProxyImageUrl } from '@/utils/imageProxy';
 
 const PAGE_SIZE = 10;
 
 // ─── 女优卡片 ────────────────────────────────────────────────────────────
 
-function ActressCard({ item, isProxyEnabled }: { item: ActressProfile; isProxyEnabled: boolean }) {
-  const imgSrc = isProxyEnabled && item.cover ? convertToProxyUrl(item.cover) : item.cover;
+function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <Icon className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500 shrink-0" />
+      <span className="text-stone-400 dark:text-stone-500 text-xs shrink-0">{label}</span>
+      <span className="text-stone-700 dark:text-stone-200 text-xs font-medium truncate">{value}</span>
+    </div>
+  );
+}
+
+function ActressCard({ item }: { item: ActressProfile }) {
+  // 统一走后端 /api/jav/proxy-image 避开浏览器 ORB
+  const imgSrc = item.cover ? getProxyImageUrl(item.cover) : undefined;
 
   const metrics: string[] = [];
   if (item.height) metrics.push(`T${item.height}`);
@@ -23,101 +37,122 @@ function ActressCard({ item, isProxyEnabled }: { item: ActressProfile; isProxyEn
   if (item.hip) metrics.push(`H${item.hip}`);
 
   return (
-    <div className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-all">
+    <div className="flex items-start gap-4 px-4 py-3.5 rounded-xl border border-stone-100 dark:border-stone-800 hover:border-pink-200 dark:hover:border-pink-900/50 hover:bg-pink-50/30 dark:hover:bg-pink-900/5 transition-all">
       {/* 封面 */}
       {imgSrc && (
         <img
           src={imgSrc}
           alt={item.name}
           loading="lazy"
-          className="shrink-0 w-12 h-16 rounded-md object-cover bg-stone-100 dark:bg-stone-800"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          className="shrink-0 w-16 h-20 rounded-lg object-cover bg-stone-100 dark:bg-stone-800 ring-1 ring-stone-200/60 dark:ring-stone-700/60"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
         />
       )}
 
-      {/* 信息 */}
-      <div className="min-w-0 flex-1">
-        {/* 名字 + 假名 + 罗马音 */}
-        <div className="flex items-baseline gap-1.5 flex-wrap">
+      {/* 信息主体 */}
+      <div className="min-w-0 flex-1 space-y-2">
+        {/* 名字区块：名字 + 假名 + 罗马音 */}
+        <div className="flex items-baseline gap-2 flex-wrap">
           {item.detailUrl ? (
             <a
               href={item.detailUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+              className="text-base font-bold text-stone-900 dark:text-stone-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
               {item.name}
             </a>
           ) : (
-            <span className="text-xs font-medium text-stone-700 dark:text-stone-300">{item.name}</span>
+            <span className="text-base font-bold text-stone-900 dark:text-stone-100">{item.name}</span>
           )}
-          {item.ruby && <span className="text-[10px] text-stone-400">{item.ruby}</span>}
-          {item.romaji && <span className="text-[10px] text-stone-400 italic">{item.romaji}</span>}
+          {item.ruby && (
+            <span className="text-sm text-stone-500 dark:text-stone-400">{item.ruby}</span>
+          )}
+          {item.romaji && (
+            <span className="text-sm text-stone-500 dark:text-stone-400 italic">{item.romaji}</span>
+          )}
         </div>
 
-        {/* 别名 */}
+        {/* 别名：独立行，明显区分 */}
         {item.alias && (
-          <div className="text-[10px] text-stone-500 mt-0.5">
-            <span className="text-stone-400">别名：</span>{item.alias}
+          <div className="text-xs text-stone-500 dark:text-stone-400">
+            <span className="text-stone-400 dark:text-stone-500 mr-1">别名</span>
+            <span className="font-medium">{item.alias}</span>
           </div>
         )}
 
-        {/* 三围 / 身高 */}
+        {/* 三围：醒目的彩色 chip */}
         {metrics.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
+          <div className="flex flex-wrap gap-1.5">
             {metrics.map((m, i) => (
-              <span key={i} className="px-1.5 py-0.5 text-[9px] font-medium bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400 rounded">{m}</span>
+              <span
+                key={i}
+                className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300 rounded-md"
+              >
+                {m}
+              </span>
             ))}
           </div>
         )}
 
-        {/* 基本信息行 */}
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-stone-500">
+        {/* 基本信息分组：grid 双列布局，每项 label:value 清晰 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 pt-1">
           {item.birthday && (
-            <span className="inline-flex items-center gap-0.5">
-              <Calendar className="w-2.5 h-2.5" />{item.birthday}
-              {item.zodiac && <span className="text-stone-400">{item.zodiac}</span>}
-            </span>
+            <InfoRow icon={Calendar} label="生日" value={item.birthday + (item.zodiac ? ` ${item.zodiac}` : '')} />
           )}
           {item.prefecture && (
-            <span className="inline-flex items-center gap-0.5">
-              <MapPin className="w-2.5 h-2.5" />{item.prefecture}
-            </span>
+            <InfoRow icon={MapPin} label="出身" value={item.prefecture} />
           )}
           {item.activePeriod && (
-            <span className="inline-flex items-center gap-0.5">
-              <Star className="w-2.5 h-2.5" />{item.activePeriod}
-            </span>
+            <InfoRow icon={Star} label="出道" value={item.activePeriod} />
           )}
           {item.agency && (
-            <span className="inline-flex items-center gap-0.5">
-              <Building2 className="w-2.5 h-2.5" />{item.agency}
-            </span>
+            <InfoRow icon={Building2} label="事务所" value={item.agency} />
+          )}
+          {item.debutWork && (
+            <InfoRow icon={Ruler} label="出道作" value={item.debutWork} />
           )}
         </div>
 
-        {/* 标签 */}
+        {/* 标签：独立分组 */}
         {item.tags && item.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {item.tags.slice(0, 8).map((t, i) => (
-              <span key={i} className="px-1 py-0.5 text-[9px] bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400 rounded">{t}</span>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {item.tags.slice(0, 10).map((t, i) => (
+              <span
+                key={i}
+                className="px-2 py-0.5 text-xs bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300 rounded-md"
+              >
+                {t}
+              </span>
             ))}
           </div>
         )}
 
         {/* 外链 */}
-        <div className="flex gap-2 mt-1">
-          {item.blogUrl && (
-            <a href={item.blogUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[9px] text-stone-400 hover:text-primary-500">
-              <Link2 className="w-2.5 h-2.5" />博客
-            </a>
-          )}
-          {item.officialUrl && (
-            <a href={item.officialUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[9px] text-stone-400 hover:text-primary-500">
-              <Link2 className="w-2.5 h-2.5" />官网
-            </a>
-          )}
-        </div>
+        {(item.blogUrl || item.officialUrl) && (
+          <div className="flex gap-3 pt-1">
+            {item.blogUrl && (
+              <a
+                href={item.blogUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-stone-500 dark:text-stone-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                <Link2 className="w-3 h-3" />博客
+              </a>
+            )}
+            {item.officialUrl && (
+              <a
+                href={item.officialUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-stone-500 dark:text-stone-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                <Link2 className="w-3 h-3" />官网
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 详情外链 */}
@@ -126,10 +161,10 @@ function ActressCard({ item, isProxyEnabled }: { item: ActressProfile; isProxyEn
           href={item.detailUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="shrink-0 text-[10px] text-pink-500 hover:text-pink-400 transition-colors"
+          className="shrink-0 p-1.5 rounded-lg text-pink-500 hover:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-all"
           title="查看完整资料"
         >
-          <ExternalLink className="w-3.5 h-3.5" />
+          <ExternalLink className="w-4 h-4" />
         </a>
       )}
     </div>
@@ -140,10 +175,9 @@ function ActressCard({ item, isProxyEnabled }: { item: ActressProfile; isProxyEn
 
 export interface JavActressResultsPanelProps {
   data: JavEnrichedData;
-  isProxyEnabled: boolean;
 }
 
-export function JavActressResultsPanel({ data, isProxyEnabled }: JavActressResultsPanelProps) {
+export function JavActressResultsPanel({ data }: JavActressResultsPanelProps) {
   const [page, setPage] = useState(1);
   const actresses = data.actresses ?? [];
   const errorMsg = data.errors?.search;
@@ -183,7 +217,7 @@ export function JavActressResultsPanel({ data, isProxyEnabled }: JavActressResul
           href={`https://www.minnano-av.com/search_result.php?search_scope=actress&search_word=${encodeURIComponent(data.keyword)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[10px] text-pink-500 hover:text-pink-400 transition-colors"
+          className="text-xs text-pink-500 hover:text-pink-400 transition-colors"
         >
           minnano 站内搜索 →
         </a>
@@ -191,9 +225,9 @@ export function JavActressResultsPanel({ data, isProxyEnabled }: JavActressResul
 
       {/* 列表 */}
       <div className="p-4 sm:p-5">
-        <div className="space-y-1.5">
+        <div className="space-y-2.5">
           {paged.map((item) => (
-            <ActressCard key={item.id} item={item} isProxyEnabled={isProxyEnabled} />
+            <ActressCard key={item.id} item={item} />
           ))}
 
           {/* 分页 */}
@@ -216,7 +250,7 @@ export function JavActressResultsPanel({ data, isProxyEnabled }: JavActressResul
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => p + 1)}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-stone-100 text-stone-500
-                           hover:bg-stone-200 hover:text-stone-700 transition-all
+                           hover:bg-stone-200 hover:text-stone-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all
                            dark:bg-stone-800/60 dark:text-stone-400 dark:hover:bg-stone-700 dark:hover:text-stone-200"
               >
                 下一页 <ChevronRight className="w-3.5 h-3.5" />

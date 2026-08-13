@@ -208,14 +208,28 @@ export const MainSearchPage: React.FC = () => {
           {(() => {
             const resultType = searchFlow.enrichedData?.resultType;
             const Panel = getResultPanel(resultType);
+            const javData = searchFlow.enrichedData as import('@/types/search').JavEnrichedData | undefined;
 
-            // JAV 女优搜索子模式：渲染女优结果面板
-            if (activeTab === 'jav' && javSubMode === 'actress' && searchFlow.enrichedData && resultType === 'jav') {
+            // JAV 女优搜索子模式：女优卡片 + 多源跳转卡片并行展示
+            if (activeTab === 'jav' && javSubMode === 'actress' && javData && resultType === 'jav') {
               return (
-                <JavActressResultsPanel
-                  data={searchFlow.enrichedData as import('@/types/search').JavEnrichedData}
-                  isProxyEnabled={isProxyEnabled}
-                />
+                <div className="flex flex-col gap-3 sm:gap-4">
+                  {/* 女优资料卡片（minnano-av 抓取） */}
+                  <JavActressResultsPanel data={javData} />
+                  {/* 多源跳转卡片（用户启用的 jav 源） */}
+                  <SearchResultsPanel
+                    results={searchFlow.searchResults}
+                    viewMode={viewMode}
+                    isAuthenticated={isAuthenticated}
+                    isProxyEnabled={isProxyEnabled}
+                    favorites={favoritesManager.favorites}
+                    categories={sourceManager.categories}
+                    majorCategories={sourceManager.majorCategories}
+                    onViewModeChange={setViewMode}
+                    onClose={() => searchFlow.resetResults()}
+                    onToggleFavorite={favoritesManager.handleToggleFavorite}
+                  />
+                </div>
               );
             }
 
