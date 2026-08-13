@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { clsx } from 'clsx';
-import { Heart, Star, MessageSquare, Eye, Bookmark, Users, Film, Tv, BookOpen, Library } from 'lucide-react';
+import { Heart, Star, MessageSquare, Eye, Bookmark, Users, Film, Tv, BookOpen, Library, Download } from 'lucide-react';
 import { Card, Badge, ProxyImage } from '@/components/ui';
 import type { CommunityPost } from '@/types/community';
 import { getBackendBaseUrl } from '@/constants';
@@ -124,7 +124,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onFavorite, on
           </Badge>
         </div>
 
-        {/* 特殊标签 - JAV演员数/Anime评分/Movie星级 */}
+        {/* 特殊标签 - 按类型展示关键信息 */}
         <div className="absolute top-3 right-3 flex gap-1.5">
           {post.postType === 'jav' && contentData.actresses?.length > 0 && (
             <Badge variant="default" size="sm" className="bg-black/60 text-white backdrop-blur-sm border-0">
@@ -132,24 +132,37 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onFavorite, on
               {contentData.actresses.length}
             </Badge>
           )}
-          {post.postType === 'anime' && contentData.rating && (
-            <Badge variant="warning" size="sm" className="bg-black/60 text-white backdrop-blur-sm border-0">
+          {post.postType === 'anime' && (() => {
+            const resCount = (contentData.nyaa?.length || 0) + (contentData.mikan?.length || 0) + (contentData.animetosho?.length || 0) + (contentData.showrss?.length || 0);
+            const rating = contentData.bgm?.[0]?.rating;
+            return (resCount > 0 || rating) ? (
+              <Badge variant="default" size="sm" className="bg-black/60 text-white backdrop-blur-sm border-0">
+                {rating ? <><Star className="w-3 h-3 mr-1 fill-current" />{rating}</> : <><Download className="w-3 h-3 mr-1" />{resCount}</>}
+              </Badge>
+            ) : null;
+          })()}
+          {post.postType === 'movie' && contentData.results?.[0]?.rating > 0 && (
+            <Badge variant="default" size="sm" className="bg-black/60 text-white backdrop-blur-sm border-0">
               <Star className="w-3 h-3 mr-1 fill-current" />
-              {contentData.rating}
+              {contentData.results[0].rating}
             </Badge>
           )}
-          {post.postType === 'movie' && contentData.rating && (
-            <div className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className={clsx(
-                    'w-3 h-3',
-                    star <= Math.round(contentData.rating / 2) && 'fill-warning-500 text-warning-500'
-                  )}
-                />
-              ))}
-            </div>
+          {post.postType === 'manga' && contentData.manga?.length > 0 && (
+            <Badge variant="default" size="sm" className="bg-black/60 text-white backdrop-blur-sm border-0">
+              <BookOpen className="w-3 h-3 mr-1" />
+              {contentData.manga.length}
+            </Badge>
+          )}
+          {post.postType === 'novel' && contentData.novels?.length > 0 && (
+            <Badge variant="default" size="sm" className="bg-black/60 text-white backdrop-blur-sm border-0">
+              <Library className="w-3 h-3 mr-1" />
+              {contentData.novels.length}
+            </Badge>
+          )}
+          {post.postType === 'actress' && contentData.cup && (
+            <Badge variant="default" size="sm" className="bg-black/60 text-white backdrop-blur-sm border-0">
+              {contentData.cup} Cup
+            </Badge>
           )}
         </div>
 

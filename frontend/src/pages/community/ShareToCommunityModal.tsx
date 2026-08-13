@@ -83,11 +83,11 @@ export const ShareToCommunityModal: React.FC<ShareToCommunityModalProps> = ({
   const typeConfig = POST_TYPE_CONFIG[initialData.postType];
   const TypeIcon = typeConfig.icon;
 
-  const toggleTag = (tagId: string) => {
+  const toggleTag = (tagName: string) => {
     setSelectedTags(prev =>
-      prev.includes(tagId)
-        ? prev.filter(t => t !== tagId)
-        : [...prev, tagId]
+      prev.includes(tagName)
+        ? prev.filter(t => t !== tagName)
+        : [...prev, tagName]
     );
   };
 
@@ -201,15 +201,15 @@ export const ShareToCommunityModal: React.FC<ShareToCommunityModalProps> = ({
               <button
                 key={tag.id}
                 type="button"
-                onClick={() => toggleTag(tag.id)}
+                onClick={() => toggleTag(tag.tagName)}
                 className={clsx(
                   'px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200',
-                  selectedTags.includes(tag.id)
+                  selectedTags.includes(tag.tagName)
                     ? 'text-white shadow-md'
                     : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700'
                 )}
                 style={
-                  selectedTags.includes(tag.id)
+                  selectedTags.includes(tag.tagName)
                     ? { backgroundColor: tag.tagColor }
                     : undefined
                 }
