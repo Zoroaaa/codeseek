@@ -105,7 +105,11 @@ function parseSearchList(html: string, keyword: string): Array<{ id: string; nam
 
 /**
  * 从详情页 HTML 解析完整女优资料
- * 详情页结构：h2 含名字（假名 / 罗马音），tbllist 表格含各字段
+ *
+ * 详情页字段结构（经浏览器实地验证）：
+ *   <tr><td><span>标签</span><p>值</p></td></tr>
+ * 标签在 <span>，值在紧邻的 <p>。
+ * タグ字段特殊：<span>タグ</span> 后跟 <div class="tagarea"><a>标签1</a>...</div>
  */
 function parseDetailPage(html: string, detailUrl: string): ActressProfile | null {
   if (!html || html.length < 500) return null;
@@ -126,7 +130,6 @@ function parseDetailPage(html: string, detailUrl: string): ActressProfile | null
     name = parts[0] || '';
     if (parts[1]) ruby = parts[1];
     if (parts[2]) romaji = parts[2];
-    // 清理尾部 ）
     ruby = ruby.replace(/[)）]/g, '').trim();
     romaji = romaji.replace(/[)）]/g, '').trim();
   }
@@ -141,23 +144,20 @@ function parseDetailPage(html: string, detailUrl: string): ActressProfile | null
     cover = coverMatch[1].startsWith('http') ? coverMatch[1] : `${BASE}${coverMatch[1]}`;
   }
 
-  // 用正则从 HTML 提取字段（详情页字段在 <tr> 或 <div> 里以 "标签\n值" 形式出现）
-  const getText = (html: string): string => html.replace(/<[^>]+>/g, '').trim();
-
-  // 提取表格行：<tr><th>标签</th><td>值</td></tr> 或类似结构
-  // minnano 实际结构是 div 块，字段名和值相邻
-  const fullText = getText(html);
+  // 核心解析：按 <span>label</span> 定位，取紧邻的 <p>value</p> 内容
+  // 结构：<span>生年月日</span><p>1998年03月18日\n（現在 28歳）うお座</p>
+  const stripTags = (s: string): string => s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
   const extractField = (label: string): string => {
-    // 匹配 "标签\n值\n" 模式（值到下一个标签前）
-    const re = new RegExp(label + '[\\s\\n]+([^\\n]+?)(?=[\\n]|生年月日|サイズ|出身地|所属事務所|AV出演期間|デビュー作品|ブログ|公式サイト|タグ|別名|$)', 'i');
-    const m = fullText.match(re);
-    return m ? m[1].trim() : '';
+    // 匹配 <span>label</span> 后的 <p>...</p>（中间允许有空白/换行）
+    const re = new RegExp('<span[^>]*>' + label + '</span>\\s*<p[^>]*>([\\s\\S]*?)</p>', 'i');
+    const m = html.match(re);
+    return m ? stripTags(m[1]) : '';
   };
 
   // 別名
   const aliasRaw = extractField('別名');
-  const alias = aliasRaw && aliasRaw.length < 60 ? aliasRaw : undefined;
+  const alias = aliasRaw && aliasRaw.length < 80 ? aliasRaw : undefined;
 
   // 生年月日: "1998年03月18日 （現在 28歳）うお座"
   const birthdayRaw = extractField('生年月日');
@@ -201,9 +201,14 @@ function parseDetailPage(html: string, detailUrl: string): ActressProfile | null
   const blogUrl = extractField('ブログ') || undefined;
   const officialUrl = extractField('公式サイト') || undefined;
 
-  // タグ
-  const tagsRaw = extractField('タグ');
-  const tags = tagsRaw ? tagsRaw.split(/\s+/).filter(t => t.length < 10).slice(0, 15) : undefined;
+  // タグ：特殊结构，<span>タグ</span> 后跟 <div class="tagarea"><a>标签</a>...</div>
+  const tags: string[] | undefined = (() => {
+    const tagBlockMatch = html.match(/<span[^>]*>タグ<\/span>[\s\S]*?<div[^>]*class="[^"]*tagarea[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    if (!tagBlockMatch) return undefined;
+    const tagLinks = tagBlockMatch[1].match(/<a[^>]*>([^<]+)<\/a>/gi) || [];
+    const ts = tagLinks.map(t => stripTags(t)).filter(Boolean);
+    return ts.length > 0 ? ts.slice(0, 15) : undefined;
+  })();
 
   return {
     id,
