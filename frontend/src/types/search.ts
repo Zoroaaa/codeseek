@@ -201,6 +201,8 @@ export interface MovieEnrichedData {
 export interface JavEnrichedData {
   resultType: 'jav';
   keyword: string;
+  /** 归一化后的日文名（actress 子模式）：供「minnano 站内搜索」链接使用 */
+  normalizedKeyword?: string;
   page: number;
   total: number;
   errors: Record<string, string | null>;

@@ -263,7 +263,7 @@ export function JavActressResultsPanel({ data, favoritedCodes, isAuthenticated, 
           <span className="px-2 py-0.5 text-xs font-bold bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-full">{actresses.length} 位</span>
         </div>
         <a
-          href={`https://www.minnano-av.com/search_result.php?search_scope=actress&search_word=${encodeURIComponent(data.keyword)}`}
+          href={`https://www.minnano-av.com/search_result.php?search_scope=actress&search_word=${encodeURIComponent(data.normalizedKeyword ?? data.keyword)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs text-pink-500 hover:text-pink-400 transition-colors"

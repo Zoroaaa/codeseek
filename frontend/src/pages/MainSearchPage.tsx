@@ -211,7 +211,7 @@ export const MainSearchPage: React.FC = () => {
                 <p className="text-xs text-red-400 mt-2 ml-1">格式請按照【SONE-520】或【SONE520】搜尋</p>
               )}
               {javSubMode === 'actress' && (
-                <p className="text-xs text-surface-500 dark:text-surface-400 mt-2 ml-1">提示：請嘗試按照維基百科使用繁體中文名或是日文名，如【水菜麗】請改成【みづなれい】搜尋</p>
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-2 ml-1">提示：可直接輸入中文名（簡繁均可）或日文名，系統自動轉換為日文搜尋</p>
               )}
               {javSubMode === 'title' && (
                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-2 ml-1">提示：請嘗試縮短字數，並優先使用【日文】搜尋</p>

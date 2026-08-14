@@ -20,6 +20,7 @@ import { checkMultiLevelRateLimit, checkRateLimitD1 } from '@/utils/rate-limit';
 import { providerRegistry } from '@/services/search-provider';
 import { setTmdbApiKey } from '@/providers/movie-provider';
 import { fetchActresses, type ActressProfile } from '@/services/actress-search';
+import { normalizeActressKeyword } from '@/services/actress-name-map';
 
 const R = VALIDATION_RULES;
 
@@ -327,6 +328,8 @@ searchRoutes.post('/', async (c) => {
             const actressData: Record<string, unknown> = {
               resultType: 'jav',
               keyword: trimmedKeyword,
+              // 归一化后的日文名：供前端「minnano 站内搜索」链接使用（原文搜不到含假名女优）
+              normalizedKeyword: normalizeActressKeyword(trimmedKeyword),
               page: limitPage,
               total: multiSourceResults.length,
               errors: { search: actressError },

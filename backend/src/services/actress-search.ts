@@ -9,6 +9,7 @@
  */
 
 import { getHtml } from '@/services/jav-utils';
+import { normalizeActressKeyword } from '@/services/actress-name-map';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────
 
@@ -246,7 +247,9 @@ const MAX_DETAIL_FETCH = 10; // 最多并发抓取详情页数量
 export async function fetchActresses(keyword: string): Promise<ActressProfile[]> {
   if (!keyword.trim()) return [];
 
-  const searchUrl = `${BASE}/search_result.php?search_scope=actress&search_word=${encodeURIComponent(keyword.trim())}`;
+  // 归一化：简体中文俗称/繁体 → minnano 可搜的日文名（映射表 + opencc 简→日新字体转换）
+  const normalized = normalizeActressKeyword(keyword);
+  const searchUrl = `${BASE}/search_result.php?search_scope=actress&search_word=${encodeURIComponent(normalized)}`;
   const html = await getHtml(searchUrl, 15000);
   if (!html || html.length < 500) return [];
 
