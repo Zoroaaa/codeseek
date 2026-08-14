@@ -173,10 +173,15 @@ async function saveEnrichedHistory(
       break;
     }
     case 'novel': {
-      // 小说：优先取 Anna's Archive 结果，fallback 到奇书网置顶结果
-      // （Anna 403 等故障时奇书网是唯一有效数据，不应跳过）
+      // 小说置顶顺序：zxcs（知轩藏书） → 奇书网 → Anna's Archive
+      // - zxcs / 奇书网均为 page=1 置顶抓取，源标识分别为 "知轩藏书" / "奇书网"
+      // - Anna 403 等故障时前两源仍可能有效，不应跳过
       const novels = (result as { novels?: Array<{ id: string; title: string; cover: string; author?: string; publisher?: string; format?: string; year?: string; category?: string; source?: string }> }).novels;
-      const firstNovel = novels?.find(n => n.source !== '奇书网') || novels?.[0];
+      const firstNovel =
+        novels?.find(n => n.source === '知轩藏书')
+        || novels?.find(n => n.source === '奇书网')
+        || novels?.find(n => n.source !== '知轩藏书' && n.source !== '奇书网')
+        || novels?.[0];
       if (firstNovel) {
         updateFields.push('title=?, cover=?, code=?');
         updateValues.push(
