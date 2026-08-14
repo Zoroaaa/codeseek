@@ -16,6 +16,8 @@ import {
   Magnet,
   Link2,
   RefreshCw,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { dataStorageApi } from '@/services/api';
 import { useAuthStore } from '@/stores';
@@ -28,6 +30,7 @@ import { Pagination, StatCard, StatsGrid, formatRelativeTime } from './shared';
 import type {
   DataRecord,
   DataRecordDetail,
+  DataRecordSource,
   DataStorageStats,
   DataRecordType,
 } from '@/types';
@@ -165,6 +168,16 @@ export const DataStorageTab: React.FC = () => {
       if (activeView === 'records') loadRecords();
     } catch {
       toast.error('清理失败');
+    }
+  };
+
+  // 磁力链接复制到剪贴板（magnet: 协议浏览器无法直接打开，供用户粘贴到下载工具）
+  const copyToClipboard = async (text: string, label = '链接') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label}已复制`);
+    } catch {
+      toast.error('复制失败');
     }
   };
 
@@ -489,7 +502,6 @@ export const DataStorageTab: React.FC = () => {
                 </h4>
                 <div className="space-y-1.5 max-h-60 overflow-y-auto">
                   {detail.sources.map((s) => {
-                    const isMagnet = s.sourceType === 'magnet';
                     let extra = '';
                     try {
                       const d = JSON.parse(s.sourceData);
@@ -499,34 +511,12 @@ export const DataStorageTab: React.FC = () => {
                       /* ignore */
                     }
                     return (
-                      <div
+                      <SourceLinkRow
                         key={s.id}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-surface-50 dark:bg-surface-900/50"
-                      >
-                        {isMagnet ? (
-                          <Magnet className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                        ) : (
-                          <Link2 className="w-3.5 h-3.5 text-surface-400 shrink-0" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-medium text-surface-700 dark:text-surface-300 truncate">
-                            {s.sourceName}
-                            {extra && <span className="text-surface-400 font-normal ml-1">· {extra}</span>}
-                          </div>
-                          <div className="text-[10px] text-surface-400 font-mono truncate">{s.sourceUrl}</div>
-                        </div>
-                        {s.sourceUrl && (
-                          <a
-                            href={s.sourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1 rounded text-surface-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 shrink-0"
-                            title="打开链接"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                      </div>
+                        source={s}
+                        extra={extra}
+                        onCopy={copyToClipboard}
+                      />
                     );
                   })}
                 </div>
@@ -685,3 +675,59 @@ function parseActors(raw: string): string[] {
   }
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
+
+// ─── 子组件：来源链接行（磁力→复制，网页→打开） ──────────────────────
+
+const SourceLinkRow: React.FC<{
+  source: DataRecordSource;
+  extra: string;
+  onCopy: (text: string, label?: string) => void;
+}> = ({ source, extra, onCopy }) => {
+  const [copied, setCopied] = useState(false);
+  const isMagnet = source.sourceType === 'magnet';
+
+  const handleCopy = () => {
+    if (!source.sourceUrl) return;
+    onCopy(source.sourceUrl, '磁力链接');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-lg bg-surface-50 dark:bg-surface-900/50">
+      {isMagnet ? (
+        <Magnet className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+      ) : (
+        <Link2 className="w-3.5 h-3.5 text-surface-400 shrink-0" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-medium text-surface-700 dark:text-surface-300 truncate">
+          {source.sourceName}
+          {extra && <span className="text-surface-400 font-normal ml-1">· {extra}</span>}
+        </div>
+        <div className="text-[10px] text-surface-400 font-mono truncate">{source.sourceUrl}</div>
+      </div>
+      {source.sourceUrl && (
+        isMagnet ? (
+          <button
+            onClick={handleCopy}
+            className="p-1 rounded text-surface-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 shrink-0 transition-colors"
+            title="复制磁力链接"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        ) : (
+          <a
+            href={source.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1 rounded text-surface-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 shrink-0"
+            title="打开链接"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )
+      )}
+    </div>
+  );
+};

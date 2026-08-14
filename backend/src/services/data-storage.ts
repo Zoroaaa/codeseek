@@ -7,9 +7,25 @@
  * 集成点：
  *   - persistDataRecord: 搜索路由 saveEnrichedHistory 之后异步调用
  *   - enrichDataRecordFromDetail: JAV detail 路由返回前异步调用（补充磁力来源）
+ *
+ * 数据完整性策略：
+ *   - content_data 存储搜索返回的首条完整元数据（含 overview/summary 等明细字段）
+ *   - data_record_sources 表存储所有磁力/下载链接（anime/movie/novel 各源的磁力）
+ *   - JAV 番号搜索返回完整详情，首采即 detail_completed=1
+ *   - 列表型结果（anime/movie/manga/novel）首采 detail_completed=0，后续按需补充
  */
 import { generateId } from '@/utils';
 import type { MagnetItem } from './jav-utils';
+
+// ─── JAV 封面相对路径补全 ─────────────────────────────────────────────
+// JavBus 返回的 cover 是相对路径（如 /pics/cover/9ho0_b.jpg），
+// 落库时补全为完整 URL，避免前端展示时再处理。
+function resolveJavCover(cover: string | undefined): string | undefined {
+  if (!cover) return undefined;
+  if (cover.startsWith('http://') || cover.startsWith('https://')) return cover;
+  if (cover.startsWith('/')) return `https://www.javbus.com${cover}`;
+  return cover;
+}
 
 // ─── 类型：Provider 返回结构（局部定义，避免循环依赖） ────────────────
 
@@ -30,15 +46,62 @@ interface BgmItem {
   tags?: string[];
   studio?: string;
   rating?: number;
+  url?: string;
+  type?: string;
+  status?: string;
+  collection?: { wish?: number; collect?: number; doing?: number; dropped?: number };
+}
+
+/** 动漫统一磁力资源（nyaa/mikan/animetosho/showrss 归一化） */
+interface AnimeUnifiedResource {
+  source: string;
+  sourceLabel: string;
+  title: string;
+  magnet: string;
+  size: string;
+  date: string;
+  seeders?: number;
+  leechers?: number;
+  group?: string;
+  trusted?: boolean;
+}
+
+/** 动漫归组结果 */
+interface AnimeGrouped {
+  groups?: Array<{ subject: { id: number }; resources: AnimeUnifiedResource[] }>;
+  ungrouped?: AnimeUnifiedResource[];
 }
 
 interface MovieItem {
   id: number;
   title: string;
+  originalTitle?: string;
+  overview?: string;
   poster: string | null;
+  backdrop?: string | null;
+  releaseDate?: string;
   release_date?: string;
   first_air_date?: string;
+  year?: string;
+  rating?: number;
   vote_average?: number;
+  voteCount?: number;
+  mediaType?: string;
+  source?: string;
+}
+
+/** 影视资源项（磁力/网盘） */
+interface MovieResourceItem {
+  title: string;
+  magnet?: string;
+  size?: string;
+  date?: string;
+  source: string;
+  sourceLabel: string;
+  resourceType?: 'magnet' | 'drive' | 'direct';
+  driveUrl?: string;
+  driveCode?: string;
+  detailUrl?: string;
 }
 
 interface MangaItem {
@@ -54,11 +117,15 @@ interface NovelItem {
   title: string;
   cover: string;
   author?: string;
+  description?: string;
   publisher?: string;
   format?: string;
   year?: string;
   category?: string;
   source?: string;
+  language?: string;
+  size?: string;
+  detailUrl?: string;
 }
 
 interface JavDetail {
@@ -219,14 +286,115 @@ function magnetsToSources(magnets: MagnetItem[], detailUrl?: string): SourceEntr
   return sources;
 }
 
+// ─── 动漫磁力资源 → 来源条目 ─────────────────────────────────────────
+// 优先取 grouped 中首条作品的关联磁力（精准归属），fallback 到全部磁力前 20 条
+function animeResourcesToSources(
+  result: Record<string, unknown>,
+  firstBgmId: number
+): SourceEntry[] {
+  const grouped = result.grouped as AnimeGrouped | undefined;
+  const nyaa = (result.nyaa as Array<{ title: string; magnet: string; size?: string; date?: string; seeders?: number; leechers?: number; trusted?: boolean }> | undefined) || [];
+  const mikan = (result.mikan as Array<{ title: string; magnet: string; size?: string; pubDate?: string; group?: string }> | undefined) || [];
+  const animetosho = (result.animetosho as Array<{ title: string; magnet: string; size?: string; date?: string; seeders?: number; leechers?: number }> | undefined) || [];
+  const showrss = (result.showrss as Array<{ title: string; magnet: string }> | undefined) || [];
+
+  // 优先用归组数据：取首条作品关联的磁力
+  if (grouped?.groups?.length) {
+    const firstGroup = grouped.groups.find((g) => g.subject.id === firstBgmId);
+    if (firstGroup?.resources?.length) {
+      return firstGroup.resources
+        .filter((r) => r.magnet)
+        .slice(0, 30)
+        .map((r) => ({
+          sourceName: r.sourceLabel || r.source || 'unknown',
+          sourceType: 'magnet',
+          sourceUrl: r.magnet,
+          sourceData: {
+            name: r.title,
+            size: r.size,
+            date: r.date,
+            seeders: r.seeders,
+            leechers: r.leechers,
+            group: r.group,
+            trusted: r.trusted,
+          },
+        }));
+    }
+  }
+
+  // fallback：合并所有磁力源前 20 条（去重 magnet）
+  const seen = new Set<string>();
+  const sources: SourceEntry[] = [];
+  const pushMagnet = (sourceName: string, item: { title: string; magnet: string; size?: string; date?: string | undefined; }) => {
+    if (!item.magnet || seen.has(item.magnet)) return;
+    seen.add(item.magnet);
+    sources.push({
+      sourceName,
+      sourceType: 'magnet',
+      sourceUrl: item.magnet,
+      sourceData: { name: item.title, size: item.size, date: item.date },
+    });
+  };
+
+  for (const n of nyaa.slice(0, 10)) pushMagnet('Nyaa', n);
+  for (const m of mikan.slice(0, 5)) pushMagnet('Mikan', { title: m.title, magnet: m.magnet, size: m.size, date: m.pubDate });
+  for (const a of animetosho.slice(0, 5)) pushMagnet('AnimeTosho', a);
+  for (const s of showrss.slice(0, 3)) pushMagnet('showRSS', s);
+
+  return sources.slice(0, 20);
+}
+
+// ─── 影视磁力资源 → 来源条目 ─────────────────────────────────────────
+
+function movieResourcesToSources(result: Record<string, unknown>): SourceEntry[] {
+  const resources = (result.resources as MovieResourceItem[] | undefined) || [];
+  const seen = new Set<string>();
+  const sources: SourceEntry[] = [];
+
+  for (const r of resources.slice(0, 30)) {
+    // 磁力链接
+    if (r.magnet && !seen.has(r.magnet)) {
+      seen.add(r.magnet);
+      sources.push({
+        sourceName: r.sourceLabel || r.source || 'unknown',
+        sourceType: 'magnet',
+        sourceUrl: r.magnet,
+        sourceData: { name: r.title, size: r.size, date: r.date },
+      });
+    }
+    // 网盘链接
+    if (r.driveUrl && !seen.has(r.driveUrl)) {
+      seen.add(r.driveUrl);
+      sources.push({
+        sourceName: r.sourceLabel || r.source || 'unknown',
+        sourceType: r.resourceType || 'drive',
+        sourceUrl: r.driveUrl,
+        sourceData: { name: r.title, code: r.driveCode, size: r.size, date: r.date },
+      });
+    }
+    // 详情页直链
+    if (r.detailUrl && !seen.has(r.detailUrl)) {
+      seen.add(r.detailUrl);
+      sources.push({
+        sourceName: r.sourceLabel || r.source || 'unknown',
+        sourceType: 'detail',
+        sourceUrl: r.detailUrl,
+        sourceData: { name: r.title },
+      });
+    }
+  }
+
+  return sources;
+}
+
 // ═════════════════════════════════════════════════════════════════════
 // 公开 API
 // ═════════════════════════════════════════════════════════════════════
 
 /**
  * 主入口：从搜索结果提取并落库。
- * 列表型结果仅采首条基础元数据（detail_completed=0）；
- * JAV 番号搜索返回完整详情，首采即 detail_completed=1 并写入磁力来源。
+ * - 列表型结果采首条完整元数据 + 所有磁力资源写入 sources 表
+ * - JAV 番号搜索返回完整详情，首采即 detail_completed=1
  *
  * 容错：任何异常只 console.error，不抛出（搜索路由用 waitUntil 异步调用）。
  */
@@ -247,11 +415,12 @@ export async function persistDataRecord(
         const detail = result.detail as JavDetail | undefined;
         if (detail && detail.code && detail.title) {
           const magnets = (result.magnets as MagnetItem[] | undefined) || [];
+          const resolvedCover = resolveJavCover(detail.cover);
           payload = {
             recordType: 'jav',
             dedupKey: `jav:${detail.code}`,
             title: detail.title,
-            cover: detail.cover,
+            cover: resolvedCover,
             code: detail.code,
             actors: detail.actresses?.length ? JSON.stringify(detail.actresses) : undefined,
             duration: detail.duration,
@@ -260,6 +429,7 @@ export async function persistDataRecord(
             tags: detail.tags,
             contentData: {
               ...detail,
+              cover: resolvedCover,
               magnets: magnets.map((m) => ({
                 name: m.name,
                 magnet: m.magnet,
@@ -302,6 +472,9 @@ export async function persistDataRecord(
         const bgm = result.bgm as BgmItem[] | undefined;
         const first = bgm?.[0];
         if (first && first.id) {
+          // 提取该作品关联的磁力资源
+          sources = animeResourcesToSources(result, first.id);
+
           payload = {
             recordType: 'anime',
             dedupKey: `anime:bgm:${first.id}`,
@@ -312,13 +485,15 @@ export async function persistDataRecord(
             tags: first.tags,
             rating: first.rating != null ? `${first.rating} 分` : undefined,
             contentData: {
-              id: first.id,
-              name: first.name,
-              nameCN: first.nameCN,
-              cover: first.cover,
-              tags: first.tags,
-              studio: first.studio,
-              rating: first.rating,
+              // 完整 bgm 元数据（含 url/type/status/collection 等明细字段）
+              ...first,
+              // 磁力资源摘要（详情进 sources 表，这里存摘要供前端快速预览）
+              magnetCount: sources.length,
+              magnets: sources.slice(0, 10).map((s) => ({
+                name: (s.sourceData as { name?: string }).name,
+                source: s.sourceName,
+                size: (s.sourceData as { size?: string }).size,
+              })),
             },
             detailCompleted: 0,
           };
@@ -327,12 +502,12 @@ export async function persistDataRecord(
       }
       case 'movie': {
         const results = result.results as MovieItem[] | undefined;
-        // 注意：movie 的 results 在 JAV Hybrid 下会被多源跳转覆盖，
-        // 但 movie provider 自身返回的列表在 enrichedData.results 赋值前已存在；
-        // 这里取首条有 id 的（poster 可能为 null）
         const first = results?.find((r) => r && typeof r.id === 'number');
         if (first) {
-          const release = first.release_date || first.first_air_date;
+          const release = first.releaseDate || first.release_date || first.first_air_date;
+          // 提取磁力/网盘资源
+          sources = movieResourcesToSources(result);
+
           payload = {
             recordType: 'movie',
             dedupKey: `movie:tmdb:${first.id}`,
@@ -340,14 +515,18 @@ export async function persistDataRecord(
             cover: first.poster || undefined,
             code: `tmdb:${first.id}`,
             releaseDate: release,
-            rating: first.vote_average != null ? `${first.vote_average} 分` : undefined,
+            rating: (first.rating ?? first.vote_average) != null
+              ? `${first.rating ?? first.vote_average} 分`
+              : undefined,
             contentData: {
-              id: first.id,
-              title: first.title,
-              poster: first.poster,
-              release_date: first.release_date,
-              first_air_date: first.first_air_date,
-              vote_average: first.vote_average,
+              // 完整 TMDB 元数据（含 overview/originalTitle/backdrop/voteCount 等明细）
+              ...first,
+              magnetCount: sources.length,
+              magnets: sources.slice(0, 10).map((s) => ({
+                name: (s.sourceData as { name?: string }).name,
+                source: s.sourceName,
+                size: (s.sourceData as { size?: string }).size,
+              })),
             },
             detailCompleted: 0,
           };
@@ -379,33 +558,45 @@ export async function persistDataRecord(
       }
       case 'novel': {
         const novels = result.novels as NovelItem[] | undefined;
-        // novels[0] 是奇书网置顶项，跳过，取第一条 Anna's Archive 结果
-        const first = novels?.find((n) => n && n.id && n.source !== '奇书网');
-        if (first) {
-          const tags = [first.format, first.year, first.category].filter(Boolean) as string[];
-          payload = {
-            recordType: 'novel',
-            dedupKey: `novel:${first.id}`,
-            title: first.title,
-            cover: first.cover,
-            code: first.id,
-            actors: first.author,
-            publisher: first.publisher,
-            tags,
-            contentData: {
-              id: first.id,
+        if (!novels || novels.length === 0) break;
+
+        // 优先取 Anna's Archive 结果（source !== '奇书网'）
+        // fallback：若 Anna 全部失败（如 403），取奇书网置顶结果
+        const first = novels.find((n) => n && n.id && n.source !== '奇书网') || novels[0];
+        if (!first) break;
+
+        const tags = [first.format, first.year, first.category].filter(Boolean) as string[];
+
+        // 详情/下载链接作为来源
+        if (first.detailUrl) {
+          sources.push({
+            sourceName: first.source || (first.source === '奇书网' ? '奇书网' : "Anna's Archive"),
+            sourceType: first.source === '奇书网' ? 'download' : 'detail',
+            sourceUrl: first.detailUrl,
+            sourceData: {
               title: first.title,
-              cover: first.cover,
-              author: first.author,
-              publisher: first.publisher,
               format: first.format,
-              year: first.year,
-              category: first.category,
+              size: first.size,
               source: first.source,
             },
-            detailCompleted: 0,
-          };
+          });
         }
+
+        payload = {
+          recordType: 'novel',
+          dedupKey: `novel:${first.id}`,
+          title: first.title,
+          cover: first.cover,
+          code: first.id,
+          actors: first.author,
+          publisher: first.publisher,
+          tags,
+          contentData: {
+            // 完整小说元数据（含 description/detailUrl/language/size 等明细）
+            ...first,
+          },
+          detailCompleted: 0,
+        };
         break;
       }
     }
@@ -436,6 +627,7 @@ export async function enrichDataRecordFromDetail(
     if (!d?.code || !d?.title) return;
 
     const magnets = detail.magnets || [];
+    const resolvedCover = resolveJavCover(d.cover);
     const dedupKey = `jav:${d.code}`;
     const now = Date.now();
 
@@ -447,6 +639,7 @@ export async function enrichDataRecordFromDetail(
 
     const contentData = {
       ...d,
+      cover: resolvedCover,
       magnets: magnets.map((m) => ({
         name: m.name,
         magnet: m.magnet,
@@ -469,7 +662,7 @@ export async function enrichDataRecordFromDetail(
         )
         .bind(
           d.title,
-          d.cover ?? null,
+          resolvedCover ?? null,
           d.actresses?.length ? JSON.stringify(d.actresses) : null,
           d.duration ?? null,
           d.releaseDate ?? null,
@@ -498,7 +691,7 @@ export async function enrichDataRecordFromDetail(
           id,
           dedupKey,
           d.title,
-          d.cover ?? null,
+          resolvedCover ?? null,
           d.code,
           d.actresses?.length ? JSON.stringify(d.actresses) : null,
           d.duration ?? null,
