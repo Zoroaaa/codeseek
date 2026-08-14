@@ -22,6 +22,7 @@ import { setTmdbApiKey } from '@/providers/movie-provider';
 import { fetchActresses, fetchActressWorks, type ActressProfile } from '@/services/actress-search';
 import { normalizeActressKeyword } from '@/services/actress-name-map';
 import type { JavItem } from '@/services/jav-utils';
+import { persistDataRecord } from '@/services/data-storage';
 
 const R = VALIDATION_RULES;
 
@@ -358,6 +359,11 @@ searchRoutes.post('/', async (c) => {
               } catch (e) { console.warn('Failed to update search history:', e); }
             }
 
+            // 数据存储：异步落库有效结果（去重，不阻塞响应）
+            c.executionCtx.waitUntil(
+              persistDataRecord(c.env.DB, actressData).catch((e) => console.error('[data-storage] persist error:', e))
+            );
+
             const responsePayload = { success: true, data: actressData };
             const responseBody = JSON.stringify(responsePayload);
             const newResponse = new Response(responseBody, {
@@ -412,6 +418,11 @@ searchRoutes.post('/', async (c) => {
               console.error(`[saveEnrichedHistory] ${provider.id} history save failed:`, histErr);
             }
           }
+
+          // 数据存储：异步落库有效结果（去重，不阻塞响应）
+          c.executionCtx.waitUntil(
+            persistDataRecord(c.env.DB, enrichedData).catch((e) => console.error('[data-storage] persist error:', e))
+          );
 
           // ── Cache Layer: 缓存搜索结果 ──
           const responseBody = JSON.stringify(success(enrichedData, '搜索完成'));
