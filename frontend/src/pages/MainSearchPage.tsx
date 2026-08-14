@@ -118,6 +118,14 @@ export const MainSearchPage: React.FC = () => {
 
   const isAdmin = isAuthenticated && user != null && (user.role === 'admin' || user.role === 'super_admin');
 
+  // 女优作品点击：切换到番号子模式并搜索，让用户从女优作品直接跳转到番号详情
+  const handleActressWorkClick = (code: string) => {
+    setJavSubMode('code');
+    searchFlow.setKeyword(code);
+    searchFlow.handleSearch(code, 1, 'code');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const renderFavoritesPanel = () => isAuthenticated && (
     <FavoritesPanel favorites={favoritesManager.favorites} isLoading={favoritesManager.isLoadingFavorites} show={showFavorites} isProxyEnabled={isProxyEnabled} onToggle={() => setShowFavorites(!showFavorites)} onRemove={favoritesManager.handleRemoveFavorite} onExport={favoritesManager.handleExportFavorites} onUpdate={() => favoritesManager.refetchFavorites()} />
   );
@@ -245,6 +253,7 @@ export const MainSearchPage: React.FC = () => {
                     isAuthenticated={isAuthenticated}
                     onToggleFavorite={favoritesManager.handleToggleFavoriteActress}
                     onLoginRequired={() => { navigate('/login'); }}
+                    onWorkClick={handleActressWorkClick}
                   />
                   {/* 多源跳转卡片（用户启用的 jav 源） */}
                   <SearchResultsPanel

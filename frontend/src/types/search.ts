@@ -234,6 +234,8 @@ export interface JavEnrichedData {
   }>;
   /** 女优资料（actress 子模式，minnano-av 抓取） */
   actresses?: ActressProfile[];
+  /** 女优作品列表（actress 子模式，JavBus 搜索抓取，仅当 minnano 女优搜索成功时才返回） */
+  actressWorks?: import('./jav').JavItem[];
 }
 
 export interface MangaEnrichedData {
