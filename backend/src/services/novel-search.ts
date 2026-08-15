@@ -1,33 +1,21 @@
 /**
  * 小说搜索服务
- * 数据源:
+ * NovelItem 抓取源:
  *   1. 知轩藏书 (https://zxcs.zip) — 精校版全本，明文搜索 + 直链下载，置顶展示
  *   2. 奇书网 (http://www.xqishuta.org) — 搜索第一本书，抓取详情页 txt 下载链接
- *   3. Anna's Archive (https://zh.annas-archive.gl) — 第一页全部电子书结果（上限 50 条）
+ *
+ * 跳转卡片源（SearchResultsPanel）：由 search.ts 路由从数据库 search_sources 表注入，
+ *   含 Z-Library / Anna's Archive / 知轩藏书 / 奇书网 / SoBooks / Lunarora / PDFs.top / 读书派等。
+ *   Anna's Archive 因人机验证不再做 NovelItem 抓取，仅保留跳转卡片。
  *
  * ⚠️ 类型契约：本文件导出的接口（NovelItem, NovelSearchResult）
  *    与 frontend/src/types/search.ts 保持结构同步。
- *
- * 设计说明：
- *   - 三个数据源并行抓取，互不阻塞：任一源失败不影响其他源返回
- *   - 置顶顺序：zxcs（精校版）→ 奇书网 → Anna's Archive（仅 page=1 时抓取前两源，避免翻页重复）
- *   - zxcs / 奇书网为单域名直连；Anna's Archive 多域名故障转移
  */
 
 import { fetchWithRetry } from '@/utils/fetch';
 import { sanitizeError } from '@/utils/error';
 
 // ─── Constants ───────────────────────────────────────────────────────────
-
-/** Anna's Archive 域名列表（按优先级，失败后自动切换） */
-const AA_DOMAINS = [
-  'zh.annas-archive.gl',
-  'zh.annas-archive.pk',
-  'zh.annas-archive.gd',
-  'annas-archive.gl',
-  'annas-archive.pk',
-  'annas-archive.gd',
-];
 
 /** 知轩藏书域名 */
 const ZXCS_DOMAIN = 'zxcs.zip';
@@ -54,10 +42,6 @@ const ZXCS_HEADERS = {
   'Referer': `https://${ZXCS_DOMAIN}/`,
 } as Record<string, string>;
 
-/** 每次返回的结果数上限（取 Anna's Archive 第一页前 10 条） */
-const PAGE_LIMIT = 10;
-/** 详情页描述抓取并发上限 */
-const DESC_CONCURRENCY = 5;
 /** 单次请求超时（ms） */
 const FETCH_TIMEOUT = 15000;
 
@@ -88,7 +72,7 @@ export interface NovelItem {
   category: string;
   /** 来源标识（如 "lgli/upload/zlib"） */
   source: string;
-  /** 详情页/下载页 URL（https://zh.annas-archive.gl/md5/<md5>） */
+  /** 详情页/下载页 URL */
   detailUrl: string;
 }
 
@@ -99,6 +83,17 @@ export interface NovelSearchResult {
   total: number;
   errors: Record<string, string | null>;
   novels: NovelItem[];
+  /** 多源跳转卡片（由 search.ts 路由从数据库注入，与 JAV 的 results 机制一致） */
+  results?: Array<{
+    id: string;
+    name: string;
+    subtitle?: string;
+    icon?: string;
+    url: string;
+    siteType: string;
+    category: string;
+    description?: string;
+  }>;
 }
 
 // ─── HTML 解析工具 ──────────────────────────────────────────────────────
@@ -120,106 +115,6 @@ function stripTags(s: string): string {
 function firstMatch(html: string, re: RegExp): string {
   const m = html.match(re);
   return m ? decodeEntities(m[1].trim()) : '';
-}
-
-// ─── 多域名故障转移 fetch ───────────────────────────────────────────────
-
-async function fetchWithFailover(
-  pathBuilder: (domain: string) => string,
-  timeoutMs: number = FETCH_TIMEOUT,
-): Promise<{ html: string; domain: string }> {
-  let lastErr = '';
-  for (const domain of AA_DOMAINS) {
-    const url = pathBuilder(domain);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      const r = await fetchWithRetry(url, {
-        headers: FETCH_HEADERS,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (r.ok) {
-        const html = await r.text();
-        if (html.length > 1000) return { html, domain };
-      }
-      lastErr = `HTTP ${r.status}`;
-    } catch (e) {
-      lastErr = e instanceof Error ? e.message : 'unknown';
-    }
-  }
-  throw new Error(lastErr);
-}
-
-// ─── Anna's Archive ────────────────────────────────────────────────────
-
-/** 从详情页 HTML 提取描述 */
-function extractDescription(html: string): string {
-  // 描述在 js-md5-top-box-description 容器内，"描述" 标签后的 <div class="mb-1">
-  const re = /描述<\/div><div class="mb-1">([\s\S]*?)<\/div>/;
-  const raw = firstMatch(html, re);
-  if (!raw) return '';
-  // 描述可能含 <br>，转为换行后去标签
-  return stripTags(raw.replace(/<br\s*\/?>/g, '\n')).trim();
-}
-
-/** 并发抓取多条结果的描述（限制并发，失败时 description 留空） */
-async function fetchDescriptions(items: NovelItem[]): Promise<void> {
-  const queue = [...items];
-  const workers: Promise<void>[] = [];
-
-  const processOne = async (item: NovelItem): Promise<void> => {
-    try {
-      const { html } = await fetchWithFailover(
-        (d) => `https://${d}/md5/${item.id}`,
-        10000,
-      );
-      item.description = extractDescription(html);
-    } catch {
-      // 描述抓取失败不影响主结果
-    }
-  };
-
-  for (let i = 0; i < DESC_CONCURRENCY; i++) {
-    workers.push((async () => {
-      while (queue.length > 0) {
-        const item = queue.shift();
-        if (item) await processOne(item);
-      }
-    })());
-  }
-  await Promise.all(workers);
-}
-
-/** 解析单条结果块 HTML */
-function parseNovelItem(block: string, domain: string): NovelItem | null {
-  const md5 = firstMatch(block, /href="\/md5\/([a-f0-9]{32})"/);
-  if (!md5) return null;
-
-  const title = firstMatch(block, /<a[^>]*js-vim-focus[^>]*>([\s\S]*?)<\/a>/);
-  const author = firstMatch(block, /<a[^>]*><span[^>]*icon-\[mdi--user-edit\][^>]*><\/span>([\s\S]*?)<\/a>/);
-  const publisher = firstMatch(block, /<a[^>]*><span[^>]*icon-\[mdi--company\][^>]*><\/span>([\s\S]*?)<\/a>/);
-  const cover = firstMatch(block, /<img[^>]*src="([^"]+)"/);
-
-  const infoMatch = block.match(/<div class="text-gray-800[^"]*"[^>]*>([\s\S]*?)(?:<a\s|<script)/);
-  const infoRaw = infoMatch ? stripTags(infoMatch[1]).trim() : '';
-  const segments = infoRaw.split('·').map(s => s.trim()).filter(Boolean);
-
-  return {
-    id: md5,
-    title: title || '未知书名',
-    author,
-    description: '',
-    publisher,
-    cover,
-    language: segments[0] || '',
-    format: segments[1] || '',
-    size: segments[2] || '',
-    year: segments[3] || '',
-    category: segments[4] || '',
-    source: segments[5] || '',
-    detailUrl: `https://${domain}/md5/${md5}`,
-  };
 }
 
 // ─── 知轩藏书 (zxcs.zip) ───────────────────────────────────────────────
@@ -462,44 +357,13 @@ async function searchXqishutaNovel(keyword: string): Promise<{ item: NovelItem |
   }
 }
 
-// ─── Anna's Archive 搜索（提取为独立函数） ─────────────────────────────
-
-async function searchAnnasArchive(keyword: string, page: number): Promise<{ novels: NovelItem[]; error: string | null }> {
-  try {
-    const { html, domain } = await fetchWithFailover(
-      (d) => `https://${d}/search?q=${encodeURIComponent(keyword)}${page > 1 ? `&page=${page}` : ''}`,
-    );
-
-    const parts = html.split(/<div class="flex\s+pt-3 pb-3 border-b/);
-    const blocks = parts.slice(1);
-
-    const novels: NovelItem[] = [];
-    for (const block of blocks) {
-      if (novels.length >= PAGE_LIMIT) break;
-      const item = parseNovelItem(block, domain);
-      if (item) novels.push(item);
-    }
-
-    if (novels.length > 0) {
-      await fetchDescriptions(novels);
-    }
-
-    return { novels, error: null };
-  } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'unknown';
-    console.error('[novel-search] Anna\'s Archive error:', sanitizeError(errorMessage));
-    return { novels: [], error: errorMessage };
-  }
-}
-
-// ─── 搜索入口（三源并行，zxcs → 奇书网 → Anna 置顶） ─────────────────
+// ─── 搜索入口（双源并行，zxcs → 奇书网 置顶） ────────────────────────
 
 export async function searchNovel(keyword: string, page: number): Promise<NovelSearchResult> {
   const safePage = Math.max(1, page);
 
   // zxcs / 奇书网仅 page=1 时抓取（翻页不重复置顶）
-  const [aaResult, xqsResult, zxcsResult] = await Promise.all([
-    searchAnnasArchive(keyword, safePage),
+  const [xqsResult, zxcsResult] = await Promise.all([
     safePage === 1 ? searchXqishutaNovel(keyword) : Promise.resolve({ item: null, error: null }),
     safePage === 1 ? searchZxcsNovel(keyword) : Promise.resolve({ item: null, error: null }),
   ]);
@@ -521,12 +385,6 @@ export async function searchNovel(keyword: string, page: number): Promise<NovelS
   }
   if (xqsResult.error) {
     errors.xqishuta = xqsResult.error;
-  }
-
-  // 3. Anna's Archive 结果
-  novels.push(...aaResult.novels);
-  if (aaResult.error) {
-    errors.annas_archive = aaResult.error;
   }
 
   return {

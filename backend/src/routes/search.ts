@@ -173,14 +173,12 @@ async function saveEnrichedHistory(
       break;
     }
     case 'novel': {
-      // 小说置顶顺序：zxcs（知轩藏书） → 奇书网 → Anna's Archive
-      // - zxcs / 奇书网均为 page=1 置顶抓取，源标识分别为 "知轩藏书" / "奇书网"
-      // - Anna 403 等故障时前两源仍可能有效，不应跳过
+      // 小说 NovelItem 置顶顺序：zxcs（知轩藏书） → 奇书网
+      // 跳转卡片源（Z-Library/Anna等）由 search_sources 表注入，不在此处理
       const novels = (result as { novels?: Array<{ id: string; title: string; cover: string; author?: string; publisher?: string; format?: string; year?: string; category?: string; source?: string }> }).novels;
       const firstNovel =
         novels?.find(n => n.source === '知轩藏书')
         || novels?.find(n => n.source === '奇书网')
-        || novels?.find(n => n.source !== '知轩藏书' && n.source !== '奇书网')
         || novels?.[0];
       if (firstNovel) {
         updateFields.push('title=?, cover=?, code=?');
@@ -386,9 +384,10 @@ searchRoutes.post('/', async (c) => {
             apiKeys: { TMDB_API_KEY: c.env.TMDB_API_KEY ?? '' },
           }) as unknown as Record<string, unknown>;
 
-          // ── JAV Hybrid：合并多源列表到 Provider 响应 ──
+          // ── JAV / Novel Hybrid：合并多源列表到 Provider 响应 ──
           // JAV 需要同时返回 detail（JavDetailPanel）和 results（SearchResultsPanel）
-          if (provider.id === 'jav') {
+          // Novel 需要同时返回 novels（NovelSearchResultPanel）和 results（SearchResultsPanel）
+          if (provider.id === 'jav' || provider.id === 'novel') {
             const sources = await c.env.DB.prepare(`
               SELECT s.* FROM search_sources s
               INNER JOIN search_source_categories c ON s.category_id = c.id
@@ -411,7 +410,10 @@ searchRoutes.post('/', async (c) => {
               category: source.category_id,
               description: source.description,
             }));
-            enrichedData.total = filteredSources.length;
+            // JAV 的 total 覆盖为源数量；Novel 保持 novels 数量（前端分页依赖）
+            if (provider.id === 'jav') {
+              enrichedData.total = filteredSources.length;
+            }
           }
 
           // 增强搜索历史记录（方案 B）
