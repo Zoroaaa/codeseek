@@ -2412,7 +2412,11 @@
       "prevBatch": "上一批",
       "batchNumber": "第 {{count}} 批",
       "nextBatch": "下一批",
-      "collectCount": "收藏人數"
+      "collectCount": "收藏人數",
+      "bangumiEntry": "Bangumi 條目",
+      "dhtHint": "DHT 網路，種子仍可取得",
+      "more": "更多 →",
+      "proxy": "代理"
     },
     "manga": {
       "status": {
@@ -2540,7 +2544,79 @@
         "batchChecking": "批次檢查中...",
         "batchCheckAll": "批次檢查所有源",
         "openManagement": "開啟搜尋源管理"
-      }
+      },
+      "title": "搜尋來源管理",
+      "checking": "檢查中",
+      "batchCheck": "批次檢查",
+      "majorCount": "{{categories}} 個分類 · {{sources}} 個搜尋來源",
+      "enabledRatio": "{{enabled}}/{{total}} 啟用",
+      "categoryCount": "{{count}} 個源",
+      "enabled": "啟用",
+      "disabled": "停用",
+      "restricted": "受限 {{time}}ms",
+      "available": "{{time}}ms",
+      "timeout": "逾時",
+      "offline": "離線",
+      "abnormal": "異常",
+      "restrictedTitle": "伺服器在線（存取受限），回應 {{time}}ms",
+      "availableTitle": "可正常存取，回應時間 {{time}}ms",
+      "unavailableTitle": "無法存取",
+      "healthCheck": "健康檢查",
+      "visitSite": "存取站點"
+    },
+    "announcement": {
+      "pinned": "置頂",
+      "close": "關閉（本會話不再顯示）"
+    },
+    "quickActions": {
+      "titleHorizontal": "快捷入口",
+      "titleVertical": "快捷操作",
+      "resources": "資源站點",
+      "manageSources": "管理搜尋來源",
+      "systemSettings": "系統設定",
+      "community": "社群分享",
+      "adminPanel": "管理後台"
+    },
+    "favorites": {
+      "title": "我的收藏",
+      "export": "匯出收藏",
+      "updating": "更新中...",
+      "updateSuccess": "狀態更新成功",
+      "updateFailed": "狀態更新失敗",
+      "statusWant": "想看",
+      "statusWatched": "已看過",
+      "toggleTo": "點擊切換到{{status}}",
+      "durationMinutes": "{{count}}分鐘",
+      "empty": "暫無收藏內容"
+    },
+    "history": {
+      "today": "今天",
+      "yesterday": "昨天",
+      "title": "搜尋歷史",
+      "selected": "已選擇 {{count}} 條",
+      "cancel": "取消",
+      "deleteSelected": "刪除選取",
+      "selectAll": "全選",
+      "resultCount": "{{count}}條",
+      "durationMinutes": "{{count}}分鐘",
+      "clearHistory": "清空歷史",
+      "empty": "暫無搜尋歷史"
+    },
+    "results": {
+      "title": "搜尋結果",
+      "defaultCategoryLabel": "搜尋",
+      "siteTypeSearch": "搜尋",
+      "siteTypeBrowse": "瀏覽",
+      "siteTypeReference": "參考",
+      "proxy": "代理",
+      "favorite": "收藏",
+      "unfavorite": "取消收藏",
+      "go": "前往"
+    },
+    "suggestions": {
+      "loading": "搜尋建議中...",
+      "empty": "暫無建議",
+      "count": "{{count}}次"
     },
     "javFormatHint": "格式請按照【SONE-520】或【SONE520】搜尋",
     "actressNameHint": "提示：可直接輸入中文名（簡繁均可）或日文名，系統自動轉換為日文搜尋",

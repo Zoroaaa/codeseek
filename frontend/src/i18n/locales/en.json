@@ -2412,7 +2412,11 @@
       "prevBatch": "Previous batch",
       "batchNumber": "Batch {{count}}",
       "nextBatch": "Next batch",
-      "collectCount": "Favorites"
+      "collectCount": "Favorites",
+      "bangumiEntry": "Bangumi entry",
+      "dhtHint": "DHT network, torrents still available",
+      "more": "More →",
+      "proxy": "Proxy"
     },
     "manga": {
       "status": {
@@ -2540,7 +2544,79 @@
         "batchChecking": "Batch checking...",
         "batchCheckAll": "Batch check all sources",
         "openManagement": "Open source management"
-      }
+      },
+      "title": "Source Management",
+      "checking": "Checking",
+      "batchCheck": "Batch check",
+      "majorCount": "{{categories}} categories · {{sources}} sources",
+      "enabledRatio": "{{enabled}}/{{total}} enabled",
+      "categoryCount": "{{count}} sources",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "restricted": "Restricted {{time}}ms",
+      "available": "{{time}}ms",
+      "timeout": "Timeout",
+      "offline": "Offline",
+      "abnormal": "Error",
+      "restrictedTitle": "Server online (restricted), response {{time}}ms",
+      "availableTitle": "Accessible, response time {{time}}ms",
+      "unavailableTitle": "Inaccessible",
+      "healthCheck": "Health check",
+      "visitSite": "Visit site"
+    },
+    "announcement": {
+      "pinned": "Pinned",
+      "close": "Close (not shown again this session)"
+    },
+    "quickActions": {
+      "titleHorizontal": "Quick Links",
+      "titleVertical": "Quick Actions",
+      "resources": "Resource Sites",
+      "manageSources": "Manage Sources",
+      "systemSettings": "System Settings",
+      "community": "Community",
+      "adminPanel": "Admin Panel"
+    },
+    "favorites": {
+      "title": "My Favorites",
+      "export": "Export favorites",
+      "updating": "Updating...",
+      "updateSuccess": "Status updated",
+      "updateFailed": "Status update failed",
+      "statusWant": "Want to watch",
+      "statusWatched": "Watched",
+      "toggleTo": "Switch to {{status}}",
+      "durationMinutes": "{{count}} min",
+      "empty": "No favorites yet"
+    },
+    "history": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "title": "Search History",
+      "selected": "{{count}} selected",
+      "cancel": "Cancel",
+      "deleteSelected": "Delete selected",
+      "selectAll": "Select all",
+      "resultCount": "{{count}} results",
+      "durationMinutes": "{{count}} min",
+      "clearHistory": "Clear history",
+      "empty": "No search history"
+    },
+    "results": {
+      "title": "Search Results",
+      "defaultCategoryLabel": "Search",
+      "siteTypeSearch": "Search",
+      "siteTypeBrowse": "Browse",
+      "siteTypeReference": "Reference",
+      "proxy": "Proxy",
+      "favorite": "Favorite",
+      "unfavorite": "Unfavorite",
+      "go": "Go"
+    },
+    "suggestions": {
+      "loading": "Loading suggestions...",
+      "empty": "No suggestions",
+      "count": "{{count}}×"
     },
     "javFormatHint": "Format: search as [SONE-520] or [SONE520]",
     "actressNameHint": "Tip: enter a Chinese (simplified or traditional) or Japanese name; the system will auto-convert it to Japanese for searching.",
