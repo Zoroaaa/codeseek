@@ -56,10 +56,10 @@ export const TrendsTab: React.FC = () => {
         <>
           {trends && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <MiniChart data={trends.userRegistrations || []} color="bg-amber-400 dark:bg-amber-500" title="用户注册趋势" />
-              <MiniChart data={trends.dailySearches || []} color="bg-green-400 dark:bg-green-500" title="每日搜索趋势" />
-              <MiniChart data={(trends.dailyLogins || []).map((d: any) => ({ date: d.date, count: d.success ?? d.total }))} color="bg-rose-400 dark:bg-rose-500" title="每日登录（成功）" />
-              <MiniChart data={trends.dailyActiveUsers || []} color="bg-orange-400 dark:bg-orange-500" title="每日活跃用户" />
+              <MiniChart data={trends.userRegistrations || []} color="bg-amber-400 dark:bg-amber-500" title={t('admin:trends.userRegTrend')} />
+              <MiniChart data={trends.dailySearches || []} color="bg-green-400 dark:bg-green-500" title={t('admin:trends.searchTrend')} />
+              <MiniChart data={(trends.dailyLogins || []).map((d: any) => ({ date: d.date, count: d.success ?? d.total }))} color="bg-rose-400 dark:bg-rose-500" title={t('admin:trends.loginTrend')} />
+              <MiniChart data={trends.dailyActiveUsers || []} color="bg-orange-400 dark:bg-orange-500" title={t('admin:trends.activeUserTrend')} />
             </div>
           )}
           {behavior && (

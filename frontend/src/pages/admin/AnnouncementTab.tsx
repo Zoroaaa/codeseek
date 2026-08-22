@@ -14,10 +14,10 @@ import { Pagination, TableWrapper, formatDate } from './shared';
 // ─── 类型样式映射 ─────────────────────────────────────────────────────
 
 const TYPE_CONFIG: Record<string, { label: string; icon: React.FC<any>; color: string; bg: string }> = {
-  info: { label: '信息', icon: Info, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-  warning: { label: '注意', icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-  success: { label: '好消息', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20' },
-  error: { label: '重要', icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
+  info: { label: 'admin:announcement.typeInfo', icon: Info, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+  warning: { label: 'admin:announcement.typeWarning', icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+  success: { label: 'admin:announcement.typeSuccess', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20' },
+  error: { label: 'admin:announcement.typeError', icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
 };
 
 const TYPE_BADGE: Record<string, string> = {
@@ -93,7 +93,7 @@ const FormModal: React.FC<{
   const isEdit = !!state.editItem;
 
   return (
-    <Modal isOpen={state.open} onClose={onClose} title={isEdit ? '编辑公告' : '发布公告'} size="lg">
+    <Modal isOpen={state.open} onClose={onClose} title={isEdit ? t('admin:announcement.editTitle') : t('admin:announcement.publish')} size="lg">
       <div className="space-y-5 max-h-[65vh] overflow-y-auto px-1">
         {/* 标题 */}
         <div>
@@ -101,7 +101,7 @@ const FormModal: React.FC<{
           <input
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-            placeholder="输入公告标题..."
+            placeholder={t('admin:announcement.titlePlaceholder')}
             className="w-full px-3 py-2.5 text-sm rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           />
         </div>
@@ -112,7 +112,7 @@ const FormModal: React.FC<{
           <textarea
             value={form.content}
             onChange={(e) => setForm({ ...form, content: e.target.value })}
-            placeholder="输入公告内容..."
+            placeholder={t('admin:announcement.contentPlaceholder')}
             rows={6}
             className="w-full px-3 py-2.5 text-sm rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
           />
@@ -134,8 +134,8 @@ const FormModal: React.FC<{
             </select>
           </div>
           <div className="flex items-end gap-3">
-            <ToggleSwitch label="置顶" checked={form.isPinned} onChange={(v) => setForm({ ...form, isPinned: v })} />
-            <ToggleSwitch label="启用" checked={form.isActive} onChange={(v) => setForm({ ...form, isActive: v })} />
+            <ToggleSwitch label={t('admin:announcement.pinnedLabel')} checked={form.isPinned} onChange={(v) => setForm({ ...form, isPinned: v })} />
+            <ToggleSwitch label={t('admin:announcement.enabledLabel')} checked={form.isActive} onChange={(v) => setForm({ ...form, isActive: v })} />
           </div>
         </div>
 
@@ -165,7 +165,7 @@ const FormModal: React.FC<{
       <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-stone-200 dark:border-stone-700">
         <Button variant="outline" size="sm" onClick={onClose}>{t('admin:announcement.cancel')}</Button>
         <Button variant="primary" size="sm" onClick={handleSubmit} disabled={submitting}>
-          {submitting ? '提交中...' : (isEdit ? '保存修改' : '发布')}
+          {submitting ? t('admin:announcement.submitting') : (isEdit ? t('admin:announcement.saveChanges') : t('admin:announcement.publish'))}
         </Button>
       </div>
     </Modal>
@@ -269,8 +269,8 @@ export const AnnouncementTab: React.FC = () => {
         <table className="w-full text-sm">
           <thead className="bg-surface-50 dark:bg-surface-900">
             <tr>
-              {['类型 / 标题', '状态', '置顶', '发布者', '创建时间', '操作'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wide">{h}</th>
+              {['admin:announcement.colTypeTitle', 'admin:announcement.colStatus', 'admin:announcement.colPinned', 'admin:announcement.colPublisher', 'admin:announcement.colCreated', 'admin:announcement.colActions'].map((h) => (
+                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wide">{t(h)}</th>
               ))}
             </tr>
           </thead>
@@ -291,18 +291,18 @@ export const AnnouncementTab: React.FC = () => {
                         <div className="font-medium text-stone-900 dark:text-stone-100 truncate" title={item.title}>{item.title}</div>
                         <div className="text-xs text-stone-500 truncate mt-0.5 line-clamp-1">{item.content}</div>
                       </div>
-                      <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0', TYPE_BADGE[item.type])}>{tc.label}</span>
+                      <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0', TYPE_BADGE[item.type])}>{t(tc.label)}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick={() => handleToggleActive(item)} title={item.is_active ? '点击禁用' : '点击启用'}>
+                    <button onClick={() => handleToggleActive(item)} title={item.is_active ? t('admin:announcement.clickDisable') : t('admin:announcement.clickEnable')}>
                       {item.is_active === 1
                         ? <Eye className="w-4 h-4 text-green-500" />
                         : <EyeOff className="w-4 h-4 text-stone-400" />}
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick={() => handleTogglePin(item)} title={item.is_pinned ? '取消置顶' : '置顶'}>
+                    <button onClick={() => handleTogglePin(item)} title={item.is_pinned ? t('admin:announcement.unpin') : t('admin:announcement.pinnedLabel')}>
                       {item.is_pinned === 1
                         ? <Pin className="w-4 h-4 text-red-500" />
                         : <PinOff className="w-4 h-4 text-stone-400" />}
@@ -318,7 +318,7 @@ export const AnnouncementTab: React.FC = () => {
                       <button
                         onClick={() => setDeleteConfirm(item)}
                         className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                        title="删除"
+                        title={t('admin:announcement.delete')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

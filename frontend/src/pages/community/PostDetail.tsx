@@ -522,7 +522,7 @@ const ResourceItem: React.FC<{ resource: any; index: number }> = ({ resource, in
       <button
         onClick={handleCopy}
         className="shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
-        title="复制链接"
+        title={t('communityPages:postDetail.copyLink')}
       >
         <Copy className="w-3.5 h-3.5" />
       </button>
@@ -817,38 +817,38 @@ export const PostDetail: React.FC<PostDetailProps> = ({ postId, onBack }) => {
           setReportReason('');
           setReportDetails('');
         }}
-        title="举报帖子"
+        title={t('communityPages:postDetail.report.title')}
         size="md"
       >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">
-              举报原因 <span className="text-red-500">*</span>
+              {t('communityPages:postDetail.report.reason')} <span className="text-red-500">*</span>
             </label>
             <div className="space-y-2">
-              {['内容违规', '虚假信息', '侵犯版权', '恶意广告', '其他原因'].map((reason) => (
+              {[['reasonViolation', 'report.reasonViolation'], ['reasonFalse', 'report.reasonFalse'], ['reasonCopyright', 'report.reasonCopyright'], ['reasonSpam', 'report.reasonSpam'], ['reasonOther', 'report.reasonOther']].map(([id, key]) => (
                 <button
-                  key={reason}
+                  key={id}
                   type="button"
-                  onClick={() => setReportReason(reason)}
+                  onClick={() => setReportReason(t(`communityPages:postDetail.${key}`))}
                   className={clsx(
                     'w-full px-4 py-2.5 rounded-lg text-sm text-left transition-all',
-                    reportReason === reason
+                    reportReason === t(`communityPages:postDetail.${key}`)
                       ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
                       : 'bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-700'
                   )}
                 >
-                  {reason}
+                  {t(`communityPages:postDetail.${key}`)}
                 </button>
               ))}
             </div>
           </div>
 
           <TextArea
-            label="详细说明（可选）"
+            label={t('communityPages:postDetail.report.detailsLabel')}
             value={reportDetails}
             onChange={(e) => setReportDetails(e.target.value)}
-            placeholder="请详细描述您要举报的问题..."
+            placeholder={t('communityPages:postDetail.report.detailsPlaceholder')}
             rows={3}
             fullWidth
           />
