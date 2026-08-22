@@ -12,9 +12,7 @@ import zhCN from './locales/zh-CN.json';
 import zhTW from './locales/zh-TW.json';
 import en from './locales/en.json';
 import {
-  DEFAULT_LANGUAGE,
   FALLBACK_LANGUAGE,
-  LANGUAGE_STORAGE_KEY,
 } from './config';
 
 export const RESOURCES = {
@@ -31,15 +29,17 @@ void i18next
   .init({
     resources: RESOURCES,
     fallbackLng: FALLBACK_LANGUAGE,
-    lng: DEFAULT_LANGUAGE,
+    // 不设置 lng：由 LanguageDetector 检测首次访问语言（按浏览器地区），
+    // 用户主动切换由 languageStore 持久化并在 rehydrate 时恢复。
     supportedLngs: ['zh-CN', 'zh-TW', 'en'],
     interpolation: {
       // React 已转义，关闭 i18next 自带转义避免双重
       escapeValue: false,
     },
     detection: {
-      order: ['localStorage', 'navigator'],
-      lookupLocalStorage: LANGUAGE_STORAGE_KEY,
+      // localStorage 由 languageStore（zustand persist）统一管理，避免双源冲突；
+      // detector 仅用 navigator 做首次访问的地区感知。
+      order: ['navigator'],
       // 由 languageStore 自管持久化，禁用 detector 的反向缓存写入，避免双写冲突
       caches: [],
       convertDetectedLanguage: (lng: string) => {
