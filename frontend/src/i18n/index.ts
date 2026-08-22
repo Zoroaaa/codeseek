@@ -18,9 +18,11 @@ import {
 } from './config';
 
 export const RESOURCES = {
-  'zh-CN': { translation: zhCN },
-  'zh-TW': { translation: zhTW },
-  'en':    { translation: en },
+  // 语言 JSON 的顶层键（home/auth/nav/tabs/search 等）即命名空间，
+  // 展开注册后可直接 t('home:hero.headlineAtlas') 形式使用。
+  'zh-CN': { ...zhCN },
+  'zh-TW': { ...zhTW },
+  'en':    { ...en },
 } as const;
 
 void i18next
