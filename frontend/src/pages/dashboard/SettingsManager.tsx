@@ -14,16 +14,20 @@ import {
   Settings,
 } from 'lucide-react';
 import { Card, Button, Input, Tabs, Modal } from '@/components/ui';
-import { useAuthStore, useThemeStore } from '@/stores';
+import { useAuthStore, useThemeStore, useLanguageStore } from '@/stores';
 import { userApi, authApi } from '@/services/api';
 import { useNotification } from '@/hooks';
 import { useValidationRules } from '@/contexts';
+import { useTranslation } from 'react-i18next';
+import { SUPPORTED_LANGUAGES, type Language } from '@/i18n/config';
 
 export const SettingsManager: React.FC = () => {
   const navigate = useNavigate();
   const notification = useNotification();
+  const { t } = useTranslation(['common', 'dashboard']);
   const { user, logout } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
+  const { language, setLanguage } = useLanguageStore();
   const validationRules = useValidationRules();
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
@@ -395,7 +399,7 @@ export const SettingsManager: React.FC = () => {
       {emailChangeStep === 'request' ? (
         <div className="space-y-4">
           <div className="p-4 bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800/50 dark:to-surface-800 rounded-xl">
-            <p className="text-sm text-surface-600 dark:text-surface-400">当前邮箱</p>
+            <p className="text-sm text-surface-600 dark:text-surface-400">{t('dashboard:settings.currentEmail')}</p>
             <p className="font-medium text-surface-900 dark:text-surface-100">
               {maskEmail(user?.email || '')}
             </p>
@@ -470,7 +474,7 @@ export const SettingsManager: React.FC = () => {
               验证码 {formatCountdown(emailChangeCountdown)} 后过期
             </p>
           ) : (
-            <p className="text-center text-sm text-error-500">验证码已过期</p>
+            <p className="text-center text-sm text-error-500">{t('dashboard:settings.codeExpired')}</p>
           )}
 
           <div className="flex gap-3">
@@ -510,7 +514,7 @@ export const SettingsManager: React.FC = () => {
               disabled={emailChangeCountdown > 0 || isLoading}
               className="text-sm text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {emailChangeCountdown > 0 ? `重新发送 (${formatCountdown(emailChangeCountdown)})` : '重新发送验证码'}
+              {emailChangeCountdown > 0 ? `${t('dashboard:settings.resend')} (${formatCountdown(emailChangeCountdown)})` : t('dashboard:settings.resendCode')}
             </button>
           </div>
         </div>
@@ -545,10 +549,10 @@ export const SettingsManager: React.FC = () => {
                   删除账户将永久移除您的所有数据，包括：
                 </p>
                 <ul className="text-sm text-error-600 dark:text-error-400 mt-2 list-disc list-inside">
-                  <li>个人资料和设置</li>
-                  <li>所有收藏夹</li>
-                  <li>搜索历史记录</li>
-                  <li>社区分享的搜索源</li>
+                  <li>{t('dashboard:settings.deleteItemProfile')}</li>
+                  <li>{t('dashboard:settings.deleteItemFavorites')}</li>
+                  <li>{t('dashboard:settings.deleteItemHistory')}</li>
+                  <li>{t('dashboard:settings.deleteItemSources')}</li>
                 </ul>
               </div>
             </div>
@@ -616,7 +620,7 @@ export const SettingsManager: React.FC = () => {
               验证码 {formatCountdown(deleteCountdown)} 后过期
             </p>
           ) : (
-            <p className="text-center text-sm text-error-500">验证码已过期</p>
+            <p className="text-center text-sm text-error-500">{t('dashboard:settings.codeExpired')}</p>
           )}
 
           <div className="flex gap-3">
@@ -644,7 +648,7 @@ export const SettingsManager: React.FC = () => {
               disabled={deleteCountdown > 0 || isLoading}
               className="text-sm text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {deleteCountdown > 0 ? `重新发送 (${formatCountdown(deleteCountdown)})` : '重新发送验证码'}
+              {deleteCountdown > 0 ? `${t('dashboard:settings.resend')} (${formatCountdown(deleteCountdown)})` : t('dashboard:settings.resendCode')}
             </button>
           </div>
         </div>
@@ -819,6 +823,27 @@ export const SettingsManager: React.FC = () => {
                   >
                     <span className="text-xl">{option.icon}</span>
                     <span className="font-medium">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">
+                {t('common:languageLabel')}
+              </label>
+              <div className="flex gap-3 flex-wrap">
+                {SUPPORTED_LANGUAGES.map((option) => (
+                  <button
+                    key={option.code}
+                    onClick={() => setLanguage(option.code as Language)}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-xl border-2 transition-all duration-200 ${
+                      language === option.code
+                        ? 'border-primary-500 bg-gradient-to-r from-primary-50 to-accent-50 text-primary-600 dark:from-primary-900/20 dark:to-accent-900/20 dark:text-primary-400 shadow-md'
+                        : 'border-surface-200 dark:border-surface-700 hover:border-primary-300 dark:hover:border-primary-600'
+                    }`}
+                  >
+                    <span className="font-medium">{option.nativeName}</span>
                   </button>
                 ))}
               </div>
